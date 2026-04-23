@@ -378,20 +378,29 @@ ${feedbackLessonsBlock}`;
       payload_json: { run_id, decision: { should_act: decision.should_act, confidence: decision.confidence_score } },
     });
 
-    if (!decision.should_act && forceApprovalDraft) {
+    // Preserve original AI intent. When the workflow forces a draft for human review,
+    // we mark forced_to_draft=true but keep should_act untouched so the UI/audit can
+    // distinguish "AI wanted to send" from "AI wanted to wait, workflow asked for draft".
+    const originalShouldAct = decision.should_act === true;
+    if (!originalShouldAct && forceApprovalDraft) {
       decision = {
         ...decision,
-        should_act: true,
+        // do NOT overwrite should_act — keep the AI's real intent
         requires_approval: true,
         workflow_force_draft: true,
-        original_should_act: false,
-        reasoning_summary: `Workflow exigiu gerar rascunho para revisão humana. Decisão original da IA: ${decision.reasoning_summary || decision.reason || "não enviar agora"}`,
+        forced_to_draft: true,
+        original_should_act: originalShouldAct,
+        original_reasoning_summary: decision.reasoning_summary || decision.reason || null,
+        reasoning_summary: `AI recomendou aguardar; workflow exigiu gerar rascunho para revisão humana. Razão original: ${decision.reasoning_summary || decision.reason || "não enviar agora"}`,
       };
 
       await supabase.from("ai_agent_execution_runs").update({ decision_json: decision }).eq("id", run_id);
     }
 
-    if (!decision.should_act) {
+    // Proceed to email generation if AI said yes OR the workflow forced a draft.
+    const proceedToGeneration = originalShouldAct || forceApprovalDraft;
+
+    if (!proceedToGeneration) {
       await supabase.from("ai_agent_execution_runs").update({
         execution_status: "skipped",
         completed_at: new Date().toISOString(),

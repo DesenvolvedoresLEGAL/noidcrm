@@ -15,6 +15,7 @@ export interface OutcomesKPIs {
 export interface OutcomeRunRow {
   run_id: string;
   created_at: string;
+  approved_at: string | null;
   scenario_label: string | null;
   execution_status: string;
   approval_status: string;
@@ -29,6 +30,15 @@ export interface OutcomeRunRow {
   replied_at: string | null;
   deal_progressed_at: string | null;
   deal_won_at: string | null;
+  // AI intent transparency
+  ai_should_act: boolean | null;
+  forced_to_draft: boolean;
+  original_should_act: boolean | null;
+  ai_reasoning: string | null;
+  skip_reason: string | null;
+  // Email send metadata
+  was_human_edited: boolean;
+  send_attempts: number;
 }
 
 export function useAgentOutcomes(agentId: string | undefined, rangeDays = 30) {
