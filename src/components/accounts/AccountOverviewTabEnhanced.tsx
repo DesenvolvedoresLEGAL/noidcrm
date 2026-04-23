@@ -158,7 +158,7 @@ export function AccountOverviewTabEnhanced({ account }: AccountOverviewTabProps)
       </div>
 
       {/* Responsáveis */}
-      {(account.owner_user_id || account.cs_user_id) && (
+      {(account.owner_user_id || account.cs_user_id || account.pre_sales_user_id) && (
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
@@ -166,7 +166,7 @@ export function AccountOverviewTabEnhanced({ account }: AccountOverviewTabProps)
               Responsáveis
             </CardTitle>
           </CardHeader>
-          <CardContent className="flex gap-6">
+          <CardContent className="flex gap-6 flex-wrap">
             {account.owner_user_id && ownerUser && (
               <div className="flex items-center gap-3">
                 <Avatar>
@@ -178,7 +178,19 @@ export function AccountOverviewTabEnhanced({ account }: AccountOverviewTabProps)
                 </div>
               </div>
             )}
-            
+
+            {account.pre_sales_user_id && preSalesUser && (
+              <div className="flex items-center gap-3">
+                <Avatar>
+                  <AvatarFallback>{preSalesUser.full_name?.charAt(0) || 'P'}</AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="text-sm font-medium">{preSalesUser.full_name}</p>
+                  <p className="text-xs text-muted-foreground">Pré-Vendedor Responsável</p>
+                </div>
+              </div>
+            )}
+
             {account.cs_user_id && csUser && (
               <div className="flex items-center gap-3">
                 <Avatar>
