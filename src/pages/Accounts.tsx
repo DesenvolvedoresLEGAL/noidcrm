@@ -222,10 +222,19 @@ export default function Accounts() {
     setSegmentoFilter('all');
     setPorteFilter('all');
     setOrigemFilter('all');
+    setScoreFinanceiroFilter('all');
     setSearchQuery('');
   };
 
-  const hasActiveFilters = segmentoFilter !== 'all' || porteFilter !== 'all' || origemFilter !== 'all' || searchQuery;
+  const hasActiveFilters = segmentoFilter !== 'all' || porteFilter !== 'all' || origemFilter !== 'all' || scoreFinanceiroFilter !== 'all' || searchQuery;
+
+  const scoreFilterLabels: Record<string, string> = {
+    excellent: 'Excelente (80–100)',
+    good: 'Bom (60–79)',
+    regular: 'Regular (40–59)',
+    bad: 'Ruim (0–39)',
+    none: 'Sem score',
+  };
 
   return (
     <Layout>
@@ -255,7 +264,7 @@ export default function Accounts() {
         />
 
         {/* KPIs */}
-        <div className="grid gap-4 md:grid-cols-5">
+        <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Total</CardTitle>
@@ -268,41 +277,51 @@ export default function Accounts() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Pequenas</CardTitle>
-              <Building2 className="h-4 w-4 text-blue-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-blue-600">{stats.pequenas}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Médias</CardTitle>
-              <Building2 className="h-4 w-4 text-green-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">{stats.medias}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Grandes</CardTitle>
-              <Building2 className="h-4 w-4 text-orange-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-orange-600">{stats.grandes}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Sem Porte</CardTitle>
+              <CardTitle className="text-sm font-medium">MEI</CardTitle>
               <Building2 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-muted-foreground">{stats.semPorte}</div>
+              <div className="text-2xl font-bold">{stats.mei}</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">ME</CardTitle>
+              <Building2 className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.me}</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">EPP</CardTitle>
+              <Building2 className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.epp}</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Médio Porte</CardTitle>
+              <Building2 className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.medio}</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Grande Porte</CardTitle>
+              <Building2 className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.grande}</div>
             </CardContent>
           </Card>
         </div>
@@ -338,7 +357,7 @@ export default function Accounts() {
 
               {/* Filtros Avançados */}
               {showFilters && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-3 border-t">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 pt-3 border-t">
                   <Select value={segmentoFilter} onValueChange={setSegmentoFilter}>
                     <SelectTrigger>
                       <SelectValue placeholder="Segmento" />
@@ -357,8 +376,8 @@ export default function Accounts() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todos os portes</SelectItem>
-                      {uniquePortes.map(p => (
-                        <SelectItem key={p} value={p!}>{p}</SelectItem>
+                      {CANONICAL_PORTES.map(p => (
+                        <SelectItem key={p} value={p}>{p}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -372,6 +391,20 @@ export default function Accounts() {
                       {uniqueOrigens.map(orig => (
                         <SelectItem key={orig} value={orig!}>{orig}</SelectItem>
                       ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Select value={scoreFinanceiroFilter} onValueChange={setScoreFinanceiroFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Score Financeiro" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os scores</SelectItem>
+                      <SelectItem value="excellent">Excelente (80–100)</SelectItem>
+                      <SelectItem value="good">Bom (60–79)</SelectItem>
+                      <SelectItem value="regular">Regular (40–59)</SelectItem>
+                      <SelectItem value="bad">Ruim (0–39)</SelectItem>
+                      <SelectItem value="none">Sem score</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
