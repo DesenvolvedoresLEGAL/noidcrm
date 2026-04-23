@@ -577,6 +577,14 @@ serve(async (req) => {
 
     console.log(`[sync-email-replies] Synced ${totalSynced} replies for user ${user.id} (scanned ${outboundEmails.length} outbounds, ${outboundsWithoutThread} sem thread)`);
 
+    await supabaseAdmin
+      .from('email_sync_config')
+      .update({
+        last_sync_at: new Date().toISOString(),
+        last_sync_error: null,
+      })
+      .eq('id', syncConfig.id);
+
     const responseBody: any = { synced: totalSynced };
     if (totalSynced === 0 && outboundsWithoutThread > 0) {
       responseBody.hint = `${outboundsWithoutThread} e-mail(s) enviado(s) ainda não têm thread Gmail correlacionado. Estamos buscando por header e por janela de tempo — se o cliente respondeu, deve aparecer na próxima sincronização.`;
@@ -590,15 +598,42 @@ serve(async (req) => {
     console.error('[sync-email-replies] Error:', error);
     const code = error?.code;
     const isReauth = code === 'gmail_reauth_required' || error?.message === 'GMAIL_REAUTH_REQUIRED';
+    const isApiDisabled = code === 'gmail_api_disabled';
+    const isScopeError = code === 'gmail_insufficient_scopes';
+
+    try {
+      if (syncConfig?.id) {
+        await supabaseAdmin
+          .from('email_sync_config')
+          .update({
+            sync_enabled: isApiDisabled ? false : syncConfig.sync_enabled,
+            last_sync_error: isReauth
+              ? 'Conexão com o Gmail expirou. Reconecte sua conta para continuar sincronizando.'
+              : isApiDisabled
+                ? 'A Gmail API não está habilitada na credencial Google conectada. Reconecte o Gmail com uma credencial válida.'
+                : isScopeError
+                  ? 'A conexão com o Gmail está sem permissões suficientes. Reconecte sua conta e autorize o acesso solicitado.'
+                  : (error instanceof Error ? error.message : 'Erro ao sincronizar respostas do Gmail'),
+          })
+          .eq('id', syncConfig.id);
+      }
+    } catch (persistError) {
+      console.error('[sync-email-replies] Failed to persist sync error:', persistError);
+    }
+
     return new Response(
       JSON.stringify({
         error: isReauth
           ? 'Conexão com o Gmail expirou. Reconecte sua conta nas configurações.'
-          : (error instanceof Error ? error.message : 'Unknown error'),
+          : isApiDisabled
+            ? 'A integração do Gmail está inválida: a Gmail API da credencial conectada está desabilitada. Reconecte com uma credencial válida.'
+            : isScopeError
+              ? 'A conexão do Gmail está sem as permissões necessárias. Reconecte sua conta.'
+              : (error instanceof Error ? error.message : 'Unknown error'),
         code: isReauth ? 'gmail_reauth_required' : (code || 'sync_failed'),
-        reauth_required: isReauth,
+        reauth_required: isReauth || isApiDisabled || isScopeError,
       }),
-      { status: isReauth ? 409 : 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: (isReauth || isApiDisabled || isScopeError) ? 409 : 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
