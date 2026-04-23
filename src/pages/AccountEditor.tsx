@@ -23,6 +23,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { accountKeys, contactKeys, opportunityKeys } from '@/lib/query-keys';
 import { cnaeToSegmento } from '@/lib/cnae-to-segmento';
+import { TIPO_EMPRESA_OPTIONS, SEGMENTO_OPTIONS, normalizeTipoEmpresa, withCurrentValue } from '@/lib/account-options';
+import { normalizeSegmento } from '@/lib/segment-normalizer';
 // Helper: transforma string vazia em null para campos UUID/opcionais
 const emptyToNull = (v: string | null | undefined) => (v === '' ? null : v);
 
@@ -42,6 +44,7 @@ const accountSchema = z.object({
   tipo_empresa: z.string().optional().nullable().transform(emptyToNull),
   owner_user_id: z.string().optional().nullable().transform(emptyToNull),
   cs_user_id: z.string().optional().nullable().transform(emptyToNull),
+  pre_sales_user_id: z.string().optional().nullable().transform(emptyToNull),
   // Dados Cadastrais
   natureza_juridica: z.string().optional().nullable().transform(emptyToNull),
   data_fundacao: z.string().optional().nullable().transform(emptyToNull),
@@ -102,7 +105,11 @@ export default function AccountEditor() {
   const [isCreatingContacts, setIsCreatingContacts] = useState(false);
 
   const { data: account, isLoading: accountLoading, error: accountError } = useAccountDetails(id!);
-  const { users, loading: usersLoading } = useOrganizationUsers();
+  const { users, loading: usersLoading } = useOrganizationUsers([
+    account?.owner_user_id,
+    account?.cs_user_id,
+    (account as any)?.pre_sales_user_id,
+  ]);
 
   const { data: originsData } = useQuery({
     queryKey: ['origins'],
@@ -139,9 +146,10 @@ export default function AccountEditor() {
         cnpj: account.cnpj || '',
         razao_social: account.razao_social || '',
         nome_fantasia: account.nome_fantasia || '',
-        tipo_empresa: account.tipo_empresa || '',
+        tipo_empresa: normalizeTipoEmpresa(account.tipo_empresa) || '',
         owner_user_id: account.owner_user_id || '',
         cs_user_id: account.cs_user_id || '',
+        pre_sales_user_id: (account as any).pre_sales_user_id || '',
         natureza_juridica: account.natureza_juridica || '',
         data_fundacao: account.data_fundacao || '',
         capital_social: account.capital_social || null,
@@ -169,7 +177,7 @@ export default function AccountEditor() {
         instagram: account.instagram || '',
         facebook: account.facebook || '',
         email_nota_fiscal: account.email_nota_fiscal || '',
-        segmento: account.segmento || '',
+        segmento: normalizeSegmento(account.segmento) || '',
         tamanho: account.tamanho || '',
         origem_principal: account.origem_principal || '',
         observacoes: account.observacoes || '',
@@ -572,19 +580,21 @@ export default function AccountEditor() {
                       <Controller
                         name="tipo_empresa"
                         control={control}
-                        render={({ field }) => (
-                          <Select value={field.value || ''} onValueChange={field.onChange}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Selecione" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="cliente">Cliente</SelectItem>
-                              <SelectItem value="prospect">Prospect</SelectItem>
-                              <SelectItem value="parceiro">Parceiro</SelectItem>
-                              <SelectItem value="fornecedor">Fornecedor</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        )}
+                        render={({ field }) => {
+                          const opts = withCurrentValue(TIPO_EMPRESA_OPTIONS, field.value);
+                          return (
+                            <Select value={field.value || ''} onValueChange={field.onChange}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecione" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {opts.map((opt) => (
+                                  <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          );
+                        }}
                       />
                     </div>
                   </div>
@@ -648,6 +658,40 @@ export default function AccountEditor() {
                           >
                             <SelectTrigger>
                               <SelectValue placeholder={usersLoading ? "Carregando..." : "Selecione"} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {usersLoading ? (
+                                <SelectItem value="_loading" disabled>Carregando usuários...</SelectItem>
+                              ) : users.length === 0 ? (
+                                <SelectItem value="_empty" disabled>Nenhum usuário encontrado</SelectItem>
+                              ) : (
+                                users.map((user) => (
+                                  <SelectItem key={user.id} value={user.id}>
+                                    {user.name}
+                                  </SelectItem>
+                                ))
+                              )}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="pre_sales_user_id">Pré-Vendedor Responsável</Label>
+                      <Controller
+                        name="pre_sales_user_id"
+                        control={control}
+                        render={({ field }) => (
+                          <Select
+                            value={field.value || ''}
+                            onValueChange={field.onChange}
+                            disabled={usersLoading}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder={usersLoading ? "Carregando..." : "Selecione (opcional)"} />
                             </SelectTrigger>
                             <SelectContent>
                               {usersLoading ? (
@@ -884,24 +928,21 @@ export default function AccountEditor() {
                       <Controller
                         name="segmento"
                         control={control}
-                        render={({ field }) => (
-                          <Select value={field.value || ''} onValueChange={field.onChange}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Selecione" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="tecnologia">Tecnologia</SelectItem>
-                              <SelectItem value="varejo">Varejo</SelectItem>
-                              <SelectItem value="industria">Indústria</SelectItem>
-                              <SelectItem value="servicos">Serviços</SelectItem>
-                              <SelectItem value="saude">Saúde</SelectItem>
-                              <SelectItem value="educacao">Educação</SelectItem>
-                              <SelectItem value="financeiro">Financeiro</SelectItem>
-                              <SelectItem value="agro">Agronegócio</SelectItem>
-                              <SelectItem value="outro">Outro</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        )}
+                        render={({ field }) => {
+                          const opts = withCurrentValue(SEGMENTO_OPTIONS, field.value);
+                          return (
+                            <Select value={field.value || ''} onValueChange={field.onChange}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecione" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {opts.map((opt) => (
+                                  <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          );
+                        }}
                       />
                     </div>
                     <div className="space-y-2">
@@ -933,27 +974,36 @@ export default function AccountEditor() {
                     <Controller
                       name="origem_principal"
                       control={control}
-                      render={({ field }) => (
-                        <Select value={field.value || ''} onValueChange={field.onChange}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecione uma origem" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {origins.map((origin) => (
-                              <SelectItem key={origin.id} value={origin.name}>
-                                <div className="flex items-center gap-2">
-                                  <span>{origin.name}</span>
-                                  {origin.origin_groups && (
-                                    <span className="text-xs text-muted-foreground">
-                                      ({origin.origin_groups.name})
-                                    </span>
-                                  )}
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      )}
+                      render={({ field }) => {
+                        const hasCurrentInList = !field.value || origins.some(o => o.name === field.value);
+                        return (
+                          <Select value={field.value || ''} onValueChange={field.onChange}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione uma origem" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {!hasCurrentInList && field.value && (
+                                <SelectItem value={field.value}>
+                                  <span>{field.value}</span>
+                                  <span className="text-xs text-muted-foreground ml-2">(legado)</span>
+                                </SelectItem>
+                              )}
+                              {origins.map((origin) => (
+                                <SelectItem key={origin.id} value={origin.name}>
+                                  <div className="flex items-center gap-2">
+                                    <span>{origin.name}</span>
+                                    {origin.origin_groups && (
+                                      <span className="text-xs text-muted-foreground">
+                                        ({origin.origin_groups.name})
+                                      </span>
+                                    )}
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        );
+                      }}
                     />
                   </div>
 

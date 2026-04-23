@@ -14,6 +14,8 @@ import { createAccount, updateAccount, lookupCNPJ, type Account, createAccountPa
 import { listOrigins, type OriginWithGroup } from '@/services/crm/origins';
 import { accountKeys, opportunityKeys } from '@/lib/query-keys';
 import { cnaeToSegmento } from '@/lib/cnae-to-segmento';
+import { TIPO_EMPRESA_OPTIONS, SEGMENTO_OPTIONS, normalizeTipoEmpresa, withCurrentValue } from '@/lib/account-options';
+import { normalizeSegmento } from '@/lib/segment-normalizer';
 import { useOrganizationUsers } from '@/hooks/useOrganizationUsers';
 import { useState, useEffect } from 'react';
 import { Search, Loader2, Building2, MapPin, Mail, Users, Briefcase, FileText, User, GitBranch } from 'lucide-react';
@@ -34,6 +36,7 @@ const accountSchema = z.object({
   situacao_cadastral: z.string().optional(),
   owner_user_id: z.string().optional(),
   cs_user_id: z.string().optional(),
+  pre_sales_user_id: z.string().optional(),
   parent_account_id: z.string().optional(),
   
   // Dados Principais - PF
@@ -94,7 +97,12 @@ export function AccountModalTabs({ open, onOpenChange, account }: AccountModalTa
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const isEditing = !!account;
-  const { users } = useOrganizationUsers();
+  const acc = account as any;
+  const { users } = useOrganizationUsers([
+    acc?.owner_user_id,
+    acc?.cs_user_id,
+    acc?.pre_sales_user_id,
+  ]);
   
   const [isLoadingCNPJ, setIsLoadingCNPJ] = useState(false);
   const [cnpjToLookup, setCnpjToLookup] = useState('');
@@ -116,16 +124,17 @@ export function AccountModalTabs({ open, onOpenChange, account }: AccountModalTa
   // Reset form when modal opens or account changes
   useEffect(() => {
     if (open) {
-      const acc = account as any;
+      // (acc declared at component scope)
       reset({
         tipo_pessoa: acc?.tipo_pessoa || 'PJ',
         cnpj: acc?.cnpj || '',
         razao_social: acc?.razao_social || '',
         nome_fantasia: acc?.nome_fantasia || '',
-        tipo_empresa: acc?.tipo_empresa || '',
+        tipo_empresa: normalizeTipoEmpresa(acc?.tipo_empresa) || '',
         situacao_cadastral: acc?.situacao_cadastral || '',
         owner_user_id: acc?.owner_user_id || '',
         cs_user_id: acc?.cs_user_id || '',
+        pre_sales_user_id: acc?.pre_sales_user_id || '',
         parent_account_id: acc?.parent_account_id || '',
         cpf: acc?.cpf || '',
         rg: acc?.rg || '',
@@ -154,7 +163,7 @@ export function AccountModalTabs({ open, onOpenChange, account }: AccountModalTa
         instagram: acc?.instagram || '',
         facebook: acc?.facebook || '',
         email_nota_fiscal: acc?.email_nota_fiscal || '',
-        segmento: acc?.segmento || '',
+        segmento: normalizeSegmento(acc?.segmento) || '',
         tamanho: acc?.tamanho || '',
         origem_principal: acc?.origem_principal || '',
         faturamento_anual: '',
@@ -586,19 +595,21 @@ export function AccountModalTabs({ open, onOpenChange, account }: AccountModalTa
                   <Controller
                     name="tipo_empresa"
                     control={control}
-                    render={({ field }) => (
-                      <Select value={field.value} onValueChange={field.onChange}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Lead">Lead</SelectItem>
-                          <SelectItem value="Prospect">Prospect</SelectItem>
-                          <SelectItem value="Cliente">Cliente</SelectItem>
-                          <SelectItem value="Ex-Cliente">Ex-Cliente</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    )}
+                    render={({ field }) => {
+                      const opts = withCurrentValue(TIPO_EMPRESA_OPTIONS, field.value);
+                      return (
+                        <Select value={field.value || ''} onValueChange={field.onChange}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {opts.map((opt) => (
+                              <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      );
+                    }}
                   />
                 </div>
 
@@ -632,6 +643,28 @@ export function AccountModalTabs({ open, onOpenChange, account }: AccountModalTa
                   control={control}
                   render={({ field }) => (
                     <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione (opcional)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {users.map((user) => (
+                          <SelectItem key={user.id} value={user.id}>
+                            {user.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="pre_sales_user_id">Pré-Vendedor Responsável</Label>
+                <Controller
+                  name="pre_sales_user_id"
+                  control={control}
+                  render={({ field }) => (
+                    <Select value={field.value || ''} onValueChange={field.onChange}>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione (opcional)" />
                       </SelectTrigger>
@@ -797,7 +830,25 @@ export function AccountModalTabs({ open, onOpenChange, account }: AccountModalTa
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="segmento">Segmento</Label>
-                  <Input id="segmento" {...register('segmento')} placeholder="Ex: Tecnologia" />
+                  <Controller
+                    name="segmento"
+                    control={control}
+                    render={({ field }) => {
+                      const opts = withCurrentValue(SEGMENTO_OPTIONS, field.value);
+                      return (
+                        <Select value={field.value || ''} onValueChange={field.onChange}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {opts.map((opt) => (
+                              <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      );
+                    }}
+                  />
                 </div>
 
                 <div className="space-y-2">

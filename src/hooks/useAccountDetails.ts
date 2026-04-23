@@ -44,6 +44,7 @@ export interface AccountDetails {
   facebook: string | null;
   owner_user_id: string | null;
   cs_user_id: string | null;
+  pre_sales_user_id: string | null;
   tipo_empresa: string | null;
   data_tornou_cliente: string | null;
   pontuacao_nps: number | null;
@@ -106,8 +107,23 @@ export function useAccountDetails(accountId: string) {
       // Buscar contagem de oportunidades por status COM pipeline_type
       const { data: opportunities } = await supabase
         .from('opportunities')
-        .select('status, valor_previsto, pipeline:pipelines(pipeline_type)')
-        .eq('account_id', accountId);
+        .select('status, valor_previsto, origem, qualified_by_user_id, created_at, pipeline:pipelines(pipeline_type)')
+        .eq('account_id', accountId)
+        .order('created_at', { ascending: false });
+
+      // Hidratação dinâmica: se a conta não tiver origem ou pré-vendedor,
+      // herdar do registro mais recente da oportunidade que tiver valor.
+      const accountAny = account as Record<string, unknown>;
+      let hydratedOrigem = (accountAny.origem_principal as string | null) ?? null;
+      let hydratedPreSales = (accountAny.pre_sales_user_id as string | null) ?? null;
+      if (!hydratedOrigem) {
+        const opWithOrigin = opportunities?.find((o) => !!(o as any).origem);
+        if (opWithOrigin) hydratedOrigem = (opWithOrigin as any).origem;
+      }
+      if (!hydratedPreSales) {
+        const opWithSdr = opportunities?.find((o) => !!(o as any).qualified_by_user_id);
+        if (opWithSdr) hydratedPreSales = (opWithSdr as any).qualified_by_user_id;
+      }
 
       // Filtrar apenas oportunidades de pipelines de vendas (sales) para métricas de valor
       const salesOpportunities = opportunities?.filter(o => o.pipeline?.pipeline_type === 'sales') || [];
@@ -150,6 +166,8 @@ export function useAccountDetails(accountId: string) {
 
       return {
         ...account,
+        origem_principal: hydratedOrigem,
+        pre_sales_user_id: hydratedPreSales,
         opportunities_count: (opportunities?.length || 0),
         opportunities_open: opportunitiesOpen,
         opportunities_won: opportunitiesWon,

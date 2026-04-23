@@ -282,6 +282,7 @@ export type Database = {
           parent_account_id: string | null
           pontuacao_nps: number | null
           porte: string | null
+          pre_sales_user_id: string | null
           qualified_at: string | null
           razao_social: string
           rg: string | null
@@ -357,6 +358,7 @@ export type Database = {
           parent_account_id?: string | null
           pontuacao_nps?: number | null
           porte?: string | null
+          pre_sales_user_id?: string | null
           qualified_at?: string | null
           razao_social: string
           rg?: string | null
@@ -432,6 +434,7 @@ export type Database = {
           parent_account_id?: string | null
           pontuacao_nps?: number | null
           porte?: string | null
+          pre_sales_user_id?: string | null
           qualified_at?: string | null
           razao_social?: string
           rg?: string | null
