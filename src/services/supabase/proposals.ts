@@ -61,6 +61,18 @@ function isProposalTerminal(proposal?: {
 }
 
 export async function sendProposal(id: string): Promise<Proposal> {
+  const { data: currentProposal, error: currentProposalError } = await supabase
+    .from('proposals')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (currentProposalError) throw currentProposalError;
+
+  if (isProposalTerminal(currentProposal)) {
+    return currentProposal as Proposal;
+  }
+
   const { data, error } = await supabase
     .from('proposals')
     .update({
