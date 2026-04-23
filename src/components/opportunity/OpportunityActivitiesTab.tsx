@@ -158,6 +158,17 @@ export function OpportunityActivitiesTab({ opportunityId }: OpportunityActivitie
         invalidateOpportunity(queryClient, opportunityId),
       ]);
 
+      // The workflow that may move the opportunity to the next stage runs
+      // in background (fire-and-forget inside completeActivity). Schedule a
+      // second invalidation pass so the kanban picks up the stage change
+      // even if the user navigates back before Realtime delivers the event.
+      setTimeout(() => {
+        invalidateOpportunity(queryClient, opportunityId);
+      }, 1500);
+      setTimeout(() => {
+        invalidateOpportunity(queryClient, opportunityId);
+      }, 4000);
+
       toast({
         title: 'Sucesso',
         description: 'Atividade concluída!',
