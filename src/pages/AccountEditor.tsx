@@ -974,27 +974,36 @@ export default function AccountEditor() {
                     <Controller
                       name="origem_principal"
                       control={control}
-                      render={({ field }) => (
-                        <Select value={field.value || ''} onValueChange={field.onChange}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecione uma origem" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {origins.map((origin) => (
-                              <SelectItem key={origin.id} value={origin.name}>
-                                <div className="flex items-center gap-2">
-                                  <span>{origin.name}</span>
-                                  {origin.origin_groups && (
-                                    <span className="text-xs text-muted-foreground">
-                                      ({origin.origin_groups.name})
-                                    </span>
-                                  )}
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      )}
+                      render={({ field }) => {
+                        const hasCurrentInList = !field.value || origins.some(o => o.name === field.value);
+                        return (
+                          <Select value={field.value || ''} onValueChange={field.onChange}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione uma origem" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {!hasCurrentInList && field.value && (
+                                <SelectItem value={field.value}>
+                                  <span>{field.value}</span>
+                                  <span className="text-xs text-muted-foreground ml-2">(legado)</span>
+                                </SelectItem>
+                              )}
+                              {origins.map((origin) => (
+                                <SelectItem key={origin.id} value={origin.name}>
+                                  <div className="flex items-center gap-2">
+                                    <span>{origin.name}</span>
+                                    {origin.origin_groups && (
+                                      <span className="text-xs text-muted-foreground">
+                                        ({origin.origin_groups.name})
+                                      </span>
+                                    )}
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        );
+                      }}
                     />
                   </div>
 
