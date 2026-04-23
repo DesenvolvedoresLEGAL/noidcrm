@@ -16,6 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { extractEmail, extractPhone } from '@/lib/contactFormat';
 import { accountKeys } from '@/lib/query-keys';
+import { normalizePorte, CANONICAL_PORTES, type CanonicalPorte } from '@/lib/porte-normalizer';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,6 +38,7 @@ export default function Accounts() {
   const [segmentoFilter, setSegmentoFilter] = useState<string>('all');
   const [porteFilter, setPorteFilter] = useState<string>('all');
   const [origemFilter, setOrigemFilter] = useState<string>('all');
+  const [scoreFinanceiroFilter, setScoreFinanceiroFilter] = useState<string>('all');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Account | undefined>();
   const [deleteDialog, setDeleteDialog] = useState<string | null>(null);
@@ -103,20 +105,29 @@ export default function Accounts() {
   const filteredAccounts = useMemo(() => {
     return accounts.filter(account => {
       if (segmentoFilter !== 'all' && account.segmento !== segmentoFilter) return false;
-      if (porteFilter !== 'all' && account.porte !== porteFilter) return false;
+      if (porteFilter !== 'all') {
+        const norm = normalizePorte(account.porte);
+        if (norm !== porteFilter) return false;
+      }
       if (origemFilter !== 'all' && account.origem_principal !== origemFilter) return false;
+      if (scoreFinanceiroFilter !== 'all') {
+        const score = (account as Account & { score_financeiro?: number | null }).score_financeiro;
+        if (scoreFinanceiroFilter === 'none') {
+          if (score !== null && score !== undefined) return false;
+        } else if (score === null || score === undefined) {
+          return false;
+        } else if (scoreFinanceiroFilter === 'excellent' && (score < 80 || score > 100)) return false;
+        else if (scoreFinanceiroFilter === 'good' && (score < 60 || score >= 80)) return false;
+        else if (scoreFinanceiroFilter === 'regular' && (score < 40 || score >= 60)) return false;
+        else if (scoreFinanceiroFilter === 'bad' && (score < 0 || score >= 40)) return false;
+      }
       return true;
     });
-  }, [accounts, segmentoFilter, porteFilter, origemFilter]);
+  }, [accounts, segmentoFilter, porteFilter, origemFilter, scoreFinanceiroFilter]);
 
   // Extrair valores únicos para filtros
   const uniqueSegmentos = useMemo(() => 
     [...new Set(accounts.map(a => a.segmento).filter(Boolean))],
-    [accounts]
-  );
-  
-  const uniquePortes = useMemo(() => 
-    [...new Set(accounts.map(a => a.porte).filter(Boolean))],
     [accounts]
   );
   
@@ -125,14 +136,19 @@ export default function Accounts() {
     [accounts]
   );
 
-  // Estatísticas por porte (usando valores normalizados da Receita)
-  const stats = useMemo(() => ({
-    total: accountsData?.total || filteredAccounts.length,
-    pequenas: filteredAccounts.filter(a => ['MEI', 'ME'].includes(a.porte || '')).length,
-    medias: filteredAccounts.filter(a => ['EPP', 'Médio Porte'].includes(a.porte || '')).length,
-    grandes: filteredAccounts.filter(a => a.porte === 'Grande Porte').length,
-    semPorte: filteredAccounts.filter(a => !a.porte).length,
-  }), [accountsData, filteredAccounts]);
+  // Estatísticas por porte canônico (MEI, ME, EPP, Médio Porte, Grande Porte)
+  const stats = useMemo(() => {
+    const byPorte = (target: CanonicalPorte) =>
+      filteredAccounts.filter(a => normalizePorte(a.porte) === target).length;
+    return {
+      total: accountsData?.total || filteredAccounts.length,
+      mei: byPorte('MEI'),
+      me: byPorte('ME'),
+      epp: byPorte('EPP'),
+      medio: byPorte('Médio Porte'),
+      grande: byPorte('Grande Porte'),
+    };
+  }, [accountsData, filteredAccounts]);
 
   // Export para CSV
   const handleExportCSV = () => {
@@ -206,10 +222,19 @@ export default function Accounts() {
     setSegmentoFilter('all');
     setPorteFilter('all');
     setOrigemFilter('all');
+    setScoreFinanceiroFilter('all');
     setSearchQuery('');
   };
 
-  const hasActiveFilters = segmentoFilter !== 'all' || porteFilter !== 'all' || origemFilter !== 'all' || searchQuery;
+  const hasActiveFilters = segmentoFilter !== 'all' || porteFilter !== 'all' || origemFilter !== 'all' || scoreFinanceiroFilter !== 'all' || searchQuery;
+
+  const scoreFilterLabels: Record<string, string> = {
+    excellent: 'Excelente (80–100)',
+    good: 'Bom (60–79)',
+    regular: 'Regular (40–59)',
+    bad: 'Ruim (0–39)',
+    none: 'Sem score',
+  };
 
   return (
     <Layout>
@@ -239,7 +264,7 @@ export default function Accounts() {
         />
 
         {/* KPIs */}
-        <div className="grid gap-4 md:grid-cols-5">
+        <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Total</CardTitle>
@@ -252,41 +277,51 @@ export default function Accounts() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Pequenas</CardTitle>
-              <Building2 className="h-4 w-4 text-blue-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-blue-600">{stats.pequenas}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Médias</CardTitle>
-              <Building2 className="h-4 w-4 text-green-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">{stats.medias}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Grandes</CardTitle>
-              <Building2 className="h-4 w-4 text-orange-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-orange-600">{stats.grandes}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Sem Porte</CardTitle>
+              <CardTitle className="text-sm font-medium">MEI</CardTitle>
               <Building2 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-muted-foreground">{stats.semPorte}</div>
+              <div className="text-2xl font-bold">{stats.mei}</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">ME</CardTitle>
+              <Building2 className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.me}</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">EPP</CardTitle>
+              <Building2 className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.epp}</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Médio Porte</CardTitle>
+              <Building2 className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.medio}</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Grande Porte</CardTitle>
+              <Building2 className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.grande}</div>
             </CardContent>
           </Card>
         </div>
@@ -322,7 +357,7 @@ export default function Accounts() {
 
               {/* Filtros Avançados */}
               {showFilters && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-3 border-t">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 pt-3 border-t">
                   <Select value={segmentoFilter} onValueChange={setSegmentoFilter}>
                     <SelectTrigger>
                       <SelectValue placeholder="Segmento" />
@@ -341,8 +376,8 @@ export default function Accounts() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todos os portes</SelectItem>
-                      {uniquePortes.map(p => (
-                        <SelectItem key={p} value={p!}>{p}</SelectItem>
+                      {CANONICAL_PORTES.map(p => (
+                        <SelectItem key={p} value={p}>{p}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -356,6 +391,20 @@ export default function Accounts() {
                       {uniqueOrigens.map(orig => (
                         <SelectItem key={orig} value={orig!}>{orig}</SelectItem>
                       ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Select value={scoreFinanceiroFilter} onValueChange={setScoreFinanceiroFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Score Financeiro" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os scores</SelectItem>
+                      <SelectItem value="excellent">Excelente (80–100)</SelectItem>
+                      <SelectItem value="good">Bom (60–79)</SelectItem>
+                      <SelectItem value="regular">Regular (40–59)</SelectItem>
+                      <SelectItem value="bad">Ruim (0–39)</SelectItem>
+                      <SelectItem value="none">Sem score</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -382,6 +431,11 @@ export default function Accounts() {
                   {origemFilter !== 'all' && (
                     <Badge variant="secondary">
                       Origem: {origemFilter}
+                    </Badge>
+                  )}
+                  {scoreFinanceiroFilter !== 'all' && (
+                    <Badge variant="secondary">
+                      Score: {scoreFilterLabels[scoreFinanceiroFilter]}
                     </Badge>
                   )}
                 </div>
