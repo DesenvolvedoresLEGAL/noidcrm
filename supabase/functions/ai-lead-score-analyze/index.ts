@@ -205,7 +205,7 @@ async function buildAccountContext(supabase: any, accountId: string) {
   const { data: account, error } = await supabase
     .from("accounts")
     .select(
-      "id, organization_id, razao_social, nome_fantasia, segmento, tamanho, porte, capital_social, cidade, uf, data_fundacao, situacao_cadastral, fit_score, intent_score, lead_score, lead_grade, score_financeiro, risco_financeiro, taxa_pagamento_pct, valor_vencido, lifecycle_stage, tipo_empresa, data_tornou_cliente, observacoes",
+      "id, organization_id, razao_social, nome_fantasia, segmento, tamanho, porte, cnae, cnaes_secundarios, capital_social, cidade, uf, data_fundacao, situacao_cadastral, fit_score, intent_score, lead_score, lead_grade, score_financeiro, risco_financeiro, taxa_pagamento_pct, valor_vencido, lifecycle_stage, tipo_empresa, data_tornou_cliente, observacoes",
     )
     .eq("id", accountId)
     .maybeSingle();
@@ -274,6 +274,8 @@ async function buildAccountContext(supabase: any, accountId: string) {
       segmento: account.segmento,
       tamanho: account.tamanho,
       porte: account.porte,
+      cnae_principal: account.cnae,
+      cnaes_secundarios: Array.isArray(account.cnaes_secundarios) ? account.cnaes_secundarios.slice(0, 10) : null,
       uf: account.uf,
       cidade: account.cidade,
       capital_social: account.capital_social,
