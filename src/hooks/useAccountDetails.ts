@@ -44,6 +44,7 @@ export interface AccountDetails {
   facebook: string | null;
   owner_user_id: string | null;
   cs_user_id: string | null;
+  pre_sales_user_id: string | null;
   tipo_empresa: string | null;
   data_tornou_cliente: string | null;
   pontuacao_nps: number | null;
