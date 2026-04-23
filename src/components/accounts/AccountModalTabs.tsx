@@ -595,19 +595,21 @@ export function AccountModalTabs({ open, onOpenChange, account }: AccountModalTa
                   <Controller
                     name="tipo_empresa"
                     control={control}
-                    render={({ field }) => (
-                      <Select value={field.value} onValueChange={field.onChange}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Lead">Lead</SelectItem>
-                          <SelectItem value="Prospect">Prospect</SelectItem>
-                          <SelectItem value="Cliente">Cliente</SelectItem>
-                          <SelectItem value="Ex-Cliente">Ex-Cliente</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    )}
+                    render={({ field }) => {
+                      const opts = withCurrentValue(TIPO_EMPRESA_OPTIONS, field.value);
+                      return (
+                        <Select value={field.value || ''} onValueChange={field.onChange}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {opts.map((opt) => (
+                              <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      );
+                    }}
                   />
                 </div>
 
@@ -806,7 +808,25 @@ export function AccountModalTabs({ open, onOpenChange, account }: AccountModalTa
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="segmento">Segmento</Label>
-                  <Input id="segmento" {...register('segmento')} placeholder="Ex: Tecnologia" />
+                  <Controller
+                    name="segmento"
+                    control={control}
+                    render={({ field }) => {
+                      const opts = withCurrentValue(SEGMENTO_OPTIONS, field.value);
+                      return (
+                        <Select value={field.value || ''} onValueChange={field.onChange}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {opts.map((opt) => (
+                              <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      );
+                    }}
+                  />
                 </div>
 
                 <div className="space-y-2">
