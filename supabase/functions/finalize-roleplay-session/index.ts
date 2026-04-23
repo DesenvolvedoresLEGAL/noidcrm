@@ -167,6 +167,8 @@ serve(async (req) => {
 
     if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime?.waitUntil) {
       EdgeRuntime.waitUntil(pipelinePromise);
+    } else {
+      await pipelinePromise;
     }
 
     return new Response(
