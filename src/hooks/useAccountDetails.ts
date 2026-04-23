@@ -166,6 +166,8 @@ export function useAccountDetails(accountId: string) {
 
       return {
         ...account,
+        origem_principal: hydratedOrigem,
+        pre_sales_user_id: hydratedPreSales,
         opportunities_count: (opportunities?.length || 0),
         opportunities_open: opportunitiesOpen,
         opportunities_won: opportunitiesWon,
