@@ -163,7 +163,7 @@ export function AccountModalTabs({ open, onOpenChange, account }: AccountModalTa
         instagram: acc?.instagram || '',
         facebook: acc?.facebook || '',
         email_nota_fiscal: acc?.email_nota_fiscal || '',
-        segmento: acc?.segmento || '',
+        segmento: normalizeSegmento(acc?.segmento) || '',
         tamanho: acc?.tamanho || '',
         origem_principal: acc?.origem_principal || '',
         faturamento_anual: '',
