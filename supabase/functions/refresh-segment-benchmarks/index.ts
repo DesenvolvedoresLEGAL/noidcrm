@@ -27,7 +27,7 @@ serve(async (req) => {
 
   try {
     const body = await req.json().catch(() => ({}));
-    const organizationId: string | undefined = body.organization_id;
+    const organizationId: string | undefined = body.organization_id || body.organizationId;
     const onlySegment: string | undefined = body.segment;
 
     if (!organizationId) {
