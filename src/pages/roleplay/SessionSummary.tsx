@@ -373,7 +373,7 @@ export default function SessionSummary() {
           )}
 
           {/* Insights */}
-          {insights && (
+          {insights ? (
             <div className="grid gap-4 md:grid-cols-2">
               <Card className="p-6 bg-success/5">
                 <div className="flex items-center gap-2 mb-3">
@@ -405,6 +405,13 @@ export default function SessionSummary() {
                 </ul>
               </Card>
             </div>
+          ) : (
+            <Card className="p-6 flex items-center gap-3">
+              <LoadingSpinner />
+              <p className="text-sm text-muted-foreground">
+                Gerando pontos fortes e áreas de melhoria...
+              </p>
+            </Card>
           )}
 
           {/* Recommended Videos */}
