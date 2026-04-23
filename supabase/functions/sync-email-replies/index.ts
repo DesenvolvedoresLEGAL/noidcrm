@@ -42,6 +42,20 @@ interface GmailThreadDetail {
   messages?: GmailMessageDetail[];
 }
 
+class GoogleApiError extends Error {
+  code: string;
+  status: number;
+  details?: unknown;
+
+  constructor(message: string, code: string, status: number, details?: unknown) {
+    super(message);
+    this.name = 'GoogleApiError';
+    this.code = code;
+    this.status = status;
+    this.details = details;
+  }
+}
+
 function getHeader(headers: Array<{ name: string; value: string }>, name: string): string {
   return headers.find(h => h.name.toLowerCase() === name.toLowerCase())?.value || '';
 }
@@ -169,13 +183,58 @@ async function refreshAccessToken(
   return tokenData.access_token;
 }
 
+async function throwGoogleApiError(response: Response): Promise<never> {
+  const rawBody = await response.text().catch(() => '');
+  let parsedBody: any = null;
+
+  try {
+    parsedBody = rawBody ? JSON.parse(rawBody) : null;
+  } catch {
+    parsedBody = null;
+  }
+
+  const reason = parsedBody?.error?.errors?.[0]?.reason || parsedBody?.error?.status || '';
+  const message = parsedBody?.error?.message || rawBody || `Gmail API request failed with status ${response.status}`;
+  const normalized = `${reason} ${message}`.toLowerCase();
+
+  if (response.status === 401) {
+    throw new GoogleApiError(
+      'Conexão com o Gmail expirou. Reconecte sua conta para continuar sincronizando.',
+      'gmail_reauth_required',
+      response.status,
+      parsedBody,
+    );
+  }
+
+  if (response.status === 403) {
+    if (normalized.includes('accessnotconfigured') || normalized.includes('service_disabled')) {
+      throw new GoogleApiError(
+        'A credencial Google desta integração está sem a Gmail API habilitada. Corrija a configuração Google e conecte o Gmail novamente.',
+        'gmail_api_disabled',
+        response.status,
+        parsedBody,
+      );
+    }
+
+    if (normalized.includes('insufficient authentication scopes')) {
+      throw new GoogleApiError(
+        'A conexão com o Gmail não tem as permissões necessárias. Reconecte sua conta para liberar acesso de leitura.',
+        'gmail_insufficient_scopes',
+        response.status,
+        parsedBody,
+      );
+    }
+  }
+
+  throw new GoogleApiError(message, 'gmail_request_failed', response.status, parsedBody);
+}
+
 async function gmailSearch(accessToken: string, query: string, maxResults = 10): Promise<GmailMessage[]> {
   const url = `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(query)}&maxResults=${maxResults}`;
   const r = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
   if (!r.ok) {
-    const errBody = await r.text().catch(() => '');
-    console.warn(`[sync-email-replies] Gmail search failed (${r.status}) for query: ${query}${errBody ? ` :: ${errBody}` : ''}`);
-    return [];
+    console.warn(`[sync-email-replies] Gmail search failed (${r.status}) for query: ${query}`);
+    await throwGoogleApiError(r);
   }
   const d = await r.json();
   return d.messages || [];
@@ -186,7 +245,10 @@ async function gmailGetMessage(accessToken: string, messageId: string): Promise<
     `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}?format=full`,
     { headers: { Authorization: `Bearer ${accessToken}` } },
   );
-  if (!r.ok) return null;
+  if (!r.ok) {
+    if (r.status === 404) return null;
+    await throwGoogleApiError(r);
+  }
   return await r.json();
 }
 
@@ -196,9 +258,9 @@ async function gmailGetThread(accessToken: string, threadId: string): Promise<Gm
     { headers: { Authorization: `Bearer ${accessToken}` } },
   );
   if (!r.ok) {
-    const errBody = await r.text().catch(() => '');
-    console.warn(`[sync-email-replies] Gmail thread fetch failed (${r.status}) for thread ${threadId}${errBody ? ` :: ${errBody}` : ''}`);
-    return null;
+    if (r.status === 404) return null;
+    console.warn(`[sync-email-replies] Gmail thread fetch failed (${r.status}) for thread ${threadId}`);
+    await throwGoogleApiError(r);
   }
   return await r.json();
 }
@@ -208,8 +270,11 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  let supabaseAdmin: any = null;
+  let syncConfig: any = null;
+
   try {
-    const supabaseAdmin = createClient(
+    supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
@@ -239,13 +304,15 @@ serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const filterOpportunityId = body.opportunity_id;
 
-    const { data: syncConfig } = await supabaseAdmin
+    const { data: loadedSyncConfig } = await supabaseAdmin
       .from('email_sync_config')
       .select('*')
       .eq('user_id', user.id)
       .eq('provider', 'gmail')
       .eq('sync_enabled', true)
       .maybeSingle();
+
+    syncConfig = loadedSyncConfig;
 
     if (!syncConfig) {
       return new Response(
@@ -515,6 +582,14 @@ serve(async (req) => {
 
     console.log(`[sync-email-replies] Synced ${totalSynced} replies for user ${user.id} (scanned ${outboundEmails.length} outbounds, ${outboundsWithoutThread} sem thread)`);
 
+    await supabaseAdmin
+      .from('email_sync_config')
+      .update({
+        last_sync_at: new Date().toISOString(),
+        last_sync_error: null,
+      })
+      .eq('id', syncConfig.id);
+
     const responseBody: any = { synced: totalSynced };
     if (totalSynced === 0 && outboundsWithoutThread > 0) {
       responseBody.hint = `${outboundsWithoutThread} e-mail(s) enviado(s) ainda não têm thread Gmail correlacionado. Estamos buscando por header e por janela de tempo — se o cliente respondeu, deve aparecer na próxima sincronização.`;
@@ -528,15 +603,42 @@ serve(async (req) => {
     console.error('[sync-email-replies] Error:', error);
     const code = error?.code;
     const isReauth = code === 'gmail_reauth_required' || error?.message === 'GMAIL_REAUTH_REQUIRED';
+    const isApiDisabled = code === 'gmail_api_disabled';
+    const isScopeError = code === 'gmail_insufficient_scopes';
+
+    try {
+      if (syncConfig?.id) {
+        await supabaseAdmin
+          .from('email_sync_config')
+          .update({
+            sync_enabled: isApiDisabled ? false : syncConfig.sync_enabled,
+            last_sync_error: isReauth
+              ? 'Conexão com o Gmail expirou. Reconecte sua conta para continuar sincronizando.'
+              : isApiDisabled
+                ? 'A Gmail API não está habilitada na credencial Google conectada. Reconecte o Gmail com uma credencial válida.'
+                : isScopeError
+                  ? 'A conexão com o Gmail está sem permissões suficientes. Reconecte sua conta e autorize o acesso solicitado.'
+                  : (error instanceof Error ? error.message : 'Erro ao sincronizar respostas do Gmail'),
+          })
+          .eq('id', syncConfig.id);
+      }
+    } catch (persistError) {
+      console.error('[sync-email-replies] Failed to persist sync error:', persistError);
+    }
+
     return new Response(
       JSON.stringify({
         error: isReauth
           ? 'Conexão com o Gmail expirou. Reconecte sua conta nas configurações.'
-          : (error instanceof Error ? error.message : 'Unknown error'),
+          : isApiDisabled
+            ? 'A integração do Gmail está inválida: a Gmail API da credencial conectada está desabilitada. Reconecte com uma credencial válida.'
+            : isScopeError
+              ? 'A conexão do Gmail está sem as permissões necessárias. Reconecte sua conta.'
+              : (error instanceof Error ? error.message : 'Unknown error'),
         code: isReauth ? 'gmail_reauth_required' : (code || 'sync_failed'),
-        reauth_required: isReauth,
+        reauth_required: isReauth || isApiDisabled || isScopeError,
       }),
-      { status: isReauth ? 409 : 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: (isReauth || isApiDisabled || isScopeError) ? 409 : 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });

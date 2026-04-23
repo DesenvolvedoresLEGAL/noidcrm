@@ -213,6 +213,11 @@ export function GmailSyncSettings({ userId }: GmailSyncSettingsProps) {
                     : 'Nunca sincronizado'
                   }
                 </p>
+                {config.last_sync_error && (
+                  <p className="text-xs text-destructive mt-1 max-w-md">
+                    {config.last_sync_error}
+                  </p>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <Button 
@@ -237,6 +242,17 @@ export function GmailSyncSettings({ userId }: GmailSyncSettingsProps) {
                     <Trash2 className="h-4 w-4" />
                   )}
                 </Button>
+                {config.last_sync_error && (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={handleConnect}
+                    disabled={connecting}
+                  >
+                    {connecting ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Mail className="h-4 w-4 mr-1" />}
+                    Reconectar
+                  </Button>
+                )}
               </div>
             </div>
 
