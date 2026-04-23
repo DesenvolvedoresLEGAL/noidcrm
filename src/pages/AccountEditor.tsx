@@ -580,19 +580,21 @@ export default function AccountEditor() {
                       <Controller
                         name="tipo_empresa"
                         control={control}
-                        render={({ field }) => (
-                          <Select value={field.value || ''} onValueChange={field.onChange}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Selecione" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="cliente">Cliente</SelectItem>
-                              <SelectItem value="prospect">Prospect</SelectItem>
-                              <SelectItem value="parceiro">Parceiro</SelectItem>
-                              <SelectItem value="fornecedor">Fornecedor</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        )}
+                        render={({ field }) => {
+                          const opts = withCurrentValue(TIPO_EMPRESA_OPTIONS, field.value);
+                          return (
+                            <Select value={field.value || ''} onValueChange={field.onChange}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecione" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {opts.map((opt) => (
+                                  <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          );
+                        }}
                       />
                     </div>
                   </div>
