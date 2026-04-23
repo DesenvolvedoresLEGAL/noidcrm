@@ -193,10 +193,16 @@ Retorne APENAS JSON (sem markdown):
     const normalizedWeaknesses = normalizeToStringArray(insights.weaknesses || []);
     const normalizedActions = normalizeToStringArray(insights.recommended_actions || []);
 
-    // Insert insights into database
+    // Upsert insights (one per session) — prevents duplicates on retry/race
+    const { data: orgRow } = await supabase
+      .from('sellers')
+      .select('organization_id')
+      .eq('id', sellerId)
+      .single();
+
     const { data: insertedInsight, error: insertError } = await supabase
       .from('performance_insights')
-      .insert({
+      .upsert({
         seller_id: sellerId,
         session_id: sessionId,
         strengths: normalizedStrengths,
@@ -205,16 +211,13 @@ Retorne APENAS JSON (sem markdown):
         recommended_actions: normalizedActions,
         next_roleplay_suggestion: insights.next_roleplay_suggestion,
         confidence_score: insights.confidence_score || 0.7,
-        organization_id: (await supabase
-          .from('sellers')
-          .select('organization_id')
-          .eq('id', sellerId)
-          .single()).data?.organization_id
-      })
+        organization_id: orgRow?.organization_id,
+      }, { onConflict: 'session_id' })
       .select()
       .single();
 
     if (insertError) {
+      console.error('[ai-generate-insights] Upsert error:', insertError);
       throw insertError;
     }
 
