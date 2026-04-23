@@ -50,8 +50,16 @@ export function invalidateOpportunity(
     );
   }
 
+  // refetchType: 'all' forces refetch even for inactive queries.
+  // The global QueryClient sets `refetchOnMount: false` (to keep navigation
+  // snappy), which means a plain invalidation only marks inactive queries
+  // stale and they NEVER refetch on remount. That caused the kanban to keep
+  // showing deleted/moved cards until a hard refresh. With 'all' we force
+  // an immediate background refetch so the next mount sees fresh data.
   return Promise.all(
-    keys.map((queryKey) => queryClient.invalidateQueries({ queryKey })),
+    keys.map((queryKey) =>
+      queryClient.invalidateQueries({ queryKey, refetchType: 'all' }),
+    ),
   );
 }
 
@@ -75,7 +83,9 @@ export function invalidateAccount(
   }
 
   return Promise.all(
-    keys.map((queryKey) => queryClient.invalidateQueries({ queryKey })),
+    keys.map((queryKey) =>
+      queryClient.invalidateQueries({ queryKey, refetchType: 'all' }),
+    ),
   );
 }
 
@@ -96,7 +106,9 @@ export function invalidateContact(
   }
 
   return Promise.all(
-    keys.map((queryKey) => queryClient.invalidateQueries({ queryKey })),
+    keys.map((queryKey) =>
+      queryClient.invalidateQueries({ queryKey, refetchType: 'all' }),
+    ),
   );
 }
 
@@ -115,7 +127,7 @@ export function invalidateProposal(
   }
 
   const tasks = keys.map((queryKey) =>
-    queryClient.invalidateQueries({ queryKey }),
+    queryClient.invalidateQueries({ queryKey, refetchType: 'all' }),
   );
 
   if (opportunityId) {

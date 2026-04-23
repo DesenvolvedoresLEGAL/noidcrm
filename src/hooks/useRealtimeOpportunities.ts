@@ -13,29 +13,38 @@ export function useRealtimeOpportunities() {
   const queryClient = useQueryClient();
 
   useEffect(() => {
+    // refetchType:'all' forces refetch even when the kanban list query is
+    // currently inactive (e.g. user is on the opportunity detail page).
+    // The global QueryClient sets refetchOnMount:false, so a plain
+    // invalidation would only mark the cache stale and the kanban would
+    // keep showing outdated cards (deleted/moved deals) until a hard
+    // refresh. This guarantees real-time changes propagate immediately.
+    const invalidate = (queryKey: readonly unknown[]) =>
+      queryClient.invalidateQueries({ queryKey, refetchType: 'all' });
+
     const channel = supabase
       .channel('realtime-opportunities')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'opportunities' },
         () => {
-          queryClient.invalidateQueries({ queryKey: opportunityKeys.lists() });
+          invalidate(opportunityKeys.lists());
         },
       )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'accounts' },
         () => {
-          queryClient.invalidateQueries({ queryKey: opportunityKeys.lists() });
-          queryClient.invalidateQueries({ queryKey: accountKeys.lists() });
+          invalidate(opportunityKeys.lists());
+          invalidate(accountKeys.lists());
         },
       )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'contacts' },
         () => {
-          queryClient.invalidateQueries({ queryKey: opportunityKeys.lists() });
-          queryClient.invalidateQueries({ queryKey: contactKeys.lists() });
+          invalidate(opportunityKeys.lists());
+          invalidate(contactKeys.lists());
         },
       )
       .subscribe();
