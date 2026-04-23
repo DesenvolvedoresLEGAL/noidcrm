@@ -270,8 +270,11 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  let supabaseAdmin: any = null;
+  let syncConfig: any = null;
+
   try {
-    const supabaseAdmin = createClient(
+    supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
@@ -301,13 +304,15 @@ serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const filterOpportunityId = body.opportunity_id;
 
-    const { data: syncConfig } = await supabaseAdmin
+    const { data: loadedSyncConfig } = await supabaseAdmin
       .from('email_sync_config')
       .select('*')
       .eq('user_id', user.id)
       .eq('provider', 'gmail')
       .eq('sync_enabled', true)
       .maybeSingle();
+
+    syncConfig = loadedSyncConfig;
 
     if (!syncConfig) {
       return new Response(
