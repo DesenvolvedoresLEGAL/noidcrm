@@ -35,7 +35,7 @@ export default function Accounts() {
   // Estados
   const [searchQuery, setSearchQuery] = useState('');
   const [segmentoFilter, setSegmentoFilter] = useState<string>('all');
-  const [tamanhoFilter, setTamanhoFilter] = useState<string>('all');
+  const [porteFilter, setPorteFilter] = useState<string>('all');
   const [origemFilter, setOrigemFilter] = useState<string>('all');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Account | undefined>();
@@ -103,11 +103,11 @@ export default function Accounts() {
   const filteredAccounts = useMemo(() => {
     return accounts.filter(account => {
       if (segmentoFilter !== 'all' && account.segmento !== segmentoFilter) return false;
-      if (tamanhoFilter !== 'all' && account.tamanho !== tamanhoFilter) return false;
+      if (porteFilter !== 'all' && account.porte !== porteFilter) return false;
       if (origemFilter !== 'all' && account.origem_principal !== origemFilter) return false;
       return true;
     });
-  }, [accounts, segmentoFilter, tamanhoFilter, origemFilter]);
+  }, [accounts, segmentoFilter, porteFilter, origemFilter]);
 
   // Extrair valores únicos para filtros
   const uniqueSegmentos = useMemo(() => 
@@ -115,8 +115,8 @@ export default function Accounts() {
     [accounts]
   );
   
-  const uniqueTamanhos = useMemo(() => 
-    [...new Set(accounts.map(a => a.tamanho).filter(Boolean))],
+  const uniquePortes = useMemo(() => 
+    [...new Set(accounts.map(a => a.porte).filter(Boolean))],
     [accounts]
   );
   
@@ -125,13 +125,13 @@ export default function Accounts() {
     [accounts]
   );
 
-  // Estatísticas por porte (usando valores normalizados)
+  // Estatísticas por porte (usando valores normalizados da Receita)
   const stats = useMemo(() => ({
     total: accountsData?.total || filteredAccounts.length,
     pequenas: filteredAccounts.filter(a => ['MEI', 'ME'].includes(a.porte || '')).length,
     medias: filteredAccounts.filter(a => ['EPP', 'Médio Porte'].includes(a.porte || '')).length,
     grandes: filteredAccounts.filter(a => a.porte === 'Grande Porte').length,
-    enterprise: filteredAccounts.filter(a => a.tamanho === 'Enterprise').length,
+    semPorte: filteredAccounts.filter(a => !a.porte).length,
   }), [accountsData, filteredAccounts]);
 
   // Export para CSV
@@ -144,13 +144,13 @@ export default function Accounts() {
       return;
     }
 
-    const headers = ['Razão Social', 'Nome Fantasia', 'CNPJ', 'Segmento', 'Tamanho', 'Origem'];
+    const headers = ['Razão Social', 'Nome Fantasia', 'CNPJ', 'Segmento', 'Porte', 'Origem'];
     const rows = filteredAccounts.map(account => [
       account.razao_social,
       account.nome_fantasia || '',
       account.cnpj || '',
       account.segmento || '',
-      account.tamanho || '',
+      account.porte || '',
       account.origem_principal || '',
     ]);
 
@@ -178,13 +178,13 @@ export default function Accounts() {
       return;
     }
 
-    const headers = ['Razão Social', 'Nome Fantasia', 'CNPJ', 'Segmento', 'Tamanho', 'Origem'];
+    const headers = ['Razão Social', 'Nome Fantasia', 'CNPJ', 'Segmento', 'Porte', 'Origem'];
     const rows = filteredAccounts.map(account => [
       account.razao_social,
       account.nome_fantasia || '',
       account.cnpj || '',
       account.segmento || '',
-      account.tamanho || '',
+      account.porte || '',
       account.origem_principal || '',
     ]);
 
@@ -204,12 +204,12 @@ export default function Accounts() {
 
   const clearFilters = () => {
     setSegmentoFilter('all');
-    setTamanhoFilter('all');
+    setPorteFilter('all');
     setOrigemFilter('all');
     setSearchQuery('');
   };
 
-  const hasActiveFilters = segmentoFilter !== 'all' || tamanhoFilter !== 'all' || origemFilter !== 'all' || searchQuery;
+  const hasActiveFilters = segmentoFilter !== 'all' || porteFilter !== 'all' || origemFilter !== 'all' || searchQuery;
 
   return (
     <Layout>
@@ -282,11 +282,11 @@ export default function Accounts() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Enterprise</CardTitle>
-              <Building2 className="h-4 w-4 text-purple-600" />
+              <CardTitle className="text-sm font-medium">Sem Porte</CardTitle>
+              <Building2 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-purple-600">{stats.enterprise}</div>
+              <div className="text-2xl font-bold text-muted-foreground">{stats.semPorte}</div>
             </CardContent>
           </Card>
         </div>
@@ -335,14 +335,14 @@ export default function Accounts() {
                     </SelectContent>
                   </Select>
 
-                  <Select value={tamanhoFilter} onValueChange={setTamanhoFilter}>
+                  <Select value={porteFilter} onValueChange={setPorteFilter}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Tamanho" />
+                      <SelectValue placeholder="Porte" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">Todos os tamanhos</SelectItem>
-                      {uniqueTamanhos.map(tam => (
-                        <SelectItem key={tam} value={tam!}>{tam}</SelectItem>
+                      <SelectItem value="all">Todos os portes</SelectItem>
+                      {uniquePortes.map(p => (
+                        <SelectItem key={p} value={p!}>{p}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -374,9 +374,9 @@ export default function Accounts() {
                       Segmento: {segmentoFilter}
                     </Badge>
                   )}
-                  {tamanhoFilter !== 'all' && (
+                  {porteFilter !== 'all' && (
                     <Badge variant="secondary">
-                      Tamanho: {tamanhoFilter}
+                      Porte: {porteFilter}
                     </Badge>
                   )}
                   {origemFilter !== 'all' && (
