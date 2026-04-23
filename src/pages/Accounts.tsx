@@ -38,6 +38,7 @@ export default function Accounts() {
   const [segmentoFilter, setSegmentoFilter] = useState<string>('all');
   const [porteFilter, setPorteFilter] = useState<string>('all');
   const [origemFilter, setOrigemFilter] = useState<string>('all');
+  const [scoreFinanceiroFilter, setScoreFinanceiroFilter] = useState<string>('all');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Account | undefined>();
   const [deleteDialog, setDeleteDialog] = useState<string | null>(null);
