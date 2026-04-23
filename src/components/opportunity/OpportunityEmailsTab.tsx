@@ -259,6 +259,10 @@ export function OpportunityEmailsTab({ opportunityId }: OpportunityEmailsTabProp
   }, [opportunityId]);
 
   useEffect(() => {
+    autoSyncStartedRef.current = false;
+  }, [opportunityId]);
+
+  useEffect(() => {
     if (loading || syncing || autoSyncStartedRef.current) return;
     const hasPendingEngagement = emails.some(
       (email) =>
