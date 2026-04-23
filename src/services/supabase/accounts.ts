@@ -43,6 +43,7 @@ const accountSchema = z.object({
   situacao_cadastral: z.string().optional().nullable(),
   owner_user_id: z.string().optional().nullable(),
   cs_user_id: z.string().optional().nullable(),
+  pre_sales_user_id: z.string().optional().nullable(),
   parent_account_id: z.string().optional().nullable(),
   
   // Dados PF
