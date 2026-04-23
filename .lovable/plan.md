@@ -1,113 +1,76 @@
 
+Objetivo: corrigir o cadastro de Conta para que Tipo de Empresa, Vendedor Responsável e CS Responsável apareçam/persistam corretamente, adicionar o campo de Pré-Vendedor Responsável e parar de quebrar Segmento/Origem no editor.
 
-# Plano — Enriquecimento via CNPJ + Migração Tamanho → Porte
+1. Corrigir a causa principal dos campos “sumindo” no formulário
+- Unificar os valores canônicos de `tipo_empresa` entre `AccountEditor` e `AccountModalTabs`, porque hoje os dois usam listas diferentes e com casing diferente (`Cliente/Prospect/...` vs `cliente/prospect/...`), o que faz o Select parecer vazio mesmo com dado salvo.
+- Corrigir `segmento` no `AccountEditor`: hoje o Select usa valores em slug minúsculo (`tecnologia`, `varejo`...), mas a conta costuma guardar valores legíveis/canônicos (`Tecnologia`, `Saúde`...), então o valor salvo não casa com os itens e não renderiza.
+- Reusar o normalizador existente de segmento para leitura consistente e evitar duplicidade visual.
 
-## Diagnóstico
+2. Tornar os responsáveis confiáveis no editor
+- Ajustar os Selects de `owner_user_id` e `cs_user_id` para sempre exibir o usuário atualmente salvo, mesmo se ele estiver inativo ou não vier na lista padrão de membros ativos.
+- Revisar `useOrganizationUsers()` para suportar esse caso sem quebrar a listagem normal da organização.
+- Manter persistência no mesmo fluxo atual (`updateAccount`), sem mudar RLS.
 
-**Lookup CNPJ hoje preenche:** razão social, nome fantasia, natureza jurídica, **porte**, capital social, CNAE principal, CEP/endereço, telefones, email, QSA.
+3. Adicionar o novo campo “Pré-Vendedor Responsável”
+- Criar uma migration adicionando `pre_sales_user_id` na tabela `accounts` (UUID nullable, mesmo padrão de responsáveis).
+- Incluir o campo no schema tipado do front por meio da integração normal do banco.
+- Expor esse campo em:
+  - `src/services/supabase/accounts.ts`
+  - `src/hooks/useAccountDetails.ts`
+  - `src/pages/AccountEditor.tsx`
+  - `src/components/accounts/AccountModalTabs.tsx`
+  - `src/components/accounts/AccountOverviewTabEnhanced.tsx`
+- Label no UI: “Pré-Vendedor Responsável”.
 
-**O que NÃO preenche (mas a edge function já retorna):**
-- `cnaes_secundarios` (somente AccountModalTabs preenche; AccountEditor — a tela "Editar conta" do print — ignora)
-- `segmento` (nunca derivado do CNAE em nenhum dos dois fluxos)
+4. Eliminar a inconsistência de Origem
+- Continuar usando somente o cadastro robusto já existente de Origens/Grupos de Origens (`origins` + `origin_groups`) como fonte de opções.
+- Remover qualquer comportamento que dependa de listas paralelas/hardcoded para origem no cadastro de conta.
+- No editor da conta, o Select de origem passará a:
+  - carregar da tabela oficial de origens;
+  - mostrar o valor atual salvo mesmo se ele estiver inativo/legado;
+  - evitar ficar “em branco” quando a conta já tem origem preenchida.
 
-**Tamanho vs Porte (dados reais no banco):**
-- `porte` populado: 228 contas (Médio Porte, ME, EPP, Grande Porte, MEI) — vem da Receita.
-- `tamanho` populado: apenas **18 contas** com valores caóticos ("2-5 pessoas", "1-10", "Grande", "Média"). Praticamente vazio.
-- Conclusão: **`tamanho` deve ser substituído por `porte`** nas telas de Lead Score, AccountCard, filtros e analytics. `tamanho` permanece no schema apenas para compatibilidade (legacy).
+5. Sincronizar Origem e Pré-Vendedor a partir da oportunidade vinculada
+- Implementar uma regra de sincronização segura para contas já ligadas a oportunidades:
+  - `origem_principal` da conta poderá ser preenchida a partir da `origem` da oportunidade vinculada;
+  - `pre_sales_user_id` da conta poderá ser preenchido a partir de `qualified_by_user_id` da oportunidade.
+- Critério técnico: usar a oportunidade vinculada mais recente com valor válido para cada campo.
+- Aplicar isso em dois níveis:
+  - leitura/hidratação da conta para exibição correta;
+  - backfill dos registros existentes que hoje estão vazios.
 
-## Mudanças
+6. Observação importante sobre Segmento
+- O sistema já tem fonte nativa para `origem` e `pré-vendedor` na oportunidade.
+- Para `segmento`, o CRM atual não tem um campo canônico nativo na oportunidade equivalente ao de origem; por isso o ajuste correto é:
+  - usar `accounts.segmento` como fonte de verdade da conta;
+  - normalizar sua leitura;
+  - manter o preenchimento automático por CNAE quando aplicável.
+- Isso resolve o problema real de “não puxar” no editor sem criar duplicidade estrutural.
 
-### 1. CNAE → Segmento (mapeamento determinístico)
-Criar `src/lib/cnae-to-segmento.ts` mapeando o **primeiro dígito da divisão CNAE** ao segmento canônico já normalizado (`segment-normalizer.ts`):
+7. Backfill dos dados já existentes
+- Executar um backfill pontual para contas que estejam sem `origem_principal` e/ou sem `pre_sales_user_id`, buscando esses dados da oportunidade vinculada mais recente.
+- Não alterar contas que já estejam corretamente preenchidas.
+- Não é necessário mudar políticas RLS; as políticas org-scoped atuais de `accounts` já cobrem a nova coluna.
 
-```text
-01-03  → Agronegócio
-05-09  → Indústria (extrativa)
-10-33  → Indústria
-35-39  → Indústria (utilities)
-41-43  → Construção
-45-47  → Comércio / Varejo (47=Varejo, 45-46=Comércio)
-49-53  → Logística
-55-56  → Eventos (56=alimentação/eventos quando combinado com 823)
-58-63  → Tecnologia
-64-66  → Financeiro
-68     → Imobiliário
-69-75  → Serviços (consultoria/jurídico)
-73     → Marketing  (73.1=publicidade, 73.2=pesquisa)
-80-82  → Serviços (82.30=eventos)
-85     → Educação
-86-88  → Saúde
-90-93  → Eventos / Cultura
-94-96  → Serviços
-```
-Função `cnaeToSegmento(codigo: string): string | null` com regras especiais (73.1x = Marketing, 82.30 = Eventos, 56 = quando combinado com eventos).
+Arquivos impactados
+- `src/pages/AccountEditor.tsx`
+- `src/components/accounts/AccountModalTabs.tsx`
+- `src/hooks/useAccountDetails.ts`
+- `src/hooks/useOrganizationUsers.ts`
+- `src/services/supabase/accounts.ts`
+- `src/components/accounts/AccountOverviewTabEnhanced.tsx`
+- `src/lib/segment-normalizer.ts` (reuso)
+- novo helper opcional para opções canônicas de conta/segmento
+- nova migration em `supabase/migrations/...`
 
-### 2. AccountEditor.tsx (lupa CNPJ — print do usuário)
-No `handleCNPJLookup`, adicionar:
-```ts
-setValue('cnaes_secundarios', data.cnaes_secundarios?.map(c => String(c.codigo)) || [], { shouldDirty: true });
-const segmentoInferido = cnaeToSegmento(data.cnae_principal?.codigo);
-if (segmentoInferido && !watch('segmento')) {
-  setValue('segmento', segmentoInferido, { shouldDirty: true });
-}
-```
+Riscos controlados
+- Baixo/médio: mudança principal é de formulário, normalização e 1 nova coluna nullable.
+- Sem quebra de multitenancy: permanece tudo em `accounts.organization_id`.
+- Sem duplicar a arquitetura de origem: o cadastro oficial existente continua sendo a única fonte de opções.
 
-### 3. AccountModalTabs.tsx (modal "Nova Conta")
-Já preenche `cnaes_secundarios`. Adicionar inferência de `segmento` (mesma lógica acima).
-
-### 4. Migração Tamanho → Porte na UI
-
-| Arquivo | Antes | Depois |
-|---|---|---|
-| `LeadScoreTable.tsx` | filtro/coluna "Tamanho" usando `tamanho` | filtro/coluna **"Porte"** usando `porte` |
-| `useLeadScoreAnalytics.ts` | `filterOptions.sizes` por `tamanho` | por `porte` |
-| `LeadScoreFilters` | `size` | `porte` |
-| `AccountCard.tsx` | badge `account.tamanho` com `getTamanhoColor` | badge `account.porte` com cores ME/EPP/Médio/Grande/MEI |
-| `Accounts.tsx` | filtro "Tamanho" | filtro "Porte" + cards de stats já usam `porte` (mantém) |
-| `LeadScoreFormulaInfo.tsx` | "Tamanho da empresa (Grande=20...)" | "Porte (Grande Porte=20, Médio=15, EPP=10, ME/MEI=5)" |
-| `AccountEditor.tsx` | label "Tamanho da Empresa" no select de funcionários | manter como **"Faixa de Funcionários"** (campo `tamanho` continua existindo, mas passa a ser opcional/secundário) |
-| `AccountModalTabs.tsx` | igual acima | igual |
-| `LeadWithScore` interface | inclui `tamanho` | incluir também `porte` |
-
-### 5. calculate-account-scores (edge function)
-Trocar bloco `account.tamanho` por `account.porte`:
-```ts
-const portePoints: Record<string, number> = {
-  'Grande Porte': 20,
-  'Médio Porte': 15,
-  'EPP': 10,
-  'ME': 5,
-  'MEI': 3,
-};
-```
-Mantém fallback para `tamanho` legacy se `porte` for nulo.
-
-### 6. AI Analysis (ai-lead-score-analyze)
-Atualizar `buildAccountContext` para incluir `porte`, `cnae`, `cnaes_secundarios` no prompt do GPT-5-mini — enriquece o RAG.
-
-## Arquivos Impactados
-
-**Novos:**
-- `src/lib/cnae-to-segmento.ts`
-
-**Editados:**
-- `src/pages/AccountEditor.tsx` (lookup + label)
-- `src/components/accounts/AccountModalTabs.tsx` (lookup + inferência)
-- `src/components/accounts/AccountCard.tsx` (badge porte)
-- `src/pages/Accounts.tsx` (filtro porte)
-- `src/components/scoring/lead/LeadScoreTable.tsx`
-- `src/components/scoring/lead/LeadScoreFormulaInfo.tsx`
-- `src/hooks/useLeadScoreAnalytics.ts` (filterOptions.portes)
-- `supabase/functions/calculate-account-scores/index.ts`
-- `supabase/functions/ai-lead-score-analyze/index.ts`
-
-## Riscos
-
-- **Mapeamento CNAE→Segmento** é heurístico; em casos limítrofes (ex.: CNAE 56 — restaurante vs. buffet de eventos) a inferência pode errar. Mitigação: só preenche se segmento estiver vazio; usuário pode sobrescrever.
-- **Campo `tamanho` legacy** permanece no schema para não quebrar imports/exports antigos. Apenas a UI passa a priorizar `porte`.
-- **Recálculo retroativo:** após o deploy, sugiro rodar "Recalcular Scores" para que as 228 contas com porte preenchido recebam pontos novos no FIT.
-
-## Próximo Passo
-
-Implementar tudo numa única passada. Após deploy, você roda **Recalcular Scores** + **Enriquecer com IA (Top 200)** para ver o impacto real do enriquecimento.
-
+Resultado esperado
+- Tipo de Empresa passa a aparecer e salvar corretamente.
+- Vendedor Responsável e CS Responsável deixam de “sumir” no editor.
+- Conta ganha campo de Pré-Vendedor Responsável.
+- Origem passa a respeitar o cadastro oficial de Origens/Grupos e pode ser herdada da oportunidade.
+- Segmento volta a carregar corretamente no cadastro da conta.
