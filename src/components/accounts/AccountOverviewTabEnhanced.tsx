@@ -69,6 +69,20 @@ export function AccountOverviewTabEnhanced({ account }: AccountOverviewTabProps)
     enabled: !!account.cs_user_id,
   });
 
+  const { data: preSalesUser } = useQuery({
+    queryKey: ['user-profile', account.pre_sales_user_id],
+    queryFn: async () => {
+      if (!account.pre_sales_user_id) return null;
+      const { data } = await supabase
+        .from('profiles')
+        .select('full_name, avatar_url')
+        .eq('user_id', account.pre_sales_user_id)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!account.pre_sales_user_id,
+  });
+
   // Buscar sócios
   const { data: partners } = useQuery({
     queryKey: ['account-partners', account.id],
