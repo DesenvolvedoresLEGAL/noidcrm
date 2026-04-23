@@ -98,11 +98,19 @@ async function handleList(
   let query = supabase
     .from("accounts")
     .select(
-      "id, razao_social, nome_fantasia, cnpj, cpf, tipo_pessoa, segmento, tamanho, porte, cnae, " +
+      "id, razao_social, nome_fantasia, cnpj, cpf, tipo_pessoa, segmento, tamanho, porte, " +
+      "cnae, cnaes_secundarios, capital_social, natureza_juridica, situacao_cadastral, " +
+      "data_situacao_cadastral, data_fundacao, opcao_simples, opcao_mei, matriz_filial, " +
+      "tipo_empresa, inscricao_estadual, inscricao_municipal, " +
       "lifecycle_stage, origem_principal, lead_score, lead_grade, fit_score, intent_score, " +
-      "emails, telefones, website, cidade, uf, cep, logradouro, numero, bairro, complemento, " +
-      "owner_user_id, cs_user_id, data_tornou_cliente, codigo_externo, observacoes, " +
-      "created_at, updated_at",
+      "score_financeiro, risco_financeiro, score_fatores, score_calculado_em, score_updated_at, " +
+      "total_titulos, titulos_pagos, titulos_vencidos, taxa_pagamento_pct, valor_total, valor_vencido, " +
+      "emails, telefones, website, email_nota_fiscal, " +
+      "linkedin, instagram, facebook, logo_url, " +
+      "cidade, uf, cep, logradouro, numero, bairro, complemento, latitude, longitude, " +
+      "owner_user_id, cs_user_id, parent_account_id, " +
+      "data_tornou_cliente, qualified_at, codigo_externo, observacoes, pontuacao_nps, " +
+      "erp_sync_at, created_at, updated_at",
       { count: "exact" }
     )
     .eq("organization_id", orgId)
@@ -403,44 +411,82 @@ function formatAccount(account: Record<string, unknown>) {
 
   return {
     id: account.id,
+
+    // Identificação
     razao_social: account.razao_social,
     nome_fantasia: account.nome_fantasia,
     cnpj: account.cnpj,
     cpf: account.cpf,
     tipo_pessoa: account.tipo_pessoa,
+    tipo_empresa: account.tipo_empresa,
+    matriz_filial: account.matriz_filial,
+    inscricao_estadual: account.inscricao_estadual,
+    inscricao_municipal: account.inscricao_municipal,
+
+    // Classificação
     segmento: account.segmento,
     tamanho: account.tamanho,
     porte: account.porte,
     cnae: account.cnae,
+    cnaes_secundarios: account.cnaes_secundarios,
+    natureza_juridica: account.natureza_juridica,
+    situacao_cadastral: account.situacao_cadastral,
+    data_situacao_cadastral: account.data_situacao_cadastral,
+    data_fundacao: account.data_fundacao,
+    capital_social: account.capital_social,
+    opcao_simples: account.opcao_simples,
+    opcao_mei: account.opcao_mei,
+
+    // Lifecycle / Origem
     lifecycle_stage: account.lifecycle_stage,
     origem_principal: account.origem_principal,
+    data_tornou_cliente: account.data_tornou_cliente,
+    qualified_at: account.qualified_at,
 
-    // Score
+    // Lead Score (CRM-side)
     lead_score: account.lead_score,
     lead_grade: account.lead_grade,
     fit_score: account.fit_score,
     intent_score: account.intent_score,
+    score_updated_at: account.score_updated_at,
 
-    // Contact (flattened)
+    // Contact (flattened + raw)
     primary_email: primaryEmail,
     primary_phone: primaryPhone,
     emails: account.emails,
     telefones: account.telefones,
     website: account.website,
+    email_nota_fiscal: account.email_nota_fiscal,
+
+    // Social / Visual
+    linkedin: account.linkedin,
+    instagram: account.instagram,
+    facebook: account.facebook,
+    logo_url: account.logo_url,
 
     // Address
     cidade: account.cidade,
     uf: account.uf,
     cep: account.cep,
+    logradouro: account.logradouro,
+    numero: account.numero,
+    bairro: account.bairro,
+    complemento: account.complemento,
+    latitude: account.latitude,
+    longitude: account.longitude,
     endereco: [account.logradouro, account.numero, account.complemento, account.bairro]
       .filter(Boolean)
       .join(", ") || null,
 
-    // IDs
+    // Owners / IDs
     owner_user_id: account.owner_user_id,
     cs_user_id: account.cs_user_id,
+    parent_account_id: account.parent_account_id,
     codigo_externo: account.codigo_externo,
-    data_tornou_cliente: account.data_tornou_cliente,
+
+    // Notas / NPS
+    observacoes: account.observacoes,
+    pontuacao_nps: account.pontuacao_nps,
 
     // Financial (ERP)
     score_financeiro: account.score_financeiro,

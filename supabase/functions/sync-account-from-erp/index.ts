@@ -150,57 +150,119 @@ Deno.serve(async (req) => {
     }
 
     const cleanDoc = document.replace(/\D/g, "");
-    const erpUrl = `${erpBaseUrl}/account-data?document=${cleanDoc}`;
 
-    console.log(`[sync-account-from-erp] Fetching from ERP: ${erpUrl}`);
-    console.log(`[sync-account-from-erp] Using ERP key prefix: ${erpApiKey.slice(0, 12)}`);
-
-    let erpResponse: Response;
-    try {
-      erpResponse = await fetch(erpUrl, {
-        headers: {
-          "X-API-Key": erpApiKey,
-          "Content-Type": "application/json",
-        },
-        signal: AbortSignal.timeout(15000),
-      });
-    } catch (fetchErr) {
-      console.error("[sync-account-from-erp] ERP network error:", fetchErr);
-      const fetchError = getFetchErrorMessage(fetchErr);
-      return jsonResponse({
-        success: false,
-        error: fetchError.error,
-        error_type: fetchError.error_type,
-        fallback: true,
-      });
+    // Build candidate document list:
+    //  1. The original document.
+    //  2. If it's a CNPJ filial (digits 9-12 != 0001), try matriz (0001) as fallback.
+    //  3. If it's the matriz, try common branch (0002) only when nothing else works? — keep conservative: matriz only.
+    const candidates = [cleanDoc];
+    if (cleanDoc.length === 14) {
+      const root = cleanDoc.slice(0, 8);
+      const branch = cleanDoc.slice(8, 12);
+      const dv = cleanDoc.slice(12);
+      if (branch !== "0001") {
+        // Try the matriz with same root, recompute DV is non-trivial → ERP usually accepts without DV check; we forward
+        // the literal `${root}0001${dv}` and let the ERP look it up by root. If the ERP demands valid DV, it returns 404 again.
+        candidates.push(`${root}0001${dv}`);
+      }
     }
 
-    if (!erpResponse.ok) {
-      const errText = await erpResponse.text();
-      const trimmedErr = errText.trim();
-      const isAuthError =
-        erpResponse.status === 401 &&
-        !/name_not_resolved|dns|enotfound/i.test(trimmedErr);
+    console.log(`[sync-account-from-erp] Using ERP key prefix: ${erpApiKey.slice(0, 12)}`);
+    console.log(`[sync-account-from-erp] Candidate documents: ${JSON.stringify(candidates)}`);
 
-      console.error(`[sync-account-from-erp] ERP error ${erpResponse.status}: ${trimmedErr}`);
+    let erpResponse: Response | null = null;
+    let lastErrText = "";
+    let lastStatus = 0;
+    let docUsed = cleanDoc;
+
+    for (const candidate of candidates) {
+      const erpUrl = `${erpBaseUrl}/account-data?document=${candidate}`;
+      console.log(`[sync-account-from-erp] Fetching from ERP: ${erpUrl}`);
+
+      try {
+        const resp = await fetch(erpUrl, {
+          headers: {
+            "X-API-Key": erpApiKey,
+            "Content-Type": "application/json",
+          },
+          signal: AbortSignal.timeout(15000),
+        });
+
+        if (resp.ok) {
+          erpResponse = resp;
+          docUsed = candidate;
+          break;
+        }
+
+        // Capture and continue to next candidate only on 404 / 500-with-"not found".
+        lastStatus = resp.status;
+        lastErrText = (await resp.text()).trim();
+        const isNotFound =
+          resp.status === 404 ||
+          (resp.status === 500 && /not.found|company.not.found/i.test(lastErrText));
+
+        console.warn(
+          `[sync-account-from-erp] Candidate ${candidate} returned ${resp.status}: ${lastErrText.slice(0, 200)}`,
+        );
+
+        if (!isNotFound) {
+          // Non-recoverable for the next candidate — stop and report.
+          erpResponse = resp;
+          docUsed = candidate;
+          break;
+        }
+      } catch (fetchErr) {
+        console.error("[sync-account-from-erp] ERP network error:", fetchErr);
+        const fetchError = getFetchErrorMessage(fetchErr);
+        return jsonResponse({
+          success: false,
+          error: fetchError.error,
+          error_type: fetchError.error_type,
+          fallback: true,
+        });
+      }
+    }
+
+    // No candidate succeeded — synthesize a clean error from the last attempt.
+    if (!erpResponse || !erpResponse.ok) {
+      const status = erpResponse?.status ?? lastStatus;
+      const trimmedErr = lastErrText;
+      const isAuthError =
+        status === 401 && !/name_not_resolved|dns|enotfound/i.test(trimmedErr);
+      const isNotFound =
+        status === 404 ||
+        (status === 500 && /not.found|company.not.found/i.test(trimmedErr));
+
+      console.error(`[sync-account-from-erp] All candidates failed. Last status ${status}: ${trimmedErr}`);
 
       const errorMessages: Record<number, string> = {
         401: "ERP rejeitou a autenticação. Revise a chave e confirme se ela foi criada para o endpoint account-data.",
         403: "Acesso negado pelo ERP. Verifique as permissões da chave de API.",
-        404: "Conta não encontrada no ERP para o documento informado.",
+        404: "Conta não encontrada no ERP para o CNPJ informado (matriz e filiais consultadas).",
         429: "ERP com limite de requisições excedido. Tente novamente em alguns minutos.",
-        500: "Erro interno no servidor do ERP.",
+        500: isNotFound
+          ? "Conta não encontrada no ERP para o CNPJ informado (o ERP só possui matriz ou outro estabelecimento)."
+          : "Erro interno no servidor do ERP.",
         502: "ERP temporariamente indisponível (Bad Gateway).",
         503: "ERP em manutenção. Tente novamente mais tarde.",
       };
 
       return jsonResponse({
         success: false,
-        error: errorMessages[erpResponse.status] || `ERP retornou erro ${erpResponse.status}`,
-        error_type: isAuthError ? "ERP_AUTH_INVALID" : "ERP_API_ERROR",
-        erp_status: erpResponse.status,
+        error: errorMessages[status] || `ERP retornou erro ${status}`,
+        error_type: isNotFound
+          ? "ERP_ACCOUNT_NOT_FOUND"
+          : isAuthError
+            ? "ERP_AUTH_INVALID"
+            : "ERP_API_ERROR",
+        erp_status: status,
+        documents_tried: candidates,
         fallback: true,
       });
+    }
+
+    if (docUsed !== cleanDoc) {
+      console.log(`[sync-account-from-erp] Matched ERP record using fallback document ${docUsed} (original: ${cleanDoc})`);
     }
 
     const erpData = await erpResponse.json();
