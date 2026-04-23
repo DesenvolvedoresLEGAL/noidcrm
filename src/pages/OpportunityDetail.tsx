@@ -176,8 +176,13 @@ export default function OpportunityDetail() {
 
   const deleteMutation = useMutation({
     mutationFn: () => deleteOpportunity(id!),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: opportunityKeys.lists() });
+    onSuccess: async () => {
+      // Force refetch BEFORE navigating so the kanban remounts with fresh data.
+      // Without refetchType:'all' the inactive list query is only marked stale
+      // and (because the global config sets refetchOnMount:false) it never
+      // refetches on remount, leaving the deleted card visible until a hard
+      // refresh.
+      await invalidateOpportunity(queryClient, id);
       toast({ title: 'Oportunidade excluída com sucesso' });
       navigate(`/app/opportunities?pipeline=${opportunity?.pipeline_id || ''}`);
     },
