@@ -23,10 +23,18 @@ export default function SessionSummary() {
   const { data: session, isLoading: loadingSession } = useQuery({
     queryKey: ['roleplay-session', sessionId],
     queryFn: () => getSession(sessionId!),
-    enabled: !!sessionId
+    enabled: !!sessionId,
+    // Poll every 2s while evaluation is still being processed (background work)
+    refetchInterval: (query) => {
+      const data = query.state.data as any;
+      if (!data) return 2000;
+      // Stop polling once we have a score (evaluation completed)
+      return data.score_overall == null ? 2000 : false;
+    },
   });
 
   const sellerId = session?.seller_id;
+  const evaluationReady = session?.score_overall != null;
   
   const { 
     recentUnlocks, 
@@ -35,26 +43,31 @@ export default function SessionSummary() {
     isCheckingBadges 
   } = useGamification(sellerId);
 
-  // Check for new badges when session loads
+  // Check for new badges only AFTER evaluation is ready
   useEffect(() => {
-    if (sellerId && sessionId) {
+    if (sellerId && sessionId && evaluationReady) {
       checkForNewBadges(sessionId);
     }
-  }, [sellerId, sessionId]);
+  }, [sellerId, sessionId, evaluationReady]);
 
   const { data: insights, isLoading: loadingInsights } = useQuery({
     queryKey: ['session-insights', sessionId],
     queryFn: async () => {
+      // Use order+limit instead of maybeSingle to be resilient against legacy duplicates
       const { data, error } = await supabase
         .from('performance_insights')
         .select('*')
         .eq('session_id', sessionId!)
+        .order('created_at', { ascending: false })
+        .limit(1)
         .maybeSingle();
 
       if (error) throw error;
       return data;
     },
-    enabled: !!sessionId
+    enabled: !!sessionId,
+    // Poll for insights (generated in background after evaluation)
+    refetchInterval: (query) => (query.state.data ? false : 3000),
   });
 
   const { data: recommendations, isLoading: loadingRecs } = useQuery({
@@ -67,12 +80,15 @@ export default function SessionSummary() {
           video_library(*)
         `)
         .eq('session_id', sessionId!)
+        .order('recommended_at', { ascending: false })
+        .limit(1)
         .maybeSingle();
 
       if (error) throw error;
       return data;
     },
-    enabled: !!sessionId
+    enabled: !!sessionId,
+    refetchInterval: (query) => (query.state.data ? false : 3000),
   });
 
   // Get badges unlocked in this session
