@@ -11,6 +11,8 @@ interface ProposalRow {
   proposal_number: string | null;
   title: string | null;
   client_name: string | null;
+  accepted_at: string | null;
+  declined_at: string | null;
   expires_at: string;
   opportunity_id: string;
   organization_id: string;
@@ -38,11 +40,13 @@ Deno.serve(async (req) => {
     const { data: proposals, error } = await supabase
       .from("proposals")
       .select(
-        `id, proposal_number, title, client_name, expires_at, opportunity_id, organization_id, total_amount,
+        `id, proposal_number, title, client_name, accepted_at, declined_at, expires_at, opportunity_id, organization_id, total_amount,
          opportunity:opportunities!inner(id, status, deleted_at)`
       )
       .not("expires_at", "is", null)
       .in("status", ["sent", "viewed"])
+      .is("accepted_at", null)
+      .is("declined_at", null)
       .is("deleted_at", null)
       .eq("opportunity.status", "open")
       .is("opportunity.deleted_at", null)
@@ -66,6 +70,14 @@ Deno.serve(async (req) => {
     let processedCount = 0;
 
     for (const proposal of proposals) {
+      if (proposal.accepted_at || proposal.declined_at) {
+        console.log(
+          `[check-proposal-expiration] skipped terminal proposal ${proposal.id}`,
+          { accepted_at: proposal.accepted_at, declined_at: proposal.declined_at }
+        );
+        continue;
+      }
+
       const expiresAt = new Date(proposal.expires_at);
       const hoursRemaining = Math.max(
         0,
