@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Layout } from '@/components/Layout';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,6 +19,7 @@ export default function SessionSummary() {
   const navigate = useNavigate();
   const [unlockedBadge, setUnlockedBadge] = useState<BadgeType | null>(null);
   const [shownBadgeIds, setShownBadgeIds] = useState<Set<string>>(new Set());
+  const recoveryRequestedRef = useRef(false);
 
   const { data: session, isLoading: loadingSession } = useQuery({
     queryKey: ['roleplay-session', sessionId],
@@ -35,6 +36,11 @@ export default function SessionSummary() {
 
   const sellerId = session?.seller_id;
   const evaluationReady = session?.score_overall != null;
+  const sessionStartedAt = session?.started_at ? new Date(session.started_at).getTime() : null;
+  const shouldAttemptRecovery = useMemo(() => {
+    if (!session || evaluationReady || !sessionId || !sessionStartedAt) return false;
+    return Date.now() - sessionStartedAt > 10000;
+  }, [session, evaluationReady, sessionId, sessionStartedAt]);
   
   const { 
     recentUnlocks, 
@@ -75,10 +81,7 @@ export default function SessionSummary() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('video_recommendations')
-        .select(`
-          *,
-          video_library(*)
-        `)
+        .select('*')
         .eq('session_id', sessionId!)
         .order('recommended_at', { ascending: false })
         .limit(1)
@@ -90,6 +93,21 @@ export default function SessionSummary() {
     enabled: !!sessionId,
     refetchInterval: (query) => (query.state.data ? false : 3000),
   });
+
+  useEffect(() => {
+    if (!shouldAttemptRecovery || recoveryRequestedRef.current) return;
+
+    recoveryRequestedRef.current = true;
+
+    supabase.functions
+      .invoke('finalize-roleplay-session', {
+        body: { sessionId },
+      })
+      .catch((error) => {
+        console.error('[SessionSummary] Recovery invoke failed:', error);
+        recoveryRequestedRef.current = false;
+      });
+  }, [sessionId, shouldAttemptRecovery]);
 
   // Get badges unlocked in this session
   const { data: sessionBadges } = useQuery({
@@ -152,7 +170,8 @@ export default function SessionSummary() {
           <LoadingSpinner />
           <h2 className="text-2xl font-bold">Avaliando seu treino...</h2>
           <p className="text-muted-foreground max-w-md">
-            Nossa IA está analisando a conversa, calculando notas por dimensão e gerando feedback detalhado. Isso pode levar até 30 segundos.
+            Nossa IA está analisando a conversa, calculando notas por dimensão e gerando feedback detalhado.
+            {shouldAttemptRecovery ? ' Detectamos atraso e reiniciamos o processamento automaticamente.' : ' Isso pode levar até 30 segundos.'}
           </p>
         </div>
       </Layout>
