@@ -1,152 +1,113 @@
 
 
-# Plano de Refinamento — Lead Score (Fase 1)
+# Plano — Enriquecimento via CNPJ + Migração Tamanho → Porte
 
-## Diagnóstico Confirmado
+## Diagnóstico
 
-Após varredura no banco e código:
+**Lookup CNPJ hoje preenche:** razão social, nome fantasia, natureza jurídica, **porte**, capital social, CNAE principal, CEP/endereço, telefones, email, QSA.
 
-- **3.862 contas ativas** vs **500 mostradas** → o hook `useLeadScoreAnalytics` tem `.limit(500)` hardcoded, e a edge function `calculate-account-scores` também limita em 500 no modo `recalculateAll`.
-- **Segmentos duplicados no banco**: existem `Serviços` (348) + `servicos` (15), `Tecnologia` (1) + `tecnologia` (5), `Indústria` (32) + `industria` (1), `Outro` (1) + `outro` (2). É problema de dado, não só de UI.
-- **Recalcular Leads quebra** em escala: roda 3.862 contas em loop sequencial dentro de uma única edge function (timeout garantido).
-- **Tabela limitada a 50** com `.slice(0, 50)` sem paginação.
-- **Insights sem ação**: cards têm `cursor-pointer` decorativo, sem onClick que filtre a tabela ou navegue.
-- **Cálculo do Lead Score** atual: fórmula determinística simples (`FIT × 0.4 + INTENT × 0.6`). Sem ML, sem RAG, sem contexto financeiro/contatos/oportunidades enriquecido.
+**O que NÃO preenche (mas a edge function já retorna):**
+- `cnaes_secundarios` (somente AccountModalTabs preenche; AccountEditor — a tela "Editar conta" do print — ignora)
+- `segmento` (nunca derivado do CNAE em nenhum dos dois fluxos)
 
----
+**Tamanho vs Porte (dados reais no banco):**
+- `porte` populado: 228 contas (Médio Porte, ME, EPP, Grande Porte, MEI) — vem da Receita.
+- `tamanho` populado: apenas **18 contas** com valores caóticos ("2-5 pessoas", "1-10", "Grande", "Média"). Praticamente vazio.
+- Conclusão: **`tamanho` deve ser substituído por `porte`** nas telas de Lead Score, AccountCard, filtros e analytics. `tamanho` permanece no schema apenas para compatibilidade (legacy).
 
-## Ajustes Propostos
+## Mudanças
 
-### 1. Corrigir contagem real (3.862 contas)
-
-**`src/hooks/useLeadScoreAnalytics.ts`**
-- Trocar `.limit(500)` por busca paginada de **todas as contas ativas** da organização (loop em páginas de 1.000 via `range()` até esgotar).
-- Adicionar `totalAccountsInOrg` separado via `count: 'exact', head: true` para o KPI "Total".
-- Normalizar `segmento` ao montar `segmentStats` e `filterOptions` (trim + capitalização consistente: `Serviços`, `Tecnologia`, etc.) usando um mapa de aliases.
-
-### 2. Padronização de Segmentos (banco + UI)
-
-**Migração SQL** para consolidar duplicatas no banco:
-```sql
-UPDATE accounts SET segmento = 'Serviços'   WHERE lower(trim(segmento)) IN ('servicos','serviços','serviço','servico');
-UPDATE accounts SET segmento = 'Tecnologia' WHERE lower(trim(segmento)) IN ('tecnologia','tech','ti');
-UPDATE accounts SET segmento = 'Indústria'  WHERE lower(trim(segmento)) IN ('industria','indústria');
-UPDATE accounts SET segmento = 'Outro'      WHERE lower(trim(segmento)) IN ('outro','outros');
-UPDATE accounts SET segmento = 'Saúde'      WHERE lower(trim(segmento)) IN ('saude','saúde');
-```
-+ trigger `BEFORE INSERT OR UPDATE` em `accounts.segmento` que aplica `initcap(trim())` e normaliza acentos via mapa.
-
-### 3. Paginação real na tabela
-
-**`src/components/scoring/lead/LeadScoreTable.tsx`**
-- Remover `.slice(0, 50)`.
-- Adicionar paginação local: 25 / 50 / 100 por página, com setas `<` `>` e indicador "1 de N".
-- Filtros (grade, segmento, tamanho, busca) aplicados antes da paginação.
-
-### 4. Recalcular Scores funcional para 3.862 contas
-
-**`supabase/functions/calculate-account-scores/index.ts`**
-- Remover `.limit(500)` no modo `recalculateAll`.
-- Implementar **processamento em batch + background**: dispara job e responde 202 imediatamente; usa `EdgeRuntime.waitUntil()` para processar em lotes de 100 contas com `Promise.all` concorrente.
-- Adicionar parâmetro `organizationId` obrigatório (multi-tenant safe).
-- Persistir progresso em tabela `score_recalc_jobs` (status, processed_count, total).
-
-**`src/components/scoring/lead/LeadScoreDashboard.tsx`**
-- Botão mostra toast inicial + polling do job para feedback "Processando 1.234 / 3.862…".
-
-### 5. Insights acionáveis
-
-**`src/components/scoring/lead/LeadScoreInsights.tsx`**
-- Cada insight ganha `onClick` que aplica filtro correspondente na tabela:
-  - "X leads quentes" → filtra `grade=A` e rola até a tabela
-  - "Leads com alto interesse" → filtro custom (FIT<50, INTENT≥70)
-  - "X% leads frios" → filtra `grade IN (D,F)`
-  - "Leads prontos para nutrição" → filtra `grade=B`
-- Adicionar botão secundário "Exportar lista (CSV)" em cada insight.
-
-### 6. Detalhamento do Cálculo (transparência)
-
-**Novo componente `LeadScoreFormulaInfo.tsx`** acessível via ícone `Info` no header do dashboard. Mostra modal explicando:
+### 1. CNAE → Segmento (mapeamento determinístico)
+Criar `src/lib/cnae-to-segmento.ts` mapeando o **primeiro dígito da divisão CNAE** ao segmento canônico já normalizado (`segment-normalizer.ts`):
 
 ```text
-LEAD SCORE = (FIT × 0.4) + (INTENT × 0.6)
+01-03  → Agronegócio
+05-09  → Indústria (extrativa)
+10-33  → Indústria
+35-39  → Indústria (utilities)
+41-43  → Construção
+45-47  → Comércio / Varejo (47=Varejo, 45-46=Comércio)
+49-53  → Logística
+55-56  → Eventos (56=alimentação/eventos quando combinado com 823)
+58-63  → Tecnologia
+64-66  → Financeiro
+68     → Imobiliário
+69-75  → Serviços (consultoria/jurídico)
+73     → Marketing  (73.1=publicidade, 73.2=pesquisa)
+80-82  → Serviços (82.30=eventos)
+85     → Educação
+86-88  → Saúde
+90-93  → Eventos / Cultura
+94-96  → Serviços
+```
+Função `cnaeToSegmento(codigo: string): string | null` com regras especiais (73.1x = Marketing, 82.30 = Eventos, 56 = quando combinado com eventos).
 
-FIT (perfil ideal — 0-100):
-  ├─ Segmento premium ........ até 25 pts
-  ├─ Tamanho da empresa ...... até 20 pts
-  ├─ Capital social .......... até 15 pts
-  ├─ Localização (SP/RJ) ..... até 15 pts
-  └─ Dados completos ......... até 25 pts
-
-INTENT (engajamento — 0-100):
-  ├─ Cliente ativo (won deals) até 40 pts
-  ├─ Bônus por deals ganhos .. até 20 pts
-  ├─ Recência (6 meses) ...... 10 pts
-  ├─ Valor ganho ............. até 15 pts
-  ├─ Atividades (decay -2/sem) até 40 pts
-  └─ Propostas + visualizações até 40 pts
-  Penalidade: -15 pts se sem atividade em 14 dias
-
-GRADES:  A ≥80 | B 60-79 | C 40-59 | D 20-39 | F <20
+### 2. AccountEditor.tsx (lupa CNPJ — print do usuário)
+No `handleCNPJLookup`, adicionar:
+```ts
+setValue('cnaes_secundarios', data.cnaes_secundarios?.map(c => String(c.codigo)) || [], { shouldDirty: true });
+const segmentoInferido = cnaeToSegmento(data.cnae_principal?.codigo);
+if (segmentoInferido && !watch('segmento')) {
+  setValue('segmento', segmentoInferido, { shouldDirty: true });
+}
 ```
 
----
+### 3. AccountModalTabs.tsx (modal "Nova Conta")
+Já preenche `cnaes_secundarios`. Adicionar inferência de `segmento` (mesma lógica acima).
 
-## Roadmap ML + RAG + KAG (Fase 2 — proposta separada)
+### 4. Migração Tamanho → Porte na UI
 
-Implementação requer infraestrutura adicional. Proposta de arquitetura para validação:
+| Arquivo | Antes | Depois |
+|---|---|---|
+| `LeadScoreTable.tsx` | filtro/coluna "Tamanho" usando `tamanho` | filtro/coluna **"Porte"** usando `porte` |
+| `useLeadScoreAnalytics.ts` | `filterOptions.sizes` por `tamanho` | por `porte` |
+| `LeadScoreFilters` | `size` | `porte` |
+| `AccountCard.tsx` | badge `account.tamanho` com `getTamanhoColor` | badge `account.porte` com cores ME/EPP/Médio/Grande/MEI |
+| `Accounts.tsx` | filtro "Tamanho" | filtro "Porte" + cards de stats já usam `porte` (mantém) |
+| `LeadScoreFormulaInfo.tsx` | "Tamanho da empresa (Grande=20...)" | "Porte (Grande Porte=20, Médio=15, EPP=10, ME/MEI=5)" |
+| `AccountEditor.tsx` | label "Tamanho da Empresa" no select de funcionários | manter como **"Faixa de Funcionários"** (campo `tamanho` continua existindo, mas passa a ser opcional/secundário) |
+| `AccountModalTabs.tsx` | igual acima | igual |
+| `LeadWithScore` interface | inclui `tamanho` | incluir também `porte` |
 
-```text
-┌──────────────────────────────────────────────────────────┐
-│  LEAD SCORE INTELLIGENCE ENGINE v2                       │
-├──────────────────────────────────────────────────────────┤
-│                                                          │
-│  [RAG] Contexto da Conta                                 │
-│    ├─ Oportunidades (won/lost/open + valores)            │
-│    ├─ Contatos (qtd, cargos, primary)                    │
-│    ├─ Atividades (timeline, frequência)                  │
-│    ├─ Score Financeiro (ERP integration)                 │
-│    ├─ Proposals (visualizações, aceites)                 │
-│    └─ Win/Loss histórico do segmento                     │
-│                                                          │
-│  [KAG] Knowledge Graph                                   │
-│    ├─ Padrões de conversão por segmento                  │
-│    ├─ Decision Makers identificados                      │
-│    └─ Sazonalidade e benchmarks                          │
-│                                                          │
-│  [ML Layer] OpenAI GPT-5 + structured output             │
-│    ├─ FIT score com justificativa textual                │
-│    ├─ INTENT score com sinais detectados                 │
-│    ├─ Probabilidade de conversão (0-100%)                │
-│    └─ Próxima melhor ação recomendada                    │
-│                                                          │
-│  [Feedback Loop]                                         │
-│    └─ Won/lost feedback retreina pesos por org           │
-└──────────────────────────────────────────────────────────┘
+### 5. calculate-account-scores (edge function)
+Trocar bloco `account.tamanho` por `account.porte`:
+```ts
+const portePoints: Record<string, number> = {
+  'Grande Porte': 20,
+  'Médio Porte': 15,
+  'EPP': 10,
+  'ME': 5,
+  'MEI': 3,
+};
 ```
+Mantém fallback para `tamanho` legacy se `porte` for nulo.
 
-Esta Fase 2 será detalhada em plano separado após validação dos ajustes da Fase 1.
+### 6. AI Analysis (ai-lead-score-analyze)
+Atualizar `buildAccountContext` para incluir `porte`, `cnae`, `cnaes_secundarios` no prompt do GPT-5-mini — enriquece o RAG.
 
----
+## Arquivos Impactados
 
-## Detalhes Técnicos (Fase 1)
+**Novos:**
+- `src/lib/cnae-to-segmento.ts`
 
-**Arquivos modificados:**
-- `src/hooks/useLeadScoreAnalytics.ts` — paginação completa + normalização de segmentos
-- `src/components/scoring/lead/LeadScoreTable.tsx` — paginação UI
-- `src/components/scoring/lead/LeadScoreDashboard.tsx` — botão Info + polling do recalc
-- `src/components/scoring/lead/LeadScoreInsights.tsx` — onClick handlers
-- `src/components/scoring/lead/LeadScoreOverviewKPIs.tsx` — usar `totalAccountsInOrg`
-- `supabase/functions/calculate-account-scores/index.ts` — remover limite + background batch
-
-**Arquivos criados:**
+**Editados:**
+- `src/pages/AccountEditor.tsx` (lookup + label)
+- `src/components/accounts/AccountModalTabs.tsx` (lookup + inferência)
+- `src/components/accounts/AccountCard.tsx` (badge porte)
+- `src/pages/Accounts.tsx` (filtro porte)
+- `src/components/scoring/lead/LeadScoreTable.tsx`
 - `src/components/scoring/lead/LeadScoreFormulaInfo.tsx`
-- `src/lib/segment-normalizer.ts`
-- Migração SQL: normalização de segmentos + trigger + tabela `score_recalc_jobs`
+- `src/hooks/useLeadScoreAnalytics.ts` (filterOptions.portes)
+- `supabase/functions/calculate-account-scores/index.ts`
+- `supabase/functions/ai-lead-score-analyze/index.ts`
 
-**Riscos:**
-- Recalcular 3.862 contas em background pode levar ~3-5 min; UI precisa do polling para não parecer travada.
-- Trigger de normalização de segmento pode quebrar imports existentes que esperam o valor literal — adicionar exceção via flag.
+## Riscos
 
-**Próximo passo após aprovação:** Implementar Fase 1 imediatamente, validar com você, depois detalhar Fase 2 (ML/RAG/KAG).
+- **Mapeamento CNAE→Segmento** é heurístico; em casos limítrofes (ex.: CNAE 56 — restaurante vs. buffet de eventos) a inferência pode errar. Mitigação: só preenche se segmento estiver vazio; usuário pode sobrescrever.
+- **Campo `tamanho` legacy** permanece no schema para não quebrar imports/exports antigos. Apenas a UI passa a priorizar `porte`.
+- **Recálculo retroativo:** após o deploy, sugiro rodar "Recalcular Scores" para que as 228 contas com porte preenchido recebam pontos novos no FIT.
+
+## Próximo Passo
+
+Implementar tudo numa única passada. Após deploy, você roda **Recalcular Scores** + **Enriquecer com IA (Top 200)** para ver o impacto real do enriquecimento.
 
