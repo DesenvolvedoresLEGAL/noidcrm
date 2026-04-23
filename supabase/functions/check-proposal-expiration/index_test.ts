@@ -34,3 +34,30 @@ Deno.test("respeita proposal_expiring_alert_enabled=false", () => {
   const enabled = settings.proposal_expiring_alert_enabled ?? true;
   assertEquals(enabled, false);
 });
+
+Deno.test("não deve considerar proposta terminal como aberta", () => {
+  function isStillOpen(proposal: {
+    status: string;
+    accepted_at?: string | null;
+    declined_at?: string | null;
+  }) {
+    return (
+      (proposal.status === "sent" || proposal.status === "viewed") &&
+      !proposal.accepted_at &&
+      !proposal.declined_at
+    );
+  }
+
+  assertEquals(
+    isStillOpen({ status: "sent", accepted_at: "2026-03-30T13:46:53.612Z", declined_at: null }),
+    false,
+  );
+  assertEquals(
+    isStillOpen({ status: "viewed", accepted_at: null, declined_at: "2026-03-30T13:46:53.612Z" }),
+    false,
+  );
+  assertEquals(
+    isStillOpen({ status: "sent", accepted_at: null, declined_at: null }),
+    true,
+  );
+});
