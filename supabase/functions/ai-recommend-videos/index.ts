@@ -223,10 +223,10 @@ Selecione no máximo 3 vídeos mais impactantes.`;
       .filter(v => videoIds.includes(v.id))
       .slice(0, 3);
 
-    // Insert recommendation record
+    // Upsert recommendation (one per session) — prevents duplicates on retry/race
     const { error: insertError } = await supabase
       .from('video_recommendations')
-      .insert({
+      .upsert({
         seller_id: sellerId,
         session_id: sessionId,
         recommended_at: new Date().toISOString(),
@@ -234,10 +234,10 @@ Selecione no máximo 3 vídeos mais impactantes.`;
         video_ids: videoIds,
         watched: false,
         organization_id: seller.organization_id
-      });
+      }, { onConflict: 'session_id' });
 
     if (insertError) {
-      console.error('Error inserting recommendation:', insertError);
+      console.error('Error upserting recommendation:', insertError);
     }
 
     return new Response(
