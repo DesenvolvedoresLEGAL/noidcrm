@@ -23,10 +23,18 @@ export default function SessionSummary() {
   const { data: session, isLoading: loadingSession } = useQuery({
     queryKey: ['roleplay-session', sessionId],
     queryFn: () => getSession(sessionId!),
-    enabled: !!sessionId
+    enabled: !!sessionId,
+    // Poll every 2s while evaluation is still being processed (background work)
+    refetchInterval: (query) => {
+      const data = query.state.data as any;
+      if (!data) return 2000;
+      // Stop polling once we have a score (evaluation completed)
+      return data.score_overall == null ? 2000 : false;
+    },
   });
 
   const sellerId = session?.seller_id;
+  const evaluationReady = session?.score_overall != null;
   
   const { 
     recentUnlocks, 
@@ -35,26 +43,31 @@ export default function SessionSummary() {
     isCheckingBadges 
   } = useGamification(sellerId);
 
-  // Check for new badges when session loads
+  // Check for new badges only AFTER evaluation is ready
   useEffect(() => {
-    if (sellerId && sessionId) {
+    if (sellerId && sessionId && evaluationReady) {
       checkForNewBadges(sessionId);
     }
-  }, [sellerId, sessionId]);
+  }, [sellerId, sessionId, evaluationReady]);
 
   const { data: insights, isLoading: loadingInsights } = useQuery({
     queryKey: ['session-insights', sessionId],
     queryFn: async () => {
+      // Use order+limit instead of maybeSingle to be resilient against legacy duplicates
       const { data, error } = await supabase
         .from('performance_insights')
         .select('*')
         .eq('session_id', sessionId!)
+        .order('created_at', { ascending: false })
+        .limit(1)
         .maybeSingle();
 
       if (error) throw error;
       return data;
     },
-    enabled: !!sessionId
+    enabled: !!sessionId,
+    // Poll for insights (generated in background after evaluation)
+    refetchInterval: (query) => (query.state.data ? false : 3000),
   });
 
   const { data: recommendations, isLoading: loadingRecs } = useQuery({
@@ -67,12 +80,15 @@ export default function SessionSummary() {
           video_library(*)
         `)
         .eq('session_id', sessionId!)
+        .order('recommended_at', { ascending: false })
+        .limit(1)
         .maybeSingle();
 
       if (error) throw error;
       return data;
     },
-    enabled: !!sessionId
+    enabled: !!sessionId,
+    refetchInterval: (query) => (query.state.data ? false : 3000),
   });
 
   // Get badges unlocked in this session
@@ -116,16 +132,33 @@ export default function SessionSummary() {
     setUnlockedBadge(null);
   };
 
-  if (loadingSession || loadingInsights || loadingRecs) {
+  if (loadingSession) {
     return (
       <Layout>
         <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4">
           <LoadingSpinner />
-          <p className="text-muted-foreground">Processando avaliação...</p>
+          <p className="text-muted-foreground">Carregando sessão...</p>
         </div>
       </Layout>
     );
   }
+
+  // If session loaded but evaluation hasn't been computed yet, show processing state.
+  // The session query polls every 2s, so this updates automatically when ready.
+  if (session && session.score_overall == null) {
+    return (
+      <Layout>
+        <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4 p-8 text-center">
+          <LoadingSpinner />
+          <h2 className="text-2xl font-bold">Avaliando seu treino...</h2>
+          <p className="text-muted-foreground max-w-md">
+            Nossa IA está analisando a conversa, calculando notas por dimensão e gerando feedback detalhado. Isso pode levar até 30 segundos.
+          </p>
+        </div>
+      </Layout>
+    );
+  }
+
 
   if (!session) {
     return (
@@ -340,7 +373,7 @@ export default function SessionSummary() {
           )}
 
           {/* Insights */}
-          {insights && (
+          {insights ? (
             <div className="grid gap-4 md:grid-cols-2">
               <Card className="p-6 bg-success/5">
                 <div className="flex items-center gap-2 mb-3">
@@ -372,6 +405,13 @@ export default function SessionSummary() {
                 </ul>
               </Card>
             </div>
+          ) : (
+            <Card className="p-6 flex items-center gap-3">
+              <LoadingSpinner />
+              <p className="text-sm text-muted-foreground">
+                Gerando pontos fortes e áreas de melhoria...
+              </p>
+            </Card>
           )}
 
           {/* Recommended Videos */}
