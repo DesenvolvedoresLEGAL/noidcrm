@@ -105,20 +105,29 @@ export default function Accounts() {
   const filteredAccounts = useMemo(() => {
     return accounts.filter(account => {
       if (segmentoFilter !== 'all' && account.segmento !== segmentoFilter) return false;
-      if (porteFilter !== 'all' && account.porte !== porteFilter) return false;
+      if (porteFilter !== 'all') {
+        const norm = normalizePorte(account.porte);
+        if (norm !== porteFilter) return false;
+      }
       if (origemFilter !== 'all' && account.origem_principal !== origemFilter) return false;
+      if (scoreFinanceiroFilter !== 'all') {
+        const score = account.score_financeiro;
+        if (scoreFinanceiroFilter === 'none') {
+          if (score !== null && score !== undefined) return false;
+        } else if (score === null || score === undefined) {
+          return false;
+        } else if (scoreFinanceiroFilter === 'excellent' && (score < 80 || score > 100)) return false;
+        else if (scoreFinanceiroFilter === 'good' && (score < 60 || score >= 80)) return false;
+        else if (scoreFinanceiroFilter === 'regular' && (score < 40 || score >= 60)) return false;
+        else if (scoreFinanceiroFilter === 'bad' && (score < 0 || score >= 40)) return false;
+      }
       return true;
     });
-  }, [accounts, segmentoFilter, porteFilter, origemFilter]);
+  }, [accounts, segmentoFilter, porteFilter, origemFilter, scoreFinanceiroFilter]);
 
   // Extrair valores únicos para filtros
   const uniqueSegmentos = useMemo(() => 
     [...new Set(accounts.map(a => a.segmento).filter(Boolean))],
-    [accounts]
-  );
-  
-  const uniquePortes = useMemo(() => 
-    [...new Set(accounts.map(a => a.porte).filter(Boolean))],
     [accounts]
   );
   
@@ -127,14 +136,19 @@ export default function Accounts() {
     [accounts]
   );
 
-  // Estatísticas por porte (usando valores normalizados da Receita)
-  const stats = useMemo(() => ({
-    total: accountsData?.total || filteredAccounts.length,
-    pequenas: filteredAccounts.filter(a => ['MEI', 'ME'].includes(a.porte || '')).length,
-    medias: filteredAccounts.filter(a => ['EPP', 'Médio Porte'].includes(a.porte || '')).length,
-    grandes: filteredAccounts.filter(a => a.porte === 'Grande Porte').length,
-    semPorte: filteredAccounts.filter(a => !a.porte).length,
-  }), [accountsData, filteredAccounts]);
+  // Estatísticas por porte canônico (MEI, ME, EPP, Médio Porte, Grande Porte)
+  const stats = useMemo(() => {
+    const byPorte = (target: CanonicalPorte) =>
+      filteredAccounts.filter(a => normalizePorte(a.porte) === target).length;
+    return {
+      total: accountsData?.total || filteredAccounts.length,
+      mei: byPorte('MEI'),
+      me: byPorte('ME'),
+      epp: byPorte('EPP'),
+      medio: byPorte('Médio Porte'),
+      grande: byPorte('Grande Porte'),
+    };
+  }, [accountsData, filteredAccounts]);
 
   // Export para CSV
   const handleExportCSV = () => {
