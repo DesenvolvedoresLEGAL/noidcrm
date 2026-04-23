@@ -17,6 +17,7 @@ import {
   syncEmailReplies,
   type OpportunityEmail,
 } from '@/services/crm/opportunity-emails';
+import { initiateGmailOAuth } from '@/services/crm/sync';
 import {
   Dialog,
   DialogContent,
@@ -288,13 +289,30 @@ export function OpportunityEmailsTab({ opportunityId }: OpportunityEmailsTabProp
           : (result.hint || 'Nenhuma nova resposta encontrada.'),
       });
       if (result.synced > 0) loadEmails();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao sincronizar respostas:', error);
-      toast({
-        title: 'Erro',
-        description: 'Não foi possível sincronizar respostas. Verifique se o Gmail está conectado nas configurações.',
-        variant: 'destructive',
-      });
+      if (error?.reauthRequired) {
+        toast({
+          title: 'Reconexão necessária',
+          description: 'A conexão com o Gmail expirou. Vamos reconectar para concluir a sincronização.',
+        });
+        try {
+          await initiateGmailOAuth(window.location.pathname);
+          return;
+        } catch {
+          toast({
+            title: 'Erro',
+            description: 'Não foi possível iniciar a reconexão do Gmail.',
+            variant: 'destructive',
+          });
+        }
+      } else {
+        toast({
+          title: 'Erro',
+          description: error?.message || 'Não foi possível sincronizar respostas.',
+          variant: 'destructive',
+        });
+      }
     } finally {
       setSyncing(false);
     }
