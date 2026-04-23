@@ -13,6 +13,7 @@ interface AccountData {
   nome_fantasia: string | null;
   segmento: string | null;
   tamanho: string | null;
+  porte: string | null;
   capital_social: number | null;
   cnpj: string | null;
   telefones: any;
@@ -281,7 +282,19 @@ async function calculateFitScore(_supabase: any, account: AccountData) {
     }
   }
 
-  if (account.tamanho) {
+  // Porte (oficial Receita Federal) — prioridade sobre `tamanho` legacy.
+  const portePoints: Record<string, number> = {
+    'Grande Porte': 20,
+    'Médio Porte': 15,
+    'EPP': 10,
+    'ME': 5,
+    'MEI': 3,
+  };
+  if (account.porte && portePoints[account.porte] !== undefined) {
+    factors.porte = portePoints[account.porte];
+    score += factors.porte;
+  } else if (account.tamanho) {
+    // Fallback legacy (campo manual)
     const sizePoints: Record<string, number> = {
       Grande: 20,
       'Média': 15,

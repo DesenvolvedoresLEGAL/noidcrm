@@ -19,7 +19,7 @@ interface LeadScoreTableProps {
   setFilters: (filters: LeadScoreFilters | ((prev: LeadScoreFilters) => LeadScoreFilters)) => void;
   filterOptions: {
     segments: (string | null)[];
-    sizes: (string | null)[];
+    portes: (string | null)[];
   };
   isLoading: boolean;
 }
@@ -54,7 +54,7 @@ export function LeadScoreTable({ leads, filters, setFilters, filterOptions, isLo
     setFilters({});
   };
 
-  const hasActiveFilters = filters.grade || filters.segment || filters.size || filters.search;
+  const hasActiveFilters = filters.grade || filters.segment || filters.porte || filters.search;
 
   if (isLoading) {
     return (
@@ -131,16 +131,16 @@ export function LeadScoreTable({ leads, filters, setFilters, filterOptions, isLo
           </Select>
           
           <Select 
-            value={filters.size || 'all'} 
-            onValueChange={(v) => setFilters(prev => ({ ...prev, size: v === 'all' ? null : v }))}
+            value={filters.porte || 'all'} 
+            onValueChange={(v) => setFilters(prev => ({ ...prev, porte: v === 'all' ? null : v }))}
           >
             <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Tamanho" />
+              <SelectValue placeholder="Porte" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos Tamanhos</SelectItem>
-              {filterOptions.sizes.map(size => (
-                <SelectItem key={size} value={size!}>{size}</SelectItem>
+              <SelectItem value="all">Todos Portes</SelectItem>
+              {filterOptions.portes.map(p => (
+                <SelectItem key={p} value={p!}>{p}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -158,7 +158,7 @@ export function LeadScoreTable({ leads, filters, setFilters, filterOptions, isLo
                 <TableHead className="text-center">INTENT</TableHead>
                 <TableHead className="text-center">Lead Score</TableHead>
                 <TableHead>Segmento</TableHead>
-                <TableHead>Tamanho</TableHead>
+                <TableHead>Porte</TableHead>
                 <TableHead className="text-right">Ação</TableHead>
               </TableRow>
             </TableHeader>
@@ -217,7 +217,7 @@ export function LeadScoreTable({ leads, filters, setFilters, filterOptions, isLo
                     )}
                   </TableCell>
                   <TableCell>
-                    {lead.tamanho || <span className="text-muted-foreground text-xs">N/A</span>}
+                    {lead.porte || <span className="text-muted-foreground text-xs">N/A</span>}
                   </TableCell>
                   <TableCell className="text-right">
                     <Button

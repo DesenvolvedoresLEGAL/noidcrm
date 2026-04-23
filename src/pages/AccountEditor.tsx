@@ -22,6 +22,7 @@ import { createContact } from '@/services/crm/contacts';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { accountKeys, contactKeys, opportunityKeys } from '@/lib/query-keys';
+import { cnaeToSegmento } from '@/lib/cnae-to-segmento';
 // Helper: transforma string vazia em null para campos UUID/opcionais
 const emptyToNull = (v: string | null | undefined) => (v === '' ? null : v);
 
@@ -48,6 +49,7 @@ const accountSchema = z.object({
   inscricao_estadual: z.string().optional().nullable().transform(emptyToNull),
   inscricao_municipal: z.string().optional().nullable().transform(emptyToNull),
   cnae: z.union([z.string(), z.number()]).optional().nullable().transform((v) => v === '' || v === null || v === undefined ? null : String(v)),
+  cnaes_secundarios: z.array(z.string()).optional().nullable(),
   porte: z.string().optional().nullable().transform(emptyToNull),
   situacao_cadastral: z.string().optional().nullable().transform(emptyToNull),
   data_situacao_cadastral: z.string().optional().nullable().transform(emptyToNull),
@@ -146,6 +148,7 @@ export default function AccountEditor() {
         inscricao_estadual: account.inscricao_estadual || '',
         inscricao_municipal: account.inscricao_municipal || '',
         cnae: account.cnae || '',
+        cnaes_secundarios: account.cnaes_secundarios || [],
         porte: account.porte || '',
         situacao_cadastral: account.situacao_cadastral || '',
         data_situacao_cadastral: account.data_situacao_cadastral || '',
@@ -200,6 +203,17 @@ export default function AccountEditor() {
       setValue('situacao_cadastral', data.situacao_cadastral || '', { shouldDirty: true });
       setValue('data_fundacao', data.data_fundacao || '', { shouldDirty: true });
       setValue('cnae', data.cnae_principal?.codigo || '', { shouldDirty: true });
+      setValue(
+        'cnaes_secundarios',
+        data.cnaes_secundarios?.map((c) => String(c.codigo)) || [],
+        { shouldDirty: true }
+      );
+      // Inferir segmento via CNAE principal (somente se ainda estiver vazio)
+      const segmentoInferido = cnaeToSegmento(data.cnae_principal?.codigo);
+      const currentSegmento = watch('segmento');
+      if (segmentoInferido && !currentSegmento) {
+        setValue('segmento', segmentoInferido, { shouldDirty: true });
+      }
       setValue('opcao_simples', data.opcao_simples || false, { shouldDirty: true });
       setValue('opcao_mei', data.opcao_mei || false, { shouldDirty: true });
       
@@ -891,7 +905,7 @@ export default function AccountEditor() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="tamanho">Tamanho da Empresa</Label>
+                      <Label htmlFor="tamanho">Faixa de Funcionários (opcional)</Label>
                       <Controller
                         name="tamanho"
                         control={control}

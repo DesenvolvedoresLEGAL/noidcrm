@@ -13,6 +13,7 @@ import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { createAccount, updateAccount, lookupCNPJ, type Account, createAccountPartner } from '@/services/crm/accounts';
 import { listOrigins, type OriginWithGroup } from '@/services/crm/origins';
 import { accountKeys, opportunityKeys } from '@/lib/query-keys';
+import { cnaeToSegmento } from '@/lib/cnae-to-segmento';
 import { useOrganizationUsers } from '@/hooks/useOrganizationUsers';
 import { useState, useEffect } from 'react';
 import { Search, Loader2, Building2, MapPin, Mail, Users, Briefcase, FileText, User, GitBranch } from 'lucide-react';
@@ -204,6 +205,12 @@ export function AccountModalTabs({ open, onOpenChange, account }: AccountModalTa
       setValue('data_fundacao', data.data_fundacao || '');
       setValue('cnae', data.cnae_principal?.codigo || '');
       setValue('cnaes_secundarios', data.cnaes_secundarios?.map(c => String(c.codigo)) || []);
+      // Inferir segmento via CNAE principal (somente se ainda estiver vazio)
+      const segmentoInferido = cnaeToSegmento(data.cnae_principal?.codigo);
+      const currentSegmento = watch('segmento');
+      if (segmentoInferido && !currentSegmento) {
+        setValue('segmento', segmentoInferido);
+      }
       setValue('opcao_simples', data.opcao_simples || false);
       setValue('opcao_mei', data.opcao_mei || false);
       
