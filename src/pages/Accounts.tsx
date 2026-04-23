@@ -111,7 +111,7 @@ export default function Accounts() {
       }
       if (origemFilter !== 'all' && account.origem_principal !== origemFilter) return false;
       if (scoreFinanceiroFilter !== 'all') {
-        const score = account.score_financeiro;
+        const score = (account as Account & { score_financeiro?: number | null }).score_financeiro;
         if (scoreFinanceiroFilter === 'none') {
           if (score !== null && score !== undefined) return false;
         } else if (score === null || score === undefined) {
