@@ -55,6 +55,38 @@ export function LeadScoreDashboard() {
     },
   });
 
+  const aiBatchMutation = useMutation({
+    mutationFn: async () => {
+      if (!organization?.id) throw new Error('Organização não encontrada');
+      const { data, error } = await supabase.functions.invoke('ai-lead-score-batch', {
+        body: { organizationId: organization.id, limit: 200 },
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      toast.success('Análise IA iniciada em background', {
+        description: 'As top 200 contas serão enriquecidas. Atualize em alguns minutos.',
+      });
+    },
+    onError: (e: any) => toast.error('Falha ao iniciar análise IA', { description: e?.message }),
+  });
+
+  const benchmarkMutation = useMutation({
+    mutationFn: async () => {
+      if (!organization?.id) throw new Error('Organização não encontrada');
+      const { data, error } = await supabase.functions.invoke('refresh-segment-benchmarks', {
+        body: { organizationId: organization.id },
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => toast.success('Benchmarks por segmento atualizados'),
+    onError: (e: any) => toast.error('Falha ao atualizar benchmarks', { description: e?.message }),
+  });
+
+  const isAIBatchRunning = aiBatchMutation.isPending;
+
   // Poll job status while recalculation runs
   useEffect(() => {
     if (!activeJobId) return;
