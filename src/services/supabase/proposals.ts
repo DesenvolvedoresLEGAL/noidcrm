@@ -44,6 +44,22 @@ const proposalSchema = z.object({
   currency: z.enum(['BRL', 'USD', 'EUR']).optional().nullable(),
 }).passthrough();
 
+const TERMINAL_PROPOSAL_STATUSES = new Set(['accepted', 'rejected']);
+
+function isProposalTerminal(proposal?: {
+  status?: string | null;
+  accepted_at?: string | null;
+  declined_at?: string | null;
+} | null) {
+  if (!proposal) return false;
+
+  return (
+    TERMINAL_PROPOSAL_STATUSES.has(proposal.status ?? '') ||
+    Boolean(proposal.accepted_at) ||
+    Boolean(proposal.declined_at)
+  );
+}
+
 export async function sendProposal(id: string): Promise<Proposal> {
   const { data, error } = await supabase
     .from('proposals')
@@ -296,7 +312,7 @@ export async function updateProposal(id: string, dto: unknown): Promise<Proposal
   // Fetch current proposal to get version for increment
   const { data: currentProposal, error: fetchError } = await supabase
     .from('proposals')
-    .select('proposal_version')
+    .select('proposal_version, status, accepted_at, declined_at')
     .eq('id', id)
     .single();
 
@@ -326,7 +342,28 @@ export async function updateProposal(id: string, dto: unknown): Promise<Proposal
   if (validated.notes !== undefined) updateData.notes = validated.notes;
   if (validated.layout_id !== undefined) updateData.layout_id = validated.layout_id === '' ? null : validated.layout_id;
   if (validated.currency !== undefined) updateData.currency = validated.currency;
-  if (validated.status !== undefined) updateData.status = validated.status;
+  if (validated.status !== undefined) {
+    if (validated.status === 'accepted') {
+      updateData.status = 'accepted';
+      updateData.accepted_at = currentProposal?.accepted_at ?? new Date().toISOString();
+      updateData.declined_at = null;
+      updateData.signature_status = 'accepted';
+    } else if (validated.status === 'rejected') {
+      updateData.status = 'rejected';
+      updateData.declined_at = currentProposal?.declined_at ?? new Date().toISOString();
+    } else if (!isProposalTerminal(currentProposal)) {
+      updateData.status = validated.status;
+      if (validated.status === 'sent') {
+        updateData.sent_at = new Date().toISOString();
+      }
+    } else {
+      console.warn('[updateProposal] ignoring terminal status downgrade attempt', {
+        proposalId: id,
+        currentStatus: currentProposal?.status,
+        requestedStatus: validated.status,
+      });
+    }
+  }
   if (validated.pdf_url !== undefined) updateData.pdf_url = validated.pdf_url;
 
   const { data, error } = await supabase
@@ -377,7 +414,7 @@ export async function sendProposalEmail(id: string, recipientEmail: string, reci
   // Get proposal details for email content
   const { data: proposal } = await supabase
     .from('proposals')
-    .select('title, public_token, pdf_url, opportunity_id')
+    .select('title, public_token, pdf_url, opportunity_id, status, accepted_at, declined_at')
     .eq('id', id)
     .single();
 
@@ -417,8 +454,12 @@ export async function sendProposalEmail(id: string, recipientEmail: string, reci
     throw new Error(errorMessage);
   }
 
-  // Update proposal status
-  await supabase.from('proposals').update({ status: 'sent', sent_at: new Date().toISOString() }).eq('id', id);
+  if (!isProposalTerminal(proposal)) {
+    await supabase
+      .from('proposals')
+      .update({ status: 'sent', sent_at: new Date().toISOString() })
+      .eq('id', id);
+  }
 }
 
 // New functions for advanced features
@@ -548,14 +589,27 @@ export async function generatePublicToken(proposalId: string): Promise<string> {
   crypto.getRandomValues(array);
   const token = Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
 
+  const { data: currentProposal, error: proposalError } = await supabase
+    .from('proposals')
+    .select('status, accepted_at, declined_at')
+    .eq('id', proposalId)
+    .single();
+
+  if (proposalError) throw proposalError;
+
   // Update proposal with token AND change status to 'sent' to allow public access
+  const updateData: Record<string, any> = {
+    public_token: token,
+  };
+
+  if (!isProposalTerminal(currentProposal)) {
+    updateData.status = 'sent';
+    updateData.sent_at = new Date().toISOString();
+  }
+
   const { error: updateError } = await supabase
     .from('proposals')
-    .update({ 
-      public_token: token,
-      status: 'sent',
-      sent_at: new Date().toISOString(),
-    })
+    .update(updateData)
     .eq('id', proposalId);
 
   if (updateError) throw updateError;
