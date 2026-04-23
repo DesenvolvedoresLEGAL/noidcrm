@@ -53,7 +53,7 @@ export function LeadScoreFormulaInfo() {
             </div>
             <ul className="space-y-2 text-sm">
               <Row label="Segmento premium (Eventos, Tecnologia, Marketing, Financeiro, Corporativo)" max="25 pts" />
-              <Row label="Tamanho da empresa (Grande=20, Média=15, Pequena=10, Micro=5)" max="20 pts" />
+              <Row label="Porte da empresa (Grande Porte=20, Médio=15, EPP=10, ME=5, MEI=3)" max="20 pts" />
               <Row label="Capital social (≥1M=15, ≥100k=10, demais=5)" max="15 pts" />
               <Row label="Localização (SP/RJ=15, MG/RS/PR/SC=10, demais=5)" max="15 pts" />
               <Row label="Dados completos (CNPJ, telefone, e-mail, cidade/UF, segmento)" max="25 pts" />

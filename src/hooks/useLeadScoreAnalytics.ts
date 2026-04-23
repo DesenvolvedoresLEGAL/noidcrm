@@ -9,7 +9,7 @@ export interface LeadScoreFilters {
   grade?: string | null;
   grades?: string[] | null; // multi-grade filter (e.g. D and F as "frios")
   segment?: string | null;
-  size?: string | null;
+  porte?: string | null;
   search?: string;
   // Custom analytic filters from insights
   custom?: 'low_fit_high_intent' | null;
@@ -21,6 +21,7 @@ export interface LeadWithScore {
   nome_fantasia: string | null;
   segmento: string | null;
   tamanho: string | null;
+  porte: string | null;
   lead_score: number | null;
   lead_grade: string | null;
   fit_score: number | null;
@@ -44,7 +45,7 @@ async function fetchAllLeads(orgId: string): Promise<LeadWithScore[]> {
     const { data, error } = await supabase
       .from('accounts')
       .select(
-        'id, razao_social, nome_fantasia, segmento, tamanho, lead_score, lead_grade, fit_score, intent_score, score_updated_at, owner_user_id, lifecycle_stage, cidade, uf'
+        'id, razao_social, nome_fantasia, segmento, tamanho, porte, lead_score, lead_grade, fit_score, intent_score, score_updated_at, owner_user_id, lifecycle_stage, cidade, uf'
       )
       .eq('organization_id', orgId)
       .is('deleted_at', null)
@@ -86,7 +87,7 @@ export function useLeadScoreAnalytics() {
         return false;
       }
       if (filters.segment && lead.segmento !== filters.segment) return false;
-      if (filters.size && lead.tamanho !== filters.size) return false;
+      if (filters.porte && lead.porte !== filters.porte) return false;
       if (filters.custom === 'low_fit_high_intent') {
         if ((lead.fit_score || 0) >= 50 || (lead.intent_score || 0) < 70) return false;
       }
@@ -178,12 +179,12 @@ export function useLeadScoreAnalytics() {
 
   // Get unique values for filters (deduped + normalized)
   const filterOptions = useMemo(() => {
-    if (!leads) return { segments: [], sizes: [] };
+    if (!leads) return { segments: [], portes: [] };
 
     const segments = uniqueNormalizedSegments(leads.map((l) => l.segmento));
-    const sizes = [...new Set(leads.map((l) => l.tamanho).filter(Boolean))] as string[];
+    const portes = [...new Set(leads.map((l) => l.porte).filter(Boolean))] as string[];
 
-    return { segments, sizes };
+    return { segments, portes };
   }, [leads]);
 
   const clearFilters = () => setFilters({});
