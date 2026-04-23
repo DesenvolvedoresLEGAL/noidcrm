@@ -1,4 +1,5 @@
 import { LeadScoreCard } from '@/components/scoring/LeadScoreCard';
+import { AccountLeadScoreAIPanel } from '@/components/scoring/lead/AccountLeadScoreAIPanel';
 import { AccountDetails } from '@/hooks/useAccountDetails';
 import { useAccountScoring } from '@/hooks/useAccountScoring';
 
@@ -24,6 +25,7 @@ export function AccountSidebar({ account }: AccountSidebarProps) {
         isRecalculating={isRecalculating}
         showRecommendations
       />
+      <AccountLeadScoreAIPanel accountId={account.id} />
     </div>
   );
 }
