@@ -14,6 +14,8 @@ import { createAccount, updateAccount, lookupCNPJ, type Account, createAccountPa
 import { listOrigins, type OriginWithGroup } from '@/services/crm/origins';
 import { accountKeys, opportunityKeys } from '@/lib/query-keys';
 import { cnaeToSegmento } from '@/lib/cnae-to-segmento';
+import { TIPO_EMPRESA_OPTIONS, SEGMENTO_OPTIONS, normalizeTipoEmpresa, withCurrentValue } from '@/lib/account-options';
+import { normalizeSegmento } from '@/lib/segment-normalizer';
 import { useOrganizationUsers } from '@/hooks/useOrganizationUsers';
 import { useState, useEffect } from 'react';
 import { Search, Loader2, Building2, MapPin, Mail, Users, Briefcase, FileText, User, GitBranch } from 'lucide-react';
@@ -34,6 +36,7 @@ const accountSchema = z.object({
   situacao_cadastral: z.string().optional(),
   owner_user_id: z.string().optional(),
   cs_user_id: z.string().optional(),
+  pre_sales_user_id: z.string().optional(),
   parent_account_id: z.string().optional(),
   
   // Dados Principais - PF
@@ -94,7 +97,12 @@ export function AccountModalTabs({ open, onOpenChange, account }: AccountModalTa
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const isEditing = !!account;
-  const { users } = useOrganizationUsers();
+  const acc = account as any;
+  const { users } = useOrganizationUsers([
+    acc?.owner_user_id,
+    acc?.cs_user_id,
+    acc?.pre_sales_user_id,
+  ]);
   
   const [isLoadingCNPJ, setIsLoadingCNPJ] = useState(false);
   const [cnpjToLookup, setCnpjToLookup] = useState('');
@@ -116,16 +124,17 @@ export function AccountModalTabs({ open, onOpenChange, account }: AccountModalTa
   // Reset form when modal opens or account changes
   useEffect(() => {
     if (open) {
-      const acc = account as any;
+      // (acc declared at component scope)
       reset({
         tipo_pessoa: acc?.tipo_pessoa || 'PJ',
         cnpj: acc?.cnpj || '',
         razao_social: acc?.razao_social || '',
         nome_fantasia: acc?.nome_fantasia || '',
-        tipo_empresa: acc?.tipo_empresa || '',
+        tipo_empresa: normalizeTipoEmpresa(acc?.tipo_empresa) || '',
         situacao_cadastral: acc?.situacao_cadastral || '',
         owner_user_id: acc?.owner_user_id || '',
         cs_user_id: acc?.cs_user_id || '',
+        pre_sales_user_id: acc?.pre_sales_user_id || '',
         parent_account_id: acc?.parent_account_id || '',
         cpf: acc?.cpf || '',
         rg: acc?.rg || '',
