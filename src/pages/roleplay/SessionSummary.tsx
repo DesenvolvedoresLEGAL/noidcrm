@@ -132,16 +132,33 @@ export default function SessionSummary() {
     setUnlockedBadge(null);
   };
 
-  if (loadingSession || loadingInsights || loadingRecs) {
+  if (loadingSession) {
     return (
       <Layout>
         <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4">
           <LoadingSpinner />
-          <p className="text-muted-foreground">Processando avaliação...</p>
+          <p className="text-muted-foreground">Carregando sessão...</p>
         </div>
       </Layout>
     );
   }
+
+  // If session loaded but evaluation hasn't been computed yet, show processing state.
+  // The session query polls every 2s, so this updates automatically when ready.
+  if (session && session.score_overall == null) {
+    return (
+      <Layout>
+        <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4 p-8 text-center">
+          <LoadingSpinner />
+          <h2 className="text-2xl font-bold">Avaliando seu treino...</h2>
+          <p className="text-muted-foreground max-w-md">
+            Nossa IA está analisando a conversa, calculando notas por dimensão e gerando feedback detalhado. Isso pode levar até 30 segundos.
+          </p>
+        </div>
+      </Layout>
+    );
+  }
+
 
   if (!session) {
     return (
