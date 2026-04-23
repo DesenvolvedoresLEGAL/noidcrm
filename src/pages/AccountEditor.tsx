@@ -23,6 +23,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { accountKeys, contactKeys, opportunityKeys } from '@/lib/query-keys';
 import { cnaeToSegmento } from '@/lib/cnae-to-segmento';
+import { TIPO_EMPRESA_OPTIONS, SEGMENTO_OPTIONS, normalizeTipoEmpresa, withCurrentValue } from '@/lib/account-options';
+import { normalizeSegmento } from '@/lib/segment-normalizer';
 // Helper: transforma string vazia em null para campos UUID/opcionais
 const emptyToNull = (v: string | null | undefined) => (v === '' ? null : v);
 
@@ -42,6 +44,7 @@ const accountSchema = z.object({
   tipo_empresa: z.string().optional().nullable().transform(emptyToNull),
   owner_user_id: z.string().optional().nullable().transform(emptyToNull),
   cs_user_id: z.string().optional().nullable().transform(emptyToNull),
+  pre_sales_user_id: z.string().optional().nullable().transform(emptyToNull),
   // Dados Cadastrais
   natureza_juridica: z.string().optional().nullable().transform(emptyToNull),
   data_fundacao: z.string().optional().nullable().transform(emptyToNull),
@@ -102,7 +105,11 @@ export default function AccountEditor() {
   const [isCreatingContacts, setIsCreatingContacts] = useState(false);
 
   const { data: account, isLoading: accountLoading, error: accountError } = useAccountDetails(id!);
-  const { users, loading: usersLoading } = useOrganizationUsers();
+  const { users, loading: usersLoading } = useOrganizationUsers([
+    account?.owner_user_id,
+    account?.cs_user_id,
+    (account as any)?.pre_sales_user_id,
+  ]);
 
   const { data: originsData } = useQuery({
     queryKey: ['origins'],
@@ -139,9 +146,10 @@ export default function AccountEditor() {
         cnpj: account.cnpj || '',
         razao_social: account.razao_social || '',
         nome_fantasia: account.nome_fantasia || '',
-        tipo_empresa: account.tipo_empresa || '',
+        tipo_empresa: normalizeTipoEmpresa(account.tipo_empresa) || '',
         owner_user_id: account.owner_user_id || '',
         cs_user_id: account.cs_user_id || '',
+        pre_sales_user_id: (account as any).pre_sales_user_id || '',
         natureza_juridica: account.natureza_juridica || '',
         data_fundacao: account.data_fundacao || '',
         capital_social: account.capital_social || null,
@@ -169,7 +177,7 @@ export default function AccountEditor() {
         instagram: account.instagram || '',
         facebook: account.facebook || '',
         email_nota_fiscal: account.email_nota_fiscal || '',
-        segmento: account.segmento || '',
+        segmento: normalizeSegmento(account.segmento) || '',
         tamanho: account.tamanho || '',
         origem_principal: account.origem_principal || '',
         observacoes: account.observacoes || '',
