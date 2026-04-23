@@ -101,14 +101,11 @@ Deno.serve(async (req: Request) => {
       // sem body, usa default
     }
 
-    // Busca contas elegíveis: CNPJ sem CNAE, não deletadas
-    const { data: accounts, error: selErr } = await admin
-      .from('accounts')
-      .select('id, cnpj, razao_social')
-      .is('deleted_at', null)
-      .not('cnpj', 'is', null)
-      .is('cnae', null)
-      .limit(batchSize);
+    // Busca rápida via RPC com timeout estendido (evita statement_timeout)
+    const { data: accounts, error: selErr } = await admin.rpc(
+      'fn_list_accounts_for_segmento_backfill',
+      { p_limit: batchSize },
+    );
 
     if (selErr) throw selErr;
 
@@ -116,40 +113,48 @@ Deno.serve(async (req: Request) => {
       processed: 0,
       updated: 0,
       failed: 0,
-      remaining: 0,
+      remaining: (accounts as unknown[])?.length === batchSize ? -1 : 0,
       errors: [],
     };
 
-    for (const acc of accounts ?? []) {
-      result.processed++;
-      const res = await processOne(admin, acc as never);
-      if (res.ok) {
-        result.updated++;
-      } else {
-        result.failed++;
-        result.errors.push({
-          account_id: (acc as { id: string }).id,
-          cnpj: (acc as { cnpj: string }).cnpj,
-          error: res.error || 'erro desconhecido',
-        });
+    // Processa em background (não bloqueia o response)
+    const job = (async () => {
+      for (const acc of (accounts ?? []) as Array<{
+        id: string;
+        cnpj: string;
+        razao_social: string;
+      }>) {
+        result.processed++;
+        const res = await processOne(admin, acc);
+        if (res.ok) result.updated++;
+        else {
+          result.failed++;
+          result.errors.push({
+            account_id: acc.id,
+            cnpj: acc.cnpj,
+            error: res.error || 'erro desconhecido',
+          });
+        }
+        await new Promise((r) => setTimeout(r, 250));
       }
-      // Throttle leve para não estourar rate limit da OpenCNPJ
-      await new Promise((r) => setTimeout(r, 250));
-    }
+      console.log('[backfill-accounts-segmento] lote concluído:', result);
+    })();
 
-    // Quantos ainda restam após este lote
-    const { count } = await admin
-      .from('accounts')
-      .select('id', { count: 'exact', head: true })
-      .is('deleted_at', null)
-      .not('cnpj', 'is', null)
-      .is('cnae', null);
-    result.remaining = count ?? 0;
+    // @ts-ignore - EdgeRuntime disponível em Deno Deploy
+    if (typeof EdgeRuntime !== 'undefined') EdgeRuntime.waitUntil(job);
+    else await job;
 
-    return new Response(JSON.stringify(result), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200,
-    });
+    return new Response(
+      JSON.stringify({
+        ok: true,
+        message: 'Backfill iniciado em background',
+        batch_size: (accounts as unknown[])?.length ?? 0,
+      }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 202,
+      },
+    );
   } catch (e) {
     console.error('[backfill-accounts-segmento] erro:', e);
     return new Response(
