@@ -30,6 +30,115 @@ function generateMessageId(emailId: string, domain: string): string {
   return `<${emailId}@${domain}>`;
 }
 
+async function backgroundGmailThreadLookup(params: {
+  supabaseAdmin: any;
+  emailRecordId: string;
+  userId: string;
+  fromEmail: string;
+  toEmail: string;
+  subject: string;
+  messageIdHeader?: string;
+}) {
+  const { supabaseAdmin, emailRecordId, userId, fromEmail, toEmail, subject, messageIdHeader } = params;
+  const delays = [3000, 20000, 90000];
+
+  for (let attempt = 0; attempt < delays.length; attempt++) {
+    await new Promise((resolve) => setTimeout(resolve, delays[attempt]));
+
+    try {
+      const { data: current } = await supabaseAdmin
+        .from('opportunity_emails')
+        .select('gmail_thread_id')
+        .eq('id', emailRecordId)
+        .maybeSingle();
+
+      if (current?.gmail_thread_id) return;
+
+      const { data: syncConfig } = await supabaseAdmin
+        .from('email_sync_config')
+        .select('id, access_token_encrypted, token_expires_at, refresh_token_encrypted')
+        .eq('user_id', userId)
+        .eq('provider', 'gmail')
+        .eq('sync_enabled', true)
+        .maybeSingle();
+
+      if (!syncConfig?.access_token_encrypted) return;
+
+      let accessToken = syncConfig.access_token_encrypted;
+
+      if (syncConfig.token_expires_at && new Date(syncConfig.token_expires_at) < new Date()) {
+        const clientId = Deno.env.get('GOOGLE_CLIENT_ID');
+        const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET');
+        if (clientId && clientSecret && syncConfig.refresh_token_encrypted) {
+          const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+              client_id: clientId,
+              client_secret: clientSecret,
+              refresh_token: syncConfig.refresh_token_encrypted,
+              grant_type: 'refresh_token',
+            }),
+          });
+          const tokenData = await tokenResponse.json();
+          if (tokenData.access_token) {
+            accessToken = tokenData.access_token;
+            await supabaseAdmin
+              .from('email_sync_config')
+              .update({
+                access_token_encrypted: tokenData.access_token,
+                token_expires_at: new Date(Date.now() + tokenData.expires_in * 1000).toISOString(),
+              })
+              .eq('id', syncConfig.id);
+          }
+        }
+      }
+
+      let foundMessage: { id: string; threadId: string } | null = null;
+
+      if (messageIdHeader) {
+        const bareId = messageIdHeader.replace(/^<|>$/g, '');
+        const searchUrl = `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(`rfc822msgid:${bareId}`)}&maxResults=1`;
+        const searchResponse = await fetch(searchUrl, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+
+        if (searchResponse.ok) {
+          const searchData = await searchResponse.json();
+          foundMessage = searchData.messages?.[0] ?? null;
+        }
+      }
+
+      if (!foundMessage) {
+        const cleanSubject = subject.replace(/"/g, '');
+        const fallbackQuery = `from:${fromEmail} to:${toEmail} subject:"${cleanSubject}" newer_than:1d`;
+        const searchUrl = `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(fallbackQuery)}&maxResults=1`;
+        const searchResponse = await fetch(searchUrl, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+
+        if (searchResponse.ok) {
+          const searchData = await searchResponse.json();
+          foundMessage = searchData.messages?.[0] ?? null;
+        }
+      }
+
+      if (foundMessage?.threadId) {
+        await supabaseAdmin
+          .from('opportunity_emails')
+          .update({
+            gmail_message_id: foundMessage.id,
+            gmail_thread_id: foundMessage.threadId,
+          })
+          .eq('id', emailRecordId);
+        return;
+      }
+    } catch (gmailError) {
+      console.error('[send-smtp-email] Gmail thread lookup failed:', gmailError);
+    }
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -137,6 +246,13 @@ serve(async (req) => {
       ? generateMessageId(emailRecord.id, emailDomain)
       : undefined;
 
+    if (emailRecord?.id && customMessageId) {
+      await supabaseAdmin
+        .from('opportunity_emails')
+        .update({ message_id_header: customMessageId })
+        .eq('id', emailRecord.id);
+    }
+
     // Step 4: Send via SMTP
     const client = new SMTPClient({
       connection: {
@@ -163,78 +279,28 @@ serve(async (req) => {
     };
 
     if (customMessageId) {
-      sendOptions.headers = {
-        'Message-ID': customMessageId,
-      };
+      sendOptions.headers = new Map<string, string>([['Message-ID', customMessageId]]);
     }
 
     await client.send(sendOptions);
     await client.close();
 
-    // Step 5: After sending, try to find the Gmail thread_id via Gmail API
-    // This runs in the background - failures here don't affect the response
     if (emailRecord?.id) {
       try {
-        // Get user's Gmail sync config for access token
-        const { data: syncConfig } = await supabaseAdmin
-          .from('email_sync_config')
-          .select('access_token_encrypted, token_expires_at, refresh_token_encrypted')
-          .eq('user_id', user.id)
-          .eq('provider', 'gmail')
-          .eq('sync_enabled', true)
-          .maybeSingle();
-
-        if (syncConfig?.access_token_encrypted) {
-          let accessToken = syncConfig.access_token_encrypted;
-
-          // Refresh if expired
-          if (syncConfig.token_expires_at && new Date(syncConfig.token_expires_at) < new Date()) {
-            const clientId = Deno.env.get('GOOGLE_CLIENT_ID');
-            const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET');
-            if (clientId && clientSecret && syncConfig.refresh_token_encrypted) {
-              const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: new URLSearchParams({
-                  client_id: clientId,
-                  client_secret: clientSecret,
-                  refresh_token: syncConfig.refresh_token_encrypted,
-                  grant_type: 'refresh_token',
-                }),
-              });
-              const tokenData = await tokenResponse.json();
-              if (tokenData.access_token) {
-                accessToken = tokenData.access_token;
-              }
-            }
-          }
-
-          // Search Gmail for the message we just sent
-          const searchQuery = `from:${smtpConfig.from_email} to:${toList[0]} subject:"${subject}" newer_than:1h`;
-          const searchUrl = `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(searchQuery)}&maxResults=1`;
-          
-          const searchResponse = await fetch(searchUrl, {
-            headers: { Authorization: `Bearer ${accessToken}` },
-          });
-
-          if (searchResponse.ok) {
-            const searchData = await searchResponse.json();
-            if (searchData.messages?.[0]) {
-              const gmailMsg = searchData.messages[0];
-              // Update the email record with Gmail IDs
-              await supabaseAdmin
-                .from('opportunity_emails')
-                .update({
-                  gmail_message_id: gmailMsg.id,
-                  gmail_thread_id: gmailMsg.threadId,
-                })
-                .eq('id', emailRecord.id);
-            }
-          }
-        }
+        // @ts-ignore EdgeRuntime is available in Supabase Edge Functions
+        EdgeRuntime.waitUntil(
+          backgroundGmailThreadLookup({
+            supabaseAdmin,
+            emailRecordId: emailRecord.id,
+            userId: user.id,
+            fromEmail: smtpConfig.from_email,
+            toEmail: toList[0],
+            subject,
+            messageIdHeader: customMessageId,
+          })
+        );
       } catch (gmailError) {
-        // Non-critical - log but don't fail
-        console.error('[send-smtp-email] Gmail thread lookup failed:', gmailError);
+        console.error('[send-smtp-email] Failed to schedule Gmail thread lookup:', gmailError);
       }
     }
 
