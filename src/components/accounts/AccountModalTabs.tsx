@@ -657,6 +657,28 @@ export function AccountModalTabs({ open, onOpenChange, account }: AccountModalTa
                   )}
                 />
               </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="pre_sales_user_id">Pré-Vendedor Responsável</Label>
+                <Controller
+                  name="pre_sales_user_id"
+                  control={control}
+                  render={({ field }) => (
+                    <Select value={field.value || ''} onValueChange={field.onChange}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione (opcional)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {users.map((user) => (
+                          <SelectItem key={user.id} value={user.id}>
+                            {user.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              </div>
             </TabsContent>
 
             {/* Aba 2: Dados Cadastrais */}
