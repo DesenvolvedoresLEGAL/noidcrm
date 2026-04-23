@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { OpportunityPendingApprovalsCard } from './OpportunityPendingApprovalsCard';
@@ -203,6 +203,7 @@ export function OpportunityEmailsTab({ opportunityId }: OpportunityEmailsTabProp
   const [composerOpen, setComposerOpen] = useState(false);
   const [contactEmail, setContactEmail] = useState<string[]>([]);
   const [contactName, setContactName] = useState<string>('');
+  const autoSyncStartedRef = useRef(false);
   const [searchParams] = useSearchParams();
   const highlightApprovalId = searchParams.get('approval');
   const {
@@ -256,6 +257,36 @@ export function OpportunityEmailsTab({ opportunityId }: OpportunityEmailsTabProp
     loadEmails();
     loadContact();
   }, [opportunityId]);
+
+  useEffect(() => {
+    autoSyncStartedRef.current = false;
+  }, [opportunityId]);
+
+  useEffect(() => {
+    if (loading || syncing || autoSyncStartedRef.current) return;
+    const hasPendingEngagement = emails.some(
+      (email) =>
+        email.direction === 'outbound' &&
+        !email.opened_at &&
+        !email.clicked_at &&
+        !email.gmail_thread_id &&
+        !email.gmail_message_id
+    );
+
+    if (!hasPendingEngagement) return;
+
+    autoSyncStartedRef.current = true;
+    void (async () => {
+      try {
+        const result = await syncEmailReplies(opportunityId);
+        if (result.synced > 0) {
+          await loadEmails();
+        }
+      } catch (error) {
+        console.error('Auto-sync de respostas falhou:', error);
+      }
+    })();
+  }, [emails, loading, opportunityId, syncing]);
 
   // Realtime subscription for new inbound emails
   useEffect(() => {
