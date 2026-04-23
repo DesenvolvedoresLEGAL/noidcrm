@@ -1,54 +1,76 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
-export function useOrganizationUsers() {
-  const [users, setUsers] = useState<Array<{ id: string; name: string; email?: string; avatar_url?: string }>>([]);
+export interface OrgUser {
+  id: string;
+  name: string;
+  email?: string;
+  avatar_url?: string;
+}
+
+/**
+ * Lists active members of the current user's organization.
+ * Optionally accepts `extraUserIds` to ALSO include specific users (e.g. the
+ * currently assigned owner/CS even if they are inactive or missing from the
+ * default member list). This prevents Selects from rendering empty when the
+ * saved value points to a user not returned by the standard query.
+ */
+export function useOrganizationUsers(extraUserIds: Array<string | null | undefined> = []) {
+  const [users, setUsers] = useState<OrgUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+
+  // Stable key for effect deps
+  const extrasKey = extraUserIds
+    .filter((id): id is string => !!id)
+    .sort()
+    .join(',');
 
   useEffect(() => {
     async function fetchUsers() {
       try {
         setLoading(true);
-        
-        // Buscar organização do usuário atual
+
         const orgId = await supabase.rpc('get_user_organization_id');
-        
         if (!orgId.data) {
           throw new Error('User organization not found');
         }
-        
-        // Query 1: Buscar user_ids de membros ATIVOS
+
+        // Active members of the organization
         const { data: activeMembers, error: membersError } = await supabase
           .from('organization_members')
           .select('user_id')
           .eq('organization_id', orgId.data)
           .eq('status', 'active');
-        
+
         if (membersError) throw membersError;
-        
-        if (!activeMembers || activeMembers.length === 0) {
+
+        const memberIds = (activeMembers || []).map((m) => m.user_id);
+        const extras = extrasKey ? extrasKey.split(',') : [];
+        const unionIds = Array.from(new Set([...memberIds, ...extras]));
+
+        if (unionIds.length === 0) {
           setUsers([]);
           return;
         }
-        
-        // Query 2: Buscar profiles dos membros ativos
-        const userIds = activeMembers.map(m => m.user_id);
+
         const { data: profiles, error: profilesError } = await supabase
           .from('profiles')
           .select('user_id, full_name, email, avatar_url')
-          .in('user_id', userIds)
+          .in('user_id', unionIds)
           .eq('organization_id', orgId.data)
           .order('full_name');
-        
+
         if (profilesError) throw profilesError;
-        
-        setUsers(profiles?.map(p => ({
-          id: p.user_id,
-          name: p.full_name || 'Sem nome',
-          email: p.email || undefined,
-          avatar_url: p.avatar_url || undefined
-        })) || []);
+
+        setUsers(
+          (profiles || []).map((p) => ({
+            id: p.user_id,
+            name: p.full_name || 'Sem nome',
+            email: p.email || undefined,
+            avatar_url: p.avatar_url || undefined,
+          })),
+        );
       } catch (err) {
         setError(err as Error);
         console.error('Error fetching users:', err);
@@ -56,9 +78,9 @@ export function useOrganizationUsers() {
         setLoading(false);
       }
     }
-    
+
     fetchUsers();
-  }, []);
+  }, [extrasKey]);
 
   return { users, loading, error };
 }
