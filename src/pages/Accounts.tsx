@@ -16,6 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { extractEmail, extractPhone } from '@/lib/contactFormat';
 import { accountKeys } from '@/lib/query-keys';
+import { normalizePorte, CANONICAL_PORTES, type CanonicalPorte } from '@/lib/porte-normalizer';
 import {
   AlertDialog,
   AlertDialogAction,
