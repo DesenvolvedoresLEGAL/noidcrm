@@ -27111,6 +27111,8 @@ export type Database = {
               similarity: number
             }[]
           }
+      fn_cnae_to_segmento: { Args: { p_cnae: string }; Returns: string }
+      fn_infer_segmento_from_name: { Args: { p_nome: string }; Returns: string }
       generate_acceptance_hash: {
         Args: {
           p_acceptor_document: string
