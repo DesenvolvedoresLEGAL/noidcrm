@@ -15574,7 +15574,7 @@ export type Database = {
           {
             foreignKeyName: "performance_insights_session_id_fkey"
             columns: ["session_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "roleplay_sessions"
             referencedColumns: ["id"]
           },
@@ -23194,7 +23194,7 @@ export type Database = {
           {
             foreignKeyName: "video_recommendations_session_id_fkey"
             columns: ["session_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "roleplay_sessions"
             referencedColumns: ["id"]
           },
