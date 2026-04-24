@@ -329,13 +329,13 @@ export function AccountModalTabs({ open, onOpenChange, account }: AccountModalTa
       };
 
       let accountId: string;
+      let result: any;
       
       if (isEditing) {
-        const result = await updateAccount(account.id, payload);
+        result = await updateAccount(account.id, payload);
         accountId = result.id;
-        return result;
       } else {
-        const result = await createAccount(payload);
+        result = await createAccount(payload);
         accountId = result.id;
         
         // Se temos dados de sócios (QSA), criar os registros
@@ -354,9 +354,16 @@ export function AccountModalTabs({ open, onOpenChange, account }: AccountModalTa
             }
           }
         }
-        
-        return result;
       }
+
+      // Persistir tags
+      try {
+        await setAccountTagsMutation.mutateAsync({ accountId, tagIds: selectedTagIds });
+      } catch (err) {
+        console.error('Erro ao salvar tags da conta:', err);
+      }
+
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: accountKeys.lists() });
