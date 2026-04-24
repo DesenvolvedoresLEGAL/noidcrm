@@ -111,7 +111,7 @@ export default function Accounts() {
     },
   });
 
-  const accounts = accountsData?.data || [];
+  const accounts = useMemo(() => accountsData?.data || [], [accountsData?.data]);
 
   // Tags da organização (lookup id → name/color)
   const { tags: orgTags } = useOrganizationTags();
