@@ -3,6 +3,13 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.76.1";
 
 const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY') ?? Deno.env.get('LOVABLE_API_KEY');
 
+function ensureAbsoluteUrl(value: string | null | undefined): string | null {
+  if (!value || typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  return trimmed.startsWith("http") ? trimmed : `https://${trimmed}`;
+}
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -26,7 +33,7 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // 1. Get prospect data
-    const { data: prospect, error: pErr } = await supabase
+    let { data: prospect, error: pErr } = await supabase
       .from("prospects")
       .select("*")
       .eq("id", prospect_id)
@@ -58,15 +65,47 @@ Deno.serve(async (req) => {
 
     // 3. Scrape website via Firecrawl
     let scrapedContent = "";
-    const website = prospect.website || prospect.normalized_domain;
+    let website = ensureAbsoluteUrl(prospect.website || prospect.normalized_domain);
+    let scrapeTarget = website
+      || ensureAbsoluteUrl(prospect.exhibitor_profile_url)
+      || ensureAbsoluteUrl(prospect.source_url)
+      || ensureAbsoluteUrl(prospect.raw_data?._source_url);
     const FIRECRAWL_API_KEY = Deno.env.get("FIRECRAWL_API_KEY");
 
-    if (website && FIRECRAWL_API_KEY) {
+    if (!website) {
       try {
-        const formattedUrl = website.startsWith("http") ? website : `https://${website}`;
+        const identityResp = await fetch(`${supabaseUrl}/functions/v1/enrich-prospect-identity`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${supabaseKey}`,
+            apikey: supabaseKey,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ prospect_id }),
+        });
+
+        if (identityResp.ok) {
+          const identityData = await identityResp.json();
+          prospect = { ...prospect, ...(identityData?.updates || {}) };
+          website = ensureAbsoluteUrl(prospect.website || prospect.normalized_domain);
+          scrapeTarget = website
+            || ensureAbsoluteUrl(prospect.exhibitor_profile_url)
+            || ensureAbsoluteUrl(prospect.source_url)
+            || ensureAbsoluteUrl(prospect.raw_data?._source_url);
+        } else {
+          console.warn("run-enrichment identity fallback failed", identityResp.status, await identityResp.text());
+        }
+      } catch (identityError) {
+        console.warn("run-enrichment identity fallback exception", identityError);
+      }
+    }
+
+    if (scrapeTarget && FIRECRAWL_API_KEY) {
+      try {
+        const formattedUrl = scrapeTarget;
 
         // Scrape main page
-        const scrapeResp = await fetch("https://api.firecrawl.dev/v1/scrape", {
+        const scrapeResp = await fetch("https://api.firecrawl.dev/v2/scrape", {
           method: "POST",
           headers: { Authorization: `Bearer ${FIRECRAWL_API_KEY}`, "Content-Type": "application/json" },
           body: JSON.stringify({ url: formattedUrl, formats: ["markdown"], onlyMainContent: true }),
@@ -78,13 +117,13 @@ Deno.serve(async (req) => {
         // Map to find additional pages
         let additionalPages: string[] = [];
         try {
-          const mapResp = await fetch("https://api.firecrawl.dev/v1/map", {
+          const mapResp = await fetch("https://api.firecrawl.dev/v2/map", {
             method: "POST",
             headers: { Authorization: `Bearer ${FIRECRAWL_API_KEY}`, "Content-Type": "application/json" },
             body: JSON.stringify({ url: formattedUrl, search: "about products services contact", limit: 10 }),
           });
           const mapData = await mapResp.json();
-          const allLinks: string[] = mapData?.links || [];
+          const allLinks: string[] = mapData?.links || mapData?.data?.links || [];
           const patterns = [/about/i, /produto/i, /product/i, /servic/i, /contact/i, /quem.somos/i, /sobre/i];
           additionalPages = allLinks
             .filter((l: string) => patterns.some((p) => p.test(l)))
@@ -96,7 +135,7 @@ Deno.serve(async (req) => {
         // Scrape additional pages
         for (const pageUrl of additionalPages) {
           try {
-            const pageResp = await fetch("https://api.firecrawl.dev/v1/scrape", {
+            const pageResp = await fetch("https://api.firecrawl.dev/v2/scrape", {
               method: "POST",
               headers: { Authorization: `Bearer ${FIRECRAWL_API_KEY}`, "Content-Type": "application/json" },
               body: JSON.stringify({ url: pageUrl, formats: ["markdown"], onlyMainContent: true }),
@@ -116,7 +155,12 @@ Deno.serve(async (req) => {
           provider_name: "internal_website",
           provider_entity_type: "company",
           provider_status: "completed",
-          raw_response: { content: scrapedContent.slice(0, 50000), pages_scraped: 1 + additionalPages.length },
+          raw_response: {
+            content: scrapedContent.slice(0, 50000),
+            pages_scraped: 1 + additionalPages.length,
+            target_url: formattedUrl,
+            source_type: website ? "official_website" : "directory_fallback",
+          },
           confidence: scrapedContent.length > 200 ? 0.8 : 0.4,
         });
         providersCompleted.push("internal_website");
@@ -135,13 +179,24 @@ Deno.serve(async (req) => {
       }
     } else {
       providersFailed.push("internal_website");
+      await supabase.from("enrichment_provider_results").insert({
+        workspace_id,
+        enrichment_run_id: run.id,
+        provider_name: "internal_website",
+        provider_entity_type: "company",
+        provider_status: "failed",
+        raw_response: {
+          error: FIRECRAWL_API_KEY
+            ? "No website, normalized_domain, exhibitor_profile_url or source_url available for enrichment"
+            : "FIRECRAWL_API_KEY missing",
+        },
+        confidence: 0,
+      });
     }
 
     // 4. AI Synthesis — Company Profile
     let companyProfile: any = null;
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-
-    if (scrapedContent.length > 50 && LOVABLE_API_KEY) {
+    if (scrapedContent.length > 50 && OPENAI_API_KEY) {
       try {
         const analysisResp = await fetch("https://api.openai.com/v1/chat/completions", {
           method: "POST",
@@ -155,7 +210,7 @@ Deno.serve(async (req) => {
               },
               {
                 role: "user",
-                content: `Analise o conteúdo extraído do site desta empresa (${prospect.company_name}, domínio: ${website}).
+                content: `Analise o conteúdo extraído do site desta empresa (${prospect.company_name}, domínio: ${website || scrapeTarget || 'não identificado'}).
 
 Retorne JSON com:
 {
@@ -284,7 +339,7 @@ ${scrapedContent.slice(0, 15000)}`,
 
     // 7. Commercial Brief via AI
     let briefData: any = null;
-    if (companyProfile && LOVABLE_API_KEY) {
+    if (companyProfile && OPENAI_API_KEY) {
       try {
         const briefResp = await fetch("https://api.openai.com/v1/chat/completions", {
           method: "POST",
