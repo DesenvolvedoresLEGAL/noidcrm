@@ -101,6 +101,31 @@ export function LeadSearchForm({ onExecute, isExecuting }: LeadSearchFormProps) 
   };
 
   const handleExecute = () => {
+    // Validação específica do tipo "event": URL precisa estar saneada
+    if (playbookType === 'event') {
+      const { url, error } = sanitizeEventUrl(inputPayload.event_url || '');
+      if (!url) {
+        toast.error(error || 'URL inválida');
+        return;
+      }
+      // Persiste o valor sanitizado no payload antes de enviar
+      const sanitizedPayload = { ...inputPayload, event_url: url };
+      setInputPayload(sanitizedPayload);
+      onExecute({
+        playbookType,
+        icpProfileId: selectedIcpId,
+        inputPayload: sanitizedPayload,
+        importRules: {
+          approvalMode,
+          scoreThreshold,
+          autoImport,
+          autoCreateOpportunity,
+          autoAssignOwner,
+        },
+      });
+      return;
+    }
+
     onExecute({
       playbookType,
       icpProfileId: selectedIcpId,
@@ -114,6 +139,12 @@ export function LeadSearchForm({ onExecute, isExecuting }: LeadSearchFormProps) 
       },
     });
   };
+
+  const eventUrlValidation = useMemo(() => {
+    if (playbookType !== 'event') return null;
+    if (!inputPayload.event_url) return null;
+    return sanitizeEventUrl(inputPayload.event_url);
+  }, [playbookType, inputPayload.event_url]);
 
   return (
     <div className="space-y-6">
