@@ -86,12 +86,24 @@ export function CommercialBriefCard({ brief }: CommercialBriefCardProps) {
         {brief.first_touch_message && (
           <div className="space-y-1">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-muted-foreground uppercase flex items-center gap-1"><MessageSquare className="h-3 w-3" />Mensagem Inicial</span>
+              <span className="text-xs font-semibold text-muted-foreground uppercase flex items-center gap-1">
+                <MessageSquare className="h-3 w-3" />
+                📧 Rascunho de e-mail (você → prospect)
+              </span>
               <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyText(brief.first_touch_message!, 'Mensagem')}>
                 <Copy className="h-3 w-3" />
               </Button>
             </div>
-            <div className="p-3 rounded-md bg-primary/5 border border-primary/10 text-muted-foreground whitespace-pre-wrap">
+            <p className="text-[10px] text-muted-foreground/70 italic">
+              SDR da NOID prospectando esta empresa. Será criado como atividade de e-mail (rascunho) na timeline da oportunidade.
+            </p>
+            {brief.email_subject && (
+              <div className="text-xs px-3 pt-2 pb-1 rounded-t-md bg-primary/5 border border-b-0 border-primary/10">
+                <span className="font-semibold text-muted-foreground">Assunto:</span>{' '}
+                <span className="text-foreground">{brief.email_subject}</span>
+              </div>
+            )}
+            <div className={`p-3 ${brief.email_subject ? 'rounded-t-none rounded-b-md border-t-0' : 'rounded-md'} bg-primary/5 border border-primary/10 text-muted-foreground whitespace-pre-wrap`}>
               {brief.first_touch_message}
             </div>
           </div>
