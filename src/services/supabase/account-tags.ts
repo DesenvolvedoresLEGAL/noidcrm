@@ -46,27 +46,81 @@ export async function setAccountTags(accountId: string, tagIds: string[]): Promi
   if (insErr) throw insErr;
 }
 
+/**
+ * Retorna TODOS os account_ids vinculados a uma tag, paginando para
+ * contornar o limite padrão de 1000 rows do PostgREST.
+ */
+export async function getAccountIdsByTag(tagId: string): Promise<Set<string>> {
+  const ids = new Set<string>();
+  const pageSize = 1000;
+  let from = 0;
+
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const { data, error } = await supabase
+      .from('account_tags')
+      .select('account_id')
+      .eq('tag_id', tagId)
+      .range(from, from + pageSize - 1);
+
+    if (error) {
+      console.error('Error fetching account ids by tag:', error);
+      break;
+    }
+    if (!data || data.length === 0) break;
+
+    for (const r of data) ids.add((r as any).account_id);
+
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
+
+  return ids;
+}
+
 export async function listAccountTagsBulk(
   accountIds: string[],
 ): Promise<Record<string, { id: string; name: string; color: string }[]>> {
   if (accountIds.length === 0) return {};
 
-  const { data, error } = await supabase
-    .from('account_tags')
-    .select('account_id, tag:tags(id, name, color)')
-    .in('account_id', accountIds);
-
-  if (error) {
-    console.error('Error fetching bulk account tags:', error);
-    return {};
-  }
-
   const map: Record<string, { id: string; name: string; color: string }[]> = {};
-  for (const row of data || []) {
-    const tag = (row as any).tag;
-    if (!tag) continue;
-    if (!map[(row as any).account_id]) map[(row as any).account_id] = [];
-    map[(row as any).account_id].push({ id: tag.id, name: tag.name, color: tag.color });
+
+  // Chunks de IDs para evitar URLs muito longas
+  const idChunkSize = 500;
+
+  for (let i = 0; i < accountIds.length; i += idChunkSize) {
+    const idChunk = accountIds.slice(i, i + idChunkSize);
+
+    // Pagina dentro do chunk para escapar do limite de 1000 rows
+    const pageSize = 1000;
+    let from = 0;
+
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const { data, error } = await supabase
+        .from('account_tags')
+        .select('account_id, tag:tags(id, name, color)')
+        .in('account_id', idChunk)
+        .range(from, from + pageSize - 1);
+
+      if (error) {
+        console.error('Error fetching bulk account tags:', error);
+        break;
+      }
+      if (!data || data.length === 0) break;
+
+      for (const row of data) {
+        const tag = (row as any).tag;
+        if (!tag) continue;
+        const accId = (row as any).account_id;
+        if (!map[accId]) map[accId] = [];
+        map[accId].push({ id: tag.id, name: tag.name, color: tag.color });
+      }
+
+      if (data.length < pageSize) break;
+      from += pageSize;
+    }
   }
+
   return map;
 }
