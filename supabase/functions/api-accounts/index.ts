@@ -36,7 +36,7 @@ function normalizeApiKey(rawValue: string | null): string {
 // --- Auth: same X-API-Key SHA-256 pattern as api-deals ---
 async function authenticateApiKey(
   req: Request,
-  supabaseAdmin: ReturnType<typeof createClient>
+  supabaseAdmin: any
 ): Promise<{ organizationId: string; keyId: string } | Response> {
   const rawApiKey =
     req.headers.get("x-api-key") ||
@@ -83,7 +83,7 @@ async function authenticateApiKey(
 // ===================== GET handlers (pull) =====================
 
 async function handleList(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   orgId: string,
   url: URL
 ) {
@@ -139,7 +139,7 @@ async function handleList(
 }
 
 async function handleGet(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   orgId: string,
   url: URL
 ) {
@@ -224,7 +224,7 @@ const ALLOWED_UPDATE_FIELDS = new Set([
 ]);
 
 async function handleWebhook(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   orgId: string,
   body: unknown
 ) {
