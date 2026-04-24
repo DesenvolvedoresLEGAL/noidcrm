@@ -63,6 +63,13 @@ interface AccountCardProps {
 export function AccountCard({ account, onView, onEdit, onDelete }: AccountCardProps) {
   const queryClient = useQueryClient();
 
+  // Tags da conta
+  const { data: tagIds = [] } = useAccountTagIds(account.id);
+  const { tags: orgTags } = useOrganizationTags();
+  const accountTags = orgTags
+    .filter((t) => tagIds.includes(t.id))
+    .map((t) => ({ id: t.id, name: t.name, color: t.color }));
+
   // Mutation para conversão de tipo
   const convertMutation = useMutation({
     mutationFn: ({ accountId, newType }: { accountId: string; newType: 'PJ' | 'PF' }) =>
