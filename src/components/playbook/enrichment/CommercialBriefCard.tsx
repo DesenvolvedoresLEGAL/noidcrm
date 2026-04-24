@@ -13,6 +13,7 @@ interface CommercialBriefCardProps {
     recommended_pitch_angle?: string | null;
     recommended_channel?: string | null;
     first_touch_message?: string | null;
+    email_subject?: string | null;
     objection_predictions?: any;
     confidence?: number | null;
   };
