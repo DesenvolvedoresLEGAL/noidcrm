@@ -47,7 +47,7 @@ serve(async (req) => {
       .select(`
         *,
         account:accounts(razao_social, nome_fantasia),
-        contact:contacts(name, email),
+        contact:contacts(nome, cargo, emails, telefones),
         stage:stages(name),
         pipeline:pipelines(name)
       `)
@@ -153,12 +153,16 @@ serve(async (req) => {
     const context = {
       opportunity: {
         title: opportunity.title,
-        value: opportunity.value,
+        value: opportunity.valor_previsto,
         probability: opportunity.prob,
         stage: opportunity.stage?.name,
         daysInStage: opportunity.days_in_stage,
         temperature: opportunity.temperature,
         status: opportunity.status,
+      },
+      contact: {
+        name: opportunity.contact?.nome,
+        role: opportunity.contact?.cargo,
       },
       account: {
         name: opportunity.account?.razao_social || opportunity.account?.nome_fantasia,

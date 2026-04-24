@@ -74,7 +74,7 @@ Deno.serve(async (req) => {
     if (contactId) {
       const { data } = await supabase
         .from("contacts")
-        .select("id, name, email, phone, position")
+        .select("id, nome, cargo, emails, telefones")
         .eq("id", contactId)
         .maybeSingle();
       contact = data;
@@ -156,10 +156,18 @@ Deno.serve(async (req) => {
       company_state: (account?.uf as string) || null,
       company_zip: (account?.cep as string) || null,
       company_address: account ? [account.logradouro, account.numero, account.complemento, account.bairro].filter(Boolean).join(", ") : null,
-      contact_name: (contact?.name as string) || proposal.client_name || null,
-      contact_email: (contact?.email as string) || proposal.client_email || null,
-      contact_phone: (contact?.phone as string) || null,
-      contact_position: (contact?.position as string) || null,
+      contact_name: (contact?.nome as string) || proposal.client_name || null,
+      contact_email: (Array.isArray(contact?.emails) && contact.emails.length > 0
+        ? (typeof contact.emails[0] === 'string'
+            ? contact.emails[0]
+            : (contact.emails[0] as Record<string, unknown>)?.value)
+        : null) as string | null || proposal.client_email || null,
+      contact_phone: (Array.isArray(contact?.telefones) && contact.telefones.length > 0
+        ? (typeof contact.telefones[0] === 'string'
+            ? contact.telefones[0]
+            : ((contact.telefones[0] as Record<string, unknown>)?.numero || (contact.telefones[0] as Record<string, unknown>)?.value))
+        : null) as string | null,
+      contact_position: (contact?.cargo as string) || null,
       products: (items || []).map((item: Record<string, unknown>) => ({
         id: item.id,
         product_id: item.product_id,
