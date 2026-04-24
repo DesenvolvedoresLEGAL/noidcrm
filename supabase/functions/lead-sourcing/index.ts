@@ -646,7 +646,26 @@ async function handleEventFirecrawl(
   accounts: any[],
   startTime: number
 ) {
-  const eventUrl = config.event_url;
+  // ── Sanitização defensiva da URL do evento ──
+  // Protege contra inputs como "https://x.com/lista e validar que ..."
+  // Também garante protocolo e remove caracteres finais perigosos.
+  const rawEventUrl = String(config.event_url || "").trim();
+  const firstToken = rawEventUrl.split(/\s+/)[0] || "";
+  const trimmedTrailing = firstToken.replace(/[",;]+$/g, "");
+  const ensuredProtocol = /^https?:\/\//i.test(trimmedTrailing) ? trimmedTrailing : (trimmedTrailing ? `https://${trimmedTrailing}` : "");
+
+  let eventUrl = "";
+  try {
+    if (ensuredProtocol) {
+      const u = new URL(ensuredProtocol);
+      if (["http:", "https:"].includes(u.protocol) && u.hostname.includes(".")) {
+        eventUrl = u.toString();
+      }
+    }
+  } catch {
+    eventUrl = "";
+  }
+
   const eventName = config.event_name || "Evento";
   const executionLog: any[] = [];
 
@@ -660,16 +679,33 @@ async function handleEventFirecrawl(
     ai_chunks_processed: 0,
     exhibitors_extracted_raw: 0,
     html_hybrid_extracted: 0,
+    markdown_pattern_extracted: 0,
     deduped_in_run: 0,
     discarded_below_score: 0,
     score_threshold_used: scoreThreshold,
     persisted_prospects: 0,
     auto_imported: 0,
+    sanitized_event_url: eventUrl,
+    raw_event_url: rawEventUrl,
   };
 
   if (!eventUrl) {
-    await supabase.from("playbook_runs").update({ status: "failed", finished_at: new Date().toISOString(), error_summary: "event_url is required", execution_time_ms: Date.now() - startTime }).eq("id", run.id);
-    return new Response(JSON.stringify({ error: "event_url is required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const errorMsg = rawEventUrl
+      ? `URL do evento inválida: "${rawEventUrl.substring(0, 120)}". Cole apenas o link completo da página de expositores.`
+      : "URL do evento é obrigatória.";
+    await logRunEvent(supabase, organizationId, run.id, "error", errorMsg, { rawEventUrl });
+    await supabase.from("playbook_runs").update({
+      status: "failed",
+      finished_at: new Date().toISOString(),
+      error_summary: errorMsg,
+      execution_time_ms: Date.now() - startTime,
+      stats: metrics,
+    }).eq("id", run.id);
+    return new Response(JSON.stringify({ error: errorMsg }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  }
+
+  if (rawEventUrl !== eventUrl) {
+    await logRunEvent(supabase, organizationId, run.id, "info", "URL do evento normalizada", { rawEventUrl, eventUrl });
   }
 
   const FIRECRAWL_API_KEY = Deno.env.get("FIRECRAWL_API_KEY");
@@ -687,7 +723,7 @@ async function handleEventFirecrawl(
     source_type: "event_exhibitors",
     source_label: eventName,
     source_url: eventUrl,
-    source_metadata: config,
+    source_metadata: { ...config, sanitized_event_url: eventUrl },
   }).select().single();
 
   // ── Step 1: Map — discover all URLs ──
@@ -1029,8 +1065,64 @@ async function handleEventFirecrawl(
 
   executionLog.push({ step: "scraping_complete", list_scraped: metrics.list_pages_scraped, profiles_scraped: metrics.profile_pages_scraped, scrape_failures: metrics.scrape_failures, at: new Date().toISOString() });
 
-  // ── Step 4: AI extraction with CHUNKING ──
+  // ── Step 3c: Deterministic Markdown Pattern Parser ──
+  // Captura padrões muito comuns em sites de evento já no markdown,
+  // sem depender da AI. Padrões cobertos:
+  //   "## NOME DA EMPRESA\n...\nStand: XYZ"   (Bett, ASP Events e similares)
+  //   "### NOME DA EMPRESA\n...Stand: XYZ"
+  //   "## NOME DA EMPRESA\n...Booth: XYZ"
+  //   "- **NOME DA EMPRESA**" em listas com logos antes
+  // Roda ANTES da AI. Se já trouxer muitos resultados, a AI ainda roda
+  // e os duplicados são removidos pelo dedupe intra-run mais adiante.
   const allExhibitors: any[] = [];
+
+  for (const scraped of scrapedContents) {
+    const md = scraped.markdown || "";
+    if (!md || md.length < 30) continue;
+
+    // Padrão 1: cabeçalhos H2/H3 de empresa seguidos opcionalmente por "Stand:" ou "Booth:"
+    // Ex.: "## 3B SCIENTIFIC\n\nStand: P160"
+    const headingPattern = /^(?:#{2,4})\s+([^\n#][^\n]{1,120})\s*$([\s\S]{0,400}?)(?=^(?:#{1,6})\s|\n\n-\s|\Z)/gm;
+    const matches = md.matchAll(headingPattern);
+    for (const m of matches) {
+      const rawName = (m[1] || "").trim()
+        .replace(/^\*+|\*+$/g, "")
+        .replace(/\s+/g, " ");
+      const block = m[2] || "";
+
+      // Filtros mínimos para não capturar cabeçalhos genéricos
+      if (rawName.length < 2 || rawName.length > 120) continue;
+      if (/^(lista|menu|home|filtros|pesquisar|sobre|contato|setores|segmento|patrocinador|patrocinadores|expositores|exhibitors|loading|todos)$/i.test(rawName)) continue;
+      if (/^[\d\W]+$/.test(rawName)) continue;
+
+      const standMatch = block.match(/(?:Stand|Booth|Estande)\s*[:#]?\s*([A-Z0-9\-]{1,12})/i);
+      const booth = standMatch ? standMatch[1].toUpperCase() : null;
+
+      allExhibitors.push({
+        company_name: rawName,
+        website: null,
+        category: null,
+        description: null,
+        booth,
+        country: null,
+        city: null,
+        exhibitor_profile_url: null,
+        signals: booth ? ["markdown_pattern", "has_booth"] : ["markdown_pattern"],
+        confidence: booth ? 75 : 60,
+        _source_url: scraped.url,
+        _page_type: scraped.page_type,
+        _extraction_method: "markdown_pattern",
+      });
+    }
+  }
+
+  metrics.markdown_pattern_extracted = allExhibitors.length;
+  if (allExhibitors.length > 0) {
+    await logRunEvent(supabase, organizationId, run.id, "info", `Parser de markdown extraiu ${allExhibitors.length} expositores antes da AI`, { count: allExhibitors.length });
+  }
+
+  // ── Step 4: AI extraction with CHUNKING ──
+  // (allExhibitors já pode conter resultados do parser de markdown — AI só complementa)
   const CHUNK_SIZE = 40000; // chars per AI call
 
   for (const scraped of scrapedContents) {

@@ -1,67 +1,148 @@
+## Diagnóstico atual do Kairós
 
+O problema desta execução não foi “falta de expositores” no site. O site da Bett tem conteúdo suficiente e, inclusive, a página expõe a lista de empresas em markdown/HTML.
 
-## Plano: corrigir filtro de TAG na lista de Contas + bloco "Lead Score por TAG"
+### O que eu confirmei
+- A execução mais recente foi concluída com:
+  - `pages_discovered: 1`
+  - `list_pages_scraped: 0`
+  - `exhibitors_extracted_raw: 0`
+  - `persisted_prospects: 0`
+- O `scoreThreshold` estava em `0`, então o problema não foi filtro de score.
+- O `input_payload.event_url` salvo na execução veio assim:
+  - `https://brasil.bettshow.com/lista-de-expositores e validar que leads/expositores`
+- Ou seja: a URL foi enviada com texto extra junto. Isso quebra o scraping logo na origem.
+- Além disso, ao buscar a URL correta, a própria página já contém a lista de expositores em conteúdo extraível, com blocos como:
+  - `## 3B SCIENTIFIC`
+  - `Stand: P160`
+  - `## 4HEROES`
+  - etc.
 
-### Problema 1 — Filtro "Tag: Expositor" retorna 0 contas
-A página `/app/accounts` já carrega todas as 3.861 contas (`page_size: 10000`) e depois chama `useAccountTagsBulk(accountIds)` para puxar `account_tags` via `.in('account_id', [...3861 ids])`.
+### Conclusão objetiva
+Hoje o módulo **não está operacional de forma definitiva** para esse fluxo de evento, porque ele ainda depende demais de heurísticas e não protege o usuário contra input inválido.
 
-Causa real: o PostgREST aplica internamente um limite padrão de 1.000 linhas por resposta. Mesmo que existam 1.343 vínculos para "Expositor", a query retorna apenas as primeiras ~1.000 linhas no total (somando todas as tags de todas as contas), então a maioria dos accounts marcados como Expositor recebe `tagsByAccount[id] = undefined` no client e o `.some(...)` do filtro falha.
+O principal problema desta rodada foi:
+1. **URL malformada no input**
+2. **Falta de validação/sanitização da URL antes da execução**
+3. **Ausência de fallback determinístico específico para páginas de expositores já renderizadas em markdown/HTML**
 
-Prova: a tela de gestão de Tags conta corretamente 1.343 (lá usamos `select('tag_id').in('tag_id', [tagId])` com poucos IDs e o filtro é direto em `tag_id`, não retorna milhares de rows).
+## O que precisa ser ajustado
 
-### Correção — Filtro server-side por tag (não filtrar no client a partir de bulk)
+### 1) Blindar a entrada da URL do evento
+- Validar que o campo seja uma URL real.
+- Sanitizar o valor antes de enviar para a função.
+- Rejeitar entradas com espaço + texto adicional após a URL.
+- Mostrar erro claro no formulário, em vez de rodar uma execução inválida.
 
-Mudar a estratégia quando `tagFilter !== 'all'`:
+### 2) Criar pré-validação antes da execução
+Antes de iniciar a busca:
+- testar a URL;
+- confirmar status HTTP/extração mínima;
+- mostrar um diagnóstico rápido como:
+  - URL válida
+  - conteúdo encontrado
+  - página parece conter expositores
+  - página parece SPA / A-Z
 
-1. Em `src/services/supabase/account-tags.ts`, adicionar:
-   - `getAccountIdsByTag(tagId: string): Promise<Set<string>>` — faz `select('account_id').eq('tag_id', tagId)` paginado de 1.000 em 1.000 até esgotar. Retorna o `Set<string>` com todos os account_ids vinculados.
-2. Em `src/hooks/useAccountTags.ts`, expor `useAccountIdsByTag(tagId)` (React Query, `staleTime: 30s`).
-3. Em `src/pages/Accounts.tsx`:
-   - Quando `tagFilter !== 'all'`, usar `useAccountIdsByTag(tagFilter)` e filtrar `accounts` por `accountIdsSet.has(account.id)` em vez de `tagsByAccount[id].some(...)`.
-   - Manter `useAccountTagsBulk` apenas para exibir os badges nos cards. **Adicionalmente paginar** o bulk dentro do service (chunks de 500 ids, agregando resultado) para que os badges também apareçam corretamente em listas grandes.
+Se a pré-validação falhar, a execução não deve começar.
 
-Resultado: o filtro "Expositor" passa a listar as 1.343 contas reais.
+### 3) Adicionar parser determinístico para páginas de expositores
+Para esse tipo de página, não depender só de IA.
 
-### Problema 2 — Falta bloco "Lead Score por TAG" no dashboard de Scoring
+Implementar um parser direto para padrões como:
+- `## NOME DA EMPRESA`
+- `Stand: XYZ`
+- imagens/logo antes do nome
+- grupos em sequência repetida
 
-Adicionar componente novo análogo a `LeadScoreBySegment`, posicionado no dashboard `/app/scoring` (página Lead Scoring), abaixo do bloco já existente de "Lead Score por Segmento".
+Esse parser deve rodar:
+- antes da IA quando o markdown já estiver “rico”, ou
+- como fallback forte quando a IA retornar pouco/zero.
 
-### Implementação do novo bloco
+### 4) Melhorar a estratégia do handler de evento
+No `lead-sourcing`:
+- logar tamanho do markdown/html retornado por página;
+- distinguir claramente:
+  - URL inválida
+  - scrape vazio
+  - scrape com conteúdo mas parser zerado
+  - parser extraiu, mas persistência falhou
+- se o markdown da página principal já contiver dezenas de blocos de empresa, pular a etapa cara de SPA/A-Z e extrair direto dali.
 
-1. **Hook** `useLeadScoreByTag(orgId)` em `src/hooks/useLeadScoreByTag.ts`:
-   - Query única que junta `account_tags` + `tags` + `accounts(lead_score)` por organização.
-   - Estratégia eficiente: 1 SELECT em `account_tags` filtrando pela org, com `select('tag_id, tag:tags(id,name,color), account:accounts(id, lead_score, lead_grade, deleted_at)')`, paginado.
-   - Agrega no client: `[{ tagId, name, color, count, averageScore }]` ordenado por `count` desc.
-   - Exclui `accounts.deleted_at IS NOT NULL`.
+### 5) Melhorar a transparência na UI
+No detalhe da execução, exibir:
+- URL efetivamente usada
+- chars de markdown/html capturados
+- tipo de extração aplicada:
+  - mapa
+  - SPA/A-Z
+  - parser markdown
+  - parser HTML híbrido
+- motivo explícito de “0 leads”
 
-2. **Componente** `LeadScoreByTag.tsx` em `src/components/scoring/lead/`:
-   - Mesmo visual do `LeadScoreBySegment` (lista ranqueada com `#`, nome, count, badge de score).
-   - Cada linha vira clicável → abre um Dialog com a lista de contas daquela tag (razão social + lead_score + lead_grade + link para a conta).
-   - Dialog usa um segundo hook `useAccountsByTagWithScore(tagId)` que faz `select('id, razao_social, nome_fantasia, lead_score, lead_grade').in('id', accountIdsFromTag)` paginado.
+Exemplo de mensagem correta:
+- “Execução abortada: URL inválida”
+- “Conteúdo capturado, mas nenhum padrão de expositor identificado”
+- “Expositores identificados, mas persistência falhou”
 
-3. **Integração** em `src/components/scoring/lead/LeadScoreDashboard.tsx`:
-   - Trocar o grid de 2 colunas atual (`LeadScoreBySegment` + `LeadScoreInsights`) por um layout que acomode também `LeadScoreByTag`. Proposta: manter grid 2 colunas e mover `LeadScoreInsights` para baixo em linha cheia, ou usar 3 colunas em `xl`. Prefiro: linha 1 = Segment + Tag (lado a lado), linha 2 = Insights full-width.
+## Implementação proposta
 
 ### Arquivos impactados
+- `src/components/playbook/LeadSearchForm.tsx`
+- `supabase/functions/lead-sourcing/index.ts`
+- `src/components/playbook/RunDetailDrawer.tsx`
+- possivelmente `src/components/playbook/LeadSourcingEngine.tsx` para feedback de pré-check
 
-**Editados:**
-- `src/services/supabase/account-tags.ts` — adicionar `getAccountIdsByTag`, paginar `listAccountTagsBulk`.
-- `src/hooks/useAccountTags.ts` — expor `useAccountIdsByTag`.
-- `src/pages/Accounts.tsx` — usar o novo hook quando `tagFilter !== 'all'`.
-- `src/components/scoring/lead/LeadScoreDashboard.tsx` — adicionar o bloco de Tag ao layout.
+### Mudanças
+1. **Frontend**
+- validação forte do campo `URL do Evento`
+- sanitização do input
+- bloqueio do submit se a URL estiver inválida
+- mensagem de ajuda específica para páginas de expositores
 
-**Novos:**
-- `src/hooks/useLeadScoreByTag.ts`
-- `src/components/scoring/lead/LeadScoreByTag.tsx`
-- `src/components/scoring/lead/LeadScoreByTagDialog.tsx` (modal com a lista de empresas)
+2. **Backend function**
+- normalização segura da URL
+- early fail com mensagem amigável se houver texto extra
+- novo parser determinístico de expositores por markdown/HTML
+- logs diagnósticos melhores
+- regra: se encontrar blocos `## empresa + Stand`, persistir direto
 
-### Riscos
-- **Baixos.** Sem mudanças em RLS, schema ou dados. Apenas leitura paginada.
-- Garantir paginação real (loop até `length < pageSize`) para não cair de novo no limite de 1.000 do PostgREST.
-- Performance: o bloco "Lead Score por TAG" puxa `account_tags` da org inteira; com ~1.350 rows hoje é trivial. Cache via React Query (`staleTime: 30s`).
+3. **Observabilidade**
+- detalhar no drawer como a extração aconteceu
+- expor contadores úteis para troubleshooting real
 
-### Resultado esperado
-- Filtro "Tag: Expositor" mostra as 1.343 contas corretamente.
-- Badges de tag continuam aparecendo nos cards mesmo em listas grandes.
-- Novo bloco "Lead Score por TAG" no dashboard Lead Scoring, ranqueando tags por nº de contas com média de score, e drill-down em modal listando todas as empresas + score + grade.
+## Resultado esperado após a correção
+- O Kairós deixa de executar com URL inválida.
+- Páginas como a da Bett passam a gerar expositores mesmo sem depender só da IA.
+- “0 leads” passa a significar um caso real, e não falha silenciosa do pipeline.
+- O módulo fica muito mais confiável para operação do time de pré-vendas em eventos.
 
+## Detalhes técnicos
+
+Fluxo alvo:
+
+```text
+Form URL
+  -> sanitize + validate
+  -> preflight check
+  -> run lead-sourcing
+      -> fetch/map page
+      -> detect rich exhibitor markdown
+      -> deterministic parser
+      -> AI enrichment only if needed
+      -> dedupe + persist
+      -> clear run diagnostics
+```
+
+Parser alvo para esse tipo de página:
+
+```text
+[logo/imagem]
+## NOME DA EMPRESA
+Stand: X123
+```
+
+Esse padrão já aparece na página da Bett e é suficiente para capturar empresas com alta confiabilidade.
+
+## Observação importante
+Há uma evidência forte de que a última execução usou uma URL contaminada com texto extra. Mesmo assim, o sistema deveria ter impedido essa execução. Esse é exatamente o tipo de proteção que vou adicionar na implementação.
