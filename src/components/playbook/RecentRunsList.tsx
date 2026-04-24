@@ -78,16 +78,21 @@ export function RecentRunsList({ runs, selectedRunId, onSelect }: RecentRunsList
               onClick={() => onSelect(run.id)}
             >
               <CardContent className="pt-4 pb-3">
-                <div className="flex justify-between items-start">
-                  <div>
+                <div className="flex justify-between items-start gap-3">
+                  <div className="min-w-0 flex-1">
                     <Badge variant="outline" className="mb-1.5">
                       {typeLabels[playbookType] || playbookType}
                     </Badge>
+                    {originName && (
+                      <div className="text-sm font-semibold truncate" title={originName}>
+                        {originName}
+                      </div>
+                    )}
                     <div className="text-xs text-muted-foreground">
                       {format(new Date(run.created_at), "dd/MM/yy 'às' HH:mm", { locale: ptBR })}
                     </div>
                   </div>
-                  <div className="text-right text-xs">
+                  <div className="text-right text-xs shrink-0">
                     <div className="font-medium">{prospectsCount} leads</div>
                     {approvedCount > 0 && (
                       <div className="text-green-600">{approvedCount} aprovados</div>
