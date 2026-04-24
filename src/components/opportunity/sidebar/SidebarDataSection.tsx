@@ -22,6 +22,8 @@ import { Button } from '@/components/ui/button';
 import { formatDateBR } from '@/lib/dateUtils';
 import { formatPhoneDisplay, extractPhone, extractEmail } from '@/lib/contactFormat';
 import { useAccountScore } from '@/hooks/useAccountScoring';
+import { useAccountTagsBulk } from '@/hooks/useAccountTags';
+import { AccountTagsBadges } from '@/components/accounts/AccountTagsSelector';
 
 interface SidebarDataSectionProps {
   opportunity: any;
@@ -37,6 +39,11 @@ export function SidebarDataSection({ opportunity, onUpdateField, isClosed }: Sid
   const leadScore = liveScore?.lead_score ?? opportunity.account?.lead_score ?? null;
   const fitScore = liveScore?.fit_score ?? opportunity.account?.fit_score ?? null;
   const intentScore = liveScore?.intent_score ?? opportunity.account?.intent_score ?? null;
+
+  // Tags da conta vinculada à oportunidade
+  const accountIdsForTags = opportunity.account?.id ? [opportunity.account.id] : [];
+  const { data: tagsByAccount } = useAccountTagsBulk(accountIdsForTags);
+  const accountTags = (opportunity.account?.id && tagsByAccount?.[opportunity.account.id]) || [];
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat('pt-BR', {
@@ -213,6 +220,16 @@ export function SidebarDataSection({ opportunity, onUpdateField, isClosed }: Sid
                             compact
                           />
                         }
+                      />
+                    </div>
+                  )}
+
+                  {/* Tags da Conta */}
+                  {accountTags.length > 0 && (
+                    <div className="pt-2 mt-2 border-t border-border">
+                      <FieldRow
+                        label="Tags"
+                        value={<AccountTagsBadges tags={accountTags} max={4} />}
                       />
                     </div>
                   )}
