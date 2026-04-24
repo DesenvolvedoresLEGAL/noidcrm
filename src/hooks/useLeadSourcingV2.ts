@@ -558,6 +558,33 @@ export function useDeletePlaybookRun() {
   });
 }
 
+export function useCancelPlaybookRun() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (runId: string) => {
+      const { error } = await supabase
+        .from('playbook_runs')
+        .update({
+          status: 'failed',
+          error_summary: 'Execução cancelada manualmente pelo usuário',
+          completed_at: new Date().toISOString(),
+        })
+        .eq('id', runId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['playbook-runs'] });
+      queryClient.invalidateQueries({ queryKey: ['playbook-runs-paginated'] });
+      queryClient.invalidateQueries({ queryKey: ['run-events'] });
+      toast.success('Execução cancelada');
+    },
+    onError: () => {
+      toast.error('Erro ao cancelar execução');
+    },
+  });
+}
+
 function chunkIds(ids: string[], size: number): string[][] {
   const chunks: string[][] = [];
   for (let i = 0; i < ids.length; i += size) {
