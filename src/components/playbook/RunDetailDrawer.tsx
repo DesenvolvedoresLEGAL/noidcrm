@@ -3,11 +3,12 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from '@/com
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Clock, CheckCircle2, XCircle, Loader2, RefreshCw, AlertTriangle, Info, AlertCircle } from 'lucide-react';
+import { Clock, CheckCircle2, XCircle, Loader2, RefreshCw, AlertTriangle, Info, AlertCircle, StopCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { useRunEvents, useRetryPlaybookRun } from '@/hooks/useLeadSourcingV2';
+import { useRunProspectCount, useForceCompleteRun } from '@/hooks/useRunProspectCount';
 import type { PlaybookRun } from '@/hooks/useLeadSourcingV2';
 
 interface RunDetailDrawerProps {
@@ -46,6 +47,9 @@ function formatMs(ms: number | null | undefined): string {
 export function RunDetailDrawer({ run, open, onClose, onViewProspects }: RunDetailDrawerProps) {
   const { data: events = [] } = useRunEvents(run?.id || null);
   const retryMutation = useRetryPlaybookRun();
+  const forceCompleteMutation = useForceCompleteRun();
+  const isLive = run?.status === 'running' || run?.status === 'queued';
+  const { data: realProspectCount } = useRunProspectCount(run?.id || null, isLive);
 
   if (!run) return null;
 
@@ -53,6 +57,11 @@ export function RunDetailDrawer({ run, open, onClose, onViewProspects }: RunDeta
   const StatusIcon = status.icon;
   const stats = run.stats as any;
   const playbookType = run.input_payload?.playbookType || 'unknown';
+
+  // Detect a stuck run: running for more than 10 minutes
+  const startedAt = run.started_at ? new Date(run.started_at).getTime() : null;
+  const minutesRunning = startedAt ? (Date.now() - startedAt) / 60000 : 0;
+  const isStuck = run.status === 'running' && minutesRunning > 10;
 
   return (
     <Sheet open={open} onOpenChange={v => !v && onClose()}>
@@ -86,6 +95,13 @@ export function RunDetailDrawer({ run, open, onClose, onViewProspects }: RunDeta
                 <div className="font-medium">{run.retry_count || 0}</div>
               </div>
               <div>
+                <span className="text-muted-foreground text-xs">Prospects (real)</span>
+                <div className="font-medium text-foreground">
+                  {realProspectCount ?? '—'}
+                  {isLive && <Loader2 className="inline h-3 w-3 ml-1 animate-spin text-muted-foreground" />}
+                </div>
+              </div>
+              <div>
                 <span className="text-muted-foreground text-xs">Criado em</span>
                 <div className="font-medium">
                   {format(new Date(run.created_at), "dd/MM/yy HH:mm:ss", { locale: ptBR })}
@@ -100,6 +116,18 @@ export function RunDetailDrawer({ run, open, onClose, onViewProspects }: RunDeta
                 </div>
               )}
             </div>
+
+            {isStuck && (
+              <div className="flex items-start gap-2 p-3 rounded-md bg-amber-500/10 border border-amber-500/20 text-sm">
+                <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0 text-amber-600" />
+                <div className="flex-1">
+                  <div className="font-medium text-amber-700">Execução parece travada</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">
+                    Rodando há {Math.round(minutesRunning)} min. Use "Forçar Conclusão" para finalizar com os {realProspectCount ?? 0} prospects já capturados.
+                  </div>
+                </div>
+              </div>
+            )}
           </section>
 
           {/* Error */}
@@ -207,7 +235,7 @@ export function RunDetailDrawer({ run, open, onClose, onViewProspects }: RunDeta
           </section>
         </div>
 
-        <SheetFooter className="flex gap-2 pt-4 border-t">
+        <SheetFooter className="flex flex-col sm:flex-row gap-2 pt-4 border-t">
           {run.status === 'failed' && (
             <Button
               variant="outline"
@@ -219,8 +247,19 @@ export function RunDetailDrawer({ run, open, onClose, onViewProspects }: RunDeta
               Retry
             </Button>
           )}
+          {isStuck && (
+            <Button
+              variant="outline"
+              className="flex-1 border-amber-500/40 text-amber-700 hover:bg-amber-500/10"
+              onClick={() => forceCompleteMutation.mutate(run.id)}
+              disabled={forceCompleteMutation.isPending}
+            >
+              <StopCircle className={cn('h-4 w-4 mr-1', forceCompleteMutation.isPending && 'animate-spin')} />
+              Forçar conclusão
+            </Button>
+          )}
           <Button className="flex-1" onClick={() => { onViewProspects(run.id); onClose(); }}>
-            Ver Prospects
+            Ver Prospects ({realProspectCount ?? 0})
           </Button>
         </SheetFooter>
       </SheetContent>

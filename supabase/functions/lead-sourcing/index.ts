@@ -1683,8 +1683,8 @@ ${chunk}`,
 
   const candidateBatches = chunkArray(candidates, 25);
 
-  for (let batchIndex = 0; batchIndex < candidateBatches.length; batchIndex++) {
-    const batch = candidateBatches[batchIndex];
+  // Persist a single batch (used for parallel execution)
+  const persistBatch = async (batch: typeof candidates, batchIndex: number) => {
     const prospectRows = batch.map((candidate) => ({
       organization_id: organizationId,
       playbook_run_id: run.id,
@@ -1722,20 +1722,18 @@ ${chunk}`,
       .select("id, raw_data");
 
     if (bulkInsertError) {
-      console.error("Bulk prospect insert error:", bulkInsertError);
-
+      console.error(`[batch ${batchIndex}] Bulk prospect insert error:`, bulkInsertError);
+      // Fall back to individual inserts to recover from partial failures
       for (const row of prospectRows) {
         const { data: singleInserted, error: singleInsertError } = await supabase
           .from("prospects")
           .insert(row)
           .select("id, raw_data")
           .single();
-
         if (singleInsertError) {
-          console.error("Single prospect insert error:", singleInsertError);
+          console.error(`[batch ${batchIndex}] Single prospect insert error:`, singleInsertError);
           continue;
         }
-
         insertedProspects.push(singleInserted);
       }
     } else {
@@ -1748,16 +1746,10 @@ ${chunk}`,
       if (candidateKey) prospectIdByCandidateKey.set(candidateKey, inserted.id);
     }
 
-    prospectsCreated += insertedProspects.length;
-    metrics.persisted_prospects = prospectsCreated;
-    metrics.prospects_created = prospectsCreated;
-    metrics.prospects_count = prospectsCreated;
-
     const scoreRows = batch
       .map((candidate) => {
         const prospectId = prospectIdByCandidateKey.get(candidate.candidateKey);
         if (!prospectId) return null;
-
         return {
           organization_id: organizationId,
           prospect_id: prospectId,
@@ -1780,7 +1772,7 @@ ${chunk}`,
     if (scoreRows.length > 0) {
       const { error: scoreInsertError } = await supabase.from("prospect_scores").insert(scoreRows);
       if (scoreInsertError) {
-        console.error("Bulk score insert error:", scoreInsertError);
+        console.error(`[batch ${batchIndex}] Bulk score insert error:`, scoreInsertError);
         for (const scoreRow of scoreRows) {
           await supabase.from("prospect_scores").insert(scoreRow);
         }
@@ -1790,7 +1782,6 @@ ${chunk}`,
     const signalRows = batch.flatMap((candidate) => {
       const prospectId = prospectIdByCandidateKey.get(candidate.candidateKey);
       if (!prospectId) return [];
-
       return candidate.exSignals.map((sig) => ({
         organization_id: organizationId,
         prospect_id: prospectId,
@@ -1806,28 +1797,55 @@ ${chunk}`,
       if (!signalChunk.length) continue;
       const { error: signalInsertError } = await supabase.from("prospect_signals").insert(signalChunk);
       if (signalInsertError) {
-        console.error("Bulk signal insert error:", signalInsertError);
+        console.error(`[batch ${batchIndex}] Bulk signal insert error:`, signalInsertError);
         for (const signalRow of signalChunk) {
           await supabase.from("prospect_signals").insert(signalRow);
         }
       }
     }
 
+    return insertedProspects.length;
+  };
+
+  // Process batches in parallel groups (4 at a time) with live heartbeat
+  const PARALLEL_CONCURRENCY = 4;
+  for (let i = 0; i < candidateBatches.length; i += PARALLEL_CONCURRENCY) {
+    const slice = candidateBatches.slice(i, i + PARALLEL_CONCURRENCY);
+    const results = await Promise.allSettled(
+      slice.map((batch, idx) => persistBatch(batch, i + idx))
+    );
+
+    for (const result of results) {
+      if (result.status === "fulfilled") {
+        prospectsCreated += result.value;
+      } else {
+        console.error("Batch persistence failed:", result.reason);
+      }
+    }
+
+    metrics.persisted_prospects = prospectsCreated;
+    metrics.prospects_created = prospectsCreated;
+    metrics.prospects_count = prospectsCreated;
+
+    // Live heartbeat: update stats AND last_heartbeat_at so the watchdog won't kill us
     await supabase.from("playbook_runs").update({
       stats: { ...metrics },
       execution_time_ms: Date.now() - startTime,
+      last_heartbeat_at: new Date().toISOString(),
     }).eq("id", run.id);
 
+    const completedBatches = Math.min(i + PARALLEL_CONCURRENCY, candidateBatches.length);
     await logRunEvent(
       supabase,
       organizationId,
       run.id,
       "info",
-      `Persistência em lote ${batchIndex + 1}/${candidateBatches.length}`,
+      `Persistidos ${prospectsCreated}/${candidates.length} (lotes ${completedBatches}/${candidateBatches.length})`,
       {
         persisted_prospects: prospectsCreated,
         candidate_count: candidates.length,
-        batch_size: batch.length,
+        batches_done: completedBatches,
+        batches_total: candidateBatches.length,
       }
     );
   }
