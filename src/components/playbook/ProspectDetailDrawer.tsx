@@ -88,6 +88,10 @@ export function ProspectDetailDrawer({
   const { data: commercialBrief } = useCommercialBrief(prospect.id);
   const { data: enrichmentSignals } = useEnrichmentSignals(prospect.id);
   const runEnrichment = useRunEnrichment();
+  const enrichIdentity = useEnrichProspectIdentity();
+
+  const minimumIdentity = hasMinimumIdentity(prospect);
+  const identityEnriched = !!prospect.identity_enriched_at;
 
   const handleEnrich = () => {
     if (prospect.organization_id) {
@@ -95,6 +99,16 @@ export function ProspectDetailDrawer({
         prospectId: prospect.id,
         workspaceId: prospect.organization_id,
       });
+    }
+  };
+
+  const handleEnrichAndImport = async () => {
+    try {
+      await enrichIdentity.mutateAsync(prospect.id);
+      // Re-check on next tick: import will fetch fresh prospect via RPC
+      onImport(prospect);
+    } catch {
+      /* toast handled in hook */
     }
   };
 
