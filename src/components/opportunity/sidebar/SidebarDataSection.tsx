@@ -223,6 +223,16 @@ export function SidebarDataSection({ opportunity, onUpdateField, isClosed }: Sid
                       />
                     </div>
                   )}
+
+                  {/* Tags da Conta */}
+                  {accountTags.length > 0 && (
+                    <div className="pt-2 mt-2 border-t border-border">
+                      <FieldRow
+                        label="Tags"
+                        value={<AccountTagsBadges tags={accountTags} max={4} />}
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
             )}
