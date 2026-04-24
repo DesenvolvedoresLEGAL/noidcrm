@@ -213,7 +213,21 @@ export function LeadSearchForm({ onExecute, isExecuting }: LeadSearchFormProps) 
               <>
                 <div className="space-y-1.5">
                   <Label className="text-xs">URL do Evento</Label>
-                  <Input placeholder="https://evento.com.br/expositores" value={inputPayload.event_url || ''} onChange={e => updatePayload('event_url', e.target.value)} />
+                  <Input
+                    placeholder="https://evento.com.br/expositores"
+                    value={inputPayload.event_url || ''}
+                    onChange={e => updatePayload('event_url', e.target.value)}
+                    aria-invalid={!!eventUrlValidation?.error}
+                  />
+                  {eventUrlValidation?.error ? (
+                    <p className="flex items-center gap-1 text-[11px] text-destructive">
+                      <AlertCircle className="h-3 w-3" /> {eventUrlValidation.error}
+                    </p>
+                  ) : (
+                    <p className="text-[10px] text-muted-foreground">
+                      Cole apenas o link da página de expositores. Espaços e texto extra serão removidos automaticamente.
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs">Nome do Evento</Label>
