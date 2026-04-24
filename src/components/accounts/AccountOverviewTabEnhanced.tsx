@@ -351,6 +351,12 @@ export function AccountOverviewTabEnhanced({ account }: AccountOverviewTabProps)
                 </span>
               </div>
             )}
+            {accountTags.length > 0 && (
+              <div className="pt-2 border-t">
+                <span className="text-muted-foreground block mb-2">Tags:</span>
+                <AccountTagsBadges tags={accountTags} max={10} />
+              </div>
+            )}
           </CardContent>
         </Card>
 
