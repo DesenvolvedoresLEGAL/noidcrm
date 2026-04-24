@@ -797,6 +797,15 @@ async function handleEventFirecrawl(
     await logRunEvent(supabase, organizationId, run.id, "info", `${paginatedAdded} páginas de paginação geradas`, { paginatedAdded });
   }
 
+  // ── Fallback SPA: garantir que o eventUrl em si seja sempre uma página de lista ──
+  // Sites Angular/React (ex: bettshow.com) frequentemente expõem zero links no map.
+  // Sem isto, listPagesToScrape ficaria vazio e nunca entraríamos nas estratégias de SPA.
+  const formattedEventUrl = eventUrl.startsWith("http") ? eventUrl : `https://${eventUrl}`;
+  if (!existingUrls.has(formattedEventUrl) && !relevantPages.some(p => p.url === formattedEventUrl)) {
+    relevantPages.push({ url: formattedEventUrl, page_type: "exhibitors_list" });
+    await logRunEvent(supabase, organizationId, run.id, "info", "URL principal adicionada como página de lista (fallback SPA)", { eventUrl: formattedEventUrl });
+  }
+
   // Count profile links from map
   const profilePages = relevantPages.filter(p => p.page_type === "exhibitor_profile");
   metrics.profile_links_discovered = profilePages.length;
