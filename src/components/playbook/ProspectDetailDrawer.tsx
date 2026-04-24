@@ -321,6 +321,23 @@ export function ProspectDetailDrawer({
           </TabsContent>
         </Tabs>
 
+        {isApproved && !isImported && minimumIdentity && (
+          <div className="rounded-md border border-primary/20 bg-primary/5 p-3 mt-3 space-y-1.5 text-xs">
+            <div className="font-semibold text-foreground flex items-center gap-1.5">
+              <PackageCheck className="h-3.5 w-3.5 text-primary" />
+              O que será criado no CRM (pipeline PRÉ VENDAS)
+            </div>
+            <ul className="space-y-1 text-muted-foreground pl-1">
+              <li>• <strong>Conta</strong> — {prospect.razao_social || prospect.company_name}{prospect.cnpj ? ` (CNPJ ${prospect.cnpj})` : ''}</li>
+              <li>• <strong>Oportunidade</strong> na 1ª etapa, com perfil completo da empresa nos metadados</li>
+              <li>• <strong>Nota inicial</strong> com brief comercial estruturado (resumo, dores, hipóteses, sinais)</li>
+              {commercialBrief?.first_touch_message && (
+                <li>• <strong>Atividade de e-mail (rascunho)</strong> na timeline, pronta para o pré-vendas revisar e disparar</li>
+              )}
+            </ul>
+          </div>
+        )}
+
         <SheetFooter className="flex gap-2 pt-4 border-t">
           {(prospect.status === 'review_pending' || prospect.approval_status === 'pending') && (
             <>

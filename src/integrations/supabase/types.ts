@@ -6655,6 +6655,7 @@ export type Database = {
           account_id: string | null
           confidence: number | null
           created_at: string | null
+          email_subject: string | null
           enrichment_run_id: string
           executive_summary: string | null
           first_touch_message: string | null
@@ -6673,6 +6674,7 @@ export type Database = {
           account_id?: string | null
           confidence?: number | null
           created_at?: string | null
+          email_subject?: string | null
           enrichment_run_id: string
           executive_summary?: string | null
           first_touch_message?: string | null
@@ -6691,6 +6693,7 @@ export type Database = {
           account_id?: string | null
           confidence?: number | null
           created_at?: string | null
+          email_subject?: string | null
           enrichment_run_id?: string
           executive_summary?: string | null
           first_touch_message?: string | null
