@@ -629,6 +629,9 @@ export default function Accounts() {
                       <AccountCard
                         key={account.id}
                         account={account}
+                        metrics={accountCardData[account.id]?.metrics}
+                        contactsPreview={accountCardData[account.id]?.contacts}
+                        tags={tagsByAccount[account.id] || []}
                         onView={() => navigate(`/app/accounts/${account.id}`)}
                         onEdit={() => {
                           setEditingAccount(account);
