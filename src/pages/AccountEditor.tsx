@@ -1026,6 +1026,17 @@ export default function AccountEditor() {
                     />
                   </div>
 
+                  <div className="space-y-2 pt-2 border-t">
+                    <Label>Tags</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Use tags para classificar atributos comerciais (ex.: Expositor, Organizador, VIP). Suporta múltipla seleção.
+                    </p>
+                    <AccountTagsSelector
+                      value={selectedTagIds}
+                      onChange={setSelectedTagIds}
+                    />
+                  </div>
+
                   <div className="space-y-2">
                     <Label htmlFor="observacoes">Observações</Label>
                     <Textarea
