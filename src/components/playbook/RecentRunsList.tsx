@@ -57,6 +57,13 @@ export function RecentRunsList({ runs, selectedRunId, onSelect }: RecentRunsList
           const StatusIcon = status.icon;
           const payload = run.input_payload as Record<string, any> | null;
           const playbookType = payload?.playbookType || payload?.search_type || 'unknown';
+          const originName =
+            payload?.event_name ||
+            payload?.directory_name ||
+            payload?.source_name ||
+            payload?.geo_name ||
+            payload?.name ||
+            (payload?.event_url ? new URL(payload.event_url).hostname.replace(/^www\./, '') : null);
           const prospectsCount = (run.stats as any)?.persisted_prospects || (run.stats as any)?.prospects_created || (run.stats as any)?.prospects_count || 0;
           const approvedCount = (run.stats as any)?.approved_count || 0;
           const timeStr = formatMs(run.execution_time_ms);
