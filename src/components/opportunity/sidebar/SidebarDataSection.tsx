@@ -40,6 +40,11 @@ export function SidebarDataSection({ opportunity, onUpdateField, isClosed }: Sid
   const fitScore = liveScore?.fit_score ?? opportunity.account?.fit_score ?? null;
   const intentScore = liveScore?.intent_score ?? opportunity.account?.intent_score ?? null;
 
+  // Tags da conta vinculada à oportunidade
+  const accountIdsForTags = opportunity.account?.id ? [opportunity.account.id] : [];
+  const { data: tagsByAccount } = useAccountTagsBulk(accountIdsForTags);
+  const accountTags = (opportunity.account?.id && tagsByAccount?.[opportunity.account.id]) || [];
+
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat('pt-BR', {
       style: 'currency',
