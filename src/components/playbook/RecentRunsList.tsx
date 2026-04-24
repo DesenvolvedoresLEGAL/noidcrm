@@ -5,8 +5,8 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Loader2, CheckCircle2, XCircle, Clock, RefreshCw, AlertTriangle, Trash2 } from 'lucide-react';
-import { useRetryPlaybookRun, useDeletePlaybookRun } from '@/hooks/useLeadSourcingV2';
+import { Loader2, CheckCircle2, XCircle, Clock, RefreshCw, AlertTriangle, Trash2, Ban } from 'lucide-react';
+import { useRetryPlaybookRun, useDeletePlaybookRun, useCancelPlaybookRun } from '@/hooks/useLeadSourcingV2';
 import { DeleteConfirmationDialog } from '@/components/ui/delete-confirmation-dialog';
 import type { PlaybookRun } from '@/hooks/useLeadSourcingV2';
 
@@ -42,7 +42,9 @@ function formatMs(ms: number | null | undefined): string {
 export function RecentRunsList({ runs, selectedRunId, onSelect }: RecentRunsListProps) {
   const retryMutation = useRetryPlaybookRun();
   const deleteMutation = useDeletePlaybookRun();
+  const cancelMutation = useCancelPlaybookRun();
   const [deleteRunId, setDeleteRunId] = useState<string | null>(null);
+  const [cancelRunId, setCancelRunId] = useState<string | null>(null);
 
   if (!runs.length) return null;
 
@@ -104,8 +106,21 @@ export function RecentRunsList({ runs, selectedRunId, onSelect }: RecentRunsList
                         className="h-6 w-6"
                         onClick={(e) => { e.stopPropagation(); retryMutation.mutate(run.id); }}
                         disabled={retryMutation.isPending}
+                        title="Tentar novamente"
                       >
                         <RefreshCw className={cn('h-3 w-3', retryMutation.isPending && 'animate-spin')} />
+                      </Button>
+                    )}
+                    {(run.status === 'running' || run.status === 'queued') && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-6 w-6 text-amber-500 hover:text-destructive"
+                        onClick={(e) => { e.stopPropagation(); setCancelRunId(run.id); }}
+                        disabled={cancelMutation.isPending}
+                        title="Cancelar execução"
+                      >
+                        <Ban className="h-3 w-3" />
                       </Button>
                     )}
                     <Button
@@ -114,6 +129,7 @@ export function RecentRunsList({ runs, selectedRunId, onSelect }: RecentRunsList
                       className="h-6 w-6 text-muted-foreground hover:text-destructive"
                       onClick={(e) => { e.stopPropagation(); setDeleteRunId(run.id); }}
                       disabled={run.status === 'running'}
+                      title="Deletar execução"
                     >
                       <Trash2 className="h-3 w-3" />
                     </Button>
