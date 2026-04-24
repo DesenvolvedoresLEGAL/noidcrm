@@ -106,6 +106,14 @@ export default function AccountEditor() {
   const [qsaData, setQsaData] = useState<Array<{ nome: string; qualificacao: string; selected: boolean }>>([]);
   const [isCreatingContacts, setIsCreatingContacts] = useState(false);
 
+  // Tags state
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
+  const { data: existingTagIds } = useAccountTagIds(id);
+  useEffect(() => {
+    setSelectedTagIds(existingTagIds || []);
+  }, [existingTagIds]);
+  const setAccountTagsMutation = useSetAccountTags();
+
   const { data: account, isLoading: accountLoading, error: accountError } = useAccountDetails(id!);
   const { users, loading: usersLoading } = useOrganizationUsers([
     account?.owner_user_id,
