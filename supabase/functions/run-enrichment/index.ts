@@ -382,6 +382,7 @@ REMETENTE: SDR da NOID (provedora de conectividade B2B / infraestrutura de rede)
         recommended_pitch_angle: briefData.recommended_pitch_angle,
         recommended_channel: briefData.recommended_channel,
         first_touch_message: briefData.first_touch_message,
+        email_subject: briefData.email_subject,
         objection_predictions: briefData.objection_predictions || [],
         confidence: briefData.confidence || 0,
       });
