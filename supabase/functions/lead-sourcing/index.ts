@@ -1074,6 +1074,97 @@ async function handleEventFirecrawl(
     }
   }
 
+  // ── Step 2c (pós-scrape): Paginação a partir do HTML capturado ──
+  // Sites de eventos (Bett, etc.) frequentemente listam expositores em ?page=1..N.
+  // Quando a URL inicial não tem ?page=, o Step 2b não dispara. Aqui detectamos:
+  // (a) links explícitos ?page=N no HTML; (b) brute-force ?page=2..MAX como fallback.
+  try {
+    const paginationCandidates = new Set<string>();
+    let maxDetectedPage = 1;
+
+    for (const scraped of scrapedContents) {
+      const html = scraped.html || "";
+      if (!html) continue;
+      // Detecta links ?page=N (ou &page=N) no HTML
+      const pageLinkRegex = /[?&](?:page|pagina|p|pg)=(\d{1,3})/gi;
+      let m: RegExpExecArray | null;
+      while ((m = pageLinkRegex.exec(html)) !== null) {
+        const n = parseInt(m[1], 10);
+        if (n > 0 && n <= 100) maxDetectedPage = Math.max(maxDetectedPage, n);
+      }
+    }
+
+    // Se detectou links de paginação OU a URL parece uma listagem de expositores,
+    // gera URLs ?page=2..MAX (mínimo 15 para sites como Bett que têm ~15 páginas).
+    const baseUrl = formattedEventUrl.split("#")[0].split("?")[0];
+    const looksLikeListing = /lista-de-expositores|expositores|exhibitors|exhibitor-list|exposants|aussteller/i.test(formattedEventUrl);
+    const shouldPaginate = maxDetectedPage > 1 || (looksLikeListing && scrapedContents.length > 0);
+
+    if (shouldPaginate) {
+      const targetMax = Math.max(maxDetectedPage, 15);
+      for (let i = 2; i <= targetMax; i++) {
+        const pageUrl = `${baseUrl}?page=${i}`;
+        if (!scrapedContents.some(s => s.url === pageUrl)) {
+          paginationCandidates.add(pageUrl);
+        }
+      }
+    }
+
+    if (paginationCandidates.size > 0) {
+      await logRunEvent(supabase, organizationId, run.id, "info", `Iniciando paginação: ${paginationCandidates.size} páginas adicionais (max detectado: ${maxDetectedPage})`, {
+        max_detected_page: maxDetectedPage,
+        pages_to_fetch: paginationCandidates.size,
+      });
+
+      let paginationSuccess = 0;
+      let consecutiveEmpty = 0;
+      const sortedPages = Array.from(paginationCandidates).sort((a, b) => {
+        const na = parseInt(a.match(/page=(\d+)/)?.[1] || "0");
+        const nb = parseInt(b.match(/page=(\d+)/)?.[1] || "0");
+        return na - nb;
+      });
+
+      for (const pageUrl of sortedPages) {
+        if (consecutiveEmpty >= 3) {
+          await logRunEvent(supabase, organizationId, run.id, "info", "Paginação interrompida: 3 páginas vazias consecutivas", { last_url: pageUrl });
+          break;
+        }
+        try {
+          const direct = await fetchEventPageDirect(pageUrl);
+          const sizeOk = (direct.html?.length || 0) > 1000;
+          if (!sizeOk) {
+            consecutiveEmpty++;
+            continue;
+          }
+          // Valida se a página tem conteúdo real (não só shell HTML)
+          const hasContent = /stand|expositor|exhibitor|booth|estande/i.test(direct.html || direct.markdown);
+          if (!hasContent) {
+            consecutiveEmpty++;
+            continue;
+          }
+          scrapedContents.push({
+            url: pageUrl,
+            markdown: direct.markdown,
+            html: direct.html,
+            page_type: "exhibitors_list",
+          });
+          paginationSuccess++;
+          consecutiveEmpty = 0;
+        } catch (_e) {
+          consecutiveEmpty++;
+        }
+      }
+
+      totalScrapedChars = scrapedContents.reduce((acc, c) => acc + (c.markdown?.length || 0) + (c.html?.length || 0), 0);
+      await logRunEvent(supabase, organizationId, run.id, "info", `Paginação concluída: ${paginationSuccess} páginas extras capturadas`, {
+        pages_captured: paginationSuccess,
+        total_scraped_chars: totalScrapedChars,
+      });
+    }
+  } catch (pagErr) {
+    await logRunEvent(supabase, organizationId, run.id, "warn", "Erro na paginação automática", { error: String(pagErr) });
+  }
+
   // ── Step 3a: SPA A-Z filter re-scrape strategy ──
   // Detecta SPA quando: poucos URLs no map OU poucos chars retornados no scrape inicial.
   // Isso cobre Angular/React/Vue (ex: bettshow.com) que renderizam tudo via JS.
