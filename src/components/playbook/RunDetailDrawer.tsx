@@ -47,6 +47,9 @@ function formatMs(ms: number | null | undefined): string {
 export function RunDetailDrawer({ run, open, onClose, onViewProspects }: RunDetailDrawerProps) {
   const { data: events = [] } = useRunEvents(run?.id || null);
   const retryMutation = useRetryPlaybookRun();
+  const forceCompleteMutation = useForceCompleteRun();
+  const isLive = run?.status === 'running' || run?.status === 'queued';
+  const { data: realProspectCount } = useRunProspectCount(run?.id || null, isLive);
 
   if (!run) return null;
 
@@ -54,6 +57,11 @@ export function RunDetailDrawer({ run, open, onClose, onViewProspects }: RunDeta
   const StatusIcon = status.icon;
   const stats = run.stats as any;
   const playbookType = run.input_payload?.playbookType || 'unknown';
+
+  // Detect a stuck run: running for more than 10 minutes
+  const startedAt = run.started_at ? new Date(run.started_at).getTime() : null;
+  const minutesRunning = startedAt ? (Date.now() - startedAt) / 60000 : 0;
+  const isStuck = run.status === 'running' && minutesRunning > 10;
 
   return (
     <Sheet open={open} onOpenChange={v => !v && onClose()}>
