@@ -353,7 +353,16 @@ export default function AccountEditor() {
   };
 
   const updateMutation = useMutation({
-    mutationFn: (data: AccountFormData) => updateAccount(id!, data),
+    mutationFn: async (data: AccountFormData) => {
+      const result = await updateAccount(id!, data);
+      // Persistir tags vinculadas
+      try {
+        await setAccountTagsMutation.mutateAsync({ accountId: id!, tagIds: selectedTagIds });
+      } catch (err) {
+        console.error('Erro ao salvar tags da conta:', err);
+      }
+      return result;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: accountKeys.lists() });
       queryClient.invalidateQueries({ queryKey: accountKeys.detailExtended(id) });
