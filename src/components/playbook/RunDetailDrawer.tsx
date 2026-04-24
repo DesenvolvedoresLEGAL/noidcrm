@@ -95,6 +95,13 @@ export function RunDetailDrawer({ run, open, onClose, onViewProspects }: RunDeta
                 <div className="font-medium">{run.retry_count || 0}</div>
               </div>
               <div>
+                <span className="text-muted-foreground text-xs">Prospects (real)</span>
+                <div className="font-medium text-foreground">
+                  {realProspectCount ?? '—'}
+                  {isLive && <Loader2 className="inline h-3 w-3 ml-1 animate-spin text-muted-foreground" />}
+                </div>
+              </div>
+              <div>
                 <span className="text-muted-foreground text-xs">Criado em</span>
                 <div className="font-medium">
                   {format(new Date(run.created_at), "dd/MM/yy HH:mm:ss", { locale: ptBR })}
@@ -109,6 +116,18 @@ export function RunDetailDrawer({ run, open, onClose, onViewProspects }: RunDeta
                 </div>
               )}
             </div>
+
+            {isStuck && (
+              <div className="flex items-start gap-2 p-3 rounded-md bg-amber-500/10 border border-amber-500/20 text-sm">
+                <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0 text-amber-600" />
+                <div className="flex-1">
+                  <div className="font-medium text-amber-700">Execução parece travada</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">
+                    Rodando há {Math.round(minutesRunning)} min. Use "Forçar Conclusão" para finalizar com os {realProspectCount ?? 0} prospects já capturados.
+                  </div>
+                </div>
+              </div>
+            )}
           </section>
 
           {/* Error */}
