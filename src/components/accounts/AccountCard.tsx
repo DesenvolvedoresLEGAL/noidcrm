@@ -30,6 +30,9 @@ import { FinancialScoreBadge } from '@/components/ui/financial-score-badge';
 import { convertAccountType } from '@/services/supabase/account-conversion';
 import { toast } from 'sonner';
 import { accountKeys } from '@/lib/query-keys';
+import { useAccountTagIds } from '@/hooks/useAccountTags';
+import { AccountTagsBadges } from './AccountTagsSelector';
+import { useOrganizationTags } from '@/hooks/useOrganizationTags';
 
 interface AccountCardProps {
   account: {

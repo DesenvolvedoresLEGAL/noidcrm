@@ -942,6 +942,14 @@ export function AccountModalTabs({ open, onOpenChange, account }: AccountModalTa
                 </div>
               </div>
 
+              <div className="space-y-2 border-t pt-4">
+                <Label>Tags</Label>
+                <p className="text-xs text-muted-foreground">
+                  Atributos comerciais (ex: Expositor, Organizador, VIP). Combinam com segmento para filtros e relatórios.
+                </p>
+                <AccountTagsSelector value={selectedTagIds} onChange={setSelectedTagIds} />
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="codigo_externo">Código Externo</Label>
                 <Input id="codigo_externo" {...register('codigo_externo')} />
