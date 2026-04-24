@@ -75,6 +75,18 @@ export interface Prospect {
   event_url: string | null;
   exhibitor_profile_url: string | null;
   booth: string | null;
+  // Identity enrichment fields
+  cnpj: string | null;
+  razao_social: string | null;
+  nome_fantasia: string | null;
+  cnae_code: string | null;
+  cnae_desc: string | null;
+  porte: string | null;
+  endereco: string | null;
+  cidade_enriched: string | null;
+  uf_enriched: string | null;
+  cep: string | null;
+  identity_enriched_at: string | null;
   created_at: string;
   prospect_scores: ProspectScore[] | null;
 }
