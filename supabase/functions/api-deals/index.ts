@@ -153,7 +153,7 @@ async function buildDeal(
   if (contactId) {
     const { data } = await supabase
       .from("contacts")
-      .select("id, name, email, phone, position")
+      .select("id, nome, cargo, emails, telefones")
       .eq("id", contactId)
       .maybeSingle();
     contact = data;
@@ -258,10 +258,18 @@ async function buildDeal(
     company_address: account ? [account.logradouro, account.numero, account.complemento, account.bairro].filter(Boolean).join(", ") : null,
 
     // Contact
-    contact_name: (contact?.name as string) || (proposal.client_name as string) || null,
-    contact_email: (contact?.email as string) || (proposal.client_email as string) || null,
-    contact_phone: (contact?.phone as string) || null,
-    contact_position: (contact?.position as string) || null,
+    contact_name: (contact?.nome as string) || (proposal.client_name as string) || null,
+    contact_email: (Array.isArray(contact?.emails) && contact.emails.length > 0
+      ? (typeof contact.emails[0] === 'string'
+          ? contact.emails[0]
+          : (contact.emails[0] as Record<string, unknown>)?.value)
+      : null) as string | null || (proposal.client_email as string) || null,
+    contact_phone: (Array.isArray(contact?.telefones) && contact.telefones.length > 0
+      ? (typeof contact.telefones[0] === 'string'
+          ? contact.telefones[0]
+          : ((contact.telefones[0] as Record<string, unknown>)?.numero || (contact.telefones[0] as Record<string, unknown>)?.value))
+      : null) as string | null,
+    contact_position: (contact?.cargo as string) || null,
 
     // Products
     products: (items || []).map((item: Record<string, unknown>) => ({
