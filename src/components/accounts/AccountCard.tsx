@@ -23,15 +23,13 @@ import {
   MoreVertical,
   RefreshCw
 } from 'lucide-react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { LeadScoreCard } from '@/components/scoring/LeadScoreCard';
 import { FinancialScoreBadge } from '@/components/ui/financial-score-badge';
 import { convertAccountType } from '@/services/supabase/account-conversion';
 import { toast } from 'sonner';
 import { accountKeys } from '@/lib/query-keys';
-import { useAccountTagIds } from '@/hooks/useAccountTags';
 import { AccountTagsBadges } from './AccountTagsSelector';
-import { useOrganizationTags } from '@/hooks/useOrganizationTags';
 
 interface AccountCardProps {
   account: {
@@ -64,13 +62,7 @@ interface AccountCardProps {
 
 export function AccountCard({ account, metrics, contactsPreview = [], tags, onView, onEdit, onDelete }: AccountCardProps) {
   const queryClient = useQueryClient();
-
-  // Tags da conta
-  const { data: tagIds = [] } = useAccountTagIds(tags ? undefined : account.id);
-  const { tags: orgTags } = useOrganizationTags();
-  const accountTags = tags || orgTags
-    .filter((t) => tagIds.includes(t.id))
-    .map((t) => ({ id: t.id, name: t.name, color: t.color }));
+  const accountTags = tags || [];
 
   // Mutation para conversão de tipo
   const convertMutation = useMutation({
@@ -238,14 +230,14 @@ export function AccountCard({ account, metrics, contactsPreview = [], tags, onVi
             <div className="text-center">
               <div className="flex items-center justify-center gap-1 text-primary mb-1">
                 <TrendingUp className="h-4 w-4" />
-                <span className="font-semibold">{metrics?.opportunities || 0}</span>
+                <span className="font-semibold">{cardMetrics.opportunities}</span>
               </div>
               <p className="text-xs text-muted-foreground">Oportunidades</p>
             </div>
             <div className="text-center">
               <div className="flex items-center justify-center gap-1 text-primary mb-1">
                 <Users className="h-4 w-4" />
-                <span className="font-semibold">{metrics?.contacts || 0}</span>
+                <span className="font-semibold">{cardMetrics.contacts}</span>
               </div>
               <p className="text-xs text-muted-foreground">Contatos</p>
             </div>
@@ -256,7 +248,7 @@ export function AccountCard({ account, metrics, contactsPreview = [], tags, onVi
                   currency: 'BRL',
                   minimumFractionDigits: 0,
                   maximumFractionDigits: 0,
-                }).format(metrics?.pipelineValue || 0)}
+                }).format(cardMetrics.pipelineValue)}
               </div>
               <p className="text-xs text-muted-foreground">Pipeline</p>
             </div>
