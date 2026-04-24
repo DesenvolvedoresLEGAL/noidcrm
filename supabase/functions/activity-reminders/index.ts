@@ -140,11 +140,11 @@ serve(async (req) => {
               await client.send({
                 from: fromAddress,
                 to: activity.email_to.join(','),
-                cc: activity.email_cc?.length ? activity.email_cc.join(',') : undefined,
+                ...(activity.email_cc?.length ? { cc: activity.email_cc.join(',') } : {}),
                 subject: activity.email_subject,
                 content: "text/html",
                 html: finalBody,
-              });
+              } as any);
 
               await client.close();
 

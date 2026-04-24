@@ -60,11 +60,20 @@ async function authenticateApiKey(
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   const keyHash = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
 
-  const { data: keyData, error } = await supabaseAdmin
+  const { data: keyDataRaw, error } = await supabaseAdmin
     .from("api_keys")
     .select("id, organization_id, scopes, active, expires_at, name, key_prefix")
     .eq("key_hash", keyHash)
     .maybeSingle();
+  const keyData = keyDataRaw as {
+    id: string;
+    organization_id: string;
+    scopes: string[] | null;
+    active: boolean;
+    expires_at: string | null;
+    name: string;
+    key_prefix: string;
+  } | null;
 
   if (error) {
     console.error("[api-deals] AUTH FAIL: DB error looking up key:", error.message);
