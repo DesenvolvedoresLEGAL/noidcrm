@@ -889,51 +889,63 @@ async function handleEventFirecrawl(
   }
 
   // ── Step 3a: SPA A-Z filter re-scrape strategy ──
-  // If map found very few URLs (SPA) and first scrape yielded high density, try clicking A-Z filters
-  const isSpaLike = discoveredUrls.length <= 3 && metrics.list_pages_scraped >= 1;
+  // Detecta SPA quando: poucos URLs no map OU poucos chars retornados no scrape inicial.
+  // Isso cobre Angular/React/Vue (ex: bettshow.com) que renderizam tudo via JS.
+  const totalScrapedChars = scrapedContents.reduce((acc, c) => acc + (c.markdown?.length || 0) + (c.html?.length || 0), 0);
+  const isSpaLike = (discoveredUrls.length <= 5) || (metrics.list_pages_scraped >= 1 && totalScrapedChars < 2000);
   if (isSpaLike && scrapedContents.length > 0) {
     const firstContent = scrapedContents[0];
     const firstHtml = firstContent.html || "";
-    
-    // Detect A-Z filter links in the HTML
+    const firstMd = firstContent.markdown || "";
+
+    // Detect A-Z filter links in HTML or markdown
     const hasAlphaFilter = /class="[^"]*(?:alpha|letter|filter|az)[^"]*"/i.test(firstHtml) ||
       /(?:data-letter|data-filter)="[A-Z]"/i.test(firstHtml) ||
       /<a[^>]*>[A-Z]<\/a>/g.test(firstHtml) ||
-      /(?:filtrar|filter).*(?:por letra|by letter|a-z)/i.test(firstHtml);
+      /(?:filtrar|filter).*(?:por letra|by letter|a-z)/i.test(firstHtml) ||
+      /\b[A-Z]\b\s*\|\s*\b[A-Z]\b\s*\|\s*\b[A-Z]\b/.test(firstMd); // "A | B | C" in markdown
 
-    if (hasAlphaFilter) {
-      await logRunEvent(supabase, organizationId, run.id, "info", "SPA detectada com filtro A-Z, fazendo scrapes por letra");
-      
+    // For known SPA event hosts, force the A-Z strategy even without explicit detection
+    const eventHost = (() => { try { return new URL(formattedEventUrl).hostname.toLowerCase(); } catch { return ""; } })();
+    const knownSpaHosts = ["bettshow.com", "brasil.bettshow.com"];
+    const forceAlphaStrategy = knownSpaHosts.some(h => eventHost.endsWith(h));
+
+    if (hasAlphaFilter || forceAlphaStrategy) {
+      await logRunEvent(supabase, organizationId, run.id, "info", "SPA detectada com filtro A-Z, fazendo scrapes por letra (stealth proxy)");
+
       const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
       for (const letter of letters) {
         try {
           const letterActions: any[] = [
-            { type: "wait", milliseconds: 2000 },
-            { type: "click", selector: `a[data-letter="${letter}"], a[data-filter="${letter}"], a[href*="letter=${letter}"], a[href*="letra=${letter}"], button[data-letter="${letter}"], .alpha-filter a:contains("${letter}"), a.letter-filter[href*="${letter.toLowerCase()}"]` },
-            { type: "wait", milliseconds: 3000 },
+            { type: "wait", milliseconds: 2500 },
+            { type: "click", selector: `a[data-letter="${letter}"], a[data-filter="${letter}"], a[href*="letter=${letter}"], a[href*="letra=${letter}"], button[data-letter="${letter}"], .alpha-filter a:has-text("${letter}"), .filter-letter:has-text("${letter}"), a.letter-filter[href*="${letter.toLowerCase()}"], li:has-text("${letter}") > a` },
+            { type: "wait", milliseconds: 3500 },
           ];
-          // Scroll after clicking
+          // Scroll after clicking to trigger lazy loaders
           for (let s = 0; s < 30; s++) {
             letterActions.push({ type: "scroll", direction: "down", amount: 5 });
             letterActions.push({ type: "wait", milliseconds: 800 });
           }
-          
-          const scrapeResp = await fetch("https://api.firecrawl.dev/v1/scrape", {
+
+          // Use Firecrawl v2 with stealth proxy for better SPA rendering
+          const scrapeResp = await fetch("https://api.firecrawl.dev/v2/scrape", {
             method: "POST",
             headers: { Authorization: `Bearer ${FIRECRAWL_API_KEY}`, "Content-Type": "application/json" },
             body: JSON.stringify({
               url: firstContent.url,
-              formats: ["markdown"],
-              onlyMainContent: true,
-              waitFor: 3000,
+              formats: ["markdown", "html"],
+              onlyMainContent: false,
+              waitFor: 4000,
               actions: letterActions,
-              timeout: 120000,
+              proxy: "stealth",
+              timeout: 180000,
             }),
           });
           const scrapeData = await scrapeResp.json();
           const markdown = scrapeData.data?.markdown || scrapeData.markdown || "";
-          if (markdown && markdown.length > 100) {
-            scrapedContents.push({ url: `${firstContent.url}#letter-${letter}`, markdown, html: "", page_type: "exhibitors_list" });
+          const html = scrapeData.data?.html || scrapeData.html || "";
+          if ((markdown && markdown.length > 100) || (html && html.length > 500)) {
+            scrapedContents.push({ url: `${firstContent.url}#letter-${letter}`, markdown, html, page_type: "exhibitors_list" });
           }
         } catch (letterErr) {
           console.warn(`A-Z scrape failed for letter ${letter}:`, letterErr);
@@ -941,31 +953,32 @@ async function handleEventFirecrawl(
       }
       await logRunEvent(supabase, organizationId, run.id, "info", `Scrapes A-Z concluídos, total de ${scrapedContents.length} conteúdos`);
     } else {
-      // No A-Z filter found — do a second deep scrape with even more scrolls
-      await logRunEvent(supabase, organizationId, run.id, "info", "SPA sem filtro A-Z detectado, fazendo scrape extra com 120 scrolls");
+      // No A-Z filter found — do a deep scrape with stealth proxy + 120 scrolls
+      await logRunEvent(supabase, organizationId, run.id, "info", "SPA sem filtro A-Z detectado, fazendo scrape profundo com stealth proxy");
       try {
         const deepScrollActions: any[] = [];
         for (let s = 0; s < 120; s++) {
           deepScrollActions.push({ type: "scroll", direction: "down", amount: 5 });
           deepScrollActions.push({ type: "wait", milliseconds: 1000 });
         }
-        const scrapeResp = await fetch("https://api.firecrawl.dev/v1/scrape", {
+        const scrapeResp = await fetch("https://api.firecrawl.dev/v2/scrape", {
           method: "POST",
           headers: { Authorization: `Bearer ${FIRECRAWL_API_KEY}`, "Content-Type": "application/json" },
           body: JSON.stringify({
             url: firstContent.url,
-            formats: ["markdown"],
-            onlyMainContent: true,
-            waitFor: 3000,
+            formats: ["markdown", "html"],
+            onlyMainContent: false,
+            waitFor: 4000,
             actions: deepScrollActions,
+            proxy: "stealth",
             timeout: 300000,
           }),
         });
         const scrapeData = await scrapeResp.json();
         const markdown = scrapeData.data?.markdown || scrapeData.markdown || "";
+        const html = scrapeData.data?.html || scrapeData.html || "";
         if (markdown && markdown.length > firstContent.markdown.length * 1.1) {
-          // Replace the original content with the deeper version
-          scrapedContents[0] = { ...firstContent, markdown };
+          scrapedContents[0] = { ...firstContent, markdown, html: html || firstContent.html };
           await logRunEvent(supabase, organizationId, run.id, "info", `Deep scroll trouxe ${markdown.length} chars vs ${firstContent.markdown.length} original`);
         }
       } catch (deepErr) {
