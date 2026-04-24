@@ -16066,6 +16066,7 @@ export type Database = {
           icp_profile_id: string | null
           id: string
           input_payload: Json
+          last_heartbeat_at: string | null
           organization_id: string
           playbook_id: string | null
           retry_count: number | null
@@ -16083,6 +16084,7 @@ export type Database = {
           icp_profile_id?: string | null
           id?: string
           input_payload?: Json
+          last_heartbeat_at?: string | null
           organization_id: string
           playbook_id?: string | null
           retry_count?: number | null
@@ -16100,6 +16102,7 @@ export type Database = {
           icp_profile_id?: string | null
           id?: string
           input_payload?: Json
+          last_heartbeat_at?: string | null
           organization_id?: string
           playbook_id?: string | null
           retry_count?: number | null
@@ -27068,6 +27071,7 @@ export type Database = {
       cleanup_expired_dedup_keys: { Args: never; Returns: number }
       cleanup_expired_oauth_nonces: { Args: never; Returns: number }
       cleanup_expired_snapshots: { Args: never; Returns: number }
+      cleanup_orphaned_playbook_runs: { Args: never; Returns: number }
       consume_volts: {
         Args: { p_action_type?: string; p_amount: number; p_org_id: string }
         Returns: Json
