@@ -1065,8 +1065,64 @@ async function handleEventFirecrawl(
 
   executionLog.push({ step: "scraping_complete", list_scraped: metrics.list_pages_scraped, profiles_scraped: metrics.profile_pages_scraped, scrape_failures: metrics.scrape_failures, at: new Date().toISOString() });
 
-  // ── Step 4: AI extraction with CHUNKING ──
+  // ── Step 3c: Deterministic Markdown Pattern Parser ──
+  // Captura padrões muito comuns em sites de evento já no markdown,
+  // sem depender da AI. Padrões cobertos:
+  //   "## NOME DA EMPRESA\n...\nStand: XYZ"   (Bett, ASP Events e similares)
+  //   "### NOME DA EMPRESA\n...Stand: XYZ"
+  //   "## NOME DA EMPRESA\n...Booth: XYZ"
+  //   "- **NOME DA EMPRESA**" em listas com logos antes
+  // Roda ANTES da AI. Se já trouxer muitos resultados, a AI ainda roda
+  // e os duplicados são removidos pelo dedupe intra-run mais adiante.
   const allExhibitors: any[] = [];
+
+  for (const scraped of scrapedContents) {
+    const md = scraped.markdown || "";
+    if (!md || md.length < 30) continue;
+
+    // Padrão 1: cabeçalhos H2/H3 de empresa seguidos opcionalmente por "Stand:" ou "Booth:"
+    // Ex.: "## 3B SCIENTIFIC\n\nStand: P160"
+    const headingPattern = /^(?:#{2,4})\s+([^\n#][^\n]{1,120})\s*$([\s\S]{0,400}?)(?=^(?:#{1,6})\s|\n\n-\s|\Z)/gm;
+    const matches = md.matchAll(headingPattern);
+    for (const m of matches) {
+      const rawName = (m[1] || "").trim()
+        .replace(/^\*+|\*+$/g, "")
+        .replace(/\s+/g, " ");
+      const block = m[2] || "";
+
+      // Filtros mínimos para não capturar cabeçalhos genéricos
+      if (rawName.length < 2 || rawName.length > 120) continue;
+      if (/^(lista|menu|home|filtros|pesquisar|sobre|contato|setores|segmento|patrocinador|patrocinadores|expositores|exhibitors|loading|todos)$/i.test(rawName)) continue;
+      if (/^[\d\W]+$/.test(rawName)) continue;
+
+      const standMatch = block.match(/(?:Stand|Booth|Estande)\s*[:#]?\s*([A-Z0-9\-]{1,12})/i);
+      const booth = standMatch ? standMatch[1].toUpperCase() : null;
+
+      allExhibitors.push({
+        company_name: rawName,
+        website: null,
+        category: null,
+        description: null,
+        booth,
+        country: null,
+        city: null,
+        exhibitor_profile_url: null,
+        signals: booth ? ["markdown_pattern", "has_booth"] : ["markdown_pattern"],
+        confidence: booth ? 75 : 60,
+        _source_url: scraped.url,
+        _page_type: scraped.page_type,
+        _extraction_method: "markdown_pattern",
+      });
+    }
+  }
+
+  metrics.markdown_pattern_extracted = allExhibitors.length;
+  if (allExhibitors.length > 0) {
+    await logRunEvent(supabase, organizationId, run.id, "info", `Parser de markdown extraiu ${allExhibitors.length} expositores antes da AI`, { count: allExhibitors.length });
+  }
+
+  // ── Step 4: AI extraction with CHUNKING ──
+  // (allExhibitors já pode conter resultados do parser de markdown — AI só complementa)
   const CHUNK_SIZE = 40000; // chars per AI call
 
   for (const scraped of scrapedContents) {
