@@ -24,7 +24,6 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import { LeadScoreCard } from '@/components/scoring/LeadScoreCard';
 import { FinancialScoreBadge } from '@/components/ui/financial-score-badge';
 import { convertAccountType } from '@/services/supabase/account-conversion';
@@ -55,18 +54,21 @@ interface AccountCardProps {
     risco_financeiro?: string | null;
     score_fatores?: Record<string, unknown> | null;
   };
+  metrics?: { opportunities: number; contacts: number; pipelineValue: number };
+  contactsPreview?: Array<{ id: string; nome: string; emails?: any; telefones?: any }>;
+  tags?: { id: string; name: string; color: string }[];
   onView: () => void;
   onEdit: () => void;
   onDelete: () => void;
 }
 
-export function AccountCard({ account, onView, onEdit, onDelete }: AccountCardProps) {
+export function AccountCard({ account, metrics, contactsPreview = [], tags, onView, onEdit, onDelete }: AccountCardProps) {
   const queryClient = useQueryClient();
 
   // Tags da conta
-  const { data: tagIds = [] } = useAccountTagIds(account.id);
+  const { data: tagIds = [] } = useAccountTagIds(tags ? undefined : account.id);
   const { tags: orgTags } = useOrganizationTags();
-  const accountTags = orgTags
+  const accountTags = tags || orgTags
     .filter((t) => tagIds.includes(t.id))
     .map((t) => ({ id: t.id, name: t.name, color: t.color }));
 
@@ -83,53 +85,8 @@ export function AccountCard({ account, onView, onEdit, onDelete }: AccountCardPr
     },
   });
 
-  // Buscar preview de contatos
-  const { data: contacts = [] } = useQuery({
-    queryKey: ['account-contacts-preview', account.id],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('contacts')
-        .select('id, nome, emails, telefones')
-        .eq('account_id', account.id)
-        .limit(3);
-      return data || [];
-    },
-  });
-
-  // Buscar métricas rápidas
-  const { data: metrics } = useQuery({
-    queryKey: ['account-metrics-preview', account.id],
-    queryFn: async () => {
-      const [
-        { count: opportunitiesCount },
-        { count: contactsCount },
-        { data: pipelineValue }
-      ] = await Promise.all([
-        supabase
-          .from('opportunities')
-          .select('*', { count: 'exact', head: true })
-          .eq('account_id', account.id)
-          .in('status', ['new', 'in_progress']),
-        supabase
-          .from('contacts')
-          .select('*', { count: 'exact', head: true })
-          .eq('account_id', account.id),
-        supabase
-          .from('opportunities')
-          .select('valor_previsto')
-          .eq('account_id', account.id)
-          .in('status', ['new', 'in_progress'])
-      ]);
-
-      const totalValue = pipelineValue?.reduce((sum, opp) => sum + (opp.valor_previsto || 0), 0) || 0;
-
-      return {
-        opportunities: opportunitiesCount || 0,
-        contacts: contactsCount || 0,
-        pipelineValue: totalValue,
-      };
-    },
-  });
+  const cardMetrics = metrics || { opportunities: 0, contacts: 0, pipelineValue: 0 };
+  const contacts = contactsPreview;
 
   const getPorteColor = (porte?: string | null) => {
     switch (porte) {
