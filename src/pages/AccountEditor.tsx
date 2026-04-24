@@ -25,6 +25,8 @@ import { accountKeys, contactKeys, opportunityKeys } from '@/lib/query-keys';
 import { cnaeToSegmento } from '@/lib/cnae-to-segmento';
 import { TIPO_EMPRESA_OPTIONS, SEGMENTO_OPTIONS, normalizeTipoEmpresa, withCurrentValue } from '@/lib/account-options';
 import { normalizeSegmento } from '@/lib/segment-normalizer';
+import { AccountTagsSelector } from '@/components/accounts/AccountTagsSelector';
+import { useAccountTagIds, useSetAccountTags } from '@/hooks/useAccountTags';
 // Helper: transforma string vazia em null para campos UUID/opcionais
 const emptyToNull = (v: string | null | undefined) => (v === '' ? null : v);
 
@@ -103,6 +105,14 @@ export default function AccountEditor() {
   const [qsaModalOpen, setQsaModalOpen] = useState(false);
   const [qsaData, setQsaData] = useState<Array<{ nome: string; qualificacao: string; selected: boolean }>>([]);
   const [isCreatingContacts, setIsCreatingContacts] = useState(false);
+
+  // Tags state
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
+  const { data: existingTagIds } = useAccountTagIds(id);
+  useEffect(() => {
+    setSelectedTagIds(existingTagIds || []);
+  }, [existingTagIds]);
+  const setAccountTagsMutation = useSetAccountTags();
 
   const { data: account, isLoading: accountLoading, error: accountError } = useAccountDetails(id!);
   const { users, loading: usersLoading } = useOrganizationUsers([
@@ -343,7 +353,16 @@ export default function AccountEditor() {
   };
 
   const updateMutation = useMutation({
-    mutationFn: (data: AccountFormData) => updateAccount(id!, data),
+    mutationFn: async (data: AccountFormData) => {
+      const result = await updateAccount(id!, data);
+      // Persistir tags vinculadas
+      try {
+        await setAccountTagsMutation.mutateAsync({ accountId: id!, tagIds: selectedTagIds });
+      } catch (err) {
+        console.error('Erro ao salvar tags da conta:', err);
+      }
+      return result;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: accountKeys.lists() });
       queryClient.invalidateQueries({ queryKey: accountKeys.detailExtended(id) });
@@ -1004,6 +1023,17 @@ export default function AccountEditor() {
                           </Select>
                         );
                       }}
+                    />
+                  </div>
+
+                  <div className="space-y-2 pt-2 border-t">
+                    <Label>Tags</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Use tags para classificar atributos comerciais (ex.: Expositor, Organizador, VIP). Suporta múltipla seleção.
+                    </p>
+                    <AccountTagsSelector
+                      value={selectedTagIds}
+                      onChange={setSelectedTagIds}
                     />
                   </div>
 
