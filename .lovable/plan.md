@@ -1,148 +1,90 @@
-## Diagnóstico atual do Kairós
 
-O problema desta execução não foi “falta de expositores” no site. O site da Bett tem conteúdo suficiente e, inclusive, a página expõe a lista de empresas em markdown/HTML.
+## Diagnóstico do erro de import (Educbank)
 
-### O que eu confirmei
-- A execução mais recente foi concluída com:
-  - `pages_discovered: 1`
-  - `list_pages_scraped: 0`
-  - `exhibitors_extracted_raw: 0`
-  - `persisted_prospects: 0`
-- O `scoreThreshold` estava em `0`, então o problema não foi filtro de score.
-- O `input_payload.event_url` salvo na execução veio assim:
-  - `https://brasil.bettshow.com/lista-de-expositores e validar que leads/expositores`
-- Ou seja: a URL foi enviada com texto extra junto. Isso quebra o scraping logo na origem.
-- Além disso, ao buscar a URL correta, a própria página já contém a lista de expositores em conteúdo extraível, com blocos como:
-  - `## 3B SCIENTIFIC`
-  - `Stand: P160`
-  - `## 4HEROES`
-  - etc.
+Olhei o `useProspectImport.ts` e a prospect Educbank no banco:
 
-### Conclusão objetiva
-Hoje o módulo **não está operacional de forma definitiva** para esse fluxo de evento, porque ele ainda depende demais de heurísticas e não protege o usuário contra input inválido.
+- A prospect **EDUCBANK** tem `website=null`, `email_public=null`, `phone_public=null`, `normalized_domain=null` — só sobrou o nome da empresa. Não tem como criar conta útil nem oportunidade qualificada com isso.
+- O hook `useProspectImport` cria a `opportunity` **sem `pipeline_id` nem `stage_id`** (campos `pipeline_id text` e `stage_id text` ficam NULL). Isso quebra a oportunidade no pipeline (e provavelmente um trigger/RLS está rejeitando, daí o erro 400 que aparece no console: `opportunities?select=id`).
+- A organização tem o pipeline `PRÉ VENDAS` (`d1b68a0f-...-sales-1`, tipo `qualification`) com primeiro estágio `Lead Captado` (`...-stage-0`) — é exatamente onde o lead deve cair.
 
-O principal problema desta rodada foi:
-1. **URL malformada no input**
-2. **Falta de validação/sanitização da URL antes da execução**
-3. **Ausência de fallback determinístico específico para páginas de expositores já renderizadas em markdown/HTML**
+Ou seja, **dois problemas combinados**: (1) faltam dados de enriquecimento; (2) o import não posiciona a opp no funil.
 
-## O que precisa ser ajustado
+## Estratégia em 2 camadas (mantendo o que já existe)
 
-### 1) Blindar a entrada da URL do evento
-- Validar que o campo seja uma URL real.
-- Sanitizar o valor antes de enviar para a função.
-- Rejeitar entradas com espaço + texto adicional após a URL.
-- Mostrar erro claro no formulário, em vez de rodar uma execução inválida.
+Já existe a edge function `run-enrichment` (Firecrawl + IA) e o hook `useEnrichment`. Só não está obrigatório no fluxo de import. Vou fazer enriquecimento **bloqueante** antes do import, em duas etapas:
 
-### 2) Criar pré-validação antes da execução
-Antes de iniciar a busca:
-- testar a URL;
-- confirmar status HTTP/extração mínima;
-- mostrar um diagnóstico rápido como:
-  - URL válida
-  - conteúdo encontrado
-  - página parece conter expositores
-  - página parece SPA / A-Z
+### Etapa A — Enriquecimento de identidade (rápido, determinístico)
+Cria nova edge `enrich-prospect-identity` que faz:
 
-Se a pré-validação falhar, a execução não deve começar.
+1. **Descoberta de domínio/site via Google CSE** (se ainda não houver `website`):
+   - Query: `"<company_name>" site oficial` + `"<company_name>" CNPJ`
+   - Usa Google Custom Search API (precisa de `GOOGLE_CSE_KEY` + `GOOGLE_CSE_CX` — vou pedir via `add_secret`).
+   - Heurística para escolher o domínio "oficial" (descarta linkedin/facebook/glassdoor; prioriza `.com.br`/`.com` cujo título contém o nome).
+2. **Descoberta de CNPJ** via:
+   - Regex no snippet do Google (padrão `\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2}`).
+   - Se não achar: scrape leve (`fetch` direto) da home + `/contato`/`/sobre` procurando o regex.
+3. **Lookup CNPJ** via função `lookup-cnpj` já existente (BrasilAPI/OpenCNPJ com cache 30d) → razão social, nome fantasia, endereço, CNAE, telefone, e-mail, porte.
+4. **Email/telefone públicos**: regex em `mailto:` / `tel:` na home + `/contato`.
+5. Persiste tudo de volta em `prospects` (`website`, `normalized_domain`, `email_public`, `phone_public`, novos campos `cnpj`, `razao_social`, `nome_fantasia`, `cnae`, `porte`, `address_*`).
 
-### 3) Adicionar parser determinístico para páginas de expositores
-Para esse tipo de página, não depender só de IA.
+> Migração: adicionar colunas `cnpj`, `razao_social`, `nome_fantasia`, `cnae_code`, `cnae_desc`, `porte`, `endereco`, `cidade_enriched`, `uf_enriched`, `cep` em `prospects` (todas opcionais).
 
-Implementar um parser direto para padrões como:
-- `## NOME DA EMPRESA`
-- `Stand: XYZ`
-- imagens/logo antes do nome
-- grupos em sequência repetida
+### Etapa B — Enriquecimento de inteligência (já existe)
+Reutilizo a `run-enrichment` atual (Firecrawl + IA gera `enriched_company_profiles`, `commercial_briefs`, `enrichment_signals`) — ela precisa de website, que a Etapa A garante.
 
-Esse parser deve rodar:
-- antes da IA quando o markdown já estiver “rico”, ou
-- como fallback forte quando a IA retornar pouco/zero.
+### Recalcular Lead Score
+Após A+B, chamo a função existente `calculate-account-scores` (ou criar uma `score-prospect`) usando os sinais reais: porte, CNAE alinhado ao ICP, presença de site, MRR estimado, sinais comerciais. Atualiza `prospects.priority_score` e `grade`.
 
-### 4) Melhorar a estratégia do handler de evento
-No `lead-sourcing`:
-- logar tamanho do markdown/html retornado por página;
-- distinguir claramente:
-  - URL inválida
-  - scrape vazio
-  - scrape com conteúdo mas parser zerado
-  - parser extraiu, mas persistência falhou
-- se o markdown da página principal já contiver dezenas de blocos de empresa, pular a etapa cara de SPA/A-Z e extrair direto dali.
+## Correção do import (`useProspectImport.ts`)
 
-### 5) Melhorar a transparência na UI
-No detalhe da execução, exibir:
-- URL efetivamente usada
-- chars de markdown/html capturados
-- tipo de extração aplicada:
-  - mapa
-  - SPA/A-Z
-  - parser markdown
-  - parser HTML híbrido
-- motivo explícito de “0 leads”
+1. Antes de qualquer insert, **bloquear se faltar website E cnpj** (forçar enriquecimento primeiro). UI mostra botão **"Enriquecer agora"** antes de "Importar".
+2. Ao importar, fazer chamada RPC nova `import_prospect_to_pipeline(prospect_id, target_pipeline_type)`:
+   - Resolve `pipeline_id` = primário com `pipeline_type='qualification'` (ou aceita override).
+   - Resolve `stage_id` = stage com menor `order_index` desse pipeline.
+   - Cria conta usando `cnpj`/`razao_social`/`nome_fantasia` enriquecidos (com dedup por CNPJ além do domínio).
+   - Cria contact com `email_public`/`phone_public`.
+   - Cria opportunity com `pipeline_id`, `stage_id`, `status='new'`, `temperatura='warm'`, `priority_score`.
+   - Faz tudo dentro de uma transação (security definer) para evitar conta órfã se opp falhar.
+3. Toast com link direto para a oportunidade criada.
 
-Exemplo de mensagem correta:
-- “Execução abortada: URL inválida”
-- “Conteúdo capturado, mas nenhum padrão de expositor identificado”
-- “Expositores identificados, mas persistência falhou”
+## UX no Drawer do Prospect
 
-## Implementação proposta
+- Banner "⚠️ Faltam dados essenciais" enquanto não houver `cnpj` + `website`.
+- Botão **"Enriquecer & Importar"** (one-click): roda Etapa A → Etapa B → Score → Import sequencialmente, com progresso visível (4 passos).
+- Botão "Importar" só fica habilitado depois de A concluído.
+- Mostra preview antes de importar: razão social, CNPJ formatado, site, e-mail, telefone, CNAE, porte, score.
 
-### Arquivos impactados
-- `src/components/playbook/LeadSearchForm.tsx`
-- `supabase/functions/lead-sourcing/index.ts`
-- `src/components/playbook/RunDetailDrawer.tsx`
-- possivelmente `src/components/playbook/LeadSourcingEngine.tsx` para feedback de pré-check
+## Próxima fase (Apollo/Lusha) — não nesta entrega
+Estrutura preparada: campo `prospects.decision_makers jsonb` + tabela `prospect_contacts`. A integração com Apollo/Lusha vai consumir `cnpj`/`normalized_domain` enriquecidos para buscar gerentes de marketing por cargo/seniority.
 
-### Mudanças
-1. **Frontend**
-- validação forte do campo `URL do Evento`
-- sanitização do input
-- bloqueio do submit se a URL estiver inválida
-- mensagem de ajuda específica para páginas de expositores
+## Arquivos impactados
 
-2. **Backend function**
-- normalização segura da URL
-- early fail com mensagem amigável se houver texto extra
-- novo parser determinístico de expositores por markdown/HTML
-- logs diagnósticos melhores
-- regra: se encontrar blocos `## empresa + Stand`, persistir direto
+**Novos:**
+- `supabase/functions/enrich-prospect-identity/index.ts` (Etapa A)
+- `supabase/migrations/<ts>_prospects_enrichment_columns.sql` (colunas CNPJ + RPC `import_prospect_to_pipeline`)
+- `src/hooks/useEnrichProspectIdentity.ts`
 
-3. **Observabilidade**
-- detalhar no drawer como a extração aconteceu
-- expor contadores úteis para troubleshooting real
+**Editados:**
+- `src/hooks/useProspectImport.ts` (usar RPC, validar dados mínimos, resolver pipeline/stage)
+- `src/components/playbook/ProspectDetailDrawer.tsx` (banner + botão "Enriquecer & Importar" + preview)
+- `supabase/functions/run-enrichment/index.ts` (deixar idempotente para rodar após Etapa A)
 
-## Resultado esperado após a correção
-- O Kairós deixa de executar com URL inválida.
-- Páginas como a da Bett passam a gerar expositores mesmo sem depender só da IA.
-- “0 leads” passa a significar um caso real, e não falha silenciosa do pipeline.
-- O módulo fica muito mais confiável para operação do time de pré-vendas em eventos.
+## Secrets necessários
+- `GOOGLE_CSE_KEY` e `GOOGLE_CSE_CX` (Google Programmable Search) — vou pedir via `add_secret` quando começar a implementar. Sem isso, caio em fallback: scrape direto via DuckDuckGo HTML (menos confiável, mas funciona).
+- `FIRECRAWL_API_KEY` já existe.
+- `OPENAI_API_KEY` já existe.
 
-## Detalhes técnicos
+## Riscos
+- Google CSE tem cota grátis baixa (100/dia). Para 447 leads = precisa plano pago ou processar em lotes ao longo de dias.
+- Nem toda empresa B2B tem CNPJ no site → fallback: busca pelo nome em BrasilAPI (não suportado) → marcar prospect como "CNPJ não encontrado" e seguir só com domínio.
+- Custo: ~1 chamada Firecrawl + 1 OpenAI + 1 CNPJ + 2 Google CSE por prospect ≈ R$ 0,15–0,30/lead.
 
-Fluxo alvo:
+## Resposta direta às suas dúvidas
 
-```text
-Form URL
-  -> sanitize + validate
-  -> preflight check
-  -> run lead-sourcing
-      -> fetch/map page
-      -> detect rich exhibitor markdown
-      -> deterministic parser
-      -> AI enrichment only if needed
-      -> dedupe + persist
-      -> clear run diagnostics
-```
+> "Onde buscar?" → Google CSE (oficial, pago após 100/dia) ou DuckDuckGo HTML (grátis, frágil). Recomendo CSE.
 
-Parser alvo para esse tipo de página:
+> "Como funciona o enriquecimento?" → Pipeline determinístico: Google → CNPJ regex → BrasilAPI/OpenCNPJ → scrape contato → Firecrawl + IA → score. Tudo cacheado.
 
-```text
-[logo/imagem]
-## NOME DA EMPRESA
-Stand: X123
-```
+> "Próxima fase Apollo/Lusha?" → Vai consumir `cnpj` + `normalized_domain` desta etapa para buscar pessoas. Nada bloqueia.
 
-Esse padrão já aparece na página da Bett e é suficiente para capturar empresas com alta confiabilidade.
-
-## Observação importante
-Há uma evidência forte de que a última execução usou uma URL contaminada com texto extra. Mesmo assim, o sistema deveria ter impedido essa execução. Esse é exatamente o tipo de proteção que vou adicionar na implementação.
+Aprova o plano? Quando aprovar, preciso que você decida: **(1) usamos Google CSE (você fornece as keys) ou (2) fallback DuckDuckGo grátis para validar primeiro?**

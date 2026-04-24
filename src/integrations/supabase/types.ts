@@ -18260,7 +18260,12 @@ export type Database = {
           approved_at: string | null
           approved_by: string | null
           booth: string | null
+          cep: string | null
+          cidade_enriched: string | null
           city: string | null
+          cnae_code: string | null
+          cnae_desc: string | null
+          cnpj: string | null
           company_name: string
           confidence: number | null
           country: string | null
@@ -18268,21 +18273,26 @@ export type Database = {
           dedupe_status: string | null
           duplicate_candidate: boolean | null
           email_public: string | null
+          endereco: string | null
           event_name: string | null
           event_url: string | null
           exhibitor_profile_url: string | null
           icp_profile_id: string | null
           id: string
+          identity_enriched_at: string | null
           industry: string | null
           linkedin_url: string | null
           matched_account_id: string | null
+          nome_fantasia: string | null
           normalized_company_name: string | null
           normalized_data: Json | null
           normalized_domain: string | null
           organization_id: string
           phone_public: string | null
           playbook_run_id: string
+          porte: string | null
           raw_data: Json | null
+          razao_social: string | null
           recommended_next_action: string | null
           rejected_at: string | null
           rejected_by: string | null
@@ -18294,6 +18304,7 @@ export type Database = {
           status: string | null
           subcategory: string | null
           summary: string | null
+          uf_enriched: string | null
           updated_at: string | null
           website: string | null
         }
@@ -18302,7 +18313,12 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           booth?: string | null
+          cep?: string | null
+          cidade_enriched?: string | null
           city?: string | null
+          cnae_code?: string | null
+          cnae_desc?: string | null
+          cnpj?: string | null
           company_name: string
           confidence?: number | null
           country?: string | null
@@ -18310,21 +18326,26 @@ export type Database = {
           dedupe_status?: string | null
           duplicate_candidate?: boolean | null
           email_public?: string | null
+          endereco?: string | null
           event_name?: string | null
           event_url?: string | null
           exhibitor_profile_url?: string | null
           icp_profile_id?: string | null
           id?: string
+          identity_enriched_at?: string | null
           industry?: string | null
           linkedin_url?: string | null
           matched_account_id?: string | null
+          nome_fantasia?: string | null
           normalized_company_name?: string | null
           normalized_data?: Json | null
           normalized_domain?: string | null
           organization_id: string
           phone_public?: string | null
           playbook_run_id: string
+          porte?: string | null
           raw_data?: Json | null
+          razao_social?: string | null
           recommended_next_action?: string | null
           rejected_at?: string | null
           rejected_by?: string | null
@@ -18336,6 +18357,7 @@ export type Database = {
           status?: string | null
           subcategory?: string | null
           summary?: string | null
+          uf_enriched?: string | null
           updated_at?: string | null
           website?: string | null
         }
@@ -18344,7 +18366,12 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           booth?: string | null
+          cep?: string | null
+          cidade_enriched?: string | null
           city?: string | null
+          cnae_code?: string | null
+          cnae_desc?: string | null
+          cnpj?: string | null
           company_name?: string
           confidence?: number | null
           country?: string | null
@@ -18352,21 +18379,26 @@ export type Database = {
           dedupe_status?: string | null
           duplicate_candidate?: boolean | null
           email_public?: string | null
+          endereco?: string | null
           event_name?: string | null
           event_url?: string | null
           exhibitor_profile_url?: string | null
           icp_profile_id?: string | null
           id?: string
+          identity_enriched_at?: string | null
           industry?: string | null
           linkedin_url?: string | null
           matched_account_id?: string | null
+          nome_fantasia?: string | null
           normalized_company_name?: string | null
           normalized_data?: Json | null
           normalized_domain?: string | null
           organization_id?: string
           phone_public?: string | null
           playbook_run_id?: string
+          porte?: string | null
           raw_data?: Json | null
+          razao_social?: string | null
           recommended_next_action?: string | null
           rejected_at?: string | null
           rejected_by?: string | null
@@ -18378,6 +18410,7 @@ export type Database = {
           status?: string | null
           subcategory?: string | null
           summary?: string | null
+          uf_enriched?: string | null
           updated_at?: string | null
           website?: string | null
         }
@@ -27394,6 +27427,10 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      import_prospect_to_pipeline: {
+        Args: { p_prospect_id: string; p_target_pipeline_type?: string }
+        Returns: Json
       }
       increment_email_kb_usage: {
         Args: { p_kb_ids: string[] }

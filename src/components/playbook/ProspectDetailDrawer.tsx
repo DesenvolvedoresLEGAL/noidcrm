@@ -3,10 +3,12 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Check, X, AlertTriangle, Globe, MapPin, Building2, ExternalLink, Download, PackageCheck } from 'lucide-react';
+import { Check, X, AlertTriangle, Globe, MapPin, Building2, ExternalLink, Download, PackageCheck, Sparkles, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Prospect } from '@/hooks/useLeadSourcingV2';
 import { useEnrichmentRun, useEnrichedCompanyProfile, useCommercialBrief, useEnrichmentSignals, useRunEnrichment } from '@/hooks/useEnrichment';
+import { useEnrichProspectIdentity } from '@/hooks/useEnrichProspectIdentity';
+import { hasMinimumIdentity } from '@/hooks/useProspectImport';
 import { EnrichProspectButton } from './enrichment/EnrichProspectButton';
 import { EnrichmentStatusBadge } from './enrichment/EnrichmentStatusBadge';
 import { CompanyEnrichmentCard } from './enrichment/CompanyEnrichmentCard';
@@ -86,6 +88,10 @@ export function ProspectDetailDrawer({
   const { data: commercialBrief } = useCommercialBrief(prospect.id);
   const { data: enrichmentSignals } = useEnrichmentSignals(prospect.id);
   const runEnrichment = useRunEnrichment();
+  const enrichIdentity = useEnrichProspectIdentity();
+
+  const minimumIdentity = hasMinimumIdentity(prospect);
+  const identityEnriched = !!prospect.identity_enriched_at;
 
   const handleEnrich = () => {
     if (prospect.organization_id) {
@@ -93,6 +99,16 @@ export function ProspectDetailDrawer({
         prospectId: prospect.id,
         workspaceId: prospect.organization_id,
       });
+    }
+  };
+
+  const handleEnrichAndImport = async () => {
+    try {
+      await enrichIdentity.mutateAsync(prospect.id);
+      // Re-check on next tick: import will fetch fresh prospect via RPC
+      onImport(prospect);
+    } catch {
+      /* toast handled in hook */
     }
   };
 
@@ -122,6 +138,28 @@ export function ProspectDetailDrawer({
                       </span>
                     )}
                   </div>
+                </div>
+              )}
+
+              {!isImported && !minimumIdentity && (
+                <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/5 border border-amber-500/30">
+                  <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                  <div className="text-sm">
+                    <div className="font-medium text-amber-700">Faltam dados essenciais</div>
+                    <div className="text-muted-foreground text-xs mt-0.5">
+                      Sem CNPJ ou domínio, não é possível criar conta no CRM. Use <strong>Enriquecer & Importar</strong> abaixo para descobrir esses dados via Google + lookup CNPJ.
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {(prospect.cnpj || prospect.razao_social) && (
+                <div className="rounded-lg bg-muted/50 border border-border p-3 text-xs space-y-1">
+                  <div className="font-semibold text-foreground uppercase tracking-wider">Identidade enriquecida</div>
+                  {prospect.razao_social && <div><span className="text-muted-foreground">Razão social:</span> <span className="font-medium">{prospect.razao_social}</span></div>}
+                  {prospect.cnpj && <div><span className="text-muted-foreground">CNPJ:</span> <span className="font-mono">{prospect.cnpj}</span></div>}
+                  {prospect.cnae_desc && <div><span className="text-muted-foreground">CNAE:</span> {prospect.cnae_desc}</div>}
+                  {prospect.porte && <div><span className="text-muted-foreground">Porte:</span> {prospect.porte}</div>}
                 </div>
               )}
 
@@ -288,9 +326,37 @@ export function ProspectDetailDrawer({
             </>
           )}
           {isApproved && !isImported && (
-            <Button className="w-full" onClick={() => onImport(prospect)} disabled={isImporting}>
-              <Download className="h-4 w-4 mr-1" />Importar no CRM
-            </Button>
+            <div className="w-full flex flex-col gap-2">
+              {!minimumIdentity ? (
+                <Button
+                  className="w-full"
+                  onClick={handleEnrichAndImport}
+                  disabled={enrichIdentity.isPending || isImporting}
+                >
+                  {enrichIdentity.isPending ? (
+                    <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Enriquecendo identidade…</>
+                  ) : (
+                    <><Sparkles className="h-4 w-4 mr-1" />Enriquecer & Importar</>
+                  )}
+                </Button>
+              ) : (
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => enrichIdentity.mutate(prospect.id)}
+                    disabled={enrichIdentity.isPending}
+                    title={identityEnriched ? 'Re-enriquecer identidade' : 'Enriquecer identidade'}
+                  >
+                    {enrichIdentity.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                  </Button>
+                  <Button className="flex-1" onClick={() => onImport(prospect)} disabled={isImporting}>
+                    <Download className="h-4 w-4 mr-1" />
+                    {isImporting ? 'Importando…' : 'Importar no CRM'}
+                  </Button>
+                </div>
+              )}
+            </div>
           )}
           {isImported && (
             <div className="w-full text-center text-sm text-muted-foreground py-2">
