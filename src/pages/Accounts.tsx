@@ -17,6 +17,8 @@ import { Badge } from '@/components/ui/badge';
 import { extractEmail, extractPhone } from '@/lib/contactFormat';
 import { accountKeys } from '@/lib/query-keys';
 import { normalizePorte, CANONICAL_PORTES, type CanonicalPorte } from '@/lib/porte-normalizer';
+import { useOrganizationTags } from '@/hooks/useOrganizationTags';
+import { useAccountTagsBulk } from '@/hooks/useAccountTags';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -39,6 +41,7 @@ export default function Accounts() {
   const [porteFilter, setPorteFilter] = useState<string>('all');
   const [origemFilter, setOrigemFilter] = useState<string>('all');
   const [scoreFinanceiroFilter, setScoreFinanceiroFilter] = useState<string>('all');
+  const [tagFilter, setTagFilter] = useState<string>('all');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Account | undefined>();
   const [deleteDialog, setDeleteDialog] = useState<string | null>(null);
