@@ -7,6 +7,9 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { formatDateBR } from '@/lib/dateUtils';
 import { FinancialScoreBadge } from '@/components/ui/financial-score-badge';
+import { useAccountTagIds } from '@/hooks/useAccountTags';
+import { useOrganizationTags } from '@/hooks/useOrganizationTags';
+import { AccountTagsBadges } from './AccountTagsSelector';
 import {
   TrendingUp,
   Users,
@@ -33,6 +36,12 @@ interface AccountOverviewTabProps {
 }
 
 export function AccountOverviewTabEnhanced({ account }: AccountOverviewTabProps) {
+  const { data: tagIds = [] } = useAccountTagIds(account.id);
+  const { tags: orgTags } = useOrganizationTags();
+  const accountTags = orgTags
+    .filter((t) => tagIds.includes(t.id))
+    .map((t) => ({ id: t.id, name: t.name, color: t.color }));
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -340,6 +349,12 @@ export function AccountOverviewTabEnhanced({ account }: AccountOverviewTabProps)
                 <span className="font-medium">
                   {formatDateBR(account.created_at)}
                 </span>
+              </div>
+            )}
+            {accountTags.length > 0 && (
+              <div className="pt-2 border-t">
+                <span className="text-muted-foreground block mb-2">Tags:</span>
+                <AccountTagsBadges tags={accountTags} max={10} />
               </div>
             )}
           </CardContent>

@@ -231,6 +231,59 @@ export type Database = {
           },
         ]
       }
+      account_tags: {
+        Row: {
+          account_id: string
+          created_at: string
+          id: string
+          organization_id: string
+          tag_id: string
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          id?: string
+          organization_id: string
+          tag_id: string
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          id?: string
+          organization_id?: string
+          tag_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "account_tags_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "account_tags_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "account_tags_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_report_legacy_retirement_readiness_v2"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "account_tags_tag_id_fkey"
+            columns: ["tag_id"]
+            isOneToOne: false
+            referencedRelation: "tags"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       accounts: {
         Row: {
           bairro: string | null

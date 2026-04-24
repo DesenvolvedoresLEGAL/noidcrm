@@ -23,6 +23,8 @@ import { Badge } from '@/components/ui/badge';
 import { ParentAccountSelector } from './ParentAccountSelector';
 import { validateCPF, formatCPF } from '@/lib/validators/cpf';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { AccountTagsSelector } from './AccountTagsSelector';
+import { useAccountTagIds, useSetAccountTags } from '@/hooks/useAccountTags';
 
 const accountSchema = z.object({
   // Tipo de Pessoa
@@ -107,6 +109,15 @@ export function AccountModalTabs({ open, onOpenChange, account }: AccountModalTa
   const [isLoadingCNPJ, setIsLoadingCNPJ] = useState(false);
   const [cnpjToLookup, setCnpjToLookup] = useState('');
   const [qsaData, setQsaData] = useState<any[]>([]);
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
+
+  // Carregar tags da conta em edição
+  const { data: existingTagIds } = useAccountTagIds(account?.id);
+  useEffect(() => {
+    if (open) setSelectedTagIds(existingTagIds || []);
+  }, [open, existingTagIds]);
+
+  const setAccountTagsMutation = useSetAccountTags();
 
   // Fetch origins from the database
   const { data: originsData } = useQuery({
@@ -318,13 +329,13 @@ export function AccountModalTabs({ open, onOpenChange, account }: AccountModalTa
       };
 
       let accountId: string;
+      let result: any;
       
       if (isEditing) {
-        const result = await updateAccount(account.id, payload);
+        result = await updateAccount(account.id, payload);
         accountId = result.id;
-        return result;
       } else {
-        const result = await createAccount(payload);
+        result = await createAccount(payload);
         accountId = result.id;
         
         // Se temos dados de sócios (QSA), criar os registros
@@ -343,9 +354,16 @@ export function AccountModalTabs({ open, onOpenChange, account }: AccountModalTa
             }
           }
         }
-        
-        return result;
       }
+
+      // Persistir tags
+      try {
+        await setAccountTagsMutation.mutateAsync({ accountId, tagIds: selectedTagIds });
+      } catch (err) {
+        console.error('Erro ao salvar tags da conta:', err);
+      }
+
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: accountKeys.lists() });
@@ -922,6 +940,14 @@ export function AccountModalTabs({ open, onOpenChange, account }: AccountModalTa
                   <Label htmlFor="data_tornou_cliente">Data que se Tornou Cliente</Label>
                   <Input id="data_tornou_cliente" {...register('data_tornou_cliente')} type="date" />
                 </div>
+              </div>
+
+              <div className="space-y-2 border-t pt-4">
+                <Label>Tags</Label>
+                <p className="text-xs text-muted-foreground">
+                  Atributos comerciais (ex: Expositor, Organizador, VIP). Combinam com segmento para filtros e relatórios.
+                </p>
+                <AccountTagsSelector value={selectedTagIds} onChange={setSelectedTagIds} />
               </div>
 
               <div className="space-y-2">

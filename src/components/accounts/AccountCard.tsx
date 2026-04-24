@@ -30,6 +30,9 @@ import { FinancialScoreBadge } from '@/components/ui/financial-score-badge';
 import { convertAccountType } from '@/services/supabase/account-conversion';
 import { toast } from 'sonner';
 import { accountKeys } from '@/lib/query-keys';
+import { useAccountTagIds } from '@/hooks/useAccountTags';
+import { AccountTagsBadges } from './AccountTagsSelector';
+import { useOrganizationTags } from '@/hooks/useOrganizationTags';
 
 interface AccountCardProps {
   account: {
@@ -59,6 +62,13 @@ interface AccountCardProps {
 
 export function AccountCard({ account, onView, onEdit, onDelete }: AccountCardProps) {
   const queryClient = useQueryClient();
+
+  // Tags da conta
+  const { data: tagIds = [] } = useAccountTagIds(account.id);
+  const { tags: orgTags } = useOrganizationTags();
+  const accountTags = orgTags
+    .filter((t) => tagIds.includes(t.id))
+    .map((t) => ({ id: t.id, name: t.name, color: t.color }));
 
   // Mutation para conversão de tipo
   const convertMutation = useMutation({
@@ -260,6 +270,11 @@ export function AccountCard({ account, onView, onEdit, onDelete }: AccountCardPr
               </Badge>
             )}
           </div>
+
+          {/* Tags da conta */}
+          {accountTags.length > 0 && (
+            <AccountTagsBadges tags={accountTags} max={3} />
+          )}
 
           {/* Métricas */}
           <div className="grid grid-cols-3 gap-3 pt-3 border-t">

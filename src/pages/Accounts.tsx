@@ -17,6 +17,8 @@ import { Badge } from '@/components/ui/badge';
 import { extractEmail, extractPhone } from '@/lib/contactFormat';
 import { accountKeys } from '@/lib/query-keys';
 import { normalizePorte, CANONICAL_PORTES, type CanonicalPorte } from '@/lib/porte-normalizer';
+import { useOrganizationTags } from '@/hooks/useOrganizationTags';
+import { useAccountTagsBulk } from '@/hooks/useAccountTags';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -39,6 +41,7 @@ export default function Accounts() {
   const [porteFilter, setPorteFilter] = useState<string>('all');
   const [origemFilter, setOrigemFilter] = useState<string>('all');
   const [scoreFinanceiroFilter, setScoreFinanceiroFilter] = useState<string>('all');
+  const [tagFilter, setTagFilter] = useState<string>('all');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Account | undefined>();
   const [deleteDialog, setDeleteDialog] = useState<string | null>(null);
@@ -101,6 +104,12 @@ export default function Accounts() {
 
   const accounts = accountsData?.data || [];
 
+  // Tags da organização (lookup id → name/color)
+  const { tags: orgTags } = useOrganizationTags();
+  // Tags por conta (bulk)
+  const accountIds = useMemo(() => accounts.map((a) => a.id), [accounts]);
+  const { data: tagsByAccount = {} } = useAccountTagsBulk(accountIds);
+
   // Filtrar contas localmente
   const filteredAccounts = useMemo(() => {
     return accounts.filter(account => {
@@ -121,9 +130,13 @@ export default function Accounts() {
         else if (scoreFinanceiroFilter === 'regular' && (score < 40 || score >= 60)) return false;
         else if (scoreFinanceiroFilter === 'bad' && (score < 0 || score >= 40)) return false;
       }
+      if (tagFilter !== 'all') {
+        const tags = tagsByAccount[account.id] || [];
+        if (!tags.some((t) => t.id === tagFilter)) return false;
+      }
       return true;
     });
-  }, [accounts, segmentoFilter, porteFilter, origemFilter, scoreFinanceiroFilter]);
+  }, [accounts, segmentoFilter, porteFilter, origemFilter, scoreFinanceiroFilter, tagFilter, tagsByAccount]);
 
   // Extrair valores únicos para filtros
   const uniqueSegmentos = useMemo(() => 
@@ -160,7 +173,7 @@ export default function Accounts() {
       return;
     }
 
-    const headers = ['Razão Social', 'Nome Fantasia', 'CNPJ', 'Segmento', 'Porte', 'Origem'];
+    const headers = ['Razão Social', 'Nome Fantasia', 'CNPJ', 'Segmento', 'Porte', 'Origem', 'Tags'];
     const rows = filteredAccounts.map(account => [
       account.razao_social,
       account.nome_fantasia || '',
@@ -168,6 +181,7 @@ export default function Accounts() {
       account.segmento || '',
       account.porte || '',
       account.origem_principal || '',
+      (tagsByAccount[account.id] || []).map(t => t.name).join(' | '),
     ]);
 
     const csvContent = [
@@ -194,7 +208,7 @@ export default function Accounts() {
       return;
     }
 
-    const headers = ['Razão Social', 'Nome Fantasia', 'CNPJ', 'Segmento', 'Porte', 'Origem'];
+    const headers = ['Razão Social', 'Nome Fantasia', 'CNPJ', 'Segmento', 'Porte', 'Origem', 'Tags'];
     const rows = filteredAccounts.map(account => [
       account.razao_social,
       account.nome_fantasia || '',
@@ -202,6 +216,7 @@ export default function Accounts() {
       account.segmento || '',
       account.porte || '',
       account.origem_principal || '',
+      (tagsByAccount[account.id] || []).map(t => t.name).join(' | '),
     ]);
 
     const csvContent = [
@@ -223,10 +238,11 @@ export default function Accounts() {
     setPorteFilter('all');
     setOrigemFilter('all');
     setScoreFinanceiroFilter('all');
+    setTagFilter('all');
     setSearchQuery('');
   };
 
-  const hasActiveFilters = segmentoFilter !== 'all' || porteFilter !== 'all' || origemFilter !== 'all' || scoreFinanceiroFilter !== 'all' || searchQuery;
+  const hasActiveFilters = segmentoFilter !== 'all' || porteFilter !== 'all' || origemFilter !== 'all' || scoreFinanceiroFilter !== 'all' || tagFilter !== 'all' || searchQuery;
 
   const scoreFilterLabels: Record<string, string> = {
     excellent: 'Excelente (80–100)',
@@ -407,6 +423,18 @@ export default function Accounts() {
                       <SelectItem value="none">Sem score</SelectItem>
                     </SelectContent>
                   </Select>
+
+                  <Select value={tagFilter} onValueChange={setTagFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Tag" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas as tags</SelectItem>
+                      {orgTags.map((t) => (
+                        <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               )}
 
@@ -436,6 +464,11 @@ export default function Accounts() {
                   {scoreFinanceiroFilter !== 'all' && (
                     <Badge variant="secondary">
                       Score: {scoreFilterLabels[scoreFinanceiroFilter]}
+                    </Badge>
+                  )}
+                  {tagFilter !== 'all' && (
+                    <Badge variant="secondary">
+                      Tag: {orgTags.find(t => t.id === tagFilter)?.name || tagFilter}
                     </Badge>
                   )}
                 </div>
