@@ -104,6 +104,12 @@ export default function Accounts() {
 
   const accounts = accountsData?.data || [];
 
+  // Tags da organização (lookup id → name/color)
+  const { tags: orgTags } = useOrganizationTags();
+  // Tags por conta (bulk)
+  const accountIds = useMemo(() => accounts.map((a) => a.id), [accounts]);
+  const { data: tagsByAccount = {} } = useAccountTagsBulk(accountIds);
+
   // Filtrar contas localmente
   const filteredAccounts = useMemo(() => {
     return accounts.filter(account => {
@@ -124,9 +130,13 @@ export default function Accounts() {
         else if (scoreFinanceiroFilter === 'regular' && (score < 40 || score >= 60)) return false;
         else if (scoreFinanceiroFilter === 'bad' && (score < 0 || score >= 40)) return false;
       }
+      if (tagFilter !== 'all') {
+        const tags = tagsByAccount[account.id] || [];
+        if (!tags.some((t) => t.id === tagFilter)) return false;
+      }
       return true;
     });
-  }, [accounts, segmentoFilter, porteFilter, origemFilter, scoreFinanceiroFilter]);
+  }, [accounts, segmentoFilter, porteFilter, origemFilter, scoreFinanceiroFilter, tagFilter, tagsByAccount]);
 
   // Extrair valores únicos para filtros
   const uniqueSegmentos = useMemo(() => 
