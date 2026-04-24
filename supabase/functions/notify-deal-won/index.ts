@@ -50,7 +50,7 @@ Deno.serve(async (req) => {
     if (proposal.opportunity_id) {
       const { data } = await supabase
         .from("opportunities")
-        .select("id, title, account_id, contact_id, value, pipeline_id, stage_id")
+        .select("id, title, account_id, contact_id, valor_previsto, pipeline_id, stage_id")
         .eq("id", proposal.opportunity_id)
         .maybeSingle();
       opportunity = data;
