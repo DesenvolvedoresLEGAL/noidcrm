@@ -294,19 +294,38 @@ ${scrapedContent.slice(0, 15000)}`,
             messages: [
               {
                 role: "system",
-                content: `Você gera commercial briefs para prospecção B2B. O texto precisa ser direto, específico e útil para abordagem comercial. Nada genérico. Retorne apenas dados estruturados.`,
+                content: `Você é um SDR sênior da NOID (provedora B2B de conectividade e infraestrutura de rede), gerando um brief comercial para prospectar uma empresa-alvo.
+
+REGRAS CRÍTICAS PARA O CAMPO first_touch_message:
+- Você é o REMETENTE (SDR da NOID prospectando). A empresa-alvo é o DESTINATÁRIO. NUNCA escreva como se fosse a empresa-alvo se apresentando.
+- Tom: 1ª pessoa do plural ("nós da NOID..."), consultivo, humano, direto. Sem clichês de vendas, sem "espero que esteja bem".
+- Objetivo da mensagem: QUALIFICAR (descobrir se há demanda de conectividade/rede), NÃO vender ainda.
+- Use o contexto do evento (quando houver) como gancho legítimo: "vimos que vocês vão estar no [evento]/no stand [X]".
+- Faça 1 pergunta de qualificação clara ao final (ex.: sobre demanda de conectividade, expansão, infraestrutura).
+- Máximo 120 palavras. Sem assinatura, sem PS, sem links.
+- Personalize com dores/sinais reais detectados, não com genéricos.
+
+Para email_subject: assunto curto (máx 60 caracteres), específico, sem clickbait. Pode usar nome da empresa + gancho do evento.
+
+Retorne apenas dados estruturados via tool call.`,
               },
               {
                 role: "user",
-                content: `Com base nos dados desta empresa, gere um commercial brief para prospecção B2B.
+                content: `Gere o brief comercial para prospecção da empresa abaixo. Lembre: VOCÊ é o SDR da NOID escrevendo PARA esta empresa.
 
-Empresa: ${prospect.company_name}
+EMPRESA-ALVO (destinatário): ${prospect.company_name}
+${prospect.event_name ? `EVENTO ONDE FOI IDENTIFICADA: ${prospect.event_name}${prospect.booth ? ` (stand ${prospect.booth})` : ''}` : ''}
 Resumo: ${companyProfile.company_summary}
 Modelo: ${companyProfile.business_model}
 Mercado: ${companyProfile.market_type}
+Porte estimado: ${companyProfile.company_size_estimate || 'n/d'}
+Presença: ${JSON.stringify(companyProfile.geographic_presence || [])}
 Produtos: ${JSON.stringify(companyProfile.products_services)}
-Dores: ${JSON.stringify(companyProfile.commercial_pains)}
-Sinais de crescimento: ${JSON.stringify(companyProfile.growth_signals)}`,
+Dores prováveis: ${JSON.stringify(companyProfile.commercial_pains)}
+Sinais de crescimento: ${JSON.stringify(companyProfile.growth_signals)}
+Sinais técnicos: ${JSON.stringify(companyProfile.tech_signals)}
+
+REMETENTE: SDR da NOID (provedora de conectividade B2B / infraestrutura de rede).`,
               },
             ],
             tools: [
