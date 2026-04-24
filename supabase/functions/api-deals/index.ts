@@ -35,7 +35,7 @@ function normalizeApiKey(rawValue: string | null): string {
 
 async function authenticateApiKey(
   req: Request,
-  supabaseAdmin: ReturnType<typeof createClient>
+  supabaseAdmin: any
 ): Promise<{ organizationId: string; keyId: string } | Response> {
   const rawApiKey =
     req.headers.get("x-api-key") ||
@@ -117,7 +117,7 @@ async function authenticateApiKey(
 
 // Build a deal object from proposal + related data
 async function buildDeal(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   proposal: Record<string, unknown>
 ) {
   const proposalId = proposal.id as string;
