@@ -423,6 +423,18 @@ export default function Accounts() {
                       <SelectItem value="none">Sem score</SelectItem>
                     </SelectContent>
                   </Select>
+
+                  <Select value={tagFilter} onValueChange={setTagFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Tag" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas as tags</SelectItem>
+                      {orgTags.map((t) => (
+                        <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               )}
 
@@ -452,6 +464,11 @@ export default function Accounts() {
                   {scoreFinanceiroFilter !== 'all' && (
                     <Badge variant="secondary">
                       Score: {scoreFilterLabels[scoreFinanceiroFilter]}
+                    </Badge>
+                  )}
+                  {tagFilter !== 'all' && (
+                    <Badge variant="secondary">
+                      Tag: {orgTags.find(t => t.id === tagFilter)?.name || tagFilter}
                     </Badge>
                   )}
                 </div>
