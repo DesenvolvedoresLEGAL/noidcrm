@@ -488,7 +488,10 @@ ICP Profile:
     };
 
     if (searchType === "event") {
-      EdgeRuntime.waitUntil(executeRun());
+      // @ts-ignore - EdgeRuntime is a Supabase Edge global not in default Deno types
+      (globalThis as any).EdgeRuntime?.waitUntil
+        ? (globalThis as any).EdgeRuntime.waitUntil(executeRun())
+        : executeRun();
 
       return new Response(
         JSON.stringify({
