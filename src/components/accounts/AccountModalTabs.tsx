@@ -23,6 +23,8 @@ import { Badge } from '@/components/ui/badge';
 import { ParentAccountSelector } from './ParentAccountSelector';
 import { validateCPF, formatCPF } from '@/lib/validators/cpf';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { AccountTagsSelector } from './AccountTagsSelector';
+import { useAccountTagIds, useSetAccountTags } from '@/hooks/useAccountTags';
 
 const accountSchema = z.object({
   // Tipo de Pessoa
@@ -107,6 +109,15 @@ export function AccountModalTabs({ open, onOpenChange, account }: AccountModalTa
   const [isLoadingCNPJ, setIsLoadingCNPJ] = useState(false);
   const [cnpjToLookup, setCnpjToLookup] = useState('');
   const [qsaData, setQsaData] = useState<any[]>([]);
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
+
+  // Carregar tags da conta em edição
+  const { data: existingTagIds } = useAccountTagIds(account?.id);
+  useEffect(() => {
+    if (open) setSelectedTagIds(existingTagIds || []);
+  }, [open, existingTagIds]);
+
+  const setAccountTagsMutation = useSetAccountTags();
 
   // Fetch origins from the database
   const { data: originsData } = useQuery({
