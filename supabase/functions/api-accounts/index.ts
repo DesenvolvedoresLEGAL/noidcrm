@@ -56,15 +56,16 @@ async function authenticateApiKey(
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
 
-  const { data: keyData, error } = await supabaseAdmin
+  const { data: keyDataRaw, error } = await supabaseAdmin
     .from("api_keys")
     .select("id, organization_id, scopes, active, expires_at")
     .eq("key_hash", keyHash)
     .maybeSingle();
 
-  if (error || !keyData) {
+  if (error || !keyDataRaw) {
     return jsonResponse({ success: false, error: "Invalid API key" }, 401);
   }
+  const keyData: any = keyDataRaw;
   if (!keyData.active) {
     return jsonResponse({ success: false, error: "API key is inactive" }, 401);
   }
