@@ -44,6 +44,14 @@ export function LeadSourcingEngine() {
     }
   }, [isEventRunning, selectedRunId, runs]);
 
+  useEffect(() => {
+    if (!drawerProspect) return;
+    const refreshedProspect = prospects.find((prospect) => prospect.id === drawerProspect.id);
+    if (refreshedProspect && refreshedProspect !== drawerProspect) {
+      setDrawerProspect(refreshedProspect);
+    }
+  }, [drawerProspect, prospects]);
+
   const handleExecute = async (params: {
     playbookType: string;
     icpProfileId: string | null;

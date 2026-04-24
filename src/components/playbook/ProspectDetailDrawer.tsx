@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Check, X, AlertTriangle, Globe, MapPin, Building2, ExternalLink, Download, PackageCheck, Sparkles, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import type { Prospect } from '@/hooks/useLeadSourcingV2';
 import { useEnrichmentRun, useEnrichedCompanyProfile, useCommercialBrief, useEnrichmentSignals, useRunEnrichment } from '@/hooks/useEnrichment';
@@ -104,9 +105,15 @@ export function ProspectDetailDrawer({
 
   const handleEnrichAndImport = async () => {
     try {
-      await enrichIdentity.mutateAsync(prospect.id);
-      // Re-check on next tick: import will fetch fresh prospect via RPC
-      onImport(prospect);
+      const result = await enrichIdentity.mutateAsync(prospect.id);
+      const enrichedProspect = { ...prospect, ...(result?.updates || {}) } as Prospect;
+
+      if (!hasMinimumIdentity(enrichedProspect)) {
+        toast.error('Enriquecimento concluído, mas ainda sem CNPJ ou domínio para importar.');
+        return;
+      }
+
+      onImport(enrichedProspect);
     } catch {
       /* toast handled in hook */
     }
