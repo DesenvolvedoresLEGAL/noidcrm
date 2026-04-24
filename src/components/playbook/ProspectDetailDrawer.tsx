@@ -326,9 +326,37 @@ export function ProspectDetailDrawer({
             </>
           )}
           {isApproved && !isImported && (
-            <Button className="w-full" onClick={() => onImport(prospect)} disabled={isImporting}>
-              <Download className="h-4 w-4 mr-1" />Importar no CRM
-            </Button>
+            <div className="w-full flex flex-col gap-2">
+              {!minimumIdentity ? (
+                <Button
+                  className="w-full"
+                  onClick={handleEnrichAndImport}
+                  disabled={enrichIdentity.isPending || isImporting}
+                >
+                  {enrichIdentity.isPending ? (
+                    <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Enriquecendo identidade…</>
+                  ) : (
+                    <><Sparkles className="h-4 w-4 mr-1" />Enriquecer & Importar</>
+                  )}
+                </Button>
+              ) : (
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => enrichIdentity.mutate(prospect.id)}
+                    disabled={enrichIdentity.isPending}
+                    title={identityEnriched ? 'Re-enriquecer identidade' : 'Enriquecer identidade'}
+                  >
+                    {enrichIdentity.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                  </Button>
+                  <Button className="flex-1" onClick={() => onImport(prospect)} disabled={isImporting}>
+                    <Download className="h-4 w-4 mr-1" />
+                    {isImporting ? 'Importando…' : 'Importar no CRM'}
+                  </Button>
+                </div>
+              )}
+            </div>
           )}
           {isImported && (
             <div className="w-full text-center text-sm text-muted-foreground py-2">
