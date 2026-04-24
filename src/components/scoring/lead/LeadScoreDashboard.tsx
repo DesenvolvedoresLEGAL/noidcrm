@@ -14,6 +14,7 @@ import { LeadScoreOverviewKPIs } from './LeadScoreOverviewKPIs';
 import { LeadGradeDistribution } from './LeadGradeDistribution';
 import { LeadScoreTable } from './LeadScoreTable';
 import { LeadScoreBySegment } from './LeadScoreBySegment';
+import { LeadScoreByTag } from './LeadScoreByTag';
 import { LeadScoreInsights } from './LeadScoreInsights';
 import { LeadScoreFormulaInfo } from './LeadScoreFormulaInfo';
 
@@ -241,13 +242,14 @@ export function LeadScoreDashboard() {
         {/* Bottom section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <LeadScoreBySegment segmentStats={segmentStats} isLoading={isLoading} />
-          <LeadScoreInsights
-            leads={allLeads}
-            kpis={kpis}
-            isLoading={isLoading}
-            setFilters={setFilters}
-          />
+          <LeadScoreByTag />
         </div>
+        <LeadScoreInsights
+          leads={allLeads}
+          kpis={kpis}
+          isLoading={isLoading}
+          setFilters={setFilters}
+        />
       </div>
     </TooltipProvider>
   );
