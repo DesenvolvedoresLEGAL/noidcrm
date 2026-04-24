@@ -173,7 +173,7 @@ export default function Accounts() {
       return;
     }
 
-    const headers = ['Razão Social', 'Nome Fantasia', 'CNPJ', 'Segmento', 'Porte', 'Origem'];
+    const headers = ['Razão Social', 'Nome Fantasia', 'CNPJ', 'Segmento', 'Porte', 'Origem', 'Tags'];
     const rows = filteredAccounts.map(account => [
       account.razao_social,
       account.nome_fantasia || '',
@@ -181,6 +181,7 @@ export default function Accounts() {
       account.segmento || '',
       account.porte || '',
       account.origem_principal || '',
+      (tagsByAccount[account.id] || []).map(t => t.name).join(' | '),
     ]);
 
     const csvContent = [
@@ -207,7 +208,7 @@ export default function Accounts() {
       return;
     }
 
-    const headers = ['Razão Social', 'Nome Fantasia', 'CNPJ', 'Segmento', 'Porte', 'Origem'];
+    const headers = ['Razão Social', 'Nome Fantasia', 'CNPJ', 'Segmento', 'Porte', 'Origem', 'Tags'];
     const rows = filteredAccounts.map(account => [
       account.razao_social,
       account.nome_fantasia || '',
@@ -215,6 +216,7 @@ export default function Accounts() {
       account.segmento || '',
       account.porte || '',
       account.origem_principal || '',
+      (tagsByAccount[account.id] || []).map(t => t.name).join(' | '),
     ]);
 
     const csvContent = [
@@ -236,10 +238,11 @@ export default function Accounts() {
     setPorteFilter('all');
     setOrigemFilter('all');
     setScoreFinanceiroFilter('all');
+    setTagFilter('all');
     setSearchQuery('');
   };
 
-  const hasActiveFilters = segmentoFilter !== 'all' || porteFilter !== 'all' || origemFilter !== 'all' || scoreFinanceiroFilter !== 'all' || searchQuery;
+  const hasActiveFilters = segmentoFilter !== 'all' || porteFilter !== 'all' || origemFilter !== 'all' || scoreFinanceiroFilter !== 'all' || tagFilter !== 'all' || searchQuery;
 
   const scoreFilterLabels: Record<string, string> = {
     excellent: 'Excelente (80–100)',
