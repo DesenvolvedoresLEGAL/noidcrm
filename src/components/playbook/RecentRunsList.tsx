@@ -166,7 +166,6 @@ export function RecentRunsList({ runs, selectedRunId, onSelect }: RecentRunsList
         }}
         title="Cancelar execução"
         description="A execução será marcada como falhada. Os dados já capturados (se houver) serão preservados."
-        confirmLabel="Cancelar execução"
         isLoading={cancelMutation.isPending}
       />
     </div>
