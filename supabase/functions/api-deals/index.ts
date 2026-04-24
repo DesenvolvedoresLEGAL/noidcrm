@@ -129,7 +129,7 @@ async function buildDeal(
   if (opportunityId) {
     const { data } = await supabase
       .from("opportunities")
-      .select("id, title, account_id, contact_id, value, pipeline_id, stage_id")
+      .select("id, title, account_id, contact_id, valor_previsto, pipeline_id, stage_id")
       .eq("id", opportunityId)
       .maybeSingle();
     opportunity = data;
