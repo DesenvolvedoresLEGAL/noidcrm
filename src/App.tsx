@@ -149,6 +149,7 @@ const RevOpsCockpit = lazy(() => import("./pages/gtm/RevOpsCockpit"));
 const ManagerDashboard = lazy(() => import("./pages/gtm/ManagerDashboard"));
 const CEODashboard = lazy(() => import("./pages/gtm/CEODashboard"));
 const PlaybooksHub = lazy(() => import("./pages/intelligence/PlaybooksHub"));
+const KairosHub = lazy(() => import("./pages/intelligence/KairosHub"));
 const WinLossHub = lazy(() => import("./pages/intelligence/WinLossHub"));
 const VibeSelling = lazy(() => import("./pages/intelligence/VibeSelling"));
 const KnowledgeGraph = lazy(() => import("./pages/app/intelligence/KnowledgeGraph"));
@@ -989,6 +990,16 @@ const App = () => (
                   <ProtectedRoute>
                     <LazyRoute>
                       <PlaybooksHub />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/intelligence/kairos"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <KairosHub />
                     </LazyRoute>
                   </ProtectedRoute>
                 }
