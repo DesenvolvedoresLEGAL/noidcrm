@@ -23,16 +23,13 @@ import {
   MoreVertical,
   RefreshCw
 } from 'lucide-react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { LeadScoreCard } from '@/components/scoring/LeadScoreCard';
 import { FinancialScoreBadge } from '@/components/ui/financial-score-badge';
 import { convertAccountType } from '@/services/supabase/account-conversion';
 import { toast } from 'sonner';
 import { accountKeys } from '@/lib/query-keys';
-import { useAccountTagIds } from '@/hooks/useAccountTags';
 import { AccountTagsBadges } from './AccountTagsSelector';
-import { useOrganizationTags } from '@/hooks/useOrganizationTags';
 
 interface AccountCardProps {
   account: {
@@ -55,20 +52,17 @@ interface AccountCardProps {
     risco_financeiro?: string | null;
     score_fatores?: Record<string, unknown> | null;
   };
+  metrics?: { opportunities: number; contacts: number; pipelineValue: number };
+  contactsPreview?: Array<{ id: string; nome: string; emails?: any; telefones?: any }>;
+  tags?: { id: string; name: string; color: string }[];
   onView: () => void;
   onEdit: () => void;
   onDelete: () => void;
 }
 
-export function AccountCard({ account, onView, onEdit, onDelete }: AccountCardProps) {
+export function AccountCard({ account, metrics, contactsPreview = [], tags, onView, onEdit, onDelete }: AccountCardProps) {
   const queryClient = useQueryClient();
-
-  // Tags da conta
-  const { data: tagIds = [] } = useAccountTagIds(account.id);
-  const { tags: orgTags } = useOrganizationTags();
-  const accountTags = orgTags
-    .filter((t) => tagIds.includes(t.id))
-    .map((t) => ({ id: t.id, name: t.name, color: t.color }));
+  const accountTags = tags || [];
 
   // Mutation para conversão de tipo
   const convertMutation = useMutation({
@@ -83,53 +77,8 @@ export function AccountCard({ account, onView, onEdit, onDelete }: AccountCardPr
     },
   });
 
-  // Buscar preview de contatos
-  const { data: contacts = [] } = useQuery({
-    queryKey: ['account-contacts-preview', account.id],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('contacts')
-        .select('id, nome, emails, telefones')
-        .eq('account_id', account.id)
-        .limit(3);
-      return data || [];
-    },
-  });
-
-  // Buscar métricas rápidas
-  const { data: metrics } = useQuery({
-    queryKey: ['account-metrics-preview', account.id],
-    queryFn: async () => {
-      const [
-        { count: opportunitiesCount },
-        { count: contactsCount },
-        { data: pipelineValue }
-      ] = await Promise.all([
-        supabase
-          .from('opportunities')
-          .select('*', { count: 'exact', head: true })
-          .eq('account_id', account.id)
-          .in('status', ['new', 'in_progress']),
-        supabase
-          .from('contacts')
-          .select('*', { count: 'exact', head: true })
-          .eq('account_id', account.id),
-        supabase
-          .from('opportunities')
-          .select('valor_previsto')
-          .eq('account_id', account.id)
-          .in('status', ['new', 'in_progress'])
-      ]);
-
-      const totalValue = pipelineValue?.reduce((sum, opp) => sum + (opp.valor_previsto || 0), 0) || 0;
-
-      return {
-        opportunities: opportunitiesCount || 0,
-        contacts: contactsCount || 0,
-        pipelineValue: totalValue,
-      };
-    },
-  });
+  const cardMetrics = metrics || { opportunities: 0, contacts: 0, pipelineValue: 0 };
+  const contacts = contactsPreview;
 
   const getPorteColor = (porte?: string | null) => {
     switch (porte) {
@@ -281,14 +230,14 @@ export function AccountCard({ account, onView, onEdit, onDelete }: AccountCardPr
             <div className="text-center">
               <div className="flex items-center justify-center gap-1 text-primary mb-1">
                 <TrendingUp className="h-4 w-4" />
-                <span className="font-semibold">{metrics?.opportunities || 0}</span>
+                <span className="font-semibold">{cardMetrics.opportunities}</span>
               </div>
               <p className="text-xs text-muted-foreground">Oportunidades</p>
             </div>
             <div className="text-center">
               <div className="flex items-center justify-center gap-1 text-primary mb-1">
                 <Users className="h-4 w-4" />
-                <span className="font-semibold">{metrics?.contacts || 0}</span>
+                <span className="font-semibold">{cardMetrics.contacts}</span>
               </div>
               <p className="text-xs text-muted-foreground">Contatos</p>
             </div>
@@ -299,7 +248,7 @@ export function AccountCard({ account, onView, onEdit, onDelete }: AccountCardPr
                   currency: 'BRL',
                   minimumFractionDigits: 0,
                   maximumFractionDigits: 0,
-                }).format(metrics?.pipelineValue || 0)}
+                }).format(cardMetrics.pipelineValue)}
               </div>
               <p className="text-xs text-muted-foreground">Pipeline</p>
             </div>

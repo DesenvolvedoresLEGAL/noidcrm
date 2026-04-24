@@ -19,6 +19,7 @@ import { accountKeys } from '@/lib/query-keys';
 import { normalizePorte, CANONICAL_PORTES, type CanonicalPorte } from '@/lib/porte-normalizer';
 import { useOrganizationTags } from '@/hooks/useOrganizationTags';
 import { useAccountTagsBulk, useAccountIdsByTag } from '@/hooks/useAccountTags';
+import { useDebounce } from '@/hooks/useDebounce';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -46,20 +47,24 @@ export default function Accounts() {
   const [editingAccount, setEditingAccount] = useState<Account | undefined>();
   const [deleteDialog, setDeleteDialog] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
+  const debouncedSearchQuery = useDebounce(searchQuery.trim(), 300);
 
   // Buscar contas com tratamento de erro
   const { data: accountsData, isLoading, error: accountsError } = useQuery({
-    queryKey: [...accountKeys.lists(), searchQuery],
+    queryKey: [...accountKeys.lists(), debouncedSearchQuery],
     queryFn: async () => {
       try {
-        const result = await listAccounts({ q: searchQuery, page_size: 10000 });
+        const result = await listAccounts({
+          q: debouncedSearchQuery,
+          page_size: debouncedSearchQuery ? 200 : 60,
+        });
         
         // Log para debug em desenvolvimento
         if (import.meta.env.DEV) {
           console.log('[Accounts] Query successful:', {
             count: result.data.length,
             total: result.total,
-            query: searchQuery
+            query: debouncedSearchQuery
           });
         }
         
@@ -75,19 +80,23 @@ export default function Accounts() {
 
   // Buscar contatos para busca global
   const { data: contacts = [] } = useQuery({
-    queryKey: ['contacts-search', searchQuery],
+    queryKey: ['contacts-search', debouncedSearchQuery],
     queryFn: async () => {
-      if (!searchQuery) return [];
+      if (debouncedSearchQuery.length < 2) return [];
       
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('contacts')
         .select('id, nome, account_id, emails, telefones')
-        .or(`nome.ilike.%${searchQuery}%,emails.cs.{${searchQuery}}`)
+        .ilike('nome', `%${debouncedSearchQuery}%`)
         .limit(10);
+      if (error) {
+        console.error('[Accounts] Contacts search failed:', error);
+        return [];
+      }
       
       return data || [];
     },
-    enabled: searchQuery.length > 0,
+    enabled: debouncedSearchQuery.length >= 2,
   });
 
   const deleteMutation = useMutation({
@@ -102,13 +111,63 @@ export default function Accounts() {
     },
   });
 
-  const accounts = accountsData?.data || [];
+  const accounts = useMemo(() => accountsData?.data || [], [accountsData?.data]);
 
   // Tags da organização (lookup id → name/color)
   const { tags: orgTags } = useOrganizationTags();
   // Tags por conta (bulk)
   const accountIds = useMemo(() => accounts.map((a) => a.id), [accounts]);
   const { data: tagsByAccount = {} } = useAccountTagsBulk(accountIds);
+  const { data: accountCardData = {} } = useQuery({
+    queryKey: ['account-card-data', accountIds.join(',')],
+    queryFn: async () => {
+      if (accountIds.length === 0) return {};
+
+      const [opportunitiesResult, contactsResult] = await Promise.all([
+        supabase
+          .from('opportunities')
+          .select('account_id, valor_previsto, status')
+          .in('account_id', accountIds)
+          .in('status', ['new', 'in_progress']),
+        supabase
+          .from('contacts')
+          .select('id, account_id, nome, emails, telefones')
+          .in('account_id', accountIds)
+          .is('deleted_at', null)
+          .order('nome'),
+      ]);
+
+      if (opportunitiesResult.error) {
+        console.error('[Accounts] Account metrics failed:', opportunitiesResult.error);
+      }
+      if (contactsResult.error) {
+        console.error('[Accounts] Account contacts preview failed:', contactsResult.error);
+      }
+
+      const grouped = accountIds.reduce((acc, id) => {
+        acc[id] = { metrics: { opportunities: 0, contacts: 0, pipelineValue: 0 }, contacts: [] as any[] };
+        return acc;
+      }, {} as Record<string, { metrics: { opportunities: number; contacts: number; pipelineValue: number }; contacts: any[] }>);
+
+      for (const opportunity of opportunitiesResult.data || []) {
+        const accountId = opportunity.account_id;
+        if (!accountId || !grouped[accountId]) continue;
+        grouped[accountId].metrics.opportunities += 1;
+        grouped[accountId].metrics.pipelineValue += Number(opportunity.valor_previsto || 0);
+      }
+
+      for (const contact of contactsResult.data || []) {
+        const accountId = contact.account_id;
+        if (!accountId || !grouped[accountId]) continue;
+        grouped[accountId].metrics.contacts += 1;
+        if (grouped[accountId].contacts.length < 3) grouped[accountId].contacts.push(contact);
+      }
+
+      return grouped;
+    },
+    enabled: accountIds.length > 0,
+    staleTime: 30_000,
+  });
   // Server-side: todos os account_ids vinculados à tag selecionada (paginado, sem limite de 1000)
   const { data: tagAccountIdsSet } = useAccountIdsByTag(tagFilter !== 'all' ? tagFilter : undefined);
 
@@ -570,6 +629,9 @@ export default function Accounts() {
                       <AccountCard
                         key={account.id}
                         account={account}
+                        metrics={accountCardData[account.id]?.metrics}
+                        contactsPreview={accountCardData[account.id]?.contacts}
+                        tags={tagsByAccount[account.id] || []}
                         onView={() => navigate(`/app/accounts/${account.id}`)}
                         onEdit={() => {
                           setEditingAccount(account);
