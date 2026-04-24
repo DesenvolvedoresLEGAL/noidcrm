@@ -1040,10 +1040,43 @@ async function handleEventFirecrawl(
     }
   }
 
+  let totalScrapedChars = scrapedContents.reduce((acc, c) => acc + (c.markdown?.length || 0) + (c.html?.length || 0), 0);
+
+  if (scrapedContents.length === 0 || totalScrapedChars < 5000) {
+    try {
+      const directContent = await fetchEventPageDirect(formattedEventUrl);
+      const directPage = {
+        url: formattedEventUrl,
+        markdown: directContent.markdown,
+        html: directContent.html,
+        page_type: "exhibitors_list",
+      };
+
+      const existingIndex = scrapedContents.findIndex((item) => item.url === formattedEventUrl);
+      if (existingIndex >= 0) {
+        const currentSize = (scrapedContents[existingIndex].markdown?.length || 0) + (scrapedContents[existingIndex].html?.length || 0);
+        const directSize = (directPage.markdown?.length || 0) + (directPage.html?.length || 0);
+        if (directSize > currentSize) scrapedContents[existingIndex] = directPage;
+      } else {
+        scrapedContents.push(directPage);
+        metrics.list_pages_scraped++;
+      }
+
+      totalScrapedChars = scrapedContents.reduce((acc, c) => acc + (c.markdown?.length || 0) + (c.html?.length || 0), 0);
+      await logRunEvent(supabase, organizationId, run.id, "info", "Fallback direto do site aplicado com sucesso", {
+        fetched_url: formattedEventUrl,
+        html_chars: directContent.html.length,
+        markdown_chars: directContent.markdown.length,
+        az_links_found: extractAzLetterLinks(directContent.html, formattedEventUrl).length,
+      });
+    } catch (directErr) {
+      await logRunEvent(supabase, organizationId, run.id, "warn", "Fallback direto do site falhou", { error: String(directErr) });
+    }
+  }
+
   // ── Step 3a: SPA A-Z filter re-scrape strategy ──
   // Detecta SPA quando: poucos URLs no map OU poucos chars retornados no scrape inicial.
   // Isso cobre Angular/React/Vue (ex: bettshow.com) que renderizam tudo via JS.
-  const totalScrapedChars = scrapedContents.reduce((acc, c) => acc + (c.markdown?.length || 0) + (c.html?.length || 0), 0);
   const isSpaLike = (discoveredUrls.length <= 5) || (metrics.list_pages_scraped >= 1 && totalScrapedChars < 2000);
   if (isSpaLike && scrapedContents.length > 0) {
     const firstContent = scrapedContents[0];
@@ -1193,12 +1226,18 @@ async function handleEventFirecrawl(
   const allExhibitors: any[] = [];
 
   for (const scraped of scrapedContents) {
+    const htmlExhibitors = extractAspEventsExhibitorsFromHtml(scraped.html || "", scraped.url);
+    if (htmlExhibitors.length > 0) {
+      allExhibitors.push(...htmlExhibitors);
+      metrics.html_hybrid_extracted += htmlExhibitors.length;
+    }
+
     const md = scraped.markdown || "";
     if (!md || md.length < 30) continue;
 
     // Padrão 1: cabeçalhos H2/H3 de empresa seguidos opcionalmente por "Stand:" ou "Booth:"
     // Ex.: "## 3B SCIENTIFIC\n\nStand: P160"
-    const headingPattern = /^(?:#{2,4})\s+([^\n#][^\n]{1,120})\s*$([\s\S]{0,400}?)(?=^(?:#{1,6})\s|\n\n-\s|\Z)/gm;
+    const headingPattern = /^(?:#{2,4})\s+([^\n#][^\n]{1,120})\s*$([\s\S]{0,400}?)(?=^(?:#{1,6})\s|\n\n-\s|$)/gm;
     const matches = md.matchAll(headingPattern);
     for (const m of matches) {
       const rawName = (m[1] || "").trim()
@@ -1211,7 +1250,7 @@ async function handleEventFirecrawl(
       if (/^(lista|menu|home|filtros|pesquisar|sobre|contato|setores|segmento|patrocinador|patrocinadores|expositores|exhibitors|loading|todos)$/i.test(rawName)) continue;
       if (/^[\d\W]+$/.test(rawName)) continue;
 
-      const standMatch = block.match(/(?:Stand|Booth|Estande)\s*[:#]?\s*([A-Z0-9\-]{1,12})/i);
+      const standMatch = block.match(/(?:Stand|Booth|Estande)\s*[:#]?\s*([A-Z0-9-]{1,12})/i);
       const booth = standMatch ? standMatch[1].toUpperCase() : null;
 
       allExhibitors.push({
