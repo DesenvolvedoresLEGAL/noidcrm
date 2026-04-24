@@ -27419,6 +27419,7 @@ export type Database = {
       is_platform_super_admin: { Args: { _user_id: string }; Returns: boolean }
       is_team_manager: { Args: { _user_id: string }; Returns: boolean }
       is_trial_expired: { Args: { org_id: string }; Returns: boolean }
+      kairos_janitor_stale_runs: { Args: never; Returns: number }
       load_noid_performance_gates: {
         Args: { p_organization_id: string }
         Returns: undefined
