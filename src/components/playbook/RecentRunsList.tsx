@@ -154,6 +154,21 @@ export function RecentRunsList({ runs, selectedRunId, onSelect }: RecentRunsList
         description="Todos os leads, scores e eventos dessa execução serão removidos permanentemente."
         isLoading={deleteMutation.isPending}
       />
+
+      <DeleteConfirmationDialog
+        open={!!cancelRunId}
+        onOpenChange={(open) => !open && setCancelRunId(null)}
+        onConfirm={() => {
+          if (cancelRunId) {
+            cancelMutation.mutate(cancelRunId);
+            setCancelRunId(null);
+          }
+        }}
+        title="Cancelar execução"
+        description="A execução será marcada como falhada. Os dados já capturados (se houver) serão preservados."
+        confirmLabel="Cancelar execução"
+        isLoading={cancelMutation.isPending}
+      />
     </div>
   );
 }
