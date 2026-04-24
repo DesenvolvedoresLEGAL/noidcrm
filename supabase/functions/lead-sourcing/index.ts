@@ -37,6 +37,122 @@ function extractDomainFromUrl(url: string | null): string | null {
   }
 }
 
+function decodeHtmlEntities(raw: string): string {
+  return raw
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCharCode(parseInt(code, 16)));
+}
+
+function resolveEventPageUrl(pageUrl: string, rawHref: string | null): string | null {
+  if (!rawHref) return null;
+  const href = decodeHtmlEntities(rawHref).trim();
+  if (!href || href.startsWith("javascript:void")) return null;
+
+  const modalMatch = href.match(/openRemoteModal\('([^']+)'/i);
+  if (modalMatch?.[1]) {
+    try {
+      const base = new URL(pageUrl);
+      return new URL(modalMatch[1].replace(/^\/+/, ""), `${base.origin}/`).toString();
+    } catch {
+      return null;
+    }
+  }
+
+  try {
+    return new URL(href, pageUrl).toString();
+  } catch {
+    return null;
+  }
+}
+
+function htmlToLightweightMarkdown(html: string): string {
+  const withoutScripts = html
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ");
+
+  const withSemanticBreaks = withoutScripts
+    .replace(/<h[2-4][^>]*>\s*(?:<a[^>]*>)?\s*([^<]+?)\s*(?:<\/a>)?\s*<\/h[2-4]>/gi, "\n## $1\n")
+    .replace(/<div[^>]*class="[^"]*stand[^"]*"[^>]*>\s*Stand:\s*([^<]+?)\s*<\/div>/gi, "\nStand: $1\n")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(?:p|div|li|section|article|ul|ol)>/gi, "\n");
+
+  return decodeHtmlEntities(withSemanticBreaks)
+    .replace(/<[^>]+>/g, " ")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+}
+
+async function fetchEventPageDirect(url: string): Promise<{ html: string; markdown: string }> {
+  const resp = await fetch(url, {
+    headers: {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36",
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+      "Cache-Control": "no-cache",
+      "Pragma": "no-cache",
+    },
+  });
+
+  if (!resp.ok) {
+    throw new Error(`Direct fetch failed (${resp.status}) for ${url}`);
+  }
+
+  const html = await resp.text();
+  return {
+    html,
+    markdown: htmlToLightweightMarkdown(html),
+  };
+}
+
+function extractAzLetterLinks(html: string, pageUrl: string): string[] {
+  const links = new Set<string>();
+  const matches = html.matchAll(/href=["']([^"']*azletter=[^"']+)["']/gi);
+  for (const match of matches) {
+    const resolved = resolveEventPageUrl(pageUrl, match[1]);
+    if (resolved) links.add(resolved);
+  }
+  return Array.from(links);
+}
+
+function extractAspEventsExhibitorsFromHtml(html: string, pageUrl: string): any[] {
+  if (!html) return [];
+
+  const exhibitors: any[] = [];
+  const cardPattern = /<li[^>]*class="[^"]*js-library-item[^"]*"[^>]*>[\s\S]*?<h2[^>]*>\s*(?:<a[^>]*href="([^"]*)"[^>]*>)?\s*([^<]{2,120})\s*(?:<\/a>)?\s*<\/h2>[\s\S]*?<div[^>]*class="[^"]*stand[^"]*"[^>]*>\s*Stand:\s*([^<]{1,24})<\/div>[\s\S]*?<\/li>/gi;
+
+  for (const match of html.matchAll(cardPattern)) {
+    const rawName = decodeHtmlEntities((match[2] || "").trim()).replace(/\s+/g, " ");
+    if (!rawName || rawName.length < 2 || rawName.length > 120) continue;
+    if (/^(lista|filtros|pesquisar|loading|todos|all)$/i.test(rawName)) continue;
+
+    exhibitors.push({
+      company_name: rawName,
+      website: null,
+      category: null,
+      description: null,
+      booth: decodeHtmlEntities((match[3] || "").trim()).toUpperCase(),
+      country: null,
+      city: null,
+      exhibitor_profile_url: resolveEventPageUrl(pageUrl, match[1] || null),
+      signals: ["html_card_pattern", "has_booth"],
+      confidence: 88,
+      _source_url: pageUrl,
+      _page_type: "exhibitors_list",
+      _extraction_method: "html_card_pattern",
+    });
+  }
+
+  return exhibitors;
+}
+
 function chunkArray<T>(items: T[], size: number): T[][] {
   if (size <= 0) return [items];
   const chunks: T[][] = [];
@@ -924,10 +1040,43 @@ async function handleEventFirecrawl(
     }
   }
 
+  let totalScrapedChars = scrapedContents.reduce((acc, c) => acc + (c.markdown?.length || 0) + (c.html?.length || 0), 0);
+
+  if (scrapedContents.length === 0 || totalScrapedChars < 5000) {
+    try {
+      const directContent = await fetchEventPageDirect(formattedEventUrl);
+      const directPage = {
+        url: formattedEventUrl,
+        markdown: directContent.markdown,
+        html: directContent.html,
+        page_type: "exhibitors_list",
+      };
+
+      const existingIndex = scrapedContents.findIndex((item) => item.url === formattedEventUrl);
+      if (existingIndex >= 0) {
+        const currentSize = (scrapedContents[existingIndex].markdown?.length || 0) + (scrapedContents[existingIndex].html?.length || 0);
+        const directSize = (directPage.markdown?.length || 0) + (directPage.html?.length || 0);
+        if (directSize > currentSize) scrapedContents[existingIndex] = directPage;
+      } else {
+        scrapedContents.push(directPage);
+        metrics.list_pages_scraped++;
+      }
+
+      totalScrapedChars = scrapedContents.reduce((acc, c) => acc + (c.markdown?.length || 0) + (c.html?.length || 0), 0);
+      await logRunEvent(supabase, organizationId, run.id, "info", "Fallback direto do site aplicado com sucesso", {
+        fetched_url: formattedEventUrl,
+        html_chars: directContent.html.length,
+        markdown_chars: directContent.markdown.length,
+        az_links_found: extractAzLetterLinks(directContent.html, formattedEventUrl).length,
+      });
+    } catch (directErr) {
+      await logRunEvent(supabase, organizationId, run.id, "warn", "Fallback direto do site falhou", { error: String(directErr) });
+    }
+  }
+
   // ── Step 3a: SPA A-Z filter re-scrape strategy ──
   // Detecta SPA quando: poucos URLs no map OU poucos chars retornados no scrape inicial.
   // Isso cobre Angular/React/Vue (ex: bettshow.com) que renderizam tudo via JS.
-  const totalScrapedChars = scrapedContents.reduce((acc, c) => acc + (c.markdown?.length || 0) + (c.html?.length || 0), 0);
   const isSpaLike = (discoveredUrls.length <= 5) || (metrics.list_pages_scraped >= 1 && totalScrapedChars < 2000);
   if (isSpaLike && scrapedContents.length > 0) {
     const firstContent = scrapedContents[0];
@@ -1077,12 +1226,18 @@ async function handleEventFirecrawl(
   const allExhibitors: any[] = [];
 
   for (const scraped of scrapedContents) {
+    const htmlExhibitors = extractAspEventsExhibitorsFromHtml(scraped.html || "", scraped.url);
+    if (htmlExhibitors.length > 0) {
+      allExhibitors.push(...htmlExhibitors);
+      metrics.html_hybrid_extracted += htmlExhibitors.length;
+    }
+
     const md = scraped.markdown || "";
     if (!md || md.length < 30) continue;
 
     // Padrão 1: cabeçalhos H2/H3 de empresa seguidos opcionalmente por "Stand:" ou "Booth:"
     // Ex.: "## 3B SCIENTIFIC\n\nStand: P160"
-    const headingPattern = /^(?:#{2,4})\s+([^\n#][^\n]{1,120})\s*$([\s\S]{0,400}?)(?=^(?:#{1,6})\s|\n\n-\s|\Z)/gm;
+    const headingPattern = /^(?:#{2,4})\s+([^\n#][^\n]{1,120})\s*$([\s\S]{0,400}?)(?=^(?:#{1,6})\s|\n\n-\s|$)/gm;
     const matches = md.matchAll(headingPattern);
     for (const m of matches) {
       const rawName = (m[1] || "").trim()
@@ -1095,7 +1250,7 @@ async function handleEventFirecrawl(
       if (/^(lista|menu|home|filtros|pesquisar|sobre|contato|setores|segmento|patrocinador|patrocinadores|expositores|exhibitors|loading|todos)$/i.test(rawName)) continue;
       if (/^[\d\W]+$/.test(rawName)) continue;
 
-      const standMatch = block.match(/(?:Stand|Booth|Estande)\s*[:#]?\s*([A-Z0-9\-]{1,12})/i);
+      const standMatch = block.match(/(?:Stand|Booth|Estande)\s*[:#]?\s*([A-Z0-9-]{1,12})/i);
       const booth = standMatch ? standMatch[1].toUpperCase() : null;
 
       allExhibitors.push({
