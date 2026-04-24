@@ -22,6 +22,8 @@ import { Button } from '@/components/ui/button';
 import { formatDateBR } from '@/lib/dateUtils';
 import { formatPhoneDisplay, extractPhone, extractEmail } from '@/lib/contactFormat';
 import { useAccountScore } from '@/hooks/useAccountScoring';
+import { useAccountTagsBulk } from '@/hooks/useAccountTags';
+import { AccountTagsBadges } from '@/components/accounts/AccountTagsSelector';
 
 interface SidebarDataSectionProps {
   opportunity: any;
