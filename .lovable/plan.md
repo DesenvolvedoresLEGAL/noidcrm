@@ -1,76 +1,105 @@
 
-Objetivo: corrigir o cadastro de Conta para que Tipo de Empresa, Vendedor Responsável e CS Responsável apareçam/persistam corretamente, adicionar o campo de Pré-Vendedor Responsável e parar de quebrar Segmento/Origem no editor.
 
-1. Corrigir a causa principal dos campos “sumindo” no formulário
-- Unificar os valores canônicos de `tipo_empresa` entre `AccountEditor` e `AccountModalTabs`, porque hoje os dois usam listas diferentes e com casing diferente (`Cliente/Prospect/...` vs `cliente/prospect/...`), o que faz o Select parecer vazio mesmo com dado salvo.
-- Corrigir `segmento` no `AccountEditor`: hoje o Select usa valores em slug minúsculo (`tecnologia`, `varejo`...), mas a conta costuma guardar valores legíveis/canônicos (`Tecnologia`, `Saúde`...), então o valor salvo não casa com os itens e não renderiza.
-- Reusar o normalizador existente de segmento para leitura consistente e evitar duplicidade visual.
+## Plano: Reclassificar "Expositor"/"Organizador" e adicionar Tags em Contas
 
-2. Tornar os responsáveis confiáveis no editor
-- Ajustar os Selects de `owner_user_id` e `cs_user_id` para sempre exibir o usuário atualmente salvo, mesmo se ele estiver inativo ou não vier na lista padrão de membros ativos.
-- Revisar `useOrganizationUsers()` para suportar esse caso sem quebrar a listagem normal da organização.
-- Manter persistência no mesmo fluxo atual (`updateAccount`), sem mudar RLS.
+Você está 100% certo. "Expositor" não é segmento, é um **atributo comercial** (a empresa participa de feiras como expositor). O correto é:
+- mover esse rótulo para uma **TAG** na conta
+- reclassificar o `segmento` para o valor real (via CNAE ou heurística)
 
-3. Adicionar o novo campo “Pré-Vendedor Responsável”
-- Criar uma migration adicionando `pre_sales_user_id` na tabela `accounts` (UUID nullable, mesmo padrão de responsáveis).
-- Incluir o campo no schema tipado do front por meio da integração normal do banco.
-- Expor esse campo em:
-  - `src/services/supabase/accounts.ts`
-  - `src/hooks/useAccountDetails.ts`
-  - `src/pages/AccountEditor.tsx`
-  - `src/components/accounts/AccountModalTabs.tsx`
-  - `src/components/accounts/AccountOverviewTabEnhanced.tsx`
-- Label no UI: “Pré-Vendedor Responsável”.
+E você ganha o filtro cruzado: "Tecnologia + tag Expositor", "Varejo + tag Organizador", etc.
 
-4. Eliminar a inconsistência de Origem
-- Continuar usando somente o cadastro robusto já existente de Origens/Grupos de Origens (`origins` + `origin_groups`) como fonte de opções.
-- Remover qualquer comportamento que dependa de listas paralelas/hardcoded para origem no cadastro de conta.
-- No editor da conta, o Select de origem passará a:
-  - carregar da tabela oficial de origens;
-  - mostrar o valor atual salvo mesmo se ele estiver inativo/legado;
-  - evitar ficar “em branco” quando a conta já tem origem preenchida.
+---
 
-5. Sincronizar Origem e Pré-Vendedor a partir da oportunidade vinculada
-- Implementar uma regra de sincronização segura para contas já ligadas a oportunidades:
-  - `origem_principal` da conta poderá ser preenchida a partir da `origem` da oportunidade vinculada;
-  - `pre_sales_user_id` da conta poderá ser preenchido a partir de `qualified_by_user_id` da oportunidade.
-- Critério técnico: usar a oportunidade vinculada mais recente com valor válido para cada campo.
-- Aplicar isso em dois níveis:
-  - leitura/hidratação da conta para exibição correta;
-  - backfill dos registros existentes que hoje estão vazios.
+### 1. Criar infraestrutura de Tags em Contas (hoje só existe em Oportunidades)
 
-6. Observação importante sobre Segmento
-- O sistema já tem fonte nativa para `origem` e `pré-vendedor` na oportunidade.
-- Para `segmento`, o CRM atual não tem um campo canônico nativo na oportunidade equivalente ao de origem; por isso o ajuste correto é:
-  - usar `accounts.segmento` como fonte de verdade da conta;
-  - normalizar sua leitura;
-  - manter o preenchimento automático por CNAE quando aplicável.
-- Isso resolve o problema real de “não puxar” no editor sem criar duplicidade estrutural.
+**Migration nova:**
+- Tabela `account_tags` (espelha `opportunity_tags`): `id`, `account_id`, `tag_id`, `organization_id`, `created_at`
+- Unique `(account_id, tag_id)` para evitar duplicidade
+- Índices em `account_id` e `tag_id`
+- RLS org-scoped (mesmo padrão de `opportunity_tags`)
 
-7. Backfill dos dados já existentes
-- Executar um backfill pontual para contas que estejam sem `origem_principal` e/ou sem `pre_sales_user_id`, buscando esses dados da oportunidade vinculada mais recente.
-- Não alterar contas que já estejam corretamente preenchidas.
-- Não é necessário mudar políticas RLS; as políticas org-scoped atuais de `accounts` já cobrem a nova coluna.
+A tabela `tags` já existe e é compartilhada por organização — **vamos reusá-la**, sem duplicar.
 
-Arquivos impactados
-- `src/pages/AccountEditor.tsx`
-- `src/components/accounts/AccountModalTabs.tsx`
-- `src/hooks/useAccountDetails.ts`
-- `src/hooks/useOrganizationUsers.ts`
-- `src/services/supabase/accounts.ts`
+---
+
+### 2. Backfill: mover "Expositor" / "Organizador" de segmento → tag
+
+Para cada conta com `segmento IN ('Expositor','Organizador')`:
+
+1. Garantir que existem as tags `Expositor` e `Organizador` na `tags` da organização (criar se não existir, com cores distintas).
+2. Inserir vínculo em `account_tags`.
+3. Reclassificar o `segmento`:
+   - se a conta tem `cnae` → usar `fn_cnae_to_segmento(cnae)`
+   - senão se tem CNPJ → marcar para enriquecimento via edge function existente `backfill-accounts-segmento`
+   - senão → aplicar `fn_infer_segmento_from_name(nome)`
+   - se nada resolver → `NULL` (melhor que mentir com "Expositor")
+
+**Volume:** 1.342 Expositor + 4 Organizador = 1.346 contas. Backfill direto em SQL.
+
+Bônus: também normalizar os 2 órfãos (`Marketing e Publicidade` → `Marketing`, `SaaS / Software` → `Tecnologia`).
+
+---
+
+### 3. UI — Editor de Conta (`AccountModalTabs.tsx` aba Comercial)
+
+Adicionar componente **TagsSelector** na aba Comercial, abaixo de "Origem Principal":
+- Multi-select com autocomplete sobre `tags` da organização
+- Botão "Criar nova tag" inline
+- Mesmo visual já usado em oportunidades (reusar `TagBadge` se existir, senão criar componente unificado em `src/components/shared/`)
+
+---
+
+### 4. Visualização — Card e Detalhe da Conta
+
+- `AccountCard.tsx`: exibir até 3 tags como badges coloridos abaixo do segmento
+- `AccountOverviewTabEnhanced.tsx`: seção "Tags" no sidebar/header da conta
+
+---
+
+### 5. Filtros na listagem de Contas (`Accounts.tsx`)
+
+Adicionar 5º filtro: **Tags** (multi-select). Combinável com os filtros já existentes (segmento, porte, origem, score). Isso entrega exatamente o cenário que você descreveu: "Tecnologia + tag Expositor".
+
+---
+
+### 6. Relatórios
+
+Já que você mencionou puxar relatórios cruzando tag × segmento:
+- Adicionar `tags` no payload de exportação CSV de contas
+- Deixar a base pronta para um relatório futuro de "Distribuição de Contas por Tag × Segmento" (não implemento o relatório agora, só preparo os dados)
+
+---
+
+### Arquivos impactados
+
+**Novos:**
+- `supabase/migrations/...` (tabela `account_tags` + RLS + índices)
+- `src/services/supabase/account-tags.ts` (CRUD)
+- `src/hooks/useAccountTags.ts`
+- `src/components/accounts/AccountTagsSelector.tsx`
+
+**Editados:**
+- `src/components/accounts/AccountModalTabs.tsx` (aba Comercial)
+- `src/components/accounts/AccountCard.tsx` (badges de tags)
 - `src/components/accounts/AccountOverviewTabEnhanced.tsx`
-- `src/lib/segment-normalizer.ts` (reuso)
-- novo helper opcional para opções canônicas de conta/segmento
-- nova migration em `supabase/migrations/...`
+- `src/pages/Accounts.tsx` (filtro de tags)
+- `src/hooks/useAccountDetails.ts` (carregar tags junto)
+- `src/services/supabase/accounts.ts` (exportação CSV com tags)
 
-Riscos controlados
-- Baixo/médio: mudança principal é de formulário, normalização e 1 nova coluna nullable.
-- Sem quebra de multitenancy: permanece tudo em `accounts.organization_id`.
-- Sem duplicar a arquitetura de origem: o cadastro oficial existente continua sendo a única fonte de opções.
+**Backfill SQL:** rodado uma vez via migration de dados, atualizando 1.346 contas.
 
-Resultado esperado
-- Tipo de Empresa passa a aparecer e salvar corretamente.
-- Vendedor Responsável e CS Responsável deixam de “sumir” no editor.
-- Conta ganha campo de Pré-Vendedor Responsável.
-- Origem passa a respeitar o cadastro oficial de Origens/Grupos e pode ser herdada da oportunidade.
-- Segmento volta a carregar corretamente no cadastro da conta.
+---
+
+### Riscos
+
+- **Baixo.** Nenhuma RLS existente é alterada; nenhum schema crítico tocado.
+- Backfill é idempotente (UPSERT na `account_tags`, UPDATE só onde `segmento IN ('Expositor','Organizador')`).
+- Multitenancy preservado: tags são por `organization_id`.
+
+### Resultado esperado
+
+- Zero contas com segmento "Expositor"/"Organizador"
+- 1.346 contas marcadas com a tag correspondente
+- Filtro combinável tag × segmento × porte × score na listagem
+- Base pronta para relatórios cruzados pelo time comercial
+
