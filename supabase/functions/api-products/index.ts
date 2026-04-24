@@ -36,7 +36,7 @@ function normalizeApiKey(rawValue: string | null): string {
 // Validate API key and return organization_id
 async function authenticateApiKey(
   req: Request,
-  supabaseAdmin: ReturnType<typeof createClient>
+  supabaseAdmin: any
 ): Promise<{ organizationId: string; keyId: string } | Response> {
   const rawApiKey =
     req.headers.get("x-api-key") ||
@@ -141,7 +141,7 @@ Deno.serve(async (req) => {
 // --- Handlers ---
 
 async function handleList(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   orgId: string,
   url: URL
 ) {
@@ -182,7 +182,7 @@ async function handleList(
 }
 
 async function handleGet(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   orgId: string,
   url: URL
 ) {
@@ -215,7 +215,7 @@ async function handleGet(
 }
 
 async function handleUpsert(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   orgId: string,
   productData: unknown
 ) {
@@ -297,7 +297,7 @@ async function handleUpsert(
 }
 
 async function handleBulkUpsert(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   orgId: string,
   items: unknown
 ) {

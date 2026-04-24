@@ -35,7 +35,7 @@ function normalizeApiKey(rawValue: string | null): string {
 
 async function authenticateApiKey(
   req: Request,
-  supabaseAdmin: ReturnType<typeof createClient>
+  supabaseAdmin: any
 ): Promise<{ organizationId: string; keyId: string } | Response> {
   const rawApiKey =
     req.headers.get("x-api-key") ||
@@ -60,11 +60,20 @@ async function authenticateApiKey(
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   const keyHash = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
 
-  const { data: keyData, error } = await supabaseAdmin
+  const { data: keyDataRaw, error } = await supabaseAdmin
     .from("api_keys")
     .select("id, organization_id, scopes, active, expires_at, name, key_prefix")
     .eq("key_hash", keyHash)
     .maybeSingle();
+  const keyData = keyDataRaw as {
+    id: string;
+    organization_id: string;
+    scopes: string[] | null;
+    active: boolean;
+    expires_at: string | null;
+    name: string;
+    key_prefix: string;
+  } | null;
 
   if (error) {
     console.error("[api-deals] AUTH FAIL: DB error looking up key:", error.message);
@@ -108,7 +117,7 @@ async function authenticateApiKey(
 
 // Build a deal object from proposal + related data
 async function buildDeal(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   proposal: Record<string, unknown>
 ) {
   const proposalId = proposal.id as string;
@@ -325,7 +334,7 @@ Deno.serve(async (req) => {
 });
 
 async function handleList(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   orgId: string,
   url: URL
 ) {
@@ -371,7 +380,7 @@ async function handleList(
 }
 
 async function handleGet(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   orgId: string,
   url: URL
 ) {
