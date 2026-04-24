@@ -141,6 +141,28 @@ export function ProspectDetailDrawer({
                 </div>
               )}
 
+              {!isImported && !minimumIdentity && (
+                <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/5 border border-amber-500/30">
+                  <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                  <div className="text-sm">
+                    <div className="font-medium text-amber-700">Faltam dados essenciais</div>
+                    <div className="text-muted-foreground text-xs mt-0.5">
+                      Sem CNPJ ou domínio, não é possível criar conta no CRM. Use <strong>Enriquecer & Importar</strong> abaixo para descobrir esses dados via Google + lookup CNPJ.
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {(prospect.cnpj || prospect.razao_social) && (
+                <div className="rounded-lg bg-muted/50 border border-border p-3 text-xs space-y-1">
+                  <div className="font-semibold text-foreground uppercase tracking-wider">Identidade enriquecida</div>
+                  {prospect.razao_social && <div><span className="text-muted-foreground">Razão social:</span> <span className="font-medium">{prospect.razao_social}</span></div>}
+                  {prospect.cnpj && <div><span className="text-muted-foreground">CNPJ:</span> <span className="font-mono">{prospect.cnpj}</span></div>}
+                  {prospect.cnae_desc && <div><span className="text-muted-foreground">CNAE:</span> {prospect.cnae_desc}</div>}
+                  {prospect.porte && <div><span className="text-muted-foreground">Porte:</span> {prospect.porte}</div>}
+                </div>
+              )}
+
               <section className="space-y-2">
                 <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Resumo</h4>
                 <div className="grid grid-cols-2 gap-2 text-sm">
