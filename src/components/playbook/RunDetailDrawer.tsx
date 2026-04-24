@@ -235,7 +235,7 @@ export function RunDetailDrawer({ run, open, onClose, onViewProspects }: RunDeta
           </section>
         </div>
 
-        <SheetFooter className="flex gap-2 pt-4 border-t">
+        <SheetFooter className="flex flex-col sm:flex-row gap-2 pt-4 border-t">
           {run.status === 'failed' && (
             <Button
               variant="outline"
@@ -247,8 +247,19 @@ export function RunDetailDrawer({ run, open, onClose, onViewProspects }: RunDeta
               Retry
             </Button>
           )}
+          {isStuck && (
+            <Button
+              variant="outline"
+              className="flex-1 border-amber-500/40 text-amber-700 hover:bg-amber-500/10"
+              onClick={() => forceCompleteMutation.mutate(run.id)}
+              disabled={forceCompleteMutation.isPending}
+            >
+              <StopCircle className={cn('h-4 w-4 mr-1', forceCompleteMutation.isPending && 'animate-spin')} />
+              Forçar conclusão
+            </Button>
+          )}
           <Button className="flex-1" onClick={() => { onViewProspects(run.id); onClose(); }}>
-            Ver Prospects
+            Ver Prospects ({realProspectCount ?? 0})
           </Button>
         </SheetFooter>
       </SheetContent>
