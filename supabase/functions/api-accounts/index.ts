@@ -514,7 +514,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const supabaseAdmin = createClient(
+    const supabaseAdmin = createClient<any>(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
