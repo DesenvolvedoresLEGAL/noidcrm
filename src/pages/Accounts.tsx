@@ -18,7 +18,7 @@ import { extractEmail, extractPhone } from '@/lib/contactFormat';
 import { accountKeys } from '@/lib/query-keys';
 import { normalizePorte, CANONICAL_PORTES, type CanonicalPorte } from '@/lib/porte-normalizer';
 import { useOrganizationTags } from '@/hooks/useOrganizationTags';
-import { useAccountTagsBulk } from '@/hooks/useAccountTags';
+import { useAccountTagsBulk, useAccountIdsByTag } from '@/hooks/useAccountTags';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -109,6 +109,8 @@ export default function Accounts() {
   // Tags por conta (bulk)
   const accountIds = useMemo(() => accounts.map((a) => a.id), [accounts]);
   const { data: tagsByAccount = {} } = useAccountTagsBulk(accountIds);
+  // Server-side: todos os account_ids vinculados à tag selecionada (paginado, sem limite de 1000)
+  const { data: tagAccountIdsSet } = useAccountIdsByTag(tagFilter !== 'all' ? tagFilter : undefined);
 
   // Filtrar contas localmente
   const filteredAccounts = useMemo(() => {
@@ -131,12 +133,12 @@ export default function Accounts() {
         else if (scoreFinanceiroFilter === 'bad' && (score < 0 || score >= 40)) return false;
       }
       if (tagFilter !== 'all') {
-        const tags = tagsByAccount[account.id] || [];
-        if (!tags.some((t) => t.id === tagFilter)) return false;
+        // Usa o Set paginado server-side em vez de tagsByAccount (que é truncado em 1000 rows)
+        if (!tagAccountIdsSet || !tagAccountIdsSet.has(account.id)) return false;
       }
       return true;
     });
-  }, [accounts, segmentoFilter, porteFilter, origemFilter, scoreFinanceiroFilter, tagFilter, tagsByAccount]);
+  }, [accounts, segmentoFilter, porteFilter, origemFilter, scoreFinanceiroFilter, tagFilter, tagAccountIdsSet]);
 
   // Extrair valores únicos para filtros
   const uniqueSegmentos = useMemo(() => 
