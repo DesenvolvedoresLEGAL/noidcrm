@@ -28,6 +28,7 @@ const pathToBreadcrumb: Record<string, { label: string; parent?: { label: string
   '/app/settings/data-management': { label: 'Gestão de Dados' },
   '/app/settings/custom-fields': { label: 'Campos Personalizados' },
   '/app/settings/custom-forms': { label: 'Formulários' },
+  '/app/settings/tags': { label: 'Tags' },
   '/app/settings/industries': { label: 'Setores' },
   '/app/settings/noid-intelligence': { label: 'NOID Intelligence' },
   '/app/settings/noid-intelligence/agents': { label: 'Agentes', parent: { label: 'NOID Intelligence', href: '/app/settings/noid-intelligence' } },
