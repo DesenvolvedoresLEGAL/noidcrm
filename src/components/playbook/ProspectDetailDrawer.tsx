@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Check, X, AlertTriangle, Globe, MapPin, Building2, ExternalLink, Download, PackageCheck, Sparkles, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import type { Prospect } from '@/hooks/useLeadSourcingV2';
 import { useEnrichmentRun, useEnrichedCompanyProfile, useCommercialBrief, useEnrichmentSignals, useRunEnrichment } from '@/hooks/useEnrichment';
 import { useEnrichProspectIdentity } from '@/hooks/useEnrichProspectIdentity';
 import { hasMinimumIdentity } from '@/hooks/useProspectImport';
