@@ -334,7 +334,7 @@ Deno.serve(async (req) => {
 });
 
 async function handleList(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   orgId: string,
   url: URL
 ) {
@@ -380,7 +380,7 @@ async function handleList(
 }
 
 async function handleGet(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   orgId: string,
   url: URL
 ) {
