@@ -81,7 +81,7 @@ serve(async (req) => {
     );
 
     // Wrap each query with retry to tolerate transient Postgres timeouts
-    const queryWithRetry = async <T,>(fn: () => Promise<T>, label: string): Promise<T | { data: null; error: any }> => {
+    const queryWithRetry = async <T = any>(fn: () => PromiseLike<T>, label: string): Promise<any> => {
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
           const result = await fn() as any;

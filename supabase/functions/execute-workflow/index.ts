@@ -1071,14 +1071,15 @@ serve(async (req) => {
                 cancelQuery = cancelQuery.lt('created_at', todayStart.toISOString());
               }
 
-              const { error, count } = await cancelQuery.select('id', { count: 'exact' });
+              const { data: cancelledRows, error } = await cancelQuery.select('id');
+              const count = cancelledRows?.length ?? 0;
 
               if (error) {
                 console.error('[execute-workflow] cancel_pending_activities error:', error);
                 result = { action: 'cancel_pending_activities', success: false, error: error.message };
               } else {
-                console.log(`[execute-workflow] Cancelled ${count ?? 0} pending activities for opportunity ${oppId} (scope=${scope})`);
-                result = { action: 'cancel_pending_activities', success: true, cancelled_count: count ?? 0 };
+                console.log(`[execute-workflow] Cancelled ${count} pending activities for opportunity ${oppId} (scope=${scope})`);
+                result = { action: 'cancel_pending_activities', success: true, cancelled_count: count };
               }
             } else {
               result = { action: 'cancel_pending_activities', success: false, error: 'No opportunity' };
