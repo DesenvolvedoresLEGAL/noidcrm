@@ -3,11 +3,12 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from '@/com
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Clock, CheckCircle2, XCircle, Loader2, RefreshCw, AlertTriangle, Info, AlertCircle } from 'lucide-react';
+import { Clock, CheckCircle2, XCircle, Loader2, RefreshCw, AlertTriangle, Info, AlertCircle, StopCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { useRunEvents, useRetryPlaybookRun } from '@/hooks/useLeadSourcingV2';
+import { useRunProspectCount, useForceCompleteRun } from '@/hooks/useRunProspectCount';
 import type { PlaybookRun } from '@/hooks/useLeadSourcingV2';
 
 interface RunDetailDrawerProps {
