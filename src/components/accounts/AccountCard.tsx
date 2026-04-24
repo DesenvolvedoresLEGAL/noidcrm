@@ -271,6 +271,11 @@ export function AccountCard({ account, onView, onEdit, onDelete }: AccountCardPr
             )}
           </div>
 
+          {/* Tags da conta */}
+          {accountTags.length > 0 && (
+            <AccountTagsBadges tags={accountTags} max={3} />
+          )}
+
           {/* Métricas */}
           <div className="grid grid-cols-3 gap-3 pt-3 border-t">
             <div className="text-center">
