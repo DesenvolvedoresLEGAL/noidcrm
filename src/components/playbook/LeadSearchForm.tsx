@@ -7,11 +7,51 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Rocket, MapPin, Globe, Users, FileUp, CalendarDays } from 'lucide-react';
+import { Loader2, Rocket, MapPin, Globe, Users, FileUp, CalendarDays, AlertCircle } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { listICPs } from '@/services/roleplay/icps';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { Slider } from '@/components/ui/slider';
+import { toast } from 'sonner';
+
+/**
+ * Sanitiza e valida a URL do evento.
+ * Remove espaços e texto adicional após a URL, garante protocolo,
+ * e retorna { url, error } onde url é null se inválida.
+ */
+function sanitizeEventUrl(raw: string): { url: string | null; error: string | null } {
+  if (!raw) return { url: null, error: 'Informe a URL do evento' };
+  let value = String(raw).trim();
+  if (!value) return { url: null, error: 'Informe a URL do evento' };
+
+  // Pega só o primeiro "token" (até o primeiro espaço) — protege contra
+  // colagens do tipo "https://x.com/lista e validar que ..."
+  const firstToken = value.split(/\s+/)[0];
+  if (firstToken !== value) {
+    value = firstToken;
+  }
+
+  // Remove caracteres finais perigosos (vírgulas, pontos, aspas)
+  value = value.replace(/[",;]+$/g, '');
+
+  // Adiciona protocolo se faltar
+  if (!/^https?:\/\//i.test(value)) {
+    value = `https://${value}`;
+  }
+
+  try {
+    const u = new URL(value);
+    if (!['http:', 'https:'].includes(u.protocol)) {
+      return { url: null, error: 'A URL deve usar http ou https' };
+    }
+    if (!u.hostname || !u.hostname.includes('.')) {
+      return { url: null, error: 'Domínio inválido na URL do evento' };
+    }
+    return { url: u.toString(), error: null };
+  } catch {
+    return { url: null, error: 'URL inválida. Cole o link completo da página de expositores' };
+  }
+}
 
 const SEARCH_TYPES = [
   { id: 'event', label: 'Evento (Expositores)', icon: CalendarDays, description: 'Encontre leads a partir de eventos e feiras' },
