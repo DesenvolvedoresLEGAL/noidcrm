@@ -29,19 +29,22 @@ const VISIBLE_MENU_ITEMS: Record<string, string[]> = {
   sales: [
     '/app/dashboard', '/app/opportunities',
     '/app/activities', '/app/accounts', '/app/contracts', '/app/reports',
-    '/app/insights', '/app/scoring', '/app/intelligence/vibe', '/app/intelligence/winloss',
+    '/app/insights', '/app/intelligence/kairos', '/app/scoring',
+    '/app/intelligence/vibe', '/app/intelligence/winloss',
     '/app/roleplay',
   ],
   cs: [
     '/app/dashboard', '/app/opportunities',
     '/app/activities', '/app/accounts', '/app/contracts', '/app/reports',
-    '/app/insights', '/app/scoring', '/app/intelligence/vibe', '/app/intelligence/winloss',
+    '/app/insights', '/app/intelligence/kairos', '/app/scoring',
+    '/app/intelligence/vibe', '/app/intelligence/winloss',
     '/app/roleplay',
   ],
   operations: [
     '/app/dashboard', '/app/opportunities',
     '/app/activities', '/app/accounts', '/app/contracts', '/app/reports',
-    '/app/insights', '/app/scoring', '/app/intelligence/vibe', '/app/intelligence/winloss',
+    '/app/insights', '/app/intelligence/kairos', '/app/scoring',
+    '/app/intelligence/vibe', '/app/intelligence/winloss',
     '/app/roleplay',
   ],
   
@@ -49,7 +52,8 @@ const VISIBLE_MENU_ITEMS: Record<string, string[]> = {
   manager: [
     '/app/dashboard', '/app/opportunities',
     '/app/activities', '/app/accounts', '/app/contracts', '/app/forecast', '/app/reports',
-    '/app/insights', '/app/intelligence/graph', '/app/intelligence/memories',
+    '/app/insights', '/app/intelligence/kairos',
+    '/app/intelligence/graph', '/app/intelligence/memories',
     '/app/intelligence/playbooks',
     '/app/scoring', '/app/intelligence/vibe', '/app/intelligence/winloss',
     '/app/settings/sales', '/app/reports/ote', '/app/roleplay',
