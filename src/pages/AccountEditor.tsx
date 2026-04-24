@@ -25,6 +25,8 @@ import { accountKeys, contactKeys, opportunityKeys } from '@/lib/query-keys';
 import { cnaeToSegmento } from '@/lib/cnae-to-segmento';
 import { TIPO_EMPRESA_OPTIONS, SEGMENTO_OPTIONS, normalizeTipoEmpresa, withCurrentValue } from '@/lib/account-options';
 import { normalizeSegmento } from '@/lib/segment-normalizer';
+import { AccountTagsSelector } from '@/components/accounts/AccountTagsSelector';
+import { useAccountTagIds, useSetAccountTags } from '@/hooks/useAccountTags';
 // Helper: transforma string vazia em null para campos UUID/opcionais
 const emptyToNull = (v: string | null | undefined) => (v === '' ? null : v);
 
