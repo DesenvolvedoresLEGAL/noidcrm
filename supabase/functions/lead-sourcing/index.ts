@@ -162,6 +162,91 @@ async function fetchEventPageDirect(url: string): Promise<{ html: string; markdo
   };
 }
 
+async function fetchSwapcardExhibitors(pageUrl: string, html: string): Promise<any[]> {
+  const ctx = extractSwapcardContext(pageUrl, html);
+  if (!ctx) return [];
+
+  const query = `query EventExhibitorListViewConnectionQuery($viewId: ID!, $endCursor: String, $eventId: ID!, $withEvent: Boolean = true) {
+    view: Core_eventExhibitorListView(viewId: $viewId) {
+      id
+      exhibitors(cursor: { first: 100, after: $endCursor }) {
+        nodes {
+          id: _id
+          name
+          type
+          logoUrl
+          htmlDescription
+          withEvent(eventId: $eventId) @include(if: $withEvent) { booth isBookmarked }
+        }
+        pageInfo { hasNextPage endCursor }
+        totalCount
+      }
+    }
+  }`;
+
+  const exhibitors: any[] = [];
+  const seen = new Set<string>();
+  let cursor: string | null = null;
+
+  for (let page = 1; page <= 30; page++) {
+    const resp = await fetch(ctx.endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/135 Safari/537.36",
+        "Origin": new URL(pageUrl).origin,
+        "Referer": pageUrl,
+        "x-client-platform": "Event App",
+        "x-client-version": "2.310.57",
+      },
+      body: JSON.stringify({
+        operationName: "EventExhibitorListViewConnectionQuery",
+        variables: { viewId: ctx.viewId, eventId: ctx.eventId, withEvent: true, endCursor: cursor },
+        query,
+      }),
+    });
+
+    const data = await resp.json().catch(() => null);
+    if (!resp.ok || data?.errors?.length) {
+      throw new Error(`Swapcard GraphQL failed (${resp.status}): ${JSON.stringify(data?.errors || data).slice(0, 300)}`);
+    }
+
+    const connection = data?.data?.view?.exhibitors;
+    const nodes = connection?.nodes || [];
+    for (const node of nodes) {
+      const name = String(node?.name || "").trim();
+      const normalized = normalizeCompanyName(name);
+      if (!name || seen.has(normalized)) continue;
+      seen.add(normalized);
+
+      const description = stripHtmlToText(node?.htmlDescription);
+      const domain = description ? extractDomain(description) : null;
+      exhibitors.push({
+        company_name: name,
+        website: domain ? `https://${domain}` : null,
+        category: node?.type || null,
+        description,
+        booth: node?.withEvent?.booth || null,
+        country: null,
+        city: null,
+        exhibitor_profile_url: null,
+        signals: ["swapcard_graphql", "listed_in_official_directory", ...(node?.withEvent?.booth ? ["has_booth"] : [])],
+        confidence: 96,
+        _source_url: pageUrl,
+        _page_type: "exhibitors_list",
+        _extraction_method: "swapcard_graphql_cursor",
+        _external_id: node?.id || null,
+        _logo_url: node?.logoUrl || null,
+      });
+    }
+
+    if (!connection?.pageInfo?.hasNextPage || !connection?.pageInfo?.endCursor) break;
+    cursor = connection.pageInfo.endCursor;
+  }
+
+  return exhibitors;
+}
+
 function extractAzLetterLinks(html: string, pageUrl: string): string[] {
   const links = new Set<string>();
   const matches = html.matchAll(/href=["']([^"']*azletter=[^"']+)["']/gi);
