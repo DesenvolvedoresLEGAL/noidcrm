@@ -95,7 +95,7 @@ export function CommercialBriefCard({ brief }: CommercialBriefCardProps) {
               </Button>
             </div>
             <p className="text-[10px] text-muted-foreground/70 italic">
-              SDR da NOID prospectando esta empresa. Será criado como atividade de e-mail (rascunho) na timeline da oportunidade.
+              SDR da NOID prospectando esta empresa. Será disparado automaticamente via seu SMTP ao importar (ou salvo como rascunho se SMTP não estiver configurado).
             </p>
             {brief.email_subject && (
               <div className="text-xs px-3 pt-2 pb-1 rounded-t-md bg-primary/5 border border-b-0 border-primary/10">
