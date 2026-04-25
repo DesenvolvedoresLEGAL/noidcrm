@@ -118,25 +118,51 @@ function parseNextDataFromHtml(html: string): any | null {
   }
 }
 
-function extractSwapcardContext(pageUrl: string, html: string): { eventId: string; eventSlug: string; viewId: string; endpoint: string } | null {
+function collectSwapcardViewIds(nextData: any, pageUrl: string): string[] {
+  const ids = new Set<string>();
+  // viewId direto da rota
+  const queryViewId = nextData?.query?.viewId;
+  if (queryViewId) ids.add(String(queryViewId));
+
+  // Última parte do pathname (fallback)
+  try {
+    const parts = new URL(pageUrl).pathname.split("/").filter(Boolean);
+    const last = decodeURIComponent(parts[parts.length - 1] || "");
+    if (last && /^[A-Za-z0-9=_-]{6,}$/.test(last)) ids.add(last);
+  } catch { /* ignore */ }
+
+  // Varredura recursiva por chaves "viewId" ou objetos com __typename "EventExhibitorListView"
+  const visit = (node: any) => {
+    if (!node || typeof node !== "object") return;
+    if (Array.isArray(node)) { for (const n of node) visit(n); return; }
+    for (const [k, v] of Object.entries(node)) {
+      if ((k === "viewId" || k === "id") && typeof v === "string" && v.length >= 8 && v.length <= 128) {
+        // Heurística: chaves "id" só entram se o objeto parecer uma view
+        if (k === "viewId" || /view|exhibitor/i.test(JSON.stringify(node).slice(0, 200))) {
+          if (/^[A-Za-z0-9=_-]+$/.test(v)) ids.add(v);
+        }
+      }
+      if (v && typeof v === "object") visit(v);
+    }
+  };
+  visit(nextData);
+
+  return Array.from(ids);
+}
+
+function extractSwapcardContext(pageUrl: string, html: string): { eventId: string; eventSlug: string; viewId: string; viewIds: string[]; endpoint: string } | null {
   const nextData = parseNextDataFromHtml(html);
   const eventId = nextData?.props?.event?.id || nextData?.props?.pageProps?.event?.id;
   const eventSlug = nextData?.query?.eventSlug || nextData?.props?.activeEventSlug || nextData?.props?.pageProps?.activeEventSlug;
-  const viewId = nextData?.query?.viewId || (() => {
-    try {
-      const parts = new URL(pageUrl).pathname.split("/").filter(Boolean);
-      return decodeURIComponent(parts[parts.length - 1] || "");
-    } catch {
-      return "";
-    }
-  })();
+  const viewIds = collectSwapcardViewIds(nextData, pageUrl);
+  const viewId = viewIds[0] || "";
 
   if (!eventId || !eventSlug || !viewId) return null;
   try {
     const origin = new URL(pageUrl).origin;
-    return { eventId, eventSlug, viewId, endpoint: `${origin}/api/graphql` };
+    return { eventId, eventSlug, viewId, viewIds, endpoint: `${origin}/api/graphql` };
   } catch {
-    return { eventId, eventSlug, viewId, endpoint: "https://api.swapcard.com/graphql" };
+    return { eventId, eventSlug, viewId, viewIds, endpoint: "https://api.swapcard.com/graphql" };
   }
 }
 
