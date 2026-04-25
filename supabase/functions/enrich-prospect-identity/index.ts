@@ -173,10 +173,34 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 2) CNPJ discovery (only if missing)
+    // 2) CNPJ discovery + full company data (address, CNAE, porte)
     let cnpj = prospect.cnpj as string | null;
-    if (!cnpj) {
-      // Try Firecrawl search with CNPJ keyword
+    const needsCompanyData = !prospect.cnae_code || !prospect.endereco || !prospect.cep || !prospect.cidade_enriched;
+
+    if (cnpj && needsCompanyData) {
+      // Já tem CNPJ mas faltam dados — enriquece direto via lookup-cnpj
+      const data = await lookupCnpj(cnpj);
+      if (data) {
+        if (!prospect.razao_social && data.razao_social) updates.razao_social = data.razao_social;
+        if (!prospect.nome_fantasia) updates.nome_fantasia = data.nome_fantasia || data.razao_social;
+        if (!prospect.cnae_code && data.cnae_principal?.codigo) updates.cnae_code = data.cnae_principal.codigo;
+        if (!prospect.cnae_desc && data.cnae_principal?.descricao) updates.cnae_desc = data.cnae_principal.descricao;
+        if (!prospect.porte && data.porte) updates.porte = data.porte;
+        if (!prospect.cep && data.cep) updates.cep = data.cep;
+        if (!prospect.cidade_enriched && data.cidade) updates.cidade_enriched = data.cidade;
+        if (!prospect.uf_enriched && data.uf) updates.uf_enriched = data.uf;
+        if (!prospect.endereco) {
+          const addr = [data.logradouro, data.numero, data.bairro].filter(Boolean).join(", ");
+          if (addr) updates.endereco = addr;
+        }
+        if (!prospect.email_public && data.email) updates.email_public = data.email;
+        if (!prospect.phone_public && Array.isArray(data.telefones) && data.telefones.length > 0) {
+          updates.phone_public = data.telefones[0];
+        }
+        log.cnpj_data_enriched = cnpj;
+      }
+    } else if (!cnpj) {
+      // Sem CNPJ — descobre via Firecrawl
       const cnpjResults = await firecrawlSearch(`"${prospect.company_name}" CNPJ`, 5);
       const allText = cnpjResults
         .map((r) => `${r.title || ""} ${r.description || ""} ${r.markdown || ""}`)
@@ -184,8 +208,6 @@ Deno.serve(async (req) => {
       const candidates = extractCnpjsFromText(allText);
       log.cnpj_candidates = candidates;
 
-      // Validate each candidate via lookup-cnpj, pick first whose razao_social
-      // contains a token of company_name
       const nameTokens = prospect.company_name
         .toLowerCase()
         .normalize("NFD").replace(/\p{Diacritic}/gu, "")
