@@ -1146,9 +1146,12 @@ async function handleEventFirecrawl(
 
     // Se detectou links de paginação OU a URL parece uma listagem de expositores,
     // gera URLs ?page=2..MAX (mínimo 15 para sites como Bett que têm ~15 páginas).
+    // GUARD: se a página-base é shell vazio de SPA, brute-force ?page=N só vai
+    // capturar 14× o mesmo shell (visto na run da Feimec). Só paginamos se há
+    // evidência REAL de paginação no HTML capturado (maxDetectedPage > 1).
     const baseUrl = formattedEventUrl.split("#")[0].split("?")[0];
     const looksLikeListing = /lista-de-expositores|expositores|exhibitors|exhibitor-list|exposants|aussteller/i.test(formattedEventUrl);
-    const shouldPaginate = maxDetectedPage > 1 || (looksLikeListing && scrapedContents.length > 0);
+    const shouldPaginate = maxDetectedPage > 1 || (looksLikeListing && scrapedContents.length > 0 && !baseIsEmptyShell);
 
     if (shouldPaginate) {
       const targetMax = Math.max(maxDetectedPage, 15);
