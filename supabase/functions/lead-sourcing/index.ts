@@ -1289,103 +1289,214 @@ async function handleEventFirecrawl(
       }
       await logRunEvent(supabase, organizationId, run.id, "info", `Scrapes A-Z concluídos, total de ${scrapedContents.length} conteúdos`);
     } else {
-      // ── Infinite-Scroll Aggressive (para SPAs com paginação por scroll) ──
-      // Substitui o single-shot de 120 scrolls por rodadas progressivas com early-stop.
-      // Cada rodada acumula scrolls e mede crescimento; se 2 rodadas seguidas
-      // crescem <5%, atingiu o fim → para. Evita gastar 5min em uma chamada
-      // monolítica que pode dar timeout (caso da Feimec).
-      await logRunEvent(supabase, organizationId, run.id, "info", "SPA sem filtro A-Z detectado, iniciando infinite-scroll progressivo (stealth proxy)", {
+      // ── Infinite-Scroll Resiliente (para SPAs com paginação por scroll, ex: Feimec) ──
+      // Estratégia: rodadas curtas e CONSTANTES (não cumulativas), para não estourar
+      // o orçamento interno do Firecrawl (que retorna payload vazio quando satura).
+      // Cada rodada faz ~25 scrolls com amount alto + waits curtos (~20s de ações).
+      // Resposta vazia é tratada como FALHA TRANSIENTE (retry), não como "fim do conteúdo".
+      // Hard-stop por tempo de parede em 6 min como rede de segurança.
+      await logRunEvent(supabase, organizationId, run.id, "info", "SPA com infinite-scroll detectado, iniciando captura resiliente (stealth proxy)", {
         spa_framework: baseSpaFramework,
         base_is_empty_shell: baseIsEmptyShell,
       });
+
+      const isFirecrawlEmpty = (sd: any): boolean => {
+        const md = sd?.data?.markdown ?? sd?.markdown ?? "";
+        const ht = sd?.data?.html ?? sd?.html ?? "";
+        return (md.length === 0) && (ht.length < 1000);
+      };
 
       let bestMarkdown = firstContent.markdown || "";
       let bestHtml = firstContent.html || "";
       let prevSize = bestMarkdown.length;
       const growthPerRound: number[] = [];
       let smallGrowthStreak = 0;
-      const MAX_ROUNDS = 4;
-      const SCROLLS_PER_ROUND = 60;
+      let emptyStreak = 0;
+      const MAX_ROUNDS = 8;
+      const SCROLLS_PER_ROUND = 25;
+      const PHASE_BUDGET_MS = 6 * 60 * 1000; // 6 min hard-stop
+      const phaseStart = Date.now();
+
+      const buildScrollActions = (): any[] => {
+        const acts: any[] = [
+          { type: "wait", milliseconds: 3000 },
+          // Pula direto para o fundo para forçar carregamento incremental antes dos scrolls
+          { type: "scroll", direction: "down", amount: 30 },
+          { type: "wait", milliseconds: 1500 },
+        ];
+        for (let s = 0; s < SCROLLS_PER_ROUND; s++) {
+          acts.push({ type: "scroll", direction: "down", amount: 10 });
+          acts.push({ type: "wait", milliseconds: 600 });
+        }
+        return acts;
+      };
+
+      const callScrape = async (waitFor: number, useStealth: boolean) => {
+        const body: any = {
+          url: firstContent.url,
+          formats: ["markdown", "html"],
+          onlyMainContent: false,
+          waitFor,
+          actions: buildScrollActions(),
+          timeout: 110000,
+        };
+        if (useStealth) body.proxy = "stealth";
+        const resp = await fetch("https://api.firecrawl.dev/v2/scrape", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${FIRECRAWL_API_KEY}`, "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        return await resp.json();
+      };
 
       for (let round = 1; round <= MAX_ROUNDS; round++) {
-        try {
-          const scrollActions: any[] = [{ type: "wait", milliseconds: 3000 }];
-          // Cada rodada faz scrolls cumulativos: rodada 2 = 120 scrolls, rodada 3 = 180...
-          // Isso simula "rolar até o fim" porque Firecrawl não persiste estado entre chamadas.
-          const totalScrolls = SCROLLS_PER_ROUND * round;
-          for (let s = 0; s < totalScrolls; s++) {
-            scrollActions.push({ type: "scroll", direction: "down", amount: 5 });
-            scrollActions.push({ type: "wait", milliseconds: 700 });
-          }
+        const elapsed = Date.now() - phaseStart;
+        if (elapsed >= PHASE_BUDGET_MS) {
+          await logRunEvent(supabase, organizationId, run.id, "info", `Infinite-scroll hard-stop por tempo (${Math.round(elapsed/1000)}s)`, {
+            rounds_executed: round - 1,
+          });
+          break;
+        }
 
-          // Timeout por chamada limitado a 180s (não 300s) — se uma rodada estourar,
-          // ainda temos as anteriores. Total worst-case: 4 × 180s = 12min, mas com
-          // early-stop fica tipicamente em 1-2 rodadas (3-6min).
-          const scrapeResp = await fetch("https://api.firecrawl.dev/v2/scrape", {
+        let attempt = 0;
+        let scrapeData: any = null;
+        let usedFallback = false;
+        // Retry interno: 1ª tentativa stealth+5s; se vier vazio, tenta sem stealth+8s
+        for (attempt = 1; attempt <= 2; attempt++) {
+          try {
+            const useStealth = attempt === 1;
+            const waitFor = attempt === 1 ? 5000 : 8000;
+            scrapeData = await callScrape(waitFor, useStealth);
+            if (!isFirecrawlEmpty(scrapeData)) {
+              if (attempt === 2) usedFallback = true;
+              break;
+            }
+            await logRunEvent(supabase, organizationId, run.id, "warn", `Rodada ${round}: resposta vazia do Firecrawl (tentativa ${attempt}/2, stealth=${useStealth})`, {
+              round,
+              attempt,
+              proxy_mode: useStealth ? "stealth" : "default",
+            });
+          } catch (callErr) {
+            await logRunEvent(supabase, organizationId, run.id, "warn", `Rodada ${round} tentativa ${attempt} falhou`, { error: String(callErr) });
+            scrapeData = null;
+          }
+        }
+
+        if (!scrapeData || isFirecrawlEmpty(scrapeData)) {
+          emptyStreak++;
+          await logRunEvent(supabase, organizationId, run.id, "warn", `Rodada ${round}/${MAX_ROUNDS}: Firecrawl entregou vazio mesmo com fallback (empty_streak=${emptyStreak})`);
+          // 3 vazias seguidas = desiste (provavelmente bloqueio persistente)
+          if (emptyStreak >= 3) {
+            await logRunEvent(supabase, organizationId, run.id, "warn", "Infinite-scroll abortado: 3 respostas vazias seguidas");
+            break;
+          }
+          continue;
+        }
+        emptyStreak = 0;
+
+        const markdown = scrapeData.data?.markdown || scrapeData.markdown || "";
+        const html = scrapeData.data?.html || scrapeData.html || "";
+        const newSize = markdown.length;
+
+        // Persistência incremental — sempre que melhorar, salva no scrapedContents[0]
+        if (newSize > bestMarkdown.length) {
+          bestMarkdown = markdown;
+          bestHtml = html || bestHtml;
+          scrapedContents[0] = { ...firstContent, markdown: bestMarkdown, html: bestHtml };
+        }
+
+        const growth = prevSize === 0 ? 1 : (newSize - prevSize) / Math.max(prevSize, 1);
+        growthPerRound.push(Math.round(growth * 1000) / 10);
+        await logRunEvent(supabase, organizationId, run.id, "info", `Infinite-scroll rodada ${round}/${MAX_ROUNDS}: ${newSize} chars (crescimento ${(growth * 100).toFixed(1)}%)`, {
+          round,
+          chars: newSize,
+          growth_pct: Math.round(growth * 1000) / 10,
+          scrolls: SCROLLS_PER_ROUND,
+          used_fallback: usedFallback,
+          accumulated_phase_ms: Date.now() - phaseStart,
+        });
+
+        // Early-stop SÓ quando há resposta válida (>1000 chars) e crescimento <5% duas vezes seguidas
+        if (newSize > 1000 && growth < 0.05) {
+          smallGrowthStreak++;
+          if (smallGrowthStreak >= 2) {
+            await logRunEvent(supabase, organizationId, run.id, "info", `Infinite-scroll early-stop: 2 rodadas consecutivas com crescimento <5%`, {
+              final_chars: newSize,
+              rounds_executed: round,
+            });
+            break;
+          }
+        } else {
+          smallGrowthStreak = 0;
+        }
+        prevSize = newSize;
+      }
+
+      // Fallback de último recurso: se ainda estamos com payload pequeno, tenta via /crawl
+      if (bestMarkdown.length < 5000) {
+        try {
+          await logRunEvent(supabase, organizationId, run.id, "info", "Scroll progressivo não progrediu, tentando fallback via /crawl");
+          const crawlResp = await fetch("https://api.firecrawl.dev/v2/crawl", {
             method: "POST",
             headers: { Authorization: `Bearer ${FIRECRAWL_API_KEY}`, "Content-Type": "application/json" },
             body: JSON.stringify({
               url: firstContent.url,
-              formats: ["markdown", "html"],
-              onlyMainContent: false,
-              waitFor: 6000, // Angular hidrata devagar
-              actions: scrollActions,
-              proxy: "stealth",
-              timeout: 180000,
+              limit: 5,
+              maxDepth: 0,
+              scrapeOptions: {
+                formats: ["markdown", "html"],
+                onlyMainContent: false,
+                waitFor: 6000,
+                actions: buildScrollActions(),
+              },
             }),
           });
-          const scrapeData = await scrapeResp.json();
-          const markdown = scrapeData.data?.markdown || scrapeData.markdown || "";
-          const html = scrapeData.data?.html || scrapeData.html || "";
-          const newSize = markdown.length;
-
-          if (newSize > bestMarkdown.length) {
-            bestMarkdown = markdown;
-            bestHtml = html || bestHtml;
-          }
-
-          const growth = prevSize === 0 ? newSize : (newSize - prevSize) / Math.max(prevSize, 1);
-          growthPerRound.push(Math.round(growth * 1000) / 10); // % com 1 casa
-          await logRunEvent(supabase, organizationId, run.id, "info", `Infinite-scroll rodada ${round}/${MAX_ROUNDS}: ${newSize} chars (crescimento ${(growth * 100).toFixed(1)}%)`, {
-            round,
-            chars: newSize,
-            growth_pct: Math.round(growth * 1000) / 10,
-            scrolls: totalScrolls,
-          });
-
-          if (growth < 0.05) {
-            smallGrowthStreak++;
-            if (smallGrowthStreak >= 2) {
-              await logRunEvent(supabase, organizationId, run.id, "info", `Infinite-scroll early-stop: 2 rodadas consecutivas com crescimento <5%`, {
-                final_chars: newSize,
-                rounds_executed: round,
+          const crawlInit = await crawlResp.json();
+          const crawlId = crawlInit?.id || crawlInit?.data?.id;
+          if (crawlId) {
+            // Polling curto: até 90s
+            const pollStart = Date.now();
+            let crawlDone = false;
+            while (Date.now() - pollStart < 90000 && !crawlDone) {
+              await new Promise(r => setTimeout(r, 5000));
+              const statusResp = await fetch(`https://api.firecrawl.dev/v2/crawl/${crawlId}`, {
+                headers: { Authorization: `Bearer ${FIRECRAWL_API_KEY}` },
               });
-              break;
+              const statusData = await statusResp.json();
+              if (statusData?.status === "completed" || statusData?.status === "failed") {
+                crawlDone = true;
+                const docs = statusData?.data || [];
+                for (const doc of docs) {
+                  const md = doc?.markdown || "";
+                  if (md.length > bestMarkdown.length) {
+                    bestMarkdown = md;
+                    bestHtml = doc?.html || bestHtml;
+                  }
+                }
+                await logRunEvent(supabase, organizationId, run.id, "info", `Fallback /crawl finalizado: ${docs.length} docs, melhor markdown ${bestMarkdown.length} chars`, {
+                  status: statusData?.status,
+                });
+              }
             }
-          } else {
-            smallGrowthStreak = 0;
           }
-          prevSize = newSize;
-        } catch (deepErr) {
-          await logRunEvent(supabase, organizationId, run.id, "warn", `Infinite-scroll rodada ${round} falhou`, { error: String(deepErr) });
-          // Não interrompe — tenta próxima rodada
+        } catch (crawlErr) {
+          await logRunEvent(supabase, organizationId, run.id, "warn", "Fallback /crawl falhou", { error: String(crawlErr) });
         }
       }
 
-      // Persiste melhor resultado se for maior que o original
+      // Persiste resultado final e re-avalia shell
       if (bestMarkdown.length > (firstContent.markdown || "").length * 1.1) {
         scrapedContents[0] = { ...firstContent, markdown: bestMarkdown, html: bestHtml };
         totalScrapedChars = scrapedContents.reduce((acc, c) => acc + (c.markdown?.length || 0) + (c.html?.length || 0), 0);
-        // Re-avaliar shell após scroll bem-sucedido
         if (baseIsEmptyShell && bestMarkdown.length >= 5000) {
           baseIsEmptyShell = false;
-          await logRunEvent(supabase, organizationId, run.id, "info", "Shell preenchido com sucesso via infinite-scroll", {
+          await logRunEvent(supabase, organizationId, run.id, "info", "Shell preenchido com sucesso via infinite-scroll resiliente", {
             final_markdown_chars: bestMarkdown.length,
             growth_per_round: growthPerRound,
           });
         }
       } else {
-        await logRunEvent(supabase, organizationId, run.id, "warn", "Infinite-scroll não trouxe conteúdo novo significativo", {
+        await logRunEvent(supabase, organizationId, run.id, "warn", "Infinite-scroll resiliente não trouxe conteúdo novo significativo", {
           original_chars: (firstContent.markdown || "").length,
           best_chars: bestMarkdown.length,
           growth_per_round: growthPerRound,
