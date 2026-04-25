@@ -1504,9 +1504,17 @@ async function handleEventFirecrawl(
 
   // ── Step 4: AI extraction with CHUNKING ──
   // (allExhibitors já pode conter resultados do parser de markdown — AI só complementa)
-  const CHUNK_SIZE = 40000; // chars per AI call
+  // WATCHDOG: timeout global de 6min no loop completo de IA. Se estourar,
+  // continua com o que já foi extraído (parser markdown + html híbrido + fallback Step 4b).
+  // Evita travas como a da Feimec (13min sem resposta exigindo Force Complete).
+  const CHUNK_SIZE = 40000;
+  const AI_PHASE_TIMEOUT_MS = 6 * 60 * 1000;
+  let aiPhaseTimedOut = false;
+  const aiPhaseStart = Date.now();
 
+  const aiLoop = (async () => {
   for (const scraped of scrapedContents) {
+    if (Date.now() - aiPhaseStart > AI_PHASE_TIMEOUT_MS) { aiPhaseTimedOut = true; break; }
     const content = scraped.markdown;
     if (!content || content.length < 30) continue;
 
