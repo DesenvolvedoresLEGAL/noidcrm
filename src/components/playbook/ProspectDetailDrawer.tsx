@@ -332,7 +332,7 @@ export function ProspectDetailDrawer({
               <li>• <strong>Oportunidade</strong> na 1ª etapa, com perfil completo da empresa nos metadados</li>
               <li>• <strong>Nota inicial</strong> com brief comercial estruturado (resumo, dores, hipóteses, sinais)</li>
               {commercialBrief?.first_touch_message && (
-                <li>• <strong>Atividade de e-mail (rascunho)</strong> na timeline, pronta para o pré-vendas revisar e disparar</li>
+                <li>• <strong>E-mail inicial disparado automaticamente</strong> via seu SMTP (ou rascunho na timeline se SMTP não estiver configurado)</li>
               )}
             </ul>
           </div>
