@@ -335,7 +335,7 @@ export function LeadSearchForm({ onExecute, isExecuting }: LeadSearchFormProps) 
         ) : (
           <Rocket className="h-5 w-5 mr-2" />
         )}
-        {isExecuting ? 'Executando Caramelo...' : 'Executar Caramelo 🔥'}
+        {isExecuting ? 'Buscando leads...' : 'Buscar Leads'}
       </Button>
     </div>
   );
