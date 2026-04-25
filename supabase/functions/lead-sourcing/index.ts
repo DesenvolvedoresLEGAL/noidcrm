@@ -1072,9 +1072,18 @@ async function handleEventFirecrawl(
 
   let totalScrapedChars = scrapedContents.reduce((acc, c) => acc + (c.markdown?.length || 0) + (c.html?.length || 0), 0);
 
+  // Flag global: a URL principal foi detectada como shell vazio de SPA?
+  // Usado para evitar caminhos inúteis (paginação brute-force, parser de markdown
+  // contra shell genérico) e priorizar render via Firecrawl com proxy stealth.
+  let baseIsEmptyShell = false;
+  let baseSpaFramework: string = "none";
+
   if (scrapedContents.length === 0 || totalScrapedChars < 5000) {
     try {
       const directContent = await fetchEventPageDirect(formattedEventUrl);
+      const directIsShell = isEmptyShell(directContent.html, directContent.markdown);
+      baseSpaFramework = detectSpaFramework(directContent.html);
+
       const directPage = {
         url: formattedEventUrl,
         markdown: directContent.markdown,
@@ -1092,12 +1101,23 @@ async function handleEventFirecrawl(
         metrics.list_pages_scraped++;
       }
 
+      if (directIsShell) {
+        baseIsEmptyShell = true;
+        await logRunEvent(supabase, organizationId, run.id, "warn", `Shell vazio de SPA detectado (${baseSpaFramework}), exigirá render via JavaScript`, {
+          framework: baseSpaFramework,
+          markdown_chars: directContent.markdown.length,
+          html_chars: directContent.html.length,
+        });
+      }
+
       totalScrapedChars = scrapedContents.reduce((acc, c) => acc + (c.markdown?.length || 0) + (c.html?.length || 0), 0);
       await logRunEvent(supabase, organizationId, run.id, "info", "Fallback direto do site aplicado com sucesso", {
         fetched_url: formattedEventUrl,
         html_chars: directContent.html.length,
         markdown_chars: directContent.markdown.length,
         az_links_found: extractAzLetterLinks(directContent.html, formattedEventUrl).length,
+        is_empty_shell: directIsShell,
+        spa_framework: baseSpaFramework,
       });
     } catch (directErr) {
       await logRunEvent(supabase, organizationId, run.id, "warn", "Fallback direto do site falhou", { error: String(directErr) });
