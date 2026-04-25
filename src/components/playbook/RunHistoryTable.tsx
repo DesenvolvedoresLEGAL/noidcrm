@@ -97,6 +97,11 @@ export function RunHistoryTable({ onSelectRun, onViewProspects }: RunHistoryTabl
               const status = statusConfig[run.status] || statusConfig.queued;
               const StatusIcon = status.icon;
               const playbookType = run.input_payload?.playbookType || 'unknown';
+              const source = run.input_payload?.event_name
+                || run.input_payload?.eventName
+                || run.input_payload?.directoryName
+                || run.input_payload?.location
+                || '—';
               const prospectsCount = (run.stats as any)?.persisted_prospects || (run.stats as any)?.prospects_created || (run.stats as any)?.prospects_count || 0;
               const approvedCount = (run.stats as any)?.approved_count || 0;
               const importedCount = (run.stats as any)?.imported_count || 0;
@@ -110,6 +115,9 @@ export function RunHistoryTable({ onSelectRun, onViewProspects }: RunHistoryTabl
                     <Badge variant="outline" className="text-xs">
                       {typeLabels[playbookType] || playbookType}
                     </Badge>
+                  </TableCell>
+                  <TableCell className="text-xs font-medium max-w-[220px] truncate" title={source}>
+                    {source}
                   </TableCell>
                   <TableCell>
                     <div className={cn('flex items-center gap-1.5 text-xs font-medium', status.color)}>
