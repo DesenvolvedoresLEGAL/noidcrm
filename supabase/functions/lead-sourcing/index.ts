@@ -153,6 +153,33 @@ function extractAspEventsExhibitorsFromHtml(html: string, pageUrl: string): any[
   return exhibitors;
 }
 
+// ── SPA shell detection (proteção contra capturas de Angular/React vazios) ──
+// Detecta quando uma página é apenas o "casco" do bundle JS sem conteúdo renderizado.
+// Crítico para sites como app.informamarkets.com.br (Angular) que servem 400KB de
+// HTML mas <2KB de markdown real — qualquer parser/paginação em cima disso é lixo.
+function detectSpaFramework(html: string): "angular" | "react" | "vue" | "unknown" | "none" {
+  if (!html) return "none";
+  if (/ng-version=|<app-root|ng-app=|_ngcontent/i.test(html)) return "angular";
+  if (/data-reactroot|__NEXT_DATA__|id=["']root["'][^>]*>\s*<\/div>|react-helmet/i.test(html)) return "react";
+  if (/data-server-rendered|__NUXT__|<div id=["']app["'][^>]*>\s*<\/div>/i.test(html)) return "vue";
+  return "unknown";
+}
+
+function isEmptyShell(html: string, markdown: string): boolean {
+  const md = markdown || "";
+  const ht = html || "";
+  // Markdown rico = não é shell, independente do HTML
+  if (md.length >= 5000) return false;
+  // Markdown pobre + framework SPA detectado = shell
+  const fw = detectSpaFramework(ht);
+  if (fw === "angular" || fw === "react" || fw === "vue") return true;
+  // Markdown muito pobre (<1500 chars) + HTML grande (>50KB) = quase certamente shell genérico
+  if (md.length < 1500 && ht.length > 50000) return true;
+  // <noscript> aviso explícito = shell
+  if (/<noscript[^>]*>[^<]*(?:enable\s+javascript|habilite\s+o?\s*javascript)/i.test(ht)) return true;
+  return false;
+}
+
 function chunkArray<T>(items: T[], size: number): T[][] {
   if (size <= 0) return [items];
   const chunks: T[][] = [];
@@ -1045,9 +1072,18 @@ async function handleEventFirecrawl(
 
   let totalScrapedChars = scrapedContents.reduce((acc, c) => acc + (c.markdown?.length || 0) + (c.html?.length || 0), 0);
 
+  // Flag global: a URL principal foi detectada como shell vazio de SPA?
+  // Usado para evitar caminhos inúteis (paginação brute-force, parser de markdown
+  // contra shell genérico) e priorizar render via Firecrawl com proxy stealth.
+  let baseIsEmptyShell = false;
+  let baseSpaFramework: string = "none";
+
   if (scrapedContents.length === 0 || totalScrapedChars < 5000) {
     try {
       const directContent = await fetchEventPageDirect(formattedEventUrl);
+      const directIsShell = isEmptyShell(directContent.html, directContent.markdown);
+      baseSpaFramework = detectSpaFramework(directContent.html);
+
       const directPage = {
         url: formattedEventUrl,
         markdown: directContent.markdown,
@@ -1065,12 +1101,23 @@ async function handleEventFirecrawl(
         metrics.list_pages_scraped++;
       }
 
+      if (directIsShell) {
+        baseIsEmptyShell = true;
+        await logRunEvent(supabase, organizationId, run.id, "warn", `Shell vazio de SPA detectado (${baseSpaFramework}), exigirá render via JavaScript`, {
+          framework: baseSpaFramework,
+          markdown_chars: directContent.markdown.length,
+          html_chars: directContent.html.length,
+        });
+      }
+
       totalScrapedChars = scrapedContents.reduce((acc, c) => acc + (c.markdown?.length || 0) + (c.html?.length || 0), 0);
       await logRunEvent(supabase, organizationId, run.id, "info", "Fallback direto do site aplicado com sucesso", {
         fetched_url: formattedEventUrl,
         html_chars: directContent.html.length,
         markdown_chars: directContent.markdown.length,
         az_links_found: extractAzLetterLinks(directContent.html, formattedEventUrl).length,
+        is_empty_shell: directIsShell,
+        spa_framework: baseSpaFramework,
       });
     } catch (directErr) {
       await logRunEvent(supabase, organizationId, run.id, "warn", "Fallback direto do site falhou", { error: String(directErr) });
@@ -1099,9 +1146,12 @@ async function handleEventFirecrawl(
 
     // Se detectou links de paginação OU a URL parece uma listagem de expositores,
     // gera URLs ?page=2..MAX (mínimo 15 para sites como Bett que têm ~15 páginas).
+    // GUARD: se a página-base é shell vazio de SPA, brute-force ?page=N só vai
+    // capturar 14× o mesmo shell (visto na run da Feimec). Só paginamos se há
+    // evidência REAL de paginação no HTML capturado (maxDetectedPage > 1).
     const baseUrl = formattedEventUrl.split("#")[0].split("?")[0];
     const looksLikeListing = /lista-de-expositores|expositores|exhibitors|exhibitor-list|exposants|aussteller/i.test(formattedEventUrl);
-    const shouldPaginate = maxDetectedPage > 1 || (looksLikeListing && scrapedContents.length > 0);
+    const shouldPaginate = maxDetectedPage > 1 || (looksLikeListing && scrapedContents.length > 0 && !baseIsEmptyShell);
 
     if (shouldPaginate) {
       const targetMax = Math.max(maxDetectedPage, 15);
@@ -1168,29 +1218,38 @@ async function handleEventFirecrawl(
     await logRunEvent(supabase, organizationId, run.id, "warn", "Erro na paginação automática", { error: String(pagErr) });
   }
 
-  // ── Step 3a: SPA A-Z filter re-scrape strategy ──
-  // Detecta SPA quando: poucos URLs no map OU poucos chars retornados no scrape inicial.
-  // Isso cobre Angular/React/Vue (ex: bettshow.com) que renderizam tudo via JS.
-  const isSpaLike = (discoveredUrls.length <= 5) || (metrics.list_pages_scraped >= 1 && totalScrapedChars < 2000);
+  // ── Step 3a: SPA strategy (A-Z filter OU Infinite-Scroll Aggressive) ──
+  // Detecta SPA quando: poucos URLs no map, poucos chars retornados, OU shell vazio detectado.
+  // Cobre Angular/React/Vue (ex: bettshow.com / app.informamarkets.com.br).
+  const isSpaLike = baseIsEmptyShell
+    || (discoveredUrls.length <= 5)
+    || (metrics.list_pages_scraped >= 1 && totalScrapedChars < 2000);
+
   if (isSpaLike && scrapedContents.length > 0) {
     const firstContent = scrapedContents[0];
     const firstHtml = firstContent.html || "";
     const firstMd = firstContent.markdown || "";
 
-    // Detect A-Z filter links in HTML or markdown
-    const hasAlphaFilter = /class="[^"]*(?:alpha|letter|filter|az)[^"]*"/i.test(firstHtml) ||
-      /(?:data-letter|data-filter)="[A-Z]"/i.test(firstHtml) ||
-      /<a[^>]*>[A-Z]<\/a>/g.test(firstHtml) ||
-      /(?:filtrar|filter).*(?:por letra|by letter|a-z)/i.test(firstHtml) ||
-      /\b[A-Z]\b\s*\|\s*\b[A-Z]\b\s*\|\s*\b[A-Z]\b/.test(firstMd); // "A | B | C" in markdown
+    // Heurística A-Z RIGOROSA — exige evidência concreta de seletores reais,
+    // não apenas presença de letras isoladas no DOM (causa falsos positivos
+    // em qualquer página com menu de navegação ou breadcrumbs).
+    const azDataAttrCount = (firstHtml.match(/(?:data-letter|data-filter)="[A-Z]"/gi) || []).length;
+    const azClassCount = (firstHtml.match(/class="[^"]*(?:alpha-filter|letter-filter|az-filter|filter-az)[^"]*"/gi) || []).length;
+    const hasAlphaFilter = azDataAttrCount >= 5 // pelo menos 5 letras com data-* atributo
+      || azClassCount >= 1
+      || /(?:filtrar|filter)\s+(?:por letra|by letter|alphabetically|a-z)/i.test(firstHtml);
 
     // For known SPA event hosts, force the A-Z strategy even without explicit detection
     const eventHost = (() => { try { return new URL(formattedEventUrl).hostname.toLowerCase(); } catch { return ""; } })();
-    const knownSpaHosts = ["bettshow.com", "brasil.bettshow.com"];
-    const forceAlphaStrategy = knownSpaHosts.some(h => eventHost.endsWith(h));
+    const knownAzHosts = ["bettshow.com", "brasil.bettshow.com"];
+    const forceAlphaStrategy = knownAzHosts.some(h => eventHost.endsWith(h));
 
     if (hasAlphaFilter || forceAlphaStrategy) {
-      await logRunEvent(supabase, organizationId, run.id, "info", "SPA detectada com filtro A-Z, fazendo scrapes por letra (stealth proxy)");
+      await logRunEvent(supabase, organizationId, run.id, "info", "SPA detectada com filtro A-Z, fazendo scrapes por letra (stealth proxy)", {
+        az_data_attrs_found: azDataAttrCount,
+        az_classes_found: azClassCount,
+        forced_by_host: forceAlphaStrategy,
+      });
 
       const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
       for (const letter of letters) {
@@ -1200,13 +1259,11 @@ async function handleEventFirecrawl(
             { type: "click", selector: `a[data-letter="${letter}"], a[data-filter="${letter}"], a[href*="letter=${letter}"], a[href*="letra=${letter}"], button[data-letter="${letter}"], .alpha-filter a:has-text("${letter}"), .filter-letter:has-text("${letter}"), a.letter-filter[href*="${letter.toLowerCase()}"], li:has-text("${letter}") > a` },
             { type: "wait", milliseconds: 3500 },
           ];
-          // Scroll after clicking to trigger lazy loaders
           for (let s = 0; s < 30; s++) {
             letterActions.push({ type: "scroll", direction: "down", amount: 5 });
             letterActions.push({ type: "wait", milliseconds: 800 });
           }
 
-          // Use Firecrawl v2 with stealth proxy for better SPA rendering
           const scrapeResp = await fetch("https://api.firecrawl.dev/v2/scrape", {
             method: "POST",
             headers: { Authorization: `Bearer ${FIRECRAWL_API_KEY}`, "Content-Type": "application/json" },
@@ -1232,36 +1289,107 @@ async function handleEventFirecrawl(
       }
       await logRunEvent(supabase, organizationId, run.id, "info", `Scrapes A-Z concluídos, total de ${scrapedContents.length} conteúdos`);
     } else {
-      // No A-Z filter found — do a deep scrape with stealth proxy + 120 scrolls
-      await logRunEvent(supabase, organizationId, run.id, "info", "SPA sem filtro A-Z detectado, fazendo scrape profundo com stealth proxy");
-      try {
-        const deepScrollActions: any[] = [];
-        for (let s = 0; s < 120; s++) {
-          deepScrollActions.push({ type: "scroll", direction: "down", amount: 5 });
-          deepScrollActions.push({ type: "wait", milliseconds: 1000 });
+      // ── Infinite-Scroll Aggressive (para SPAs com paginação por scroll) ──
+      // Substitui o single-shot de 120 scrolls por rodadas progressivas com early-stop.
+      // Cada rodada acumula scrolls e mede crescimento; se 2 rodadas seguidas
+      // crescem <5%, atingiu o fim → para. Evita gastar 5min em uma chamada
+      // monolítica que pode dar timeout (caso da Feimec).
+      await logRunEvent(supabase, organizationId, run.id, "info", "SPA sem filtro A-Z detectado, iniciando infinite-scroll progressivo (stealth proxy)", {
+        spa_framework: baseSpaFramework,
+        base_is_empty_shell: baseIsEmptyShell,
+      });
+
+      let bestMarkdown = firstContent.markdown || "";
+      let bestHtml = firstContent.html || "";
+      let prevSize = bestMarkdown.length;
+      const growthPerRound: number[] = [];
+      let smallGrowthStreak = 0;
+      const MAX_ROUNDS = 4;
+      const SCROLLS_PER_ROUND = 60;
+
+      for (let round = 1; round <= MAX_ROUNDS; round++) {
+        try {
+          const scrollActions: any[] = [{ type: "wait", milliseconds: 3000 }];
+          // Cada rodada faz scrolls cumulativos: rodada 2 = 120 scrolls, rodada 3 = 180...
+          // Isso simula "rolar até o fim" porque Firecrawl não persiste estado entre chamadas.
+          const totalScrolls = SCROLLS_PER_ROUND * round;
+          for (let s = 0; s < totalScrolls; s++) {
+            scrollActions.push({ type: "scroll", direction: "down", amount: 5 });
+            scrollActions.push({ type: "wait", milliseconds: 700 });
+          }
+
+          // Timeout por chamada limitado a 180s (não 300s) — se uma rodada estourar,
+          // ainda temos as anteriores. Total worst-case: 4 × 180s = 12min, mas com
+          // early-stop fica tipicamente em 1-2 rodadas (3-6min).
+          const scrapeResp = await fetch("https://api.firecrawl.dev/v2/scrape", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${FIRECRAWL_API_KEY}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              url: firstContent.url,
+              formats: ["markdown", "html"],
+              onlyMainContent: false,
+              waitFor: 6000, // Angular hidrata devagar
+              actions: scrollActions,
+              proxy: "stealth",
+              timeout: 180000,
+            }),
+          });
+          const scrapeData = await scrapeResp.json();
+          const markdown = scrapeData.data?.markdown || scrapeData.markdown || "";
+          const html = scrapeData.data?.html || scrapeData.html || "";
+          const newSize = markdown.length;
+
+          if (newSize > bestMarkdown.length) {
+            bestMarkdown = markdown;
+            bestHtml = html || bestHtml;
+          }
+
+          const growth = prevSize === 0 ? newSize : (newSize - prevSize) / Math.max(prevSize, 1);
+          growthPerRound.push(Math.round(growth * 1000) / 10); // % com 1 casa
+          await logRunEvent(supabase, organizationId, run.id, "info", `Infinite-scroll rodada ${round}/${MAX_ROUNDS}: ${newSize} chars (crescimento ${(growth * 100).toFixed(1)}%)`, {
+            round,
+            chars: newSize,
+            growth_pct: Math.round(growth * 1000) / 10,
+            scrolls: totalScrolls,
+          });
+
+          if (growth < 0.05) {
+            smallGrowthStreak++;
+            if (smallGrowthStreak >= 2) {
+              await logRunEvent(supabase, organizationId, run.id, "info", `Infinite-scroll early-stop: 2 rodadas consecutivas com crescimento <5%`, {
+                final_chars: newSize,
+                rounds_executed: round,
+              });
+              break;
+            }
+          } else {
+            smallGrowthStreak = 0;
+          }
+          prevSize = newSize;
+        } catch (deepErr) {
+          await logRunEvent(supabase, organizationId, run.id, "warn", `Infinite-scroll rodada ${round} falhou`, { error: String(deepErr) });
+          // Não interrompe — tenta próxima rodada
         }
-        const scrapeResp = await fetch("https://api.firecrawl.dev/v2/scrape", {
-          method: "POST",
-          headers: { Authorization: `Bearer ${FIRECRAWL_API_KEY}`, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            url: firstContent.url,
-            formats: ["markdown", "html"],
-            onlyMainContent: false,
-            waitFor: 4000,
-            actions: deepScrollActions,
-            proxy: "stealth",
-            timeout: 300000,
-          }),
+      }
+
+      // Persiste melhor resultado se for maior que o original
+      if (bestMarkdown.length > (firstContent.markdown || "").length * 1.1) {
+        scrapedContents[0] = { ...firstContent, markdown: bestMarkdown, html: bestHtml };
+        totalScrapedChars = scrapedContents.reduce((acc, c) => acc + (c.markdown?.length || 0) + (c.html?.length || 0), 0);
+        // Re-avaliar shell após scroll bem-sucedido
+        if (baseIsEmptyShell && bestMarkdown.length >= 5000) {
+          baseIsEmptyShell = false;
+          await logRunEvent(supabase, organizationId, run.id, "info", "Shell preenchido com sucesso via infinite-scroll", {
+            final_markdown_chars: bestMarkdown.length,
+            growth_per_round: growthPerRound,
+          });
+        }
+      } else {
+        await logRunEvent(supabase, organizationId, run.id, "warn", "Infinite-scroll não trouxe conteúdo novo significativo", {
+          original_chars: (firstContent.markdown || "").length,
+          best_chars: bestMarkdown.length,
+          growth_per_round: growthPerRound,
         });
-        const scrapeData = await scrapeResp.json();
-        const markdown = scrapeData.data?.markdown || scrapeData.markdown || "";
-        const html = scrapeData.data?.html || scrapeData.html || "";
-        if (markdown && markdown.length > firstContent.markdown.length * 1.1) {
-          scrapedContents[0] = { ...firstContent, markdown, html: html || firstContent.html };
-          await logRunEvent(supabase, organizationId, run.id, "info", `Deep scroll trouxe ${markdown.length} chars vs ${firstContent.markdown.length} original`);
-        }
-      } catch (deepErr) {
-        console.warn("Deep scroll scrape failed:", deepErr);
       }
     }
   }
@@ -1320,6 +1448,10 @@ async function handleEventFirecrawl(
   const allExhibitors: any[] = [];
 
   for (const scraped of scrapedContents) {
+    // GUARD: pular shells vazios — H2/H3 do menu/UI viram falsos positivos
+    // (ex: 32 "expositores" extraídos do shell Angular da Feimec).
+    if (isEmptyShell(scraped.html || "", scraped.markdown || "")) continue;
+
     const htmlExhibitors = extractAspEventsExhibitorsFromHtml(scraped.html || "", scraped.url);
     if (htmlExhibitors.length > 0) {
       allExhibitors.push(...htmlExhibitors);
@@ -1372,9 +1504,17 @@ async function handleEventFirecrawl(
 
   // ── Step 4: AI extraction with CHUNKING ──
   // (allExhibitors já pode conter resultados do parser de markdown — AI só complementa)
-  const CHUNK_SIZE = 40000; // chars per AI call
+  // WATCHDOG: timeout global de 6min no loop completo de IA. Se estourar,
+  // continua com o que já foi extraído (parser markdown + html híbrido + fallback Step 4b).
+  // Evita travas como a da Feimec (13min sem resposta exigindo Force Complete).
+  const CHUNK_SIZE = 40000;
+  const AI_PHASE_TIMEOUT_MS = 6 * 60 * 1000;
+  let aiPhaseTimedOut = false;
+  const aiPhaseStart = Date.now();
 
+  const aiLoop = (async () => {
   for (const scraped of scrapedContents) {
+    if (Date.now() - aiPhaseStart > AI_PHASE_TIMEOUT_MS) { aiPhaseTimedOut = true; break; }
     const content = scraped.markdown;
     if (!content || content.length < 30) continue;
 
@@ -1485,6 +1625,17 @@ ${chunk}`,
         await logRunEvent(supabase, organizationId, run.id, "warn", `Erro na extração AI: ${scraped.url}`, { error: String(err) });
       }
     }
+  }
+  })();
+
+  const aiTimeout = new Promise<void>((resolve) => setTimeout(() => { aiPhaseTimedOut = true; resolve(); }, AI_PHASE_TIMEOUT_MS + 5000));
+  await Promise.race([aiLoop, aiTimeout]);
+
+  if (aiPhaseTimedOut) {
+    await logRunEvent(supabase, organizationId, run.id, "warn", "Watchdog: extração IA excedeu 6min, prosseguindo com resultados parciais", {
+      exhibitors_so_far: allExhibitors.length,
+      chunks_processed: metrics.ai_chunks_processed,
+    });
   }
 
   metrics.exhibitors_extracted_raw = allExhibitors.length;

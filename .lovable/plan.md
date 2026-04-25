@@ -1,90 +1,146 @@
+## Diagnóstico (a partir dos logs reais da run FEIMEC 2026)
 
-## Diagnóstico do erro de import (Educbank)
+A run da Feimec quebrou por **três problemas combinados**, não um só. Já validei cada um nos `run_events` da DB:
 
-Olhei o `useProspectImport.ts` e a prospect Educbank no banco:
+| Etapa do log | O que aconteceu | Por quê |
+|---|---|---|
+| `Fallback direto: html_chars=407692, markdown_chars=1893, az_links_found=0` | Capturou shell HTML pesado (Angular bundle) com markdown praticamente vazio | `app.informamarkets.com.br` é SPA Angular que renderiza 100% via JS — `fetch()` direto traz só o `<app-root>` vazio |
+| `Iniciando paginação: 14 páginas adicionais (max detectado: 1) … pages_captured: 14` | "Capturou" 14 páginas extras (?page=2..15) totalizando 6MB | Falsa-vitória: cada página retornou o **mesmo shell Angular**, infloou o tamanho mas não tem expositores. Critério de validade (`stand|expositor|exhibitor|booth`) bate no shell global |
+| `SPA detectada com filtro A-Z` (8s para 26 letras com waitFor:4000) | Disparou estratégia A-Z falsamente (heurística achou "A | B | C" no shell) e gastou 0 tempo útil | Heurística A-Z muito permissiva + cliques em seletores que não existem na página |
+| `Parser de markdown extraiu 32 expositores antes da AI` | 32 falsos positivos vindos do shell genérico | Padrão de heading H2/H3 capturou strings do menu/UI |
+| **Travou aqui por 13 min** | Loop de IA processou 15 conteúdos × até ~150 chunks de 40KB cada, serial, sem timeout total | Sem watchdog na fase de IA — usuário precisou forçar conclusão |
 
-- A prospect **EDUCBANK** tem `website=null`, `email_public=null`, `phone_public=null`, `normalized_domain=null` — só sobrou o nome da empresa. Não tem como criar conta útil nem oportunidade qualificada com isso.
-- O hook `useProspectImport` cria a `opportunity` **sem `pipeline_id` nem `stage_id`** (campos `pipeline_id text` e `stage_id text` ficam NULL). Isso quebra a oportunidade no pipeline (e provavelmente um trigger/RLS está rejeitando, daí o erro 400 que aparece no console: `opportunities?select=id`).
-- A organização tem o pipeline `PRÉ VENDAS` (`d1b68a0f-...-sales-1`, tipo `qualification`) com primeiro estágio `Lead Captado` (`...-stage-0`) — é exatamente onde o lead deve cair.
+**Conclusão:** o pipeline atual assume que `fetch()` direto + paginação `?page=N` resolve tudo. Para SPAs reais (Angular/React renderizado client-side), precisamos **sempre** passar por Firecrawl com `proxy:stealth` + scroll, e **detectar quando o shell é vazio** para abortar caminhos inúteis (paginação falsa, A-Z falso, parsers de markdown).
 
-Ou seja, **dois problemas combinados**: (1) faltam dados de enriquecimento; (2) o import não posiciona a opp no funil.
+---
 
-## Estratégia em 2 camadas (mantendo o que já existe)
+## O que NÃO vou mexer (proteção do que funciona — Bet Brasil)
 
-Já existe a edge function `run-enrichment` (Firecrawl + IA) e o hook `useEnrichment`. Só não está obrigatório no fluxo de import. Vou fazer enriquecimento **bloqueante** antes do import, em duas etapas:
+- ✅ Firecrawl `/v1/map` para descobrir páginas
+- ✅ Detecção de paginação `?page=N` para sites estáticos com markdown rico
+- ✅ Scrape inicial com `actions: scroll` (60×) para `/v1/scrape`
+- ✅ Parser de markdown H2/H3, parser híbrido HTML, extração com IA (gpt-5-mini)
+- ✅ Dedupe intra-run, scoring, persistência em batches
 
-### Etapa A — Enriquecimento de identidade (rápido, determinístico)
-Cria nova edge `enrich-prospect-identity` que faz:
+A lógica continua **idêntica** quando o conteúdo capturado é rico em texto. Só adiciono caminhos novos quando detectamos shell vazio de SPA.
 
-1. **Descoberta de domínio/site via Google CSE** (se ainda não houver `website`):
-   - Query: `"<company_name>" site oficial` + `"<company_name>" CNPJ`
-   - Usa Google Custom Search API (precisa de `GOOGLE_CSE_KEY` + `GOOGLE_CSE_CX` — vou pedir via `add_secret`).
-   - Heurística para escolher o domínio "oficial" (descarta linkedin/facebook/glassdoor; prioriza `.com.br`/`.com` cujo título contém o nome).
-2. **Descoberta de CNPJ** via:
-   - Regex no snippet do Google (padrão `\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2}`).
-   - Se não achar: scrape leve (`fetch` direto) da home + `/contato`/`/sobre` procurando o regex.
-3. **Lookup CNPJ** via função `lookup-cnpj` já existente (BrasilAPI/OpenCNPJ com cache 30d) → razão social, nome fantasia, endereço, CNAE, telefone, e-mail, porte.
-4. **Email/telefone públicos**: regex em `mailto:` / `tel:` na home + `/contato`.
-5. Persiste tudo de volta em `prospects` (`website`, `normalized_domain`, `email_public`, `phone_public`, novos campos `cnpj`, `razao_social`, `nome_fantasia`, `cnae`, `porte`, `address_*`).
+---
 
-> Migração: adicionar colunas `cnpj`, `razao_social`, `nome_fantasia`, `cnae_code`, `cnae_desc`, `porte`, `endereco`, `cidade_enriched`, `uf_enriched`, `cep` em `prospects` (todas opcionais).
+## Mudanças propostas
 
-### Etapa B — Enriquecimento de inteligência (já existe)
-Reutilizo a `run-enrichment` atual (Firecrawl + IA gera `enriched_company_profiles`, `commercial_briefs`, `enrichment_signals`) — ela precisa de website, que a Etapa A garante.
+### 1. Detector de "shell vazio de SPA" (novo helper)
 
-### Recalcular Lead Score
-Após A+B, chamo a função existente `calculate-account-scores` (ou criar uma `score-prospect`) usando os sinais reais: porte, CNAE alinhado ao ICP, presença de site, MRR estimado, sinais comerciais. Atualiza `prospects.priority_score` e `grade`.
+Função `isEmptyShell(html, markdown)` que retorna `true` quando:
+- `markdown.length < 5_000` E
+- HTML contém marcadores típicos (`<app-root`, `<div id="root"`, `ng-version=`, `data-reactroot`, `<noscript>You need to enable JavaScript`)
 
-## Correção do import (`useProspectImport.ts`)
+Quando isso acontece para o **fallback direto**, marcar a página como `requires_js_render = true` em vez de empurrar pro `scrapedContents`.
 
-1. Antes de qualquer insert, **bloquear se faltar website E cnpj** (forçar enriquecimento primeiro). UI mostra botão **"Enriquecer agora"** antes de "Importar".
-2. Ao importar, fazer chamada RPC nova `import_prospect_to_pipeline(prospect_id, target_pipeline_type)`:
-   - Resolve `pipeline_id` = primário com `pipeline_type='qualification'` (ou aceita override).
-   - Resolve `stage_id` = stage com menor `order_index` desse pipeline.
-   - Cria conta usando `cnpj`/`razao_social`/`nome_fantasia` enriquecidos (com dedup por CNPJ além do domínio).
-   - Cria contact com `email_public`/`phone_public`.
-   - Cria opportunity com `pipeline_id`, `stage_id`, `status='new'`, `temperatura='warm'`, `priority_score`.
-   - Faz tudo dentro de uma transação (security definer) para evitar conta órfã se opp falhar.
-3. Toast com link direto para a oportunidade criada.
+### 2. Pular paginação `?page=N` quando o conteúdo-base é shell vazio
 
-## UX no Drawer do Prospect
+Hoje, `shouldPaginate` dispara se `looksLikeListing && scrapedContents.length > 0` — sem checar **qualidade**. Vou adicionar:
+- Se a página-base é `isEmptyShell` (markdown < 5KB), **não** gerar `?page=2..15` brute-force (evita os 6MB de shells repetidos da Feimec)
+- Manter brute-force quando há detecção real de `?page=N` no HTML OU quando markdown-base tem >5KB de conteúdo real
 
-- Banner "⚠️ Faltam dados essenciais" enquanto não houver `cnpj` + `website`.
-- Botão **"Enriquecer & Importar"** (one-click): roda Etapa A → Etapa B → Score → Import sequencialmente, com progresso visível (4 passos).
-- Botão "Importar" só fica habilitado depois de A concluído.
-- Mostra preview antes de importar: razão social, CNPJ formatado, site, e-mail, telefone, CNAE, porte, score.
+### 3. Refinar a heurística A-Z (eliminar falsos positivos)
 
-## Próxima fase (Apollo/Lusha) — não nesta entrega
-Estrutura preparada: campo `prospects.decision_makers jsonb` + tabela `prospect_contacts`. A integração com Apollo/Lusha vai consumir `cnpj`/`normalized_domain` enriquecidos para buscar gerentes de marketing por cargo/seniority.
+Hoje qualquer `A | B | C` no markdown ativa A-Z. Vou exigir **pelo menos um match concreto de seletor**:
+- `data-letter="A"` OU `data-filter="A"` OU `class="alpha-filter"` OU `class="letter-filter"`
+- A regex genérica `/<a[^>]*>[A-Z]<\/a>/` é muito frouxa — exigir contagem ≥10 letras distintas em links isolados
+
+`forceAlphaStrategy` por host conhecido fica intocado (Bet Brasil continua forçada).
+
+### 4. Nova estratégia: **Infinite-Scroll Aggressive** para SPAs sem A-Z
+
+Quando `isSpaLike && !hasAlphaFilter && !forceAlphaStrategy` (ramo "deep scroll" de hoje), substituir o single-shot de 120 scrolls por **scroll progressivo com early-stop**:
+
+```ts
+// 4 rodadas de 60 scrolls cada, com proxy stealth
+// A cada rodada: comparar tamanho do markdown com a anterior
+// Se crescimento <5% por 2 rodadas seguidas → stop (atingiu fundo)
+// Se crescimento >5% → continuar até max 4 rodadas
+```
+
+Vantagens:
+- Para Feimec, quebra em sub-jobs de Firecrawl (timeout 180s cada) em vez de 1 chamada de 300s que arrisca timeout
+- Evita gastar budget se já chegou ao fim cedo
+- Usa `waitFor: 6000` (Angular hidrata devagar) e `formats: ["html", "markdown"]`
+- **Atualiza** `scrapedContents[0]` com o melhor resultado, não acumula shells duplicados
+
+### 5. Watchdog na fase de IA (impede travamentos como o de 13 min)
+
+Adicionar `Promise.race` com timeout de **6 minutos** no loop completo de extração IA (`Step 4`). Se estourar:
+- Loga `warn: "AI extraction timeout, usando apenas resultados parciais"`
+- Continua para Step 4b (extração híbrida HTML) com o que já tem
+- Garante que a run sempre chega ao status final e ao `persist`
+
+Já existe um watchdog global, mas ele só dispara depois de 10+ min sem update de status. Esse watchdog é **interno** ao Step 4 e mais agressivo.
+
+### 6. Filtrar parser de markdown contra shell vazio
+
+No Step 3.5 (parser markdown H2/H3), pular `scrapedContents` cujo `markdown.length < 3_000` E `isEmptyShell(html, markdown)`. Evita os 32 falsos positivos da Feimec.
+
+### 7. Métricas adicionais nos `run_events`
+
+Logar explicitamente:
+- `spa_detected_kind: "angular" | "react" | "vue" | "unknown"` 
+- `infinite_scroll_rounds: N`
+- `infinite_scroll_growth_per_round: [chars1, chars2, ...]`
+- `ai_extraction_timed_out: bool`
+
+Ajuda muito o próximo debug e alimenta o feedback loop de sourcing.
+
+---
 
 ## Arquivos impactados
 
-**Novos:**
-- `supabase/functions/enrich-prospect-identity/index.ts` (Etapa A)
-- `supabase/migrations/<ts>_prospects_enrichment_columns.sql` (colunas CNPJ + RPC `import_prospect_to_pipeline`)
-- `src/hooks/useEnrichProspectIdentity.ts`
+### Editar
+- **`supabase/functions/lead-sourcing/index.ts`** (único arquivo da edge) — mudanças isoladas em 4 trechos:
+  - Adicionar helpers `isEmptyShell()` e `detectSpaFramework()` no topo
+  - Step 2 (fallback direto, ~linha 1048-1078): marcar `requires_js_render` em vez de aceitar shell vazio cego
+  - Step 2c (paginação, ~linha 1080-1169): pular brute-force quando base é shell vazio
+  - Step 3a (SPA strategy, ~linha 1171-1267): refinar heurística A-Z + nova `infiniteScrollAggressive()`
+  - Step 4 (IA, ~linha 1373-1488): wrapper `Promise.race` com timeout 6min
+  - Step 3.5 (parser markdown, ~linha 1322-1366): pular shells vazios
 
-**Editados:**
-- `src/hooks/useProspectImport.ts` (usar RPC, validar dados mínimos, resolver pipeline/stage)
-- `src/components/playbook/ProspectDetailDrawer.tsx` (banner + botão "Enriquecer & Importar" + preview)
-- `supabase/functions/run-enrichment/index.ts` (deixar idempotente para rodar após Etapa A)
+### Criar
+- Nada novo. Tudo cabe no `index.ts` existente para não fragmentar a função.
 
-## Secrets necessários
-- `GOOGLE_CSE_KEY` e `GOOGLE_CSE_CX` (Google Programmable Search) — vou pedir via `add_secret` quando começar a implementar. Sem isso, caio em fallback: scrape direto via DuckDuckGo HTML (menos confiável, mas funciona).
-- `FIRECRAWL_API_KEY` já existe.
-- `OPENAI_API_KEY` já existe.
+### NÃO mexer
+- `supabase/functions/run-enrichment/`, `import_prospect_to_pipeline` RPC, `RecentRunsList.tsx`, `RunDetailDrawer.tsx`, `useForceCompleteRun` — já funcionando
+- Lógica de scoring, dedupe, persistência, autoImport
+- Caramelo Engine v5 (chunking híbrido) e padrão fallback determinístico
 
-## Riscos
-- Google CSE tem cota grátis baixa (100/dia). Para 447 leads = precisa plano pago ou processar em lotes ao longo de dias.
-- Nem toda empresa B2B tem CNPJ no site → fallback: busca pelo nome em BrasilAPI (não suportado) → marcar prospect como "CNPJ não encontrado" e seguir só com domínio.
-- Custo: ~1 chamada Firecrawl + 1 OpenAI + 1 CNPJ + 2 Google CSE por prospect ≈ R$ 0,15–0,30/lead.
+---
 
-## Resposta direta às suas dúvidas
+## Validação após implementar
 
-> "Onde buscar?" → Google CSE (oficial, pago após 100/dia) ou DuckDuckGo HTML (grátis, frágil). Recomendo CSE.
+1. **Smoke test Bet Brasil 2026** — re-rodar (ou comparar logs) garantindo:
+   - Mesmas 447 prospects (±5%)
+   - Mesma estratégia A-Z executada (forceAlphaStrategy via host conhecido)
+   - Tempo <8 min como antes
 
-> "Como funciona o enriquecimento?" → Pipeline determinístico: Google → CNPJ regex → BrasilAPI/OpenCNPJ → scrape contato → Firecrawl + IA → score. Tudo cacheado.
+2. **Smoke test Feimec 2026** — rodar nova execução:
+   - Esperado: detectar shell vazio, pular paginação falsa, executar Infinite-Scroll Aggressive com 2-4 rodadas, capturar markdown >50KB com nomes reais
+   - Run finaliza em <10 min com prospects > 0
+   - Se a Firecrawl ainda não conseguir renderizar Angular pesado mesmo com `proxy:stealth`, log explícito + fallback `completed_empty` claro (não trava)
 
-> "Próxima fase Apollo/Lusha?" → Vai consumir `cnpj` + `normalized_domain` desta etapa para buscar pessoas. Nada bloqueia.
+3. **Inspecionar `run_events`** da nova execução Feimec para confirmar novas métricas
 
-Aprova o plano? Quando aprovar, preciso que você decida: **(1) usamos Google CSE (você fornece as keys) ou (2) fallback DuckDuckGo grátis para validar primeiro?**
+---
+
+## Riscos & mitigação
+
+| Risco | Mitigação |
+|---|---|
+| Mudar heurística A-Z pode afetar Bet Brasil | `forceAlphaStrategy` por host (`bettshow.com`) continua intocado — Bet sempre roda A-Z |
+| Watchdog de IA cortar runs grandes legítimas | Timeout de 6min é generoso (Bet Brasil rodou em 6,2min total — fase IA é menor que isso). Se cortar, ainda persiste o que já extraiu |
+| Firecrawl `proxy:stealth` é mais caro/lento | Já usado hoje na rota A-Z; só passa a ser usado em SPAs sem A-Z (caso novo) |
+| Angular SPAs como Feimec podem genuinamente bloquear scraping | Aceitar como `completed_empty` claro com mensagem orientando o usuário a tentar evento de dia diferente / reportar URL alternativa |
+
+---
+
+## Próximos passos (depois deste fix)
+
+- Adicionar configuração de "estratégia preferida" por host conhecido (ex: `informamarkets.com.br → infinite_scroll_aggressive`) na tabela `lead_source_strategies`
+- Métricas no Histórico mostrando qual estratégia capturou cada run (já temos `executionLog` mas não exibido)
