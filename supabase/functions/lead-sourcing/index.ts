@@ -153,6 +153,33 @@ function extractAspEventsExhibitorsFromHtml(html: string, pageUrl: string): any[
   return exhibitors;
 }
 
+// ── SPA shell detection (proteção contra capturas de Angular/React vazios) ──
+// Detecta quando uma página é apenas o "casco" do bundle JS sem conteúdo renderizado.
+// Crítico para sites como app.informamarkets.com.br (Angular) que servem 400KB de
+// HTML mas <2KB de markdown real — qualquer parser/paginação em cima disso é lixo.
+function detectSpaFramework(html: string): "angular" | "react" | "vue" | "unknown" | "none" {
+  if (!html) return "none";
+  if (/ng-version=|<app-root|ng-app=|_ngcontent/i.test(html)) return "angular";
+  if (/data-reactroot|__NEXT_DATA__|id=["']root["'][^>]*>\s*<\/div>|react-helmet/i.test(html)) return "react";
+  if (/data-server-rendered|__NUXT__|<div id=["']app["'][^>]*>\s*<\/div>/i.test(html)) return "vue";
+  return "unknown";
+}
+
+function isEmptyShell(html: string, markdown: string): boolean {
+  const md = markdown || "";
+  const ht = html || "";
+  // Markdown rico = não é shell, independente do HTML
+  if (md.length >= 5000) return false;
+  // Markdown pobre + framework SPA detectado = shell
+  const fw = detectSpaFramework(ht);
+  if (fw === "angular" || fw === "react" || fw === "vue") return true;
+  // Markdown muito pobre (<1500 chars) + HTML grande (>50KB) = quase certamente shell genérico
+  if (md.length < 1500 && ht.length > 50000) return true;
+  // <noscript> aviso explícito = shell
+  if (/<noscript[^>]*>[^<]*(?:enable\s+javascript|habilite\s+o?\s*javascript)/i.test(ht)) return true;
+  return false;
+}
+
 function chunkArray<T>(items: T[], size: number): T[][] {
   if (size <= 0) return [items];
   const chunks: T[][] = [];
