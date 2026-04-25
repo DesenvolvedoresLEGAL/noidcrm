@@ -1693,6 +1693,24 @@ async function handleEventFirecrawl(
   // e os duplicados são removidos pelo dedupe intra-run mais adiante.
   const allExhibitors: any[] = [];
 
+  const swapcardHtml = scrapedContents.find((item) => /swapcard|__NEXT_DATA__|Core_EventExhibitorListView/i.test(item.html || ""))?.html || scrapedContents[0]?.html || "";
+  if (swapcardHtml) {
+    try {
+      const swapcardExhibitors = await fetchSwapcardExhibitors(formattedEventUrl, swapcardHtml);
+      if (swapcardExhibitors.length > 0) {
+        allExhibitors.push(...swapcardExhibitors);
+        metrics.html_hybrid_extracted += swapcardExhibitors.length;
+        metrics.exhibitors_extracted_raw = allExhibitors.length;
+        await logRunEvent(supabase, organizationId, run.id, "info", `Swapcard GraphQL extraiu ${swapcardExhibitors.length} expositores via cursor`, {
+          count: swapcardExhibitors.length,
+          extraction_method: "swapcard_graphql_cursor",
+        });
+      }
+    } catch (swapcardErr) {
+      await logRunEvent(supabase, organizationId, run.id, "warn", "Extração Swapcard GraphQL falhou; mantendo fallback por scroll/AI", { error: String(swapcardErr) });
+    }
+  }
+
   for (const scraped of scrapedContents) {
     // GUARD: pular shells vazios — H2/H3 do menu/UI viram falsos positivos
     // (ex: 32 "expositores" extraídos do shell Angular da Feimec).
