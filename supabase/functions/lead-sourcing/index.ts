@@ -212,62 +212,99 @@ async function fetchSwapcardExhibitors(pageUrl: string, html: string): Promise<a
 
   const exhibitors: any[] = [];
   const seen = new Set<string>();
-  let cursor: string | null = null;
+  const viewIds = ctx.viewIds.length > 0 ? ctx.viewIds : [ctx.viewId];
+  const diagnostics: { viewId: string; total: number; fetched: number; pages: number }[] = [];
 
-  for (let page = 1; page <= 30; page++) {
-    const resp: Response = await fetch(ctx.endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/135 Safari/537.36",
-        "Origin": new URL(pageUrl).origin,
-        "Referer": pageUrl,
-        "x-client-platform": "Event App",
-        "x-client-version": "2.310.57",
-      },
-      body: JSON.stringify({
-        operationName: "EventExhibitorListViewConnectionQuery",
-        variables: { viewId: ctx.viewId, eventId: ctx.eventId, withEvent: true, endCursor: cursor },
-        query,
-      }),
-    });
+  for (const viewId of viewIds) {
+    let cursor: string | null = null;
+    let lastTotal = 0;
+    let fetchedThisView = 0;
+    let pages = 0;
+    let consecutiveEmpty = 0;
 
-    const data: any = await resp.json().catch(() => null);
-    if (!resp.ok || data?.errors?.length) {
-      throw new Error(`Swapcard GraphQL failed (${resp.status}): ${JSON.stringify(data?.errors || data).slice(0, 300)}`);
-    }
-
-    const connection: any = data?.data?.view?.exhibitors;
-    const nodes = connection?.nodes || [];
-    for (const node of nodes) {
-      const name = String(node?.name || "").trim();
-      const normalized = normalizeCompanyName(name);
-      if (!name || seen.has(normalized)) continue;
-      seen.add(normalized);
-
-      const description = stripHtmlToText(node?.htmlDescription);
-      const domain = description ? extractDomain(description) : null;
-      exhibitors.push({
-        company_name: name,
-        website: domain ? `https://${domain}` : null,
-        category: node?.type || null,
-        description,
-        booth: node?.withEvent?.booth || null,
-        country: null,
-        city: null,
-        exhibitor_profile_url: null,
-        signals: ["swapcard_graphql", "listed_in_official_directory", ...(node?.withEvent?.booth ? ["has_booth"] : [])],
-        confidence: 96,
-        _source_url: pageUrl,
-        _page_type: "exhibitors_list",
-        _extraction_method: "swapcard_graphql_cursor",
-        _external_id: node?.id || null,
-        _logo_url: node?.logoUrl || null,
+    // Limite generoso: 200 páginas × 100 = 20k itens (cobre qualquer feira)
+    for (let page = 1; page <= 200; page++) {
+      pages = page;
+      const resp: Response = await fetch(ctx.endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/135 Safari/537.36",
+          "Origin": new URL(pageUrl).origin,
+          "Referer": pageUrl,
+          "x-client-platform": "Event App",
+          "x-client-version": "2.310.57",
+        },
+        body: JSON.stringify({
+          operationName: "EventExhibitorListViewConnectionQuery",
+          variables: { viewId, eventId: ctx.eventId, withEvent: true, endCursor: cursor },
+          query,
+        }),
       });
+
+      const data: any = await resp.json().catch(() => null);
+      if (!resp.ok || data?.errors?.length) {
+        // View inválida — pula pra próxima ao invés de quebrar tudo
+        if (page === 1) break;
+        throw new Error(`Swapcard GraphQL failed (${resp.status}) view=${viewId}: ${JSON.stringify(data?.errors || data).slice(0, 300)}`);
+      }
+
+      const connection: any = data?.data?.view?.exhibitors;
+      if (!connection) break;
+      lastTotal = connection?.totalCount || lastTotal;
+      const nodes: any[] = connection?.nodes || [];
+
+      let addedThisPage = 0;
+      for (const node of nodes) {
+        const name = String(node?.name || "").trim();
+        const normalized = normalizeCompanyName(name);
+        if (!name || seen.has(normalized)) continue;
+        seen.add(normalized);
+        addedThisPage++;
+        fetchedThisView++;
+
+        const description = stripHtmlToText(node?.htmlDescription);
+        const domain = description ? extractDomain(description) : null;
+        exhibitors.push({
+          company_name: name,
+          website: domain ? `https://${domain}` : null,
+          category: node?.type || null,
+          description,
+          booth: node?.withEvent?.booth || null,
+          country: null,
+          city: null,
+          exhibitor_profile_url: null,
+          signals: ["swapcard_graphql", "listed_in_official_directory", ...(node?.withEvent?.booth ? ["has_booth"] : [])],
+          confidence: 96,
+          _source_url: pageUrl,
+          _page_type: "exhibitors_list",
+          _extraction_method: "swapcard_graphql_cursor",
+          _external_id: node?.id || null,
+          _logo_url: node?.logoUrl || null,
+        });
+      }
+
+      // Se a página inteira foi composta de duplicatas, conta como vazia
+      if (nodes.length === 0 || addedThisPage === 0) consecutiveEmpty++;
+      else consecutiveEmpty = 0;
+
+      const hasNext = !!connection?.pageInfo?.hasNextPage;
+      const nextCursor = connection?.pageInfo?.endCursor || null;
+
+      // Continua se: a API diz que tem mais OU ainda não atingimos totalCount desta view
+      const shouldContinue = (hasNext && nextCursor)
+        || (lastTotal > 0 && fetchedThisView < lastTotal && nextCursor && consecutiveEmpty < 3);
+
+      if (!shouldContinue) break;
+      cursor = nextCursor;
     }
 
-    if (!connection?.pageInfo?.hasNextPage || !connection?.pageInfo?.endCursor) break;
-    cursor = connection.pageInfo.endCursor;
+    diagnostics.push({ viewId, total: lastTotal, fetched: fetchedThisView, pages });
+  }
+
+  // Anexa diagnóstico no primeiro item pra logar lá em cima
+  if (exhibitors.length > 0) {
+    (exhibitors[0] as any).__swapcard_diagnostics = diagnostics;
   }
 
   return exhibitors;
