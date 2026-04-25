@@ -189,7 +189,7 @@ async function fetchSwapcardExhibitors(pageUrl: string, html: string): Promise<a
   let cursor: string | null = null;
 
   for (let page = 1; page <= 30; page++) {
-    const resp = await fetch(ctx.endpoint, {
+    const resp: Response = await fetch(ctx.endpoint, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -206,12 +206,12 @@ async function fetchSwapcardExhibitors(pageUrl: string, html: string): Promise<a
       }),
     });
 
-    const data = await resp.json().catch(() => null);
+    const data: any = await resp.json().catch(() => null);
     if (!resp.ok || data?.errors?.length) {
       throw new Error(`Swapcard GraphQL failed (${resp.status}): ${JSON.stringify(data?.errors || data).slice(0, 300)}`);
     }
 
-    const connection = data?.data?.view?.exhibitors;
+    const connection: any = data?.data?.view?.exhibitors;
     const nodes = connection?.nodes || [];
     for (const node of nodes) {
       const name = String(node?.name || "").trim();
