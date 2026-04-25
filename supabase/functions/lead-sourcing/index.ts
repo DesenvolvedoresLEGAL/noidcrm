@@ -1423,7 +1423,40 @@ async function handleEventFirecrawl(
     || (discoveredUrls.length <= 5)
     || (metrics.list_pages_scraped >= 1 && totalScrapedChars < 2000);
 
-  if (isSpaLike && scrapedContents.length > 0) {
+  // ── Step 3a-PRE: Native JSON API Probe ──
+  // Muitas SPAs (ex: ABRINT) consomem uma API REST pública que devolve a lista
+  // completa de expositores em uma única chamada. Antes de gastar Firecrawl em
+  // A-Z ou infinite-scroll, tentamos descobrir e chamar essa API diretamente.
+  // Se conseguir, injeta o resultado como markdown sintético em scrapedContents
+  // e o pipeline existente (parser → AI → dedup) segue normal.
+  // Falha silenciosa: se nada for encontrado, o fluxo A-Z / infinite-scroll roda
+  // exatamente como antes (zero regressão para Feimec/Bett/Feicon).
+  if (isSpaLike) {
+    try {
+      const apiResult = await tryNativeApiProbe(formattedEventUrl, supabase, organizationId, run.id);
+      if (apiResult && apiResult.exhibitors.length >= 5) {
+        scrapedContents.push({
+          url: apiResult.endpoint,
+          markdown: apiResult.markdown,
+          html: "",
+          page_type: "exhibitors_list",
+        });
+        totalScrapedChars += apiResult.markdown.length;
+        metrics.list_pages_scraped += 1;
+        await logRunEvent(supabase, organizationId, run.id, "info",
+          `Native API capturou ${apiResult.exhibitors.length} expositores em 1 chamada — pulando A-Z/scroll`,
+          { endpoint: apiResult.endpoint, count: apiResult.exhibitors.length });
+        // Marca para pular A-Z e infinite-scroll abaixo (já temos tudo)
+        (scrapedContents as any).__nativeApiSucceeded = true;
+      }
+    } catch (apiErr) {
+      await logRunEvent(supabase, organizationId, run.id, "info",
+        "Native API probe não encontrou endpoint utilizável, continuando com estratégias padrão",
+        { detail: String(apiErr).slice(0, 200) });
+    }
+  }
+
+  if (isSpaLike && scrapedContents.length > 0 && !(scrapedContents as any).__nativeApiSucceeded) {
     const firstContent = scrapedContents[0];
     const firstHtml = firstContent.html || "";
     const firstMd = firstContent.markdown || "";
@@ -3086,4 +3119,136 @@ ${icpContext}`,
 
   return new Response(JSON.stringify({ run_id: run.id, prospects_count: created, stats }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Native API Probe — descobre endpoints REST públicos em SPAs (ABRINT-like)
+// ─────────────────────────────────────────────────────────────────────────────
+// Estratégia ADITIVA: roda apenas quando isSpaLike=true, nunca substitui as
+// estratégias A-Z (Bett) ou infinite-scroll (Feimec). Se falhar, o pipeline
+// segue para o fluxo padrão sem regressão.
+//
+// 1. Baixa o HTML da landing page → extrai os bundles JS (<script src>)
+// 2. Procura por endpoints com palavras-chave (expositores/exhibitors/exhibitors-list)
+//    e hosts API candidatos (api.<domain>, mesmo host /api/...)
+// 3. Tenta cada combinação, valida payload JSON com >=5 itens contendo "name"
+// 4. Retorna lista normalizada como markdown sintético compatível com o parser
+async function tryNativeApiProbe(
+  eventUrl: string,
+  supabase: any,
+  organizationId: string,
+  runId: string,
+): Promise<{ endpoint: string; markdown: string; exhibitors: any[] } | null> {
+  const u = new URL(eventUrl);
+  const baseHost = u.origin;
+  const apiHostGuesses = new Set<string>([
+    `https://api.${u.hostname.replace(/^www\./, "")}`,
+    baseHost,
+  ]);
+
+  // 1. Baixa landing page
+  const landingResp = await fetch(eventUrl, { headers: { "User-Agent": "Mozilla/5.0" } });
+  if (!landingResp.ok) return null;
+  const landingHtml = await landingResp.text();
+
+  // 2. Extrai URLs dos bundles JS
+  const scriptSrcs = Array.from(landingHtml.matchAll(/<script[^>]+src=["']([^"']+\.js)["']/g))
+    .map((m) => m[1])
+    .map((src) => src.startsWith("http") ? src : new URL(src, baseHost).toString())
+    .slice(0, 5); // limite de bundles
+
+  // 3. Concatena conteúdo dos bundles e procura por endpoints/hosts
+  let bundlesContent = "";
+  for (const src of scriptSrcs) {
+    try {
+      const r = await fetch(src, { headers: { "User-Agent": "Mozilla/5.0" } });
+      if (r.ok) bundlesContent += "\n" + (await r.text());
+    } catch { /* ignora bundle individual */ }
+  }
+
+  // Hosts adicionais descobertos no JS (ex: api.abrint.com.br)
+  const hostMatches = bundlesContent.matchAll(/https:\/\/api\.[a-z0-9.-]+\.[a-z]{2,}/gi);
+  for (const hm of hostMatches) apiHostGuesses.add(hm[0]);
+
+  // Caminhos prováveis para listagem de expositores
+  const pathGuesses = [
+    "/api/expositores",
+    "/api/exhibitors",
+    "/api/v1/expositores",
+    "/api/v1/exhibitors",
+    "/api/v1.0/expositores",
+    "/api/v1.0/exhibitors",
+    "/api/exhibitors-list",
+    "/api/expositores-lista",
+  ];
+
+  // Detecta paths reais nos bundles também (ex: `/api/foo/bar`)
+  const pathMatches = bundlesContent.matchAll(/["'`](\/api\/[a-z0-9_/.-]*(?:expositor|exhibitor)[a-z0-9_/-]*)["'`]/gi);
+  for (const pm of pathMatches) {
+    const p = pm[1].split("$")[0].replace(/\/$/, ""); // remove template literals
+    if (p && !pathGuesses.includes(p)) pathGuesses.push(p);
+  }
+
+  await logRunEvent(supabase, organizationId, runId, "info", "Native API probe iniciado", {
+    api_hosts: Array.from(apiHostGuesses),
+    paths_to_try: pathGuesses.length,
+  });
+
+  // 4. Testa combinações host × path
+  for (const host of apiHostGuesses) {
+    for (const path of pathGuesses) {
+      const endpoint = `${host}${path}`;
+      try {
+        const resp = await fetch(endpoint, {
+          headers: { "User-Agent": "Mozilla/5.0", "Accept": "application/json" },
+        });
+        if (!resp.ok) continue;
+        const ct = resp.headers.get("content-type") || "";
+        if (!ct.includes("json")) continue;
+
+        const json = await resp.json();
+        // Aceita {data: [...]}, {items: [...]}, [...], {success, data: [...]}
+        let list: any[] = [];
+        if (Array.isArray(json)) list = json;
+        else if (Array.isArray(json?.data)) list = json.data;
+        else if (Array.isArray(json?.items)) list = json.items;
+        else if (Array.isArray(json?.exhibitors)) list = json.exhibitors;
+        else if (Array.isArray(json?.expositores)) list = json.expositores;
+
+        // Valida: precisa ter >=5 itens com algo que pareça nome de empresa
+        if (list.length < 5) continue;
+        const nameKeys = ["name", "nome", "company", "empresa", "razao_social", "title"];
+        const validItems = list.filter((it) =>
+          it && typeof it === "object" && nameKeys.some((k) => typeof it[k] === "string" && it[k].length > 1)
+        );
+        if (validItems.length < 5) continue;
+
+        // 5. Converte para markdown sintético compatível com o parser existente
+        const lines: string[] = [`# Expositores (extraídos via API ${endpoint})`, ""];
+        for (const it of validItems) {
+          const name = nameKeys.map((k) => it[k]).find((v) => typeof v === "string" && v.trim().length > 1);
+          if (!name) continue;
+          const website = it.website || it.url || it.site || "";
+          const description = it.description || it.descricao || it.descriptionPortuguese || it.about || "";
+          const segment = it.segment || it.segmento || it.category || it.categoria || "";
+          const location = it.location || it.localizacao || it.booth || it.stand || it.estande || "";
+
+          lines.push(`## ${String(name).trim()}`);
+          if (website) lines.push(`Website: ${website}`);
+          if (segment) lines.push(`Segmento: ${segment}`);
+          if (location) lines.push(`Estande: ${location}`);
+          if (description) lines.push(String(description).substring(0, 500));
+          lines.push("");
+        }
+
+        return {
+          endpoint,
+          markdown: lines.join("\n"),
+          exhibitors: validItems,
+        };
+      } catch { /* tenta próximo */ }
+    }
+  }
+
+  return null;
 }
