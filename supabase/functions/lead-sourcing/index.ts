@@ -90,6 +90,56 @@ function htmlToLightweightMarkdown(html: string): string {
     .trim();
 }
 
+function stripHtmlToText(rawHtml: string | null | undefined): string | null {
+  if (!rawHtml) return null;
+  const text = decodeHtmlEntities(rawHtml)
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  return text || null;
+}
+
+function parseNextDataFromHtml(html: string): any | null {
+  const match = html.match(/<script[^>]+id=["']__NEXT_DATA__["'][^>]*>([\s\S]*?)<\/script>/i);
+  if (!match?.[1]) return null;
+  try {
+    return JSON.parse(match[1]);
+  } catch {
+    try {
+      return JSON.parse(decodeHtmlEntities(match[1]));
+    } catch {
+      return null;
+    }
+  }
+}
+
+function extractSwapcardContext(pageUrl: string, html: string): { eventId: string; eventSlug: string; viewId: string; endpoint: string } | null {
+  const nextData = parseNextDataFromHtml(html);
+  const eventId = nextData?.props?.event?.id || nextData?.props?.pageProps?.event?.id;
+  const eventSlug = nextData?.query?.eventSlug || nextData?.props?.activeEventSlug || nextData?.props?.pageProps?.activeEventSlug;
+  const viewId = nextData?.query?.viewId || (() => {
+    try {
+      const parts = new URL(pageUrl).pathname.split("/").filter(Boolean);
+      return decodeURIComponent(parts[parts.length - 1] || "");
+    } catch {
+      return "";
+    }
+  })();
+
+  if (!eventId || !eventSlug || !viewId) return null;
+  try {
+    const origin = new URL(pageUrl).origin;
+    return { eventId, eventSlug, viewId, endpoint: `${origin}/api/graphql` };
+  } catch {
+    return { eventId, eventSlug, viewId, endpoint: "https://api.swapcard.com/graphql" };
+  }
+}
+
 async function fetchEventPageDirect(url: string): Promise<{ html: string; markdown: string }> {
   const resp = await fetch(url, {
     headers: {
