@@ -83,6 +83,7 @@ export function RunHistoryTable({ onSelectRun, onViewProspects }: RunHistoryTabl
             <TableRow>
               <TableHead>Data</TableHead>
               <TableHead>Tipo</TableHead>
+              <TableHead>Fonte</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Prospects</TableHead>
               <TableHead className="text-right">Aprovados</TableHead>
