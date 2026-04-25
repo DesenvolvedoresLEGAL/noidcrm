@@ -1448,6 +1448,10 @@ async function handleEventFirecrawl(
   const allExhibitors: any[] = [];
 
   for (const scraped of scrapedContents) {
+    // GUARD: pular shells vazios — H2/H3 do menu/UI viram falsos positivos
+    // (ex: 32 "expositores" extraídos do shell Angular da Feimec).
+    if (isEmptyShell(scraped.html || "", scraped.markdown || "")) continue;
+
     const htmlExhibitors = extractAspEventsExhibitorsFromHtml(scraped.html || "", scraped.url);
     if (htmlExhibitors.length > 0) {
       allExhibitors.push(...htmlExhibitors);
