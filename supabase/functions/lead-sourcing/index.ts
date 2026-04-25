@@ -1761,12 +1761,15 @@ async function handleEventFirecrawl(
     try {
       const swapcardExhibitors = await fetchSwapcardExhibitors(formattedEventUrl, swapcardHtml);
       if (swapcardExhibitors.length > 0) {
+        const diagnostics = (swapcardExhibitors[0] as any).__swapcard_diagnostics;
+        if (diagnostics) delete (swapcardExhibitors[0] as any).__swapcard_diagnostics;
         allExhibitors.push(...swapcardExhibitors);
         metrics.html_hybrid_extracted += swapcardExhibitors.length;
         metrics.exhibitors_extracted_raw = allExhibitors.length;
         await logRunEvent(supabase, organizationId, run.id, "info", `Swapcard GraphQL extraiu ${swapcardExhibitors.length} expositores via cursor`, {
           count: swapcardExhibitors.length,
           extraction_method: "swapcard_graphql_cursor",
+          views_diagnostics: diagnostics,
         });
       }
     } catch (swapcardErr) {
