@@ -1626,6 +1626,17 @@ ${chunk}`,
       }
     }
   }
+  })();
+
+  const aiTimeout = new Promise<void>((resolve) => setTimeout(() => { aiPhaseTimedOut = true; resolve(); }, AI_PHASE_TIMEOUT_MS + 5000));
+  await Promise.race([aiLoop, aiTimeout]);
+
+  if (aiPhaseTimedOut) {
+    await logRunEvent(supabase, organizationId, run.id, "warn", "Watchdog: extração IA excedeu 6min, prosseguindo com resultados parciais", {
+      exhibitors_so_far: allExhibitors.length,
+      chunks_processed: metrics.ai_chunks_processed,
+    });
+  }
 
   metrics.exhibitors_extracted_raw = allExhibitors.length;
   executionLog.push({ step: "ai_extraction", chunks_processed: metrics.ai_chunks_processed, exhibitors_extracted: allExhibitors.length, at: new Date().toISOString() });
