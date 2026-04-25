@@ -1,82 +1,109 @@
-## Diagnóstico (confirmado pelos logs do run da FEIMEC)
+# Plano: Ajustes Finais do Kairós
 
-A FEIMEC roda em `app.informamarkets.com.br` (React SPA com infinite-scroll, sem filtro A-Z). O motor entrou no branch correto (`infinite-scroll progressivo`), mas as chamadas ao Firecrawl voltaram **0 chars** nas duas rodadas:
+## Diagnóstico
 
-```
-Infinite-scroll rodada 1/4: 0 chars (crescimento -100%)  → 60 scrolls, waitFor 6000ms
-Infinite-scroll rodada 2/4: 0 chars (crescimento 0%)     → 120 scrolls, waitFor 6000ms
-Early-stop disparado → fica com o shell original (1893 chars)
-Parser pegou só 2 expositores → AI extraiu 201 → CRM persistiu 151 (parou na letra C)
-```
+Examinei a Edge Function `lead-sourcing`, a RPC `import_prospect_to_pipeline`, a função `enrich-prospect-identity`, o componente `RunHistoryTable.tsx` e a função `send-smtp-email`. Identifiquei que:
 
-**Causa raiz**: Firecrawl está estourando o orçamento interno da request quando recebe `60+ scrolls × (5 amount + 700ms wait)` em uma única chamada. Quando isso acontece, ele responde HTTP 200 mas com `data.markdown = ""`, então nosso código acha que "não cresceu" e para. Pior: a rodada 2 manda **120 scrolls cumulativos**, agravando o timeout. O resultado é que **o infinite-scroll nunca dispara de fato** na FEIMEC.
+1. **Histórico**: o `playbook_runs.input_payload` já guarda `event_name` e `event_url`, mas a tabela não exibe — falta apenas adicionar a coluna **Fonte**.
+2. **Origem "Kairós"**: hoje a RPC grava `origem = 'lead_sourcing'` em `opportunities` e `origem_principal = 'lead_sourcing'` em `accounts`. Precisa virar `'kairos'`.
+3. **Enriquecimento CNPJ na importação**: o `enrich-prospect-identity` SÓ chama `lookup-cnpj` quando o prospect **não tem CNPJ ainda**. Quando o sourcing já trouxe o CNPJ (caso do Swapcard/FEIMEC), os campos `cnae_code`, `cnae_desc`, `cep`, `endereco`, `cidade_enriched`, `uf_enriched`, `porte` ficam vazios — e ao importar, a conta nasce sem endereço/segmento/CNAE.
+4. **E-mail rascunho duplicado**: a RPC cria uma `activity` tipo `email` com status `pending` ("Rascunho: e-mail inicial para…") na timeline. Você quer que isso vire um e-mail real disparado via SMTP do usuário (com fallback para rascunho na aba E-mails se SMTP não estiver configurado).
 
-A BETT funciona porque cai no branch `forceAlphaStrategy` (host `bettshow.com`) — esse caminho é totalmente independente e **não será tocado**.
+---
 
-## Objetivo
+## Alterações
 
-Capturar as ~780 empresas da FEIMEC sem quebrar:
-- BETT BRASIL (A-Z forçado por host) — caminho intocado
-- Páginas estáticas paginadas — caminho intocado
-- Outras SPAs já funcionais
+### 1. Coluna "Fonte" no Histórico de Execuções
+**Arquivo**: `src/components/playbook/RunHistoryTable.tsx`
 
-## Plano de correção (escopo cirúrgico em `supabase/functions/lead-sourcing/index.ts`)
+- Adicionar coluna **Fonte** entre **Tipo** e **Status**, lendo `run.input_payload?.event_name` (ou `eventName`/`directoryName`/`location` para outros tipos).
+- Quando vazio, mostrar `—`.
+- Manter alinhamento e responsividade.
 
-### 1. Reescrever o branch `Infinite-Scroll Aggressive` (linhas ~1291–1394)
+### 2. Origem "Kairós" em contas e oportunidades
+**Migração SQL** — atualizar a RPC `import_prospect_to_pipeline`:
 
-Trocar a estratégia "scrolls cumulativos numa única request" por **rodadas curtas e empilháveis** que respeitam o orçamento do Firecrawl e detectam respostas vazias como falha (não como "fim do conteúdo"):
+- Em `INSERT INTO accounts (..., origem_principal, ...)` trocar `'lead_sourcing'` por `'kairos'`.
+- Em `INSERT INTO opportunities (..., origem, ...)` trocar `'lead_sourcing'` por `'kairos'`.
+- Em `source_metadata` manter o sub-campo `'source': 'kairos'` (era `'lead_sourcing'`).
+- Manter `imported_via: 'import_prospect_to_pipeline'` para auditoria interna.
 
-- **Scrolls por rodada constantes (não cumulativos)**: 25 scrolls × 600ms = ~15s de ações + render → cabe folgado em uma request de 120s.
-- **Mais rodadas, menos peso por rodada**: `MAX_ROUNDS = 8` (era 4). Worst-case 8 × ~25s = 3min, vs 12min do desenho atual.
-- **Estratégia de carrinho**: cada rodada começa **da posição final da anterior**, simulada por `scrollTo bottom` antes do scroll incremental. Como Firecrawl não persiste estado, mandamos o conjunto crescente, mas com `amount` maior por scroll para diminuir o número de ações:
-  - Rodada N: `scroll(direction:'down', amount: 10)` × 25 + waits curtos. Total de ações por request constante.
-- **Resposta vazia = falha, não fim**: se `markdown.length === 0` e `html.length < 1000`, **não conta como "growth = 0"**. Loga `"Resposta vazia do Firecrawl, possível timeout interno"` e tenta a mesma rodada **uma vez** com `waitFor=8000` e sem `proxy:stealth` (fallback). Só então marca como falha.
-- **Early-stop só por crescimento real**: `smallGrowthStreak` só incrementa quando a resposta foi **válida** (>1000 chars) e crescimento <5%. Empty/failed não conta.
-- **Hard-stop por tempo de parede**: total acumulado da fase de scroll limitado a 6 min (`Date.now() - phaseStart`), como rede de segurança.
-- **Persistência incremental**: a cada rodada bem-sucedida, atualiza `scrapedContents[0]` imediatamente (não só no fim). Se o run falhar/timeout depois, o melhor markdown já está salvo para a fase de extração de IA.
+> Não vamos rebatizar registros antigos — só novos imports. Se você quiser depois, posso fazer um update retroativo nos imports do Kairós.
 
-### 2. Rota direta como fallback final
+### 3. Enriquecimento CNPJ completo antes/durante importação
+**Arquivo**: `supabase/functions/enrich-prospect-identity/index.ts`
 
-Se após todas as rodadas `bestMarkdown.length < 5000`, fazer **uma última tentativa via Firecrawl `crawl`** apontando para o mesmo URL com `limit: 50, maxDepth: 1, scrapeOptions.actions: [scrolls]`. O `crawl` tem timeout interno mais generoso e historicamente entrega payloads que `scrape` perde em SPAs pesadas. Esse fallback só roda quando o scroll progressivo não progrediu — não impacta BETT/estáticas.
+Refatorar a etapa 2 (CNPJ) para sempre tentar enriquecer endereço/CNAE/porte:
 
-### 3. Refinar a heurística de "resposta vazia" do Firecrawl globalmente (mínimo)
+- Se o prospect **já tem CNPJ** mas faltam `cnae_code`/`endereco`/`cep`, chamar `lookup-cnpj` mesmo assim e preencher `razao_social`, `nome_fantasia`, `cnae_code`, `cnae_desc`, `porte`, `cep`, `cidade_enriched`, `uf_enriched`, `endereco`, e como fallback `email_public`/`phone_public`.
+- Se o prospect **não tem CNPJ**, manter o fluxo atual (busca via Firecrawl + valida via lookup-cnpj).
+- O `lookup-cnpj` já tem cache de 30 dias com fallback OpenCNPJ → BrasilAPI (regra registrada em memória), então não há custo extra significativo.
 
-Adicionar helper `isFirecrawlEmpty(scrapeData)` que retorna `true` quando `data.markdown` e `data.html` são ambos vazios/curtos. Usar **só** dentro do branch infinite-scroll novo (não nos demais call-sites, para não mexer no que está estável).
+**Migração SQL** — Reforçar a RPC `import_prospect_to_pipeline` para casos onde o enrich nunca rodou:
 
-### 4. Logs explícitos
+- Antes do `INSERT INTO accounts`, se o prospect tem CNPJ mas **não tem** `cnae_code`/`endereco`/`cep`, chamar `pg_net` ou simplesmente **deixar a tarefa para a função de enrich** (preferir esse caminho).
+- Melhor abordagem: o frontend (hook `useImportProspect`) deve chamar `enrich-prospect-identity` antes de chamar a RPC quando faltar dados de endereço/CNAE no prospect. Isso evita dependência de `pg_net` e mantém a RPC pura.
 
-Adicionar logs por rodada com `attempt`, `wait_ms`, `proxy_mode`, `chars`, `growth_pct`, `accumulated_phase_ms`. Isso permite diagnosticar futuras regressões sem adivinhar.
+**Arquivo**: `src/hooks/useProspectImport.ts`
 
-### 5. Aviso visual no card "Recent Runs" (opcional, sem código novo de UI)
+- Antes de `importViaRpc`, verificar se faltam campos críticos da conta (`cnae_code`, `cep` ou `endereco`). Se faltar e tiver CNPJ, invocar `supabase.functions.invoke('enrich-prospect-identity', { body: { prospect_id } })` e aguardar.
+- Mesmo tratamento no `useBulkImportProspects` (com paralelismo controlado, batch de 5).
+- Toast de progresso: "Enriquecendo dados…".
 
-Já temos campos suficientes em `stats`. Nenhuma alteração de frontend nessa rodada.
+### 4. Disparo automático de e-mail via SMTP do usuário
+**Migração SQL** — modificar a RPC `import_prospect_to_pipeline`:
 
-## Garantias de não-regressão
+- **Remover** o `INSERT INTO activities` de `type='email'` com título "Rascunho: e-mail inicial para…".
+- **Manter** o `opportunity_notes` com o brief comercial (isso é útil).
+- Em vez disso, retornar no JSON da RPC um campo `email_to_send` com `{ subject, body, to, opportunity_id, account_id, contact_id }` quando houver `commercial_brief.first_touch_message` e `email_public`.
 
-| Caminho | Estado atual | Após mudança |
-|---|---|---|
-| BETT (A-Z forçado por host) | branch `forceAlphaStrategy` linha 1247 | **idêntico, intocado** |
-| Páginas estáticas paginadas | branch de paginação linhas ~950–1003 | **idêntico, intocado** |
-| Páginas estáticas com map farto | branch padrão linhas ~1006–1071 | **idêntico, intocado** |
-| SPA com A-Z genuíno (≥5 data-letter) | `hasAlphaFilter = true` linha 1238 | **idêntico, intocado** |
-| SPA com infinite-scroll (FEIMEC) | rodadas cumulativas + 0 chars = early-stop falso | **rodadas curtas + detecção de empty + crawl fallback** |
+**Nova Edge Function** `send-kairos-initial-email`:
+- Recebe `{ opportunity_id, subject, body, to, account_id, contact_id }`.
+- Verifica se o usuário (`auth.uid()`) tem SMTP configurado em `user_smtp_settings` (mesma fonte que `send-smtp-email` usa).
+- **Se sim**: invoca internamente `send-smtp-email` (que já registra em `opportunity_emails` com tracking pixel/click, sincroniza com Gmail, etc — regra registrada em memória "SMTP fallback / Custom SMTP config").
+- **Se não**: cria registro em `opportunity_emails` com `status='draft'` para o vendedor abrir na aba E-mails da oportunidade, completar e enviar (em vez da activity).
+- Retorna `{ sent: bool, draft_id: uuid? }`.
 
-## Riscos
+**Arquivo**: `src/hooks/useProspectImport.ts`
 
-- **Custo Firecrawl**: 8 rodadas × ~25s vs 4 rodadas × até 180s. Custo total tende a **cair**, não subir.
-- **Tempo total do run**: limite de 6min para a fase scroll, alinhado com o watchdog de IA já existente (também 6min).
-- **Crawl fallback**: só dispara quando scroll fracassou; consumo extra controlado por `limit: 50, maxDepth: 1`.
+- Após a RPC retornar com `email_to_send`, invocar `send-kairos-initial-email`.
+- Toast contextual:
+  - Se enviado: "✅ Importado e e-mail inicial disparado para {email}"
+  - Se rascunho: "✉️ Importado — e-mail inicial salvo como rascunho na aba E-mails"
+- No bulk: contar `emails_sent` e `emails_drafted`.
+
+**Arquivo**: `src/components/playbook/ProspectDetailDrawer.tsx`
+
+- Atualizar o texto que diz "Atividade de e-mail (rascunho) na timeline…" para refletir o novo comportamento ("E-mail inicial disparado automaticamente via seu SMTP, ou salvo como rascunho na aba E-mails se SMTP não estiver configurado").
+
+---
 
 ## Arquivos impactados
 
-- `supabase/functions/lead-sourcing/index.ts` (apenas o bloco `else` do A-Z, linhas ~1291–1394, + um helper novo)
+- `src/components/playbook/RunHistoryTable.tsx` — coluna Fonte
+- `src/hooks/useProspectImport.ts` — pré-enriquecimento + disparo de e-mail
+- `src/components/playbook/ProspectDetailDrawer.tsx` — copy do "what happens"
+- `src/components/playbook/enrichment/CommercialBriefCard.tsx` — copy do brief
+- `supabase/functions/enrich-prospect-identity/index.ts` — sempre enriquecer endereço/CNAE quando tem CNPJ
+- `supabase/functions/send-kairos-initial-email/index.ts` — **NOVA**
+- Migração SQL: ajuste em `import_prospect_to_pipeline` (origem `kairos` + remoção da activity email + retorno de `email_to_send`)
 
-## Validação após deploy
+---
 
-1. Disparar nova busca FEIMEC 2026 (mesmo URL): esperar ≥500 expositores extraídos.
-2. Disparar nova busca BETT BRASIL 2026: esperar mesmas ~447 leads (regressão check).
-3. Conferir `run_events` da FEIMEC: rodadas devem mostrar crescimento real (>5%) nas primeiras 3-5 rodadas.
+## Riscos e Mitigações
 
-## Próximo passo
+- **Origem "kairos" pode quebrar relatórios** que filtram por `origem='lead_sourcing'`. Vou rodar `rg` para localizar e atualizar (provavelmente Win/Loss Hub e analytics de sourcing — regra de "Sourcing feedback loop" em memória).
+- **Disparo automático sem revisão**: o vendedor recebe um e-mail saindo "em nome dele" sem ler. Mitigação: o brief comercial é gerado por IA com `confidence` e o `first_touch_message` segue regras estritas (1ª pessoa, máx 120 palavras, 1 pergunta de qualificação) — o sistema só dispara se houver `commercial_brief.first_touch_message` E `email_public` válido. Caso contrário, vira rascunho.
+- **Custo Firecrawl/OpenCNPJ**: o pré-enriquecimento na importação aumenta chamadas, mas há cache de 30d no `lookup-cnpj` (regra de memória "CNPJ lookup resilience"), então o impacto real é baixo em re-imports.
+- **Compatibilidade com o sourcing já feito (BETT/FEIMEC)**: nada do scraping muda. Apenas o fluxo pós-aprovação.
 
-Aprove este plano para eu aplicar a alteração na edge function `lead-sourcing` e re-deployar imediatamente.
+---
+
+## Próximos passos
+
+Após aprovação, executo na ordem:
+1. Migração SQL da RPC (origem + remover activity + retornar email_to_send).
+2. Ajustar `enrich-prospect-identity` e re-deploy.
+3. Criar e deployar `send-kairos-initial-email`.
+4. Atualizar `useProspectImport`, `RunHistoryTable`, `ProspectDetailDrawer` e `CommercialBriefCard`.
+5. Atualizar memórias (`mem://`) com a nova origem `kairos` e o novo fluxo de e-mail Kairós.
