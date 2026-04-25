@@ -90,6 +90,56 @@ function htmlToLightweightMarkdown(html: string): string {
     .trim();
 }
 
+function stripHtmlToText(rawHtml: string | null | undefined): string | null {
+  if (!rawHtml) return null;
+  const text = decodeHtmlEntities(rawHtml)
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  return text || null;
+}
+
+function parseNextDataFromHtml(html: string): any | null {
+  const match = html.match(/<script[^>]+id=["']__NEXT_DATA__["'][^>]*>([\s\S]*?)<\/script>/i);
+  if (!match?.[1]) return null;
+  try {
+    return JSON.parse(match[1]);
+  } catch {
+    try {
+      return JSON.parse(decodeHtmlEntities(match[1]));
+    } catch {
+      return null;
+    }
+  }
+}
+
+function extractSwapcardContext(pageUrl: string, html: string): { eventId: string; eventSlug: string; viewId: string; endpoint: string } | null {
+  const nextData = parseNextDataFromHtml(html);
+  const eventId = nextData?.props?.event?.id || nextData?.props?.pageProps?.event?.id;
+  const eventSlug = nextData?.query?.eventSlug || nextData?.props?.activeEventSlug || nextData?.props?.pageProps?.activeEventSlug;
+  const viewId = nextData?.query?.viewId || (() => {
+    try {
+      const parts = new URL(pageUrl).pathname.split("/").filter(Boolean);
+      return decodeURIComponent(parts[parts.length - 1] || "");
+    } catch {
+      return "";
+    }
+  })();
+
+  if (!eventId || !eventSlug || !viewId) return null;
+  try {
+    const origin = new URL(pageUrl).origin;
+    return { eventId, eventSlug, viewId, endpoint: `${origin}/api/graphql` };
+  } catch {
+    return { eventId, eventSlug, viewId, endpoint: "https://api.swapcard.com/graphql" };
+  }
+}
+
 async function fetchEventPageDirect(url: string): Promise<{ html: string; markdown: string }> {
   const resp = await fetch(url, {
     headers: {
@@ -110,6 +160,91 @@ async function fetchEventPageDirect(url: string): Promise<{ html: string; markdo
     html,
     markdown: htmlToLightweightMarkdown(html),
   };
+}
+
+async function fetchSwapcardExhibitors(pageUrl: string, html: string): Promise<any[]> {
+  const ctx = extractSwapcardContext(pageUrl, html);
+  if (!ctx) return [];
+
+  const query = `query EventExhibitorListViewConnectionQuery($viewId: ID!, $endCursor: String, $eventId: ID!, $withEvent: Boolean = true) {
+    view: Core_eventExhibitorListView(viewId: $viewId) {
+      id
+      exhibitors(cursor: { first: 100, after: $endCursor }) {
+        nodes {
+          id: _id
+          name
+          type
+          logoUrl
+          htmlDescription
+          withEvent(eventId: $eventId) @include(if: $withEvent) { booth isBookmarked }
+        }
+        pageInfo { hasNextPage endCursor }
+        totalCount
+      }
+    }
+  }`;
+
+  const exhibitors: any[] = [];
+  const seen = new Set<string>();
+  let cursor: string | null = null;
+
+  for (let page = 1; page <= 30; page++) {
+    const resp: Response = await fetch(ctx.endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/135 Safari/537.36",
+        "Origin": new URL(pageUrl).origin,
+        "Referer": pageUrl,
+        "x-client-platform": "Event App",
+        "x-client-version": "2.310.57",
+      },
+      body: JSON.stringify({
+        operationName: "EventExhibitorListViewConnectionQuery",
+        variables: { viewId: ctx.viewId, eventId: ctx.eventId, withEvent: true, endCursor: cursor },
+        query,
+      }),
+    });
+
+    const data: any = await resp.json().catch(() => null);
+    if (!resp.ok || data?.errors?.length) {
+      throw new Error(`Swapcard GraphQL failed (${resp.status}): ${JSON.stringify(data?.errors || data).slice(0, 300)}`);
+    }
+
+    const connection: any = data?.data?.view?.exhibitors;
+    const nodes = connection?.nodes || [];
+    for (const node of nodes) {
+      const name = String(node?.name || "").trim();
+      const normalized = normalizeCompanyName(name);
+      if (!name || seen.has(normalized)) continue;
+      seen.add(normalized);
+
+      const description = stripHtmlToText(node?.htmlDescription);
+      const domain = description ? extractDomain(description) : null;
+      exhibitors.push({
+        company_name: name,
+        website: domain ? `https://${domain}` : null,
+        category: node?.type || null,
+        description,
+        booth: node?.withEvent?.booth || null,
+        country: null,
+        city: null,
+        exhibitor_profile_url: null,
+        signals: ["swapcard_graphql", "listed_in_official_directory", ...(node?.withEvent?.booth ? ["has_booth"] : [])],
+        confidence: 96,
+        _source_url: pageUrl,
+        _page_type: "exhibitors_list",
+        _extraction_method: "swapcard_graphql_cursor",
+        _external_id: node?.id || null,
+        _logo_url: node?.logoUrl || null,
+      });
+    }
+
+    if (!connection?.pageInfo?.hasNextPage || !connection?.pageInfo?.endCursor) break;
+    cursor = connection.pageInfo.endCursor;
+  }
+
+  return exhibitors;
 }
 
 function extractAzLetterLinks(html: string, pageUrl: string): string[] {
@@ -1557,6 +1692,24 @@ async function handleEventFirecrawl(
   // Roda ANTES da AI. Se já trouxer muitos resultados, a AI ainda roda
   // e os duplicados são removidos pelo dedupe intra-run mais adiante.
   const allExhibitors: any[] = [];
+
+  const swapcardHtml = scrapedContents.find((item) => /swapcard|__NEXT_DATA__|Core_EventExhibitorListView/i.test(item.html || ""))?.html || scrapedContents[0]?.html || "";
+  if (swapcardHtml) {
+    try {
+      const swapcardExhibitors = await fetchSwapcardExhibitors(formattedEventUrl, swapcardHtml);
+      if (swapcardExhibitors.length > 0) {
+        allExhibitors.push(...swapcardExhibitors);
+        metrics.html_hybrid_extracted += swapcardExhibitors.length;
+        metrics.exhibitors_extracted_raw = allExhibitors.length;
+        await logRunEvent(supabase, organizationId, run.id, "info", `Swapcard GraphQL extraiu ${swapcardExhibitors.length} expositores via cursor`, {
+          count: swapcardExhibitors.length,
+          extraction_method: "swapcard_graphql_cursor",
+        });
+      }
+    } catch (swapcardErr) {
+      await logRunEvent(supabase, organizationId, run.id, "warn", "Extração Swapcard GraphQL falhou; mantendo fallback por scroll/AI", { error: String(swapcardErr) });
+    }
+  }
 
   for (const scraped of scrapedContents) {
     // GUARD: pular shells vazios — H2/H3 do menu/UI viram falsos positivos
