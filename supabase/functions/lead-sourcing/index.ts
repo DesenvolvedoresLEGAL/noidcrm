@@ -1423,7 +1423,40 @@ async function handleEventFirecrawl(
     || (discoveredUrls.length <= 5)
     || (metrics.list_pages_scraped >= 1 && totalScrapedChars < 2000);
 
-  if (isSpaLike && scrapedContents.length > 0) {
+  // ── Step 3a-PRE: Native JSON API Probe ──
+  // Muitas SPAs (ex: ABRINT) consomem uma API REST pública que devolve a lista
+  // completa de expositores em uma única chamada. Antes de gastar Firecrawl em
+  // A-Z ou infinite-scroll, tentamos descobrir e chamar essa API diretamente.
+  // Se conseguir, injeta o resultado como markdown sintético em scrapedContents
+  // e o pipeline existente (parser → AI → dedup) segue normal.
+  // Falha silenciosa: se nada for encontrado, o fluxo A-Z / infinite-scroll roda
+  // exatamente como antes (zero regressão para Feimec/Bett/Feicon).
+  if (isSpaLike) {
+    try {
+      const apiResult = await tryNativeApiProbe(formattedEventUrl, supabase, organizationId, run.id);
+      if (apiResult && apiResult.exhibitors.length >= 5) {
+        scrapedContents.push({
+          url: apiResult.endpoint,
+          markdown: apiResult.markdown,
+          html: "",
+          page_type: "exhibitors_list",
+        });
+        totalScrapedChars += apiResult.markdown.length;
+        metrics.list_pages_scraped += 1;
+        await logRunEvent(supabase, organizationId, run.id, "info",
+          `Native API capturou ${apiResult.exhibitors.length} expositores em 1 chamada — pulando A-Z/scroll`,
+          { endpoint: apiResult.endpoint, count: apiResult.exhibitors.length });
+        // Marca para pular A-Z e infinite-scroll abaixo (já temos tudo)
+        (scrapedContents as any).__nativeApiSucceeded = true;
+      }
+    } catch (apiErr) {
+      await logRunEvent(supabase, organizationId, run.id, "info",
+        "Native API probe não encontrou endpoint utilizável, continuando com estratégias padrão",
+        { detail: String(apiErr).slice(0, 200) });
+    }
+  }
+
+  if (isSpaLike && scrapedContents.length > 0 && !(scrapedContents as any).__nativeApiSucceeded) {
     const firstContent = scrapedContents[0];
     const firstHtml = firstContent.html || "";
     const firstMd = firstContent.markdown || "";
