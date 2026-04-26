@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   Bot, Workflow, ShieldCheck, ScrollText, BarChart3,
-  Wrench, Brain, Server, ArrowRight, Construction
+  Wrench, Brain, Server, ArrowRight, Construction, Network
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -80,6 +80,15 @@ const hubItems = [
     icon: ShieldCheck,
     path: '/app/settings/noid-intelligence/permissions',
     available: true,
+  },
+  {
+    id: 'mcp-registry',
+    title: 'MCP Registry',
+    description: 'Governança técnica de tools, contexto e prompts',
+    icon: Network,
+    path: '/app/settings/noid-intelligence/mcp-registry',
+    available: true,
+    badge: 'Técnico',
   },
 ];
 
