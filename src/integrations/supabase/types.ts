@@ -27562,6 +27562,18 @@ export type Database = {
       }
     }
     Functions: {
+      _mcp_apply_object_security: {
+        Args: {
+          p_can_execute: boolean
+          p_can_read: boolean
+          p_can_suggest: boolean
+          p_prompt_id: string
+          p_requires_approval: boolean
+          p_resource_id: string
+          p_tool_id: string
+        }
+        Returns: boolean
+      }
       admin_delete_organization: { Args: { org_id: string }; Returns: boolean }
       block_expired_trial: { Args: { org_id: string }; Returns: boolean }
       build_knowledge_graph: {
@@ -28075,6 +28087,26 @@ export type Database = {
               subject: string
             }[]
           }
+      mcp_create_permission: {
+        Args: {
+          p_agent_id?: string
+          p_allowed_scopes?: Json
+          p_can_execute?: boolean
+          p_can_read?: boolean
+          p_can_suggest?: boolean
+          p_max_calls_per_day?: number
+          p_metadata?: Json
+          p_organization_id: string
+          p_prompt_id?: string
+          p_requires_approval?: boolean
+          p_resource_id?: string
+          p_role_name?: string
+          p_status?: string
+          p_tool_id?: string
+          p_user_id?: string
+        }
+        Returns: string
+      }
       mcp_log_audit: {
         Args: {
           p_action: string
@@ -28098,6 +28130,24 @@ export type Database = {
           p_user_id?: string
         }
         Returns: Json
+      }
+      mcp_set_permission_status: {
+        Args: { p_permission_id: string; p_status: string }
+        Returns: string
+      }
+      mcp_update_permission: {
+        Args: {
+          p_allowed_scopes?: Json
+          p_can_execute?: boolean
+          p_can_read?: boolean
+          p_can_suggest?: boolean
+          p_max_calls_per_day?: number
+          p_metadata?: Json
+          p_permission_id: string
+          p_requires_approval?: boolean
+          p_status?: string
+        }
+        Returns: string
       }
       move_to_dlq: {
         Args: {
