@@ -46,6 +46,8 @@ export default function McpRegistryPage() {
           <TabsTrigger value="resources">Resources</TabsTrigger>
           <TabsTrigger value="prompts">Prompts</TabsTrigger>
           <TabsTrigger value="permissions">Permissions</TabsTrigger>
+          <TabsTrigger value="invocations">Invocations</TabsTrigger>
+          <TabsTrigger value="audit-logs">Audit Logs</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
 
@@ -55,6 +57,8 @@ export default function McpRegistryPage() {
         <TabsContent value="resources"><ResourcesTab canEditGlobal={canEditGlobal} /></TabsContent>
         <TabsContent value="prompts"><PromptsTab canEditGlobal={canEditGlobal} /></TabsContent>
         <TabsContent value="permissions"><PermissionsTab /></TabsContent>
+        <TabsContent value="invocations"><MCPInvocationsTab /></TabsContent>
+        <TabsContent value="audit-logs"><MCPAuditLogsTab /></TabsContent>
         <TabsContent value="settings"><SettingsTab /></TabsContent>
       </Tabs>
     </div>
