@@ -7,6 +7,8 @@ import { ResourcesTab } from '@/components/mcp-registry/tabs/ResourcesTab';
 import { PromptsTab } from '@/components/mcp-registry/tabs/PromptsTab';
 import { PermissionsTab } from '@/components/mcp-registry/tabs/PermissionsTab';
 import { SettingsTab } from '@/components/mcp-registry/tabs/SettingsTab';
+import { MCPInvocationsTab } from '@/components/mcp-registry/invocations/MCPInvocationsTab';
+import { MCPAuditLogsTab } from '@/components/mcp-registry/audit/MCPAuditLogsTab';
 import { AccessDenied } from '@/components/AccessDenied';
 import { useCanAccessMcpRegistry } from '@/hooks/useMcpRegistry';
 import { Skeleton } from '@/components/ui/skeleton';
