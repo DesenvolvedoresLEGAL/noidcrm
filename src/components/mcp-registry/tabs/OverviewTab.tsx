@@ -29,6 +29,8 @@ export function OverviewTab() {
   const { data: metrics, isLoading: metricsLoading } = useMcpOverviewMetrics();
   const { data: settings, isLoading: settingsLoading } = useMcpSettings();
   const { data: permMetrics } = useMcpPermissionMetrics();
+  const { data: invMetrics } = useMcpInvocationMetrics();
+  const { data: auditMetrics } = useMcpAuditMetrics();
 
   if (metricsLoading || settingsLoading) {
     return (
