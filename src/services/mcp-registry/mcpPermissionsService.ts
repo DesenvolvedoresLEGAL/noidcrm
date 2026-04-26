@@ -237,18 +237,26 @@ export interface UserLite {
 }
 
 export async function listUsersForPermissions(orgId: string): Promise<UserLite[]> {
-  const { data, error } = await supabase
+  const { data: members, error } = await supabase
     .from('organization_members')
-    .select('user_id, profiles!organization_members_user_id_fkey(full_name)')
+    .select('user_id')
     .eq('organization_id', orgId);
   if (error) {
     console.warn('[listUsersForPermissions]', error.message);
     return [];
   }
-  return (data ?? []).map((m: { user_id: string; profiles?: { full_name?: string | null } | null }) => ({
-    user_id: m.user_id,
-    full_name: m.profiles?.full_name ?? null,
-  }));
+  const ids = (members ?? []).map((m) => m.user_id);
+  if (ids.length === 0) return [];
+  const { data: profiles, error: pErr } = await supabase
+    .from('profiles')
+    .select('id, full_name')
+    .in('id', ids);
+  if (pErr) {
+    console.warn('[listUsersForPermissions:profiles]', pErr.message);
+    return ids.map((id) => ({ user_id: id, full_name: null }));
+  }
+  const byId = new Map((profiles ?? []).map((p) => [p.id, p.full_name as string | null]));
+  return ids.map((id) => ({ user_id: id, full_name: byId.get(id) ?? null }));
 }
 
 export const MCP_ROLE_SUGGESTIONS = [
