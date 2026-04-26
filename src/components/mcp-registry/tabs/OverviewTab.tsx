@@ -2,7 +2,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { MCPMetricCard } from '../MCPMetricCard';
-import { useMcpOverviewMetrics, useMcpSettings, useMcpPermissionMetrics } from '@/hooks/useMcpRegistry';
+import { useMcpOverviewMetrics, useMcpSettings, useMcpPermissionMetrics, useMcpInvocationMetrics, useMcpAuditMetrics } from '@/hooks/useMcpRegistry';
 import {
   Server,
   Wrench,
@@ -15,7 +15,15 @@ import {
   Shield,
   Zap,
   Lock,
+  Activity,
+  FlaskConical,
+  CheckCircle2,
+  Calendar,
+  CalendarDays,
+  History,
 } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 export function OverviewTab() {
   const { data: metrics, isLoading: metricsLoading } = useMcpOverviewMetrics();
