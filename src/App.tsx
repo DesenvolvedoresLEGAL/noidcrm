@@ -810,6 +810,7 @@ const App = () => (
                 <Route path="/app/settings/noid-intelligence/memories" element={<NoidPlaceholder title="Memórias" description="Gerencie o conhecimento persistente dos agentes." />} />
                 <Route path="/app/settings/noid-intelligence/environments" element={<NoidEnvironments />} />
                 <Route path="/app/settings/noid-intelligence/permissions" element={<NoidPermissions />} />
+                <Route path="/app/settings/noid-intelligence/mcp-registry" element={<McpRegistryPage />} />
               </Route>
 
               {/* Individual System Settings Pages */}
