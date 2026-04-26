@@ -52,6 +52,21 @@ import {
   type UpdateMcpPermissionInput,
   type TestPermissionInput,
 } from '@/services/mcp-registry/mcpPermissionsService';
+import {
+  listMcpInvocations,
+  getMcpInvocationById,
+  createSimulatedMcpInvocation,
+  getMcpInvocationMetrics,
+  listMcpToolsForInvocation,
+  type InvocationFilters,
+  type CreateSimulatedInvocationInput,
+} from '@/services/mcp-registry/mcpInvocationsService';
+import {
+  listMcpAuditLogs,
+  getMcpAuditLogById,
+  getMcpAuditMetrics,
+  type AuditLogFilters,
+} from '@/services/mcp-registry/mcpAuditService';
 
 /**
  * Acesso ao MCP Registry: owner / admin da organização ou platform admin.
