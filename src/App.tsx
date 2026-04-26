@@ -134,6 +134,7 @@ const AgentDetail = lazy(() => import("./pages/settings/noid-intelligence/AgentD
 const NoidPlaceholder = lazy(() => import("./pages/settings/noid-intelligence/PlaceholderPage"));
 const NoidPermissions = lazy(() => import("./pages/settings/noid-intelligence/PermissionsPage"));
 const NoidEnvironments = lazy(() => import("./pages/settings/noid-intelligence/EnvironmentsPage"));
+const McpRegistryPage = lazy(() => import("./pages/settings/noid-intelligence/McpRegistryPage"));
 const AgentBuilderPage = lazy(() => import("./pages/settings/noid-intelligence/AgentBuilderPage"));
 const AgentSimulatorPage = lazy(() => import("./pages/settings/noid-intelligence/AgentSimulatorPage"));
 const ApprovalsPage = lazy(() => import("./pages/settings/noid-intelligence/ApprovalsPage"));
