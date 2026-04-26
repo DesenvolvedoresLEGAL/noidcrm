@@ -107,6 +107,30 @@ export function OverviewTab() {
         <MCPMetricCard label="Exigem aprovação" value={permMetrics?.with_approval ?? 0} icon={Lock} />
       </div>
 
+      {/* Atividade & Auditoria (Sprint 1.5) */}
+      <div className="space-y-2">
+        <h3 className="text-sm font-semibold text-foreground">Atividade & Auditoria</h3>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <MCPMetricCard label="Invocations totais" value={invMetrics?.total ?? 0} icon={Activity} />
+          <MCPMetricCard label="Invocations 24h" value={invMetrics?.last_24h ?? 0} icon={Calendar} />
+          <MCPMetricCard label="Invocations bloqueadas" value={invMetrics?.blocked ?? 0} icon={Shield} variant="warning" />
+          <MCPMetricCard label="Invocations com sucesso" value={invMetrics?.success ?? 0} icon={CheckCircle2} variant="success" />
+          <MCPMetricCard label="Invocations simuladas" value={invMetrics?.simulated ?? 0} icon={FlaskConical} />
+          <MCPMetricCard label="Audit logs totais" value={auditMetrics?.total ?? 0} icon={History} />
+          <MCPMetricCard label="Audit logs 7d" value={auditMetrics?.last_7d ?? 0} icon={CalendarDays} />
+          <MCPMetricCard
+            label="Último evento MCP"
+            value={
+              auditMetrics?.last_event_at
+                ? formatDistanceToNow(new Date(auditMetrics.last_event_at), { addSuffix: true, locale: ptBR })
+                : '—'
+            }
+            icon={Clock}
+            variant="muted"
+          />
+        </div>
+      </div>
+
       {/* Bloco explicativo */}
       <Card>
         <CardContent className="p-5 space-y-2">
