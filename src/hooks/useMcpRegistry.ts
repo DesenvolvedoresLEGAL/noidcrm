@@ -36,7 +36,22 @@ import {
   type UpdateMcpSettingsInput,
   type UpdateMcpToolInput,
 } from '@/services/mcp-registry/mcpRegistryService';
-import type { McpStatus } from '@/services/mcp-registry/types';
+import type { McpStatus, McpPermissionStatus } from '@/services/mcp-registry/types';
+import {
+  listMcpPermissions,
+  createMcpPermission,
+  updateMcpPermission,
+  setMcpPermissionStatus,
+  archiveMcpPermission,
+  testMcpPermission,
+  getMcpPermissionMetrics,
+  listAiAgentsForPermissions,
+  listUsersForPermissions,
+  type McpPermissionFilters,
+  type CreateMcpPermissionInput,
+  type UpdateMcpPermissionInput,
+  type TestPermissionInput,
+} from '@/services/mcp-registry/mcpPermissionsService';
 
 /**
  * Acesso ao MCP Registry: owner / admin da organização ou platform admin.
@@ -59,6 +74,10 @@ const KEY = {
   prompts: (orgId: string, f: PromptFilters) => ['mcp', 'prompts', orgId, f] as const,
   settings: (orgId: string) => ['mcp', 'settings', orgId] as const,
   overview: (orgId: string) => ['mcp', 'overview', orgId] as const,
+  permissions: (orgId: string, f: McpPermissionFilters) => ['mcp', 'permissions', orgId, f] as const,
+  permissionMetrics: (orgId: string) => ['mcp', 'permission-metrics', orgId] as const,
+  agentsForPerms: (orgId: string) => ['mcp', 'agents-for-perms', orgId] as const,
+  usersForPerms: (orgId: string) => ['mcp', 'users-for-perms', orgId] as const,
 };
 
 function invalidateAll(qc: ReturnType<typeof useQueryClient>) {
