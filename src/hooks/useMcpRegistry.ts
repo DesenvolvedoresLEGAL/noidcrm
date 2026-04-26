@@ -281,3 +281,89 @@ export function useMcpOverviewMetrics() {
     enabled: !!orgId,
   });
 }
+
+// ===================== PERMISSIONS (Sprint 1.4) =====================
+
+export function useMcpPermissions(filters: McpPermissionFilters = {}) {
+  const { organization } = useCurrentOrganization();
+  const orgId = organization?.id ?? '';
+  return useQuery({
+    queryKey: KEY.permissions(orgId, filters),
+    queryFn: () => listMcpPermissions(orgId, filters),
+    enabled: !!orgId,
+  });
+}
+
+export function useMcpPermissionMetrics() {
+  const { organization } = useCurrentOrganization();
+  const orgId = organization?.id ?? '';
+  return useQuery({
+    queryKey: KEY.permissionMetrics(orgId),
+    queryFn: () => getMcpPermissionMetrics(orgId),
+    enabled: !!orgId,
+  });
+}
+
+export function useCreateMcpPermission() {
+  const qc = useQueryClient();
+  const { organization } = useCurrentOrganization();
+  return useMutation({
+    mutationFn: (input: CreateMcpPermissionInput) => {
+      if (!organization?.id) throw new Error('Organização não definida');
+      return createMcpPermission(organization.id, input);
+    },
+    onSuccess: () => invalidateAll(qc),
+  });
+}
+
+export function useUpdateMcpPermission() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: UpdateMcpPermissionInput }) =>
+      updateMcpPermission(id, input),
+    onSuccess: () => invalidateAll(qc),
+  });
+}
+
+export function useSetMcpPermissionStatus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, status }: { id: string; status: McpPermissionStatus }) =>
+      setMcpPermissionStatus(id, status),
+    onSuccess: () => invalidateAll(qc),
+  });
+}
+
+export function useArchiveMcpPermission() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => archiveMcpPermission(id),
+    onSuccess: () => invalidateAll(qc),
+  });
+}
+
+export function useTestMcpPermission() {
+  return useMutation({
+    mutationFn: (input: TestPermissionInput) => testMcpPermission(input),
+  });
+}
+
+export function useAiAgentsForPermissions() {
+  const { organization } = useCurrentOrganization();
+  const orgId = organization?.id ?? '';
+  return useQuery({
+    queryKey: KEY.agentsForPerms(orgId),
+    queryFn: () => listAiAgentsForPermissions(orgId),
+    enabled: !!orgId,
+  });
+}
+
+export function useUsersForPermissions() {
+  const { organization } = useCurrentOrganization();
+  const orgId = organization?.id ?? '';
+  return useQuery({
+    queryKey: KEY.usersForPerms(orgId),
+    queryFn: () => listUsersForPermissions(orgId),
+    enabled: !!orgId,
+  });
+}
