@@ -61,14 +61,10 @@ export function MCPSimulatedInvocationForm({ open, onOpenChange, agents, users }
       return;
     }
 
-    let parsed: Record<string, unknown> = {};
-    try {
-      const txt = inputJson.trim();
-      parsed = txt ? JSON.parse(txt) : {};
-    } catch {
-      toast.error('JSON inválido. Corrija antes de continuar.');
-      return;
-    }
+    const parsed: Record<string, unknown> =
+      inputValue && typeof inputValue === 'object' && !Array.isArray(inputValue)
+        ? (inputValue as Record<string, unknown>)
+        : {};
 
     try {
       const res = await create.mutateAsync({
