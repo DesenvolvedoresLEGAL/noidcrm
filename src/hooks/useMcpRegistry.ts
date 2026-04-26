@@ -385,22 +385,6 @@ export function useUsersForPermissions() {
 
 // ===================== INVOCATIONS & AUDIT (Sprint 1.5) =====================
 
-import {
-  listMcpInvocations,
-  getMcpInvocationById,
-  createSimulatedMcpInvocation,
-  getMcpInvocationMetrics,
-  listMcpToolsForInvocation,
-  type InvocationFilters,
-  type CreateSimulatedInvocationInput,
-} from '@/services/mcp-registry/mcpInvocationsService';
-import {
-  listMcpAuditLogs,
-  getMcpAuditLogById,
-  getMcpAuditMetrics,
-  type AuditLogFilters,
-} from '@/services/mcp-registry/mcpAuditService';
-
 const KEY_S15 = {
   invocations: (orgId: string, f: InvocationFilters) => ['mcp', 'invocations', orgId, f] as const,
   invocationDetail: (id: string) => ['mcp', 'invocation', id] as const,
