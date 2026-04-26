@@ -81,6 +81,15 @@ const hubItems = [
     path: '/app/settings/noid-intelligence/permissions',
     available: true,
   },
+  {
+    id: 'mcp-registry',
+    title: 'MCP Registry',
+    description: 'Governança técnica de tools, contexto e prompts',
+    icon: Network,
+    path: '/app/settings/noid-intelligence/mcp-registry',
+    available: true,
+    badge: 'Técnico',
+  },
 ];
 
 export default function NoidIntelligenceHub() {
