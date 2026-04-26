@@ -1,246 +1,268 @@
-# Sprint 1.2 — MCP Registry Foundation: Seeds + RPCs de Governança
 
-## ✅ Pré-validação (Sprint 1.1)
-Confirmado via `read_query`:
-- 8 tabelas MCP existem com `organization_id` (não `tenant_id`)
-- 8 organizações existem em `public.organizations`
-- Helpers RLS disponíveis: `user_is_org_member`, `user_is_org_admin`, `is_platform_admin`, `get_user_organization_id`
-- Função `update_updated_at_column` disponível
-- Tabela `ai_agents` existe (FK de `agent_id`)
-- Seeds limpos (0 registros) → idempotência simples
+# Sprint 1.3 — MCP Registry UI (NOID Intelligence)
+
+Sprint focada **somente em interface administrativa** para visualizar e gerenciar os dados criados nas Sprints 1.1 e 1.2. Sem execução, sem gateway, sem permissions UI, sem invocations UI, sem audit logs UI.
 
 ---
 
-## 🎯 Escopo desta sprint
+## 1. Posicionamento e rota
 
-**Apenas migration SQL.** Sem frontend, sem edge functions, sem execução real, sem APIs externas, sem alteração de dados do CRM.
+A área NOID Intelligence já existe em `/app/settings/noid-intelligence` (SettingsLayout + breadcrumbs já configurados). Vou aproveitar a estrutura existente:
+
+- **Hub**: adicionar card **MCP Registry** (categoria *Configurações Técnicas*) no `NoidIntelligenceHub.tsx` — sem criar segunda sidebar.
+- **Rota base**: `/app/settings/noid-intelligence/mcp-registry`
+- **Subrotas (tabs internas via state, não rotas filhas)** — uma página única com `Tabs` para evitar inflar o `App.tsx`:
+  - Overview, Servers, Tools, Resources, Prompts, Settings
+- **Breadcrumbs**: adicionar entrada em `SettingsLayout.tsx`:
+  ```
+  '/app/settings/noid-intelligence/mcp-registry': { label: 'MCP Registry', parent: { label: 'NOID Intelligence', href: '/app/settings/noid-intelligence' } }
+  ```
 
 ---
 
-## 📦 Migration única — `<timestamp>_mcp_sprint_1_2_seeds_and_rpcs.sql`
+## 2. Controle de acesso
 
-### Bloco 1 — Seed do servidor interno (idempotente via `ON CONFLICT (slug) WHERE organization_id IS NULL`)
+Reutilizar hooks existentes — **sem criar lógica paralela**:
 
-```sql
-INSERT INTO public.mcp_servers (organization_id, name, slug, description, server_type, transport_type, status, auth_type, risk_level, metadata)
-VALUES (NULL, 'NOID Internal MCP Server', 'noid_internal_mcp',
-  'Servidor MCP interno do NOID Intelligence para registry, contexto, tools controladas, permissões e auditoria.',
-  'internal', 'http', 'draft', 'service_role', 'low',
-  '{"source":"system_seed","scope":"noid_intelligence","real_execution_enabled":false,"created_by_sprint":"1.2"}'::jsonb)
-ON CONFLICT — usando o índice partial único existente da Sprint 1.1 para slug global.
+- `useCurrentOrganization()` → `isOwner`, `isAdmin`
+- `usePlatformAdmin()` → `isPlatformAdmin`, `isSuperAdmin`
+
+Regra de acesso (`canAccessMcpRegistry`):
+```
+isOwner || isAdmin || isPlatformAdmin
 ```
 
-### Bloco 2 — Seed de 5 tools (todas `is_enabled=false`)
-Inseridas via CTE referenciando o `server_id` do `noid_internal_mcp`:
-1. `get_lead_context` — read_only, low, requires_approval=false
-2. `draft_whatsapp_followup` — suggestion_only, low, requires_approval=false
-3. `draft_email_followup` — suggestion_only, low, requires_approval=false
-4. `suggest_next_activity` — suggestion_only, low, requires_approval=false
-5. `simulate_stage_update` — approval_required, medium, requires_approval=true
+Aplicação:
+1. **Hub card** só renderiza se `canAccessMcpRegistry === true`.
+2. **Página** valida no topo; se negado, renderiza `<AccessDenied />` (componente já existe) com texto: *"Acesso restrito. O MCP Registry é uma configuração técnica do NOID Intelligence."*
+3. **Edição de registros globais** (`organization_id IS NULL`) só liberada se `isPlatformAdmin === true`. Caso contrário, item global é exibido em modo read-only com badge "Global" e botões de edição desabilitados com tooltip: *"Item global — somente platform admin pode editar."*
 
-Idempotência via `ON CONFLICT` no índice partial de slug global de `mcp_tools`.
+---
 
-### Bloco 3 — Seed de 7 resources (todos `is_enabled=false`)
-1. `crm://lead/{lead_id}` — crm/tenant/low
-2. `crm://opportunity/{opportunity_id}` — sales/tenant/low
-3. `crm://proposal/{proposal_id}` — proposal/tenant/medium
-4. `crm://activity/{activity_id}` — activity/tenant/low
-5. `crm://report/proposals_viewed_today` — report/role_based/medium
-6. `crm://playbook/pre_sales` — playbook/tenant/low
-7. `crm://organization/{organization_id}/sales_rules` — tenant/admin_only/high
+## 3. Estrutura de arquivos
 
-Idempotência via `WHERE NOT EXISTS` por `(server_id, uri_pattern)` (não há índice único nesse par, mas usamos guard explícita).
+### Página principal
+- `src/pages/settings/noid-intelligence/McpRegistryPage.tsx` — página única com Tabs.
 
-### Bloco 4 — Seed de 5 prompts (todos `status=draft`, `version=1`)
-1. `followup_curto_whatsapp` — sales_script
-2. `objection_pavilhao_homologada` — objection_handling
-3. `proposal_viewed_reactivation` — sales_script
-4. `daily_sales_digest` — analysis
-5. `pre_sales_call_script` — sales_script
+### Tabs (componentes, mesmo diretório)
+- `src/components/mcp-registry/tabs/OverviewTab.tsx`
+- `src/components/mcp-registry/tabs/ServersTab.tsx`
+- `src/components/mcp-registry/tabs/ToolsTab.tsx`
+- `src/components/mcp-registry/tabs/ResourcesTab.tsx`
+- `src/components/mcp-registry/tabs/PromptsTab.tsx`
+- `src/components/mcp-registry/tabs/SettingsTab.tsx`
 
-Idempotência via `ON CONFLICT` no índice partial de slug global de `mcp_prompts`.
+### Componentes reutilizáveis
+- `src/components/mcp-registry/MCPRegistryHeader.tsx` — título, subtítulo, banner de segurança.
+- `src/components/mcp-registry/MCPMetricCard.tsx`
+- `src/components/mcp-registry/MCPStatusBadge.tsx` — `draft|active|inactive|archived|enabled|disabled`
+- `src/components/mcp-registry/MCPRiskBadge.tsx` — `low|medium|high|critical`
+- `src/components/mcp-registry/MCPExecutionModeBadge.tsx`
+- `src/components/mcp-registry/MCPScopeBadge.tsx` — Global vs Organização
+- `src/components/mcp-registry/MCPJsonViewer.tsx` — read-only `<pre>` com formatação.
+- `src/components/mcp-registry/MCPJsonEditor.tsx` — `<Textarea>` com validação `JSON.parse` antes de salvar.
+- `src/components/mcp-registry/MCPEmptyState.tsx`
+- `src/components/mcp-registry/MCPConfirmDialog.tsx` (wrapper sobre `AlertDialog` shadcn)
+- `src/components/mcp-registry/forms/MCPServerForm.tsx`
+- `src/components/mcp-registry/forms/MCPToolForm.tsx`
+- `src/components/mcp-registry/forms/MCPResourceForm.tsx`
+- `src/components/mcp-registry/forms/MCPPromptForm.tsx`
+- `src/components/mcp-registry/MCPSettingsPanel.tsx`
 
-### Bloco 5 — Seed de `mcp_registry_settings` para todas as organizações existentes
+### Camada de serviço
+- `src/services/mcp-registry/mcpRegistryService.ts` — todos os CRUDs e helpers, usando o cliente Supabase normal (RLS aplicada).
+- `src/hooks/useMcpRegistry.ts` — hooks React Query (`useMcpServers`, `useMcpTools`, `useMcpResources`, `useMcpPrompts`, `useMcpSettings`, `useMcpOverviewMetrics`) + mutations.
 
-```sql
-INSERT INTO public.mcp_registry_settings (organization_id, is_mcp_enabled, allow_external_servers,
-  default_requires_approval, default_daily_call_limit, log_retention_days, metadata)
-SELECT o.id, false, false, true, 100, 180,
-  '{"source":"system_seed","scope":"noid_intelligence","created_by_sprint":"1.2"}'::jsonb
-FROM public.organizations o
-ON CONFLICT (organization_id) DO NOTHING;
+---
+
+## 4. Camada de serviço (resumo das funções)
+
+```ts
+// listagens (RLS já filtra por organização + globais com organization_id IS NULL)
+listMcpServers(filters?)         // mcp_servers
+listMcpTools(filters?)           // join virtual com server.name
+listMcpResources(filters?)
+listMcpPrompts(filters?)
+getMcpSettings(orgId)            // .maybeSingle()
+getMcpOverviewMetrics(orgId)     // contagens agregadas por status
+
+// mutações (organization_id sempre = currentOrgId; global bloqueado para não-platform-admin)
+createMcpServer / updateMcpServer / setMcpServerStatus(id, 'active'|'inactive'|'archived')
+createMcpTool / updateMcpTool / toggleMcpTool(id, enabled)
+createMcpResource / updateMcpResource / toggleMcpResource(id, enabled)
+createMcpPrompt / updateMcpPrompt / setMcpPromptStatus(id, status)
+createMcpSettingsIfMissing(orgId)
+updateMcpSettings(id, payload)
+
+// auditoria
+logMcpAudit({ entityType, entityId, action, afterJson, metadata })
+   // chama supabase.rpc('mcp_log_audit', { p_organization_id, p_user_id: auth.uid(), ... })
 ```
 
-→ Cria 8 registros (uma por organização).
+**Regras de segurança no serviço:**
+- `organization_id` sempre obtido do contexto (`useCurrentOrganization`) — nunca aceito como argumento da UI.
+- `p_user_id` enviado para `mcp_log_audit` SEMPRE = `(await supabase.auth.getUser()).data.user.id`. Nunca confia em valor da UI.
+- Cada mutação dispara `logMcpAudit` correspondente (`created|updated|enabled|disabled|activated|deactivated|archived`).
+- Falha de auditoria é logada mas **não derruba a operação principal** (auditoria é best-effort, mensagem toast separada).
 
 ---
 
-### Bloco 6 — RPC `public.mcp_log_audit`
+## 5. Detalhes por aba
 
-`SECURITY DEFINER`, `SET search_path = public`.
+### 5.1 Overview
+- Banner de segurança: *"Modo fundação ativo. Nenhuma tool executa ações reais nesta fase."*
+- Bloco explicativo "Fundação MCP do NOID Intelligence".
+- Cards de métrica (`MCPMetricCard`) em grid 4 colunas (responsivo):
+  - Servidores: total / active / draft
+  - Tools: total / habilitadas / desabilitadas
+  - Resources: total / habilitados
+  - Prompts: total / active / draft
+- Bloco "Status da organização":
+  - Badge `MCP ativo` / `MCP desativado` (de `is_mcp_enabled`)
+  - Badge `Servidores externos permitidos` / `Servidores externos bloqueados`
+  - Limite diário padrão, retenção de logs.
 
-**Validações:**
-- `p_entity_type` e `p_action` não vazios
-- Se `p_organization_id IS NOT NULL`: exigir `user_is_org_member(p_organization_id) OR is_platform_admin(auth.uid())`
-- `auth.uid()` aceito como `p_user_id` default
+Métricas via uma única query agregada (`getMcpOverviewMetrics`) usando `head:true, count:'exact'` com filtros por status.
 
-**Comportamento:**
-- INSERT em `mcp_audit_logs`
-- Retorna `uuid` do log criado
+### 5.2 Servers
+- Tabela com colunas: Nome, Slug, Tipo, Transporte, Status, Auth, Risco, Escopo, Criado em.
+- Filtros: status, tipo, transporte, risco, escopo.
+- Drawer/Dialog `MCPServerForm` com todos os enums já definidos no spec.
+- Validação client-side (zod): name/slug/server_type/transport_type/status/auth_type/risk_level obrigatórios; metadata JSON válido.
+- **Regra externa**: ao tentar `status=active` em `server_type=external` quando `allow_external_servers=false`, bloquear com toast: *"Servidores externos estão bloqueados nas configurações MCP desta organização."*
+- Ações: ativar/desativar/arquivar via `setMcpServerStatus` — sem delete físico.
 
-**Concedido:** `GRANT EXECUTE ... TO authenticated`. Service role para seeds internos pode chamar com `p_organization_id = NULL`.
+### 5.3 Tools
+- Tabela: Nome, Slug, Servidor (resolvido via `useMcpServers`), Categoria, Modo, Risco, Aprovação, Habilitada, Escopo, Criado em.
+- Filtros: servidor, categoria, modo, risco, habilitada, requires_approval, escopo.
+- Form `MCPToolForm`:
+  - `is_enabled` default `false`.
+  - Auto-set `requires_approval = true` quando `risk_level ∈ {high, critical}` ou `execution_mode = approval_required` (campo travado em true com tooltip).
+  - Se `execution_mode = automatic_controlled`: alerta inline *"Execução automática controlada ainda não está liberada nesta fase."*
+  - Validação JSON em `input_schema`, `output_schema`, `metadata`.
+- **Sem botão de "executar/testar tool"** — não há chamada a `mcp_record_invocation` nesta sprint.
 
----
+### 5.4 Resources
+- Tabela: Nome, URI Pattern, Tipo, Escopo de leitura, Risco, Habilitado, Escopo, Criado em.
+- Form `MCPResourceForm`:
+  - `is_enabled` default `false`.
+  - Sugestão (não bloqueia) se `read_scope=admin_only` + `risk_level=low` → propor `risk_level=high`.
+  - Alerta inline para `resource_type=external`.
 
-### Bloco 7 — RPC `public.check_mcp_permission`
+### 5.5 Prompts
+- Tabela: Nome, Slug, Tipo, Versão, Status, Escopo, Criado em.
+- Form `MCPPromptForm`:
+  - `status` default `draft`.
+  - `version` default `1`, validação `>= 1`.
+  - `variables` validado como `JSON.parse` + `Array.isArray`.
+  - Aviso ao editar prompt `active`: *"Você está editando um prompt ativo. Para ambientes produtivos, recomendamos criar uma nova versão."*
+- **Botão "Duplicar nova versão"** (escopo simples): cria novo registro com `version + 1`, `status='draft'`, mesmo `slug`. Como o índice único atual é `(organization_id, slug)`, slug duplicado quebra. Solução nesta sprint: **manter apenas o aviso e desabilitar o botão "Duplicar versão"** com tooltip *"Disponível em sprint futura quando o versionamento por slug estiver finalizado"* — evita complexidade conforme permite o spec.
 
-`SECURITY DEFINER`, `SET search_path = public`. Retorno `jsonb`.
-
-**Validações iniciais:**
-- `p_organization_id NOT NULL`
-- `p_action IN ('read','suggest','execute')`
-- pelo menos um de `p_agent_id / p_user_id / p_role_name`
-- pelo menos um de `p_tool_id / p_resource_id / p_prompt_id`
-- `user_is_org_member(p_organization_id) OR is_platform_admin(auth.uid())` — caso contrário retorna `{"allowed":false,"requires_approval":true,"reason":"Cross-organization access denied"}`
-
-**Lógica de match (CTE):**
-- Filtra `mcp_permissions` com `organization_id = p_organization_id` AND `status = 'active'`
-- Match de subject: `(agent_id = p_agent_id OR user_id = p_user_id OR role_name = p_role_name)` para os parâmetros não-nulos
-- Match de objeto: `(tool_id = p_tool_id OR resource_id = p_resource_id OR prompt_id = p_prompt_id)` para os parâmetros não-nulos
-- Filtra por flag da ação: `can_read` / `can_suggest` / `can_execute`
-
-**Retornos:**
-- Sem nenhuma permissão na org com subject+objeto match → `{"allowed":false,"requires_approval":true,"reason":"No matching MCP permission found"}`
-- Permissões existem mas nenhuma autoriza a ação pedida → `{"allowed":false,"requires_approval":true,"reason":"MCP permission does not allow requested action"}`
-- Permitido → `requires_approval = bool_or(requires_approval)` (mais restritiva prevalece). `{"allowed":true,"requires_approval":<bool>,"reason":"Permission granted"}`
-
-**Concedido:** `GRANT EXECUTE ... TO authenticated`.
-
----
-
-### Bloco 8 — RPC `public.mcp_record_invocation`
-
-`SECURITY DEFINER`, `SET search_path = public`. Retorno `jsonb`.
-
-**Fluxo (12 passos):**
-1. Valida `p_organization_id NOT NULL`
-2. Valida `user_is_org_member OR is_platform_admin` → senão retorna erro de cross-org
-3. Busca `mcp_registry_settings` da org
-4. Se não existir → INSERT em `mcp_tool_invocations` com `execution_status='blocked'`, `error_message='MCP settings not found for this organization'`, audit log `blocked_invocation`, return
-5. Se `is_mcp_enabled = false` → INSERT blocked, error `'MCP is disabled for this organization'`, audit, return
-6. Busca tool por `p_tool_id`
-7. Se não existir → blocked `'Tool not found'`
-8. Se `is_enabled = false` → blocked `'Tool is disabled'`
-9. Mapeia `execution_mode → action`:
-   - `read_only` → `read`
-   - `suggestion_only` → `suggest`
-   - `approval_required` ou `automatic_controlled` → `execute`
-10. Chama `check_mcp_permission` (subject = agent_id ou user_id da chamada)
-11. Se `allowed=false` → blocked `'Permission denied'`
-12. Caso contrário INSERT com:
-   - `invocation_type='simulated'`
-   - `execution_status='success'`
-   - `approval_status = CASE WHEN requires_approval THEN 'pending' ELSE 'not_required' END`
-   - `started_at = finished_at = now()`
-   - `output_json = '{"simulated":true,"message":"Simulated MCP invocation completed. No external action was executed."}'::jsonb`
-   - `risk_level / execution_mode` herdados da tool
-   - `volts_consumed = 0`
-13. Audit log via `mcp_log_audit` com `entity_type='mcp_invocation'`, `action='simulated_invocation_created'` ou `'blocked_invocation'`
-14. Retorna `jsonb` com `invocation_id, execution_status, approval_status, error_message, output_json`
-
-**Crítico:** RPC nunca toca leads, oportunidades, propostas, atividades. Apenas escreve em `mcp_tool_invocations` + `mcp_audit_logs`.
-
-**Concedido:** `GRANT EXECUTE ... TO authenticated`.
+### 5.6 Settings
+- Carrega `mcp_registry_settings` para `organization_id` atual via `.maybeSingle()`.
+- Se ausente: empty state com botão **"Criar settings MCP para esta organização"** → `createMcpSettingsIfMissing` com defaults do spec.
+- Painel com switches/inputs e copies do spec:
+  - `is_mcp_enabled` (com confirm dialog ao ativar)
+  - `allow_external_servers` (com confirm dialog ao ativar)
+  - `default_requires_approval`
+  - `default_daily_call_limit` (number > 0)
+  - `log_retention_days` (number > 0)
+  - `metadata` (JSON Editor)
 
 ---
 
-### Bloco 9 — Auditoria dos próprios seeds
+## 6. Banco de dados
 
-Após criar todas as RPCs, chamar `mcp_log_audit` (via `DO $$ ... $$`) com role de service para registrar:
-- 1× `mcp_server` / `system_seed_created`
-- 5× `mcp_tool` / `system_seed_created`
-- 7× `mcp_resource` / `system_seed_created`
-- 5× `mcp_prompt` / `system_seed_created`
-- 8× `mcp_registry_settings` / `system_seed_created` (uma por org)
-
-`organization_id = NULL` para os seeds globais; `organization_id = <org>` para settings.
+**Nenhuma migração de schema** nesta sprint — a fundação está pronta. Apenas leituras/escritas via RLS existente e RPC `mcp_log_audit`.
 
 ---
 
-## 🔒 Garantias de segurança
+## 7. Integração no Hub e App.tsx
 
-- **Sem `tenant_id`** em nenhum lugar
-- **Sem nova tabela de agentes** — usa `ai_agents` (FK já estabelecida na Sprint 1.1)
-- **Sem service_role no frontend** — RPCs `SECURITY DEFINER` validam org via helpers
-- **`search_path = public`** em todas as 3 RPCs (regra core do projeto)
-- **Sem cross-org** — `check_mcp_permission` retorna `false` antes de qualquer query
-- **Sem execução real** — `mcp_record_invocation` apenas escreve em tabelas MCP
-- **RLS Sprint 1.1 não enfraquecido** — apenas adicionamos RPCs e dados; nenhuma policy alterada
-- **Idempotente** — pode ser re-executado sem duplicar
+### `src/pages/settings/noid-intelligence/NoidIntelligenceHub.tsx`
+- Adicionar item:
+  ```ts
+  {
+    id: 'mcp-registry',
+    title: 'MCP Registry',
+    description: 'Governança técnica de tools, resources e prompts',
+    icon: Database, // lucide
+    path: '/app/settings/noid-intelligence/mcp-registry',
+    available: true,
+    requiresAdmin: true, // novo flag → render condicional
+  }
+  ```
+- Filtrar `hubItems` por `canAccessMcpRegistry` antes do `.map`.
 
----
+### `src/App.tsx`
+- Adicionar import lazy:
+  ```ts
+  const McpRegistryPage = lazy(() => import("./pages/settings/noid-intelligence/McpRegistryPage"));
+  ```
+- Registrar rota dentro do bloco NOID Intelligence (mesmo padrão `<Route>` simples já usado nas demais).
 
-## 🧪 Validações pós-deploy
-
-```sql
--- 1. Servidor interno
-SELECT id, slug, status FROM mcp_servers WHERE slug = 'noid_internal_mcp';
--- → 1 linha
-
--- 2. Tools (5, todas disabled)
-SELECT slug, is_enabled, execution_mode, requires_approval FROM mcp_tools ORDER BY slug;
-
--- 3. Resources (7, todos disabled)
-SELECT uri_pattern, is_enabled, read_scope FROM mcp_resources ORDER BY uri_pattern;
-
--- 4. Prompts (5, todos draft v1)
-SELECT slug, status, version FROM mcp_prompts ORDER BY slug;
-
--- 5. Settings (8, uma por org)
-SELECT organization_id, is_mcp_enabled, allow_external_servers FROM mcp_registry_settings;
-
--- 6. Permissão sem registro (esperado: allowed=false)
-SELECT public.check_mcp_permission(
-  p_organization_id := '<org_id>',
-  p_role_name := 'admin',
-  p_tool_id := (SELECT id FROM mcp_tools WHERE slug='get_lead_context'),
-  p_action := 'read');
-
--- 7. Invocation com MCP desabilitado (esperado: blocked)
-SELECT public.mcp_record_invocation(
-  p_organization_id := '<org_id>',
-  p_tool_id := (SELECT id FROM mcp_tools WHERE slug='get_lead_context'));
-
--- 8. Invocation registrada
-SELECT execution_status, error_message FROM mcp_tool_invocations ORDER BY created_at DESC LIMIT 5;
-
--- 9. Audit logs dos seeds
-SELECT entity_type, action, count(*) FROM mcp_audit_logs GROUP BY 1,2 ORDER BY 1,2;
-```
+### `src/pages/settings/SettingsLayout.tsx`
+- Adicionar entrada de breadcrumb (item 1).
 
 ---
 
-## 📋 Resumo entregável
+## 8. Estados e UX
 
-| Item | Quantidade |
-|---|---|
-| Servidores criados | 1 (`noid_internal_mcp`) |
-| Tools criadas | 5 (todas `is_enabled=false`) |
-| Resources criados | 7 (todos `is_enabled=false`) |
-| Prompts criados | 5 (todos `status=draft`, `version=1`) |
-| Settings criadas | 8 (uma por organização) |
-| RPCs criadas | 3 (`mcp_log_audit`, `check_mcp_permission`, `mcp_record_invocation`) |
-| Audit logs gerados | ~26 (1 server + 5 tools + 7 resources + 5 prompts + 8 settings) |
-| Tabelas alteradas | 0 (apenas INSERTs e CREATE FUNCTION) |
-| Frontend | 0 arquivos |
-| Edge functions | 0 |
+- Loading: `Skeleton` (já existe) em todas as tabelas e cards.
+- Empty states com texto exato do spec.
+- Erros: `toast` com mensagens amigáveis.
+- Validação JSON: bloqueia salvamento, exibe mensagem inline + toast *"JSON inválido. Corrija antes de salvar."*
+- Mutations usam React Query → `invalidateQueries(['mcp', ...])` para atualização reativa.
 
 ---
 
-## ⚠️ Pontos de atenção para Sprint 1.3
+## 9. O que NÃO será feito (reforço do spec)
 
-1. A Sprint 1.3 criará a UI dentro de **NOID Intelligence → Configurações Técnicas → MCP Registry** (sem rota nova de produto).
-2. Toda criação/edição de permissões pela UI deverá usar RPCs (não INSERT direto), pois RLS bloqueia gestão por usuário comum.
-3. Antes de habilitar qualquer tool real (`is_enabled=true`), Sprint 1.3 precisará introduzir o MCP Gateway (fora do escopo atual).
-4. `is_mcp_enabled=false` em todas as orgs é o estado seguro padrão — UI deverá exigir ação explícita do owner para ativar.
-5. `simulate_stage_update` é a única tool com `requires_approval=true` — útil para validar o fluxo de approval na Sprint 1.3.
+- ❌ Aba Permissions (Sprint 1.4)
+- ❌ Aba Invocations (Sprint 1.5)
+- ❌ Aba Audit Logs (Sprint 1.5)
+- ❌ Botão executar/testar tool
+- ❌ Chamadas a `mcp_record_invocation`
+- ❌ MCP Gateway, servidor MCP HTTP
+- ❌ Conexões externas (WhatsApp, Gmail, Apollo, etc.)
+- ❌ Alterações em leads/oportunidades/propostas
+- ❌ Duplicação do builder ou playground
+- ❌ Nova tabela de agentes ou coluna `tenant_id`
+
+---
+
+## 10. Critérios de aceite (mapa para verificação)
+
+Todos os 34 critérios do spec serão atendidos:
+- Acesso gated via `usePermissions` + `usePlatformAdmin` ✓
+- Tabs Overview/Servers/Tools/Resources/Prompts/Settings ✓
+- Métricas reais agregadas via Supabase count ✓
+- Tools/Resources nascem desabilitados; Prompts em draft ✓
+- Tools `high|critical` forçam `requires_approval=true` ✓
+- JSON inválido bloqueia salvamento ✓
+- `mcp_log_audit` chamado com `p_user_id = auth.uid()` ✓
+- `organization_id` sempre do contexto, nunca da UI ✓
+- Globais read-only para não-platform-admin ✓
+- RLS preservada (sem service_role no front) ✓
+
+---
+
+## 11. Resumo de entregáveis
+
+**Arquivos novos (~22):**
+- 1 página principal
+- 6 tabs
+- ~13 componentes reutilizáveis (header, badges, json viewer/editor, empty state, confirm dialog, 4 forms, settings panel, metric card, scope badge)
+- 1 service file
+- 1 hook file (React Query)
+
+**Arquivos editados (3):**
+- `src/App.tsx` — 1 import lazy + 1 `<Route>`
+- `src/pages/settings/noid-intelligence/NoidIntelligenceHub.tsx` — 1 hub item + filtro de acesso
+- `src/pages/settings/SettingsLayout.tsx` — 1 entry de breadcrumb
+
+**Risco:** Baixo. Toda a interação com banco passa por RLS já validada nas Sprints 1.1/1.2. Nenhuma RPC nova, nenhuma migração. A única lógica sensível é o gating de acesso — coberto por reuso dos hooks já existentes (`usePermissions`, `usePlatformAdmin`).
+
+**Pontos de atenção para Sprint 1.4:**
+- O índice único atual de `mcp_prompts` `(organization_id, slug)` precisa evoluir para `(organization_id, slug, version)` para suportar versionamento real do botão "Duplicar versão" — adiado para a sprint que tratar de Permissions ou explicitamente de versionamento.
+- Considerar adicionar coluna `created_by`/`updated_by` automática via trigger usando `auth.uid()` para reduzir dependência de envio manual desses campos pela UI.
