@@ -11897,6 +11897,530 @@ export type Database = {
           },
         ]
       }
+      mcp_audit_logs: {
+        Row: {
+          action: string
+          after_json: Json | null
+          agent_id: string | null
+          before_json: Json | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string
+          id: string
+          ip_address: string | null
+          metadata: Json
+          organization_id: string | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          after_json?: Json | null
+          agent_id?: string | null
+          before_json?: Json | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          ip_address?: string | null
+          metadata?: Json
+          organization_id?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          after_json?: Json | null
+          agent_id?: string | null
+          before_json?: Json | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          ip_address?: string | null
+          metadata?: Json
+          organization_id?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mcp_audit_logs_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mcp_permissions: {
+        Row: {
+          agent_id: string | null
+          allowed_scopes: Json
+          can_execute: boolean
+          can_read: boolean
+          can_suggest: boolean
+          created_at: string
+          created_by: string | null
+          id: string
+          max_calls_per_day: number | null
+          metadata: Json
+          organization_id: string
+          prompt_id: string | null
+          requires_approval: boolean
+          resource_id: string | null
+          role_name: string | null
+          status: string
+          tool_id: string | null
+          updated_at: string
+          updated_by: string | null
+          user_id: string | null
+        }
+        Insert: {
+          agent_id?: string | null
+          allowed_scopes?: Json
+          can_execute?: boolean
+          can_read?: boolean
+          can_suggest?: boolean
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          max_calls_per_day?: number | null
+          metadata?: Json
+          organization_id: string
+          prompt_id?: string | null
+          requires_approval?: boolean
+          resource_id?: string | null
+          role_name?: string | null
+          status?: string
+          tool_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          agent_id?: string | null
+          allowed_scopes?: Json
+          can_execute?: boolean
+          can_read?: boolean
+          can_suggest?: boolean
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          max_calls_per_day?: number | null
+          metadata?: Json
+          organization_id?: string
+          prompt_id?: string | null
+          requires_approval?: boolean
+          resource_id?: string | null
+          role_name?: string | null
+          status?: string
+          tool_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mcp_permissions_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mcp_permissions_prompt_id_fkey"
+            columns: ["prompt_id"]
+            isOneToOne: false
+            referencedRelation: "mcp_prompts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mcp_permissions_resource_id_fkey"
+            columns: ["resource_id"]
+            isOneToOne: false
+            referencedRelation: "mcp_resources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mcp_permissions_tool_id_fkey"
+            columns: ["tool_id"]
+            isOneToOne: false
+            referencedRelation: "mcp_tools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mcp_prompts: {
+        Row: {
+          content: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          metadata: Json
+          name: string
+          organization_id: string | null
+          prompt_type: string
+          slug: string
+          status: string
+          updated_at: string
+          updated_by: string | null
+          variables: Json
+          version: number
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          metadata?: Json
+          name: string
+          organization_id?: string | null
+          prompt_type?: string
+          slug: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+          variables?: Json
+          version?: number
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          metadata?: Json
+          name?: string
+          organization_id?: string | null
+          prompt_type?: string
+          slug?: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+          variables?: Json
+          version?: number
+        }
+        Relationships: []
+      }
+      mcp_registry_settings: {
+        Row: {
+          allow_external_servers: boolean
+          created_at: string
+          created_by: string | null
+          default_daily_call_limit: number
+          default_requires_approval: boolean
+          id: string
+          is_mcp_enabled: boolean
+          log_retention_days: number
+          metadata: Json
+          organization_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          allow_external_servers?: boolean
+          created_at?: string
+          created_by?: string | null
+          default_daily_call_limit?: number
+          default_requires_approval?: boolean
+          id?: string
+          is_mcp_enabled?: boolean
+          log_retention_days?: number
+          metadata?: Json
+          organization_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          allow_external_servers?: boolean
+          created_at?: string
+          created_by?: string | null
+          default_daily_call_limit?: number
+          default_requires_approval?: boolean
+          id?: string
+          is_mcp_enabled?: boolean
+          log_retention_days?: number
+          metadata?: Json
+          organization_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      mcp_resources: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_enabled: boolean
+          metadata: Json
+          name: string
+          organization_id: string | null
+          read_scope: string
+          resource_type: string
+          risk_level: string
+          server_id: string | null
+          updated_at: string
+          updated_by: string | null
+          uri_pattern: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_enabled?: boolean
+          metadata?: Json
+          name: string
+          organization_id?: string | null
+          read_scope?: string
+          resource_type?: string
+          risk_level?: string
+          server_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          uri_pattern: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_enabled?: boolean
+          metadata?: Json
+          name?: string
+          organization_id?: string | null
+          read_scope?: string
+          resource_type?: string
+          risk_level?: string
+          server_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          uri_pattern?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mcp_resources_server_id_fkey"
+            columns: ["server_id"]
+            isOneToOne: false
+            referencedRelation: "mcp_servers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mcp_servers: {
+        Row: {
+          auth_type: string
+          base_url: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          metadata: Json
+          name: string
+          organization_id: string | null
+          risk_level: string
+          server_type: string
+          slug: string
+          status: string
+          transport_type: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          auth_type?: string
+          base_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          metadata?: Json
+          name: string
+          organization_id?: string | null
+          risk_level?: string
+          server_type?: string
+          slug: string
+          status?: string
+          transport_type?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          auth_type?: string
+          base_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          metadata?: Json
+          name?: string
+          organization_id?: string | null
+          risk_level?: string
+          server_type?: string
+          slug?: string
+          status?: string
+          transport_type?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      mcp_tool_invocations: {
+        Row: {
+          agent_id: string | null
+          approval_required: boolean
+          approval_status: string
+          created_at: string
+          error_message: string | null
+          execution_mode: string
+          execution_status: string
+          finished_at: string | null
+          id: string
+          input_json: Json
+          invocation_type: string
+          organization_id: string
+          output_json: Json | null
+          risk_level: string
+          started_at: string | null
+          tool_id: string | null
+          tool_slug: string
+          user_id: string | null
+          volts_consumed: number
+        }
+        Insert: {
+          agent_id?: string | null
+          approval_required?: boolean
+          approval_status?: string
+          created_at?: string
+          error_message?: string | null
+          execution_mode?: string
+          execution_status?: string
+          finished_at?: string | null
+          id?: string
+          input_json?: Json
+          invocation_type?: string
+          organization_id: string
+          output_json?: Json | null
+          risk_level?: string
+          started_at?: string | null
+          tool_id?: string | null
+          tool_slug: string
+          user_id?: string | null
+          volts_consumed?: number
+        }
+        Update: {
+          agent_id?: string | null
+          approval_required?: boolean
+          approval_status?: string
+          created_at?: string
+          error_message?: string | null
+          execution_mode?: string
+          execution_status?: string
+          finished_at?: string | null
+          id?: string
+          input_json?: Json
+          invocation_type?: string
+          organization_id?: string
+          output_json?: Json | null
+          risk_level?: string
+          started_at?: string | null
+          tool_id?: string | null
+          tool_slug?: string
+          user_id?: string | null
+          volts_consumed?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mcp_tool_invocations_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mcp_tool_invocations_tool_id_fkey"
+            columns: ["tool_id"]
+            isOneToOne: false
+            referencedRelation: "mcp_tools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mcp_tools: {
+        Row: {
+          category: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          execution_mode: string
+          id: string
+          input_schema: Json
+          is_enabled: boolean
+          metadata: Json
+          name: string
+          organization_id: string | null
+          output_schema: Json
+          requires_approval: boolean
+          risk_level: string
+          server_id: string | null
+          slug: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          execution_mode?: string
+          id?: string
+          input_schema?: Json
+          is_enabled?: boolean
+          metadata?: Json
+          name: string
+          organization_id?: string | null
+          output_schema?: Json
+          requires_approval?: boolean
+          risk_level?: string
+          server_id?: string | null
+          slug: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          execution_mode?: string
+          id?: string
+          input_schema?: Json
+          is_enabled?: boolean
+          metadata?: Json
+          name?: string
+          organization_id?: string | null
+          output_schema?: Json
+          requires_approval?: boolean
+          risk_level?: string
+          server_id?: string | null
+          slug?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mcp_tools_server_id_fkey"
+            columns: ["server_id"]
+            isOneToOne: false
+            referencedRelation: "mcp_servers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       measurement_units: {
         Row: {
           abbreviation: string
