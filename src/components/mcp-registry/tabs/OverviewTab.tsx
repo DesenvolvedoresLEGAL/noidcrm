@@ -2,7 +2,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { MCPMetricCard } from '../MCPMetricCard';
-import { useMcpOverviewMetrics, useMcpSettings } from '@/hooks/useMcpRegistry';
+import { useMcpOverviewMetrics, useMcpSettings, useMcpPermissionMetrics } from '@/hooks/useMcpRegistry';
 import {
   Server,
   Wrench,
@@ -12,11 +12,15 @@ import {
   ShieldX,
   Clock,
   Gauge,
+  Shield,
+  Zap,
+  Lock,
 } from 'lucide-react';
 
 export function OverviewTab() {
   const { data: metrics, isLoading: metricsLoading } = useMcpOverviewMetrics();
   const { data: settings, isLoading: settingsLoading } = useMcpSettings();
+  const { data: permMetrics } = useMcpPermissionMetrics();
 
   if (metricsLoading || settingsLoading) {
     return (
@@ -83,6 +87,14 @@ export function OverviewTab() {
         <MCPMetricCard label="Tools" value={m.tools.total} icon={Wrench} variant="warning" hint={`${m.tools.enabled} habilitadas · ${m.tools.disabled} desabilitadas`} />
         <MCPMetricCard label="Resources" value={m.resources.total} icon={Database} variant="muted" hint={`${m.resources.enabled} habilitados · ${m.resources.disabled} desabilitados`} />
         <MCPMetricCard label="Prompts" value={m.prompts.total} icon={FileText} variant="success" hint={`${m.prompts.active} ativos · ${m.prompts.draft} draft`} />
+      </div>
+
+      {/* Permissões (Sprint 1.4) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <MCPMetricCard label="Permissões totais" value={permMetrics?.total ?? 0} icon={Shield} />
+        <MCPMetricCard label="Permissões ativas" value={permMetrics?.active ?? 0} icon={ShieldCheck} variant="success" />
+        <MCPMetricCard label="Com execução liberada" value={permMetrics?.with_execute ?? 0} icon={Zap} variant="warning" />
+        <MCPMetricCard label="Exigem aprovação" value={permMetrics?.with_approval ?? 0} icon={Lock} />
       </div>
 
       {/* Bloco explicativo */}

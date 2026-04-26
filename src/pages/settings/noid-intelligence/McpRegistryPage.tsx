@@ -5,6 +5,7 @@ import { ServersTab } from '@/components/mcp-registry/tabs/ServersTab';
 import { ToolsTab } from '@/components/mcp-registry/tabs/ToolsTab';
 import { ResourcesTab } from '@/components/mcp-registry/tabs/ResourcesTab';
 import { PromptsTab } from '@/components/mcp-registry/tabs/PromptsTab';
+import { PermissionsTab } from '@/components/mcp-registry/tabs/PermissionsTab';
 import { SettingsTab } from '@/components/mcp-registry/tabs/SettingsTab';
 import { AccessDenied } from '@/components/AccessDenied';
 import { useCanAccessMcpRegistry } from '@/hooks/useMcpRegistry';
@@ -42,6 +43,7 @@ export default function McpRegistryPage() {
           <TabsTrigger value="tools">Tools</TabsTrigger>
           <TabsTrigger value="resources">Resources</TabsTrigger>
           <TabsTrigger value="prompts">Prompts</TabsTrigger>
+          <TabsTrigger value="permissions">Permissions</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
 
@@ -50,6 +52,7 @@ export default function McpRegistryPage() {
         <TabsContent value="tools"><ToolsTab canEditGlobal={canEditGlobal} /></TabsContent>
         <TabsContent value="resources"><ResourcesTab canEditGlobal={canEditGlobal} /></TabsContent>
         <TabsContent value="prompts"><PromptsTab canEditGlobal={canEditGlobal} /></TabsContent>
+        <TabsContent value="permissions"><PermissionsTab /></TabsContent>
         <TabsContent value="settings"><SettingsTab /></TabsContent>
       </Tabs>
     </div>
