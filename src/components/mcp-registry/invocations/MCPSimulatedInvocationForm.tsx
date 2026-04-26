@@ -35,7 +35,7 @@ export function MCPSimulatedInvocationForm({ open, onOpenChange, agents, users }
   const [toolId, setToolId] = useState<string>('');
   const [agentId, setAgentId] = useState<string>('none');
   const [userId, setUserId] = useState<string>('current');
-  const [inputJson, setInputJson] = useState<string>('{}');
+  const [inputValue, setInputValue] = useState<unknown>({});
   const [jsonValid, setJsonValid] = useState(true);
 
   useEffect(() => {
@@ -43,7 +43,7 @@ export function MCPSimulatedInvocationForm({ open, onOpenChange, agents, users }
       setToolId('');
       setAgentId('none');
       setUserId('current');
-      setInputJson('{}');
+      setInputValue({});
       setJsonValid(true);
     }
   }, [open]);
