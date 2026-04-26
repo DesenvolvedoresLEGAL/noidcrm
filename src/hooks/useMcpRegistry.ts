@@ -17,6 +17,7 @@ import {
   setMcpServerStatus,
   toggleMcpResource,
   toggleMcpTool,
+  updateMcpTool,
   updateMcpPrompt,
   updateMcpResource,
   updateMcpServer,
