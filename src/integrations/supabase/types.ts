@@ -27628,6 +27628,19 @@ export type Database = {
           table_name: string
         }[]
       }
+      check_mcp_permission: {
+        Args: {
+          p_action: string
+          p_agent_id?: string
+          p_organization_id: string
+          p_prompt_id?: string
+          p_resource_id?: string
+          p_role_name?: string
+          p_tool_id?: string
+          p_user_id?: string
+        }
+        Returns: Json
+      }
       cleanup_expired_dedup_keys: { Args: never; Returns: number }
       cleanup_expired_oauth_nonces: { Args: never; Returns: number }
       cleanup_expired_snapshots: { Args: never; Returns: number }
@@ -28062,6 +28075,30 @@ export type Database = {
               subject: string
             }[]
           }
+      mcp_log_audit: {
+        Args: {
+          p_action: string
+          p_after_json?: Json
+          p_agent_id?: string
+          p_before_json?: Json
+          p_entity_id?: string
+          p_entity_type: string
+          p_metadata?: Json
+          p_organization_id?: string
+          p_user_id?: string
+        }
+        Returns: string
+      }
+      mcp_record_invocation: {
+        Args: {
+          p_agent_id?: string
+          p_input_json?: Json
+          p_organization_id: string
+          p_tool_id: string
+          p_user_id?: string
+        }
+        Returns: Json
+      }
       move_to_dlq: {
         Args: {
           dlq_name: string
