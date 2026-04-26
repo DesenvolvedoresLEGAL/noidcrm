@@ -1,208 +1,160 @@
-# Sprint 1.4 — MCP Registry: Permissions
+# Sprint 1.5 — MCP Registry: Invocations & Audit Logs
 
-## Contexto verificado no banco
+## Objetivo
+Adicionar as duas últimas abas do MCP Registry dentro do NOID Intelligence:
+- **Invocations** — listagem, detalhe e formulário de **simulação controlada** via RPC `mcp_record_invocation`.
+- **Audit Logs** — listagem e detalhe somente-leitura de `mcp_audit_logs`.
 
-| Item | Estado |
-|---|---|
-| Tabela `mcp_permissions` | Existe com colunas exatas (`agent_id`, `user_id`, `role_name`, `tool_id`, `resource_id`, `prompt_id`, `can_read/suggest/execute`, `requires_approval`, `max_calls_per_day`, `allowed_scopes`, `status`, `metadata`, audit cols) |
-| Constraints DB | `has_subject` (≥1 alvo), `has_object` (≥1 objeto), `status_chk` (active/inactive/archived), `max_calls_chk` (>0 ou null) |
-| RLS | SELECT: `user_is_org_admin OR is_platform_admin` · INSERT/UPDATE: `user_is_org_admin` · DELETE: bloqueado |
-| FKs | `agent_id → ai_agents`, `tool_id/resource_id/prompt_id → mcp_*` ON DELETE CASCADE |
-| RPCs existentes | `check_mcp_permission`, `mcp_log_audit`, `mcp_record_invocation`, `is_platform_admin`, `user_is_org_admin`, `user_is_org_member` |
-| Tabelas auxiliares | `ai_agents` (id, name, slug, organization_id, status), `organization_members` (já usado em hooks) |
+Ordem final das abas: Overview · Servers · Tools · Resources · Prompts · Permissions · **Invocations** · **Audit Logs** · Settings.
 
-**Decisão arquitetural**: RLS já é suficientemente forte. Vamos usar **Supabase client direto** para CRUD (INSERT/UPDATE com `user_is_org_admin` enforced no banco) + auditoria via `mcp_log_audit`. As **3 RPCs novas** (`mcp_create_permission`, `mcp_update_permission`, `mcp_set_permission_status`) serão criadas como `SECURITY DEFINER` para centralizar **regras de segurança que CHECK constraints não conseguem expressar** (ex.: bloqueio de `can_execute` em tools `critical` ou `automatic_controlled`, forçar `requires_approval` em risco médio+, regra `admin_only`). O frontend chama as RPCs como caminho preferencial; RLS é a defesa em profundidade.
+Nada nesta sprint executa ação real, envia email/WhatsApp, conecta API externa, altera CRM, cria gateway/servidor MCP, ou duplica builder/playground.
 
----
+## Estado já validado no banco (não precisa migration nova)
+- `mcp_tool_invocations` e `mcp_audit_logs` existem com colunas exatas usadas pela UI.
+- RLS já correto:
+  - SELECT: admin da org + platform_admin (invocations também permite o próprio user_id ver suas chamadas).
+  - INSERT/UPDATE/DELETE bloqueados → frontend só pode ler. Mutações **só via RPC**.
+- RPC `public.mcp_record_invocation(p_organization_id, p_tool_id, p_agent_id, p_user_id, p_input_json)` já existe, é `SECURITY DEFINER`, faz cross-org guard, trata 4 cenários (settings ausentes, MCP off, tool off/inexistente, sem permissão) e success → retorna `jsonb` com `invocation_id`, `execution_status`, `approval_status`, `error_message`, `output_json`.
+- RPC já chama `mcp_log_audit` com action `blocked_invocation` ou `simulated_invocation_created`.
 
-## 1. Migração SQL (1 arquivo)
+➡️ **Sem migrations obrigatórias.** Patch defensivo opcional listado no fim.
 
-`supabase/migrations/<ts>_sprint_1_4_mcp_permissions_rpcs.sql`
+## 1. Tipos novos — `src/services/mcp-registry/types.ts`
+Adicionar:
+- `McpInvocationType = 'simulated' | 'real'`
+- `McpExecutionStatus = 'pending' | 'running' | 'success' | 'failed' | 'cancelled' | 'blocked'`
+- `McpApprovalStatus = 'not_required' | 'pending' | 'approved' | 'rejected' | 'expired'`
+- Interface `McpToolInvocation` (mapeada 1:1 com colunas reais do banco).
+- Interface `McpAuditLog` (idem).
+- Interfaces de métricas: `McpInvocationMetrics`, `McpAuditMetrics`.
+- Interface `RecordInvocationResult` (retorno da RPC).
+- Adicionar `'mcp_invocation'` em `McpAuditEntityType` e `'simulated_invocation_created'`, `'blocked_invocation'`, `'system_seed_created'`, `'system_seed_verified'` em `McpAuditAction`.
 
-### 1.1 RPC `public.mcp_create_permission`
-- `SECURITY DEFINER`, `search_path = public`
-- Assinatura conforme spec (todos os parâmetros)
-- Validações:
-  1. `auth.uid()` não nulo
-  2. `user_is_org_admin(p_organization_id) OR is_platform_admin(auth.uid())` → senão raise `insufficient_privilege`
-  3. Exatamente 1 alvo: `(agent_id IS NOT NULL)::int + (user_id IS NOT NULL)::int + (role_name IS NOT NULL)::int = 1`
-  4. Exatamente 1 objeto: `(tool_id IS NOT NULL)::int + (resource_id IS NOT NULL)::int + (prompt_id IS NOT NULL)::int = 1`
-  5. Se `status='active'`: pelo menos um de `can_read/can_suggest/can_execute = true`
-  6. `jsonb_typeof(p_allowed_scopes) = 'array'`, `jsonb_typeof(p_metadata) = 'object'`
-  7. **Regras de segurança por objeto**:
-     - Se `tool_id`: ler tool. Se `risk_level='critical'` E `can_execute` → raise "Tools críticas não podem receber execução nesta fase"
-     - Se `execution_mode='automatic_controlled'` E `can_execute` → raise "Execução automática controlada ainda não está liberada"
-     - Se `can_execute` E `risk_level IN ('medium','high','critical')` → forçar `requires_approval := true`
-     - Se `execution_mode='approval_required'` → forçar `requires_approval := true`
-     - Se `resource_id`: ler resource. Se `read_scope='admin_only'` E (`can_suggest` OR `can_execute`) → raise "Resources admin_only só permitem can_read"
-     - Se `prompt_id`: se `can_execute` → raise "Execução de prompt não está liberada nesta sprint"
-  8. Se `agent_id`: validar `agent.organization_id = p_organization_id` (cross-org)
-  9. Se `user_id`: validar via `organization_members` que pertence à org
-- INSERT em `mcp_permissions` com `created_by = auth.uid()`, `updated_by = auth.uid()`
-- Chamar `mcp_log_audit` (entity_type=`mcp_permission`, action=`created`, after_json = row)
-- Retornar `uuid`
+## 2. Service — `src/services/mcp-registry/mcpInvocationsService.ts` (novo)
+Funções (todas usando o supabase client normal, RLS-compliant, **nunca** service_role):
+- `listMcpInvocations(orgId, filters)` — query em `mcp_tool_invocations`, filtros: data range, tool_id, invocation_type, risk_level, execution_mode, approval_status, execution_status, agent_id, user_id. Order by `created_at desc`, limit configurable (default 200).
+- `getMcpInvocationById(id)` — single + cast JSON.
+- `createSimulatedMcpInvocation({ orgId, toolId, agentId, userId, inputJson })` — chama RPC `mcp_record_invocation`. **Nunca** faz insert direto. Retorna `RecordInvocationResult` para a UI tratar blocked/success/error sem confundir blocked com erro.
+- `getMcpInvocationMetrics(orgId)` — count queries em paralelo: total, simulated, blocked, success, failed, pending_approval, last_24h, sum(volts_consumed). Usa `head: true, count: 'exact'` quando possível.
+- Helpers de resolução (compartilhados):
+  - `listAiAgentsForInvocation(orgId)` — `ai_agents` filtrado por organization_id.
+  - `listOrganizationMembersForSelection(orgId)` — reaproveita pattern já em `mcpPermissionsService.ts`.
+  - `listMcpToolsForInvocation(orgId)` — visíveis (globais + org), inclui `risk_level`, `execution_mode`, `is_enabled`.
 
-### 1.2 RPC `public.mcp_update_permission`
-- Mesma proteção (admin/platform_admin da org da permissão existente)
-- **Não aceita** mudar `organization_id`, `agent_id`, `user_id`, `role_name`, `tool_id`, `resource_id`, `prompt_id` (apenas flags + status + metadata + scopes + max_calls)
-- Reaplica regras de segurança de can_execute (busca tool/resource/prompt do registro)
-- COALESCE para campos opcionais
-- Audit `before_json`/`after_json`, action=`updated`
+## 3. Service — `src/services/mcp-registry/mcpAuditService.ts` (novo)
+- `listMcpAuditLogs(orgId, filters)` — filtros: date range, entity_type, action, user_id, agent_id; metadata JSON filters via `metadata->>'sprint'`, `metadata->>'source'`, `metadata->>'area'` usando `eq` em colunas computadas. Order by `created_at desc`, limit 200.
+- `getMcpAuditLogById(id)` — single.
+- `getMcpAuditMetrics(orgId)` — count queries paralelas: total, last_24h, last_7d, by entity_type (permission, invocation, settings), seeds (action começa com `system_seed_`), blocked (action = `blocked_invocation`).
 
-### 1.3 RPC `public.mcp_set_permission_status`
-- Validação de admin
-- UPDATE status (CHECK enum garante valores)
-- Audit action = `activated` | `deactivated` | `archived`
+## 4. Hooks — extend `src/hooks/useMcpRegistry.ts`
+React Query hooks novos:
+- `useMcpInvocations(filters)`, `useMcpInvocationDetail(id)`, `useMcpInvocationMetrics()`
+- `useCreateSimulatedMcpInvocation()` — mutation com `onSuccess` invalidando keys de invocations, audit logs e overview metrics. **Não** mostra toast aqui — UI decide com base em `execution_status`.
+- `useMcpAuditLogs(filters)`, `useMcpAuditLogDetail(id)`, `useMcpAuditMetrics()`
+- `useMcpToolsForInvocation()`, `useAiAgentsForInvocation()`, `useOrgMembersForInvocation()` — selects compartilhados.
 
-### 1.4 GRANT EXECUTE TO authenticated nas 3 RPCs
+Todos usam `useCurrentOrganization()` para resolver `organization_id` automaticamente — UI nunca passa orgId manualmente.
 
-### 1.5 Patch leve `mcp_log_audit` — **não-quebra**
-Sobrecarga **não** será criada. Em vez disso, adicionar `IF auth.uid() IS NOT NULL AND p_user_id IS NOT NULL AND p_user_id <> auth.uid() AND NOT is_platform_admin(auth.uid()) THEN p_user_id := auth.uid(); END IF;` no início. Frontend ainda envia `auth.uid()`, mas o servidor passa a sobrescrever em caso de tentativa de spoof por usuário não-admin. Este patch é seguro: não muda assinatura nem casos válidos.
+Reutilizar `useCanAccessMcpRegistry()` da Sprint 1.3 nas novas tabs.
 
----
+## 5. Componentes novos — `src/components/mcp-registry/`
 
-## 2. Tipos & Service Layer
+### 5.1 Badges (`badges/`)
+- `MCPInvocationStatusBadge.tsx` — variantes: pending (default), running (info), success (success), failed (destructive), cancelled (muted), blocked (warning, com ícone Shield).
+- `MCPApprovalStatusBadge.tsx` — variantes para 5 estados.
+- `MCPInvocationTypeBadge.tsx` — `simulated` (secondary) vs `real` (destructive + tooltip "Registro real encontrado. Esta UI não executa ações reais.").
+- `MCPAuditActionBadge.tsx` — mapping de cores por ação (created/updated/enabled/disabled/etc).
+- `MCPAuditEntityBadge.tsx` — entity_type → ícone + label.
 
-### 2.1 `src/services/mcp-registry/types.ts` — adicionar
-```ts
-export type McpPermissionStatus = 'active' | 'inactive' | 'archived';
-export type McpPermissionAction = 'read' | 'suggest' | 'execute';
-export type McpPermissionTargetType = 'agent' | 'user' | 'role';
-export type McpPermissionObjectType = 'tool' | 'resource' | 'prompt';
+### 5.2 Invocations (`invocations/`)
+- `MCPInvocationsTab.tsx` — wrapper com banner "Ambiente seguro. As invocations desta fase são apenas simulações…", summary cards, filtros, tabela, drawer de detalhe e botão "Criar invocation simulada".
+- `MCPInvocationSummaryCards.tsx` — 8 cards (totais, simuladas, bloqueadas, success, com erro, pending approval, últimas 24h, volts consumidos).
+- `MCPInvocationFilters.tsx` — date range, selects para tool/type/risk/mode/approval/exec status/agent/user.
+- `MCPInvocationTable.tsx` — colunas: Data, Tool (slug + nome resolvido), Tipo (badge), Agente (nome resolvido ou ID curto + copy), Usuário (idem), Risco, Modo, Aprovação, Status, Volts, Erro (truncado). Linha clicável → drawer.
+- `MCPInvocationDetailDrawer.tsx` — usa `Sheet`. Mostra todos os campos, `MCPJsonViewer` para input/output/error_message, tabela de timing (started_at/finished_at/duration). Botões: Copiar ID, Copiar input JSON, Copiar output JSON. Sem editar/deletar/aprovar/reprocessar/executar.
+- `MCPSimulatedInvocationForm.tsx` — em `Dialog`. Campos: Tool (Combobox com risk/mode/is_enabled visíveis), Agent opcional, User opcional (default = usuário atual, oculto se não houver listagem disponível), Input JSON (`MCPJsonEditor` com validação). Caixa de ajuda (Alert info) explicando como obter success. Submit chama `useCreateSimulatedMcpInvocation` e roteia mensagem por `execution_status`:
+  - `success` → toast.success "Simulação registrada com sucesso. Nenhuma ação externa foi executada."
+  - `blocked` → toast.warning "Simulação bloqueada corretamente pela camada MCP." + mostra `error_message`.
+  - erro técnico (RPC retorna erro Postgres) → toast.error "Não foi possível registrar a simulação MCP."
+  Após qualquer resposta da RPC (success ou blocked), invalida queries e fecha o dialog.
 
-export interface McpPermission {
-  id: string; organization_id: string;
-  agent_id: string | null; user_id: string | null; role_name: string | null;
-  tool_id: string | null; resource_id: string | null; prompt_id: string | null;
-  can_read: boolean; can_suggest: boolean; can_execute: boolean;
-  requires_approval: boolean; max_calls_per_day: number | null;
-  allowed_scopes: unknown[]; status: McpPermissionStatus;
-  metadata: Record<string, unknown>;
-  created_at: string; updated_at: string;
-}
+### 5.3 Audit Logs (`audit/`)
+- `MCPAuditLogsTab.tsx` — wrapper com summary cards, filtros, tabela, drawer.
+- `MCPAuditLogSummaryCards.tsx` — 8 cards (total, 24h, 7d, permission events, invocation events, settings events, seed events, blocked events).
+- `MCPAuditLogFilters.tsx` — date range, entity_type select, action select, user/agent select, sprint/source/area selects (a partir de metadata).
+- `MCPAuditLogTable.tsx` — colunas: Data, Entidade (badge + ID curto), Ação (badge), Usuário, Agente, Entity ID (copy), Origem (`metadata.source`/`area`/`sprint`).
+- `MCPAuditLogDrawer.tsx` — usa `Sheet`. Mostra ID, organization_id, entity_type/id/action, user/agent, ip_address, user_agent, created_at, e três `MCPJsonViewer`: before_json, after_json, metadata. Botões: Copiar ID, Copiar entity_id, Copiar JSON. **Sem** editar/deletar/regravar.
 
-export interface McpPermissionMetrics {
-  total: number; active: number; inactive: number; archived: number;
-  by_agent: number; by_user: number; by_role: number;
-  with_execute: number; with_approval: number;
-}
+## 6. Integração — `src/pages/settings/noid-intelligence/McpRegistryPage.tsx`
+Adicionar 2 `TabsTrigger` + 2 `TabsContent` para `invocations` e `audit-logs`, posicionados entre `permissions` e `settings`. Lazy import dos novos tabs para não inflar bundle inicial.
 
-export interface CheckPermissionResult {
-  allowed: boolean; requires_approval: boolean; reason: string;
-}
-```
-Adicionar `'mcp_permission'` ao `McpAuditEntityType` (já é string union).
+## 7. Overview — atualizar `src/components/mcp-registry/tabs/OverviewTab.tsx`
+Adicionar uma nova seção "Atividade & Auditoria" com 8 cards:
+- Invocations totais, Invocations 24h, Invocations bloqueadas, Invocations success, Invocations simuladas
+- Audit logs totais, Audit logs 7d, Último evento MCP (relative time)
 
-### 2.2 `src/services/mcp-registry/mcpPermissionsService.ts` (novo)
-Funções (todas RLS-safe, validam `orgId`):
-- `listMcpPermissions(orgId, filters): Promise<McpPermission[]>` — SELECT direto + filtros (status, target_type, object_type, can_*, requires_approval)
-- `createMcpPermission(orgId, input)` → `supabase.rpc('mcp_create_permission', {...})` → refetch by id
-- `updateMcpPermission(id, input)` → `rpc('mcp_update_permission', {...})`
-- `setMcpPermissionStatus(id, status)` → `rpc('mcp_set_permission_status', {...})`
-- `archiveMcpPermission(id)` → atalho para status='archived'
-- `testMcpPermission({orgId, agentId?, userId?, roleName?, toolId?, resourceId?, promptId?, action})` → `rpc('check_mcp_permission', {...})` retorna `CheckPermissionResult`
-- `getMcpPermissionMetrics(orgId): Promise<McpPermissionMetrics>` — SELECT minimal e agrega no client
-- `listAiAgentsForPermissions(orgId): Promise<{id,name,slug}[]>` — `from('ai_agents').select('id,name,slug').eq('organization_id', orgId).order('name')`
-- `listUsersForPermissions(orgId): Promise<{user_id, full_name, email}[]>` — join `organization_members → profiles` (mesmo padrão de `PermissionsPage.tsx`)
-- `listRolesForPermissions(): {value,label}[]` — constante (founder, owner, admin, technical_admin, manager, sales, pre_sales, support)
+Manter as métricas de permissions da Sprint 1.4. Usar os hooks `useMcpInvocationMetrics()` e `useMcpAuditMetrics()`.
 
-### 2.3 `src/hooks/useMcpRegistry.ts` — adicionar hooks
-- `useMcpPermissions(filters)`, `useCreateMcpPermission`, `useUpdateMcpPermission`, `useSetMcpPermissionStatus`, `useArchiveMcpPermission`, `useTestMcpPermission` (mutation)
-- `useMcpPermissionMetrics()`
-- `useAiAgentsForPermissions()`, `useUsersForPermissions()`
-- Todos invalidam `['mcp']` e key específica `mcp/permissions`
-- **Importar** `useMcpPermissionMetrics` no `OverviewTab` para somar 4 cards novos
+## 8. Segurança — defense-in-depth
+- Frontend **nunca** envia `p_user_id` arbitrário para `mcp_record_invocation`. Default: omite p_user_id (RPC já faz `COALESCE(p_user_id, auth.uid())`). Só envia se admin selecionou um membro real da org via combobox.
+- Frontend nunca insere direto em `mcp_tool_invocations` nem em `mcp_audit_logs`.
+- Tabs gated por `useCanAccessMcpRegistry` (mesmo guard das demais).
+- RLS já garante isolamento. Sem alteração de policies.
 
----
+### Patch defensivo opcional (registrado, **não** aplicado nesta sprint para evitar risco):
+A RPC `mcp_record_invocation` aceita `p_user_id` arbitrário. Embora o cross-org guard já bloqueie usar user de outra org, idealmente, espelhando o patch de `mcp_log_audit` da Sprint 1.4, devemos forçar `v_user_id := auth.uid()` quando o caller não for admin/owner/founder/technical_admin/platform_admin. Como a UI já é restrita a admins, isso é defesa em profundidade. **Ponto de atenção registrado para Sprint 2.1.**
 
-## 3. Componentes UI (em `src/components/mcp-registry/permissions/`)
+## 9. UX patterns
+- Empty states usando `MCPEmptyState` existente.
+- Loading: skeletons em cards, tabela e drawer.
+- Blocked deve **parecer** comportamento de segurança (warning amarelo + ícone Shield), nunca erro vermelho.
+- Success da simulação deixa explícito "Nenhuma ação externa foi executada".
+- Type `real` aparece com badge destrutivo + tooltip de aviso. UI nunca cria `real`.
 
-| Componente | Propósito |
-|---|---|
-| `MCPPermissionStatusBadge.tsx` | active/inactive/archived (reutiliza style de `MCPStatusBadge`) |
-| `MCPPermissionTargetBadge.tsx` | "Agent: NomeBot" / "User: João" / "Role: admin" com ícone |
-| `MCPPermissionObjectBadge.tsx` | "Tool · slug" / "Resource · uri" / "Prompt · slug" |
-| `MCPPermissionActionBadges.tsx` | Trio Read/Suggest/Execute (verde/cinza) |
-| `MCPPermissionSummaryCards.tsx` | Reusa `MCPMetricCard` x 7 (total, ativas, por agent/user/role, execute, approval) |
-| `MCPPermissionFilters.tsx` | Selects de target_type, object_type, status, can_*, requires_approval |
-| `MCPPermissionTable.tsx` | Tabela com colunas spec + actions dropdown (Edit, Activate, Deactivate, Archive) |
-| `MCPPermissionForm.tsx` | Modal/sheet de create/edit. Step 1 (escolher tipo de alvo + alvo), Step 2 (escolher tipo de objeto + objeto), Step 3 (permissões + approval + max_calls + scopes JSON + metadata JSON). Validações client-side espelhando RPC. Avisos contextuais (tool critical, automatic_controlled, admin_only, prompt execute) |
-| `MCPPermissionDetailDrawer.tsx` | Drawer read-only com todos os campos + audit log resumo |
-| `MCPPermissionTestPanel.tsx` | Painel inline na aba: form (target type + alvo + object type + objeto + action) + botão "Testar permissão" → exibe `CheckPermissionResult` com 2 badges (allowed, requires_approval) + bloco `reason`. Usa `useTestMcpPermission` |
+## 10. Critérios de aceite (resumo)
+- 2 tabs novas dentro do MCP Registry, gated por admin.
+- Listagem real, filtros funcionais, métricas reais.
+- Detalhes em drawer somente-leitura, com JSON viewer.
+- Simulação chama RPC (nunca insert direto), trata 4 cenários (blocked × 3 + success).
+- Overview atualizado.
+- Sem service_role, sem alteração de RLS, sem chamada externa, sem mexer em CRM, sem duplicar Hub/Builder/Playground.
 
-### 3.1 `src/components/mcp-registry/tabs/PermissionsTab.tsx` (novo)
-Layout:
-1. Header + descrição
-2. `MCPPermissionSummaryCards`
-3. Botão "Nova permissão" (abre `MCPPermissionForm`)
-4. `MCPPermissionFilters`
-5. `MCPPermissionTable` (com empty state, loading, error)
-6. Separador
-7. `MCPPermissionTestPanel`
+## Arquivos a criar/editar
 
-### 3.2 `MCPPermissionForm` — regras de segurança client-side (espelham RPC)
-- Carrega dados do objeto selecionado (tool/resource/prompt) via cache da query existente
-- Se tool `risk_level='critical'`: desabilita switch `can_execute` + tooltip
-- Se tool `execution_mode='automatic_controlled'`: idem
-- Se tool `risk_level IN ('medium','high','critical')` e `can_execute=true`: força `requires_approval=true` e desabilita switch
-- Se tool `execution_mode='approval_required'`: força `requires_approval=true`
-- Se resource `read_scope='admin_only'`: desabilita `can_suggest`/`can_execute`
-- Se prompt: desabilita `can_execute`
-- Validação JSON ao blur (reuso de `MCPJsonEditor` para `allowed_scopes` e `metadata`)
-- Bloqueia submit se status=active e nenhum can_*
+**Novos (≈18 arquivos):**
+- `src/services/mcp-registry/mcpInvocationsService.ts`
+- `src/services/mcp-registry/mcpAuditService.ts`
+- `src/components/mcp-registry/badges/MCPInvocationStatusBadge.tsx`
+- `src/components/mcp-registry/badges/MCPApprovalStatusBadge.tsx`
+- `src/components/mcp-registry/badges/MCPInvocationTypeBadge.tsx`
+- `src/components/mcp-registry/badges/MCPAuditActionBadge.tsx`
+- `src/components/mcp-registry/badges/MCPAuditEntityBadge.tsx`
+- `src/components/mcp-registry/invocations/MCPInvocationsTab.tsx`
+- `src/components/mcp-registry/invocations/MCPInvocationSummaryCards.tsx`
+- `src/components/mcp-registry/invocations/MCPInvocationFilters.tsx`
+- `src/components/mcp-registry/invocations/MCPInvocationTable.tsx`
+- `src/components/mcp-registry/invocations/MCPInvocationDetailDrawer.tsx`
+- `src/components/mcp-registry/invocations/MCPSimulatedInvocationForm.tsx`
+- `src/components/mcp-registry/audit/MCPAuditLogsTab.tsx`
+- `src/components/mcp-registry/audit/MCPAuditLogSummaryCards.tsx`
+- `src/components/mcp-registry/audit/MCPAuditLogFilters.tsx`
+- `src/components/mcp-registry/audit/MCPAuditLogTable.tsx`
+- `src/components/mcp-registry/audit/MCPAuditLogDrawer.tsx`
 
----
-
-## 4. Wiring
-
-### 4.1 `src/pages/settings/noid-intelligence/McpRegistryPage.tsx`
-Adicionar `<TabsTrigger value="permissions">Permissions</TabsTrigger>` entre "Prompts" e "Settings" e `<TabsContent value="permissions"><PermissionsTab /></TabsContent>`. **Não criar nova rota** (mesma página).
-
-### 4.2 `OverviewTab.tsx`
-Adicionar 4 `MCPMetricCard` consumindo `useMcpPermissionMetrics`:
-- "Permissões totais"
-- "Permissões ativas"
-- "Com execução liberada"
-- "Exigem aprovação"
-
-### 4.3 Acesso
-A guarda já existe em `McpRegistryPage` via `useCanAccessMcpRegistry`. A aba herda. Sem mudanças adicionais.
-
----
-
-## 5. Pontos de atenção / não-fazer
-
-- ❌ Sem aba Invocations / Audit Logs (Sprint 1.5)
-- ❌ Sem chamadas a `mcp_record_invocation` no frontend
-- ❌ Sem execução real de tool
-- ❌ Não criar rota nova (Permissions é aba dentro de `/app/settings/noid-intelligence/mcp-registry`)
-- ✅ `organization_id` sempre de `useCurrentOrganization()` — sem dropdown
-- ✅ `p_user_id` em audits sempre `auth.uid()` (já é o padrão do service); patch no `mcp_log_audit` adiciona defesa em profundidade
-- ✅ Globais (org_id null) podem ser **objeto protegido** mas **permissão é sempre org-scoped**
-
----
-
-## 6. Resumo de arquivos
-
-**Migração**: 1 arquivo SQL com 3 RPCs novas + patch idempotente em `mcp_log_audit`
-
-**Novos** (TS):
-- `src/services/mcp-registry/mcpPermissionsService.ts`
-- `src/components/mcp-registry/permissions/` (9 componentes)
-- `src/components/mcp-registry/tabs/PermissionsTab.tsx`
-
-**Editados**:
+**Editados (4 arquivos):**
 - `src/services/mcp-registry/types.ts` (tipos novos)
-- `src/hooks/useMcpRegistry.ts` (8 hooks novos)
-- `src/pages/settings/noid-intelligence/McpRegistryPage.tsx` (1 tab nova)
-- `src/components/mcp-registry/tabs/OverviewTab.tsx` (4 cards novos)
+- `src/hooks/useMcpRegistry.ts` (hooks novos)
+- `src/pages/settings/noid-intelligence/McpRegistryPage.tsx` (2 tabs novas)
+- `src/components/mcp-registry/tabs/OverviewTab.tsx` (seção Atividade & Auditoria)
 
-## 7. Como testar (pós-implementação)
-1. Como admin → MCP Registry → aba Permissions visível
-2. Criar permissão `role=admin / tool=get_lead_context / can_read=true` → sucesso
-3. Painel de teste → role=admin, tool=get_lead_context, action=read → `allowed: true`
-4. Mesmo teste com action=execute → `allowed: false`
-5. Tentar criar permissão em tool com `risk_level=critical` e `can_execute=true` → bloqueado (UI + RPC)
-6. Criar permissão sem alvo / sem objeto / sem ação ativa → bloqueado
-7. Login como user comum → aba não aparece, rota retorna `AccessDenied`
-8. Verificar audit log: `SELECT entity_type, action FROM mcp_audit_logs WHERE entity_type='mcp_permission' ORDER BY created_at DESC LIMIT 10;`
+**Migrations:** nenhuma obrigatória. Patch defensivo em `mcp_record_invocation` deferido para Sprint 2.1.
+
+## Riscos
+- Baixo. Não toca em RLS, RPCs existentes, schema, ou em produtos vivos do CRM.
+- Único risco potencial: a RPC retorna `jsonb` que precisamos parsear corretamente — já validei o shape no banco.
+
+## Próximos passos (Sprint 2)
+1. Patch defensivo em `mcp_record_invocation` (force `auth.uid()` quando caller não for admin).
+2. Estender RPC para aceitar `p_role_name` permitindo testar simulação por role na UI.
+3. Aprovação humana de invocations (`approval_status = pending` → admin aprova/rejeita).
+4. Início da camada de execução real (MCP Gateway).
