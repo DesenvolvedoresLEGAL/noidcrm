@@ -130,7 +130,11 @@ export type McpAuditAction =
   | 'disabled'
   | 'activated'
   | 'deactivated'
-  | 'archived';
+  | 'archived'
+  | 'system_seed_created'
+  | 'system_seed_verified'
+  | 'simulated_invocation_created'
+  | 'blocked_invocation';
 
 export type McpAuditEntityType =
   | 'mcp_server'
@@ -138,7 +142,95 @@ export type McpAuditEntityType =
   | 'mcp_resource'
   | 'mcp_prompt'
   | 'mcp_registry_settings'
-  | 'mcp_permission';
+  | 'mcp_permission'
+  | 'mcp_invocation';
+
+// ===================== INVOCATIONS & AUDIT (Sprint 1.5) =====================
+
+export type McpInvocationType = 'simulated' | 'real';
+export type McpExecutionStatus =
+  | 'pending'
+  | 'running'
+  | 'success'
+  | 'failed'
+  | 'cancelled'
+  | 'blocked';
+export type McpApprovalStatus =
+  | 'not_required'
+  | 'pending'
+  | 'approved'
+  | 'rejected'
+  | 'expired';
+
+export interface McpToolInvocation {
+  id: string;
+  organization_id: string;
+  agent_id: string | null;
+  user_id: string | null;
+  tool_id: string | null;
+  tool_slug: string | null;
+  invocation_type: McpInvocationType;
+  input_json: Record<string, unknown>;
+  output_json: Record<string, unknown> | null;
+  risk_level: McpRiskLevel;
+  execution_mode: McpExecutionMode | null;
+  approval_required: boolean;
+  approval_status: McpApprovalStatus;
+  execution_status: McpExecutionStatus;
+  error_message: string | null;
+  volts_consumed: number;
+  started_at: string | null;
+  finished_at: string | null;
+  created_at: string;
+}
+
+export interface McpAuditLog {
+  id: string;
+  organization_id: string | null;
+  user_id: string | null;
+  agent_id: string | null;
+  entity_type: McpAuditEntityType | string;
+  entity_id: string | null;
+  action: McpAuditAction | string;
+  before_json: Record<string, unknown> | null;
+  after_json: Record<string, unknown> | null;
+  metadata: Record<string, unknown>;
+  ip_address: string | null;
+  user_agent: string | null;
+  created_at: string;
+}
+
+export interface McpInvocationMetrics {
+  total: number;
+  simulated: number;
+  real: number;
+  blocked: number;
+  success: number;
+  failed: number;
+  pending_approval: number;
+  last_24h: number;
+  volts_consumed: number;
+}
+
+export interface McpAuditMetrics {
+  total: number;
+  last_24h: number;
+  last_7d: number;
+  permission_events: number;
+  invocation_events: number;
+  settings_events: number;
+  seed_events: number;
+  blocked_events: number;
+  last_event_at: string | null;
+}
+
+export interface RecordInvocationResult {
+  invocation_id: string | null;
+  execution_status: McpExecutionStatus;
+  approval_status: McpApprovalStatus;
+  error_message: string | null;
+  output_json: Record<string, unknown> | null;
+}
 
 // ===================== PERMISSIONS (Sprint 1.4) =====================
 

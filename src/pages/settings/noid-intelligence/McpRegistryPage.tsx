@@ -7,6 +7,8 @@ import { ResourcesTab } from '@/components/mcp-registry/tabs/ResourcesTab';
 import { PromptsTab } from '@/components/mcp-registry/tabs/PromptsTab';
 import { PermissionsTab } from '@/components/mcp-registry/tabs/PermissionsTab';
 import { SettingsTab } from '@/components/mcp-registry/tabs/SettingsTab';
+import { MCPInvocationsTab } from '@/components/mcp-registry/invocations/MCPInvocationsTab';
+import { MCPAuditLogsTab } from '@/components/mcp-registry/audit/MCPAuditLogsTab';
 import { AccessDenied } from '@/components/AccessDenied';
 import { useCanAccessMcpRegistry } from '@/hooks/useMcpRegistry';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -44,6 +46,8 @@ export default function McpRegistryPage() {
           <TabsTrigger value="resources">Resources</TabsTrigger>
           <TabsTrigger value="prompts">Prompts</TabsTrigger>
           <TabsTrigger value="permissions">Permissions</TabsTrigger>
+          <TabsTrigger value="invocations">Invocations</TabsTrigger>
+          <TabsTrigger value="audit-logs">Audit Logs</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
 
@@ -53,6 +57,8 @@ export default function McpRegistryPage() {
         <TabsContent value="resources"><ResourcesTab canEditGlobal={canEditGlobal} /></TabsContent>
         <TabsContent value="prompts"><PromptsTab canEditGlobal={canEditGlobal} /></TabsContent>
         <TabsContent value="permissions"><PermissionsTab /></TabsContent>
+        <TabsContent value="invocations"><MCPInvocationsTab /></TabsContent>
+        <TabsContent value="audit-logs"><MCPAuditLogsTab /></TabsContent>
         <TabsContent value="settings"><SettingsTab /></TabsContent>
       </Tabs>
     </div>

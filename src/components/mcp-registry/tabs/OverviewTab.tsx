@@ -2,7 +2,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { MCPMetricCard } from '../MCPMetricCard';
-import { useMcpOverviewMetrics, useMcpSettings, useMcpPermissionMetrics } from '@/hooks/useMcpRegistry';
+import { useMcpOverviewMetrics, useMcpSettings, useMcpPermissionMetrics, useMcpInvocationMetrics, useMcpAuditMetrics } from '@/hooks/useMcpRegistry';
 import {
   Server,
   Wrench,
@@ -15,12 +15,22 @@ import {
   Shield,
   Zap,
   Lock,
+  Activity,
+  FlaskConical,
+  CheckCircle2,
+  Calendar,
+  CalendarDays,
+  History,
 } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 export function OverviewTab() {
   const { data: metrics, isLoading: metricsLoading } = useMcpOverviewMetrics();
   const { data: settings, isLoading: settingsLoading } = useMcpSettings();
   const { data: permMetrics } = useMcpPermissionMetrics();
+  const { data: invMetrics } = useMcpInvocationMetrics();
+  const { data: auditMetrics } = useMcpAuditMetrics();
 
   if (metricsLoading || settingsLoading) {
     return (
@@ -95,6 +105,30 @@ export function OverviewTab() {
         <MCPMetricCard label="Permissões ativas" value={permMetrics?.active ?? 0} icon={ShieldCheck} variant="success" />
         <MCPMetricCard label="Com execução liberada" value={permMetrics?.with_execute ?? 0} icon={Zap} variant="warning" />
         <MCPMetricCard label="Exigem aprovação" value={permMetrics?.with_approval ?? 0} icon={Lock} />
+      </div>
+
+      {/* Atividade & Auditoria (Sprint 1.5) */}
+      <div className="space-y-2">
+        <h3 className="text-sm font-semibold text-foreground">Atividade & Auditoria</h3>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <MCPMetricCard label="Invocations totais" value={invMetrics?.total ?? 0} icon={Activity} />
+          <MCPMetricCard label="Invocations 24h" value={invMetrics?.last_24h ?? 0} icon={Calendar} />
+          <MCPMetricCard label="Invocations bloqueadas" value={invMetrics?.blocked ?? 0} icon={Shield} variant="warning" />
+          <MCPMetricCard label="Invocations com sucesso" value={invMetrics?.success ?? 0} icon={CheckCircle2} variant="success" />
+          <MCPMetricCard label="Invocations simuladas" value={invMetrics?.simulated ?? 0} icon={FlaskConical} />
+          <MCPMetricCard label="Audit logs totais" value={auditMetrics?.total ?? 0} icon={History} />
+          <MCPMetricCard label="Audit logs 7d" value={auditMetrics?.last_7d ?? 0} icon={CalendarDays} />
+          <MCPMetricCard
+            label="Último evento MCP"
+            value={
+              auditMetrics?.last_event_at
+                ? formatDistanceToNow(new Date(auditMetrics.last_event_at), { addSuffix: true, locale: ptBR })
+                : '—'
+            }
+            icon={Clock}
+            variant="muted"
+          />
+        </div>
       </div>
 
       {/* Bloco explicativo */}

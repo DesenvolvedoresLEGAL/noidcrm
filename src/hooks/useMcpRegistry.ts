@@ -52,6 +52,21 @@ import {
   type UpdateMcpPermissionInput,
   type TestPermissionInput,
 } from '@/services/mcp-registry/mcpPermissionsService';
+import {
+  listMcpInvocations,
+  getMcpInvocationById,
+  createSimulatedMcpInvocation,
+  getMcpInvocationMetrics,
+  listMcpToolsForInvocation,
+  type InvocationFilters,
+  type CreateSimulatedInvocationInput,
+} from '@/services/mcp-registry/mcpInvocationsService';
+import {
+  listMcpAuditLogs,
+  getMcpAuditLogById,
+  getMcpAuditMetrics,
+  type AuditLogFilters,
+} from '@/services/mcp-registry/mcpAuditService';
 
 /**
  * Acesso ao MCP Registry: owner / admin da organização ou platform admin.
@@ -364,6 +379,99 @@ export function useUsersForPermissions() {
   return useQuery({
     queryKey: KEY.usersForPerms(orgId),
     queryFn: () => listUsersForPermissions(orgId),
+    enabled: !!orgId,
+  });
+}
+
+// ===================== INVOCATIONS & AUDIT (Sprint 1.5) =====================
+
+const KEY_S15 = {
+  invocations: (orgId: string, f: InvocationFilters) => ['mcp', 'invocations', orgId, f] as const,
+  invocationDetail: (id: string) => ['mcp', 'invocation', id] as const,
+  invocationMetrics: (orgId: string) => ['mcp', 'invocation-metrics', orgId] as const,
+  toolsForInvocation: (orgId: string) => ['mcp', 'tools-for-invocation', orgId] as const,
+  auditLogs: (orgId: string, f: AuditLogFilters) => ['mcp', 'audit-logs', orgId, f] as const,
+  auditDetail: (id: string) => ['mcp', 'audit-log', id] as const,
+  auditMetrics: (orgId: string) => ['mcp', 'audit-metrics', orgId] as const,
+};
+
+export function useMcpInvocations(filters: InvocationFilters = {}) {
+  const { organization } = useCurrentOrganization();
+  const orgId = organization?.id ?? '';
+  return useQuery({
+    queryKey: KEY_S15.invocations(orgId, filters),
+    queryFn: () => listMcpInvocations(orgId, filters),
+    enabled: !!orgId,
+  });
+}
+
+export function useMcpInvocationDetail(id: string | null) {
+  return useQuery({
+    queryKey: KEY_S15.invocationDetail(id ?? ''),
+    queryFn: () => getMcpInvocationById(id as string),
+    enabled: !!id,
+  });
+}
+
+export function useMcpInvocationMetrics() {
+  const { organization } = useCurrentOrganization();
+  const orgId = organization?.id ?? '';
+  return useQuery({
+    queryKey: KEY_S15.invocationMetrics(orgId),
+    queryFn: () => getMcpInvocationMetrics(orgId),
+    enabled: !!orgId,
+  });
+}
+
+export function useCreateSimulatedMcpInvocation() {
+  const qc = useQueryClient();
+  const { organization } = useCurrentOrganization();
+  return useMutation({
+    mutationFn: (input: Omit<CreateSimulatedInvocationInput, 'orgId'>) => {
+      if (!organization?.id) throw new Error('Organização não definida');
+      return createSimulatedMcpInvocation({ ...input, orgId: organization.id });
+    },
+    onSuccess: () => {
+      // Sucesso E blocked invalidam: ambos geram registros novos.
+      invalidateAll(qc);
+    },
+  });
+}
+
+export function useMcpToolsForInvocation() {
+  const { organization } = useCurrentOrganization();
+  const orgId = organization?.id ?? '';
+  return useQuery({
+    queryKey: KEY_S15.toolsForInvocation(orgId),
+    queryFn: () => listMcpToolsForInvocation(orgId),
+    enabled: !!orgId,
+  });
+}
+
+export function useMcpAuditLogs(filters: AuditLogFilters = {}) {
+  const { organization } = useCurrentOrganization();
+  const orgId = organization?.id ?? '';
+  return useQuery({
+    queryKey: KEY_S15.auditLogs(orgId, filters),
+    queryFn: () => listMcpAuditLogs(orgId, filters),
+    enabled: !!orgId,
+  });
+}
+
+export function useMcpAuditLogDetail(id: string | null) {
+  return useQuery({
+    queryKey: KEY_S15.auditDetail(id ?? ''),
+    queryFn: () => getMcpAuditLogById(id as string),
+    enabled: !!id,
+  });
+}
+
+export function useMcpAuditMetrics() {
+  const { organization } = useCurrentOrganization();
+  const orgId = organization?.id ?? '';
+  return useQuery({
+    queryKey: KEY_S15.auditMetrics(orgId),
+    queryFn: () => getMcpAuditMetrics(orgId),
     enabled: !!orgId,
   });
 }
