@@ -189,12 +189,13 @@ export function MCPSimulatedInvocationForm({ open, onOpenChange, agents, users }
           <div className="space-y-1">
             <Label>Input JSON</Label>
             <MCPJsonEditor
-              value={inputJson}
+              value={inputValue}
               onChange={(v, valid) => {
-                setInputJson(v);
+                setInputValue(v);
                 setJsonValid(valid);
               }}
-              minHeight="160px"
+              rows={8}
+              helperText="Se vazio, será enviado {} para a RPC."
             />
           </div>
         </div>
