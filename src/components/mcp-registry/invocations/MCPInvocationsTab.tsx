@@ -61,8 +61,12 @@ export function MCPInvocationsTab() {
         <MCPEmptyState
           title="Nenhuma invocation MCP registrada"
           description="Crie uma simulação controlada para validar permissões e segurança."
-          actionLabel="Criar invocation simulada"
-          onAction={() => setFormOpen(true)}
+          action={
+            <Button onClick={() => setFormOpen(true)} className="gap-2">
+              <Plus className="h-4 w-4" />
+              Criar invocation simulada
+            </Button>
+          }
         />
       ) : (
         <MCPInvocationTable
