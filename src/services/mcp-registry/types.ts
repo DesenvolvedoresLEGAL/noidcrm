@@ -137,7 +137,54 @@ export type McpAuditEntityType =
   | 'mcp_tool'
   | 'mcp_resource'
   | 'mcp_prompt'
-  | 'mcp_registry_settings';
+  | 'mcp_registry_settings'
+  | 'mcp_permission';
+
+// ===================== PERMISSIONS (Sprint 1.4) =====================
+
+export type McpPermissionStatus = 'active' | 'inactive' | 'archived';
+export type McpPermissionAction = 'read' | 'suggest' | 'execute';
+export type McpPermissionTargetType = 'agent' | 'user' | 'role';
+export type McpPermissionObjectType = 'tool' | 'resource' | 'prompt';
+
+export interface McpPermission {
+  id: string;
+  organization_id: string;
+  agent_id: string | null;
+  user_id: string | null;
+  role_name: string | null;
+  tool_id: string | null;
+  resource_id: string | null;
+  prompt_id: string | null;
+  can_read: boolean;
+  can_suggest: boolean;
+  can_execute: boolean;
+  requires_approval: boolean;
+  max_calls_per_day: number | null;
+  allowed_scopes: unknown[];
+  status: McpPermissionStatus;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface McpPermissionMetrics {
+  total: number;
+  active: number;
+  inactive: number;
+  archived: number;
+  by_agent: number;
+  by_user: number;
+  by_role: number;
+  with_execute: number;
+  with_approval: number;
+}
+
+export interface CheckPermissionResult {
+  allowed: boolean;
+  requires_approval: boolean;
+  reason: string;
+}
 
 export const SERVER_TYPES: McpServerType[] = ['internal', 'external'];
 export const TRANSPORT_TYPES: McpTransportType[] = ['http', 'stdio', 'sse'];
