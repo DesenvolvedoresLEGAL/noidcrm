@@ -180,7 +180,21 @@ Deno.serve(async (req) => {
     const rule = pickRule((rules ?? []) as DecisionRule[], score, confidence, contactScore);
 
     if (!rule) {
-      const { data: log } = await supabase
+      // Modo estrito: se a regra ideal estiver desligada, NÃO faz fallback automático.
+      // Detecta regras inativas que matchariam para registro/observabilidade.
+      const { data: allRules } = await supabase
+        .from("decision_rules")
+        .select("id, name, is_active, min_score, max_score, min_confidence, priority_label")
+        .eq("organization_id", organization_id);
+      const inactiveMatches = (allRules ?? []).filter((r: any) => {
+        if (r.is_active) return false;
+        if (r.min_score != null && score < r.min_score) return false;
+        if (r.max_score != null && score > r.max_score) return false;
+        if (r.min_confidence != null && confidence < r.min_confidence) return false;
+        return true;
+      });
+
+      const { data: log, error: logErr } = await supabase
         .from("decision_logs")
         .insert({
           organization_id,
@@ -189,12 +203,22 @@ Deno.serve(async (req) => {
           score,
           confidence,
           quality_label: qualityLabel,
-          decision_taken: "skipped_no_rule",
-          decision_payload: { score, confidence },
+          decision_taken: "no_active_matching_rule",
+          decision_payload: {
+            score,
+            confidence,
+            reason: inactiveMatches.length > 0
+              ? "ideal_rule_disabled"
+              : "no_rule_covers_score_range",
+            inactive_matching_rules: inactiveMatches.map((r: any) => ({
+              id: r.id, name: r.name, priority_label: r.priority_label,
+            })),
+          },
         })
         .select()
         .single();
-      return jsonResponse({ decision_taken: "skipped_no_rule", log });
+      if (logErr) console.error("decision_logs insert failed:", logErr);
+      return jsonResponse({ decision_taken: "no_active_matching_rule", log, log_error: logErr?.message ?? null });
     }
 
     if (dry_run) {
@@ -256,6 +280,33 @@ Deno.serve(async (req) => {
         if (rule.owner_strategy === "fixed" && rule.fixed_owner_user_id) {
           ownerUserId = rule.fixed_owner_user_id;
         } else {
+          // Auto-bootstrap: se a fila estiver vazia, popula com membros ativos da org.
+          const { count: queueCount } = await supabase
+            .from("owner_queue")
+            .select("id", { count: "exact", head: true })
+            .eq("organization_id", organization_id)
+            .eq("is_active", true);
+
+          if (!queueCount || queueCount === 0) {
+            const { data: members } = await supabase
+              .from("organization_members")
+              .select("user_id")
+              .eq("organization_id", organization_id);
+            if (members && members.length > 0) {
+              const rows = members.map((m: any) => ({
+                organization_id,
+                user_id: m.user_id,
+                weight: 1,
+                is_active: true,
+                role_filter: rule.owner_role_filter,
+              }));
+              await supabase.from("owner_queue").upsert(rows, {
+                onConflict: "organization_id,user_id",
+                ignoreDuplicates: true,
+              });
+            }
+          }
+
           const { data: oid } = await supabase.rpc("claim_next_owner_round_robin", {
             _organization_id: organization_id,
             _role_filter: rule.owner_role_filter,
@@ -263,6 +314,7 @@ Deno.serve(async (req) => {
           ownerUserId = (oid as string) ?? null;
         }
         if (ownerUserId) actions.owner_user_id = ownerUserId;
+        else errors.push("assign_owner: no_active_owner_in_queue");
       } catch (e: any) {
         errors.push(`assign_owner: ${e.message}`);
       }
