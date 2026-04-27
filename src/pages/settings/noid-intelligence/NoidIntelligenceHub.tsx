@@ -99,6 +99,15 @@ const hubItems = [
     available: true,
     badge: 'Auto',
   },
+  {
+    id: 'learning',
+    title: 'Performance & Aprendizado',
+    description: 'Funil, sinais que convertem e performance de outreach',
+    icon: TrendingUp,
+    path: '/app/settings/noid-intelligence/learning',
+    available: true,
+    badge: 'Learning',
+  },
 ];
 
 export default function NoidIntelligenceHub() {
