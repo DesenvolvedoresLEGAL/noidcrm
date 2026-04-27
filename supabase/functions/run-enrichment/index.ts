@@ -125,6 +125,44 @@ function gradeFromScore(score: number): "A" | "B" | "C" | "D" {
   return "D";
 }
 
+type QualityLabel = "high_confidence" | "usable" | "low_confidence" | "insufficient";
+
+function qualityLabelFromGrade(grade: "A" | "B" | "C" | "D"): QualityLabel {
+  switch (grade) {
+    case "A": return "high_confidence";
+    case "B": return "usable";
+    case "C": return "low_confidence";
+    case "D": return "insufficient";
+  }
+}
+
+const REQUIRED_NORMALIZED_FIELDS: Array<keyof NormalizedProfile> = [
+  "company_summary",
+  "business_model",
+  "market_type",
+  "industry",
+  "target_customer",
+  "geo",
+  "company_size_hint",
+  "top_pains",
+  "top_opportunities",
+  "trigger_signals",
+  "digital_maturity",
+];
+
+function computeMissingFields(data: NormalizedProfile): string[] {
+  const missing: string[] = [];
+  for (const f of REQUIRED_NORMALIZED_FIELDS) {
+    const v = data[f];
+    if (v == null) missing.push(f as string);
+    else if (Array.isArray(v) && v.length === 0) missing.push(f as string);
+  }
+  return missing;
+}
+
+// Bump this string whenever the normalization prompt or schema changes
+const PROMPT_VERSION = "enrichment.normalize.v2.0";
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
