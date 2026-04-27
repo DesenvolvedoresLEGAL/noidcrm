@@ -219,7 +219,16 @@ export function LeadResultsTable({
                 </TableHead>
                 <TableHead>Empresa</TableHead>
                 <TableHead>Origem</TableHead>
-                <TableHead className="text-center">Confiança</TableHead>
+                <TableHead className="text-center">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="cursor-help underline decoration-dotted">Confiança</span>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="max-w-xs text-xs">
+                      Confiança da extração de dados pela IA (0–100). Não confundir com o Score de prioridade comercial.
+                    </TooltipContent>
+                  </Tooltip>
+                </TableHead>
                 <TableHead className="text-center">Score</TableHead>
                 <TableHead className="text-center">Grade</TableHead>
                 <TableHead>Duplicidade</TableHead>
