@@ -615,7 +615,7 @@ REMETENTE: SDR da NOID.`,
       });
     }
 
-    // 10. Re-score prospect
+    // 10. Re-score prospect (Score V3 = base + enrichment + learning_adjustment)
     let scoreBonus = 0;
     if (hasNormalized) {
       if (website) scoreBonus += 10;
@@ -624,7 +624,39 @@ REMETENTE: SDR da NOID.`,
       if (normalized.trigger_signals.length > 0) scoreBonus += 3;
     }
 
-    if (scoreBonus > 0) {
+    // Sprint C: compute learning_adjustment from learning_signals
+    let learningAdjustment = 0;
+    try {
+      const { data: prospectSignalsAll } = await supabase
+        .from("prospect_signals")
+        .select("signal_type, signal_value")
+        .eq("organization_id", workspace_id)
+        .eq("prospect_id", prospect_id);
+      const { data: enrichmentSignalsAll } = await supabase
+        .from("enrichment_signals")
+        .select("signal_type, signal_value")
+        .eq("workspace_id", workspace_id)
+        .eq("prospect_id", prospect_id);
+      const allSig = [...(prospectSignalsAll ?? []), ...(enrichmentSignalsAll ?? [])];
+      if (allSig.length > 0) {
+        const { data: learn } = await supabase
+          .from("learning_signals")
+          .select("signal_type, signal_value, impact_score, confidence")
+          .eq("organization_id", workspace_id)
+          .gte("confidence", 0.2);
+        const learnMap = new Map(
+          (learn ?? []).map((l: any) => [`${l.signal_type}:${l.signal_value}`, Number(l.impact_score)]),
+        );
+        for (const s of allSig) {
+          const k = `${(s as any).signal_type}:${(s as any).signal_value}`;
+          if (learnMap.has(k)) learningAdjustment += learnMap.get(k)!;
+        }
+      }
+    } catch (e) {
+      console.error("[learning_adjustment] failed:", e);
+    }
+
+    if (scoreBonus > 0 || learningAdjustment !== 0) {
       const { data: existingScore } = await supabase
         .from("prospect_scores")
         .select("*")
@@ -632,7 +664,13 @@ REMETENTE: SDR da NOID.`,
         .maybeSingle();
       if (existingScore) {
         const newSignalScore = (existingScore.signal_score || 0) + scoreBonus;
-        const newTotal = (existingScore.icp_fit_score || 0) + newSignalScore + (existingScore.data_quality_score || 0) + (existingScore.source_trust_score || 0) - (existingScore.penalty_score || 0);
+        const newTotal =
+          (existingScore.icp_fit_score || 0) +
+          newSignalScore +
+          (existingScore.data_quality_score || 0) +
+          (existingScore.source_trust_score || 0) -
+          (existingScore.penalty_score || 0) +
+          learningAdjustment;
         const newGrade = newTotal >= 80 ? "A" : newTotal >= 60 ? "B" : newTotal >= 40 ? "C" : "D";
         await supabase
           .from("prospect_scores")
@@ -642,6 +680,7 @@ REMETENTE: SDR da NOID.`,
             reasoning: {
               ...(existingScore.reasoning as any || {}),
               enrichment_bonus: scoreBonus,
+              learning_adjustment: learningAdjustment,
               enrichment_signals: [
                 ...normalized.top_pains.map((p) => `pain:${p}`),
                 ...normalized.top_opportunities.map((g) => `growth:${g}`),
@@ -649,7 +688,7 @@ REMETENTE: SDR da NOID.`,
             },
           })
           .eq("id", existingScore.id);
-        await supabase.from("prospects").update({ priority_score: newTotal }).eq("id", prospect_id);
+        await supabase.from("prospects").update({ priority_score: Math.max(0, newTotal) }).eq("id", prospect_id);
       }
     }
 
