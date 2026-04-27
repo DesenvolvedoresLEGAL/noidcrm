@@ -73,13 +73,26 @@ export function ProspectLifecycleTimeline({ prospectId }: Props) {
       {events.map((e: any) => {
         const Icon = ICONS[e.event_type] ?? CircleDot;
         const label = LABELS[e.event_type] ?? e.event_type;
+        const cls = e.event_class as string | undefined;
+        const classLabel = cls === "outcome" ? "Resultado" : cls === "action" ? "Ação" : null;
         return (
           <li key={e.id} className="ml-6">
             <span className="absolute -left-3 flex h-6 w-6 items-center justify-center rounded-full bg-background border border-border">
               <Icon className="h-3 w-3 text-primary" />
             </span>
             <div className="flex items-baseline justify-between gap-2">
-              <p className="text-sm font-medium text-foreground">{label}</p>
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-medium text-foreground">{label}</p>
+                {classLabel && (
+                  <span className={`text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded border ${
+                    cls === "outcome"
+                      ? "border-emerald-500/40 text-emerald-600 dark:text-emerald-400"
+                      : "border-border text-muted-foreground"
+                  }`}>
+                    {classLabel}
+                  </span>
+                )}
+              </div>
               <time className="text-xs text-muted-foreground tabular-nums">
                 {format(new Date(e.created_at), "dd/MM HH:mm", { locale: ptBR })}
               </time>

@@ -12153,8 +12153,74 @@ export type Database = {
           },
         ]
       }
+      learning_queue: {
+        Row: {
+          attempts: number
+          cancelled_reason: string | null
+          created_at: string
+          error: string | null
+          event_id: string
+          event_type: string
+          id: string
+          opportunity_id: string | null
+          organization_id: string
+          outcome: string
+          payload: Json
+          process_after: string
+          processed_at: string | null
+          prospect_id: string | null
+          status: string
+          weight: number
+        }
+        Insert: {
+          attempts?: number
+          cancelled_reason?: string | null
+          created_at?: string
+          error?: string | null
+          event_id: string
+          event_type: string
+          id?: string
+          opportunity_id?: string | null
+          organization_id: string
+          outcome: string
+          payload?: Json
+          process_after: string
+          processed_at?: string | null
+          prospect_id?: string | null
+          status?: string
+          weight?: number
+        }
+        Update: {
+          attempts?: number
+          cancelled_reason?: string | null
+          created_at?: string
+          error?: string | null
+          event_id?: string
+          event_type?: string
+          id?: string
+          opportunity_id?: string | null
+          organization_id?: string
+          outcome?: string
+          payload?: Json
+          process_after?: string
+          processed_at?: string | null
+          prospect_id?: string | null
+          status?: string
+          weight?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "learning_queue_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "revenue_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       learning_signals: {
         Row: {
+          attribution_breakdown: Json
           confidence: number
           created_at: string
           id: string
@@ -12168,6 +12234,7 @@ export type Database = {
           signal_value: string
         }
         Insert: {
+          attribution_breakdown?: Json
           confidence?: number
           created_at?: string
           id?: string
@@ -12181,6 +12248,7 @@ export type Database = {
           signal_value: string
         }
         Update: {
+          attribution_breakdown?: Json
           confidence?: number
           created_at?: string
           id?: string
@@ -19772,6 +19840,7 @@ export type Database = {
           contact_id: string | null
           created_at: string
           engagement_value: number | null
+          event_class: string | null
           event_subtype: string | null
           event_type: string
           external_id: string | null
@@ -19793,6 +19862,7 @@ export type Database = {
           contact_id?: string | null
           created_at?: string
           engagement_value?: number | null
+          event_class?: string | null
           event_subtype?: string | null
           event_type: string
           external_id?: string | null
@@ -19814,6 +19884,7 @@ export type Database = {
           contact_id?: string | null
           created_at?: string
           engagement_value?: number | null
+          event_class?: string | null
           event_subtype?: string | null
           event_type?: string
           external_id?: string | null

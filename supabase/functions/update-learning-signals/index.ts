@@ -1,10 +1,10 @@
-// Sprint C: Aggregates prospect/enrichment signals into org-wide learning_signals
-// when terminal events (replied / meeting / won / lost) occur.
+// Sprint C.1: Aggregates outcome signals into learning_signals with attribution.
 //
 // Protections:
-//  - occurrences < 20  -> impact_score = 0  (avoid bias)
-//  - impact_score      -> clamped to [-20, +20]
-//  - confidence        -> min(occurrences / 100, 1.0)
+//  - occurrences < 20 -> impact_score = 0
+//  - impact_score clamped to [-20, +20]
+//  - confidence = min(occurrences / 100, 1.0)
+//  - attribution_breakdown groups counters by playbook/template/channel
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.76.1";
 
@@ -31,6 +31,22 @@ function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
 
+function bumpBreakdown(
+  breakdown: any,
+  dimension: string,
+  key: string | undefined | null,
+  outcome: "positive" | "negative",
+  weight: number,
+) {
+  if (!key) return breakdown;
+  const dimKey = `by_${dimension}`;
+  breakdown[dimKey] ??= {};
+  breakdown[dimKey][key] ??= { pos: 0, neg: 0 };
+  if (outcome === "positive") breakdown[dimKey][key].pos += weight;
+  else breakdown[dimKey][key].neg += weight;
+  return breakdown;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -41,6 +57,7 @@ Deno.serve(async (req) => {
       opportunity_id = null,
       outcome,
       weight = 1,
+      attribution = {},
     } = await req.json();
 
     if (!organization_id || !outcome) {
@@ -49,7 +66,6 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
-    // Resolve prospect_id from opportunity if needed
     let resolvedProspectId = prospect_id;
     if (!resolvedProspectId && opportunity_id) {
       const { data: opp } = await supabase
@@ -60,7 +76,6 @@ Deno.serve(async (req) => {
       resolvedProspectId = (opp as any)?.prospect_id ?? null;
     }
 
-    // Collect signals from both prospect_signals and enrichment_signals
     const signals: Array<{ signal_type: string; signal_value: string }> = [];
 
     if (resolvedProspectId) {
@@ -87,7 +102,6 @@ Deno.serve(async (req) => {
     for (const s of signals) {
       if (!s.signal_type || !s.signal_value) continue;
 
-      // Upsert row, then read+update for impact calculation
       await supabase.from("learning_signals").upsert(
         {
           organization_id,
@@ -99,7 +113,7 @@ Deno.serve(async (req) => {
 
       const { data: current } = await supabase
         .from("learning_signals")
-        .select("id, occurrences, positive_outcomes, negative_outcomes")
+        .select("id, occurrences, positive_outcomes, negative_outcomes, attribution_breakdown")
         .eq("organization_id", organization_id)
         .eq("signal_type", s.signal_type)
         .eq("signal_value", s.signal_value)
@@ -108,10 +122,8 @@ Deno.serve(async (req) => {
       if (!current) continue;
 
       const occurrences = (current.occurrences ?? 0) + 1;
-      const positive =
-        (current.positive_outcomes ?? 0) + (outcome === "positive" ? weight : 0);
-      const negative =
-        (current.negative_outcomes ?? 0) + (outcome === "negative" ? weight : 0);
+      const positive = (current.positive_outcomes ?? 0) + (outcome === "positive" ? weight : 0);
+      const negative = (current.negative_outcomes ?? 0) + (outcome === "negative" ? weight : 0);
 
       let impact = 0;
       if (occurrences >= MIN_OCCURRENCES_FOR_IMPACT) {
@@ -119,6 +131,14 @@ Deno.serve(async (req) => {
         impact = clamp(ratio * 30, -IMPACT_CAP, IMPACT_CAP);
       }
       const confidence = Math.min(occurrences / 100, 1);
+
+      // Update attribution_breakdown
+      let breakdown = (current.attribution_breakdown as any) ?? {};
+      breakdown = bumpBreakdown(breakdown, "playbook", attribution?.playbook_id, outcome, weight);
+      breakdown = bumpBreakdown(breakdown, "template", attribution?.template_variant ?? attribution?.template_id, outcome, weight);
+      breakdown = bumpBreakdown(breakdown, "channel", attribution?.channel, outcome, weight);
+      breakdown = bumpBreakdown(breakdown, "decision_rule", attribution?.decision_rule_id, outcome, weight);
+      breakdown = bumpBreakdown(breakdown, "sequence", attribution?.sequence_id, outcome, weight);
 
       await supabase
         .from("learning_signals")
@@ -128,6 +148,7 @@ Deno.serve(async (req) => {
           negative_outcomes: negative,
           impact_score: Number(impact.toFixed(2)),
           confidence: Number(confidence.toFixed(3)),
+          attribution_breakdown: breakdown,
           last_recalculated_at: new Date().toISOString(),
         })
         .eq("id", current.id);
