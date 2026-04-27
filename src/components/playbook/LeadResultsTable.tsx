@@ -12,6 +12,7 @@ import {
 import { Check, X, AlertTriangle, Download, PackageCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Prospect } from '@/hooks/useLeadSourcingV2';
+import { DecisionBadge } from '@/components/decision-engine/DecisionBadge';
 
 type FilterKey = 'all' | 'pending' | 'approved' | 'rejected' | 'imported' | 'duplicate' | 'high_score' | 'no_domain';
 
@@ -246,7 +247,12 @@ export function LeadResultsTable({
                         )) : <span className="text-xs text-muted-foreground">—</span>}
                       </div>
                     </TableCell>
-                    <TableCell><StatusBadge status={prospect.status} approvalStatus={prospect.approval_status} /></TableCell>
+                    <TableCell>
+                      <div className="flex flex-col gap-1">
+                        <StatusBadge status={prospect.status} approvalStatus={prospect.approval_status} />
+                        <DecisionBadge prospectId={prospect.id} />
+                      </div>
+                    </TableCell>
                     <TableCell className="text-right" onClick={e => e.stopPropagation()}>
                       {prospect.status === 'review_pending' && (
                         <div className="flex gap-1 justify-end">

@@ -16,6 +16,7 @@ import { CompanyEnrichmentCard } from './enrichment/CompanyEnrichmentCard';
 import { CommercialBriefCard } from './enrichment/CommercialBriefCard';
 import { EnrichmentSignalsList } from './enrichment/EnrichmentSignalsList';
 import { EnrichmentTimeline } from './enrichment/EnrichmentTimeline';
+import { DecisionDetailPanel } from '@/components/decision-engine/DecisionDetailPanel';
 
 interface ProspectDetailDrawerProps {
   prospect: Prospect | null;
