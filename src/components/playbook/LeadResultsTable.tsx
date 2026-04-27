@@ -181,22 +181,33 @@ export function LeadResultsTable({
           )}
         </div>
         {/* Filters */}
-        <div className="flex flex-wrap gap-1.5 pt-2">
-          {FILTERS.map(f => (
-            <button
-              key={f.key}
-              onClick={() => { setActiveFilter(f.key); setSelectedIds(new Set()); }}
-              className={cn(
-                'px-2.5 py-1 rounded-full text-xs font-medium border transition-colors',
-                activeFilter === f.key
-                  ? 'bg-primary text-primary-foreground border-primary'
-                  : 'bg-background text-muted-foreground border-border hover:border-primary/40'
-              )}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
+        <TooltipProvider>
+          <div className="flex flex-wrap gap-1.5 pt-2">
+            {FILTERS.map(f => {
+              const btn = (
+                <button
+                  key={f.key}
+                  onClick={() => { setActiveFilter(f.key); setSelectedIds(new Set()); }}
+                  className={cn(
+                    'px-2.5 py-1 rounded-full text-xs font-medium border transition-colors',
+                    activeFilter === f.key
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-background text-muted-foreground border-border hover:border-primary/40'
+                  )}
+                >
+                  {f.label}
+                </button>
+              );
+              if (!f.tooltip) return btn;
+              return (
+                <Tooltip key={f.key}>
+                  <TooltipTrigger asChild>{btn}</TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-xs text-xs">{f.tooltip}</TooltipContent>
+                </Tooltip>
+              );
+            })}
+          </div>
+        </TooltipProvider>
       </CardHeader>
       <CardContent>
         <TooltipProvider>
