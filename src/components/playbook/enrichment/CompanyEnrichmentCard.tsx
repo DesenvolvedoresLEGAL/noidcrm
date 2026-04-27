@@ -1,6 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Building2, Globe, ShoppingBag, TrendingUp, AlertTriangle, Cpu } from 'lucide-react';
+import { EnrichmentQualityBadge } from './EnrichmentQualityBadge';
+import { FallbackIndicator } from './FallbackIndicator';
 
 interface CompanyEnrichmentCardProps {
   profile: {
@@ -15,6 +17,13 @@ interface CompanyEnrichmentCardProps {
     tech_signals?: any;
     confidence?: number | null;
   };
+  run?: {
+    quality_grade?: string | null;
+    quality_score?: number | null;
+    fallback_used?: boolean | null;
+    fallback_pages_fetched?: any;
+    content_length?: number | null;
+  } | null;
 }
 
 function TagList({ items, icon: Icon, color }: { items: string[]; icon: any; color: string }) {
@@ -30,19 +39,31 @@ function TagList({ items, icon: Icon, color }: { items: string[]; icon: any; col
   );
 }
 
-export function CompanyEnrichmentCard({ profile }: CompanyEnrichmentCardProps) {
+export function CompanyEnrichmentCard({ profile, run }: CompanyEnrichmentCardProps) {
+  const grade = (run?.quality_grade as 'A' | 'B' | 'C' | 'D' | undefined) ?? null;
+  const score = run?.quality_score ?? (profile.confidence != null ? Math.round((profile.confidence as number) * 100) : null);
+  const fallbackPages = Array.isArray(run?.fallback_pages_fetched) ? (run!.fallback_pages_fetched as any[]) : [];
+  const fallbackUsed = !!run?.fallback_used;
+
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="text-sm flex items-center gap-2">
+        <CardTitle className="text-sm flex items-center gap-2 flex-wrap">
           <Building2 className="h-4 w-4 text-primary" />
           Perfil da Empresa
-          {profile.confidence != null && (
-            <Badge variant="secondary" className="ml-auto text-xs">
-              {Math.round((profile.confidence as number) * 100)}% confiança
-            </Badge>
-          )}
+          <div className="ml-auto">
+            {grade ? (
+              <EnrichmentQualityBadge grade={grade} score={score} />
+            ) : score != null ? (
+              <Badge variant="secondary" className="text-xs">{score}% confiança</Badge>
+            ) : null}
+          </div>
         </CardTitle>
+        {fallbackUsed && (
+          <div className="pt-1">
+            <FallbackIndicator pages={fallbackPages} />
+          </div>
+        )}
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
         {profile.company_summary && <p className="text-muted-foreground">{profile.company_summary}</p>}
@@ -56,6 +77,9 @@ export function CompanyEnrichmentCard({ profile }: CompanyEnrichmentCardProps) {
           )}
           {profile.company_size_estimate && (
             <div><span className="text-muted-foreground">Porte:</span> <span className="font-medium">{profile.company_size_estimate}</span></div>
+          )}
+          {run?.content_length != null && (
+            <div><span className="text-muted-foreground">Conteúdo:</span> <span className="font-medium">{run.content_length.toLocaleString('pt-BR')} chars</span></div>
           )}
         </div>
 

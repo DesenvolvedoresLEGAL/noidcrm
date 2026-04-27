@@ -74,15 +74,18 @@ export function useRunEnrichment() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ prospectId, workspaceId }: { prospectId: string; workspaceId: string }) => {
+    mutationFn: async ({ prospectId, workspaceId, forceFallback }: { prospectId: string; workspaceId: string; forceFallback?: boolean }) => {
       const { data, error } = await supabase.functions.invoke('run-enrichment', {
-        body: { prospect_id: prospectId, workspace_id: workspaceId },
+        body: { prospect_id: prospectId, workspace_id: workspaceId, force_fallback: !!forceFallback },
       });
       if (error) throw error;
       return data;
     },
-    onSuccess: (_data, variables) => {
-      toast.success('Enriquecimento concluído!');
+    onSuccess: (data, variables) => {
+      const grade = (data as any)?.quality_grade;
+      const score = (data as any)?.quality_score;
+      const suffix = grade && typeof score === 'number' ? ` (${grade} · ${score}%)` : '';
+      toast.success(`Enriquecimento concluído!${suffix}`);
       queryClient.invalidateQueries({ queryKey: ['enrichment-run', variables.prospectId] });
       queryClient.invalidateQueries({ queryKey: ['enriched-company-profile', variables.prospectId] });
       queryClient.invalidateQueries({ queryKey: ['commercial-brief', variables.prospectId] });

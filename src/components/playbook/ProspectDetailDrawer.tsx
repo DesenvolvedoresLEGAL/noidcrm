@@ -103,6 +103,16 @@ export function ProspectDetailDrawer({
     }
   };
 
+  const handleForceFallback = () => {
+    if (prospect.organization_id) {
+      runEnrichment.mutate({
+        prospectId: prospect.id,
+        workspaceId: prospect.organization_id,
+        forceFallback: true,
+      });
+    }
+  };
+
   const handleEnrichAndImport = async () => {
     try {
       const result = await enrichIdentity.mutateAsync(prospect.id);
@@ -299,11 +309,12 @@ export function ProspectDetailDrawer({
                   hasRun={!!enrichmentRun}
                   isLoading={runEnrichment.isPending}
                   onClick={handleEnrich}
+                  onForceFallback={handleForceFallback}
                 />
                 <EnrichmentStatusBadge status={enrichmentRun?.status} />
               </div>
 
-              {companyProfile && <CompanyEnrichmentCard profile={companyProfile} />}
+              {companyProfile && <CompanyEnrichmentCard profile={companyProfile} run={enrichmentRun as any} /> }
               {commercialBrief && <CommercialBriefCard brief={commercialBrief} />}
               {enrichmentSignals && enrichmentSignals.length > 0 && <EnrichmentSignalsList signals={enrichmentSignals} />}
               <EnrichmentTimeline

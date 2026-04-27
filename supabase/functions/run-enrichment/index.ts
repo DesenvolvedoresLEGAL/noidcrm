@@ -1,6 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.76.1";
 
-
 const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY') ?? Deno.env.get('LOVABLE_API_KEY');
 
 function ensureAbsoluteUrl(value: string | null | undefined): string | null {
@@ -10,17 +9,128 @@ function ensureAbsoluteUrl(value: string | null | undefined): string | null {
   return trimmed.startsWith("http") ? trimmed : `https://${trimmed}`;
 }
 
+function getDomainRoot(absoluteUrl: string): string | null {
+  try {
+    const u = new URL(absoluteUrl);
+    return `${u.protocol}//${u.host}`;
+  } catch {
+    return null;
+  }
+}
+
+const FALLBACK_PATHS = [
+  { path: "/about", source_type: "fallback_about" },
+  { path: "/sobre", source_type: "fallback_sobre" },
+  { path: "/empresa", source_type: "fallback_empresa" },
+  { path: "/quem-somos", source_type: "fallback_quem_somos" },
+];
+
+function stripHtml(html: string): string {
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+async function fetchFallbackPage(url: string): Promise<string | null> {
+  try {
+    const ctrl = new AbortController();
+    const timeout = setTimeout(() => ctrl.abort(), 8000);
+    const res = await fetch(url, {
+      signal: ctrl.signal,
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; NoidEnrichmentBot/1.0)",
+        "Accept": "text/html,application/xhtml+xml",
+      },
+      redirect: "follow",
+    });
+    clearTimeout(timeout);
+    if (!res.ok) return null;
+    const html = await res.text();
+    const text = stripHtml(html);
+    return text.length > 200 ? text.slice(0, 20000) : null;
+  } catch {
+    return null;
+  }
+}
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+interface NormalizedProfile {
+  company_summary: string | null;
+  business_model: string | null;
+  market_type: string | null;
+  industry: string | null;
+  sub_industry: string | null;
+  target_customer: string | null;
+  geo: string | null;
+  company_size_hint: string | null;
+  top_pains: string[];
+  top_opportunities: string[];
+  trigger_signals: string[];
+  digital_maturity: string | null;
+  confidence_notes: string | null;
+}
+
+function cleanNormalized(raw: any): NormalizedProfile {
+  const arr = (v: any) => (Array.isArray(v) ? v.filter((x) => typeof x === "string" && x.trim()).slice(0, 12) : []);
+  const str = (v: any) => (typeof v === "string" && v.trim() ? v.trim() : null);
+  return {
+    company_summary: str(raw?.company_summary),
+    business_model: str(raw?.business_model),
+    market_type: str(raw?.market_type),
+    industry: str(raw?.industry),
+    sub_industry: str(raw?.sub_industry),
+    target_customer: str(raw?.target_customer),
+    geo: str(raw?.geo),
+    company_size_hint: str(raw?.company_size_hint),
+    top_pains: arr(raw?.top_pains),
+    top_opportunities: arr(raw?.top_opportunities),
+    trigger_signals: arr(raw?.trigger_signals),
+    digital_maturity: str(raw?.digital_maturity),
+    confidence_notes: str(raw?.confidence_notes),
+  };
+}
+
+function calculateConfidence(data: NormalizedProfile, contentLength: number, fallbackUsed: boolean): number {
+  let score = 0;
+  if (contentLength > 3000) score += 30;
+  else if (contentLength > 1500) score += 20;
+  else score += 10;
+  if (data.top_pains.length >= 2) score += 20;
+  if (data.top_opportunities.length >= 2) score += 20;
+  if (data.industry) score += 10;
+  if (data.business_model) score += 10;
+  if (fallbackUsed) score -= 10;
+  return Math.max(0, Math.min(score, 100));
+}
+
+function gradeFromScore(score: number): "A" | "B" | "C" | "D" {
+  if (score >= 80) return "A";
+  if (score >= 60) return "B";
+  if (score >= 40) return "C";
+  return "D";
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { prospect_id, workspace_id } = await req.json();
+    const body = await req.json();
+    const { prospect_id, workspace_id, force_fallback } = body;
     if (!prospect_id || !workspace_id) {
       return new Response(JSON.stringify({ error: "prospect_id and workspace_id required" }), {
         status: 400,
@@ -51,7 +161,7 @@ Deno.serve(async (req) => {
       .insert({
         workspace_id,
         prospect_id,
-        trigger_source: "manual",
+        trigger_source: force_fallback ? "manual_force_fallback" : "manual",
         status: "running",
         providers_requested: ["internal_website"],
         started_at: new Date().toISOString(),
@@ -63,7 +173,7 @@ Deno.serve(async (req) => {
     const providersCompleted: string[] = [];
     const providersFailed: string[] = [];
 
-    // 3. Scrape website via Firecrawl
+    // 3. Resolve target
     let scrapedContent = "";
     let website = ensureAbsoluteUrl(prospect.website || prospect.normalized_domain);
     let scrapeTarget = website
@@ -83,7 +193,6 @@ Deno.serve(async (req) => {
           },
           body: JSON.stringify({ prospect_id }),
         });
-
         if (identityResp.ok) {
           const identityData = await identityResp.json();
           prospect = { ...prospect, ...(identityData?.updates || {}) };
@@ -92,63 +201,37 @@ Deno.serve(async (req) => {
             || ensureAbsoluteUrl(prospect.exhibitor_profile_url)
             || ensureAbsoluteUrl(prospect.source_url)
             || ensureAbsoluteUrl(prospect.raw_data?._source_url);
-        } else {
-          console.warn("run-enrichment identity fallback failed", identityResp.status, await identityResp.text());
         }
       } catch (identityError) {
         console.warn("run-enrichment identity fallback exception", identityError);
       }
     }
 
+    // 4. Scrape principal via Firecrawl
+    let mainContentLength = 0;
     if (scrapeTarget && FIRECRAWL_API_KEY) {
       try {
-        const formattedUrl = scrapeTarget;
-
-        // Scrape main page
         const scrapeResp = await fetch("https://api.firecrawl.dev/v2/scrape", {
           method: "POST",
           headers: { Authorization: `Bearer ${FIRECRAWL_API_KEY}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ url: formattedUrl, formats: ["markdown"], onlyMainContent: true }),
+          body: JSON.stringify({ url: scrapeTarget, formats: ["markdown"], onlyMainContent: true }),
         });
         const scrapeData = await scrapeResp.json();
         const mainContent = scrapeData?.data?.markdown || scrapeData?.markdown || "";
         scrapedContent += mainContent;
+        mainContentLength = mainContent.length;
 
-        // Map to find additional pages
-        let additionalPages: string[] = [];
-        try {
-          const mapResp = await fetch("https://api.firecrawl.dev/v2/map", {
-            method: "POST",
-            headers: { Authorization: `Bearer ${FIRECRAWL_API_KEY}`, "Content-Type": "application/json" },
-            body: JSON.stringify({ url: formattedUrl, search: "about products services contact", limit: 10 }),
-          });
-          const mapData = await mapResp.json();
-          const allLinks: string[] = mapData?.links || mapData?.data?.links || [];
-          const patterns = [/about/i, /produto/i, /product/i, /servic/i, /contact/i, /quem.somos/i, /sobre/i];
-          additionalPages = allLinks
-            .filter((l: string) => patterns.some((p) => p.test(l)))
-            .slice(0, 3);
-        } catch (e) {
-          console.warn("Map failed, continuing with main page only:", e);
-        }
+        // raw source
+        await supabase.from("enrichment_raw_sources").insert({
+          organization_id: workspace_id,
+          prospect_id,
+          enrichment_run_id: run.id,
+          source_type: website ? "firecrawl_main" : "firecrawl_directory",
+          url: scrapeTarget,
+          raw_content: mainContent.slice(0, 50000),
+          content_length: mainContentLength,
+        });
 
-        // Scrape additional pages
-        for (const pageUrl of additionalPages) {
-          try {
-            const pageResp = await fetch("https://api.firecrawl.dev/v2/scrape", {
-              method: "POST",
-              headers: { Authorization: `Bearer ${FIRECRAWL_API_KEY}`, "Content-Type": "application/json" },
-              body: JSON.stringify({ url: pageUrl, formats: ["markdown"], onlyMainContent: true }),
-            });
-            const pageData = await pageResp.json();
-            const pageContent = pageData?.data?.markdown || pageData?.markdown || "";
-            if (pageContent) scrapedContent += `\n\n---\nPágina: ${pageUrl}\n\n${pageContent}`;
-          } catch (e) {
-            console.warn("Failed to scrape:", pageUrl, e);
-          }
-        }
-
-        // Save provider result
         await supabase.from("enrichment_provider_results").insert({
           workspace_id,
           enrichment_run_id: run.id,
@@ -156,12 +239,11 @@ Deno.serve(async (req) => {
           provider_entity_type: "company",
           provider_status: "completed",
           raw_response: {
-            content: scrapedContent.slice(0, 50000),
-            pages_scraped: 1 + additionalPages.length,
-            target_url: formattedUrl,
+            content: mainContent.slice(0, 50000),
+            target_url: scrapeTarget,
             source_type: website ? "official_website" : "directory_fallback",
           },
-          confidence: scrapedContent.length > 200 ? 0.8 : 0.4,
+          confidence: mainContent.length > 200 ? 0.8 : 0.4,
         });
         providersCompleted.push("internal_website");
       } catch (e) {
@@ -187,16 +269,46 @@ Deno.serve(async (req) => {
         provider_status: "failed",
         raw_response: {
           error: FIRECRAWL_API_KEY
-            ? "No website, normalized_domain, exhibitor_profile_url or source_url available for enrichment"
+            ? "No website/domain available for enrichment"
             : "FIRECRAWL_API_KEY missing",
         },
         confidence: 0,
       });
     }
 
-    // 4. AI Synthesis — Company Profile
-    let companyProfile: any = null;
-    if (scrapedContent.length > 50 && OPENAI_API_KEY) {
+    // 5. Fallback determinístico
+    let fallbackUsed = false;
+    const fallbackPagesFetched: Array<{ url: string; source_type: string; length: number }> = [];
+
+    const shouldFallback = force_fallback === true || mainContentLength < 1500;
+    const domainRoot = website ? getDomainRoot(website) : null;
+
+    if (shouldFallback && domainRoot) {
+      for (const { path, source_type } of FALLBACK_PATHS) {
+        const url = `${domainRoot}${path}`;
+        const text = await fetchFallbackPage(url);
+        if (text && text.length > 200) {
+          scrapedContent += `\n\n---\nFallback: ${url}\n\n${text}`;
+          fallbackUsed = true;
+          fallbackPagesFetched.push({ url, source_type, length: text.length });
+          await supabase.from("enrichment_raw_sources").insert({
+            organization_id: workspace_id,
+            prospect_id,
+            enrichment_run_id: run.id,
+            source_type,
+            url,
+            raw_content: text,
+            content_length: text.length,
+          });
+        }
+      }
+    }
+
+    const totalContentLength = scrapedContent.length;
+
+    // 6. Normalização via IA com schema fechado
+    let normalized: NormalizedProfile = cleanNormalized({});
+    if (totalContentLength > 50 && OPENAI_API_KEY) {
       try {
         const analysisResp = await fetch("https://api.openai.com/v1/chat/completions", {
           method: "POST",
@@ -206,60 +318,58 @@ Deno.serve(async (req) => {
             messages: [
               {
                 role: "system",
-                content: `Você é o Caramelo Enrichment Agent. Analise o site oficial de uma empresa e transforme conteúdo disperso em inteligência comercial útil para vendas B2B. Regras: nunca invente dados, quando houver incerteza reduza confidence, priorize fatos observáveis, retorne apenas JSON estruturado.`,
+                content: `Você é um motor de inteligência comercial B2B.
+
+Analise o conteúdo abaixo e extraia informações estruturadas da empresa.
+
+REGRAS RÍGIDAS:
+- Seja objetivo.
+- NÃO invente dados.
+- Se não tiver informação suficiente para um campo, retorne null (ou array vazio).
+- Não escreva texto fora do JSON.
+- Use SOMENTE o tool call estruturado.`,
               },
               {
                 role: "user",
-                content: `Analise o conteúdo extraído do site desta empresa (${prospect.company_name}, domínio: ${website || scrapeTarget || 'não identificado'}).
+                content: `Empresa: ${prospect.company_name}
+Domínio: ${website || scrapeTarget || 'não identificado'}
 
-Retorne JSON com:
-{
-  "company_summary": "resumo objetivo em até 3 linhas",
-  "business_model": "modelo de negócio provável",
-  "market_type": "B2B, B2C ou ambos",
-  "company_size_estimate": "micro/pequena/média/grande",
-  "geographic_presence": ["lista de regiões/cidades"],
-  "products_services": ["lista de produtos ou serviços principais"],
-  "industries_detected": ["setores de atuação"],
-  "tech_signals": ["sinais de tecnologia detectados"],
-  "growth_signals": ["sinais de crescimento"],
-  "commercial_pains": ["dores comerciais prováveis"],
-  "strategic_notes": "observações estratégicas",
-  "confidence": 0.0 a 1.0
-}
-
-Conteúdo do site:
-${scrapedContent.slice(0, 15000)}`,
+CONTEÚDO:
+${scrapedContent.slice(0, 18000)}`,
               },
             ],
             tools: [
               {
                 type: "function",
                 function: {
-                  name: "extract_company_profile",
-                  description: "Extract structured company profile from website content",
+                  name: "extract_normalized_profile",
+                  description: "Extract canonical normalized B2B company profile",
                   parameters: {
                     type: "object",
                     properties: {
-                      company_summary: { type: "string" },
-                      business_model: { type: "string" },
-                      market_type: { type: "string" },
-                      company_size_estimate: { type: "string" },
-                      geographic_presence: { type: "array", items: { type: "string" } },
-                      products_services: { type: "array", items: { type: "string" } },
-                      industries_detected: { type: "array", items: { type: "string" } },
-                      tech_signals: { type: "array", items: { type: "string" } },
-                      growth_signals: { type: "array", items: { type: "string" } },
-                      commercial_pains: { type: "array", items: { type: "string" } },
-                      strategic_notes: { type: "string" },
-                      confidence: { type: "number" },
+                      company_summary: { type: ["string", "null"] },
+                      business_model: { type: ["string", "null"] },
+                      market_type: { type: ["string", "null"], enum: ["B2B", "B2C", "B2B2C", null] },
+                      industry: { type: ["string", "null"] },
+                      sub_industry: { type: ["string", "null"] },
+                      target_customer: { type: ["string", "null"] },
+                      geo: { type: ["string", "null"] },
+                      company_size_hint: { type: ["string", "null"], enum: ["small", "medium", "large", "unknown", null] },
+                      top_pains: { type: "array", items: { type: "string" } },
+                      top_opportunities: { type: "array", items: { type: "string" } },
+                      trigger_signals: { type: "array", items: { type: "string" } },
+                      digital_maturity: { type: ["string", "null"], enum: ["low", "medium", "high", null] },
+                      confidence_notes: { type: ["string", "null"] },
                     },
-                    required: ["company_summary", "business_model", "market_type", "confidence"],
+                    required: [
+                      "company_summary", "business_model", "market_type", "industry",
+                      "top_pains", "top_opportunities", "trigger_signals"
+                    ],
                   },
                 },
               },
             ],
-            tool_choice: { type: "function", function: { name: "extract_company_profile" } },
+            tool_choice: { type: "function", function: { name: "extract_normalized_profile" } },
           }),
         });
 
@@ -267,17 +377,36 @@ ${scrapedContent.slice(0, 15000)}`,
           const aiData = await analysisResp.json();
           const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
           if (toolCall) {
-            companyProfile = JSON.parse(toolCall.function.arguments);
+            normalized = cleanNormalized(JSON.parse(toolCall.function.arguments));
           }
         }
       } catch (e) {
-        console.error("AI synthesis error:", e);
+        console.error("AI normalization error:", e);
       }
     }
 
-    // 5. Save enriched_company_profiles
-    if (companyProfile) {
-      // Check for existing profile
+    // 7. Score determinístico
+    const qualityScore = calculateConfidence(normalized, totalContentLength, fallbackUsed);
+    const qualityGrade = gradeFromScore(qualityScore);
+    const hasNormalized = !!(normalized.company_summary || normalized.business_model || normalized.industry);
+
+    // 8a. Persistir snapshot histórico
+    if (hasNormalized || totalContentLength > 0) {
+      await supabase.from("enrichment_normalized").insert({
+        organization_id: workspace_id,
+        prospect_id,
+        enrichment_run_id: run.id,
+        data: normalized as any,
+        confidence_score: qualityScore,
+        quality_grade: qualityGrade,
+        fallback_used: fallbackUsed,
+        content_length: totalContentLength,
+      });
+    }
+
+    // 8b. Atualizar enriched_company_profiles (view atual)
+    let companyProfile: any = null;
+    if (hasNormalized) {
       const { data: existing } = await supabase
         .from("enriched_company_profiles")
         .select("id")
@@ -290,18 +419,18 @@ ${scrapedContent.slice(0, 15000)}`,
         prospect_id,
         canonical_company_name: prospect.company_name,
         canonical_domain: website,
-        company_summary: companyProfile.company_summary,
-        business_model: companyProfile.business_model,
-        market_type: companyProfile.market_type,
-        company_size_estimate: companyProfile.company_size_estimate,
-        geographic_presence: companyProfile.geographic_presence || [],
-        products_services: companyProfile.products_services || [],
-        industries_detected: companyProfile.industries_detected || [],
-        tech_signals: companyProfile.tech_signals || [],
-        growth_signals: companyProfile.growth_signals || [],
-        commercial_pains: companyProfile.commercial_pains || [],
-        strategic_notes: companyProfile.strategic_notes,
-        confidence: companyProfile.confidence || 0,
+        company_summary: normalized.company_summary,
+        business_model: normalized.business_model,
+        market_type: normalized.market_type,
+        company_size_estimate: normalized.company_size_hint,
+        geographic_presence: normalized.geo ? [normalized.geo] : [],
+        products_services: [],
+        industries_detected: normalized.industry ? [normalized.industry, normalized.sub_industry].filter(Boolean) : [],
+        tech_signals: normalized.trigger_signals,
+        growth_signals: normalized.top_opportunities,
+        commercial_pains: normalized.top_pains,
+        strategic_notes: normalized.confidence_notes,
+        confidence: qualityScore / 100,
         last_enriched_at: new Date().toISOString(),
       };
 
@@ -310,8 +439,9 @@ ${scrapedContent.slice(0, 15000)}`,
       } else {
         await supabase.from("enriched_company_profiles").insert(profileData);
       }
+      companyProfile = profileData;
 
-      // 6. Create enrichment_signals
+      // 8c. Signals
       const signals: any[] = [];
       const addSignals = (type: string, values: string[], weight: number) => {
         for (const v of values || []) {
@@ -323,21 +453,21 @@ ${scrapedContent.slice(0, 15000)}`,
             signal_value: v,
             source_provider: "internal_website",
             weight,
-            confidence: companyProfile.confidence || 0,
+            confidence: qualityScore / 100,
           });
         }
       };
-      addSignals("growth", companyProfile.growth_signals, 5);
-      addSignals("tech", companyProfile.tech_signals, 3);
-      addSignals("pain", companyProfile.commercial_pains, 8);
-      addSignals("industry", companyProfile.industries_detected, 2);
+      addSignals("growth", normalized.top_opportunities, 5);
+      addSignals("tech", normalized.trigger_signals, 3);
+      addSignals("pain", normalized.top_pains, 8);
+      if (normalized.industry) addSignals("industry", [normalized.industry], 2);
 
       if (signals.length > 0) {
         await supabase.from("enrichment_signals").insert(signals);
       }
     }
 
-    // 7. Commercial Brief via AI
+    // 9. Commercial Brief (mantém comportamento)
     let briefData: any = null;
     if (companyProfile && OPENAI_API_KEY) {
       try {
@@ -351,36 +481,32 @@ ${scrapedContent.slice(0, 15000)}`,
                 role: "system",
                 content: `Você é um SDR sênior da NOID (provedora B2B de conectividade e infraestrutura de rede), gerando um brief comercial para prospectar uma empresa-alvo.
 
-REGRAS CRÍTICAS PARA O CAMPO first_touch_message:
-- Você é o REMETENTE (SDR da NOID prospectando). A empresa-alvo é o DESTINATÁRIO. NUNCA escreva como se fosse a empresa-alvo se apresentando.
-- Tom: 1ª pessoa do plural ("nós da NOID..."), consultivo, humano, direto. Sem clichês de vendas, sem "espero que esteja bem".
-- Objetivo da mensagem: QUALIFICAR (descobrir se há demanda de conectividade/rede), NÃO vender ainda.
-- Use o contexto do evento (quando houver) como gancho legítimo: "vimos que vocês vão estar no [evento]/no stand [X]".
-- Faça 1 pergunta de qualificação clara ao final (ex.: sobre demanda de conectividade, expansão, infraestrutura).
+REGRAS CRÍTICAS PARA first_touch_message:
+- Você é o REMETENTE (SDR da NOID prospectando). NUNCA escreva como se fosse a empresa-alvo.
+- Tom: 1ª pessoa do plural ("nós da NOID..."), consultivo, humano, direto. Sem clichês.
+- Objetivo: QUALIFICAR (descobrir se há demanda de conectividade/rede), NÃO vender ainda.
+- Use o contexto do evento (quando houver) como gancho legítimo.
+- 1 pergunta de qualificação clara ao final.
 - Máximo 120 palavras. Sem assinatura, sem PS, sem links.
-- Personalize com dores/sinais reais detectados, não com genéricos.
+- Personalize com dores/sinais reais detectados.
 
-Para email_subject: assunto curto (máx 60 caracteres), específico, sem clickbait. Pode usar nome da empresa + gancho do evento.
-
-Retorne apenas dados estruturados via tool call.`,
+email_subject: assunto curto (máx 60 caracteres), específico.`,
               },
               {
                 role: "user",
-                content: `Gere o brief comercial para prospecção da empresa abaixo. Lembre: VOCÊ é o SDR da NOID escrevendo PARA esta empresa.
+                content: `EMPRESA-ALVO: ${prospect.company_name}
+${prospect.event_name ? `EVENTO: ${prospect.event_name}${prospect.booth ? ` (stand ${prospect.booth})` : ''}` : ''}
+Resumo: ${normalized.company_summary}
+Modelo: ${normalized.business_model}
+Mercado: ${normalized.market_type}
+Indústria: ${normalized.industry || 'n/d'}
+Porte estimado: ${normalized.company_size_hint || 'n/d'}
+Geo: ${normalized.geo || 'n/d'}
+Dores: ${JSON.stringify(normalized.top_pains)}
+Oportunidades: ${JSON.stringify(normalized.top_opportunities)}
+Trigger signals: ${JSON.stringify(normalized.trigger_signals)}
 
-EMPRESA-ALVO (destinatário): ${prospect.company_name}
-${prospect.event_name ? `EVENTO ONDE FOI IDENTIFICADA: ${prospect.event_name}${prospect.booth ? ` (stand ${prospect.booth})` : ''}` : ''}
-Resumo: ${companyProfile.company_summary}
-Modelo: ${companyProfile.business_model}
-Mercado: ${companyProfile.market_type}
-Porte estimado: ${companyProfile.company_size_estimate || 'n/d'}
-Presença: ${JSON.stringify(companyProfile.geographic_presence || [])}
-Produtos: ${JSON.stringify(companyProfile.products_services)}
-Dores prováveis: ${JSON.stringify(companyProfile.commercial_pains)}
-Sinais de crescimento: ${JSON.stringify(companyProfile.growth_signals)}
-Sinais técnicos: ${JSON.stringify(companyProfile.tech_signals)}
-
-REMETENTE: SDR da NOID (provedora de conectividade B2B / infraestrutura de rede).`,
+REMETENTE: SDR da NOID.`,
               },
             ],
             tools: [
@@ -398,8 +524,8 @@ REMETENTE: SDR da NOID (provedora de conectividade B2B / infraestrutura de rede)
                       value_hypotheses: { type: "array", items: { type: "string" } },
                       recommended_pitch_angle: { type: "string" },
                       recommended_channel: { type: "string" },
-                      email_subject: { type: "string", description: "Assunto curto e específico para o e-mail inicial (máx 60 chars)" },
-                      first_touch_message: { type: "string", description: "Corpo do e-mail inicial. SDR da NOID escrevendo PARA a empresa-alvo. 1ª pessoa, máx 120 palavras, 1 pergunta de qualificação ao final." },
+                      email_subject: { type: "string" },
+                      first_touch_message: { type: "string" },
                       objection_predictions: { type: "array", items: { type: "string" } },
                       confidence: { type: "number" },
                     },
@@ -424,7 +550,6 @@ REMETENTE: SDR da NOID (provedora de conectividade B2B / infraestrutura de rede)
       }
     }
 
-    // 8. Save commercial_briefs
     if (briefData) {
       await supabase.from("commercial_briefs").insert({
         workspace_id,
@@ -443,13 +568,13 @@ REMETENTE: SDR da NOID (provedora de conectividade B2B / infraestrutura de rede)
       });
     }
 
-    // 9. Re-score prospect
+    // 10. Re-score prospect
     let scoreBonus = 0;
-    if (companyProfile) {
-      if (website) scoreBonus += 10; // website confirmed
-      if ((companyProfile.commercial_pains || []).length > 0) scoreBonus += 10;
-      if ((companyProfile.growth_signals || []).length > 0) scoreBonus += 5;
-      if ((companyProfile.tech_signals || []).length > 0) scoreBonus += 3;
+    if (hasNormalized) {
+      if (website) scoreBonus += 10;
+      if (normalized.top_pains.length > 0) scoreBonus += 10;
+      if (normalized.top_opportunities.length > 0) scoreBonus += 5;
+      if (normalized.trigger_signals.length > 0) scoreBonus += 3;
     }
 
     if (scoreBonus > 0) {
@@ -458,12 +583,10 @@ REMETENTE: SDR da NOID (provedora de conectividade B2B / infraestrutura de rede)
         .select("*")
         .eq("prospect_id", prospect_id)
         .maybeSingle();
-
       if (existingScore) {
         const newSignalScore = (existingScore.signal_score || 0) + scoreBonus;
         const newTotal = (existingScore.icp_fit_score || 0) + newSignalScore + (existingScore.data_quality_score || 0) + (existingScore.source_trust_score || 0) - (existingScore.penalty_score || 0);
         const newGrade = newTotal >= 80 ? "A" : newTotal >= 60 ? "B" : newTotal >= 40 ? "C" : "D";
-
         await supabase
           .from("prospect_scores")
           .update({
@@ -473,31 +596,30 @@ REMETENTE: SDR da NOID (provedora de conectividade B2B / infraestrutura de rede)
               ...(existingScore.reasoning as any || {}),
               enrichment_bonus: scoreBonus,
               enrichment_signals: [
-                ...(companyProfile.commercial_pains || []).map((p: string) => `pain:${p}`),
-                ...(companyProfile.growth_signals || []).map((g: string) => `growth:${g}`),
+                ...normalized.top_pains.map((p) => `pain:${p}`),
+                ...normalized.top_opportunities.map((g) => `growth:${g}`),
               ],
             },
           })
           .eq("id", existingScore.id);
-
-        // Update prospect priority_score
-        await supabase
-          .from("prospects")
-          .update({ priority_score: newTotal })
-          .eq("id", prospect_id);
+        await supabase.from("prospects").update({ priority_score: newTotal }).eq("id", prospect_id);
       }
     }
 
-    // 10. Finalize enrichment_run
-    const enrichmentScore = companyProfile ? (companyProfile.confidence || 0) * 100 : 0;
+    // 11. Finalize enrichment_run com novos campos
     await supabase
       .from("enrichment_runs")
       .update({
         status: providersFailed.length > 0 && providersCompleted.length === 0 ? "failed" : "completed",
         providers_completed: providersCompleted,
         providers_failed: providersFailed,
-        merge_status: companyProfile ? "completed" : "failed",
-        enrichment_score: enrichmentScore,
+        merge_status: hasNormalized ? "completed" : "failed",
+        enrichment_score: qualityScore,
+        quality_score: qualityScore,
+        quality_grade: qualityGrade,
+        fallback_used: fallbackUsed,
+        content_length: totalContentLength,
+        fallback_pages_fetched: fallbackPagesFetched,
         finished_at: new Date().toISOString(),
       })
       .eq("id", run.id);
@@ -507,9 +629,11 @@ REMETENTE: SDR da NOID (provedora de conectividade B2B / infraestrutura de rede)
         success: true,
         run_id: run.id,
         status: providersFailed.length > 0 && providersCompleted.length === 0 ? "failed" : "completed",
-        providers_completed: providersCompleted,
-        providers_failed: providersFailed,
-        has_company_profile: !!companyProfile,
+        quality_score: qualityScore,
+        quality_grade: qualityGrade,
+        fallback_used: fallbackUsed,
+        content_length: totalContentLength,
+        has_company_profile: hasNormalized,
         has_brief: !!briefData,
         score_bonus: scoreBonus,
       }),
