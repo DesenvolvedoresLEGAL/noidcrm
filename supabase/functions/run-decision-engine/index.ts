@@ -194,7 +194,7 @@ Deno.serve(async (req) => {
         return true;
       });
 
-      const { data: log } = await supabase
+      const { data: log, error: logErr } = await supabase
         .from("decision_logs")
         .insert({
           organization_id,
@@ -217,7 +217,8 @@ Deno.serve(async (req) => {
         })
         .select()
         .single();
-      return jsonResponse({ decision_taken: "no_active_matching_rule", log });
+      if (logErr) console.error("decision_logs insert failed:", logErr);
+      return jsonResponse({ decision_taken: "no_active_matching_rule", log, log_error: logErr?.message ?? null });
     }
 
     if (dry_run) {
