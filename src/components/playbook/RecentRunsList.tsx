@@ -46,8 +46,36 @@ export function RecentRunsList({ runs, selectedRunId, onSelect }: RecentRunsList
   const retryMutation = useRetryPlaybookRun();
   const deleteMutation = useDeletePlaybookRun();
   const cancelMutation = useCancelPlaybookRun();
+  const queryClient = useQueryClient();
   const [deleteRunId, setDeleteRunId] = useState<string | null>(null);
   const [cancelRunId, setCancelRunId] = useState<string | null>(null);
+
+  const rescoreMutation = useMutation({
+    mutationFn: async (runId: string) => {
+      const { data, error } = await supabase.functions.invoke('rescore-prospects', {
+        body: { run_id: runId },
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      const total = data?.total ?? 0;
+      const rescored = data?.rescored ?? 0;
+      const learning = data?.learning_signals_active ?? 0;
+      if (learning === 0) {
+        toast.info('Re-pontuação concluída', {
+          description: 'Nenhum learning signal ativo (confiança ≥ 0.2). Scores não mudaram. Continue rodando o sistema para acumular aprendizado.',
+        });
+      } else {
+        toast.success('Re-pontuação concluída', {
+          description: `${rescored} de ${total} prospects atualizados com base em ${learning} sinais aprendidos.`,
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ['lead-sourcing-prospects'] });
+      queryClient.invalidateQueries({ queryKey: ['playbook-runs'] });
+    },
+    onError: (e: any) => toast.error('Falha ao re-pontuar', { description: e.message }),
+  });
 
   if (!runs.length) return null;
 
