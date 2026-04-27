@@ -180,6 +180,20 @@ Deno.serve(async (req) => {
     const rule = pickRule((rules ?? []) as DecisionRule[], score, confidence, contactScore);
 
     if (!rule) {
+      // Modo estrito: se a regra ideal estiver desligada, NÃO faz fallback automático.
+      // Detecta regras inativas que matchariam para registro/observabilidade.
+      const { data: allRules } = await supabase
+        .from("decision_rules")
+        .select("id, name, is_active, min_score, max_score, min_confidence, priority_label")
+        .eq("organization_id", organization_id);
+      const inactiveMatches = (allRules ?? []).filter((r: any) => {
+        if (r.is_active) return false;
+        if (r.min_score != null && score < r.min_score) return false;
+        if (r.max_score != null && score > r.max_score) return false;
+        if (r.min_confidence != null && confidence < r.min_confidence) return false;
+        return true;
+      });
+
       const { data: log } = await supabase
         .from("decision_logs")
         .insert({
@@ -189,12 +203,21 @@ Deno.serve(async (req) => {
           score,
           confidence,
           quality_label: qualityLabel,
-          decision_taken: "skipped_no_rule",
-          decision_payload: { score, confidence },
+          decision_taken: "no_active_matching_rule",
+          decision_payload: {
+            score,
+            confidence,
+            reason: inactiveMatches.length > 0
+              ? "ideal_rule_disabled"
+              : "no_rule_covers_score_range",
+            inactive_matching_rules: inactiveMatches.map((r: any) => ({
+              id: r.id, name: r.name, priority_label: r.priority_label,
+            })),
+          },
         })
         .select()
         .single();
-      return jsonResponse({ decision_taken: "skipped_no_rule", log });
+      return jsonResponse({ decision_taken: "no_active_matching_rule", log });
     }
 
     if (dry_run) {
