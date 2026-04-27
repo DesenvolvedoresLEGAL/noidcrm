@@ -154,7 +154,18 @@ export function RecentRunsList({ runs, selectedRunId, onSelect }: RecentRunsList
                         <RefreshCw className={cn('h-3 w-3', retryMutation.isPending && 'animate-spin')} />
                       </Button>
                     )}
-                    {(run.status === 'running' || run.status === 'queued') && (
+                    {run.status === 'completed' && prospectsCount > 0 && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-6 w-6 text-primary"
+                        onClick={(e) => { e.stopPropagation(); rescoreMutation.mutate(run.id); }}
+                        disabled={rescoreMutation.isPending}
+                        title="Re-pontuar com aprendizado atual (Score V3)"
+                      >
+                        <Sparkles className={cn('h-3 w-3', rescoreMutation.isPending && rescoreMutation.variables === run.id && 'animate-pulse')} />
+                      </Button>
+                    )}
                       <Button
                         size="icon"
                         variant="ghost"
