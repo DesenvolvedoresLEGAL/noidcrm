@@ -455,6 +455,53 @@ Deno.serve(async (req) => {
       .select()
       .single();
 
+    // Sprint C: track lifecycle event (fire-and-forget)
+    supabase.functions.invoke("track-event", {
+      body: {
+        event_type: "decision_executed",
+        organization_id,
+        prospect_id,
+        opportunity_id: actions.opportunity_id ?? null,
+        account_id: actions.account_id ?? null,
+        metadata: {
+          rule_id: rule.id,
+          rule_name: rule.name,
+          priority_label: rule.priority_label,
+          decision_taken: decisionTaken,
+          actions,
+          score,
+          confidence,
+        },
+        dedup_key: `decision:${log?.id ?? `${prospect_id}:${enrichment_run_id ?? "none"}`}`,
+      },
+    }).catch((err) => console.error("track-event decision_executed failed:", err));
+
+    if (actions.opportunity_id) {
+      supabase.functions.invoke("track-event", {
+        body: {
+          event_type: "opportunity_created",
+          organization_id,
+          prospect_id,
+          opportunity_id: actions.opportunity_id,
+          account_id: actions.account_id ?? null,
+          metadata: { source: "decision_engine", rule_id: rule.id },
+          dedup_key: `opp_created:${actions.opportunity_id}`,
+        },
+      }).catch((err) => console.error("track-event opportunity_created failed:", err));
+    }
+    if ((actions as any).task_id) {
+      supabase.functions.invoke("track-event", {
+        body: {
+          event_type: "task_created",
+          organization_id,
+          prospect_id,
+          opportunity_id: actions.opportunity_id ?? null,
+          metadata: { source: "decision_engine", task_id: (actions as any).task_id },
+          dedup_key: `task_created:${(actions as any).task_id}`,
+        },
+      }).catch((err) => console.error("track-event task_created failed:", err));
+    }
+
     return jsonResponse({
       decision_taken: decisionTaken,
       rule_applied: { id: rule.id, name: rule.name, priority_label: rule.priority_label },
