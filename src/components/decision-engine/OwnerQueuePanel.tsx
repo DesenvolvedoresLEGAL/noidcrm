@@ -8,11 +8,10 @@ import { formatDateBR } from "@/lib/dateUtils";
 interface QueueRow {
   id: string;
   user_id: string;
-  role: string | null;
+  role_filter: string | null;
   weight: number;
   is_active: boolean;
   last_assigned_at: string | null;
-  total_assigned: number;
   profile?: { full_name: string | null; email: string | null };
 }
 
@@ -65,15 +64,14 @@ export function OwnerQueuePanel({ organizationId }: { organizationId: string | u
                 {row.profile?.full_name ?? row.profile?.email ?? row.user_id.slice(0, 8)}
               </div>
               <div className="text-xs text-muted-foreground flex gap-2 mt-1">
-                {row.role && <Badge variant="outline">{row.role}</Badge>}
+                {row.role_filter && <Badge variant="outline">{row.role_filter}</Badge>}
                 <Badge variant="secondary">peso {row.weight}</Badge>
                 {!row.is_active && <Badge variant="destructive">inativo</Badge>}
               </div>
             </div>
             <div className="text-xs text-muted-foreground text-right">
-              <div>Atribuídos: <span className="font-medium">{row.total_assigned}</span></div>
               <div>
-                Última: {row.last_assigned_at ? formatDateBR(row.last_assigned_at) : "—"}
+                Última atribuição: {row.last_assigned_at ? formatDateBR(row.last_assigned_at) : "—"}
               </div>
             </div>
           </CardContent>
