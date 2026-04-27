@@ -692,7 +692,7 @@ REMETENTE: SDR da NOID.`,
       }
     }
 
-    // 11. Finalize enrichment_run com novos campos
+    // 11. Finalize enrichment_run com novos campos (Sprint B + C)
     await supabase
       .from("enrichment_runs")
       .update({
@@ -710,9 +710,26 @@ REMETENTE: SDR da NOID.`,
         fallback_pages_fetched: fallbackPagesFetched,
         missing_fields: missingFields,
         prompt_version: PROMPT_VERSION,
+        learning_adjustment: learningAdjustment,
         finished_at: new Date().toISOString(),
       })
       .eq("id", run.id);
+
+    // Sprint C: track lifecycle event (fire-and-forget)
+    supabase.functions.invoke("track-event", {
+      body: {
+        event_type: "enrichment_completed",
+        organization_id: workspace_id,
+        prospect_id,
+        metadata: {
+          run_id: run.id,
+          quality_label: qualityLabel,
+          score: qualityScore,
+          fallback_used: fallbackUsed,
+        },
+        dedup_key: `enrichment:${run.id}`,
+      },
+    }).catch((err) => console.error("track-event enrichment_completed failed:", err));
 
     // Sprint B: trigger Decision Engine se qualidade for usável (fire-and-forget)
     if (qualityLabel === "high_confidence" || qualityLabel === "usable") {
