@@ -279,6 +279,33 @@ Deno.serve(async (req) => {
         if (rule.owner_strategy === "fixed" && rule.fixed_owner_user_id) {
           ownerUserId = rule.fixed_owner_user_id;
         } else {
+          // Auto-bootstrap: se a fila estiver vazia, popula com membros ativos da org.
+          const { count: queueCount } = await supabase
+            .from("owner_queue")
+            .select("id", { count: "exact", head: true })
+            .eq("organization_id", organization_id)
+            .eq("is_active", true);
+
+          if (!queueCount || queueCount === 0) {
+            const { data: members } = await supabase
+              .from("organization_members")
+              .select("user_id")
+              .eq("organization_id", organization_id);
+            if (members && members.length > 0) {
+              const rows = members.map((m: any) => ({
+                organization_id,
+                user_id: m.user_id,
+                weight: 1,
+                is_active: true,
+                role_filter: rule.owner_role_filter,
+              }));
+              await supabase.from("owner_queue").upsert(rows, {
+                onConflict: "organization_id,user_id",
+                ignoreDuplicates: true,
+              });
+            }
+          }
+
           const { data: oid } = await supabase.rpc("claim_next_owner_round_robin", {
             _organization_id: organization_id,
             _role_filter: rule.owner_role_filter,
@@ -286,6 +313,7 @@ Deno.serve(async (req) => {
           ownerUserId = (oid as string) ?? null;
         }
         if (ownerUserId) actions.owner_user_id = ownerUserId;
+        else errors.push("assign_owner: no_active_owner_in_queue");
       } catch (e: any) {
         errors.push(`assign_owner: ${e.message}`);
       }
