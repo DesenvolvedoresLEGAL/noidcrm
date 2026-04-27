@@ -8433,6 +8433,138 @@ export type Database = {
           },
         ]
       }
+      decision_logs: {
+        Row: {
+          actions_executed: Json
+          confidence: number | null
+          created_at: string
+          decision_payload: Json
+          decision_taken: string
+          enrichment_run_id: string | null
+          error_message: string | null
+          id: string
+          organization_id: string
+          prospect_id: string | null
+          quality_label: string | null
+          rule_id: string | null
+          score: number | null
+        }
+        Insert: {
+          actions_executed?: Json
+          confidence?: number | null
+          created_at?: string
+          decision_payload?: Json
+          decision_taken: string
+          enrichment_run_id?: string | null
+          error_message?: string | null
+          id?: string
+          organization_id: string
+          prospect_id?: string | null
+          quality_label?: string | null
+          rule_id?: string | null
+          score?: number | null
+        }
+        Update: {
+          actions_executed?: Json
+          confidence?: number | null
+          created_at?: string
+          decision_payload?: Json
+          decision_taken?: string
+          enrichment_run_id?: string | null
+          error_message?: string | null
+          id?: string
+          organization_id?: string
+          prospect_id?: string | null
+          quality_label?: string | null
+          rule_id?: string | null
+          score?: number | null
+        }
+        Relationships: []
+      }
+      decision_rules: {
+        Row: {
+          action_assign_owner: boolean
+          action_create_opportunity: boolean
+          action_create_task: boolean
+          action_enroll_sequence: boolean
+          created_at: string
+          created_by: string | null
+          description: string | null
+          fixed_owner_user_id: string | null
+          id: string
+          is_active: boolean
+          max_score: number | null
+          min_confidence: number | null
+          min_contact_score: number | null
+          min_score: number | null
+          name: string
+          organization_id: string
+          owner_role_filter: string | null
+          owner_strategy: string | null
+          pipeline_id: string | null
+          priority: number
+          priority_label: string | null
+          sequence_id: string | null
+          stage_id: string | null
+          task_template: Json
+          updated_at: string
+        }
+        Insert: {
+          action_assign_owner?: boolean
+          action_create_opportunity?: boolean
+          action_create_task?: boolean
+          action_enroll_sequence?: boolean
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          fixed_owner_user_id?: string | null
+          id?: string
+          is_active?: boolean
+          max_score?: number | null
+          min_confidence?: number | null
+          min_contact_score?: number | null
+          min_score?: number | null
+          name: string
+          organization_id: string
+          owner_role_filter?: string | null
+          owner_strategy?: string | null
+          pipeline_id?: string | null
+          priority?: number
+          priority_label?: string | null
+          sequence_id?: string | null
+          stage_id?: string | null
+          task_template?: Json
+          updated_at?: string
+        }
+        Update: {
+          action_assign_owner?: boolean
+          action_create_opportunity?: boolean
+          action_create_task?: boolean
+          action_enroll_sequence?: boolean
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          fixed_owner_user_id?: string | null
+          id?: string
+          is_active?: boolean
+          max_score?: number | null
+          min_confidence?: number | null
+          min_contact_score?: number | null
+          min_score?: number | null
+          name?: string
+          organization_id?: string
+          owner_role_filter?: string | null
+          owner_strategy?: string | null
+          pipeline_id?: string | null
+          priority?: number
+          priority_label?: string | null
+          sequence_id?: string | null
+          stage_id?: string | null
+          task_template?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
       dedupe_registry: {
         Row: {
           created_at: string | null
@@ -16090,6 +16222,90 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      outbound_tasks: {
+        Row: {
+          account_id: string | null
+          created_at: string
+          decision_log_id: string | null
+          due_at: string | null
+          id: string
+          opportunity_id: string | null
+          organization_id: string
+          owner_user_id: string | null
+          payload: Json
+          prospect_id: string | null
+          status: string
+          task_type: string
+          updated_at: string
+        }
+        Insert: {
+          account_id?: string | null
+          created_at?: string
+          decision_log_id?: string | null
+          due_at?: string | null
+          id?: string
+          opportunity_id?: string | null
+          organization_id: string
+          owner_user_id?: string | null
+          payload?: Json
+          prospect_id?: string | null
+          status?: string
+          task_type: string
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string | null
+          created_at?: string
+          decision_log_id?: string | null
+          due_at?: string | null
+          id?: string
+          opportunity_id?: string | null
+          organization_id?: string
+          owner_user_id?: string | null
+          payload?: Json
+          prospect_id?: string | null
+          status?: string
+          task_type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      owner_queue: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          last_assigned_at: string | null
+          organization_id: string
+          role_filter: string | null
+          updated_at: string
+          user_id: string
+          weight: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          last_assigned_at?: string | null
+          organization_id: string
+          role_filter?: string | null
+          updated_at?: string
+          user_id: string
+          weight?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          last_assigned_at?: string | null
+          organization_id?: string
+          role_filter?: string | null
+          updated_at?: string
+          user_id?: string
+          weight?: number
+        }
+        Relationships: []
       }
       pending_release_changes: {
         Row: {
@@ -27825,6 +28041,10 @@ export type Database = {
         }
         Returns: Json
       }
+      claim_next_owner_round_robin: {
+        Args: { _organization_id: string; _role_filter?: string }
+        Returns: string
+      }
       cleanup_expired_dedup_keys: { Args: never; Returns: number }
       cleanup_expired_oauth_nonces: { Args: never; Returns: number }
       cleanup_expired_snapshots: { Args: never; Returns: number }
@@ -28376,6 +28596,10 @@ export type Database = {
           p_target_version_id: string
         }
         Returns: string
+      }
+      seed_default_decision_rules: {
+        Args: { _org_id: string }
+        Returns: undefined
       }
       try_acquire_dedup_lock: {
         Args: {
