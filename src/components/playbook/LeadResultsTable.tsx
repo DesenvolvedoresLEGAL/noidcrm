@@ -110,16 +110,19 @@ export function LeadResultsTable({
 
   const filtered = useMemo(() => {
     return prospects.filter(p => {
+      const s = p.prospect_scores?.[0];
+      const priority = s?.priority_score ?? 0;
       switch (activeFilter) {
         case 'pending': return p.status === 'review_pending' || p.approval_status === 'pending';
         case 'approved': return p.status === 'approved' || p.approval_status === 'approved';
         case 'rejected': return p.status === 'rejected' || p.approval_status === 'rejected';
         case 'imported': return p.approval_status === 'imported' || p.status === 'converted';
         case 'duplicate': return p.dedupe_status === 'strong_match' || p.dedupe_status === 'possible_match';
-        case 'high_score': {
-          const s = p.prospect_scores?.[0];
-          return s && (s.priority_score >= 70 || ((s.icp_fit_score || 0) + (s.data_quality_score || 0) + (s.source_trust_score || 0) - (s.penalty_score || 0)) >= 70);
-        }
+        case 'tier_s': return s && priority >= TIER_S_MIN;
+        case 'tier_a': return s && priority >= TIER_A_MIN && priority < TIER_S_MIN;
+        case 'tier_b': return s && priority >= TIER_B_MIN && priority < TIER_A_MIN;
+        case 'tier_c': return s && priority < TIER_B_MIN;
+        case 'high_score': return s && priority >= HIGH_SCORE_MIN;
         case 'no_domain': return !p.normalized_domain;
         default: return true;
       }
