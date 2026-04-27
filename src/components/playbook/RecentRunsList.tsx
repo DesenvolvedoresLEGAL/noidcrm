@@ -1,13 +1,16 @@
 import { useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Loader2, CheckCircle2, XCircle, Clock, RefreshCw, AlertTriangle, Trash2, Ban } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, Clock, RefreshCw, AlertTriangle, Trash2, Ban, Sparkles } from 'lucide-react';
 import { useRetryPlaybookRun, useDeletePlaybookRun, useCancelPlaybookRun } from '@/hooks/useLeadSourcingV2';
 import { DeleteConfirmationDialog } from '@/components/ui/delete-confirmation-dialog';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import type { PlaybookRun } from '@/hooks/useLeadSourcingV2';
 
 interface RecentRunsListProps {
@@ -43,8 +46,36 @@ export function RecentRunsList({ runs, selectedRunId, onSelect }: RecentRunsList
   const retryMutation = useRetryPlaybookRun();
   const deleteMutation = useDeletePlaybookRun();
   const cancelMutation = useCancelPlaybookRun();
+  const queryClient = useQueryClient();
   const [deleteRunId, setDeleteRunId] = useState<string | null>(null);
   const [cancelRunId, setCancelRunId] = useState<string | null>(null);
+
+  const rescoreMutation = useMutation({
+    mutationFn: async (runId: string) => {
+      const { data, error } = await supabase.functions.invoke('rescore-prospects', {
+        body: { run_id: runId },
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      const total = data?.total ?? 0;
+      const rescored = data?.rescored ?? 0;
+      const learning = data?.learning_signals_active ?? 0;
+      if (learning === 0) {
+        toast.info('Re-pontuação concluída', {
+          description: 'Nenhum learning signal ativo (confiança ≥ 0.2). Scores não mudaram. Continue rodando o sistema para acumular aprendizado.',
+        });
+      } else {
+        toast.success('Re-pontuação concluída', {
+          description: `${rescored} de ${total} prospects atualizados com base em ${learning} sinais aprendidos.`,
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ['lead-sourcing-prospects'] });
+      queryClient.invalidateQueries({ queryKey: ['playbook-runs'] });
+    },
+    onError: (e: any) => toast.error('Falha ao re-pontuar', { description: e.message }),
+  });
 
   if (!runs.length) return null;
 
@@ -121,6 +152,18 @@ export function RecentRunsList({ runs, selectedRunId, onSelect }: RecentRunsList
                         title="Tentar novamente"
                       >
                         <RefreshCw className={cn('h-3 w-3', retryMutation.isPending && 'animate-spin')} />
+                      </Button>
+                    )}
+                    {run.status === 'completed' && prospectsCount > 0 && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-6 w-6 text-primary"
+                        onClick={(e) => { e.stopPropagation(); rescoreMutation.mutate(run.id); }}
+                        disabled={rescoreMutation.isPending}
+                        title="Re-pontuar com aprendizado atual (Score V3)"
+                      >
+                        <Sparkles className={cn('h-3 w-3', rescoreMutation.isPending && rescoreMutation.variables === run.id && 'animate-pulse')} />
                       </Button>
                     )}
                     {(run.status === 'running' || run.status === 'queued') && (

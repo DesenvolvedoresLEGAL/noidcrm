@@ -14,16 +14,31 @@ import { cn } from '@/lib/utils';
 import type { Prospect } from '@/hooks/useLeadSourcingV2';
 import { DecisionBadge } from '@/components/decision-engine/DecisionBadge';
 
-type FilterKey = 'all' | 'pending' | 'approved' | 'rejected' | 'imported' | 'duplicate' | 'high_score' | 'no_domain';
+type FilterKey = 'all' | 'pending' | 'approved' | 'rejected' | 'imported' | 'duplicate' | 'tier_s' | 'tier_a' | 'tier_b' | 'tier_c' | 'high_score' | 'no_domain';
 
-const FILTERS: { key: FilterKey; label: string }[] = [
+// Tier thresholds — calibrados sobre dados reais (priority_score range observado: 141–316)
+// Tier S: alta prioridade absoluta (top 30%)
+// Tier A: prioridade alta com ICP forte
+// Tier B: segunda onda
+// Tier C: descartar ou enriquecer manualmente
+const TIER_S_MIN = 280;
+const TIER_A_MIN = 230;
+const TIER_B_MIN = 180;
+// Score Alto = Tier S + Tier A
+const HIGH_SCORE_MIN = TIER_A_MIN;
+
+const FILTERS: { key: FilterKey; label: string; tooltip?: string }[] = [
   { key: 'all', label: 'Todos' },
   { key: 'pending', label: 'Pendentes' },
   { key: 'approved', label: 'Aprovados' },
   { key: 'imported', label: 'Importados' },
   { key: 'rejected', label: 'Rejeitados' },
   { key: 'duplicate', label: 'Possível Duplicado' },
-  { key: 'high_score', label: 'Score Alto' },
+  { key: 'high_score', label: 'Score Alto', tooltip: `Inclui Tier S e Tier A (priority_score ≥ ${HIGH_SCORE_MIN}). Combina ICP fit, sinais positivos detectados, qualidade dos dados e ajuste do learning loop.` },
+  { key: 'tier_s', label: `Tier S (≥${TIER_S_MIN})`, tooltip: 'Prioridade máxima — atacar primeiro. Alto ICP fit + múltiplos sinais positivos.' },
+  { key: 'tier_a', label: `Tier A (${TIER_A_MIN}–${TIER_S_MIN - 1})`, tooltip: 'Alta prioridade — segunda onda imediata. ICP forte com sinais consistentes.' },
+  { key: 'tier_b', label: `Tier B (${TIER_B_MIN}–${TIER_A_MIN - 1})`, tooltip: 'Prioridade média — trabalhar após Tier S/A ou enriquecer para subir de tier.' },
+  { key: 'tier_c', label: `Tier C (<${TIER_B_MIN})`, tooltip: 'Baixa prioridade — ICP fraco ou poucos sinais. Considerar descarte ou enrichment manual.' },
   { key: 'no_domain', label: 'Sem Domínio' },
 ];
 
@@ -95,16 +110,19 @@ export function LeadResultsTable({
 
   const filtered = useMemo(() => {
     return prospects.filter(p => {
+      const s = p.prospect_scores?.[0];
+      const priority = s?.priority_score ?? 0;
       switch (activeFilter) {
         case 'pending': return p.status === 'review_pending' || p.approval_status === 'pending';
         case 'approved': return p.status === 'approved' || p.approval_status === 'approved';
         case 'rejected': return p.status === 'rejected' || p.approval_status === 'rejected';
         case 'imported': return p.approval_status === 'imported' || p.status === 'converted';
         case 'duplicate': return p.dedupe_status === 'strong_match' || p.dedupe_status === 'possible_match';
-        case 'high_score': {
-          const s = p.prospect_scores?.[0];
-          return s && (s.priority_score >= 70 || ((s.icp_fit_score || 0) + (s.data_quality_score || 0) + (s.source_trust_score || 0) - (s.penalty_score || 0)) >= 70);
-        }
+        case 'tier_s': return s && priority >= TIER_S_MIN;
+        case 'tier_a': return s && priority >= TIER_A_MIN && priority < TIER_S_MIN;
+        case 'tier_b': return s && priority >= TIER_B_MIN && priority < TIER_A_MIN;
+        case 'tier_c': return s && priority < TIER_B_MIN;
+        case 'high_score': return s && priority >= HIGH_SCORE_MIN;
         case 'no_domain': return !p.normalized_domain;
         default: return true;
       }
@@ -163,22 +181,33 @@ export function LeadResultsTable({
           )}
         </div>
         {/* Filters */}
-        <div className="flex flex-wrap gap-1.5 pt-2">
-          {FILTERS.map(f => (
-            <button
-              key={f.key}
-              onClick={() => { setActiveFilter(f.key); setSelectedIds(new Set()); }}
-              className={cn(
-                'px-2.5 py-1 rounded-full text-xs font-medium border transition-colors',
-                activeFilter === f.key
-                  ? 'bg-primary text-primary-foreground border-primary'
-                  : 'bg-background text-muted-foreground border-border hover:border-primary/40'
-              )}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
+        <TooltipProvider>
+          <div className="flex flex-wrap gap-1.5 pt-2">
+            {FILTERS.map(f => {
+              const btn = (
+                <button
+                  key={f.key}
+                  onClick={() => { setActiveFilter(f.key); setSelectedIds(new Set()); }}
+                  className={cn(
+                    'px-2.5 py-1 rounded-full text-xs font-medium border transition-colors',
+                    activeFilter === f.key
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-background text-muted-foreground border-border hover:border-primary/40'
+                  )}
+                >
+                  {f.label}
+                </button>
+              );
+              if (!f.tooltip) return btn;
+              return (
+                <Tooltip key={f.key}>
+                  <TooltipTrigger asChild>{btn}</TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-xs text-xs">{f.tooltip}</TooltipContent>
+                </Tooltip>
+              );
+            })}
+          </div>
+        </TooltipProvider>
       </CardHeader>
       <CardContent>
         <TooltipProvider>
@@ -190,7 +219,16 @@ export function LeadResultsTable({
                 </TableHead>
                 <TableHead>Empresa</TableHead>
                 <TableHead>Origem</TableHead>
-                <TableHead className="text-center">Confiança</TableHead>
+                <TableHead className="text-center">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="cursor-help underline decoration-dotted">Confiança</span>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="max-w-xs text-xs">
+                      Confiança da extração de dados pela IA (0–100). Não confundir com o Score de prioridade comercial.
+                    </TooltipContent>
+                  </Tooltip>
+                </TableHead>
                 <TableHead className="text-center">Score</TableHead>
                 <TableHead className="text-center">Grade</TableHead>
                 <TableHead>Duplicidade</TableHead>
