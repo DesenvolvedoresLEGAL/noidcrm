@@ -109,7 +109,15 @@ export function CompanyEnrichmentCard({ profile, run }: CompanyEnrichmentCardPro
         <TagList items={profile.growth_signals as string[] || []} icon={TrendingUp} color="border-green-500/30 text-green-600" />
         <TagList items={profile.tech_signals as string[] || []} icon={Cpu} color="border-purple-500/30 text-purple-600" />
         <TagList items={profile.commercial_pains as string[] || []} icon={AlertTriangle} color="border-amber-500/30 text-amber-600" />
+
+        {Array.isArray(run?.missing_fields) && run!.missing_fields.length > 0 && (
+          <div className="text-xs text-muted-foreground border-t border-border pt-2 mt-2">
+            <span className="font-medium">Campos sem evidência:</span>{' '}
+            {(run!.missing_fields as string[]).map((f) => FIELD_LABELS[f] || f).join(', ')}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
 }
+
