@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   Bot, Workflow, ShieldCheck, ScrollText, BarChart3,
-  Wrench, Brain, Server, ArrowRight, Construction, Network
+  Wrench, Brain, Server, ArrowRight, Construction, Network, TrendingUp
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -98,6 +98,15 @@ const hubItems = [
     path: '/app/settings/noid-intelligence/decision-rules',
     available: true,
     badge: 'Auto',
+  },
+  {
+    id: 'learning',
+    title: 'Performance & Aprendizado',
+    description: 'Funil, sinais que convertem e performance de outreach',
+    icon: TrendingUp,
+    path: '/app/settings/noid-intelligence/learning',
+    available: true,
+    badge: 'Learning',
   },
 ];
 

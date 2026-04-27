@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.increment_outreach_metric FROM PUBLIC, anon;
