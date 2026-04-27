@@ -90,6 +90,15 @@ const hubItems = [
     available: true,
     badge: 'Técnico',
   },
+  {
+    id: 'decision-rules',
+    title: 'Decision Engine',
+    description: 'Regras que transformam scores em ações automáticas',
+    icon: Workflow,
+    path: '/app/settings/noid-intelligence/decision-rules',
+    available: true,
+    badge: 'Auto',
+  },
 ];
 
 export default function NoidIntelligenceHub() {
