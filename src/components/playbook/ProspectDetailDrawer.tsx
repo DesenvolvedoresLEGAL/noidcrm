@@ -17,6 +17,7 @@ import { CommercialBriefCard } from './enrichment/CommercialBriefCard';
 import { EnrichmentSignalsList } from './enrichment/EnrichmentSignalsList';
 import { EnrichmentTimeline } from './enrichment/EnrichmentTimeline';
 import { DecisionDetailPanel } from '@/components/decision-engine/DecisionDetailPanel';
+import { ProspectLifecycleTimeline } from '@/components/learning/ProspectLifecycleTimeline';
 
 interface ProspectDetailDrawerProps {
   prospect: Prospect | null;
@@ -337,6 +338,12 @@ export function ProspectDetailDrawer({
           <TabsContent value="decision">
             <div className="py-4">
               <DecisionDetailPanel prospectId={prospect.id} enrichmentRunId={enrichmentRun?.id} />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="timeline">
+            <div className="py-4">
+              <ProspectLifecycleTimeline prospectId={prospect.id} />
             </div>
           </TabsContent>
         </Tabs>
