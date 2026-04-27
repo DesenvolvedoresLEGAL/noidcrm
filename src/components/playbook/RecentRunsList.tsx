@@ -1,13 +1,16 @@
 import { useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Loader2, CheckCircle2, XCircle, Clock, RefreshCw, AlertTriangle, Trash2, Ban } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, Clock, RefreshCw, AlertTriangle, Trash2, Ban, Sparkles } from 'lucide-react';
 import { useRetryPlaybookRun, useDeletePlaybookRun, useCancelPlaybookRun } from '@/hooks/useLeadSourcingV2';
 import { DeleteConfirmationDialog } from '@/components/ui/delete-confirmation-dialog';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import type { PlaybookRun } from '@/hooks/useLeadSourcingV2';
 
 interface RecentRunsListProps {
