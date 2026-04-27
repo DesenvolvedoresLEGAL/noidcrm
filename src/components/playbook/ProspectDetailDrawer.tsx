@@ -140,6 +140,7 @@ export function ProspectDetailDrawer({
           <TabsList className="w-full">
             <TabsTrigger value="details" className="flex-1">Detalhes</TabsTrigger>
             <TabsTrigger value="enrichment" className="flex-1">Enrichment</TabsTrigger>
+            <TabsTrigger value="decision" className="flex-1">Decisão</TabsTrigger>
           </TabsList>
 
           <TabsContent value="details">
@@ -328,6 +329,12 @@ export function ProspectDetailDrawer({
                   Clique em "Enriquecer com IA" para iniciar a análise deste prospect.
                 </div>
               )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="decision">
+            <div className="py-4">
+              <DecisionDetailPanel prospectId={prospect.id} enrichmentRunId={enrichmentRun?.id} />
             </div>
           </TabsContent>
         </Tabs>
