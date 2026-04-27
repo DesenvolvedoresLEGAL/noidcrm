@@ -9334,6 +9334,74 @@ export type Database = {
           },
         ]
       }
+      enrichment_normalized: {
+        Row: {
+          confidence_score: number | null
+          content_length: number | null
+          created_at: string
+          data: Json
+          enrichment_run_id: string | null
+          fallback_used: boolean
+          id: string
+          organization_id: string
+          prospect_id: string | null
+          quality_grade: string | null
+        }
+        Insert: {
+          confidence_score?: number | null
+          content_length?: number | null
+          created_at?: string
+          data?: Json
+          enrichment_run_id?: string | null
+          fallback_used?: boolean
+          id?: string
+          organization_id: string
+          prospect_id?: string | null
+          quality_grade?: string | null
+        }
+        Update: {
+          confidence_score?: number | null
+          content_length?: number | null
+          created_at?: string
+          data?: Json
+          enrichment_run_id?: string | null
+          fallback_used?: boolean
+          id?: string
+          organization_id?: string
+          prospect_id?: string | null
+          quality_grade?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "enrichment_normalized_enrichment_run_id_fkey"
+            columns: ["enrichment_run_id"]
+            isOneToOne: false
+            referencedRelation: "enrichment_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "enrichment_normalized_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "enrichment_normalized_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_report_legacy_retirement_readiness_v2"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "enrichment_normalized_prospect_id_fkey"
+            columns: ["prospect_id"]
+            isOneToOne: false
+            referencedRelation: "prospects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       enrichment_provider_results: {
         Row: {
           confidence: number | null
@@ -9398,12 +9466,80 @@ export type Database = {
           },
         ]
       }
+      enrichment_raw_sources: {
+        Row: {
+          content_length: number | null
+          created_at: string
+          enrichment_run_id: string | null
+          id: string
+          organization_id: string
+          prospect_id: string | null
+          raw_content: string | null
+          source_type: string
+          url: string | null
+        }
+        Insert: {
+          content_length?: number | null
+          created_at?: string
+          enrichment_run_id?: string | null
+          id?: string
+          organization_id: string
+          prospect_id?: string | null
+          raw_content?: string | null
+          source_type: string
+          url?: string | null
+        }
+        Update: {
+          content_length?: number | null
+          created_at?: string
+          enrichment_run_id?: string | null
+          id?: string
+          organization_id?: string
+          prospect_id?: string | null
+          raw_content?: string | null
+          source_type?: string
+          url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "enrichment_raw_sources_enrichment_run_id_fkey"
+            columns: ["enrichment_run_id"]
+            isOneToOne: false
+            referencedRelation: "enrichment_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "enrichment_raw_sources_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "enrichment_raw_sources_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_report_legacy_retirement_readiness_v2"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "enrichment_raw_sources_prospect_id_fkey"
+            columns: ["prospect_id"]
+            isOneToOne: false
+            referencedRelation: "prospects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       enrichment_runs: {
         Row: {
           account_id: string | null
+          content_length: number | null
           created_at: string | null
           created_by: string | null
           enrichment_score: number | null
+          fallback_pages_fetched: Json
+          fallback_used: boolean
           finished_at: string | null
           id: string
           merge_status: string | null
@@ -9411,6 +9547,8 @@ export type Database = {
           providers_completed: Json | null
           providers_failed: Json | null
           providers_requested: Json | null
+          quality_grade: string | null
+          quality_score: number | null
           started_at: string | null
           status: string
           trigger_source: string
@@ -9419,9 +9557,12 @@ export type Database = {
         }
         Insert: {
           account_id?: string | null
+          content_length?: number | null
           created_at?: string | null
           created_by?: string | null
           enrichment_score?: number | null
+          fallback_pages_fetched?: Json
+          fallback_used?: boolean
           finished_at?: string | null
           id?: string
           merge_status?: string | null
@@ -9429,6 +9570,8 @@ export type Database = {
           providers_completed?: Json | null
           providers_failed?: Json | null
           providers_requested?: Json | null
+          quality_grade?: string | null
+          quality_score?: number | null
           started_at?: string | null
           status?: string
           trigger_source: string
@@ -9437,9 +9580,12 @@ export type Database = {
         }
         Update: {
           account_id?: string | null
+          content_length?: number | null
           created_at?: string | null
           created_by?: string | null
           enrichment_score?: number | null
+          fallback_pages_fetched?: Json
+          fallback_used?: boolean
           finished_at?: string | null
           id?: string
           merge_status?: string | null
@@ -9447,6 +9593,8 @@ export type Database = {
           providers_completed?: Json | null
           providers_failed?: Json | null
           providers_requested?: Json | null
+          quality_grade?: string | null
+          quality_score?: number | null
           started_at?: string | null
           status?: string
           trigger_source?: string
