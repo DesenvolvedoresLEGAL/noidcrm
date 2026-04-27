@@ -166,6 +166,7 @@ export function RecentRunsList({ runs, selectedRunId, onSelect }: RecentRunsList
                         <Sparkles className={cn('h-3 w-3', rescoreMutation.isPending && rescoreMutation.variables === run.id && 'animate-pulse')} />
                       </Button>
                     )}
+                    {(run.status === 'running' || run.status === 'queued') && (
                       <Button
                         size="icon"
                         variant="ghost"
