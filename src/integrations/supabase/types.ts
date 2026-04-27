@@ -9687,6 +9687,7 @@ export type Database = {
           fallback_used: boolean
           finished_at: string | null
           id: string
+          learning_adjustment: number | null
           merge_status: string | null
           missing_fields: Json
           prompt_version: string | null
@@ -9714,6 +9715,7 @@ export type Database = {
           fallback_used?: boolean
           finished_at?: string | null
           id?: string
+          learning_adjustment?: number | null
           merge_status?: string | null
           missing_fields?: Json
           prompt_version?: string | null
@@ -9741,6 +9743,7 @@ export type Database = {
           fallback_used?: boolean
           finished_at?: string | null
           id?: string
+          learning_adjustment?: number | null
           merge_status?: string | null
           missing_fields?: Json
           prompt_version?: string | null
@@ -12147,6 +12150,63 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "playbook_runs"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      learning_signals: {
+        Row: {
+          confidence: number
+          created_at: string
+          id: string
+          impact_score: number
+          last_recalculated_at: string
+          negative_outcomes: number
+          occurrences: number
+          organization_id: string
+          positive_outcomes: number
+          signal_type: string
+          signal_value: string
+        }
+        Insert: {
+          confidence?: number
+          created_at?: string
+          id?: string
+          impact_score?: number
+          last_recalculated_at?: string
+          negative_outcomes?: number
+          occurrences?: number
+          organization_id: string
+          positive_outcomes?: number
+          signal_type: string
+          signal_value: string
+        }
+        Update: {
+          confidence?: number
+          created_at?: string
+          id?: string
+          impact_score?: number
+          last_recalculated_at?: string
+          negative_outcomes?: number
+          occurrences?: number
+          organization_id?: string
+          positive_outcomes?: number
+          signal_type?: string
+          signal_value?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "learning_signals_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "learning_signals_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_report_legacy_retirement_readiness_v2"
+            referencedColumns: ["organization_id"]
           },
         ]
       }
@@ -16271,6 +16331,75 @@ export type Database = {
         }
         Relationships: []
       }
+      outreach_performance: {
+        Row: {
+          channel: string
+          created_at: string
+          delivered: number
+          id: string
+          last_event_at: string | null
+          losses: number
+          meetings: number
+          opened: number
+          organization_id: string
+          replied: number
+          sent: number
+          template_type: string
+          updated_at: string
+          variant: string
+          wins: number
+        }
+        Insert: {
+          channel: string
+          created_at?: string
+          delivered?: number
+          id?: string
+          last_event_at?: string | null
+          losses?: number
+          meetings?: number
+          opened?: number
+          organization_id: string
+          replied?: number
+          sent?: number
+          template_type?: string
+          updated_at?: string
+          variant?: string
+          wins?: number
+        }
+        Update: {
+          channel?: string
+          created_at?: string
+          delivered?: number
+          id?: string
+          last_event_at?: string | null
+          losses?: number
+          meetings?: number
+          opened?: number
+          organization_id?: string
+          replied?: number
+          sent?: number
+          template_type?: string
+          updated_at?: string
+          variant?: string
+          wins?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "outreach_performance_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "outreach_performance_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_report_legacy_retirement_readiness_v2"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
       owner_queue: {
         Row: {
           created_at: string
@@ -19651,6 +19780,7 @@ export type Database = {
           organization_id: string
           payload: Json | null
           processed_at: string | null
+          prospect_id: string | null
           revenue_impact: number | null
           sentiment_score: number | null
           source: string | null
@@ -19671,6 +19801,7 @@ export type Database = {
           organization_id: string
           payload?: Json | null
           processed_at?: string | null
+          prospect_id?: string | null
           revenue_impact?: number | null
           sentiment_score?: number | null
           source?: string | null
@@ -19691,6 +19822,7 @@ export type Database = {
           organization_id?: string
           payload?: Json | null
           processed_at?: string | null
+          prospect_id?: string | null
           revenue_impact?: number | null
           sentiment_score?: number | null
           source?: string | null
@@ -19795,6 +19927,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "revenue_events_prospect_id_fkey"
+            columns: ["prospect_id"]
+            isOneToOne: false
+            referencedRelation: "prospects"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -28382,6 +28521,17 @@ export type Database = {
       }
       increment_email_knowledge_usage: {
         Args: { knowledge_ids: string[] }
+        Returns: undefined
+      }
+      increment_outreach_metric: {
+        Args: {
+          p_amount?: number
+          p_channel: string
+          p_metric: string
+          p_organization_id: string
+          p_template_type: string
+          p_variant: string
+        }
         Returns: undefined
       }
       increment_usage: {
