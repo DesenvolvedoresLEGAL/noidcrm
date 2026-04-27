@@ -141,6 +141,7 @@ const ApprovalsPage = lazy(() => import("./pages/settings/noid-intelligence/Appr
 const RunDetailPage = lazy(() => import("./pages/settings/noid-intelligence/RunDetailPage"));
 const EmailAgentMetricsPage = lazy(() => import("./pages/settings/noid-intelligence/EmailAgentMetricsPage"));
 const AgentOutcomesPage = lazy(() => import("./pages/settings/noid-intelligence/AgentOutcomesPage"));
+const DecisionRulesPage = lazy(() => import("./pages/settings/noid-intelligence/DecisionRulesPage"));
 
 // GTM Routes - Revenue Operating System
 const SDRCommandCenter = lazy(() => import("./pages/gtm/SDRCommandCenter"));
@@ -811,6 +812,7 @@ const App = () => (
                 <Route path="/app/settings/noid-intelligence/environments" element={<NoidEnvironments />} />
                 <Route path="/app/settings/noid-intelligence/permissions" element={<NoidPermissions />} />
                 <Route path="/app/settings/noid-intelligence/mcp-registry" element={<McpRegistryPage />} />
+                <Route path="/app/settings/noid-intelligence/decision-rules" element={<DecisionRulesPage />} />
               </Route>
 
               {/* Individual System Settings Pages */}

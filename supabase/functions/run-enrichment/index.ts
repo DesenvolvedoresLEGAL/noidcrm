@@ -675,6 +675,21 @@ REMETENTE: SDR da NOID.`,
       })
       .eq("id", run.id);
 
+    // Sprint B: trigger Decision Engine se qualidade for usável (fire-and-forget)
+    if (qualityLabel === "high_confidence" || qualityLabel === "usable") {
+      try {
+        supabase.functions.invoke("run-decision-engine", {
+          body: {
+            prospect_id,
+            enrichment_run_id: run.id,
+            organization_id: workspace_id,
+          },
+        }).catch((err) => console.error("run-decision-engine trigger failed:", err));
+      } catch (err) {
+        console.error("run-decision-engine invoke error:", err);
+      }
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
