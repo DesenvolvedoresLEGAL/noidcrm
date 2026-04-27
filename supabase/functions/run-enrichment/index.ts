@@ -316,9 +316,12 @@ Deno.serve(async (req) => {
 
     // 5. Fallback determinístico
     let fallbackUsed = false;
+    let fallbackReason: string | null = null;
     const fallbackPagesFetched: Array<{ url: string; source_type: string; length: number }> = [];
 
     const shouldFallback = force_fallback === true || mainContentLength < 1500;
+    if (force_fallback === true) fallbackReason = "forced_by_user";
+    else if (mainContentLength < 1500) fallbackReason = "low_content_length";
     const domainRoot = website ? getDomainRoot(website) : null;
 
     if (shouldFallback && domainRoot) {
@@ -426,6 +429,8 @@ ${scrapedContent.slice(0, 18000)}`,
     // 7. Score determinístico
     const qualityScore = calculateConfidence(normalized, totalContentLength, fallbackUsed);
     const qualityGrade = gradeFromScore(qualityScore);
+    const qualityLabel = qualityLabelFromGrade(qualityGrade);
+    const missingFields = computeMissingFields(normalized);
     const hasNormalized = !!(normalized.company_summary || normalized.business_model || normalized.industry);
 
     // 8a. Persistir snapshot histórico
@@ -437,8 +442,12 @@ ${scrapedContent.slice(0, 18000)}`,
         data: normalized as any,
         confidence_score: qualityScore,
         quality_grade: qualityGrade,
+        quality_label: qualityLabel,
         fallback_used: fallbackUsed,
+        fallback_reason: fallbackUsed ? fallbackReason : null,
         content_length: totalContentLength,
+        missing_fields: missingFields,
+        prompt_version: PROMPT_VERSION,
       });
     }
 
@@ -655,9 +664,13 @@ REMETENTE: SDR da NOID.`,
         enrichment_score: qualityScore,
         quality_score: qualityScore,
         quality_grade: qualityGrade,
+        quality_label: qualityLabel,
         fallback_used: fallbackUsed,
+        fallback_reason: fallbackUsed ? fallbackReason : null,
         content_length: totalContentLength,
         fallback_pages_fetched: fallbackPagesFetched,
+        missing_fields: missingFields,
+        prompt_version: PROMPT_VERSION,
         finished_at: new Date().toISOString(),
       })
       .eq("id", run.id);
@@ -669,8 +682,12 @@ REMETENTE: SDR da NOID.`,
         status: providersFailed.length > 0 && providersCompleted.length === 0 ? "failed" : "completed",
         quality_score: qualityScore,
         quality_grade: qualityGrade,
+        quality_label: qualityLabel,
         fallback_used: fallbackUsed,
+        fallback_reason: fallbackUsed ? fallbackReason : null,
         content_length: totalContentLength,
+        missing_fields: missingFields,
+        prompt_version: PROMPT_VERSION,
         has_company_profile: hasNormalized,
         has_brief: !!briefData,
         score_bonus: scoreBonus,
