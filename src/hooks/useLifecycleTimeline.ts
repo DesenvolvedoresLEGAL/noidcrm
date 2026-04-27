@@ -8,7 +8,7 @@ export function useLifecycleTimeline(prospectId: string | undefined) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("revenue_events")
-        .select("id, event_type, channel, event_subtype, payload, created_at, source")
+        .select("id, event_type, event_class, channel, event_subtype, payload, created_at, source")
         .eq("prospect_id", prospectId!)
         .order("created_at", { ascending: true })
         .limit(200);
