@@ -23,8 +23,23 @@ interface CompanyEnrichmentCardProps {
     fallback_used?: boolean | null;
     fallback_pages_fetched?: any;
     content_length?: number | null;
+    missing_fields?: any;
   } | null;
 }
+
+const FIELD_LABELS: Record<string, string> = {
+  company_summary: 'resumo',
+  business_model: 'modelo de negócio',
+  market_type: 'tipo de mercado',
+  industry: 'indústria',
+  target_customer: 'cliente-alvo',
+  geo: 'região',
+  company_size_hint: 'porte',
+  top_pains: 'dores',
+  top_opportunities: 'oportunidades',
+  trigger_signals: 'sinais',
+  digital_maturity: 'maturidade digital',
+};
 
 function TagList({ items, icon: Icon, color }: { items: string[]; icon: any; color: string }) {
   if (!items?.length) return null;
