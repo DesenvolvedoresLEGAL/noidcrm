@@ -14,16 +14,31 @@ import { cn } from '@/lib/utils';
 import type { Prospect } from '@/hooks/useLeadSourcingV2';
 import { DecisionBadge } from '@/components/decision-engine/DecisionBadge';
 
-type FilterKey = 'all' | 'pending' | 'approved' | 'rejected' | 'imported' | 'duplicate' | 'high_score' | 'no_domain';
+type FilterKey = 'all' | 'pending' | 'approved' | 'rejected' | 'imported' | 'duplicate' | 'tier_s' | 'tier_a' | 'tier_b' | 'tier_c' | 'high_score' | 'no_domain';
 
-const FILTERS: { key: FilterKey; label: string }[] = [
+// Tier thresholds — calibrados sobre dados reais (priority_score range observado: 141–316)
+// Tier S: alta prioridade absoluta (top 30%)
+// Tier A: prioridade alta com ICP forte
+// Tier B: segunda onda
+// Tier C: descartar ou enriquecer manualmente
+const TIER_S_MIN = 280;
+const TIER_A_MIN = 230;
+const TIER_B_MIN = 180;
+// Score Alto = Tier S + Tier A
+const HIGH_SCORE_MIN = TIER_A_MIN;
+
+const FILTERS: { key: FilterKey; label: string; tooltip?: string }[] = [
   { key: 'all', label: 'Todos' },
   { key: 'pending', label: 'Pendentes' },
   { key: 'approved', label: 'Aprovados' },
   { key: 'imported', label: 'Importados' },
   { key: 'rejected', label: 'Rejeitados' },
   { key: 'duplicate', label: 'Possível Duplicado' },
-  { key: 'high_score', label: 'Score Alto' },
+  { key: 'high_score', label: 'Score Alto', tooltip: `Inclui Tier S e Tier A (priority_score ≥ ${HIGH_SCORE_MIN}). Combina ICP fit, sinais positivos detectados, qualidade dos dados e ajuste do learning loop.` },
+  { key: 'tier_s', label: `Tier S (≥${TIER_S_MIN})`, tooltip: 'Prioridade máxima — atacar primeiro. Alto ICP fit + múltiplos sinais positivos.' },
+  { key: 'tier_a', label: `Tier A (${TIER_A_MIN}–${TIER_S_MIN - 1})`, tooltip: 'Alta prioridade — segunda onda imediata. ICP forte com sinais consistentes.' },
+  { key: 'tier_b', label: `Tier B (${TIER_B_MIN}–${TIER_A_MIN - 1})`, tooltip: 'Prioridade média — trabalhar após Tier S/A ou enriquecer para subir de tier.' },
+  { key: 'tier_c', label: `Tier C (<${TIER_B_MIN})`, tooltip: 'Baixa prioridade — ICP fraco ou poucos sinais. Considerar descarte ou enrichment manual.' },
   { key: 'no_domain', label: 'Sem Domínio' },
 ];
 
