@@ -9341,11 +9341,15 @@ export type Database = {
           created_at: string
           data: Json
           enrichment_run_id: string | null
+          fallback_reason: string | null
           fallback_used: boolean
           id: string
+          missing_fields: Json
           organization_id: string
+          prompt_version: string | null
           prospect_id: string | null
           quality_grade: string | null
+          quality_label: string | null
         }
         Insert: {
           confidence_score?: number | null
@@ -9353,11 +9357,15 @@ export type Database = {
           created_at?: string
           data?: Json
           enrichment_run_id?: string | null
+          fallback_reason?: string | null
           fallback_used?: boolean
           id?: string
+          missing_fields?: Json
           organization_id: string
+          prompt_version?: string | null
           prospect_id?: string | null
           quality_grade?: string | null
+          quality_label?: string | null
         }
         Update: {
           confidence_score?: number | null
@@ -9365,11 +9373,15 @@ export type Database = {
           created_at?: string
           data?: Json
           enrichment_run_id?: string | null
+          fallback_reason?: string | null
           fallback_used?: boolean
           id?: string
+          missing_fields?: Json
           organization_id?: string
+          prompt_version?: string | null
           prospect_id?: string | null
           quality_grade?: string | null
+          quality_label?: string | null
         }
         Relationships: [
           {
@@ -9539,15 +9551,19 @@ export type Database = {
           created_by: string | null
           enrichment_score: number | null
           fallback_pages_fetched: Json
+          fallback_reason: string | null
           fallback_used: boolean
           finished_at: string | null
           id: string
           merge_status: string | null
+          missing_fields: Json
+          prompt_version: string | null
           prospect_id: string | null
           providers_completed: Json | null
           providers_failed: Json | null
           providers_requested: Json | null
           quality_grade: string | null
+          quality_label: string | null
           quality_score: number | null
           started_at: string | null
           status: string
@@ -9562,15 +9578,19 @@ export type Database = {
           created_by?: string | null
           enrichment_score?: number | null
           fallback_pages_fetched?: Json
+          fallback_reason?: string | null
           fallback_used?: boolean
           finished_at?: string | null
           id?: string
           merge_status?: string | null
+          missing_fields?: Json
+          prompt_version?: string | null
           prospect_id?: string | null
           providers_completed?: Json | null
           providers_failed?: Json | null
           providers_requested?: Json | null
           quality_grade?: string | null
+          quality_label?: string | null
           quality_score?: number | null
           started_at?: string | null
           status?: string
@@ -9585,15 +9605,19 @@ export type Database = {
           created_by?: string | null
           enrichment_score?: number | null
           fallback_pages_fetched?: Json
+          fallback_reason?: string | null
           fallback_used?: boolean
           finished_at?: string | null
           id?: string
           merge_status?: string | null
+          missing_fields?: Json
+          prompt_version?: string | null
           prospect_id?: string | null
           providers_completed?: Json | null
           providers_failed?: Json | null
           providers_requested?: Json | null
           quality_grade?: string | null
+          quality_label?: string | null
           quality_score?: number | null
           started_at?: string | null
           status?: string
