@@ -125,6 +125,44 @@ function gradeFromScore(score: number): "A" | "B" | "C" | "D" {
   return "D";
 }
 
+type QualityLabel = "high_confidence" | "usable" | "low_confidence" | "insufficient";
+
+function qualityLabelFromGrade(grade: "A" | "B" | "C" | "D"): QualityLabel {
+  switch (grade) {
+    case "A": return "high_confidence";
+    case "B": return "usable";
+    case "C": return "low_confidence";
+    case "D": return "insufficient";
+  }
+}
+
+const REQUIRED_NORMALIZED_FIELDS: Array<keyof NormalizedProfile> = [
+  "company_summary",
+  "business_model",
+  "market_type",
+  "industry",
+  "target_customer",
+  "geo",
+  "company_size_hint",
+  "top_pains",
+  "top_opportunities",
+  "trigger_signals",
+  "digital_maturity",
+];
+
+function computeMissingFields(data: NormalizedProfile): string[] {
+  const missing: string[] = [];
+  for (const f of REQUIRED_NORMALIZED_FIELDS) {
+    const v = data[f];
+    if (v == null) missing.push(f as string);
+    else if (Array.isArray(v) && v.length === 0) missing.push(f as string);
+  }
+  return missing;
+}
+
+// Bump this string whenever the normalization prompt or schema changes
+const PROMPT_VERSION = "enrichment.normalize.v2.0";
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -278,9 +316,12 @@ Deno.serve(async (req) => {
 
     // 5. Fallback determinístico
     let fallbackUsed = false;
+    let fallbackReason: string | null = null;
     const fallbackPagesFetched: Array<{ url: string; source_type: string; length: number }> = [];
 
     const shouldFallback = force_fallback === true || mainContentLength < 1500;
+    if (force_fallback === true) fallbackReason = "forced_by_user";
+    else if (mainContentLength < 1500) fallbackReason = "low_content_length";
     const domainRoot = website ? getDomainRoot(website) : null;
 
     if (shouldFallback && domainRoot) {
@@ -388,6 +429,8 @@ ${scrapedContent.slice(0, 18000)}`,
     // 7. Score determinístico
     const qualityScore = calculateConfidence(normalized, totalContentLength, fallbackUsed);
     const qualityGrade = gradeFromScore(qualityScore);
+    const qualityLabel = qualityLabelFromGrade(qualityGrade);
+    const missingFields = computeMissingFields(normalized);
     const hasNormalized = !!(normalized.company_summary || normalized.business_model || normalized.industry);
 
     // 8a. Persistir snapshot histórico
@@ -399,8 +442,12 @@ ${scrapedContent.slice(0, 18000)}`,
         data: normalized as any,
         confidence_score: qualityScore,
         quality_grade: qualityGrade,
+        quality_label: qualityLabel,
         fallback_used: fallbackUsed,
+        fallback_reason: fallbackUsed ? fallbackReason : null,
         content_length: totalContentLength,
+        missing_fields: missingFields,
+        prompt_version: PROMPT_VERSION,
       });
     }
 
@@ -617,9 +664,13 @@ REMETENTE: SDR da NOID.`,
         enrichment_score: qualityScore,
         quality_score: qualityScore,
         quality_grade: qualityGrade,
+        quality_label: qualityLabel,
         fallback_used: fallbackUsed,
+        fallback_reason: fallbackUsed ? fallbackReason : null,
         content_length: totalContentLength,
         fallback_pages_fetched: fallbackPagesFetched,
+        missing_fields: missingFields,
+        prompt_version: PROMPT_VERSION,
         finished_at: new Date().toISOString(),
       })
       .eq("id", run.id);
@@ -631,8 +682,12 @@ REMETENTE: SDR da NOID.`,
         status: providersFailed.length > 0 && providersCompleted.length === 0 ? "failed" : "completed",
         quality_score: qualityScore,
         quality_grade: qualityGrade,
+        quality_label: qualityLabel,
         fallback_used: fallbackUsed,
+        fallback_reason: fallbackUsed ? fallbackReason : null,
         content_length: totalContentLength,
+        missing_fields: missingFields,
+        prompt_version: PROMPT_VERSION,
         has_company_profile: hasNormalized,
         has_brief: !!briefData,
         score_bonus: scoreBonus,
