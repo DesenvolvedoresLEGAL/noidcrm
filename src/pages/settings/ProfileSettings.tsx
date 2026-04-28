@@ -7,14 +7,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useState, useEffect, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { User, Calendar, Mail, Settings, Loader2, KeyRound, Eye, EyeOff, Camera } from 'lucide-react';
+import { User, Calendar, Mail, Settings, Loader2, KeyRound, Eye, EyeOff, Camera, Info } from 'lucide-react';
 import { useOrganizationPipelines } from '@/hooks/useOrganizationPipelines';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { SmtpSettings } from '@/components/settings/SmtpSettings';
 import { GmailSyncSettings } from '@/components/settings/GmailSyncSettings';
 import { AvatarCropEditor } from '@/components/avatar/AvatarCropEditor';
+import { CurrentUserContextCard } from '@/components/settings/profile/CurrentUserContextCard';
 
 const roleLabels: Record<string, string> = {
   owner: 'Proprietário',
