@@ -39,6 +39,9 @@ export function DashboardPreviewModal({ open, onOpenChange, row, tenantId }: Pro
   }, [open, row?.user_id, tenantId]);
 
   const requiresReview = !!row?.metadata?.requires_review;
+  const permissionKey = (result?.context.permission_key || '').toLowerCase();
+  const isAdminPermission = permissionKey === 'admin';
+  const isOwnerOverride = !!result?.owner_override || result?.resolution_source === 'owner_override';
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
