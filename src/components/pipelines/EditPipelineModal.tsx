@@ -157,13 +157,26 @@ export function EditPipelineModal({ open, onClose, onSave, pipeline }: EditPipel
 
   const handleSave = () => {
     if (!name.trim() || selectedBUIds.length === 0) return;
+    // Validar: se distribuição ativa + cargo "any", precisa pelo menos 1 usuário
+    if (
+      distributionStrategy !== 'none' &&
+      distributionRole === 'any' &&
+      distributionUserIds.length === 0
+    ) {
+      return;
+    }
+    // Mapear 'any' -> null para satisfazer constraint pipelines_lead_distribution_role_check
+    const normalizedRole =
+      distributionStrategy === 'none' || distributionRole === 'any'
+        ? null
+        : distributionRole;
     onSave({
       name: name.trim(),
       pipeline_type: pipelineType,
       is_primary: pipelineType === 'sales' ? isPrimary : false,
       business_unit_ids: selectedBUIds,
       lead_distribution_strategy: distributionStrategy,
-      lead_distribution_role: distributionStrategy === 'none' ? null : distributionRole,
+      lead_distribution_role: normalizedRole,
       lead_distribution_user_ids:
         distributionStrategy === 'none' ? [] : distributionUserIds,
     });
