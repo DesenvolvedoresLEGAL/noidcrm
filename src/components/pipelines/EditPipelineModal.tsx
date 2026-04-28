@@ -422,7 +422,7 @@ export function EditPipelineModal({ open, onClose, onSave, pipeline }: EditPipel
           </Button>
           <Button 
             onClick={handleSave} 
-            disabled={!name.trim() || selectedBUIds.length === 0 || businessUnits.length === 0}
+            disabled={!name.trim() || selectedBUIds.length === 0 || businessUnits.length === 0 || distributionInvalid}
           >
             {pipeline ? 'Salvar' : 'Criar Funil'}
           </Button>
