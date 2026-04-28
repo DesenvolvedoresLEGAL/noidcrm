@@ -126,7 +126,7 @@ export function EditPipelineModal({ open, onClose, onSave, pipeline }: EditPipel
       setDistributionStrategy(
         (pipeline.lead_distribution_strategy as LeadDistributionStrategy) || 'none',
       );
-      setDistributionRole(pipeline.lead_distribution_role || 'any');
+      setDistributionRole(pipeline.lead_distribution_role ?? 'any');
       setDistributionUserIds(pipeline.lead_distribution_user_ids || []);
     } else {
       setName('');
@@ -157,13 +157,26 @@ export function EditPipelineModal({ open, onClose, onSave, pipeline }: EditPipel
 
   const handleSave = () => {
     if (!name.trim() || selectedBUIds.length === 0) return;
+    // Validar: se distribuição ativa + cargo "any", precisa pelo menos 1 usuário
+    if (
+      distributionStrategy !== 'none' &&
+      distributionRole === 'any' &&
+      distributionUserIds.length === 0
+    ) {
+      return;
+    }
+    // Mapear 'any' -> null para satisfazer constraint pipelines_lead_distribution_role_check
+    const normalizedRole =
+      distributionStrategy === 'none' || distributionRole === 'any'
+        ? null
+        : distributionRole;
     onSave({
       name: name.trim(),
       pipeline_type: pipelineType,
       is_primary: pipelineType === 'sales' ? isPrimary : false,
       business_unit_ids: selectedBUIds,
       lead_distribution_strategy: distributionStrategy,
-      lead_distribution_role: distributionStrategy === 'none' ? null : distributionRole,
+      lead_distribution_role: normalizedRole,
       lead_distribution_user_ids:
         distributionStrategy === 'none' ? [] : distributionUserIds,
     });
@@ -176,6 +189,13 @@ export function EditPipelineModal({ open, onClose, onSave, pipeline }: EditPipel
   );
   const showDistributionConfig = distributionStrategy !== 'none';
   const showUserList = distributionRole === 'any';
+  // Distribuição de leads só deve listar usuários ATIVOS da organização.
+  // O hook marca inativos com sufixo "(Inativo)" — filtramos esses.
+  const activeOrgUsers = orgUsers.filter((u) => !u.name.endsWith('(Inativo)'));
+  const distributionInvalid =
+    showDistributionConfig &&
+    showUserList &&
+    distributionUserIds.length === 0;
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -351,13 +371,13 @@ export function EditPipelineModal({ open, onClose, onSave, pipeline }: EditPipel
                     <Label className="text-xs">Usuários elegíveis</Label>
                     {loadingUsers ? (
                       <p className="text-sm text-muted-foreground">Carregando usuários...</p>
-                    ) : orgUsers.length === 0 ? (
+                    ) : activeOrgUsers.length === 0 ? (
                       <p className="text-sm text-muted-foreground">
                         Nenhum usuário ativo na organização.
                       </p>
                     ) : (
                       <div className="space-y-1.5 max-h-40 overflow-y-auto rounded-md border border-border p-2">
-                        {orgUsers.map((u) => (
+                        {activeOrgUsers.map((u) => (
                           <div key={u.id} className="flex items-center space-x-2">
                             <Checkbox
                               id={`dist-user-${u.id}`}
@@ -402,7 +422,7 @@ export function EditPipelineModal({ open, onClose, onSave, pipeline }: EditPipel
           </Button>
           <Button 
             onClick={handleSave} 
-            disabled={!name.trim() || selectedBUIds.length === 0 || businessUnits.length === 0}
+            disabled={!name.trim() || selectedBUIds.length === 0 || businessUnits.length === 0 || distributionInvalid}
           >
             {pipeline ? 'Salvar' : 'Criar Funil'}
           </Button>
