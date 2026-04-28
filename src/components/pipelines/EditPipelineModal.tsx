@@ -284,6 +284,116 @@ export function EditPipelineModal({ open, onClose, onSave, pipeline }: EditPipel
               </>
             )}
           </div>
+
+          {/* Distribuição de leads */}
+          <div className="space-y-3 border-t border-border pt-4">
+            <div className="flex items-center gap-2">
+              <Users className="h-4 w-4 text-muted-foreground" />
+              <Label className="text-sm font-semibold">Distribuição automática de leads</Label>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Define como novas oportunidades neste funil serão atribuídas a um responsável.
+            </p>
+
+            <Select
+              value={distributionStrategy}
+              onValueChange={(v) => setDistributionStrategy(v as LeadDistributionStrategy)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione uma estratégia" />
+              </SelectTrigger>
+              <SelectContent>
+                {DISTRIBUTION_STRATEGIES.map((s) => {
+                  const Icon = s.icon;
+                  return (
+                    <SelectItem key={s.value} value={s.value}>
+                      <div className="flex items-center gap-2">
+                        <Icon className="h-3.5 w-3.5" />
+                        {s.label}
+                      </div>
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+
+            {selectedStrategyInfo && (
+              <div className="flex items-start gap-2 p-2 bg-muted/50 rounded-md">
+                <Info className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                <p className="text-xs text-muted-foreground">{selectedStrategyInfo.description}</p>
+              </div>
+            )}
+
+            {showDistributionConfig && (
+              <>
+                <div className="space-y-2">
+                  <Label className="text-xs">Cargo elegível</Label>
+                  <Select value={distributionRole} onValueChange={setDistributionRole}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DISTRIBUTION_ROLES.map((r) => (
+                        <SelectItem key={r.value} value={r.value}>
+                          {r.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[11px] text-muted-foreground">
+                    Quando "Qualquer cargo" é selecionado, a distribuição usa apenas a lista de
+                    usuários abaixo.
+                  </p>
+                </div>
+
+                {showUserList && (
+                  <div className="space-y-2">
+                    <Label className="text-xs">Usuários elegíveis</Label>
+                    {loadingUsers ? (
+                      <p className="text-sm text-muted-foreground">Carregando usuários...</p>
+                    ) : orgUsers.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">
+                        Nenhum usuário ativo na organização.
+                      </p>
+                    ) : (
+                      <div className="space-y-1.5 max-h-40 overflow-y-auto rounded-md border border-border p-2">
+                        {orgUsers.map((u) => (
+                          <div key={u.id} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`dist-user-${u.id}`}
+                              checked={distributionUserIds.includes(u.id)}
+                              onCheckedChange={() => toggleDistributionUser(u.id)}
+                            />
+                            <label
+                              htmlFor={`dist-user-${u.id}`}
+                              className="text-sm leading-none cursor-pointer"
+                            >
+                              {u.name}
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {distributionUserIds.length === 0 && (
+                      <p className="text-[11px] text-amber-600 dark:text-amber-500">
+                        Selecione ao menos um usuário para esta estratégia funcionar.
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {distributionStrategy === 'territory' && (
+                  <div className="flex items-start gap-2 p-2 bg-muted/50 rounded-md">
+                    <Info className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                    <p className="text-[11px] text-muted-foreground">
+                      Caso o estado (UF) da empresa não esteja mapeado para nenhum usuário, o
+                      sistema cai automaticamente para Round Robin entre os elegíveis.
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </div>
 
         <DialogFooter>
