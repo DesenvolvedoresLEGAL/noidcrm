@@ -374,12 +374,21 @@ export default function ProfileSettings() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="orgRole">Função Organizacional</Label>
+                  <Label htmlFor="orgRole" className="flex items-center gap-1.5">
+                    Função Organizacional
+                    <span className="text-[10px] font-normal uppercase tracking-wide text-muted-foreground border border-border rounded px-1 py-0.5">
+                      Legado
+                    </span>
+                  </Label>
                   <div className="flex items-center h-10">
                     <Badge variant="outline" className="text-sm">
                       {roleLabels[orgRole] || orgRole || 'Não definida'}
                     </Badge>
                   </div>
+                  <p className="text-xs text-muted-foreground flex items-start gap-1">
+                    <Info className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                    Configuração legada. A função usada para dashboards dinâmicos fica em <strong>Contexto CRM</strong>.
+                  </p>
                 </div>
 
                 <div className="space-y-2">
