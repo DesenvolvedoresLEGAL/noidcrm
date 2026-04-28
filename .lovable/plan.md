@@ -1,184 +1,171 @@
-# Sprint 6.3 — Piloto Controlado do Dashboard Closer + Pace Diário
+## Sprint 6.4 — Substituição Controlada da Home do Closer Piloto
 
-Ativar o novo Dashboard Closer para **1 Closer piloto por tenant** com rollback imediato, opt‑in via botão no dashboard legado (sem redirecionamento automático), e adicionar bloco **Pace Diário** logo após a Central do Dia.
+### Objetivo
+
+Quando o Closer piloto abrir a home do CRM (`/dashboard`), renderizar automaticamente o novo Dashboard Closer no lugar do dashboard legado, mantendo:
+- Fallback imediato para o dashboard legado em qualquer falha de elegibilidade ou erro.
+- Botão de retorno manual ao dashboard atual (preferência de sessão).
+- Auditoria completa de runtime (allow / fallback / erro / escolhas do usuário).
+- Zero impacto sobre SDR, CS, Manager, Admin, Owner ou usuários não piloto.
+
+Sem redirect global, sem alteração de sidebar, login, RLS, automações ou notificações.
 
 ---
 
-## Parte 1 — Banco de dados (1 migration)
+### Arquitetura do gate
 
-**Arquivo:** `supabase/migrations/<timestamp>_sprint_6_3_pilot_and_pace.sql`
+A substituição acontece **dentro** de `src/pages/Dashboard.tsx`, envolvendo o resultado de `renderDashboard()` (que hoje devolve `RepDashboard`, `AEDashboard`, etc.) com um wrapper:
 
-### 1.1 Tabela de auditoria de piloto
-```sql
-create table public.crm_dynamic_dashboard_pilot_logs (
-  id uuid primary key default gen_random_uuid(),
-  tenant_id uuid not null,
-  target_user_id uuid not null,
-  changed_by uuid not null,
-  action text not null check (action in
-    ('enable_pilot','disable_user_pilot','disable_tenant_dynamic_dashboard','rollback')),
-  previous_global_flag boolean,
-  new_global_flag boolean,
-  previous_user_flag boolean,
-  new_user_flag boolean,
-  reason text,
-  metadata jsonb not null default '{}',
-  created_at timestamptz not null default now()
-);
-alter table ... enable row level security;
--- SELECT: somente Owner/Admin do tenant (is_tenant_admin_or_owner)
--- INSERT: bloqueado no client (apenas via RPC SECURITY DEFINER)
--- UPDATE/DELETE: bloqueado
-create index on ... (tenant_id, created_at desc);
+```text
+Dashboard.tsx
+ └── <DynamicDashboardRuntimeGate legacyDashboard={renderDashboard()} />
+        ├── loading → skeleton curto
+        ├── elegível + sem modo legado de sessão → DynamicDashboardShell(CloserDashboard)
+        ├── não elegível → legacyDashboard
+        └── erro de runtime → legacyDashboard + log runtime_error
 ```
 
-### 1.2 RPCs (SECURITY DEFINER, search_path = public)
-
-- **`crm_enable_closer_dashboard_pilot(p_tenant_id, p_target_user_id, p_reason)`**
-  Validações: caller pertence ao tenant; caller é Owner/Admin; target ativo no tenant; `business_function_key='closer'`; `requires_review=false`; permission/department/function não nulos. Atualiza `crm_user_contexts.is_dashboard_dynamic_enabled=true` apenas para o target. Faz UPSERT em `crm_feature_flags` ligando `dynamic_dashboards_enabled=true` apenas para `tenant_id` atual. Insere log `enable_pilot` capturando flags antes/depois. Retorna jsonb `{success, target_user_id, tenant_id, flags, rollback_hint}`.
-
-- **`crm_disable_closer_dashboard_pilot(p_tenant_id, p_target_user_id, p_reason)`**
-  Owner/Admin + mesmo tenant. Seta `is_dashboard_dynamic_enabled=false` apenas para o target. Log `disable_user_pilot`. **Não** mexe na flag global.
-
-- **`crm_disable_tenant_dynamic_dashboards(p_tenant_id, p_reason)`**
-  Owner/Admin + mesmo tenant. Seta `dynamic_dashboards_enabled=false` no tenant. Log `disable_tenant_dynamic_dashboard`. **Não** desliga `function_automations_enabled`. **Não** liga `dynamic_user_context_enabled`.
-
-Todas com `GRANT EXECUTE ... TO authenticated`.
-
-### 1.3 RPC `crm_get_closer_dashboard_data` — adicionar `pace`
-
-Estender o RPC existente para calcular e retornar a chave `pace` no JSON:
-
-- Fonte de meta: reusar a lógica atual (`sales_goals` -> `seller_targets`) + considerar `ote_seller_configs` + `ote_levels` (`monthly_goal`, `goal_type='revenue'`) que já alimentam o RepPACE legado. Se houver meta por nível OTE para o usuário, usar `custom_goal_override` ou `ote_levels.monthly_goal`. Registrar `goal_source` no metadata.
-- Dias úteis: segunda a sexta, **sem feriados** na v1 → `business_days_rule = 'monday_to_friday_no_holidays_v1'`. Se `holidays` retornar linhas para o tenant no mês atual, usar e marcar `'calendar_table'`.
-- Cálculos (sempre **mês atual**, independente de `p_period`):
-  - `business_days_total`, `business_days_elapsed` (incluir hoje se útil), `business_days_remaining`
-  - `expected_pace_today = goal/total * elapsed`
-  - `pace_gap_value = realized - expected`
-  - `remaining_to_goal = max(goal - realized, 0)`
-  - `required_daily_rate = remaining_to_goal / NULLIF(remaining,0)` (fallback `remaining_to_goal` se `remaining=0`)
-  - `current_daily_average = realized / NULLIF(elapsed,1)`
-  - `pace_percent = realized/expected*100`
-- Status:
-  - `pace_percent >= 105` → `Acima do pace` / `success`
-  - `>= 95` → `No pace` / `info`
-  - `>= 75` → `Atrasado` / `attention`
-  - `< 75` → `Crítico` / `critical`
-- Proteções: meta nula/0 ou `business_days_total=0` → retornar `{available:false, status:'Meta não configurada', severity:'warning', reason:'...'}`.
-- Sempre adicionar `pace_uses_current_month=true` no `metadata`.
+Nenhum componente legado é alterado, movido ou reescrito.
 
 ---
 
-## Parte 2 — Frontend
+### Backend (1 migração)
 
-### 2.1 Tipos — `src/types/dashboard/closer.ts`
-Acrescentar:
-```ts
-export type CloserPaceStatus = 'Acima do pace' | 'No pace' | 'Atrasado' | 'Crítico' | 'Meta não configurada';
-export type CloserPaceSeverity = 'success' | 'info' | 'attention' | 'critical' | 'warning';
-export interface CloserPaceData {
-  available: boolean;
-  reason?: string;
-  goal_value?: number; realized_value?: number; goal_attainment_percent?: number;
-  business_days_total?: number; business_days_elapsed?: number; business_days_remaining?: number;
-  expected_pace_today?: number; pace_gap_value?: number; remaining_to_goal?: number;
-  required_daily_rate?: number; current_daily_average?: number; pace_percent?: number;
-  status: CloserPaceStatus; severity: CloserPaceSeverity;
-  business_days_rule?: string; why_here?: string;
-}
-```
-Adicionar `pace?: CloserPaceData` em `CloserDashboardData`.
+**Tabela** `public.crm_dynamic_dashboard_runtime_logs`
+- Colunas conforme especificação (id, tenant_id, user_id, profile_key, event_type, guard_allowed, fallback_used, fallback_reason, load_ms, error_message, metadata, created_at).
+- CHECK em `event_type` (`runtime_allowed`, `runtime_fallback`, `runtime_error`, `user_chose_legacy_dashboard`, `user_returned_to_dynamic_dashboard`).
+- Índices `(tenant_id, user_id, created_at desc)` e `(tenant_id, event_type, created_at desc)`.
+- RLS habilitado. Policy de SELECT apenas para `is_tenant_admin_or_owner(tenant_id)`. Sem INSERT/UPDATE/DELETE direto pelo client.
 
-### 2.2 Componentes Pace — `src/components/dashboard/closer/`
-- **`CloserPaceSection.tsx`** — Header + status card grande + grid 8 cards + barra de progresso da meta. Trata `available=false` com aviso amigável.
-- **`CloserPaceCard.tsx`** — Card reutilizável (label, valor, hint, severity opcional).
-- **`CloserPaceStatusBadge.tsx`** — Badge colorido por severity.
-- **`CloserPaceProgress.tsx`** — Barra horizontal (realizado vs meta) com marcador de pace esperado hoje.
+**RPC** `public.crm_log_dynamic_dashboard_runtime_event(...)` — `security definer`, `set search_path = public`.
+- Valida que `auth.uid()` pertence ao tenant via `crm_user_context_view`.
+- Permite o próprio usuário registrar eventos de si mesmo; admin/owner podem registrar para qualquer usuário do tenant.
+- Trunca `error_message` para 500 chars; nunca propaga stack trace para fora.
+- Retorna `jsonb { success: true, id }`.
+- `revoke all from public; grant execute to authenticated`.
 
-### 2.3 Inserir Pace no `CloserDashboard.tsx`
-Nova ordem: `CentralDoDia` → **`CloserPaceSection`** → `CloserTopActions` → listas → `CloserKpiGrid` → `CloserRiskDealsList`. Manter KPIs intactos (sem duplicar destaque da meta).
-
-### 2.4 Serviço de piloto — `src/services/crm/closerDashboardPilot.ts` (novo)
-Wrappers para as 3 RPCs + listagem dos logs (`select * from crm_dynamic_dashboard_pilot_logs ... order by created_at desc limit 50`).
-
-### 2.5 Hooks — `src/hooks/dashboard/useCloserDashboardPilot.ts` (novo)
-- `useEnableCloserPilot()`, `useDisableCloserPilot()`, `useDisableTenantDynamicDashboards()` (mutations com invalidação de `crm_feature_flags`, `crm_user_contexts` e `dynamic-dashboard-guard`).
-- `usePilotEligibleClosers(tenantId)` — lista usuários com `business_function_key='closer'`, `status='active'`, expondo `requires_review`.
-- `useTenantDynamicFlag(tenantId)` — leitura de `crm_feature_flags`.
-- `usePilotLogs(tenantId)`.
-
-### 2.6 UI do piloto — `src/components/settings/userContext/CloserPilotSection.tsx` (novo)
-Render dentro do `UserContextTab` (acima da tabela atual) com:
-- Tenant atual (read‑only).
-- Combobox de Closers elegíveis com badge de revisão (Validado / Revisar / Incompleto).
-- Status de `dynamic_dashboards_enabled` (tenant) e `is_dashboard_dynamic_enabled` (user).
-- Botões: **Habilitar piloto** (desabilitado se `requires_review`), **Desligar piloto deste Closer**, **Desligar dashboard dinâmico neste tenant**.
-- Texto de rollback imediato.
-- Apenas visível para Owner/Admin (reusar guarda existente do `UserContextTab`).
-
-### 2.7 Botão opt‑in no dashboard legado
-- **Hook novo** `src/hooks/dashboard/useCloserPilotEntrypoint.ts`: usa `useCurrentUser` + `useDynamicDashboardGuard(tenantId, userId)` — retorna `{visible: boolean}` apenas se **todas** as condições passarem (global flag, user flag, `bfKey='closer'`, resolver OK, profile resolvido, `requires_review=false`).
-- **Componente novo** `src/components/dashboard/closer/CloserPilotEntryButton.tsx`: card discreto com título "Experimentar novo Dashboard Closer", subtexto, botão que `navigate('/app/dynamic-dashboard')`. Renderiza `null` se `visible=false`.
-- **Integração** em `RepDashboard.tsx`: inserir o componente logo após `DashboardHeader` (antes do `RepKPICards`). Sem alterar nenhum outro dashboard.
-
-### 2.8 Página dinâmica — `DynamicDashboardPage.tsx`
-Já existe e já loga runtime view. Atualizar `metadata` enviado para incluir `{sprint:'6.3', entrypoint:'direct_url', pilot_enabled, global_flag, user_flag}` (entrypoint baseado em `location.state?.from === 'legacy_button'` quando vier do botão; fallback `direct_url`). Botão "Voltar ao dashboard atual" já existe no `DynamicDashboardSafeBanner` (apenas navegação, não desliga flags) — manter como está.
-
-### 2.9 Auditoria UI — Admin Center
-Reusar `CloserDashboardAuditLog` existente; adicionar nova aba/seção **"Logs de piloto"** (`PilotActivationLog.tsx`) que lista entradas de `crm_dynamic_dashboard_pilot_logs` (action, target, changed_by, reason, flags antes/depois, data).
-
-### 2.10 Tipos Supabase
-`src/integrations/supabase/types.ts` será regenerado automaticamente pela migration. Não editar manualmente.
+Nenhuma alteração em `crm_feature_flags`, `crm_user_contexts`, `crm_business_functions`, `organization_members`, `user_roles`, propostas, oportunidades, atividades, metas. Flags continuam `false` até ativação manual operacional.
 
 ---
 
-## Segurança e regras invioláveis
+### Frontend
 
-- `auth.uid()` obrigatório como `targetUserId` no runtime. Preview admin continua aceitando outro target.
-- Nenhuma flag global ativada fora do tenant atual do caller.
-- `function_automations_enabled` permanece **false**.
-- `dynamic_user_context_enabled` permanece **false** (guard atual não exige).
-- Sem redirect automático em lugar nenhum (sem `<Navigate>` para `/app/dynamic-dashboard`).
-- Sidebar global, login, permissões, dashboards de SDR/CS/Manager/Admin/Owner: **intactos**.
-- Sem criação de tarefas, notificações, automações ou alterações em propostas/negócios/atividades.
+**Novo hook** `src/hooks/dashboard/useDynamicDashboardRuntimeGate.ts`
+- Usa `useCurrentUser()` para `tenantId` e `userId` (sempre `auth.uid()`, nunca aceita override).
+- Reaproveita `useDynamicDashboardGuard(tenantId, userId)`.
+- Lê `metadata.requires_review` de `crm_user_contexts` e nega se `true`.
+- Estado de sessão: lê `sessionStorage['noid_use_legacy_dashboard_session']`.
+- Retorna: `{ isLoading, shouldRenderDynamic, fallbackReason, resolvedProfile, resolution, context, flags, error, useLegacyForSession, setUseLegacyForSession, refresh }`.
+- `setUseLegacyForSession(true|false)` grava/remove em sessionStorage, dispara invalidate da query e chama RPC `crm_log_dynamic_dashboard_runtime_event` com `user_chose_legacy_dashboard` ou `user_returned_to_dynamic_dashboard`.
 
----
+**Novo componente** `src/components/dashboard/runtime/DynamicDashboardRuntimeGate.tsx`
+- Props: `{ legacyDashboard: React.ReactNode }`.
+- ErrorBoundary interno em volta do `DynamicDashboardShell` runtime: em qualquer erro, renderiza `legacyDashboard`, registra `runtime_error` com `error_message` enxuto, e exibe toast discreto único.
+- Mede `load_ms`: marca `performance.now()` antes do render do shell; ao montar com dados prontos (callback do shell ou efeito após `guard.data?.allowed`), envia `runtime_allowed` com `load_ms`. Adiciona `metadata.warning = 'slow_load'` se > 5000ms.
+- Quando o gate decide pelo legado por motivo diferente de "sessão legada manual", registra `runtime_fallback` com `fallback_reason` (mapeado de `GuardDenyReason`).
+- Quando renderiza o shell runtime, injeta no `metadata` do log: `entrypoint = dashboard_home_gate`, `render_mode = dynamic_runtime`, `profile_key`, `guard_result = allowed`, `sprint = 6.4`.
+- Banner de segurança (`DynamicDashboardSafeBanner` reaproveitado) e botão **Voltar ao dashboard atual** dentro do shell. Esse botão chama `setUseLegacyForSession(true)`.
 
-## Critérios de validação (queries entregues no final)
+**Banner no legado para piloto em modo sessão**
+- Novo componente leve `src/components/dashboard/runtime/LegacySessionReturnBanner.tsx`.
+- Aparece **somente** quando: usuário é piloto elegível **e** `useLegacyForSession === true`.
+- Botão **Abrir novo Dashboard Closer** chama `setUseLegacyForSession(false)`.
+- Não aparece para fallback automático nem para usuários não elegíveis.
 
-```sql
--- Apenas tenant piloto com flag ligada
-select tenant_id, key, enabled from crm_feature_flags where key='dynamic_dashboards_enabled';
+**Plug do gate em `src/pages/Dashboard.tsx`**
+- Passa o resultado atual de `renderDashboard()` como `legacyDashboard`.
+- Renderiza `<DynamicDashboardRuntimeGate legacyDashboard={...} />` dentro do mesmo `<Layout>`.
+- Renderiza `LegacySessionReturnBanner` acima do legado quando aplicável (gate expõe esse estado).
 
--- Apenas o usuário piloto com user flag
-select tenant_id, user_id, is_dashboard_dynamic_enabled
-from crm_user_contexts where is_dashboard_dynamic_enabled = true;
+**Atualização de `CloserPilotEntryButton.tsx`**
+- Quando o gate já vai renderizar o novo dashboard automaticamente (piloto elegível e sem modo legado de sessão), o botão fica oculto. Hoje só aparece quando `visible=true`; adicionar verificação adicional para esconder se o gate vai automaticamente substituir (fica ativo apenas no caso teórico em que entrypoint manual ainda fizer sentido, mas com gate pronto, o `LegacySessionReturnBanner` cobre o caso de modo legado).
 
--- Logs por ação
-select action, count(*) from crm_dynamic_dashboard_pilot_logs group by action;
-
--- Views runtime/preview
-select source, period, count(*) from crm_closer_dashboard_views group by source, period;
-
--- Confirmar function_automations_enabled = false
-select count(*) from crm_feature_flags where key='function_automations_enabled' and enabled=true;
-```
-
----
-
-## Entregáveis
-
-1. **Migration** com tabela `crm_dynamic_dashboard_pilot_logs`, 3 RPCs de piloto e RPC `crm_get_closer_dashboard_data` estendida com `pace`.
-2. **Componentes novos**: `CloserPaceSection`, `CloserPaceCard`, `CloserPaceStatusBadge`, `CloserPaceProgress`, `CloserPilotEntryButton`, `CloserPilotSection`, `PilotActivationLog`.
-3. **Hooks/Serviços novos**: `useCloserDashboardPilot`, `useCloserPilotEntrypoint`, `closerDashboardPilot.ts`.
-4. **Edições**: `CloserDashboard.tsx` (ordem + Pace), `closer.ts` (tipos), `RepDashboard.tsx` (botão opt‑in), `UserContextTab.tsx` (seção de piloto), `AdminCenterPage.tsx` (logs de piloto), `DynamicDashboardPage.tsx` (metadata `entrypoint`).
-5. Resumo final com instruções de habilitar piloto / rollback individual / rollback de tenant + resultado das queries de validação.
+**Atualização de `src/pages/DynamicDashboardPage.tsx`**
+- Reaproveitar o mesmo hook `useDynamicDashboardRuntimeGate` para consistência de log (`entrypoint = direct_url` em vez de `dashboard_home_gate`).
+- Para acesso direto de não piloto: continuar mostrando `DynamicDashboardFallback` com botão de voltar.
 
 ---
 
-## Riscos e mitigação
+### Painel administrativo
 
-- **Meta indisponível**: Pace renderiza warning sem quebrar o dashboard.
-- **Flag global afetando outros usuários do tenant**: Mitigado pelo botão opt‑in só aparecer com 5 condições combinadas; outros usuários não veem botão e caem no fallback se acessarem URL.
-- **Closer trocando de função após habilitar piloto**: Guard recalcula a cada query (`staleTime 30s`); botão e runtime caem automaticamente.
-- **Divisão por zero no Pace**: NULLIF + fallbacks explícitos.
+Atualizar `src/components/settings/userContext/CloserPilotSection.tsx` (criado na Sprint 6.3) para incluir um card **Runtime do Dashboard Closer**:
+- Último acesso runtime (`max(created_at) where event_type='runtime_allowed'`).
+- Total de `runtime_allowed`, `runtime_fallback`, `runtime_error` (últimos 30 dias).
+- Tempo médio e máximo de `load_ms`.
+- Botões já existentes: rollback individual e rollback do tenant.
+- Status atual das flags global e individual.
+
+Atualizar `src/components/settings/adminCenter/PilotActivationLog.tsx` ou criar `RuntimeAccessLog.tsx` no Admin Center para listar os últimos 50 eventos de `crm_dynamic_dashboard_runtime_logs` (consulta SELECT já permitida pela policy admin/owner).
+
+Sem gráficos. Tabelas e cards simples.
+
+---
+
+### Telemetria — convenções
+
+Cada evento inserido via RPC carrega no `metadata`:
+- `entrypoint`: `dashboard_home_gate` | `direct_url` | `legacy_session_banner`
+- `render_mode`: `dynamic_runtime`
+- `profile_key`: ex. `dashboard_sales_closer_placeholder`
+- `guard_result`: `allowed` | `denied`
+- `load_started_at`, `loaded_at`, `load_ms`
+- `sprint`: `6.4`
+
+`crm_closer_dashboard_views` continua sendo gravado com `source='runtime'` no caso allowed (mantém compatibilidade com dashboards já existentes).
+
+---
+
+### Critérios de aceite
+
+Funcionais:
+1. Closer piloto elegível: home renderiza novo Dashboard Closer automaticamente, com Central do Dia → Pace Diário → Top 10 → propostas → follow-ups → KPIs → deals em risco.
+2. Botão **Voltar ao dashboard atual** funciona e persiste apenas na sessão.
+3. Botão **Abrir novo Dashboard Closer** aparece no legado apenas em modo sessão manual e funciona.
+4. Closer não piloto e usuários não Closer: sem alteração visual.
+5. Desligar flag global ou flag individual ou negar resolver: fallback imediato sem erro visível.
+6. Erro no novo dashboard: fallback automático + log `runtime_error` + toast discreto.
+7. `/app/dynamic-dashboard` continua funcional para piloto e fallback seguro para não piloto.
+8. Admin Center mostra runtime allowed, fallback, erros e tempos.
+
+Técnicos:
+1. Build e TypeScript passam.
+2. Guard usa `auth.uid()`; runtime nunca aceita `targetUserId` externo.
+3. RLS preservado, policies novas restritas a admin/owner para SELECT.
+4. RPC com `security definer` + `set search_path = public` + grants restritos.
+5. `function_automations_enabled` permanece `false`.
+6. Nenhuma alteração em propostas, atividades, oportunidades, metas, sidebar, login, organization_members, user_roles.
+
+---
+
+### Rollback
+
+- Operacional: `crm_disable_closer_dashboard_pilot(tenant, user)`, `crm_disable_tenant_dynamic_dashboards(tenant)`, botão de sessão.
+- Técnico: remover o wrapper `DynamicDashboardRuntimeGate` do `Dashboard.tsx`. Tabela de logs e RPC permanecem. `/app/dynamic-dashboard` segue intacta.
+
+---
+
+### Arquivos
+
+Criados:
+- `supabase/migrations/<timestamp>_sprint_6_4_runtime_logs.sql`
+- `src/hooks/dashboard/useDynamicDashboardRuntimeGate.ts`
+- `src/components/dashboard/runtime/DynamicDashboardRuntimeGate.tsx`
+- `src/components/dashboard/runtime/LegacySessionReturnBanner.tsx`
+- `src/services/crm/dynamicDashboardRuntimeLogs.ts` (wrapper da RPC)
+- `src/components/settings/adminCenter/RuntimeAccessLog.tsx`
+
+Editados:
+- `src/pages/Dashboard.tsx` (envolve com gate; sem mexer no interior do legado)
+- `src/pages/DynamicDashboardPage.tsx` (reaproveita hook e log padronizado)
+- `src/components/dashboard/closer/CloserPilotEntryButton.tsx` (oculta quando gate substitui)
+- `src/components/settings/userContext/CloserPilotSection.tsx` (card runtime)
+- `src/components/settings/adminCenter/AdminCenterPage.tsx` (inclui RuntimeAccessLog)
+- `src/integrations/supabase/types.ts` (auto-gerado)
+
+---
+
+### Riscos e pendências para Sprint 6.5
+
+- ErrorBoundary depende de erros lançados no shell; falhas silenciosas (timeouts internos da query) caem em `runtime_allowed` com `load_ms` alto — monitorar via `warning='slow_load'`.
+- `Dashboard.tsx` continua roteando por papel; gate só atua quando o resultado corrente já seria renderizado (não conflita com SDR/CS/Manager/Owner/Admin porque o guard exige `business_function_key='closer'`).
+- Sprint 6.5 pode estender o gate para outros perfis (`sdr`, `cs`) usando o mesmo wrapper, sem reescrever a home.

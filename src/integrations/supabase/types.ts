@@ -7948,6 +7948,51 @@ export type Database = {
         }
         Relationships: []
       }
+      crm_dynamic_dashboard_runtime_logs: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          event_type: string
+          fallback_reason: string | null
+          fallback_used: boolean
+          guard_allowed: boolean
+          id: string
+          load_ms: number | null
+          metadata: Json
+          profile_key: string | null
+          tenant_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          event_type: string
+          fallback_reason?: string | null
+          fallback_used?: boolean
+          guard_allowed?: boolean
+          id?: string
+          load_ms?: number | null
+          metadata?: Json
+          profile_key?: string | null
+          tenant_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          event_type?: string
+          fallback_reason?: string | null
+          fallback_used?: boolean
+          guard_allowed?: boolean
+          id?: string
+          load_ms?: number | null
+          metadata?: Json
+          profile_key?: string | null
+          tenant_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       crm_feature_flags: {
         Row: {
           config: Json
@@ -28999,6 +29044,21 @@ export type Database = {
           p_tenant_id: string
         }
         Returns: string
+      }
+      crm_log_dynamic_dashboard_runtime_event: {
+        Args: {
+          p_error_message?: string
+          p_event_type?: string
+          p_fallback_reason?: string
+          p_fallback_used?: boolean
+          p_guard_allowed?: boolean
+          p_load_ms?: number
+          p_metadata?: Json
+          p_profile_key?: string
+          p_tenant_id: string
+          p_user_id: string
+        }
+        Returns: Json
       }
       crm_resolve_dashboard_profile: {
         Args: { p_preview?: boolean; p_tenant_id: string; p_user_id: string }
