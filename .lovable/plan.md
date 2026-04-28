@@ -1,171 +1,106 @@
-## Sprint 6.4 — Substituição Controlada da Home do Closer Piloto
+# Fix: Re-aceitação de proposta não notifica/celebra/Slack e workflow ignora duplicata soft-deleted
 
-### Objetivo
+## Contexto
 
-Quando o Closer piloto abrir a home do CRM (`/dashboard`), renderizar automaticamente o novo Dashboard Closer no lugar do dashboard legado, mantendo:
-- Fallback imediato para o dashboard legado em qualquer falha de elegibilidade ou erro.
-- Botão de retorno manual ao dashboard atual (preferência de sessão).
-- Auditoria completa de runtime (allow / fallback / erro / escolhas do usuário).
-- Zero impacto sobre SDR, CS, Manager, Admin, Owner ou usuários não piloto.
+A proposta `ab76157a` (PONTOBR) foi reaceita hoje 28/04 16:40 por Milena. Status já era `accepted` desde 16/04, então o trigger `enqueue_acceptance_effect_job` não criou job novo (guard só dispara em transição `* -> accepted`). Em paralelo, o workflow de aceitação tentou duplicar a opp para o funil OPERACIONAL mas pulou porque encontrou a duplicata antiga `467bbae1` — sem notar que ela está soft-deleted desde 28/04 09:37.
 
-Sem redirect global, sem alteração de sidebar, login, RLS, automações ou notificações.
+Resultado: nenhuma notificação in-app, nenhuma celebração, nenhum aviso Slack, nenhuma opp operacional ativa.
 
----
+## Mudanças
 
-### Arquitetura do gate
+### 1. Trigger `enqueue_acceptance_effect_job` — permitir re-aceitação real
 
-A substituição acontece **dentro** de `src/pages/Dashboard.tsx`, envolvendo o resultado de `renderDashboard()` (que hoje devolve `RepDashboard`, `AEDashboard`, etc.) com um wrapper:
+Mudar a condição para também disparar quando `accepted_at` muda mesmo com `status` já em `accepted`. Isso captura o caso real onde o cliente reabre o link e reconfirma após uma soft-delete da duplicata operacional ou após uma reativação manual.
 
-```text
-Dashboard.tsx
- └── <DynamicDashboardRuntimeGate legacyDashboard={renderDashboard()} />
-        ├── loading → skeleton curto
-        ├── elegível + sem modo legado de sessão → DynamicDashboardShell(CloserDashboard)
-        ├── não elegível → legacyDashboard
-        └── erro de runtime → legacyDashboard + log runtime_error
+A unique constraint em `acceptance_effect_jobs(proposal_id)` precisa relaxar para permitir um novo job por re-aceitação. Opções:
+- Trocar para constraint composta `(proposal_id, accepted_at)` e incluir `accepted_at` como coluna do job
+- Ou remover unique e adicionar índice para idempotência via `accepted_at` no próprio INSERT
+
+Vou usar a opção composta, mais auditável.
+
+```sql
+-- Adicionar coluna accepted_at em acceptance_effect_jobs
+ALTER TABLE public.acceptance_effect_jobs
+  ADD COLUMN IF NOT EXISTS accepted_at timestamptz;
+
+-- Backfill com proposals.accepted_at via subquery
+UPDATE public.acceptance_effect_jobs j
+   SET accepted_at = p.accepted_at
+  FROM public.proposals p
+ WHERE p.id = j.proposal_id AND j.accepted_at IS NULL;
+
+-- Trocar unique
+ALTER TABLE public.acceptance_effect_jobs
+  DROP CONSTRAINT IF EXISTS acceptance_effect_jobs_proposal_id_key;
+CREATE UNIQUE INDEX IF NOT EXISTS acceptance_effect_jobs_proposal_acceptance_uq
+  ON public.acceptance_effect_jobs (proposal_id, accepted_at);
+
+-- Atualizar trigger
+CREATE OR REPLACE FUNCTION public.enqueue_acceptance_effect_job()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
+BEGIN
+  IF NEW.status = 'accepted'
+     AND NEW.accepted_at IS NOT NULL
+     AND (
+       OLD.status IS DISTINCT FROM 'accepted'
+       OR OLD.accepted_at IS DISTINCT FROM NEW.accepted_at
+     )
+  THEN
+    INSERT INTO public.acceptance_effect_jobs (proposal_id, organization_id, opportunity_id, accepted_at)
+    VALUES (NEW.id, NEW.organization_id, NEW.opportunity_id, NEW.accepted_at)
+    ON CONFLICT (proposal_id, accepted_at) DO NOTHING;
+  END IF;
+  RETURN NEW;
+END;
+$$;
 ```
 
-Nenhum componente legado é alterado, movido ou reescrito.
+### 2. Workflow automation — anti-duplicação respeita soft-delete
 
----
+Encontrar a função/edge que executa a action `duplicate` do workflow (executor de `automation rules`). Onde hoje verifica "existe opp filha em pipeline X com `source_opportunity_id = origem`", incluir filtro `AND deleted_at IS NULL`. Sem isso uma duplicata jogada na lixeira bloqueia a recriação.
 
-### Backend (1 migração)
+Localização provável: `supabase/functions/process-pending-workflows/` ou `supabase/functions/_shared/workflow-actions/duplicate.ts`. Vou inspecionar e ajustar.
 
-**Tabela** `public.crm_dynamic_dashboard_runtime_logs`
-- Colunas conforme especificação (id, tenant_id, user_id, profile_key, event_type, guard_allowed, fallback_used, fallback_reason, load_ms, error_message, metadata, created_at).
-- CHECK em `event_type` (`runtime_allowed`, `runtime_fallback`, `runtime_error`, `user_chose_legacy_dashboard`, `user_returned_to_dynamic_dashboard`).
-- Índices `(tenant_id, user_id, created_at desc)` e `(tenant_id, event_type, created_at desc)`.
-- RLS habilitado. Policy de SELECT apenas para `is_tenant_admin_or_owner(tenant_id)`. Sem INSERT/UPDATE/DELETE direto pelo client.
+### 3. Higiene: edge de aceite pública precisa atualizar `updated_at`
 
-**RPC** `public.crm_log_dynamic_dashboard_runtime_event(...)` — `security definer`, `set search_path = public`.
-- Valida que `auth.uid()` pertence ao tenant via `crm_user_context_view`.
-- Permite o próprio usuário registrar eventos de si mesmo; admin/owner podem registrar para qualquer usuário do tenant.
-- Trunca `error_message` para 500 chars; nunca propaga stack trace para fora.
-- Retorna `jsonb { success: true, id }`.
-- `revoke all from public; grant execute to authenticated`.
+No edge function de public proposal acceptance, garantir que o UPDATE inclua `updated_at = now()`. Hoje só toca `accepted_at`/`status`/dados do aceitante, deixando `updated_at` congelado e atrapalhando ordenação e cache invalidation.
 
-Nenhuma alteração em `crm_feature_flags`, `crm_user_contexts`, `crm_business_functions`, `organization_members`, `user_roles`, propostas, oportunidades, atividades, metas. Flags continuam `false` até ativação manual operacional.
+### 4. Reprocessar o caso PONTOBR (one-shot)
 
----
+Após aplicar 1 e 2:
+- Inserir manualmente um job em `acceptance_effect_jobs` para `proposal_id = ab76157a` com `accepted_at = 2026-04-28 19:40:30+00` para que o worker padrão processe notificações, celebração e Slack.
+- Restaurar opp `467bbae1` (set `deleted_at = NULL`) OU rodar o workflow manualmente para gerar nova duplicata operacional. Pergunta para o usuário antes de decidir (ver abaixo).
 
-### Frontend
+### 5. Observabilidade
 
-**Novo hook** `src/hooks/dashboard/useDynamicDashboardRuntimeGate.ts`
-- Usa `useCurrentUser()` para `tenantId` e `userId` (sempre `auth.uid()`, nunca aceita override).
-- Reaproveita `useDynamicDashboardGuard(tenantId, userId)`.
-- Lê `metadata.requires_review` de `crm_user_contexts` e nega se `true`.
-- Estado de sessão: lê `sessionStorage['noid_use_legacy_dashboard_session']`.
-- Retorna: `{ isLoading, shouldRenderDynamic, fallbackReason, resolvedProfile, resolution, context, flags, error, useLegacyForSession, setUseLegacyForSession, refresh }`.
-- `setUseLegacyForSession(true|false)` grava/remove em sessionStorage, dispara invalidate da query e chama RPC `crm_log_dynamic_dashboard_runtime_event` com `user_chose_legacy_dashboard` ou `user_returned_to_dynamic_dashboard`.
+Adicionar log em `system_events` quando `enqueue_acceptance_effect_job` dispara via re-aceitação (vs primeira aceitação) para distinguir os dois caminhos no audit.
 
-**Novo componente** `src/components/dashboard/runtime/DynamicDashboardRuntimeGate.tsx`
-- Props: `{ legacyDashboard: React.ReactNode }`.
-- ErrorBoundary interno em volta do `DynamicDashboardShell` runtime: em qualquer erro, renderiza `legacyDashboard`, registra `runtime_error` com `error_message` enxuto, e exibe toast discreto único.
-- Mede `load_ms`: marca `performance.now()` antes do render do shell; ao montar com dados prontos (callback do shell ou efeito após `guard.data?.allowed`), envia `runtime_allowed` com `load_ms`. Adiciona `metadata.warning = 'slow_load'` se > 5000ms.
-- Quando o gate decide pelo legado por motivo diferente de "sessão legada manual", registra `runtime_fallback` com `fallback_reason` (mapeado de `GuardDenyReason`).
-- Quando renderiza o shell runtime, injeta no `metadata` do log: `entrypoint = dashboard_home_gate`, `render_mode = dynamic_runtime`, `profile_key`, `guard_result = allowed`, `sprint = 6.4`.
-- Banner de segurança (`DynamicDashboardSafeBanner` reaproveitado) e botão **Voltar ao dashboard atual** dentro do shell. Esse botão chama `setUseLegacyForSession(true)`.
+## Arquivos impactados
 
-**Banner no legado para piloto em modo sessão**
-- Novo componente leve `src/components/dashboard/runtime/LegacySessionReturnBanner.tsx`.
-- Aparece **somente** quando: usuário é piloto elegível **e** `useLegacyForSession === true`.
-- Botão **Abrir novo Dashboard Closer** chama `setUseLegacyForSession(false)`.
-- Não aparece para fallback automático nem para usuários não elegíveis.
+- `supabase/migrations/<novo>.sql` — itens 1 (schema + trigger).
+- `supabase/functions/_shared/workflow-actions/*` ou `process-pending-workflows/index.ts` — item 2.
+- `supabase/functions/<accept-proposal-public>/index.ts` (nome real a confirmar) — item 3.
+- Migration extra one-shot ou script de exec — item 4.
 
-**Plug do gate em `src/pages/Dashboard.tsx`**
-- Passa o resultado atual de `renderDashboard()` como `legacyDashboard`.
-- Renderiza `<DynamicDashboardRuntimeGate legacyDashboard={...} />` dentro do mesmo `<Layout>`.
-- Renderiza `LegacySessionReturnBanner` acima do legado quando aplicável (gate expõe esse estado).
+## Riscos
 
-**Atualização de `CloserPilotEntryButton.tsx`**
-- Quando o gate já vai renderizar o novo dashboard automaticamente (piloto elegível e sem modo legado de sessão), o botão fica oculto. Hoje só aparece quando `visible=true`; adicionar verificação adicional para esconder se o gate vai automaticamente substituir (fica ativo apenas no caso teórico em que entrypoint manual ainda fizer sentido, mas com gate pronto, o `LegacySessionReturnBanner` cobre o caso de modo legado).
+- **Reprocessar a PONTOBR**: pode disparar celebração para um deal que o time já considera fechado mentalmente. Aceitável, é o comportamento correto.
+- **Re-aceitações repetidas**: agora cada novo `accepted_at` gera novo job. Se um cliente abre o link 5x e reconfirma, vamos celebrar 5x. Mitigação: o edge function público só atualiza `accepted_at` quando o usuário clica em "Aceitar" explicitamente (não em cada view), o que é o caso atual. Posso adicionar dedupe extra no worker de notificação ("não notificar mesma proposta accepted 2x em janela de 5 min") se você quiser camada extra.
+- **Workflow duplicate ignorando soft-delete**: o comportamento novo passa a recriar a opp operacional mesmo quando havia uma na lixeira. Isso é o comportamento desejado, mas vale checar se algum tenant usa soft-delete intencional para evitar recriação.
 
-**Atualização de `src/pages/DynamicDashboardPage.tsx`**
-- Reaproveitar o mesmo hook `useDynamicDashboardRuntimeGate` para consistência de log (`entrypoint = direct_url` em vez de `dashboard_home_gate`).
-- Para acesso direto de não piloto: continuar mostrando `DynamicDashboardFallback` com botão de voltar.
+## Validação
 
----
+1. Após migration, confirmar via SELECT que trigger novo está ativo e índice composto existe.
+2. Reprocessar PONTOBR e validar: notificação in-app aparece, modal de celebração dispara para Wagner, mensagem no Slack do tenant, opp operacional recriada (ou opp `467bbae1` reativada conforme decisão).
+3. Teste manual: duplicar uma proposta accepted, voltar para draft, reenviar, reaceitar — deve gerar novo job.
+4. Build verde.
 
-### Painel administrativo
+## Pergunta antes de implementar
 
-Atualizar `src/components/settings/userContext/CloserPilotSection.tsx` (criado na Sprint 6.3) para incluir um card **Runtime do Dashboard Closer**:
-- Último acesso runtime (`max(created_at) where event_type='runtime_allowed'`).
-- Total de `runtime_allowed`, `runtime_fallback`, `runtime_error` (últimos 30 dias).
-- Tempo médio e máximo de `load_ms`.
-- Botões já existentes: rollback individual e rollback do tenant.
-- Status atual das flags global e individual.
-
-Atualizar `src/components/settings/adminCenter/PilotActivationLog.tsx` ou criar `RuntimeAccessLog.tsx` no Admin Center para listar os últimos 50 eventos de `crm_dynamic_dashboard_runtime_logs` (consulta SELECT já permitida pela policy admin/owner).
-
-Sem gráficos. Tabelas e cards simples.
-
----
-
-### Telemetria — convenções
-
-Cada evento inserido via RPC carrega no `metadata`:
-- `entrypoint`: `dashboard_home_gate` | `direct_url` | `legacy_session_banner`
-- `render_mode`: `dynamic_runtime`
-- `profile_key`: ex. `dashboard_sales_closer_placeholder`
-- `guard_result`: `allowed` | `denied`
-- `load_started_at`, `loaded_at`, `load_ms`
-- `sprint`: `6.4`
-
-`crm_closer_dashboard_views` continua sendo gravado com `source='runtime'` no caso allowed (mantém compatibilidade com dashboards já existentes).
-
----
-
-### Critérios de aceite
-
-Funcionais:
-1. Closer piloto elegível: home renderiza novo Dashboard Closer automaticamente, com Central do Dia → Pace Diário → Top 10 → propostas → follow-ups → KPIs → deals em risco.
-2. Botão **Voltar ao dashboard atual** funciona e persiste apenas na sessão.
-3. Botão **Abrir novo Dashboard Closer** aparece no legado apenas em modo sessão manual e funciona.
-4. Closer não piloto e usuários não Closer: sem alteração visual.
-5. Desligar flag global ou flag individual ou negar resolver: fallback imediato sem erro visível.
-6. Erro no novo dashboard: fallback automático + log `runtime_error` + toast discreto.
-7. `/app/dynamic-dashboard` continua funcional para piloto e fallback seguro para não piloto.
-8. Admin Center mostra runtime allowed, fallback, erros e tempos.
-
-Técnicos:
-1. Build e TypeScript passam.
-2. Guard usa `auth.uid()`; runtime nunca aceita `targetUserId` externo.
-3. RLS preservado, policies novas restritas a admin/owner para SELECT.
-4. RPC com `security definer` + `set search_path = public` + grants restritos.
-5. `function_automations_enabled` permanece `false`.
-6. Nenhuma alteração em propostas, atividades, oportunidades, metas, sidebar, login, organization_members, user_roles.
-
----
-
-### Rollback
-
-- Operacional: `crm_disable_closer_dashboard_pilot(tenant, user)`, `crm_disable_tenant_dynamic_dashboards(tenant)`, botão de sessão.
-- Técnico: remover o wrapper `DynamicDashboardRuntimeGate` do `Dashboard.tsx`. Tabela de logs e RPC permanecem. `/app/dynamic-dashboard` segue intacta.
-
----
-
-### Arquivos
-
-Criados:
-- `supabase/migrations/<timestamp>_sprint_6_4_runtime_logs.sql`
-- `src/hooks/dashboard/useDynamicDashboardRuntimeGate.ts`
-- `src/components/dashboard/runtime/DynamicDashboardRuntimeGate.tsx`
-- `src/components/dashboard/runtime/LegacySessionReturnBanner.tsx`
-- `src/services/crm/dynamicDashboardRuntimeLogs.ts` (wrapper da RPC)
-- `src/components/settings/adminCenter/RuntimeAccessLog.tsx`
-
-Editados:
-- `src/pages/Dashboard.tsx` (envolve com gate; sem mexer no interior do legado)
-- `src/pages/DynamicDashboardPage.tsx` (reaproveita hook e log padronizado)
-- `src/components/dashboard/closer/CloserPilotEntryButton.tsx` (oculta quando gate substitui)
-- `src/components/settings/userContext/CloserPilotSection.tsx` (card runtime)
-- `src/components/settings/adminCenter/AdminCenterPage.tsx` (inclui RuntimeAccessLog)
-- `src/integrations/supabase/types.ts` (auto-gerado)
-
----
-
-### Riscos e pendências para Sprint 6.5
-
-- ErrorBoundary depende de erros lançados no shell; falhas silenciosas (timeouts internos da query) caem em `runtime_allowed` com `load_ms` alto — monitorar via `warning='slow_load'`.
-- `Dashboard.tsx` continua roteando por papel; gate só atua quando o resultado corrente já seria renderizado (não conflita com SDR/CS/Manager/Owner/Admin porque o guard exige `business_function_key='closer'`).
-- Sprint 6.5 pode estender o gate para outros perfis (`sdr`, `cs`) usando o mesmo wrapper, sem reescrever a home.
+Para o item 4, qual comportamento você prefere para a opp operacional `467bbae1` que está na lixeira?
+- (a) Restaurar a existente (`deleted_at = NULL`) — preserva histórico interno se houver
+- (b) Criar uma nova duplicata via workflow — começa do zero, opp antiga fica perdida na lixeira
