@@ -13,7 +13,6 @@ import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { updateAccount, lookupCNPJ, type Account } from '@/services/crm/accounts';
 import { listOrigins, type OriginWithGroup } from '@/services/crm/origins';
 import { useAccountDetails } from '@/hooks/useAccountDetails';
-import { supabase } from '@/integrations/supabase/client';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
