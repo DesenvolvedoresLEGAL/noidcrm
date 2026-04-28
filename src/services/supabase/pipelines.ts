@@ -58,6 +58,9 @@ export interface Pipeline {
   is_primary?: boolean;
   bu: ('ALUGUE' | 'HUMANOID')[]; // Legacy field for compatibility
   business_unit_ids: string[];
+  lead_distribution_strategy?: LeadDistributionStrategy;
+  lead_distribution_role?: string | null;
+  lead_distribution_user_ids?: string[];
   stages: Stage[];
   created_at: string;
 }
