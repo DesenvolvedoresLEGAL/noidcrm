@@ -55,9 +55,15 @@ export function useSaveUserContext(tenantId: string | null | undefined, organiza
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (payload: SaveUserContextPayload) => saveUserContext(payload),
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       toast.success('Contexto do usuário atualizado com sucesso.');
+      // Invalidate the list view used by the Contexto CRM tab
       qc.invalidateQueries({ queryKey: ['user-contexts', tenantId, organizationId] });
+      // Invalidate the per-user (self) view used by ProfileSettings card
+      qc.invalidateQueries({ queryKey: ['user-context-self', tenantId, variables.user_id] });
+      // Force an immediate refetch so the UI reflects the saved state without manual reload
+      qc.refetchQueries({ queryKey: ['user-contexts', tenantId, organizationId], type: 'active' });
+      qc.refetchQueries({ queryKey: ['user-context-self', tenantId, variables.user_id], type: 'active' });
     },
     onError: (err: any) => {
       console.error('[useSaveUserContext] error', err);
