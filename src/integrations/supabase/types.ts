@@ -7650,6 +7650,264 @@ export type Database = {
           },
         ]
       }
+      crm_business_functions: {
+        Row: {
+          automation_profile_key: string | null
+          created_at: string
+          dashboard_profile_key: string | null
+          department_id: string | null
+          description: string | null
+          function_group: string | null
+          id: string
+          is_active: boolean
+          is_sales_related: boolean
+          is_system: boolean
+          key: string
+          metadata: Json
+          name: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          automation_profile_key?: string | null
+          created_at?: string
+          dashboard_profile_key?: string | null
+          department_id?: string | null
+          description?: string | null
+          function_group?: string | null
+          id?: string
+          is_active?: boolean
+          is_sales_related?: boolean
+          is_system?: boolean
+          key: string
+          metadata?: Json
+          name: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          automation_profile_key?: string | null
+          created_at?: string
+          dashboard_profile_key?: string | null
+          department_id?: string | null
+          description?: string | null
+          function_group?: string | null
+          id?: string
+          is_active?: boolean
+          is_sales_related?: boolean
+          is_system?: boolean
+          key?: string
+          metadata?: Json
+          name?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_business_functions_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "crm_departments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_departments: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          is_system: boolean
+          key: string
+          metadata: Json
+          name: string
+          sort_order: number
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_system?: boolean
+          key: string
+          metadata?: Json
+          name: string
+          sort_order?: number
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_system?: boolean
+          key?: string
+          metadata?: Json
+          name?: string
+          sort_order?: number
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      crm_feature_flags: {
+        Row: {
+          config: Json
+          created_at: string
+          description: string | null
+          enabled: boolean
+          id: string
+          key: string
+          name: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          description?: string | null
+          enabled?: boolean
+          id?: string
+          key: string
+          name?: string | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          description?: string | null
+          enabled?: boolean
+          id?: string
+          key?: string
+          name?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      crm_permission_roles: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          is_system: boolean
+          key: string
+          level: number
+          metadata: Json
+          name: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_system?: boolean
+          key: string
+          level?: number
+          metadata?: Json
+          name: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_system?: boolean
+          key?: string
+          level?: number
+          metadata?: Json
+          name?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      crm_user_contexts: {
+        Row: {
+          business_function_id: string | null
+          created_at: string
+          department_id: string | null
+          id: string
+          is_automation_dynamic_enabled: boolean
+          is_dashboard_dynamic_enabled: boolean
+          legacy_commercial_function: string | null
+          legacy_user_type: string | null
+          manager_user_id: string | null
+          metadata: Json
+          permission_role_id: string | null
+          status: string
+          tenant_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          business_function_id?: string | null
+          created_at?: string
+          department_id?: string | null
+          id?: string
+          is_automation_dynamic_enabled?: boolean
+          is_dashboard_dynamic_enabled?: boolean
+          legacy_commercial_function?: string | null
+          legacy_user_type?: string | null
+          manager_user_id?: string | null
+          metadata?: Json
+          permission_role_id?: string | null
+          status?: string
+          tenant_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          business_function_id?: string | null
+          created_at?: string
+          department_id?: string | null
+          id?: string
+          is_automation_dynamic_enabled?: boolean
+          is_dashboard_dynamic_enabled?: boolean
+          legacy_commercial_function?: string | null
+          legacy_user_type?: string | null
+          manager_user_id?: string | null
+          metadata?: Json
+          permission_role_id?: string | null
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_user_contexts_business_function_id_fkey"
+            columns: ["business_function_id"]
+            isOneToOne: false
+            referencedRelation: "crm_business_functions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_user_contexts_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "crm_departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_user_contexts_permission_role_id_fkey"
+            columns: ["permission_role_id"]
+            isOneToOne: false
+            referencedRelation: "crm_permission_roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cs_health_metrics: {
         Row: {
           account_id: string
@@ -25363,6 +25621,34 @@ export type Database = {
           },
         ]
       }
+      crm_user_context_view: {
+        Row: {
+          automation_profile_key: string | null
+          business_function_key: string | null
+          business_function_name: string | null
+          created_at: string | null
+          dashboard_profile_key: string | null
+          department_key: string | null
+          department_name: string | null
+          function_group: string | null
+          id: string | null
+          is_automation_dynamic_enabled: boolean | null
+          is_dashboard_dynamic_enabled: boolean | null
+          is_sales_related: boolean | null
+          legacy_commercial_function: string | null
+          legacy_user_type: string | null
+          manager_user_id: string | null
+          metadata: Json | null
+          permission_key: string | null
+          permission_level: number | null
+          permission_name: string | null
+          status: string | null
+          tenant_id: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Relationships: []
+      }
       forecast_accuracy_metrics: {
         Row: {
           ai_accuracy_rate: number | null
@@ -28653,6 +28939,10 @@ export type Database = {
       is_platform_admin_for_rls: { Args: { user_id: string }; Returns: boolean }
       is_platform_super_admin: { Args: { _user_id: string }; Returns: boolean }
       is_team_manager: { Args: { _user_id: string }; Returns: boolean }
+      is_tenant_admin_or_owner: {
+        Args: { _tenant_id: string }
+        Returns: boolean
+      }
       is_trial_expired: { Args: { org_id: string }; Returns: boolean }
       kairos_janitor_stale_runs: { Args: never; Returns: number }
       load_noid_performance_gates: {
@@ -28864,6 +29154,7 @@ export type Database = {
         Args: { by_user_id: string; org_id: string; reason?: string }
         Returns: boolean
       }
+      user_belongs_to_tenant: { Args: { _tenant_id: string }; Returns: boolean }
       user_can_access_proposal: {
         Args: { _opportunity_id: string; _organization_id: string }
         Returns: boolean
