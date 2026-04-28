@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { ArrowLeft, FileText, Save, FileDown, ExternalLink, Loader2 } from 'lucide-react';
+import { ArrowLeft, FileText, Save, FileDown, ExternalLink, Loader2, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { generatePublicToken } from '@/services/crm/proposals';
+import { generatePublicToken, reopenProposal } from '@/services/crm/proposals';
 import { buildProposalPublicUrl, buildProposalDirectUrl } from '@/lib/proposalUrl';
 import { useQueryClient } from '@tanstack/react-query';
 import { proposalKeys } from '@/lib/query-keys';
