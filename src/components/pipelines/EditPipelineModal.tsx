@@ -189,6 +189,13 @@ export function EditPipelineModal({ open, onClose, onSave, pipeline }: EditPipel
   );
   const showDistributionConfig = distributionStrategy !== 'none';
   const showUserList = distributionRole === 'any';
+  // Distribuição de leads só deve listar usuários ATIVOS da organização.
+  // O hook marca inativos com sufixo "(Inativo)" — filtramos esses.
+  const activeOrgUsers = orgUsers.filter((u) => !u.name.endsWith('(Inativo)'));
+  const distributionInvalid =
+    showDistributionConfig &&
+    showUserList &&
+    distributionUserIds.length === 0;
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
