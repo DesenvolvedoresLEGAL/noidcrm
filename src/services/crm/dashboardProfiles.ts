@@ -70,6 +70,7 @@ export interface DashboardResolutionResult {
     dynamic_dashboards_enabled: boolean;
     dynamic_user_context_enabled: boolean;
   };
+  owner_override?: boolean;
 }
 
 export interface DashboardResolutionLog {
