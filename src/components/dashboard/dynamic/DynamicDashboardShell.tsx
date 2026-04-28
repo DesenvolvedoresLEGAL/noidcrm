@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 import { DynamicDashboardHeader } from './DynamicDashboardHeader';
 import { DynamicDashboardGrid } from './DynamicDashboardGrid';
 import { DynamicDashboardState } from './DynamicDashboardState';
+import { CloserDashboard } from '@/components/dashboard/closer/CloserDashboard';
 
 export type DynamicDashboardShellProps = {
   profile: DashboardProfile | ResolvedDashboardProfile | null;
@@ -22,6 +23,8 @@ export type DynamicDashboardShellProps = {
   loading?: boolean;
   error?: Error | null;
   className?: string;
+  tenantId?: string;
+  targetUserId?: string;
 };
 
 export function DynamicDashboardShell({
