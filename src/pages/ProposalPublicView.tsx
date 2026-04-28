@@ -122,16 +122,16 @@ export default function ProposalPublicView() {
 
   useEffect(() => {
     if (proposal?.opportunity?.title) {
-      document.title = `${proposal.opportunity.title} | NOID CRM`;
+      document.title = `${proposal.opportunity.title} | Proposta Comercial`;
       return;
     }
 
     if (proposal?.title) {
-      document.title = `${proposal.title} | NOID CRM`;
+      document.title = `${proposal.title} | Proposta Comercial`;
       return;
     }
 
-    document.title = 'Proposta Comercial | NOID CRM';
+    document.title = 'Proposta Comercial';
   }, [proposal?.opportunity?.title, proposal?.title]);
 
   const loadWinReasons = async () => {

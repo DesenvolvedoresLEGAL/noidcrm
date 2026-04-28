@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { ArrowLeft, FileText, Save, FileDown, ExternalLink, Loader2 } from 'lucide-react';
+import { ArrowLeft, FileText, Save, FileDown, ExternalLink, Loader2, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { generatePublicToken } from '@/services/crm/proposals';
+import { generatePublicToken, reopenProposal } from '@/services/crm/proposals';
 import { buildProposalPublicUrl, buildProposalDirectUrl } from '@/lib/proposalUrl';
 import { useQueryClient } from '@tanstack/react-query';
 import { proposalKeys } from '@/lib/query-keys';
@@ -24,8 +25,8 @@ interface ProposalEditorHeaderProps {
 
 const statusConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
   draft: { label: 'Rascunho', variant: 'secondary' },
-  sent: { label: 'Enviada', variant: 'default' },
-  viewed: { label: 'Visualizada', variant: 'outline' },
+  sent: { label: 'Aberta', variant: 'default' },
+  viewed: { label: 'Aberta · Visualizada', variant: 'outline' },
   accepted: { label: 'Aceita', variant: 'default' },
   rejected: { label: 'Recusada', variant: 'destructive' },
   expired: { label: 'Expirada', variant: 'destructive' },
@@ -61,7 +62,9 @@ export function ProposalEditorHeader({
 }: ProposalEditorHeaderProps) {
   const queryClient = useQueryClient();
   const [isGeneratingLink, setIsGeneratingLink] = useState(false);
+  const [isReopening, setIsReopening] = useState(false);
   const statusInfo = statusConfig[status] || statusConfig.draft;
+  const isTerminal = status === 'accepted' || status === 'rejected';
 
   const handleQuickView = async () => {
     if (!proposalId) {
@@ -94,6 +97,27 @@ export function ProposalEditorHeader({
     }
   };
 
+  const handleReopen = async () => {
+    if (!proposalId) return;
+    const confirmMsg = status === 'accepted'
+      ? 'Reabrir esta proposta? Ela voltará ao status "Aberta" e o registro de aceite será limpo.'
+      : 'Reabrir esta proposta? Ela voltará ao status "Aberta" e o registro de recusa será limpo.';
+    if (!window.confirm(confirmMsg)) return;
+
+    setIsReopening(true);
+    try {
+      await reopenProposal(proposalId);
+      queryClient.invalidateQueries({ queryKey: proposalKeys.detail(proposalId) });
+      queryClient.invalidateQueries({ queryKey: proposalKeys.lists() });
+      toast.success('Proposta reaberta. Status atualizado para "Aberta".');
+    } catch (error) {
+      console.error('Error reopening proposal:', error);
+      toast.error('Erro ao reabrir proposta.');
+    } finally {
+      setIsReopening(false);
+    }
+  };
+
   return (
     <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-10">
       <div className="flex flex-col gap-3 px-4 py-3 md:flex-row md:items-center md:justify-between md:px-6 md:py-4">
@@ -118,6 +142,11 @@ export function ProposalEditorHeader({
                     {proposalNumber}
                   </span>
                 )}
+                {!isNew && (
+                  <Badge variant={statusInfo.variant} className="text-xs">
+                    {statusInfo.label}
+                  </Badge>
+                )}
               </div>
               {lastSaved && (
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
@@ -131,6 +160,23 @@ export function ProposalEditorHeader({
 
         {/* Action Buttons */}
         <div className="flex items-center gap-2 ml-11 md:ml-0">
+          {isTerminal && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleReopen}
+              disabled={isReopening || !proposalId}
+              title='Reabrir proposta (volta para "Aberta")'
+            >
+              {isReopening ? (
+                <Loader2 className="h-4 w-4 animate-spin md:mr-2" />
+              ) : (
+                <RotateCcw className="h-4 w-4 md:mr-2" />
+              )}
+              <span className="hidden md:inline">Reabrir Proposta</span>
+            </Button>
+          )}
+
           <Button 
             variant="outline" 
             size="sm"

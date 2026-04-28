@@ -21,10 +21,10 @@ export function ProposalViewModal({ open, onOpenChange, proposal }: ProposalView
   const getStatusBadge = (status: string) => {
     const variants: Record<string, any> = {
       draft: { variant: 'secondary', label: 'Rascunho' },
-      sent: { variant: 'default', label: 'Enviada' },
-      viewed: { variant: 'outline', label: 'Visualizada' },
+      sent: { variant: 'default', label: 'Aberta' },
+      viewed: { variant: 'outline', label: 'Aberta · Visualizada' },
       accepted: { variant: 'default', label: 'Aceita' },
-      rejected: { variant: 'destructive', label: 'Rejeitada' },
+      rejected: { variant: 'destructive', label: 'Recusada' },
     };
     const config = variants[status] || variants.draft;
     return <Badge variant={config.variant}>{config.label}</Badge>;

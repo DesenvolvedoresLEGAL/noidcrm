@@ -997,19 +997,24 @@ export async function reopenOpportunity(
     throw new Error('Erro ao reabrir oportunidade');
   }
 
-  // 4. Cancel accepted proposals
+  // 4. Reopen terminal proposals (accepted/rejected) tied to this opportunity.
+  //    Reopening the opportunity must NOT mark accepted proposals as rejected.
+  //    We bring them back to 'sent' so the public link still works and the
+  //    client never sees a misleading "Recusada" banner.
   const { error: proposalError } = await supabase
     .from('proposals')
     .update({
-      status: 'rejected',
-      declined_at: now,
-      declined_reason: `Venda reaberta: ${input.reason}`,
+      status: 'sent',
+      accepted_at: null,
+      declined_at: null,
+      declined_reason: null,
+      signature_status: 'pending',
     })
     .eq('opportunity_id', id)
-    .eq('status', 'accepted');
+    .in('status', ['accepted', 'rejected']);
 
   if (proposalError) {
-    console.warn('Error cancelling proposals:', proposalError);
+    console.warn('Error reopening proposals:', proposalError);
     // Don't throw - opportunity was already reopened
   }
 

@@ -219,7 +219,8 @@ export function ProposalContextCards({ account, contact, proposalData }: Proposa
                 className="text-xs"
               >
                 {proposalData.status === 'draft' ? 'Rascunho' :
-                 proposalData.status === 'sent' ? 'Enviada' :
+                 proposalData.status === 'sent' ? 'Aberta' :
+                 proposalData.status === 'viewed' ? 'Aberta · Visualizada' :
                  proposalData.status === 'accepted' ? 'Aceita' :
                  proposalData.status === 'rejected' ? 'Recusada' :
                  proposalData.status}

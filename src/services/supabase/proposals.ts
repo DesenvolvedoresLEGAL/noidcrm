@@ -761,6 +761,32 @@ export async function declineProposal(token: string, reason: string): Promise<vo
   if (error) throw error;
 }
 
+/**
+ * Reopen a proposal that was previously accepted or rejected, bringing it
+ * back to an open ('sent') state. Used when an opportunity is reopened or
+ * when the seller needs to revise an already-closed proposal because the
+ * project changed. Clears all terminal markers so the public link no longer
+ * shows the "Aceita" or "Recusada" banner.
+ */
+export async function reopenProposal(proposalId: string): Promise<Proposal> {
+  const { data, error } = await supabase
+    .from('proposals')
+    .update({
+      status: 'sent',
+      accepted_at: null,
+      declined_at: null,
+      declined_reason: null,
+      signature_status: 'pending',
+      sent_at: new Date().toISOString(),
+    })
+    .eq('id', proposalId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data as Proposal;
+}
+
 export async function trackView(
   proposalId: string, 
   metadata?: { 

@@ -16,6 +16,7 @@ export {
   getProposalByToken,
   acceptProposal,
   declineProposal,
+  reopenProposal,
   trackView,
   updateProposalView,
   getProposalStats,
