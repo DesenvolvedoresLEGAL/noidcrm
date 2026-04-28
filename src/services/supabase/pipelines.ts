@@ -217,7 +217,11 @@ export async function updatePipeline(id: string, data: Partial<Pipeline>): Promi
     updates.lead_distribution_strategy = data.lead_distribution_strategy;
   }
   if (data.lead_distribution_role !== undefined) {
-    updates.lead_distribution_role = data.lead_distribution_role;
+    // Defesa em profundidade: 'any' / '' não são valores válidos pela constraint
+    // pipelines_lead_distribution_role_check. Normalizar para NULL.
+    const roleValue = data.lead_distribution_role;
+    updates.lead_distribution_role =
+      roleValue === 'any' || roleValue === '' ? null : roleValue;
   }
   if (data.lead_distribution_user_ids !== undefined) {
     updates.lead_distribution_user_ids = data.lead_distribution_user_ids;
