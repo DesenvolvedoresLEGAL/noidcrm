@@ -98,6 +98,10 @@ function mapDBToPipeline(dbPipeline: DBPipeline, dbStages: DBStage[]): Pipeline 
     is_primary: dbPipeline.is_primary ?? false,
     bu: normalizeLegacyType(dbPipeline.type),
     business_unit_ids: dbPipeline.business_unit_ids || [],
+    lead_distribution_strategy:
+      (dbPipeline.lead_distribution_strategy as LeadDistributionStrategy) || 'none',
+    lead_distribution_role: dbPipeline.lead_distribution_role,
+    lead_distribution_user_ids: dbPipeline.lead_distribution_user_ids || [],
     stages: dbStages.map(mapDBToStage),
     created_at: dbPipeline.created_at,
   };
