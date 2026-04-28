@@ -142,6 +142,11 @@ export function ProposalEditorHeader({
                     {proposalNumber}
                   </span>
                 )}
+                {!isNew && (
+                  <Badge variant={statusInfo.variant} className="text-xs">
+                    {statusInfo.label}
+                  </Badge>
+                )}
               </div>
               {lastSaved && (
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
