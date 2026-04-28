@@ -28878,6 +28878,16 @@ export type Database = {
         }
         Returns: string
       }
+      crm_get_closer_dashboard_data: {
+        Args: {
+          p_end_date?: string
+          p_period?: string
+          p_start_date?: string
+          p_tenant_id: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
       crm_resolve_dashboard_profile: {
         Args: { p_preview?: boolean; p_tenant_id: string; p_user_id: string }
         Returns: Json
