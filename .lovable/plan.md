@@ -1,57 +1,43 @@
-Plano de correção
+## Problema
 
-1. Corrigir a regra errada na reabertura de oportunidade
-- Alterar `reopenOpportunity()` para NÃO transformar proposta aceita em `rejected`.
-- Quando uma oportunidade for reaberta, as propostas vinculadas que estiverem `accepted` ou `rejected` devem voltar para status aberto, usando `sent` como status técnico porque é o status que mantém o link público acessível.
-- Limpar os campos que fazem a tela pública exibir “Proposta Recusada” ou “Proposta Aceita”:
-  - `declined_at = null`
-  - `declined_reason = null`
-  - `accepted_at = null`
-  - `signature_status = 'pending'`
-- Manter o `public_token`, para o link rápido existente continuar funcionando.
+No modal **Funis e Etapas → Distribuição automática de leads** existem dois bugs:
 
-2. Corrigir o caso atual já quebrado
-- Criar migração para reparar propostas que foram recusadas automaticamente pela reabertura com motivo começando por `Venda reaberta:`.
-- Para essas propostas, voltar `status` para `sent`, limpar `declined_at` e `declined_reason`, e manter o link público.
-- Confirmado no banco que a proposta `PROP-2026-00448` está exatamente nesse estado incorreto: oportunidade aberta, proposta `rejected`, `declined_reason = Venda reaberta: Precisamos atualizar o projeto`.
+1. **Erro 400 ao salvar** quando o cargo elegível é **"Qualquer cargo (usar lista)"**.
+   - Mensagem real do backend: `new row for relation "pipelines" violates check constraint "pipelines_lead_distribution_role_check"`.
+   - Causa: o frontend envia o valor literal `'any'` em `lead_distribution_role`, mas a constraint do banco só aceita `sdr | seller | closer | cs | am | farmer | ae` (ou `NULL`). Por isso, ao escolher "SDR / Pré-vendas" funciona, mas "Qualquer cargo" sempre quebra.
 
-3. Endurecer o serviço de propostas para permitir reabertura controlada
-- Hoje `updateProposal()` bloqueia downgrade quando existe `accepted_at` ou `declined_at`, o que é bom para evitar alteração acidental, mas impede correção controlada.
-- Adicionar uma função explícita no serviço, por exemplo `reopenProposalForOpportunityUpdate(proposalId)`, que reabre a proposta com limpeza completa dos campos terminais.
-- Essa função será usada apenas em fluxo interno/autenticado, não pelo cliente público.
+2. **Lista "Usuários elegíveis" mostra todos os usuários já cadastrados** (incluindo inativos / removidos).
+   - Causa: o hook `useOrganizationUsers` faz UNION de `organization_members (status=active)` com **todos** os `profiles` da organização, e marca os inativos com sufixo `(Inativo)`. Esse comportamento é proposital para outros formulários (ex.: Editar Oportunidade, onde queremos exibir o owner antigo mesmo inativo). Mas no contexto de **distribuição de leads** só faz sentido listar usuários ativos.
 
-4. Ajustar UI para status “Aberta”
-- Atualizar badges/labels de proposta para exibir `sent`/`viewed` como “Aberta” ou “Aberta/Visualizada”, em vez de induzir que a proposta está encerrada.
-- Garantir que o editor de proposta não mostre “Recusada” após reabrir a oportunidade.
-- Garantir que o link público não mostre o banner vermelho quando a proposta foi reaberta.
+## Correção
 
-5. Remover menções internas ao cliente no link público
-- Remover textos/comentários visíveis ou potenciais mensagens ao cliente que mencionem “notificações internas”, “Slack”, “sistema interno”, “NOID CRM” onde aparecerem no contexto público.
-- Ajustar o `document.title` da página pública para linguagem neutra de cliente, por exemplo `Proposta Comercial`, sem “NOID CRM”.
-- A tela pública deve falar apenas da proposta, cliente, contato, valores e ações de aceite/recusa.
+### 1. `src/components/pipelines/EditPipelineModal.tsx`
+- Quando `distributionRole === 'any'`, enviar `lead_distribution_role: null` em vez de `'any'` (compatível com a constraint do banco e com o significado: "sem filtro de cargo, usar lista").
+- Ao carregar pipeline existente, traduzir `null → 'any'` para a UI continuar mostrando "Qualquer cargo".
+- Filtrar a lista exibida em **Usuários elegíveis** removendo qualquer usuário marcado como `(Inativo)` pelo hook (mantendo só ativos da organização).
+- Validação adicional: bloquear o "Salvar" quando estratégia ≠ `none`, cargo = `any` e nenhum usuário foi selecionado (hoje só mostra um aviso amarelo, mas o backend aceita salvar vazio).
 
-6. Avaliar botão “Reabrir proposta”
-- Adicionar uma ação discreta no editor/detalhe da proposta para reabrir proposta terminal (`accepted`/`rejected`) quando houver atualização de projeto.
-- Essa ação fará a mesma limpeza segura dos campos terminais e voltará a proposta para “Aberta”.
-- Se a proposta estiver ligada a uma oportunidade ganha/perdida, o fluxo deve orientar a reabrir a oportunidade também, para manter consistência.
+### 2. `src/services/supabase/pipelines.ts` (defesa em profundidade)
+- No `updatePipeline` / `createPipeline`, sanitizar: se `lead_distribution_role === 'any'` ou string vazia → gravar `null`. Garante que nenhum outro caller futuro derrube a constraint.
 
-Arquivos impactados
-- `src/services/supabase/opportunities.ts`
-- `src/services/supabase/proposals.ts`
-- `src/pages/ProposalEditor.tsx`
-- `src/pages/ProposalPublicView.tsx`
-- `src/components/proposals/ProposalEditorHeader.tsx`
-- `src/components/proposals/ProposalContextCards.tsx`
-- possivelmente `src/components/proposals/ProposalsList.tsx` e `ProposalViewModal.tsx` para padronizar labels
-- nova migração em `supabase/migrations/` para reparar dados já afetados
+### Fora de escopo
+- Não alterar `useOrganizationUsers` (é compartilhado por 14+ telas que dependem do comportamento atual de exibir inativos com sufixo).
+- Não alterar a constraint do banco — o conjunto de cargos é intencional.
 
-Resultado esperado
-- Reabrir oportunidade nunca mais marca proposta aceita como recusada.
-- Proposta reaberta fica “Aberta”, editável e com link público válido.
-- Cliente não vê mensagem de recusa indevida no link rápido.
-- A proposta atual `PROP-2026-00448` será corrigida no banco.
-- Link público não expõe linguagem interna do sistema ao cliente.
+## Arquivos impactados
 
-Riscos
-- Ao limpar `accepted_at`, essa proposta deixa de contar como aceita nos relatórios após a reabertura, o que é coerente com a regra: se a venda foi reaberta para atualizar projeto, a proposta volta a estar aberta.
-- Histórico/auditoria deve preservar o fato de que houve aceite anterior e reabertura, por isso a correção deve registrar audit log/migration quando possível.
+- `src/components/pipelines/EditPipelineModal.tsx` (mapear `any ↔ null`, filtrar inativos da lista, validação de salvar)
+- `src/services/supabase/pipelines.ts` (sanitização defensiva de `lead_distribution_role`)
+
+## Riscos
+
+- Baixo. Mudanças isoladas ao modal de funis e à camada de serviço de pipelines.
+- Pipelines existentes que já tenham `lead_distribution_role = 'sdr' | 'closer' | 'cs'` continuam funcionando normalmente.
+- Pipelines criados anteriormente com a UI mostrando "Qualquer cargo" nunca chegaram a ser salvos (sempre falhavam), então não há dados legados a migrar.
+
+## Próximos passos
+
+Após aprovação:
+1. Aplicar as duas alterações.
+2. Testar: criar/editar funil escolhendo Round Robin + "Qualquer cargo" + 2 usuários ativos → salvar deve funcionar.
+3. Confirmar que a lista exibe apenas usuários ativos da organização.

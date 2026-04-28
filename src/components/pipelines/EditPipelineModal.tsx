@@ -126,7 +126,7 @@ export function EditPipelineModal({ open, onClose, onSave, pipeline }: EditPipel
       setDistributionStrategy(
         (pipeline.lead_distribution_strategy as LeadDistributionStrategy) || 'none',
       );
-      setDistributionRole(pipeline.lead_distribution_role || 'any');
+      setDistributionRole(pipeline.lead_distribution_role ?? 'any');
       setDistributionUserIds(pipeline.lead_distribution_user_ids || []);
     } else {
       setName('');
