@@ -7716,6 +7716,8 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          metadata: Json
+          period: string | null
           source: string
           target_user_id: string
           tenant_id: string
@@ -7724,6 +7726,8 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          metadata?: Json
+          period?: string | null
           source?: string
           target_user_id: string
           tenant_id: string
@@ -7732,6 +7736,8 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          metadata?: Json
+          period?: string | null
           source?: string
           target_user_id?: string
           tenant_id?: string
@@ -28915,6 +28921,16 @@ export type Database = {
         }
         Returns: Json
       }
+      crm_log_closer_dashboard_view: {
+        Args: {
+          p_metadata?: Json
+          p_period?: string
+          p_source?: string
+          p_target_user_id: string
+          p_tenant_id: string
+        }
+        Returns: string
+      }
       crm_resolve_dashboard_profile: {
         Args: { p_preview?: boolean; p_tenant_id: string; p_user_id: string }
         Returns: Json
@@ -28935,6 +28951,10 @@ export type Database = {
       crm_seed_default_dashboard_profiles: {
         Args: { p_tenant_id: string }
         Returns: number
+      }
+      crm_set_user_dynamic_dashboard: {
+        Args: { p_enabled: boolean; p_tenant_id: string; p_user_id: string }
+        Returns: boolean
       }
       delete_contract: { Args: { contract_id: string }; Returns: boolean }
       delete_email: {
