@@ -58,6 +58,7 @@ const formatPhone = (value: string) => {
 export default function ProfileSettings() {
   const { user } = useSupabaseAuth();
   const { pipelines } = useOrganizationPipelines();
+  const queryClient = useQueryClient();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
