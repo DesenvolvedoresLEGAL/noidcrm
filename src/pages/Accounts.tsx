@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Plus, Search, Building2, Download, Filter, X } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { listAccounts, deleteAccount, type Account } from '@/services/supabase/accounts';
+import { listAccounts, deleteAccount, getAccountsPorteSummary, type Account } from '@/services/supabase/accounts';
 import { supabase } from '@/integrations/supabase/client';
 import { AccountModalTabs } from '@/components/accounts/AccountModalTabs';
 import { AccountCard } from '@/components/accounts/AccountCard';

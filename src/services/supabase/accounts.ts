@@ -95,9 +95,20 @@ const accountSchema = z.object({
   logo_url: z.string().optional().nullable(),
 });
 
-export async function listAccounts(params?: { 
+// Map canonical porte (UI label) -> DB string variants accepted as equivalent
+const PORTE_VARIANTS: Record<string, string[]> = {
+  'MEI': ['MEI', 'MICROEMPREENDEDOR INDIVIDUAL', 'MICRO EMPREENDEDOR INDIVIDUAL'],
+  'ME': ['ME', 'MICRO', 'MICROEMPRESA', 'MICRO EMPRESA'],
+  'EPP': ['EPP', 'PEQUENO', 'PEQUENO PORTE', 'PEQUENA', 'EMPRESA DE PEQUENO PORTE'],
+  'Médio Porte': ['MEDIO', 'MÉDIO', 'MEDIA', 'MÉDIA', 'MEDIO PORTE', 'MÉDIO PORTE', 'EMPRESA DE MEDIO PORTE', 'EMPRESA DE MÉDIO PORTE'],
+  'Grande Porte': ['GRANDE', 'GRANDE PORTE', 'EMPRESA DE GRANDE PORTE', 'DEMAIS'],
+};
+
+export async function listAccounts(params?: {
   segmento?: string;
   tamanho?: string;
+  porte?: string;
+  origem_principal?: string;
   q?: string;
   page?: number;
   page_size?: number;
@@ -126,6 +137,18 @@ export async function listAccounts(params?: {
     query = query.eq('tamanho', params.tamanho);
   }
 
+  if (params?.origem_principal) {
+    query = query.eq('origem_principal', params.origem_principal);
+  }
+
+  // Porte: filter by all DB variants matching the canonical UI value
+  if (params?.porte) {
+    const variants = PORTE_VARIANTS[params.porte] ?? [params.porte];
+    // Build OR with case-insensitive match on each variant
+    const orFilter = variants.map((v) => `porte.ilike.${v}`).join(',');
+    query = query.or(orFilter);
+  }
+
   if (params?.q) {
     query = query.or(`razao_social.ilike.%${params.q}%,nome_fantasia.ilike.%${params.q}%,cnpj.ilike.%${params.q}%`);
   }
@@ -141,6 +164,23 @@ export async function listAccounts(params?: {
 
   if (error) throw error;
   return { data: data as Account[], total: count || 0 };
+}
+
+export async function getAccountsPorteSummary() {
+  const { data: orgId, error: orgError } = await supabase.rpc('get_user_organization_id');
+  if (orgError || !orgId) throw new Error('User must belong to an organization');
+  const { data, error } = await supabase.rpc('get_accounts_porte_summary', { _organization_id: orgId });
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : data;
+  return {
+    total: Number(row?.total ?? 0),
+    mei: Number(row?.mei ?? 0),
+    me: Number(row?.me ?? 0),
+    epp: Number(row?.epp ?? 0),
+    medio: Number(row?.medio ?? 0),
+    grande: Number(row?.grande ?? 0),
+    sem_porte: Number(row?.sem_porte ?? 0),
+  };
 }
 
 export async function getAccount(id: string) {
