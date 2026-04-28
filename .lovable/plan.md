@@ -1,88 +1,97 @@
-## Diagnóstico
+## Ajustes Gerais — 6 correções
 
-Investiguei direto no banco e na lógica do filtro. Tem 3 problemas misturados.
+### 1. Notificações de propostas vencidas em deals já fechados/perdidos
 
-### 1. As 3 listas existentes JÁ estão pontuadas — mas com scoring V1/V2 (sem learning)
+**Causa raiz:** Em `supabase/functions/check-proposal-expiration/index.ts`, o filtro `.eq("opportunity.status", "open")` no embed PostgREST **não filtra a tabela pai** — só remove o objeto embedado. Resultado: propostas de oportunidades `won`, `lost`, soft-deleted, ou de pipelines que não são VENDAS continuam disparando alertas (PROP-2026-00467, 00533, 00548 são `lost`; PROP-2026-00324 é do pipeline OPERACIONAL).
 
-Os ajustes do **Score V3** (learning_adjustment vindo dos sinais aprendidos) só são aplicados quando `run-enrichment` roda. Os 1.484 prospects das 3 buscas (ABRINT, FEIMEC, BETT) foram pontuados nos dias 24-25/04, antes do learning loop existir — e o sistema nunca tinha 20 ocorrências de sinal nenhum, então mesmo se rodasse de novo, `learning_adjustment = 0` hoje.
+**Correção:**
+- Reescrever a query buscando `proposal_id` + filtrar oportunidades em SQL com join real (via RPC ou duas queries: primeiro buscar opportunities `status='open'`, `pipeline_type='sales'`, `deleted_at IS NULL`, depois propostas vinculadas).
+- Adicionar filtro **`pipeline_type = 'sales'`** (join com `pipelines`).
+- Adicionar verificação no loop: se `opportunity.status !== 'open'` ou `opportunity.deleted_at !== null` → `continue`.
+- Mesma correção em `supabase/functions/build-daily-digest/index.ts` para `proposals_due_today`/`proposals_due_tomorrow`.
 
-**Distribuição real no banco (não está tudo igual, é o filtro que mente):**
+### 2. Round Robin não funciona + criar mais estratégias de distribuição
 
-```text
-ABRINT 2026   → 242 com score 201 (B), 2 com 229 (A)
-FEIMEC 2026   → 511 com 287 (A), 235 com 277 (A), 30 com 307 (A), 14 com ~141 (C), 2 com 201 (B)
-BETT BRASIL   → 357 com 260 (A), 35 com 175 (C), 27 com 163 (C), 15 com 201 (B), + 13 outros variando 203–316
-```
+**Estado atual:** `claim_next_owner_round_robin` existe e funciona, mas só é invocada via Decision Engine e Workflows. Não há UI em `/settings/pipelines` para configurar distribuição por pipeline. A tabela `pipelines` não tem coluna de estratégia.
 
-Ou seja: **dentro de cada busca os scores variam pouco** porque o ICP fit está saturando em 100 e os sinais detectados são quase sempre os mesmos 3 (`markdown pattern`, `participates in events`, `listed in official directory`). Isso é limitação do enrichment atual, não do filtro.
+**Correção:**
+- Migração: adicionar a `pipelines` as colunas:
+  - `lead_distribution_strategy TEXT` (`none | round_robin | load_balanced | territory | manual_assignment | random`)
+  - `lead_distribution_role TEXT` (`sdr | seller | closer | cs`) — qual papel recebe
+  - `lead_distribution_user_ids UUID[]` (pool opcional; se vazio, usa todos ativos do papel)
+- Estender RPC: criar `claim_next_owner_v2(pipeline_id, role, strategy)` cobrindo:
+  - **round_robin** — alfabético, rotativo (já existe lógica)
+  - **load_balanced** — escolhe usuário com menor nº de oportunidades abertas
+  - **random** — sorteio entre ativos
+  - **territory** — usa `territories` do usuário (já existem na base) cruzando com UF da conta
+  - **manual_assignment** — não atribui (deixa nulo, usuário decide)
+- UI em `EditPipelineModal.tsx`: nova seção "Distribuição de Leads" com:
+  - Select de estratégia
+  - Select de papel-alvo (Pré-vendedor / Vendedor / Closer / CS)
+  - Multi-select opcional para restringir o pool
+- Integração: ao criar oportunidade no pipeline (via formulários, importação, lead ingest), chamar a RPC se `owner_user_id` estiver vazio e a pipeline tiver estratégia configurada.
 
-### 2. O filtro "Score Alto" está quebrado conceitualmente
+### 3. Auto-preencher Pré-Vendedor na conta quando pré-vendedor cria oportunidade
 
-Código atual em `LeadResultsTable.tsx:104-107`:
-```ts
-case 'high_score':
-  return s.priority_score >= 70 || (icp+quality+trust-penalty) >= 70;
-```
+**Implementação:** No serviço `createOpportunity` (`src/services/crm/opportunities.ts`):
+- Após criar a oportunidade, se o pipeline for do tipo `qualification` (PRE VENDAS) **e** o usuário criador tiver papel SDR/BDR (Pré-vendedor) **e** a conta vinculada não tiver `pre_sales_user_id`:
+  - Atualizar `accounts.pre_sales_user_id = user.id` (com `cs_user_id` para closers e `owner_user_id` para vendedores na mesma lógica para `sales`).
+- Garantir verificação de `has_role` antes de fixar.
 
-O threshold `>= 70` é absurdamente baixo — **todo prospect com score >= 70 passa**, e como o menor score real é 141, **literalmente todos os 1.484 leads aparecem como "Score Alto"**. Por isso você vê a lista inteira.
+### 4. Persistência dos responsáveis (Pré-vendedor / Vendedor / CS) na conta
 
-### 3. A coluna "Confiança" mostra 60 fixo na UI mas no banco varia (96, 88, 60)
+**Diagnóstico (já confirmado em DB):** WEBDOX tem `owner_user_id` e `pre_sales_user_id` salvos corretamente no banco. O bug é de **exibição**: o `Select` do `AccountEditor`/`AccountModalTabs` mostra "Selecione" porque `useOrganizationUsers` provavelmente:
+- Filtra por `is_active = true`, ocultando usuários antigos.
+- Não inclui o ID do usuário salvo se ele não estiver na primeira página de resultados.
 
-Bug de exibição/origem do dado — `prospect.confidence` na imagem está mostrando o mesmo valor para todos da mesma run, provavelmente porque é a confiança da extração do scraper (por página), não a confiança do scoring.
+**Correção:**
+- Garantir que `useOrganizationUsers` (chamado com `[owner, cs, pre_sales]` extras) **sempre carregue esses IDs explicitamente**, mesmo que estejam inativos, com flag `(Inativo)` no label.
+- Forçar `reset()` do React Hook Form a rodar **após** os usuários extras serem carregados (atualmente faz reset assim que `account` chega, antes do `users` populado, então o `Select` recebe um valor que não existe na lista de opções).
 
----
+### 5. Central de Notificações — Tab "Propostas" deve incluir vencidas e visualizadas
 
-## Como priorizar suas 3 listas HOJE (sem esperar Sprint D)
+**Estado atual:** `useUnifiedInbox` categoriza notificações por `category`. Eventos `proposal_expired`, `proposal_expiring_24h`, `proposal_expiring_48h`, `proposal_viewed` precisam mapear para `category: 'proposals'`.
 
-Como o ICP fit saturou em 100 para a maioria, a única dimensão que ainda discrimina é **priority_score absoluto + grade + signal_score**. Proposta:
+**Correção:**
+- Em `src/hooks/useUnifiedInbox.ts` (e/ou `normalizeInboxItems.ts`), adicionar/garantir mapeamento dos tipos:
+  - `proposal_expired`, `proposal_expiring_24h`, `proposal_expiring_48h`, `proposal_viewed`, `proposal_accepted`, `proposal_declined` → `category: 'proposals'`.
+- Verificar que o badge da aba conta esses tipos.
 
-**Tier S (atacar primeiro)** — `priority_score >= 280` OU `signal_score >= 80`
-→ FEIMEC: ~778 leads / BETT: ~12 leads / ABRINT: 0
+### 6. Filtro de Porte em /accounts retorna vazio + KPIs incorretos
 
-**Tier A** — `priority_score 230–279` E `grade = A`
-→ BETT: ~357 / ABRINT: 2
+**Causa raiz:** `listAccounts` carrega só **60 contas** por página (server-side, ordenado por `razao_social`). O filtro de porte roda **client-side** sobre essa página → WEBDOX (W…) não está nas primeiras 60. Os cards "Médio Porte: 2" também refletem só essas 60. Quando o usuário aplica o filtro Médio Porte, o KPI muda para "0" porque o filtro é aplicado sobre o conjunto já truncado.
 
-**Tier B (segunda onda)** — `priority_score 180–229`, `grade B`
-→ ABRINT: 242 / BETT: 15 / FEIMEC: 2
-
-**Tier C (descartar ou enrichment manual)** — `priority_score < 180` ou `grade C`
-→ resto, ~95 leads, normalmente `icp_fit ~15` (não bateram ICP)
-
-ABRINT está praticamente todo empilhado em B porque o enrichment dela achou menos sinais por lead. Recomendo **rodar re-enrichment do ABRINT** com a versão atual para tentar separar melhor.
-
----
-
-## Plano de correção (Sprint mini, antes da Sprint D)
-
-### Mudança 1 — Redefinir "Score Alto" com threshold real
-`src/components/playbook/LeadResultsTable.tsx`:
-- Trocar `>= 70` por `>= 250` (ou tornar configurável por org).
-- Adicionar 4 sub-filtros: **Tier S (≥280)**, **Tier A (230–279)**, **Tier B (180–229)**, **Tier C (<180)**.
-- Default do filtro "Score Alto" = Tier S + Tier A.
-
-### Mudança 2 — Corrigir coluna "Confiança"
-- Investigar se `prospect.confidence` está vindo da extração (página) ou do scoring. Se for da extração, renomear coluna na UI para **"Confiança Extração"** e adicionar coluna **"Confiança Score"** vinda de `prospect_scores` (a calcular).
-
-### Mudança 3 — Botão "Re-pontuar lista" nas Execuções Recentes
-Adicionar ação por run que dispara `run-enrichment` em modo `rescore-only` para os prospects daquela run. Assim, conforme o learning loop acumula sinais (>= 20 ocorrências), você consegue trazer as listas antigas para o V3 sem reprocessar scraping.
-- Edge function: novo modo `rescore_existing` em `run-enrichment` que pula scraping/AI e só recalcula `prospect_scores` aplicando `learning_adjustment` atual.
-
-### Mudança 4 — Documentar regra do "Score Alto" na UI
-Tooltip no chip "Score Alto" explicando: *"Inclui Tier S e Tier A (priority_score ≥ 230). Considera ICP fit, qualidade dos dados, sinais positivos detectados e ajuste do learning loop."*
+**Correção:**
+- Estender `listAccounts` para aceitar `porte`, `origem_principal`, `score_financeiro_range` como filtros server-side (`.eq()` / `.gte/lte()`).
+- Mover o filtro de porte do `useMemo` client-side para `queryKey` + parâmetro do `listAccounts`, usando `normalizePorte` no banco via mapeamento (ou aceitar a forma canônica direta — confirmar valores em uso na base).
+- Para os KPIs por porte, criar query agregada separada (`select porte, count(*)` agrupado) executada uma vez sobre toda a organização (sem paginação), retornando contagens reais por porte canônico.
+- Substituir contagens `byPorte` por essas contagens agregadas.
 
 ---
 
-## Resposta direta às suas perguntas
+## Arquivos impactados (resumo técnico)
 
-1. **Os ajustes valem para as listas existentes?** Não. Foram pontuadas antes do learning loop. Para aproveitar, precisa do botão "Re-pontuar" da Mudança 3.
-2. **Como priorizar as 3 listas hoje?** Use os Tiers S/A/B/C acima. **FEIMEC tem o melhor pool (778 leads tier S)**, BETT tem volume médio com qualidade, ABRINT precisa re-enrichment porque está empilhado em B.
-3. **O que é "Score Alto"?** Hoje é um filtro quebrado (tudo passa). Depois da correção será: Tier S + Tier A = `priority_score >= 230` com grade A.
+**Migrações:**
+- Nova migração: colunas em `pipelines` (distribution strategy/role/user_ids) + RPC `claim_next_owner_v2` + RPC `get_accounts_porte_summary(org_id)`.
 
----
+**Edge Functions:**
+- `supabase/functions/check-proposal-expiration/index.ts` — filtro pipeline_type='sales' + status open hard
+- `supabase/functions/build-daily-digest/index.ts` — mesmo filtro
 
-## Risks
-- Mudar o threshold do filtro pode "esconder" leads que SDRs já estavam trabalhando — precisa avisar o time antes do deploy.
-- Re-pontuar listas antigas pode mudar a ordenação que os SDRs já memorizaram.
+**Frontend:**
+- `src/services/supabase/accounts.ts` — `listAccounts` aceita `porte`, novos filtros server-side
+- `src/pages/Accounts.tsx` — filtros server-side + KPIs via RPC agregada
+- `src/pages/AccountEditor.tsx` + `src/components/accounts/AccountModalTabs.tsx` — reset após users carregar; mostrar inativos
+- `src/hooks/useOrganizationUsers.ts` — aceitar IDs forçados mesmo inativos
+- `src/hooks/useUnifiedInbox.ts` (ou normalizeInboxItems) — mapear tipos de proposta para category 'proposals'
+- `src/components/pipelines/EditPipelineModal.tsx` — nova seção "Distribuição de Leads"
+- `src/services/crm/pipelines.ts` — passar campos de distribuição
+- `src/services/crm/opportunities.ts` — auto-set `pre_sales_user_id`/`owner_user_id`/`cs_user_id` na conta + invocar `claim_next_owner_v2` quando `owner` vazio
 
-## Next steps
-Aguardo seu OK para implementar as Mudanças 1, 2, 3 e 4. Sprint D (learning loop em ação real) continua na sequência depois disso.
+## Riscos
+- Auto-set de responsáveis na conta pode sobrescrever atribuições intencionais — mitigado: só preenche quando o campo está vazio.
+- Round Robin v2 precisa convivências com workflows existentes que já chamam a v1 — manter v1 funcionando.
+- Filtro porte server-side exige normalização: porte no banco tem variantes ("MEDIO PORTE", "Médio Porte"); usar `ILIKE` ou expandir o filtro para múltiplas variantes equivalentes via `normalizePorte` reverso.
+
+## Próximos passos após aprovação
+Implementar na ordem: (6) → (4) → (1) → (5) → (3) → (2), pois (2) é o maior e os outros desbloqueiam fluxo imediato do usuário.
