@@ -9,6 +9,38 @@ export type CloserWidgetAvailability = 'ready' | 'unavailable';
 export type CloserSeverity = 'critical' | 'attention' | 'opportunity' | 'info';
 export type CloserItemKind = 'activity' | 'proposal' | 'opportunity';
 
+export type CloserPaceStatus =
+  | 'Acima do pace'
+  | 'No pace'
+  | 'Atrasado'
+  | 'Crítico'
+  | 'Meta não configurada';
+
+export type CloserPaceSeverity = 'success' | 'info' | 'attention' | 'critical' | 'warning';
+
+export interface CloserPaceData {
+  available: boolean;
+  reason?: string;
+  goal_value?: number;
+  realized_value?: number;
+  goal_attainment_percent?: number;
+  business_days_total?: number;
+  business_days_elapsed?: number;
+  business_days_remaining?: number;
+  expected_pace_today?: number;
+  pace_gap_value?: number;
+  remaining_to_goal?: number;
+  required_daily_rate?: number;
+  current_daily_average?: number;
+  pace_percent?: number;
+  status: CloserPaceStatus;
+  severity: CloserPaceSeverity;
+  business_days_rule?: string;
+  pace_uses_current_month?: boolean;
+  goal_source?: string;
+  why_here?: string;
+}
+
 export interface CloserDashboardKpis {
   open_pipeline_value: number;
   open_pipeline_count: number;
@@ -103,6 +135,7 @@ export interface CloserDashboardData {
   };
   availability: Record<string, CloserWidgetAvailability>;
   goal_warning: CloserGoalWarning | null;
+  pace?: CloserPaceData;
   metadata: {
     generated_at: string;
     source: string;
