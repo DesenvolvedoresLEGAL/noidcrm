@@ -11,7 +11,7 @@ export type DashboardLayoutType =
   | 'legacy'
   | 'unknown';
 
-export type ShellMode = 'preview' | 'admin_center' | 'future_runtime';
+export type ShellMode = 'preview' | 'admin_center' | 'future_runtime' | 'runtime';
 
 export interface NormalizedShellWidget {
   key: string;
@@ -110,6 +110,7 @@ export function useDynamicDashboardShell(
 
     const badges: string[] = [];
     if (mode === 'preview') badges.push('Preview');
+    if (mode === 'runtime') badges.push('Runtime');
     if (isPlaceholder) badges.push('Placeholder');
     if (isAdminCenter) badges.push('Admin Center');
     if (isOwnerCockpit) badges.push('Owner Cockpit');
