@@ -62,7 +62,9 @@ export function ProposalEditorHeader({
 }: ProposalEditorHeaderProps) {
   const queryClient = useQueryClient();
   const [isGeneratingLink, setIsGeneratingLink] = useState(false);
+  const [isReopening, setIsReopening] = useState(false);
   const statusInfo = statusConfig[status] || statusConfig.draft;
+  const isTerminal = status === 'accepted' || status === 'rejected';
 
   const handleQuickView = async () => {
     if (!proposalId) {
@@ -92,6 +94,27 @@ export function ProposalEditorHeader({
       toast.error('Erro ao gerar link de visualização.');
     } finally {
       setIsGeneratingLink(false);
+    }
+  };
+
+  const handleReopen = async () => {
+    if (!proposalId) return;
+    const confirmMsg = status === 'accepted'
+      ? 'Reabrir esta proposta? Ela voltará ao status "Aberta" e o registro de aceite será limpo.'
+      : 'Reabrir esta proposta? Ela voltará ao status "Aberta" e o registro de recusa será limpo.';
+    if (!window.confirm(confirmMsg)) return;
+
+    setIsReopening(true);
+    try {
+      await reopenProposal(proposalId);
+      queryClient.invalidateQueries({ queryKey: proposalKeys.detail(proposalId) });
+      queryClient.invalidateQueries({ queryKey: proposalKeys.lists() });
+      toast.success('Proposta reaberta. Status atualizado para "Aberta".');
+    } catch (error) {
+      console.error('Error reopening proposal:', error);
+      toast.error('Erro ao reabrir proposta.');
+    } finally {
+      setIsReopening(false);
     }
   };
 
