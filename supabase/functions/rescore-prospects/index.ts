@@ -281,7 +281,7 @@ async function logEvent(
     trace_id: crypto.randomUUID(),
     actor_type: "system",
     event_type: eventType,
-    event_category: "intelligence",
+    event_category: "ai",
     action: eventType.split(".")[1] ?? eventType,
     entity_type: runId ? "playbook_run" : "prospect_batch",
     entity_id: entityId,
