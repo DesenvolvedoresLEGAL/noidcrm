@@ -58,12 +58,12 @@ export async function listCloserDashboardViews(
   const ids = Array.from(new Set(rows.flatMap((r) => [r.viewer_user_id, r.target_user_id])));
   const { data: profiles } = await supabase
     .from('profiles')
-    .select('id, full_name, email')
-    .in('id', ids);
+    .select('user_id, full_name, email')
+    .in('user_id', ids);
 
   const map = new Map<string, { name: string | null; email: string | null }>();
   (profiles || []).forEach((p: any) => {
-    map.set(p.id, { name: p.full_name ?? null, email: p.email ?? null });
+    map.set(p.user_id, { name: p.full_name ?? null, email: p.email ?? null });
   });
 
   return rows.map((r) => ({
