@@ -25,6 +25,7 @@ import { validateCPF, formatCPF } from '@/lib/validators/cpf';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { AccountTagsSelector } from './AccountTagsSelector';
 import { useAccountTagIds, useSetAccountTags } from '@/hooks/useAccountTags';
+import { invalidateAccount } from '@/lib/cache-invalidation';
 
 const accountSchema = z.object({
   // Tipo de Pessoa
@@ -365,9 +366,8 @@ export function AccountModalTabs({ open, onOpenChange, account }: AccountModalTa
 
       return result;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: accountKeys.lists() });
-      queryClient.invalidateQueries({ queryKey: opportunityKeys.lists() });
+    onSuccess: async (savedAccount) => {
+      await invalidateAccount(queryClient, savedAccount?.id || account?.id);
       toast({
         title: isEditing ? 'Conta atualizada' : 'Conta criada',
         description: isEditing
