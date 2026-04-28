@@ -7903,6 +7903,51 @@ export type Database = {
         }
         Relationships: []
       }
+      crm_dynamic_dashboard_pilot_logs: {
+        Row: {
+          action: string
+          changed_by: string
+          created_at: string
+          id: string
+          metadata: Json
+          new_global_flag: boolean | null
+          new_user_flag: boolean | null
+          previous_global_flag: boolean | null
+          previous_user_flag: boolean | null
+          reason: string | null
+          target_user_id: string
+          tenant_id: string
+        }
+        Insert: {
+          action: string
+          changed_by: string
+          created_at?: string
+          id?: string
+          metadata?: Json
+          new_global_flag?: boolean | null
+          new_user_flag?: boolean | null
+          previous_global_flag?: boolean | null
+          previous_user_flag?: boolean | null
+          reason?: string | null
+          target_user_id: string
+          tenant_id: string
+        }
+        Update: {
+          action?: string
+          changed_by?: string
+          created_at?: string
+          id?: string
+          metadata?: Json
+          new_global_flag?: boolean | null
+          new_user_flag?: boolean | null
+          previous_global_flag?: boolean | null
+          previous_user_flag?: boolean | null
+          reason?: string | null
+          target_user_id?: string
+          tenant_id?: string
+        }
+        Relationships: []
+      }
       crm_feature_flags: {
         Row: {
           config: Json
@@ -28911,6 +28956,26 @@ export type Database = {
         }
         Returns: string
       }
+      crm_disable_closer_dashboard_pilot: {
+        Args: {
+          p_reason?: string
+          p_target_user_id: string
+          p_tenant_id: string
+        }
+        Returns: Json
+      }
+      crm_disable_tenant_dynamic_dashboards: {
+        Args: { p_reason?: string; p_tenant_id: string }
+        Returns: Json
+      }
+      crm_enable_closer_dashboard_pilot: {
+        Args: {
+          p_reason?: string
+          p_target_user_id: string
+          p_tenant_id: string
+        }
+        Returns: Json
+      }
       crm_get_closer_dashboard_data: {
         Args: {
           p_end_date?: string
@@ -28919,6 +28984,10 @@ export type Database = {
           p_tenant_id: string
           p_user_id: string
         }
+        Returns: Json
+      }
+      crm_get_closer_pace_data: {
+        Args: { p_tenant_id: string; p_user_id: string }
         Returns: Json
       }
       crm_log_closer_dashboard_view: {
