@@ -21,7 +21,7 @@ import { ArrowLeft, Save, Loader2, Building2, MapPin, Mail, Users, Briefcase, Fi
 import { createContact } from '@/services/crm/contacts';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
-import { accountKeys, contactKeys, opportunityKeys } from '@/lib/query-keys';
+import { accountKeys, contactKeys } from '@/lib/query-keys';
 import { cnaeToSegmento } from '@/lib/cnae-to-segmento';
 import { TIPO_EMPRESA_OPTIONS, SEGMENTO_OPTIONS, normalizeTipoEmpresa, withCurrentValue } from '@/lib/account-options';
 import { normalizeSegmento } from '@/lib/segment-normalizer';
