@@ -1,131 +1,157 @@
-# Sprint 4 — Motor de Dashboards Dinâmicos (preview only)
+# Sprint 5: Dynamic Dashboard Shell + Admin Center Entry
 
-Objetivo: criar a infraestrutura silenciosa que resolve qual dashboard cada usuário deveria ver, com fallback total e somente em modo preview. O dashboard real, sidebar, login, rotas e flags permanecem intocados.
+Criar um chassi visual reutilizável que renderiza qualquer profile de `crm_dashboard_profiles` e expor o Admin Center como uma área administrativa em Configurações. O dashboard real do NOID, sidebar global, login, rotas críticas e feature flags **não são alterados**.
 
-## 1. Migration de schema
+## Estado já validado no banco
 
-Arquivo: `supabase/migrations/<timestamp>_sprint4_dashboard_resolver.sql`
+- 8 organizações × 17 profiles cada (validado).
+- `dashboard_admin_placeholder` já tem `name = "Admin Center"`, `metadata.is_admin_center = true` e widgets `crm_health`, `integrations`, `data_quality`.
+- Flags `dynamic_dashboards_enabled`, `dynamic_user_context_enabled`, `function_automations_enabled` continuam `false`.
+- Resolver com `owner_override` operacional.
 
-### Tabela `crm_dashboard_profiles`
-- Campos exatamente como especificado (id, tenant_id, key, name, description, scope_type, scope_key, layout/widgets/filters/permissions/metadata jsonb, is_system, is_active, timestamps).
-- Constraints: key/name não vazios, `scope_type in ('user','business_function','department','permission_role','default')`, unique (tenant_id, key) e (tenant_id, scope_type, scope_key).
-- Índices: (tenant_id, key), (tenant_id, scope_type, scope_key), (tenant_id, is_active).
-- Trigger `set_updated_at()`.
-- RLS on. Policies:
-  - SELECT: `user_belongs_to_tenant(tenant_id)`.
-  - ALL (manage): `is_tenant_admin_or_owner(tenant_id)`.
+Conclusão: **nenhuma migração nova é necessária**. Trabalho 100% frontend.
 
-### Tabela `crm_dashboard_resolution_logs`
-- Campos como especificado (append-only, sem updated_at).
-- FK `resolved_profile_id` → `crm_dashboard_profiles(id)` ON DELETE SET NULL.
-- Check em `resolution_source` com os 7 valores permitidos.
-- Índices: (tenant_id, user_id, created_at desc), (tenant_id, resolution_source, created_at desc), (tenant_id, fallback_used, created_at desc).
-- RLS on. Apenas policy de SELECT para Owner/Admin. Inserção exclusivamente via RPC SECURITY DEFINER.
+## Componentes que serão criados
 
-## 2. Seeds idempotentes
+Estrutura nova em `src/components/dashboard/dynamic/`:
 
-Mesma migration, bloco `DO $$ ... $$` que itera por todos os tenants distintos de `crm_user_contexts` e faz `INSERT ... ON CONFLICT (tenant_id, key) DO NOTHING` para os 10 placeholders:
+```text
+DynamicDashboardShell.tsx     -> orquestra header + grid + estados
+DynamicDashboardHeader.tsx    -> nome, descrição, escopo, badges
+DynamicDashboardGrid.tsx      -> grid responsivo (1/2/3/4 cols)
+DynamicWidgetRenderer.tsx     -> card neutro por widget + ícone por key
+DynamicDashboardState.tsx     -> loading/empty/error/legacy/unsupported/forbidden
+```
 
-1. `dashboard_legacy_default` (default/default)
-2. `dashboard_owner_placeholder` (permission_role/owner)
-3. `dashboard_admin_placeholder` (permission_role/admin)
-4. `dashboard_manager_placeholder` (permission_role/manager)
-5. `dashboard_user_placeholder` (permission_role/user)
-6. `dashboard_sales_closer_placeholder` (business_function/closer)
-7. `dashboard_pre_sales_sdr_placeholder` (business_function/sdr)
-8. `dashboard_cs_placeholder` (business_function/cs)
-9. `dashboard_operations_placeholder` (department/operations)
-10. `dashboard_finance_placeholder` (department/finance)
+Cada componente é puro, recebe props tipadas e nunca busca dados reais (sem queries de pipeline, receita, propostas, leads, forecast).
 
-Todos `is_system=true`, `is_active=true`, layout/widgets exatos do briefing.
+### Comportamento do `DynamicDashboardShell`
 
-## 3. RPC `crm_resolve_dashboard_profile(p_tenant_id, p_user_id, p_preview default true)`
+- `profile = null` → estado `empty` ("O dashboard padrão continuará sendo usado").
+- `profile.layout.type = "legacy"` → estado `legacy`.
+- `profile.layout.type = "placeholder"` ou `"dynamic_placeholder"` → header + grid de widgets placeholder.
+- Layout desconhecido → estado `unsupported` (não quebra a tela).
+- JSON inválido em widgets → cada widget é renderizado defensivamente; widgets desconhecidos viram badge "Não implementado".
+- `mode` = `preview | admin_center | future_runtime` controla apenas badges/avisos no header.
 
-`security definer`, `set search_path = public`, `grant execute to authenticated`.
+### Badges no header
 
-Fluxo:
-1. Validar `auth.uid()` não nulo.
-2. Validar `user_belongs_to_tenant(p_tenant_id)` — caller.
-3. Validar p_user_id pertence ao tenant via `organization_members` (status active/suspended).
-4. Buscar contexto em `crm_user_context_view` (permission_key, department_key, business_function_key, is_dashboard_dynamic_enabled).
-5. Buscar flag `dynamic_dashboards_enabled` e `dynamic_user_context_enabled` em `crm_feature_flags` para o tenant.
-6. Montar lista de candidatos em ordem (user → business_function → department → permission_role → default), descartando entradas com scope_key nulo.
-7. Buscar primeiro profile `is_active=true` que bata; armazenar `candidate_profiles` (array com tentativas avaliadas).
-8. Definir `resolution_source` e `fallback_used`/`fallback_reason`:
-   - sem contexto → `legacy_fallback` + `missing_user_context`.
-   - sem match → `legacy_fallback` + `no_matching_profile` (resolve `dashboard_legacy_default`).
-   - exception → `error_fallback` + mensagem segura.
-   - se flag global desligada e profile não-legacy resolvido → `fallback_reason = 'dynamic_dashboards_disabled'` (mas `resolution_source` continua sendo a real, `fallback_used = true` apenas quando caímos no legacy).
-9. `should_use_dynamic_dashboard = true` SOMENTE se: `p_preview=false` AND `dynamic_dashboards_enabled=true` AND `is_dashboard_dynamic_enabled=true` AND profile encontrado AND `fallback_used=false` AND `layout->>'type' <> 'legacy'`.
-10. Inserir log em `crm_dashboard_resolution_logs` com snapshot de contexto, candidatos, flags e metadata `{created_by_sprint:'dashboard_resolver_sprint_4', preview:p_preview, caller_user_id:auth.uid()}`.
-11. Retornar jsonb no formato do briefing.
+- `Preview` (sempre em modo preview).
+- `Placeholder` (sempre — não há dados reais).
+- `Admin Center` (se `metadata.is_admin_center`).
+- `Owner Cockpit` (se `resolution.resolution_source === 'owner_override'`).
+- `Fallback` (se `resolution.fallback_used`).
 
-Bloco `EXCEPTION WHEN OTHERS` para garantir error_fallback + log.
+## Hook novo
 
-## 4. Frontend (preview only, Owner/Admin)
+`src/hooks/dashboard/useDynamicDashboardShell.ts`
 
-### Service
-`src/services/crm/dashboardProfiles.ts`
-- `getDashboardProfiles(tenantId)`
-- `resolveDashboardProfilePreview(tenantId, userId)` → chama RPC com `p_preview=true`
-- `getDashboardResolutionLogs(tenantId, { limit=50 })`
+- Recebe `profile` e opcionalmente `resolution`.
+- Normaliza: `layoutType`, `widgets[]`, `isLegacy`, `isPlaceholder`, `isAdminCenter`, `isUnsupported`, `badges[]`, `safeTitle`, `safeDescription`.
 
-### Hook
-`src/hooks/dashboard/useDashboardResolver.ts`
-- `useDashboardProfiles()`, `useResolveDashboardPreview()` (mutation), `useDashboardResolutionLogs()`
-- Stub não-usado: `useResolvedDashboardForCurrentUser()` (criado mas NÃO importado pelo dashboard real).
+## Service e hooks ampliados
 
-### Componentes
-`src/components/settings/dashboardResolver/`
-- `DashboardPreviewModal.tsx` — Dialog com seções: Usuário, Permissão/Área/Função, Flags (global + individual), Dashboard resolvido, Fonte, Fallback + motivo, Lista de candidatos avaliados, Widgets placeholder, Aviso "Uso real: Não, dashboard atual permanece ativo". Se `requires_review=true`, exibe Alert amarelo. Botão único: Fechar.
-- `DashboardResolutionBadge.tsx` — badge colorido por `resolution_source`.
-- `DashboardCandidateList.tsx` — lista das tentativas (ordem + match/miss).
-- `DashboardPlaceholderWidgets.tsx` — render dos widgets jsonb como cards "placeholder".
+`src/services/crm/dashboardProfiles.ts`:
+- Adicionar `getDashboardProfileByKey(tenantId, key)`.
+- Adicionar `getAdminCenterProfile(tenantId)` (busca `dashboard_admin_placeholder`).
+- Garantir filtro `tenant_id` + `is_active = true` em ambos.
 
-### Integração na aba existente
-`src/components/settings/userContext/UserContextTab.tsx`:
-- Adicionar coluna/ação "Preview Dashboard" por linha (ícone + tooltip), visível só para Owner/Admin (já é o caso da aba inteira).
-- Ao clicar, abrir `DashboardPreviewModal` com `tenant_id` + `user_id` da linha.
-- (Opcional, se não inflar) subaba "Logs de resolução" com tabela simples (Data, Usuário, Dashboard, Fonte, Fallback, Motivo, Preview), top 50. Se ficar pesado, omitir nesta sprint conforme o briefing autoriza.
+`src/hooks/dashboard/useDashboardResolver.ts`:
+- Adicionar `useDashboardProfileByKey(profileKey)`.
+- Adicionar `useAdminCenterProfile()`.
+- Tipos atualizados (já existe `owner_override` em `DashboardResolutionSource`).
 
-Nenhuma mudança em sidebar, rotas, login, dashboard real ou no componente `Dashboard.tsx`.
+## Modal de Preview enriquecido
 
-## 5. Validações pós-deploy
+Atualizar `src/components/settings/dashboardResolver/DashboardPreviewModal.tsx`:
+- Manter aviso fixo, dados do usuário, resolução, candidatos.
+- Substituir o bloco atual de widgets por `<DynamicDashboardShell mode="preview" profile={...} resolution={...} />`.
+- Sem botão de ativar.
 
-Rodar via `supabase--read_query`:
-1. `select tenant_id, count(*) from crm_dashboard_profiles group by 1` → 10 por tenant (7 tenants → 70 total).
-2. `select count(*) from crm_dashboard_resolution_logs` → 0.
-3. Flags: 3 chaves × 8 tenants, todas `false`.
-4. Sem duplicatas em (tenant_id, scope_type, scope_key).
-5. Após preview manual no UI, logs > 0 com `resolution_source` esperado e `fallback_used` correto.
+Criar componente novo `DashboardResolutionDetails.tsx` extraindo o bloco de "fonte/fallback/uso real" para reuso.
 
-## 6. Garantias de não-regressão
+## Admin Center
 
-- Não toca: `Dashboard.tsx`, `App.tsx`, sidebar, rotas, login, `organization_members`, `user_roles`, `profiles`, `crm_user_contexts`, `crm_feature_flags`.
-- Não habilita nenhuma flag.
-- RPC isolada, sem efeitos colaterais além do log.
-- Rollback documentado: drop da RPC + 2 tabelas, nada mais.
+Estrutura nova em `src/components/settings/adminCenter/`:
 
-## Arquivos a criar/editar
+```text
+AdminCenterCard.tsx       -> card de entrada (CTA "Abrir Admin Center")
+AdminCenterPage.tsx       -> página completa do Admin Center
+AdminCenterExplainer.tsx  -> card "Admin não é cargo. É permissão."
+```
 
-**Criar**
-- `supabase/migrations/<ts>_sprint4_dashboard_resolver.sql`
-- `src/services/crm/dashboardProfiles.ts`
-- `src/hooks/dashboard/useDashboardResolver.ts`
-- `src/components/settings/dashboardResolver/DashboardPreviewModal.tsx`
-- `src/components/settings/dashboardResolver/DashboardResolutionBadge.tsx`
-- `src/components/settings/dashboardResolver/DashboardCandidateList.tsx`
-- `src/components/settings/dashboardResolver/DashboardPlaceholderWidgets.tsx`
+### Onde aparece
 
-**Editar (mínimo)**
-- `src/components/settings/userContext/UserContextTab.tsx` — adicionar ação "Preview Dashboard" na linha.
+- **Aba nova** "Admin Center" em `Configurações > Equipes e Usuários`, ao lado de Usuários / Equipes / Contexto CRM.
+- Visível **apenas** para Owner/Admin (mesma checagem `isOrgAdmin` já usada na aba Contexto CRM).
+- **Não toca na sidebar global** nem cria rota nova.
+- Card de entrada `AdminCenterCard` opcional dentro da aba Contexto CRM apontando para a aba Admin Center (curto, contextual).
 
-## Riscos
+### Conteúdo da página
 
-- View `crm_user_context_view` precisa estar acessível dentro da RPC (já é definer + search_path public). ✅
-- Logs append-only podem crescer; índices cobrem consultas; sem retenção nesta sprint (aceitável).
-- Se `is_dashboard_dynamic_enabled` na view vier `null` para usuários não-revisados, tratar como `false` no resolver.
+1. `AdminCenterExplainer` — card com o texto exato:
+   > **Admin não é cargo. É permissão.**
+   > Usuários Admin podem gerenciar configurações do CRM, mas o dashboard principal continua seguindo a função operacional da pessoa. Ex.: alguém do Financeiro com permissão Admin continuará vendo o dashboard financeiro quando os dashboards dinâmicos forem ativados.
+2. `DynamicDashboardShell` em modo `admin_center`, alimentado por `useAdminCenterProfile()`.
+3. Fallbacks:
+   - Erro no fetch → "Não foi possível carregar o Admin Center. As configurações atuais continuam funcionando."
+   - Profile ausente → "Admin Center ainda não foi configurado para este tenant."
+   - Widgets vazios → "Nenhum widget placeholder configurado."
 
-## Definição de pronto
+### Permissão
 
-Owner/Admin abre Configurações → Equipes e Usuários → Contexto CRM → Preview Dashboard em qualquer linha; modal mostra profile resolvido, candidatos e fallback; logs registram cada chamada; `should_use_dynamic_dashboard` retorna sempre `false`; nenhuma flag ativada; dashboard real, sidebar, login e rotas inalterados.
+- Frontend: gate `isOrgAdmin`. Não-admins veem `Alert` "Você não tem permissão para visualizar esta área."
+- Backend: já protegido por RLS de `crm_dashboard_profiles` (apenas membros do tenant leem; admins/owners gerenciam).
+
+## Arquivos alterados/criados
+
+**Criados:**
+- `src/components/dashboard/dynamic/DynamicDashboardShell.tsx`
+- `src/components/dashboard/dynamic/DynamicDashboardHeader.tsx`
+- `src/components/dashboard/dynamic/DynamicDashboardGrid.tsx`
+- `src/components/dashboard/dynamic/DynamicWidgetRenderer.tsx`
+- `src/components/dashboard/dynamic/DynamicDashboardState.tsx`
+- `src/components/settings/adminCenter/AdminCenterCard.tsx`
+- `src/components/settings/adminCenter/AdminCenterPage.tsx`
+- `src/components/settings/adminCenter/AdminCenterExplainer.tsx`
+- `src/components/settings/dashboardResolver/DashboardResolutionDetails.tsx`
+- `src/hooks/dashboard/useDynamicDashboardShell.ts`
+
+**Editados:**
+- `src/services/crm/dashboardProfiles.ts` (+ 2 funções)
+- `src/hooks/dashboard/useDashboardResolver.ts` (+ 2 hooks)
+- `src/components/settings/dashboardResolver/DashboardPreviewModal.tsx` (usa o shell)
+- `src/pages/settings/TeamsAndUsers.tsx` (+ aba "Admin Center" gated)
+
+**Não tocados:**
+- `src/App.tsx` (sem rotas novas)
+- Sidebar global, layouts, login, dashboard real
+- Migrações / RLS / RPCs (sem mudança no banco)
+
+## Fora do escopo (explicitamente)
+
+- Nenhuma feature flag é ativada.
+- Nenhum dado real (receita, leads, pipeline, forecast, CAC, LTV, clientes) é buscado.
+- Nenhuma rota nova na sidebar.
+- Sem alteração em `crm_user_contexts`, `crm_feature_flags`, `organization_members`, `user_roles`.
+- Sem mudança no resolver ou nos profiles existentes.
+
+## Validação após implementação
+
+Frontend:
+1. Owner → Preview → shell renderiza Cockpit Owner com badge `Owner Cockpit` (via `owner_override`).
+2. Closer → Preview → shell renderiza "Dashboard Closer" com 3 widgets placeholder.
+3. `requires_review` → Preview → shell + alerta amarelo de revisão.
+4. Admin/Owner → aba "Admin Center" → renderiza shell com 3 widgets (Saúde do CRM / Integrações / Qualidade de dados) + explainer.
+5. Manager/User → não vê aba Admin Center nem botão Preview (gate `isOrgAdmin`).
+6. Dashboard real, sidebar, login e rotas → intactos.
+
+SQL pós-uso:
+- Profiles por org continuam 17.
+- Sem duplicatas em `(tenant, scope_type, scope_key)`.
+- Logs de preview ainda com `fallback_used = true`, `fallback_reason = 'dynamic_dashboards_disabled'`.
+- Flags continuam `false`.
+
+## Risco
+
+Baixo. Tudo é frontend isolado e gateado por `isOrgAdmin`. Modal de preview já existia; estamos enriquecendo, não substituindo. Nenhuma rota crítica do app é tocada.

@@ -40,6 +40,7 @@ export interface ResolvedDashboardProfile {
   scope_key: string;
   layout: Record<string, any>;
   widgets: Array<Record<string, any>>;
+  metadata?: Record<string, any>;
 }
 
 export interface DashboardCandidate {
@@ -100,6 +101,25 @@ export async function getDashboardProfiles(tenantId: string): Promise<DashboardP
     .order('scope_key', { ascending: true });
   if (error) throw error;
   return (data || []) as unknown as DashboardProfile[];
+}
+
+export async function getDashboardProfileByKey(
+  tenantId: string,
+  key: string,
+): Promise<DashboardProfile | null> {
+  const { data, error } = await supabase
+    .from('crm_dashboard_profiles' as any)
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .eq('is_active', true)
+    .eq('key', key)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as unknown as DashboardProfile) ?? null;
+}
+
+export async function getAdminCenterProfile(tenantId: string): Promise<DashboardProfile | null> {
+  return getDashboardProfileByKey(tenantId, 'dashboard_admin_placeholder');
 }
 
 export async function resolveDashboardProfilePreview(

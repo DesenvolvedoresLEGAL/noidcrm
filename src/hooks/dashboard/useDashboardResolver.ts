@@ -1,5 +1,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import {
+  getAdminCenterProfile,
+  getDashboardProfileByKey,
   getDashboardProfiles,
   getDashboardResolutionLogs,
   resolveDashboardProfilePreview,
@@ -10,6 +12,27 @@ export function useDashboardProfiles(tenantId: string | null | undefined) {
   return useQuery({
     queryKey: ['crm-dashboard-profiles', tenantId],
     queryFn: () => getDashboardProfiles(tenantId as string),
+    enabled: !!tenantId,
+    staleTime: 60_000,
+  });
+}
+
+export function useDashboardProfileByKey(
+  tenantId: string | null | undefined,
+  profileKey: string | null | undefined,
+) {
+  return useQuery({
+    queryKey: ['crm-dashboard-profile-by-key', tenantId, profileKey],
+    queryFn: () => getDashboardProfileByKey(tenantId as string, profileKey as string),
+    enabled: !!tenantId && !!profileKey,
+    staleTime: 60_000,
+  });
+}
+
+export function useAdminCenterProfile(tenantId: string | null | undefined) {
+  return useQuery({
+    queryKey: ['crm-admin-center-profile', tenantId],
+    queryFn: () => getAdminCenterProfile(tenantId as string),
     enabled: !!tenantId,
     staleTime: 60_000,
   });
