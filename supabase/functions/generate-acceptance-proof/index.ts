@@ -126,6 +126,7 @@ serve(async (req: Request) => {
         acceptor_ip: acceptorIp,
         acceptor_user_agent: acceptorUserAgent,
         acceptance_hash: acceptanceHash,
+        updated_at: acceptedAt.toISOString(),
       })
       .eq("id", proposalId);
 

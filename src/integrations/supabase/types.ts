@@ -73,6 +73,7 @@ export type Database = {
       }
       acceptance_effect_jobs: {
         Row: {
+          accepted_at: string | null
           attempt_count: number
           created_at: string
           id: string
@@ -86,6 +87,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          accepted_at?: string | null
           attempt_count?: number
           created_at?: string
           id?: string
@@ -99,6 +101,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          accepted_at?: string | null
           attempt_count?: number
           created_at?: string
           id?: string
@@ -129,42 +132,42 @@ export type Database = {
           {
             foreignKeyName: "acceptance_effect_jobs_proposal_id_fkey"
             columns: ["proposal_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "proposals"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "acceptance_effect_jobs_proposal_id_fkey"
             columns: ["proposal_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "v_opportunity_accepted_proposal_v2"
             referencedColumns: ["proposal_id"]
           },
           {
             foreignKeyName: "acceptance_effect_jobs_proposal_id_fkey"
             columns: ["proposal_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "v_opportunity_amounts_v2"
             referencedColumns: ["accepted_proposal_id"]
           },
           {
             foreignKeyName: "acceptance_effect_jobs_proposal_id_fkey"
             columns: ["proposal_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "v_opportunity_amounts_v2"
             referencedColumns: ["latest_proposal_id"]
           },
           {
             foreignKeyName: "acceptance_effect_jobs_proposal_id_fkey"
             columns: ["proposal_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "v_opportunity_latest_commercial_proposal_v2"
             referencedColumns: ["proposal_id"]
           },
           {
             foreignKeyName: "acceptance_effect_jobs_proposal_id_fkey"
             columns: ["proposal_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "v_proposals_normalized_v2"
             referencedColumns: ["id"]
           },
