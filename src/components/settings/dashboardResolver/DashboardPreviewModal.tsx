@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -7,6 +7,7 @@ import { useResolveDashboardPreview } from '@/hooks/dashboard/useDashboardResolv
 import { DashboardCandidateList } from './DashboardCandidateList';
 import { DashboardResolutionDetails } from './DashboardResolutionDetails';
 import { DynamicDashboardShell } from '@/components/dashboard/dynamic/DynamicDashboardShell';
+import { logCloserDashboardView } from '@/services/crm/closerDashboardAudit';
 import type { UserContextRow } from '@/services/crm/userContext';
 
 interface Props {
@@ -19,14 +20,35 @@ interface Props {
 export function DashboardPreviewModal({ open, onOpenChange, row, tenantId }: Props) {
   const mutation = useResolveDashboardPreview();
   const result = mutation.data;
+  const loggedRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (open && row?.user_id && tenantId) {
       mutation.reset();
+      loggedRef.current = null;
       mutation.mutate({ tenantId, userId: row.user_id });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, row?.user_id, tenantId]);
+
+  // Log preview view once per opened user
+  useEffect(() => {
+    if (!open || !result || !row?.user_id || !tenantId) return;
+    const isCloser = result.context?.business_function_key === 'closer';
+    if (!isCloser) return;
+    if (loggedRef.current === row.user_id) return;
+    loggedRef.current = row.user_id;
+    logCloserDashboardView({
+      tenantId,
+      targetUserId: row.user_id,
+      source: 'preview',
+      period: 'current_month',
+      metadata: {
+        resolution_source: result.resolution_source,
+        profile_key: result.resolved_profile?.key ?? null,
+      },
+    });
+  }, [open, result, row?.user_id, tenantId]);
 
   const requiresReview = !!row?.metadata?.requires_review;
 
