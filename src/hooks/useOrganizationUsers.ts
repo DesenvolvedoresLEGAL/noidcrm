@@ -51,9 +51,11 @@ export function useOrganizationUsers(extraUserIds: Array<string | null | undefin
           .select('user_id')
           .eq('organization_id', orgId.data);
 
-        if (orgProfilesError) throw orgProfilesError;
+        if (orgProfilesError) {
+          console.warn('Could not load organization profiles, falling back to active members:', orgProfilesError);
+        }
 
-        const profileIds = (orgProfiles || []).map((p) => p.user_id).filter(Boolean);
+        const profileIds = orgProfilesError ? [] : (orgProfiles || []).map((p) => p.user_id).filter(Boolean);
         const extras = extrasKey ? extrasKey.split(',') : [];
         const unionIds = Array.from(new Set([...memberIds, ...profileIds, ...extras]));
 
