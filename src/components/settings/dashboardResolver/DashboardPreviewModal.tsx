@@ -62,6 +62,24 @@ export function DashboardPreviewModal({ open, onOpenChange, row, tenantId }: Pro
           </Alert>
         )}
 
+        {isAdminPermission && (
+          <Alert>
+            <Info className="h-4 w-4" />
+            <AlertDescription>
+              Permissão <strong>Admin</strong> libera gestão do CRM (Admin Center), mas o dashboard principal segue a função/área do usuário.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {isOwnerOverride && (
+          <Alert>
+            <Info className="h-4 w-4" />
+            <AlertDescription>
+              Override de <strong>Owner</strong>: usuários com permissão Owner sempre resolvem para o cockpit executivo, mesmo com função ou área mapeadas.
+            </AlertDescription>
+          </Alert>
+        )}
+
         {mutation.isPending ? (
           <div className="flex items-center justify-center p-10">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
