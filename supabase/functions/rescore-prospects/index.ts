@@ -1,13 +1,6 @@
 // Re-pontua prospects existentes aplicando o learning_adjustment atual.
-// NÃO refaz scraping nem chamada de IA. Apenas:
-//   1. Lê signals já coletados (prospect_signals + enrichment_signals)
-//   2. Cruza com learning_signals atual (impacto + confiança)
-//   3. Recalcula priority_score = base + signal_score + learning_adjustment
-//   4. Atualiza prospect_scores e prospects.priority_score
-//
-// Modos:
-//   - { run_id }                → re-pontua todos prospects daquela run
-//   - { prospect_ids: [...] }   → re-pontua prospects específicos
+// Background pattern: responde 202 imediatamente e processa via EdgeRuntime.waitUntil.
+// Status acompanhado via system_events (rescore.started / rescore.completed / rescore.failed).
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
@@ -20,7 +13,6 @@ const corsHeaders = {
 interface Body {
   run_id?: string;
   prospect_ids?: string[];
-  organization_id?: string;
 }
 
 interface Score {
@@ -34,6 +26,9 @@ interface Score {
   penalty_score: number;
   reasoning: any;
 }
+
+// @ts-ignore - EdgeRuntime exists at runtime in Supabase edge functions
+declare const EdgeRuntime: { waitUntil: (p: Promise<unknown>) => void };
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -51,7 +46,7 @@ Deno.serve(async (req) => {
       return json({ error: "run_id ou prospect_ids obrigatório" }, 400);
     }
 
-    // 1. Resolve prospects alvo
+    // Resolve prospects alvo (rápido, dentro do request)
     let targets: { id: string; organization_id: string }[] = [];
     if (run_id) {
       const { data, error } = await supabase
@@ -69,11 +64,77 @@ Deno.serve(async (req) => {
       targets = data ?? [];
     }
 
-    if (targets.length === 0) return json({ rescored: 0, message: "Nenhum prospect encontrado" });
+    if (targets.length === 0) {
+      return json({ status: "noop", rescored: 0, total: 0, message: "Nenhum prospect encontrado" });
+    }
 
     const orgId = targets[0].organization_id;
+    const entityId = run_id ?? targets[0].id;
 
-    // 2. Carrega learning signals da org (cache em memória)
+    // Guard contra duplo-clique (last started < 60s atrás e ainda sem completed/failed depois)
+    const sixtySecondsAgo = new Date(Date.now() - 60_000).toISOString();
+    const { data: recentStarted } = await supabase
+      .from("system_events")
+      .select("id, created_at")
+      .eq("entity_id", entityId)
+      .eq("event_type", "rescore.started")
+      .gte("created_at", sixtySecondsAgo)
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    if (recentStarted && recentStarted.length > 0) {
+      const startedAt = recentStarted[0].created_at;
+      const { data: terminal } = await supabase
+        .from("system_events")
+        .select("id")
+        .eq("entity_id", entityId)
+        .in("event_type", ["rescore.completed", "rescore.failed"])
+        .gte("created_at", startedAt)
+        .limit(1);
+
+      if (!terminal || terminal.length === 0) {
+        return json(
+          { status: "in_progress", total: targets.length, message: "Re-pontuação já em andamento para esta execução." },
+          202,
+        );
+      }
+    }
+
+    // Marca início
+    await logEvent(supabase, orgId, "rescore.started", entityId, run_id, {
+      total: targets.length,
+      run_id,
+      prospect_ids: prospect_ids?.length ?? null,
+    });
+
+    // Background processing
+    EdgeRuntime.waitUntil(processRescore(supabase, targets, orgId, entityId, run_id));
+
+    return json(
+      {
+        status: "processing",
+        total: targets.length,
+        entity_id: entityId,
+        message: "Re-pontuação iniciada em background.",
+      },
+      202,
+    );
+  } catch (e: any) {
+    console.error("[rescore-prospects] enqueue error", e);
+    return json({ error: e.message }, 500);
+  }
+});
+
+async function processRescore(
+  supabase: any,
+  targets: { id: string; organization_id: string }[],
+  orgId: string,
+  entityId: string,
+  runId?: string,
+) {
+  const startedAt = Date.now();
+  try {
+    // Carrega learning signals da org (1 query)
     const { data: learn } = await supabase
       .from("learning_signals")
       .select("signal_type, signal_value, impact_score, confidence")
@@ -89,9 +150,9 @@ Deno.serve(async (req) => {
     let failed = 0;
     const adjustments: number[] = [];
 
-    // 3. Processa em lotes de 50
-    for (let i = 0; i < targets.length; i += 50) {
-      const batch = targets.slice(i, i + 50);
+    const BATCH_SIZE = 200;
+    for (let i = 0; i < targets.length; i += BATCH_SIZE) {
+      const batch = targets.slice(i, i + BATCH_SIZE);
       const batchIds = batch.map((b) => b.id);
 
       const [{ data: scores }, { data: pSignals }, { data: eSignals }] = await Promise.all([
@@ -114,6 +175,9 @@ Deno.serve(async (req) => {
         arr.push({ signal_type: (s as any).signal_type, signal_value: (s as any).signal_value });
         signalsByProspect.set((s as any).prospect_id, arr);
       }
+
+      const scoreUpdates: any[] = [];
+      
 
       for (const score of (scores ?? []) as Score[]) {
         try {
@@ -139,25 +203,21 @@ Deno.serve(async (req) => {
             learningAdjustment;
 
           const newGrade = newTotal >= 280 ? "A" : newTotal >= 230 ? "B" : newTotal >= 180 ? "C" : "D";
+          const finalScore = Math.max(0, newTotal);
 
-          await supabase
-            .from("prospect_scores")
-            .update({
-              priority_score: Math.max(0, newTotal),
-              grade: newGrade,
-              reasoning: {
-                ...(score.reasoning || {}),
-                learning_adjustment: learningAdjustment,
-                rescored_at: new Date().toISOString(),
-              },
-            })
-            .eq("id", score.id);
-
-          await supabase
-            .from("prospects")
-            .update({ priority_score: Math.max(0, newTotal) })
-            .eq("id", score.prospect_id);
-
+          // NOTE: prospect_scores.priority_score é coluna GERADA (sem learning_adjustment).
+          // Persistimos só grade + reasoning. O ajuste vive em reasoning.learning_adjustment
+          // e o consumidor (UI/queries) deve somar ao priority_score base se quiser o "score V3".
+          scoreUpdates.push({
+            id: score.id,
+            grade: newGrade,
+            reasoning: {
+              ...(score.reasoning || {}),
+              learning_adjustment: learningAdjustment,
+              effective_score: finalScore,
+              rescored_at: new Date().toISOString(),
+            },
+          });
           adjustments.push(learningAdjustment);
           rescored++;
         } catch (e) {
@@ -165,25 +225,70 @@ Deno.serve(async (req) => {
           failed++;
         }
       }
+
+      // Bulk update via PATCH em paralelo limitado (upsert não funciona para colunas geradas)
+      const CONCURRENCY = 10;
+      for (let j = 0; j < scoreUpdates.length; j += CONCURRENCY) {
+        const slice = scoreUpdates.slice(j, j + CONCURRENCY);
+        await Promise.all(
+          slice.map((u) =>
+            supabase
+              .from("prospect_scores")
+              .update({ grade: u.grade, reasoning: u.reasoning })
+              .eq("id", u.id)
+              .then((r: any) => {
+                if (r.error) console.error("[rescore] update score error", u.id, r.error.message);
+              }),
+          ),
+        );
+      }
     }
 
-    return json({
+    const durationMs = Date.now() - startedAt;
+    await logEvent(supabase, orgId, "rescore.completed", entityId, runId, {
       rescored,
       unchanged,
       failed,
       total: targets.length,
-      avg_adjustment: adjustments.length > 0 ? adjustments.reduce((a, b) => a + b, 0) / adjustments.length : 0,
+      avg_adjustment:
+        adjustments.length > 0 ? adjustments.reduce((a, b) => a + b, 0) / adjustments.length : 0,
       learning_signals_active: learnMap.size,
-      message:
-        learnMap.size === 0
-          ? "Nenhum learning signal com confiança >= 0.2 ainda. Re-pontuação não alterou scores."
-          : `Re-pontuados ${rescored} de ${targets.length} prospects.`,
+      duration_ms: durationMs,
     });
+
+    console.log(
+      `[rescore-prospects] done entity=${entityId} rescored=${rescored}/${targets.length} duration=${durationMs}ms`,
+    );
   } catch (e: any) {
-    console.error("[rescore-prospects]", e);
-    return json({ error: e.message }, 500);
+    console.error("[rescore-prospects] background error", e);
+    await logEvent(supabase, orgId, "rescore.failed", entityId, runId, {
+      error: e.message,
+      total: targets.length,
+    });
   }
-});
+}
+
+async function logEvent(
+  supabase: any,
+  orgId: string,
+  eventType: string,
+  entityId: string,
+  runId: string | undefined,
+  payload: Record<string, unknown>,
+) {
+  const { error } = await supabase.from("system_events").insert({
+    organization_id: orgId,
+    trace_id: crypto.randomUUID(),
+    actor_type: "system",
+    event_type: eventType,
+    event_category: "ai",
+    action: eventType.split(".")[1] ?? eventType,
+    entity_type: runId ? "playbook_run" : "prospect_batch",
+    entity_id: entityId,
+    payload,
+  });
+  if (error) console.error("[rescore] system_events insert error", error.message);
+}
 
 function json(data: any, status = 200) {
   return new Response(JSON.stringify(data), {

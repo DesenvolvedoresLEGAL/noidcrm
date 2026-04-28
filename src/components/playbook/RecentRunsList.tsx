@@ -56,23 +56,75 @@ export function RecentRunsList({ runs, selectedRunId, onSelect }: RecentRunsList
         body: { run_id: runId },
       });
       if (error) throw error;
-      return data;
+      return { runId, ...(data || {}) };
     },
     onSuccess: (data) => {
       const total = data?.total ?? 0;
-      const rescored = data?.rescored ?? 0;
-      const learning = data?.learning_signals_active ?? 0;
-      if (learning === 0) {
-        toast.info('Re-pontuação concluída', {
-          description: 'Nenhum learning signal ativo (confiança ≥ 0.2). Scores não mudaram. Continue rodando o sistema para acumular aprendizado.',
-        });
-      } else {
-        toast.success('Re-pontuação concluída', {
-          description: `${rescored} de ${total} prospects atualizados com base em ${learning} sinais aprendidos.`,
-        });
+      const runId = data?.runId as string;
+
+      if (data?.status === 'noop' || total === 0) {
+        toast.info('Nada para re-pontuar', { description: 'Nenhum prospect encontrado nesta execução.' });
+        return;
       }
-      queryClient.invalidateQueries({ queryKey: ['lead-sourcing-prospects'] });
-      queryClient.invalidateQueries({ queryKey: ['playbook-runs'] });
+
+      if (data?.status === 'in_progress') {
+        toast.info('Re-pontuação já em andamento', {
+          description: 'Aguarde a conclusão antes de disparar novamente.',
+        });
+        return;
+      }
+
+      toast.info('Re-pontuação iniciada', {
+        description: `Processando ${total} prospects em background. Você será notificado ao concluir.`,
+      });
+
+      // Polling leve em system_events (até 3 min)
+      const startedAt = Date.now();
+      const MAX_MS = 3 * 60 * 1000;
+      const pollId = window.setInterval(async () => {
+        if (Date.now() - startedAt > MAX_MS) {
+          window.clearInterval(pollId);
+          toast.warning('Re-pontuação ainda processando', {
+            description: 'A operação continua em background. Atualize a página em alguns instantes.',
+          });
+          return;
+        }
+
+        const { data: events } = await supabase
+          .from('system_events')
+          .select('event_type, payload, created_at')
+          .eq('entity_id', runId)
+          .in('event_type', ['rescore.completed', 'rescore.failed'])
+          .gte('created_at', new Date(startedAt - 5000).toISOString())
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (!events || events.length === 0) return;
+        const evt = events[0];
+        window.clearInterval(pollId);
+
+        if (evt.event_type === 'rescore.failed') {
+          const err = (evt.payload as any)?.error || 'Erro desconhecido';
+          toast.error('Falha ao re-pontuar', { description: err });
+          return;
+        }
+
+        const p = (evt.payload as any) || {};
+        const learning = p.learning_signals_active ?? 0;
+        const rescored = p.rescored ?? 0;
+        const totalDone = p.total ?? total;
+        if (learning === 0) {
+          toast.info('Re-pontuação concluída', {
+            description: 'Nenhum learning signal ativo (confiança ≥ 0.2). Scores não mudaram.',
+          });
+        } else {
+          toast.success('Re-pontuação concluída', {
+            description: `${rescored} de ${totalDone} prospects atualizados com base em ${learning} sinais aprendidos.`,
+          });
+        }
+        queryClient.invalidateQueries({ queryKey: ['lead-sourcing-prospects'] });
+        queryClient.invalidateQueries({ queryKey: ['playbook-runs'] });
+      }, 5000);
     },
     onError: (e: any) => toast.error('Falha ao re-pontuar', { description: e.message }),
   });
