@@ -46,8 +46,16 @@ export function useOrganizationUsers(extraUserIds: Array<string | null | undefin
         if (membersError) throw membersError;
 
         const memberIds = (activeMembers || []).map((m) => m.user_id);
+        const { data: orgProfiles, error: orgProfilesError } = await supabase
+          .from('profiles')
+          .select('user_id')
+          .eq('organization_id', orgId.data);
+
+        if (orgProfilesError) throw orgProfilesError;
+
+        const profileIds = (orgProfiles || []).map((p) => p.user_id).filter(Boolean);
         const extras = extrasKey ? extrasKey.split(',') : [];
-        const unionIds = Array.from(new Set([...memberIds, ...extras]));
+        const unionIds = Array.from(new Set([...memberIds, ...profileIds, ...extras]));
 
         if (unionIds.length === 0) {
           setUsers([]);
@@ -65,7 +73,7 @@ export function useOrganizationUsers(extraUserIds: Array<string | null | undefin
         if (profilesError) throw profilesError;
 
         // Mark non-active extras with "(Inativo)" suffix for clarity
-        const memberSet = new Set(memberIds);
+        const memberSet = new Set([...memberIds, ...profileIds]);
         setUsers(
           (profiles || []).map((p) => {
             const isInactive = !memberSet.has(p.user_id);
