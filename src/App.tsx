@@ -45,6 +45,7 @@ import ScheduleDemo from "./pages/ScheduleDemo";
 
 // Protected routes - lazy loaded
 const Dashboard = lazy(() => import("./pages/Dashboard"));
+const DynamicDashboardPage = lazy(() => import("./pages/DynamicDashboardPage"));
 const Leads = lazy(() => import("./pages/Leads"));
 const Opportunities = lazy(() => import("./pages/Opportunities"));
 const Activities = lazy(() => import("./pages/Activities"));
@@ -353,6 +354,16 @@ const App = () => (
                   <ProtectedRoute>
                     <LazyRoute>
                       <Dashboard />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/dynamic-dashboard"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <DynamicDashboardPage />
                     </LazyRoute>
                   </ProtectedRoute>
                 }
