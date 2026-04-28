@@ -1,106 +1,87 @@
-# Fix: Re-aceitação de proposta não notifica/celebra/Slack e workflow ignora duplicata soft-deleted
+# Fix: Timeout 504 em "Repontuar com aprendizado" (Kairós)
 
-## Contexto
+## Diagnóstico
 
-A proposta `ab76157a` (PONTOBR) foi reaceita hoje 28/04 16:40 por Milena. Status já era `accepted` desde 16/04, então o trigger `enqueue_acceptance_effect_job` não criou job novo (guard só dispara em transição `* -> accepted`). Em paralelo, o workflow de aceitação tentou duplicar a opp para o funil OPERACIONAL mas pulou porque encontrou a duplicata antiga `467bbae1` — sem notar que ela está soft-deleted desde 28/04 09:37.
+A edge function `rescore-prospects` está dando **504 (timeout em 150s)** ao re-pontuar runs do Kairós.
 
-Resultado: nenhuma notificação in-app, nenhuma celebração, nenhum aviso Slack, nenhuma opp operacional ativa.
+**Causa raiz:**
+- Para cada prospect, faz 2 `UPDATE` sequenciais (`prospect_scores` + `prospects`).
+- Run ABRINT 2026 tem 244 prospects → ~488 round-trips serializados ao Postgres.
+- Run FEIMEC tem 793 prospects → ~1586 round-trips, impossível dentro de 150s.
+- Logs confirmam: uma execução sucedeu em 137s, próximas estouraram 150s (504).
 
-## Mudanças
+Não é bug de lógica nem de schema — é arquitetura síncrona inadequada para o volume.
 
-### 1. Trigger `enqueue_acceptance_effect_job` — permitir re-aceitação real
+## Correção
 
-Mudar a condição para também disparar quando `accepted_at` muda mesmo com `status` já em `accepted`. Isso captura o caso real onde o cliente reabre o link e reconfirma após uma soft-delete da duplicata operacional ou após uma reativação manual.
+### 1. Edge function `rescore-prospects` — execução em background
 
-A unique constraint em `acceptance_effect_jobs(proposal_id)` precisa relaxar para permitir um novo job por re-aceitação. Opções:
-- Trocar para constraint composta `(proposal_id, accepted_at)` e incluir `accepted_at` como coluna do job
-- Ou remover unique e adicionar índice para idempotência via `accepted_at` no próprio INSERT
+Seguindo o padrão já adotado no projeto (`background-execution-pattern-long-running-tasks`):
 
-Vou usar a opção composta, mais auditável.
+- Responder **202 Accepted imediatamente** com `{ run_id, total, status: 'processing' }`.
+- Usar `EdgeRuntime.waitUntil(...)` para o processamento real continuar após o response.
+- Eliminar updates 1-a-1: substituir por **`upsert` em batch único por lote** em `prospect_scores` (já tem `id`), e atualizar `prospects.priority_score` via **RPC SQL** que faz `UPDATE ... FROM (VALUES ...)` em massa.
+- Aumentar lote para 200 e paralelizar leitura/escrita por lote.
+
+### 2. Tabela de status (opcional, mas recomendado)
+
+Reaproveitar `system_events` para registrar:
+- `rescore.started` (com run_id, total)
+- `rescore.completed` (com rescored, unchanged, failed, learning_signals_active, avg_adjustment)
+- `rescore.failed` (com erro)
+
+Não criar tabela nova — UI lê o último evento via realtime ou polling leve.
+
+### 3. Frontend `RecentRunsList.tsx`
+
+- Toast imediato: "Re-pontuação iniciada em background. Notificaremos quando concluir."
+- Polling leve (a cada 5s, máx 3 min) em `system_events` filtrando por `event_type='rescore.completed'` e `entity_id=run.id`, OU subscription realtime.
+- Ao receber conclusão: toast final com `rescored / total / avg_adjustment` e invalidar queries de prospects da run.
+- Botão fica em estado `loading` enquanto polling não vê conclusão (com timeout de fallback de 3 min).
+
+### 4. RPC auxiliar (migration)
 
 ```sql
--- Adicionar coluna accepted_at em acceptance_effect_jobs
-ALTER TABLE public.acceptance_effect_jobs
-  ADD COLUMN IF NOT EXISTS accepted_at timestamptz;
-
--- Backfill com proposals.accepted_at via subquery
-UPDATE public.acceptance_effect_jobs j
-   SET accepted_at = p.accepted_at
-  FROM public.proposals p
- WHERE p.id = j.proposal_id AND j.accepted_at IS NULL;
-
--- Trocar unique
-ALTER TABLE public.acceptance_effect_jobs
-  DROP CONSTRAINT IF EXISTS acceptance_effect_jobs_proposal_id_key;
-CREATE UNIQUE INDEX IF NOT EXISTS acceptance_effect_jobs_proposal_acceptance_uq
-  ON public.acceptance_effect_jobs (proposal_id, accepted_at);
-
--- Atualizar trigger
-CREATE OR REPLACE FUNCTION public.enqueue_acceptance_effect_job()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path TO 'public'
-AS $$
-BEGIN
-  IF NEW.status = 'accepted'
-     AND NEW.accepted_at IS NOT NULL
-     AND (
-       OLD.status IS DISTINCT FROM 'accepted'
-       OR OLD.accepted_at IS DISTINCT FROM NEW.accepted_at
-     )
-  THEN
-    INSERT INTO public.acceptance_effect_jobs (proposal_id, organization_id, opportunity_id, accepted_at)
-    VALUES (NEW.id, NEW.organization_id, NEW.opportunity_id, NEW.accepted_at)
-    ON CONFLICT (proposal_id, accepted_at) DO NOTHING;
-  END IF;
-  RETURN NEW;
-END;
-$$;
+create or replace function public.bulk_update_prospect_priority(
+  p_updates jsonb -- [{"id": "uuid", "score": 245}, ...]
+) returns int
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare v_count int;
+begin
+  with payload as (
+    select (x->>'id')::uuid as id, (x->>'score')::numeric as score
+    from jsonb_array_elements(p_updates) x
+  )
+  update prospects p set priority_score = payload.score
+  from payload where p.id = payload.id;
+  get diagnostics v_count = row_count;
+  return v_count;
+end $$;
 ```
 
-### 2. Workflow automation — anti-duplicação respeita soft-delete
-
-Encontrar a função/edge que executa a action `duplicate` do workflow (executor de `automation rules`). Onde hoje verifica "existe opp filha em pipeline X com `source_opportunity_id = origem`", incluir filtro `AND deleted_at IS NULL`. Sem isso uma duplicata jogada na lixeira bloqueia a recriação.
-
-Localização provável: `supabase/functions/process-pending-workflows/` ou `supabase/functions/_shared/workflow-actions/duplicate.ts`. Vou inspecionar e ajustar.
-
-### 3. Higiene: edge de aceite pública precisa atualizar `updated_at`
-
-No edge function de public proposal acceptance, garantir que o UPDATE inclua `updated_at = now()`. Hoje só toca `accepted_at`/`status`/dados do aceitante, deixando `updated_at` congelado e atrapalhando ordenação e cache invalidation.
-
-### 4. Reprocessar o caso PONTOBR (one-shot)
-
-Após aplicar 1 e 2:
-- Inserir manualmente um job em `acceptance_effect_jobs` para `proposal_id = ab76157a` com `accepted_at = 2026-04-28 19:40:30+00` para que o worker padrão processe notificações, celebração e Slack.
-- Restaurar opp `467bbae1` (set `deleted_at = NULL`) OU rodar o workflow manualmente para gerar nova duplicata operacional. Pergunta para o usuário antes de decidir (ver abaixo).
-
-### 5. Observabilidade
-
-Adicionar log em `system_events` quando `enqueue_acceptance_effect_job` dispara via re-aceitação (vs primeira aceitação) para distinguir os dois caminhos no audit.
+Permite atualizar centenas de prospects em **um único round-trip**.
 
 ## Arquivos impactados
 
-- `supabase/migrations/<novo>.sql` — itens 1 (schema + trigger).
-- `supabase/functions/_shared/workflow-actions/*` ou `process-pending-workflows/index.ts` — item 2.
-- `supabase/functions/<accept-proposal-public>/index.ts` (nome real a confirmar) — item 3.
-- Migration extra one-shot ou script de exec — item 4.
+- `supabase/functions/rescore-prospects/index.ts` — refatorar para background + bulk
+- `src/components/playbook/RecentRunsList.tsx` — UX assíncrona + polling/realtime
+- `supabase/migrations/<timestamp>_rescore_bulk.sql` — RPC `bulk_update_prospect_priority` + index `system_events(entity_id, event_type, created_at desc)` se faltar
+
+## Resultados esperados
+
+- Run de 244 prospects: response em <1s, processamento em ~5-10s.
+- Run de 793 prospects: response em <1s, processamento em ~15-30s.
+- Sem mais 504. UX clara de progresso.
 
 ## Riscos
 
-- **Reprocessar a PONTOBR**: pode disparar celebração para um deal que o time já considera fechado mentalmente. Aceitável, é o comportamento correto.
-- **Re-aceitações repetidas**: agora cada novo `accepted_at` gera novo job. Se um cliente abre o link 5x e reconfirma, vamos celebrar 5x. Mitigação: o edge function público só atualiza `accepted_at` quando o usuário clica em "Aceitar" explicitamente (não em cada view), o que é o caso atual. Posso adicionar dedupe extra no worker de notificação ("não notificar mesma proposta accepted 2x em janela de 5 min") se você quiser camada extra.
-- **Workflow duplicate ignorando soft-delete**: o comportamento novo passa a recriar a opp operacional mesmo quando havia uma na lixeira. Isso é o comportamento desejado, mas vale checar se algum tenant usa soft-delete intencional para evitar recriação.
+- **Race condition** se usuário clicar 2x: mitigar com guard em `system_events` (se há `rescore.started` para esse run nos últimos 2 min, retornar 409).
+- **EdgeRuntime.waitUntil** já é usado em outras funções do projeto, padrão estabelecido.
+- Migration adiciona apenas RPC nova (não-destrutiva).
 
-## Validação
+## Recuperação imediata (sem aguardar deploy)
 
-1. Após migration, confirmar via SELECT que trigger novo está ativo e índice composto existe.
-2. Reprocessar PONTOBR e validar: notificação in-app aparece, modal de celebração dispara para Wagner, mensagem no Slack do tenant, opp operacional recriada (ou opp `467bbae1` reativada conforme decisão).
-3. Teste manual: duplicar uma proposta accepted, voltar para draft, reenviar, reaceitar — deve gerar novo job.
-4. Build verde.
-
-## Pergunta antes de implementar
-
-Para o item 4, qual comportamento você prefere para a opp operacional `467bbae1` que está na lixeira?
-- (a) Restaurar a existente (`deleted_at = NULL`) — preserva histórico interno se houver
-- (b) Criar uma nova duplicata via workflow — começa do zero, opp antiga fica perdida na lixeira
+Posso disparar manualmente o re-processamento da run ABRINT 2026 chamando a função em lotes menores via SQL direto, mas o ideal é aplicar o fix definitivo.

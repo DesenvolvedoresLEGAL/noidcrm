@@ -28870,6 +28870,10 @@ export type Database = {
         Args: { p_build_type?: string; p_organization_id: string }
         Returns: string
       }
+      bulk_update_prospect_priority: {
+        Args: { p_updates: Json }
+        Returns: number
+      }
       calculate_edge_weight: { Args: { p_edge_id: string }; Returns: number }
       calculate_fraud_score: {
         Args: {
