@@ -20,6 +20,8 @@ const stageSchema = z.object({
   allow_lose_opportunity: z.boolean().optional(),
 });
 
+export type LeadDistributionStrategy = 'none' | 'round_robin' | 'load_balanced' | 'random' | 'territory';
+
 interface DBPipeline {
   id: string;
   name: string;
@@ -28,6 +30,9 @@ interface DBPipeline {
   is_primary: boolean | null;
   color: string | null;
   business_unit_ids: string[] | null;
+  lead_distribution_strategy: string | null;
+  lead_distribution_role: string | null;
+  lead_distribution_user_ids: string[] | null;
   created_at: string;
 }
 
