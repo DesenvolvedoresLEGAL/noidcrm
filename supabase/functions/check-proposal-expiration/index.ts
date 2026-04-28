@@ -35,22 +35,21 @@ Deno.serve(async (req) => {
     const todayEnd = new Date(now);
     todayEnd.setHours(23, 59, 59, 999);
 
-    // Fetch proposals that have expires_at set, are still open (sent/viewed), not deleted
-    // and whose parent opportunity is still active (not won/lost/deleted)
-    const { data: proposals, error } = await supabase
+    // Fetch proposals expiring within 48h that are still open (sent/viewed)
+    // and whose parent opportunity is still active (open, not deleted, sales pipeline)
+    // NOTE: PostgREST embed filters do NOT filter the parent row — we must filter in JS.
+    const { data: proposalsRaw, error } = await supabase
       .from("proposals")
       .select(
         `id, proposal_number, title, client_name, accepted_at, declined_at, expires_at, opportunity_id, organization_id, total_amount,
-         opportunity:opportunities!inner(id, status, deleted_at)`
+         opportunity:opportunities!inner(id, status, deleted_at, pipeline_id, pipelines:pipelines(pipeline_type))`
       )
       .not("expires_at", "is", null)
       .in("status", ["sent", "viewed"])
       .is("accepted_at", null)
       .is("declined_at", null)
       .is("deleted_at", null)
-      .eq("opportunity.status", "open")
-      .is("opportunity.deleted_at", null)
-      .lte("expires_at", in48h.toISOString()) as { data: ProposalRow[] | null; error: any };
+      .lte("expires_at", in48h.toISOString()) as { data: any[] | null; error: any };
 
     if (error) {
       console.error("Error fetching proposals:", error);
@@ -59,6 +58,17 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // Hard filter in JS: only opportunities that are open, not deleted, and from a 'sales' pipeline
+    const proposals = (proposalsRaw || []).filter((p: any) => {
+      const opp = p.opportunity;
+      if (!opp) return false;
+      if (opp.deleted_at) return false;
+      if (opp.status !== "open" && opp.status !== "new" && opp.status !== "in_progress") return false;
+      const pipelineType = opp.pipelines?.pipeline_type;
+      if (pipelineType !== "sales") return false;
+      return true;
+    }) as ProposalRow[];
 
     if (!proposals || proposals.length === 0) {
       return new Response(
