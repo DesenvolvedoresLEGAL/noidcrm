@@ -181,15 +181,9 @@ export default function Accounts() {
   // Server-side: todos os account_ids vinculados à tag selecionada (paginado, sem limite de 1000)
   const { data: tagAccountIdsSet } = useAccountIdsByTag(tagFilter !== 'all' ? tagFilter : undefined);
 
-  // Filtrar contas localmente
+  // Filtrar contas localmente apenas para filtros que ainda não são server-side
   const filteredAccounts = useMemo(() => {
     return accounts.filter(account => {
-      if (segmentoFilter !== 'all' && account.segmento !== segmentoFilter) return false;
-      if (porteFilter !== 'all') {
-        const norm = normalizePorte(account.porte);
-        if (norm !== porteFilter) return false;
-      }
-      if (origemFilter !== 'all' && account.origem_principal !== origemFilter) return false;
       if (scoreFinanceiroFilter !== 'all') {
         const score = (account as Account & { score_financeiro?: number | null }).score_financeiro;
         if (scoreFinanceiroFilter === 'none') {
@@ -202,37 +196,34 @@ export default function Accounts() {
         else if (scoreFinanceiroFilter === 'bad' && (score < 0 || score >= 40)) return false;
       }
       if (tagFilter !== 'all') {
-        // Usa o Set paginado server-side em vez de tagsByAccount (que é truncado em 1000 rows)
         if (!tagAccountIdsSet || !tagAccountIdsSet.has(account.id)) return false;
       }
       return true;
     });
-  }, [accounts, segmentoFilter, porteFilter, origemFilter, scoreFinanceiroFilter, tagFilter, tagAccountIdsSet]);
+  }, [accounts, scoreFinanceiroFilter, tagFilter, tagAccountIdsSet]);
 
   // Extrair valores únicos para filtros
-  const uniqueSegmentos = useMemo(() => 
+  const uniqueSegmentos = useMemo(() =>
     [...new Set(accounts.map(a => a.segmento).filter(Boolean))],
     [accounts]
   );
-  
-  const uniqueOrigens = useMemo(() => 
+
+  const uniqueOrigens = useMemo(() =>
     [...new Set(accounts.map(a => a.origem_principal).filter(Boolean))],
     [accounts]
   );
 
-  // Estatísticas por porte canônico (MEI, ME, EPP, Médio Porte, Grande Porte)
+  // Estatísticas por porte canônico — agregadas via RPC (org-wide, não pagina)
   const stats = useMemo(() => {
-    const byPorte = (target: CanonicalPorte) =>
-      filteredAccounts.filter(a => normalizePorte(a.porte) === target).length;
     return {
-      total: accountsData?.total || filteredAccounts.length,
-      mei: byPorte('MEI'),
-      me: byPorte('ME'),
-      epp: byPorte('EPP'),
-      medio: byPorte('Médio Porte'),
-      grande: byPorte('Grande Porte'),
+      total: porteSummary?.total ?? accountsData?.total ?? 0,
+      mei: porteSummary?.mei ?? 0,
+      me: porteSummary?.me ?? 0,
+      epp: porteSummary?.epp ?? 0,
+      medio: porteSummary?.medio ?? 0,
+      grande: porteSummary?.grande ?? 0,
     };
-  }, [accountsData, filteredAccounts]);
+  }, [porteSummary, accountsData]);
 
   // Export para CSV
   const handleExportCSV = () => {
