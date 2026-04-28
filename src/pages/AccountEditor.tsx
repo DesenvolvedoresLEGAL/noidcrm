@@ -156,7 +156,7 @@ export default function AccountEditor() {
   });
   const origins = (originsData || []).filter((o: OriginWithGroup) => o.is_active);
 
-  const { register, handleSubmit, control, formState: { errors, isSubmitting }, setValue, watch, reset } = useForm<AccountFormData>({
+  const { register, handleSubmit, control, formState: { errors, isSubmitting }, setValue, watch, reset, getValues } = useForm<AccountFormData>({
     resolver: zodResolver(accountSchema),
     mode: 'onSubmit',
   });
@@ -223,6 +223,21 @@ export default function AccountEditor() {
       });
     }
   }, [account, reset]);
+
+  useEffect(() => {
+    if (!account) return;
+    const current = getValues();
+    if (!current.owner_user_id && account.owner_user_id) {
+      setValue('owner_user_id', account.owner_user_id, { shouldDirty: false });
+    }
+    if (!current.cs_user_id && account.cs_user_id) {
+      setValue('cs_user_id', account.cs_user_id, { shouldDirty: false });
+    }
+    const savedPreSalesId = (account as any).pre_sales_user_id;
+    if (!current.pre_sales_user_id && savedPreSalesId) {
+      setValue('pre_sales_user_id', savedPreSalesId, { shouldDirty: false });
+    }
+  }, [account, getValues, setValue]);
 
   // Handle CNPJ lookup
   const handleCNPJLookup = async () => {
@@ -413,9 +428,15 @@ export default function AccountEditor() {
     console.log('🔵 AccountEditor.onSubmit - dados recebidos:', data);
     setIsSaving(true);
     try {
+      const protectedResponsibles = {
+        owner_user_id: data.owner_user_id || account.owner_user_id || null,
+        cs_user_id: data.cs_user_id || account.cs_user_id || null,
+        pre_sales_user_id: data.pre_sales_user_id || (account as any).pre_sales_user_id || null,
+      };
+
       // Pré-processar: converter strings vazias em null
       const processedData = Object.fromEntries(
-        Object.entries(data).map(([key, value]) => [
+        Object.entries({ ...data, ...protectedResponsibles }).map(([key, value]) => [
           key,
           value === '' ? null : value
         ])
