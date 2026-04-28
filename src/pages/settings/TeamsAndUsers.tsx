@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { Layout } from '@/components/Layout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Users as UsersIcon, Users2, ShieldCheck } from 'lucide-react';
+import { Users as UsersIcon, Users2, ShieldCheck, LayoutDashboard } from 'lucide-react';
 
 import UsersContent from '@/components/settings/UsersContent';
 import TeamsContent from '@/components/settings/TeamsContent';
 import UserContextTab from '@/components/settings/userContext/UserContextTab';
+import { AdminCenterPage } from '@/components/settings/adminCenter/AdminCenterPage';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 
 export default function TeamsAndUsers() {
@@ -36,6 +37,12 @@ export default function TeamsAndUsers() {
                 Contexto CRM
               </TabsTrigger>
             )}
+            {isOrgAdmin && (
+              <TabsTrigger value="admin-center" className="gap-2">
+                <LayoutDashboard className="h-4 w-4" />
+                Admin Center
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="users" className="mt-6">
@@ -49,6 +56,12 @@ export default function TeamsAndUsers() {
           {isOrgAdmin && (
             <TabsContent value="context" className="mt-6">
               <UserContextTab />
+            </TabsContent>
+          )}
+
+          {isOrgAdmin && (
+            <TabsContent value="admin-center" className="mt-6">
+              <AdminCenterPage />
             </TabsContent>
           )}
         </Tabs>
