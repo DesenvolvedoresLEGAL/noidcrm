@@ -4,6 +4,7 @@ import { useCloserDashboardData } from '@/hooks/dashboard/useCloserDashboardData
 import { CloserPeriodFilter } from './CloserPeriodFilter';
 import { CloserKpiGrid } from './CloserKpiGrid';
 import { CentralDoDiaSection } from './CentralDoDiaSection';
+import { CloserPaceSection } from './CloserPaceSection';
 import { CloserRiskDealsList } from './CloserRiskDealsList';
 import { CloserSectionList } from './CloserSectionList';
 import { CloserTopActions } from './CloserTopActions';
@@ -77,6 +78,8 @@ export function CloserDashboard({ tenantId, targetUserId }: Props) {
       )}
 
       <CentralDoDiaSection central={data.central_do_dia} />
+
+      <CloserPaceSection pace={data.pace} />
 
       <CloserTopActions actions={lists.top_actions_today ?? []} />
 
