@@ -40,6 +40,7 @@ export interface ResolvedDashboardProfile {
   scope_key: string;
   layout: Record<string, any>;
   widgets: Array<Record<string, any>>;
+  metadata?: Record<string, any>;
 }
 
 export interface DashboardCandidate {
