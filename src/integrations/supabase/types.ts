@@ -7712,6 +7712,33 @@ export type Database = {
           },
         ]
       }
+      crm_closer_dashboard_views: {
+        Row: {
+          created_at: string
+          id: string
+          source: string
+          target_user_id: string
+          tenant_id: string
+          viewer_user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          source?: string
+          target_user_id: string
+          tenant_id: string
+          viewer_user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          source?: string
+          target_user_id?: string
+          tenant_id?: string
+          viewer_user_id?: string
+        }
+        Relationships: []
+      }
       crm_dashboard_profiles: {
         Row: {
           created_at: string
