@@ -371,13 +371,13 @@ export function EditPipelineModal({ open, onClose, onSave, pipeline }: EditPipel
                     <Label className="text-xs">Usuários elegíveis</Label>
                     {loadingUsers ? (
                       <p className="text-sm text-muted-foreground">Carregando usuários...</p>
-                    ) : orgUsers.length === 0 ? (
+                    ) : activeOrgUsers.length === 0 ? (
                       <p className="text-sm text-muted-foreground">
                         Nenhum usuário ativo na organização.
                       </p>
                     ) : (
                       <div className="space-y-1.5 max-h-40 overflow-y-auto rounded-md border border-border p-2">
-                        {orgUsers.map((u) => (
+                        {activeOrgUsers.map((u) => (
                           <div key={u.id} className="flex items-center space-x-2">
                             <Checkbox
                               id={`dist-user-${u.id}`}
