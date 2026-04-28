@@ -122,6 +122,34 @@ export default function AccountEditor() {
     (account as any)?.pre_sales_user_id,
   ]);
 
+  const responsibleIds = [account?.owner_user_id, account?.cs_user_id, (account as any)?.pre_sales_user_id]
+    .filter((value): value is string => Boolean(value));
+
+  const { data: savedResponsibleUsers = [] } = useQuery({
+    queryKey: ['account-saved-responsibles', id, responsibleIds.join(',')],
+    queryFn: async () => {
+      if (responsibleIds.length === 0) return [];
+      const { supabase } = await import('@/integrations/supabase/client');
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('user_id, full_name, email, avatar_url')
+        .in('user_id', responsibleIds);
+      if (error) throw error;
+      return (data || []).map((profile) => ({
+        id: profile.user_id,
+        name: profile.full_name || profile.email || 'Usuário sem nome',
+        email: profile.email || undefined,
+        avatar_url: profile.avatar_url || undefined,
+      }));
+    },
+    enabled: responsibleIds.length > 0,
+    staleTime: 0,
+  });
+
+  const selectUsers = [...savedResponsibleUsers, ...users].filter(
+    (user, index, list) => list.findIndex((item) => item.id === user.id) === index,
+  );
+
   const { data: originsData } = useQuery({
     queryKey: ['origins'],
     queryFn: () => listOrigins(),
@@ -652,10 +680,10 @@ export default function AccountEditor() {
                             <SelectContent>
                               {usersLoading ? (
                                 <SelectItem value="_loading" disabled>Carregando usuários...</SelectItem>
-                              ) : users.length === 0 ? (
+                              ) : selectUsers.length === 0 ? (
                                 <SelectItem value="_empty" disabled>Nenhum usuário encontrado</SelectItem>
                               ) : (
-                                users.map((user) => (
+                                selectUsers.map((user) => (
                                   <SelectItem key={user.id} value={user.id}>
                                     {user.name}
                                   </SelectItem>
@@ -683,10 +711,10 @@ export default function AccountEditor() {
                             <SelectContent>
                               {usersLoading ? (
                                 <SelectItem value="_loading" disabled>Carregando usuários...</SelectItem>
-                              ) : users.length === 0 ? (
+                              ) : selectUsers.length === 0 ? (
                                 <SelectItem value="_empty" disabled>Nenhum usuário encontrado</SelectItem>
                               ) : (
-                                users.map((user) => (
+                                selectUsers.map((user) => (
                                   <SelectItem key={user.id} value={user.id}>
                                     {user.name}
                                   </SelectItem>
@@ -717,10 +745,10 @@ export default function AccountEditor() {
                             <SelectContent>
                               {usersLoading ? (
                                 <SelectItem value="_loading" disabled>Carregando usuários...</SelectItem>
-                              ) : users.length === 0 ? (
+                              ) : selectUsers.length === 0 ? (
                                 <SelectItem value="_empty" disabled>Nenhum usuário encontrado</SelectItem>
                               ) : (
-                                users.map((user) => (
+                                selectUsers.map((user) => (
                                   <SelectItem key={user.id} value={user.id}>
                                     {user.name}
                                   </SelectItem>
