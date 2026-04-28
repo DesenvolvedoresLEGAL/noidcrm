@@ -54,12 +54,64 @@ const PIPELINE_TYPES = [
   },
 ] as const;
 
+const DISTRIBUTION_STRATEGIES: Array<{
+  value: LeadDistributionStrategy;
+  label: string;
+  description: string;
+  icon: typeof Shuffle;
+}> = [
+  {
+    value: 'none',
+    label: 'Sem distribuição automática',
+    description: 'Os leads precisam ser atribuídos manualmente.',
+    icon: Ban,
+  },
+  {
+    value: 'round_robin',
+    label: 'Round Robin (revezamento)',
+    description: 'Distribui leads em ordem rotativa entre os usuários elegíveis.',
+    icon: Shuffle,
+  },
+  {
+    value: 'load_balanced',
+    label: 'Carga balanceada',
+    description: 'Atribui ao usuário com menor número de oportunidades abertas no momento.',
+    icon: Scale,
+  },
+  {
+    value: 'random',
+    label: 'Aleatório',
+    description: 'Sorteia um usuário elegível a cada novo lead.',
+    icon: Dice5,
+  },
+  {
+    value: 'territory',
+    label: 'Por território (UF)',
+    description: 'Atribui pelo estado (UF) da empresa, com fallback para round robin.',
+    icon: MapPin,
+  },
+];
+
+const DISTRIBUTION_ROLES = [
+  { value: 'sdr', label: 'SDR / Pré-vendas' },
+  { value: 'closer', label: 'Closer / Vendedor' },
+  { value: 'cs', label: 'Customer Success' },
+  { value: 'any', label: 'Qualquer cargo (usar lista)' },
+];
+
 export function EditPipelineModal({ open, onClose, onSave, pipeline }: EditPipelineModalProps) {
   const { businessUnits, loading: loadingBUs } = useBusinessUnits();
+  const { users: orgUsers, loading: loadingUsers } = useOrganizationUsers(
+    pipeline?.lead_distribution_user_ids || [],
+  );
   const [name, setName] = useState('');
   const [pipelineType, setPipelineType] = useState<Pipeline['pipeline_type']>('sales');
   const [isPrimary, setIsPrimary] = useState(false);
   const [selectedBUIds, setSelectedBUIds] = useState<string[]>([]);
+  const [distributionStrategy, setDistributionStrategy] =
+    useState<LeadDistributionStrategy>('none');
+  const [distributionRole, setDistributionRole] = useState<string>('any');
+  const [distributionUserIds, setDistributionUserIds] = useState<string[]>([]);
 
   useEffect(() => {
     if (pipeline) {
@@ -71,11 +123,19 @@ export function EditPipelineModal({ open, onClose, onSave, pipeline }: EditPipel
       } else {
         setSelectedBUIds([]);
       }
+      setDistributionStrategy(
+        (pipeline.lead_distribution_strategy as LeadDistributionStrategy) || 'none',
+      );
+      setDistributionRole(pipeline.lead_distribution_role || 'any');
+      setDistributionUserIds(pipeline.lead_distribution_user_ids || []);
     } else {
       setName('');
       setPipelineType('sales');
       setIsPrimary(false);
       setSelectedBUIds([]);
+      setDistributionStrategy('none');
+      setDistributionRole('any');
+      setDistributionUserIds([]);
     }
   }, [pipeline, open]);
 
@@ -89,18 +149,33 @@ export function EditPipelineModal({ open, onClose, onSave, pipeline }: EditPipel
     });
   };
 
+  const toggleDistributionUser = (userId: string) => {
+    setDistributionUserIds((prev) =>
+      prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId],
+    );
+  };
+
   const handleSave = () => {
     if (!name.trim() || selectedBUIds.length === 0) return;
-    onSave({ 
-      name: name.trim(), 
+    onSave({
+      name: name.trim(),
       pipeline_type: pipelineType,
       is_primary: pipelineType === 'sales' ? isPrimary : false,
-      business_unit_ids: selectedBUIds 
+      business_unit_ids: selectedBUIds,
+      lead_distribution_strategy: distributionStrategy,
+      lead_distribution_role: distributionStrategy === 'none' ? null : distributionRole,
+      lead_distribution_user_ids:
+        distributionStrategy === 'none' ? [] : distributionUserIds,
     });
     onClose();
   };
 
-  const selectedTypeInfo = PIPELINE_TYPES.find(t => t.value === pipelineType);
+  const selectedTypeInfo = PIPELINE_TYPES.find((t) => t.value === pipelineType);
+  const selectedStrategyInfo = DISTRIBUTION_STRATEGIES.find(
+    (s) => s.value === distributionStrategy,
+  );
+  const showDistributionConfig = distributionStrategy !== 'none';
+  const showUserList = distributionRole === 'any';
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
