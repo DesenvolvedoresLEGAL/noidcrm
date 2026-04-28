@@ -129,39 +129,58 @@ export default function AccountEditor() {
   const setAccountTagsMutation = useSetAccountTags();
 
   const { data: account, isLoading: accountLoading, error: accountError } = useAccountDetails(id!);
-  const { users, loading: usersLoading } = useOrganizationUsers([
-    account?.owner_user_id,
-    account?.cs_user_id,
-    (account as any)?.pre_sales_user_id,
-  ]);
-
-  const responsibleIds = [account?.owner_user_id, account?.cs_user_id, (account as any)?.pre_sales_user_id]
-    .filter((value): value is string => Boolean(value));
-
-  const { data: savedResponsibleUsers = [] } = useQuery({
-    queryKey: ['account-saved-responsibles', id, responsibleIds.join(',')],
+  const { data: responsibleOptions, isLoading: usersLoading } = useQuery({
+    queryKey: ['account-responsible-options', id],
     queryFn: async () => {
-      if (responsibleIds.length === 0) return [];
-      const { supabase } = await import('@/integrations/supabase/client');
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('user_id, full_name, email, avatar_url')
-        .in('user_id', responsibleIds);
-      if (error) throw error;
-      return (data || []).map((profile) => ({
-        id: profile.user_id,
-        name: profile.full_name || profile.email || 'Usuário sem nome',
-        email: profile.email || undefined,
-        avatar_url: profile.avatar_url || undefined,
-      }));
+      const { data: orgId, error: orgError } = await supabase.rpc('get_user_organization_id');
+      if (orgError || !orgId) throw orgError || new Error('Organização não encontrada');
+
+      const [{ data: members, error: membersError }, { data: sellers, error: sellersError }, { data: roles, error: rolesError }] = await Promise.all([
+        supabase.from('organization_members').select('user_id, org_role, status').eq('organization_id', orgId).eq('status', 'active'),
+        supabase.from('sellers').select('user_id, name, email, role, active').eq('organization_id', orgId).eq('active', true),
+        supabase.from('user_roles').select('user_id, role'),
+      ]);
+
+      if (membersError) throw membersError;
+      if (sellersError) throw sellersError;
+      if (rolesError) throw rolesError;
+
+      const activeSalesMembers = new Set(
+        (members || [])
+          .filter((member) => normalizeRole(member.org_role) === 'sales')
+          .map((member) => member.user_id),
+      );
+      const salesRoleUsers = new Set(
+        (roles || [])
+          .filter((role) => normalizeRole(role.role) === 'sales')
+          .map((role) => role.user_id),
+      );
+
+      const commercialUsers = (sellers || [])
+        .filter((seller) => seller.user_id && activeSalesMembers.has(seller.user_id) && salesRoleUsers.has(seller.user_id))
+        .map((seller) => ({
+          id: seller.user_id!,
+          name: seller.name || seller.email || 'Usuário sem nome',
+          email: seller.email,
+          role: seller.role,
+        })) as ResponsibleOption[];
+
+      const byRole = (allowed: Set<string>) =>
+        commercialUsers.filter((user) => allowed.has(normalizeRole(user.role)));
+
+      return {
+        owners: byRole(SALES_OWNER_ROLES),
+        preSales: byRole(PRE_SALES_ROLES),
+        cs: byRole(CS_ROLES),
+      };
     },
-    enabled: responsibleIds.length > 0,
     staleTime: 0,
+    refetchOnMount: 'always',
   });
 
-  const selectUsers = [...savedResponsibleUsers, ...users].filter(
-    (user, index, list) => list.findIndex((item) => item.id === user.id) === index,
-  );
+  const ownerUsers = responsibleOptions?.owners || [];
+  const preSalesUsers = responsibleOptions?.preSales || [];
+  const csUsers = responsibleOptions?.cs || [];
 
   const { data: originsData } = useQuery({
     queryKey: ['origins'],
