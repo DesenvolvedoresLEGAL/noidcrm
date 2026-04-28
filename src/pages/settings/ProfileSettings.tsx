@@ -198,18 +198,29 @@ export default function ProfileSettings() {
     if (!user) return;
     setSaving(true);
     try {
+      // Use upsert keyed on user_id so the row is created if missing,
+      // ensuring default_pipeline_id always persists.
       const { error } = await supabase
         .from('profiles')
-        .update({
-          full_name: fullName,
-          phone: phone.replace(/\D/g, ''),
-          cpf: cpf.replace(/\D/g, ''),
-          birth_date: birthDate || null,
-          default_pipeline_id: defaultPipelineId || null,
-        })
-        .eq('user_id', user.id);
+        .upsert(
+          {
+            user_id: user.id,
+            full_name: fullName,
+            phone: phone.replace(/\D/g, ''),
+            cpf: cpf.replace(/\D/g, ''),
+            birth_date: birthDate || null,
+            default_pipeline_id: defaultPipelineId || null,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'user_id' },
+        );
 
       if (error) throw error;
+
+      // Invalidate the cached current user so default_pipeline_id is re-read fresh
+      // across the app (Opportunities page, hooks, etc.) without a manual reload.
+      await queryClient.invalidateQueries({ queryKey: ['current-user'] });
+
       toast.success('Dados atualizados com sucesso');
     } catch (error) {
       console.error('Error updating profile:', error);
