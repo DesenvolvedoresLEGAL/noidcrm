@@ -786,6 +786,8 @@ export async function reopenProposal(proposalId: string): Promise<Proposal> {
   if (error) throw error;
   return data as Proposal;
 }
+
+export async function trackView(
   proposalId: string, 
   metadata?: { 
     ip?: string; 
