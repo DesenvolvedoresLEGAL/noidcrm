@@ -34,6 +34,8 @@ export function DynamicDashboardShell({
   loading = false,
   error = null,
   className,
+  tenantId,
+  targetUserId,
 }: DynamicDashboardShellProps) {
   const shell = useDynamicDashboardShell(profile, { mode, resolution });
 
@@ -47,6 +49,9 @@ export function DynamicDashboardShell({
     return <DynamicDashboardState state="empty" />;
   }
 
+  const isCloserProfile = profile.key === 'dashboard_sales_closer_placeholder';
+  const canRenderCloserReal = isCloserProfile && !!tenantId && !!targetUserId;
+
   return (
     <Card className={cn('border-dashed', className)}>
       <CardContent className="p-4 md:p-5 space-y-4">
@@ -55,17 +60,21 @@ export function DynamicDashboardShell({
         {shell.isLegacy && <DynamicDashboardState state="legacy" />}
         {shell.isUnsupported && <DynamicDashboardState state="unsupported" />}
 
-        {shell.isPlaceholder && (
-          <>
-            <Alert>
-              <Info className="h-4 w-4" />
-              <AlertDescription>
-                Este shell ainda não exibe dados reais. Os widgets abaixo são placeholders
-                vindos do JSON do profile e não substituem o dashboard atual do CRM.
-              </AlertDescription>
-            </Alert>
-            <DynamicDashboardGrid widgets={shell.widgets} />
-          </>
+        {canRenderCloserReal ? (
+          <CloserDashboard tenantId={tenantId!} targetUserId={targetUserId!} />
+        ) : (
+          shell.isPlaceholder && (
+            <>
+              <Alert>
+                <Info className="h-4 w-4" />
+                <AlertDescription>
+                  Este shell ainda não exibe dados reais. Os widgets abaixo são placeholders
+                  vindos do JSON do profile e não substituem o dashboard atual do CRM.
+                </AlertDescription>
+              </Alert>
+              <DynamicDashboardGrid widgets={shell.widgets} />
+            </>
+          )
         )}
       </CardContent>
     </Card>
