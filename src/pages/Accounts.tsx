@@ -49,25 +49,28 @@ export default function Accounts() {
   const [showFilters, setShowFilters] = useState(false);
   const debouncedSearchQuery = useDebounce(searchQuery.trim(), 300);
 
-  // Buscar contas com tratamento de erro
+  // Buscar contas com tratamento de erro (porte/segmento/origem agora server-side)
   const { data: accountsData, isLoading, error: accountsError } = useQuery({
-    queryKey: [...accountKeys.lists(), debouncedSearchQuery],
+    queryKey: [...accountKeys.lists(), debouncedSearchQuery, segmentoFilter, porteFilter, origemFilter],
     queryFn: async () => {
       try {
         const result = await listAccounts({
           q: debouncedSearchQuery,
-          page_size: debouncedSearchQuery ? 200 : 60,
+          page_size: debouncedSearchQuery ? 200 : 200,
+          segmento: segmentoFilter !== 'all' ? segmentoFilter : undefined,
+          porte: porteFilter !== 'all' ? porteFilter : undefined,
+          origem_principal: origemFilter !== 'all' ? origemFilter : undefined,
         });
-        
-        // Log para debug em desenvolvimento
+
         if (import.meta.env.DEV) {
           console.log('[Accounts] Query successful:', {
             count: result.data.length,
             total: result.total,
-            query: debouncedSearchQuery
+            query: debouncedSearchQuery,
+            filters: { segmentoFilter, porteFilter, origemFilter },
           });
         }
-        
+
         return result;
       } catch (error) {
         console.error('[Accounts] Query failed:', error);
@@ -76,6 +79,13 @@ export default function Accounts() {
     },
     retry: 2,
     retryDelay: 1000,
+  });
+
+  // KPIs agregados de toda a organização (sem paginação)
+  const { data: porteSummary } = useQuery({
+    queryKey: ['accounts-porte-summary'],
+    queryFn: getAccountsPorteSummary,
+    staleTime: 60_000,
   });
 
   // Buscar contatos para busca global
