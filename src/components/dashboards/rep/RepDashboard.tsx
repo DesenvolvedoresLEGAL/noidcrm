@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import { usePlanType } from "@/hooks/usePlanType";
 import { RepDailySummary } from "./RepDailySummary";
 import { PushNotificationOptIn } from "@/components/notifications/PushNotificationOptIn";
+import { CloserPilotEntryButton } from "@/components/dashboard/closer/CloserPilotEntryButton";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -92,6 +93,11 @@ export function RepDashboard() {
         title="Meu Dashboard"
         subtitle="Suas vendas, sua performance"
       />
+
+      {/* Closer pilot opt-in (renders only when all guard conditions pass) */}
+      <motion.div variants={sectionVariants}>
+        <CloserPilotEntryButton />
+      </motion.div>
 
       {/* Push Notification Opt-In */}
       <motion.div variants={sectionVariants}>

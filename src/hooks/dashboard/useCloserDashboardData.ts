@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getCloserDashboardData } from '@/services/crm/closerDashboard';
-import type { CloserDashboardData, CloserPeriodKey } from '@/types/dashboard/closer';
+import { getCloserPaceData } from '@/services/crm/closerDashboardPilot';
+import type { CloserDashboardData, CloserPeriodKey, CloserPaceData } from '@/types/dashboard/closer';
 
 export interface UseCloserDashboardDataOptions {
   tenantId: string | null | undefined;
@@ -36,22 +37,36 @@ export function useCloserDashboardData({
     staleTime: 30_000,
   });
 
+  // Pace sempre referente ao mês atual, independente do período
+  const paceQuery = useQuery<CloserPaceData>({
+    queryKey: ['closer-pace', tenantId, userId],
+    queryFn: () => getCloserPaceData(tenantId as string, userId as string),
+    enabled: !!tenantId && !!userId && enabled,
+    staleTime: 60_000,
+  });
+
+  const data = useMemo<CloserDashboardData | undefined>(() => {
+    if (!query.data) return query.data;
+    return { ...query.data, pace: paceQuery.data ?? query.data.pace };
+  }, [query.data, paceQuery.data]);
+
   const unavailableWidgets = useMemo(() => {
-    const av = query.data?.availability ?? {};
+    const av = data?.availability ?? {};
     return Object.entries(av)
       .filter(([, v]) => v === 'unavailable')
       .map(([k]) => k);
-  }, [query.data]);
+  }, [data]);
 
   const isEmpty =
-    !!query.data &&
-    !query.data.error &&
-    (query.data.kpis?.open_pipeline_count ?? 0) === 0 &&
-    (query.data.kpis?.proposals_open_count ?? 0) === 0 &&
-    (query.data.kpis?.overdue_followups_count ?? 0) === 0;
+    !!data &&
+    !data.error &&
+    (data.kpis?.open_pipeline_count ?? 0) === 0 &&
+    (data.kpis?.proposals_open_count ?? 0) === 0 &&
+    (data.kpis?.overdue_followups_count ?? 0) === 0;
 
   return {
     ...query,
+    data,
     period,
     setPeriod,
     customRange,

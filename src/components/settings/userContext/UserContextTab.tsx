@@ -21,6 +21,7 @@ import { UserContextStatsCards } from './UserContextStatsCards';
 import { ReviewStatusBadge, PermissionBadge, DepartmentBadge } from './UserContextBadges';
 import { EditUserContextModal } from './EditUserContextModal';
 import { UserDynamicDashboardToggle } from './UserDynamicDashboardToggle';
+import { CloserPilotSection } from './CloserPilotSection';
 
 const REVIEW_FILTER: Array<{ value: 'all' | ReviewStatus; label: string }> = [
   { value: 'all', label: 'Todos' },
@@ -107,6 +108,8 @@ export default function UserContextTab() {
         noContext={stats.noContext}
         incomplete={stats.incomplete}
       />
+
+      {isAdmin && <CloserPilotSection tenantId={tenantId} organizationId={organizationId} />}
 
       <Card>
         <CardHeader>

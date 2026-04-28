@@ -1,167 +1,184 @@
+# Sprint 6.3 — Piloto Controlado do Dashboard Closer + Pace Diário
 
-# Sprint 6 — Dashboard Closer Real v1
-
-Objetivo: plugar dados reais do CRM em um Dashboard Closer renderizado dentro do `DynamicDashboardShell`, exclusivamente em preview Owner/Admin (Configurações > Equipes e Usuários > Contexto CRM). Nada em produção muda: nem dashboard real, nem sidebar, nem rotas, nem flags, nem permissões.
-
----
-
-## 1. Schema confirmado (auditoria)
-
-Fontes reais identificadas no banco:
-
-- Oportunidades: `public.opportunities` — `organization_id`, `owner_user_id`, `status` (`new|open|won|lost`), `stage_id`, `valor_previsto`, `closed_at`, `won_at`, `next_followup_date`, `last_contact_date`, `deleted_at`, `prob`, `risk_score`.
-- Etapas: `public.stages` (`id`, `name`, `pipeline_id`, `order_index`, `probability`).
-- Histórico de etapa: `public.opportunity_stage_history` (`changed_at`, `to_stage_id`) → para "deal parado".
-- Propostas: `public.proposals` — `organization_id`, `opportunity_id`, `status` (`draft|sent|viewed|accepted|declined|expired`), `value`, `sent_at`, `viewed_at`, `expires_at`, `last_viewed_at`, `views_count`, `accepted_at`, `declined_at`. Owner = `opportunities.owner_user_id` via join.
-- Visualizações de proposta: `public.proposal_views` (`proposal_id`, `viewed_at`).
-- Atividades: `public.activities` — `organization_id`, `owner_user_id`, `opportunity_id`, `status` (`pending|completed|cancelled`), `scheduled_date`, `completed_at`, `deleted_at`.
-- Metas: `public.sales_goals` (mensal, por `user_id` + `period_start/end`, `target_value`) e `public.seller_targets` (`monthly_revenue_target`, `period_month`). Usaremos `sales_goals` como primária e `seller_targets` como fallback.
-- Contexto Closer: `public.crm_user_context_view` com `business_function_key='closer'`.
-
-Todas as métricas pedidas têm fonte. Não haverá `unavailable` por ausência de schema; reservaremos esse status apenas para falhas pontuais futuras.
+Ativar o novo Dashboard Closer para **1 Closer piloto por tenant** com rollback imediato, opt‑in via botão no dashboard legado (sem redirecionamento automático), e adicionar bloco **Pace Diário** logo após a Central do Dia.
 
 ---
 
-## 2. Backend — uma única RPC consolidada
+## Parte 1 — Banco de dados (1 migration)
 
-Migração nova:
+**Arquivo:** `supabase/migrations/<timestamp>_sprint_6_3_pilot_and_pace.sql`
 
-`public.crm_get_closer_dashboard_data(p_tenant_id uuid, p_user_id uuid, p_period text default 'current_month', p_start_date date default null, p_end_date date default null) returns jsonb`
-
-- `LANGUAGE plpgsql SECURITY DEFINER SET search_path = public`.
-- Validações iniciais (raise EXCEPTION em caso de violação):
-  1. `auth.uid()` pertence a `p_tenant_id` (via `organization_members` ativo).
-  2. Caller é Owner ou Admin do tenant (`user_is_org_admin(p_tenant_id)` OU role `owner`); senão, só pode consultar o próprio `user_id`.
-  3. `p_user_id` pertence ao tenant.
-  4. `p_user_id` tem `business_function_key='closer'` em `crm_user_context_view`. Se não, retorna JSON com `{ "error": "not_a_closer" }` mas sem raise (para o shell renderizar mensagem amigável).
-- Resolve janela `[start_ts, end_ts]` a partir de `p_period`:
-  - `current_month`: mês corrente até agora.
-  - `last_7_days` / `last_30_days`: now() − N dias.
-  - `current_quarter`: trimestre vigente.
-  - `custom`: usa `p_start_date`/`p_end_date`.
-- Calcula em CTEs todas as métricas e devolve `jsonb` no contrato exigido (user, context, period, kpis, lists, availability, metadata).
-
-Mapeamento das métricas:
-
-- **open_pipeline**: `opportunities` onde `organization_id=tenant`, `owner_user_id=user`, `status IN ('new','open')`, `deleted_at IS NULL`. Soma `valor_previsto` + count.
-- **proposals_open**: `proposals` join `opportunities` em `opp.owner_user_id=user`, `proposals.status IN ('sent','viewed')`, `accepted_at IS NULL`, `declined_at IS NULL`. Soma `value` + count.
-- **proposals_viewed_count**: `proposals` com `last_viewed_at` dentro do período (mesmo join de owner).
-- **overdue_followups**: `activities` com `owner_user_id=user`, `status='pending'`, `scheduled_date < now()`, `deleted_at IS NULL`. Count + lista top 10 por mais antigos.
-- **risk_deals**: oportunidades abertas com pelo menos um sinal: (a) sem `last_contact_date` há > 7 dias, (b) `proposals.status IN ('sent','viewed')` há > 3 dias sem resposta, (c) follow-up vencido associado, (d) parado na mesma etapa há > 7 dias via `opportunity_stage_history`, (e) `prob < 30`. Lista top 10 por `valor_previsto desc`.
-- **monthly_goal_value**: `sales_goals` onde `user_id=user`, `period_type='monthly'`, mês corrente. Fallback: `seller_targets.monthly_revenue_target` para `period_month` corrente. Sem registro → `null` + `availability.goals='unavailable'`.
-- **monthly_revenue_value**: `opportunities` `status='won'`, `closed_at` no período (mês corrente especificamente para o KPI, independente do filtro — manter consistência com a memória "Win Rate usa closed_at"). Soma `valor_previsto`.
-- **win_rate_percent**: won/(won+lost) com `closed_at` no período, `owner_user_id=user`, exclui `deleted_at`.
-- **average_ticket_value**: revenue/won_count no período. `null` se won_count=0.
-- **next_actions**: gerado em CTE com regras determinísticas e prioridade 1–8 (proposta visualizada hoje sem follow-up, proposta vencendo hoje, follow-up vencido, proposta vencida, deal alto valor sem próxima atividade, deal parado >7 dias, proposta vencendo em 48h, proposta enviada sem resposta >3 dias). Top 10 ordenados por prioridade asc + valor desc.
-- **Central do Dia** (no JSON em `central_do_dia`):
-  - `today_activities_count`, `overdue_followups_count`, `proposals_expiring_today`, `proposals_expiring_48h`, `proposals_expired`, `proposals_viewed_no_followup`, `opportunities_without_next_activity`, `stalled_opportunities`.
-  - Listas: `today_agenda` (top 10), `overdue_followups` (top 10), `proposals_action_required` (unifica vencendo/vencidas/visualizadas-sem-followup, top 10), `top_actions_today` (alias do next_actions filtrado por hoje).
-
-Grants:
-```
-revoke all on function public.crm_get_closer_dashboard_data(uuid,uuid,text,date,date) from public;
-grant execute on function public.crm_get_closer_dashboard_data(uuid,uuid,text,date,date) to authenticated;
+### 1.1 Tabela de auditoria de piloto
+```sql
+create table public.crm_dynamic_dashboard_pilot_logs (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null,
+  target_user_id uuid not null,
+  changed_by uuid not null,
+  action text not null check (action in
+    ('enable_pilot','disable_user_pilot','disable_tenant_dynamic_dashboard','rollback')),
+  previous_global_flag boolean,
+  new_global_flag boolean,
+  previous_user_flag boolean,
+  new_user_flag boolean,
+  reason text,
+  metadata jsonb not null default '{}',
+  created_at timestamptz not null default now()
+);
+alter table ... enable row level security;
+-- SELECT: somente Owner/Admin do tenant (is_tenant_admin_or_owner)
+-- INSERT: bloqueado no client (apenas via RPC SECURITY DEFINER)
+-- UPDATE/DELETE: bloqueado
+create index on ... (tenant_id, created_at desc);
 ```
 
-Sem alterações em RLS, policies, tabelas existentes ou flags.
+### 1.2 RPCs (SECURITY DEFINER, search_path = public)
+
+- **`crm_enable_closer_dashboard_pilot(p_tenant_id, p_target_user_id, p_reason)`**
+  Validações: caller pertence ao tenant; caller é Owner/Admin; target ativo no tenant; `business_function_key='closer'`; `requires_review=false`; permission/department/function não nulos. Atualiza `crm_user_contexts.is_dashboard_dynamic_enabled=true` apenas para o target. Faz UPSERT em `crm_feature_flags` ligando `dynamic_dashboards_enabled=true` apenas para `tenant_id` atual. Insere log `enable_pilot` capturando flags antes/depois. Retorna jsonb `{success, target_user_id, tenant_id, flags, rollback_hint}`.
+
+- **`crm_disable_closer_dashboard_pilot(p_tenant_id, p_target_user_id, p_reason)`**
+  Owner/Admin + mesmo tenant. Seta `is_dashboard_dynamic_enabled=false` apenas para o target. Log `disable_user_pilot`. **Não** mexe na flag global.
+
+- **`crm_disable_tenant_dynamic_dashboards(p_tenant_id, p_reason)`**
+  Owner/Admin + mesmo tenant. Seta `dynamic_dashboards_enabled=false` no tenant. Log `disable_tenant_dynamic_dashboard`. **Não** desliga `function_automations_enabled`. **Não** liga `dynamic_user_context_enabled`.
+
+Todas com `GRANT EXECUTE ... TO authenticated`.
+
+### 1.3 RPC `crm_get_closer_dashboard_data` — adicionar `pace`
+
+Estender o RPC existente para calcular e retornar a chave `pace` no JSON:
+
+- Fonte de meta: reusar a lógica atual (`sales_goals` -> `seller_targets`) + considerar `ote_seller_configs` + `ote_levels` (`monthly_goal`, `goal_type='revenue'`) que já alimentam o RepPACE legado. Se houver meta por nível OTE para o usuário, usar `custom_goal_override` ou `ote_levels.monthly_goal`. Registrar `goal_source` no metadata.
+- Dias úteis: segunda a sexta, **sem feriados** na v1 → `business_days_rule = 'monday_to_friday_no_holidays_v1'`. Se `holidays` retornar linhas para o tenant no mês atual, usar e marcar `'calendar_table'`.
+- Cálculos (sempre **mês atual**, independente de `p_period`):
+  - `business_days_total`, `business_days_elapsed` (incluir hoje se útil), `business_days_remaining`
+  - `expected_pace_today = goal/total * elapsed`
+  - `pace_gap_value = realized - expected`
+  - `remaining_to_goal = max(goal - realized, 0)`
+  - `required_daily_rate = remaining_to_goal / NULLIF(remaining,0)` (fallback `remaining_to_goal` se `remaining=0`)
+  - `current_daily_average = realized / NULLIF(elapsed,1)`
+  - `pace_percent = realized/expected*100`
+- Status:
+  - `pace_percent >= 105` → `Acima do pace` / `success`
+  - `>= 95` → `No pace` / `info`
+  - `>= 75` → `Atrasado` / `attention`
+  - `< 75` → `Crítico` / `critical`
+- Proteções: meta nula/0 ou `business_days_total=0` → retornar `{available:false, status:'Meta não configurada', severity:'warning', reason:'...'}`.
+- Sempre adicionar `pace_uses_current_month=true` no `metadata`.
 
 ---
 
-## 3. Frontend — service, hook e componentes
+## Parte 2 — Frontend
 
-### 3.1 Service `src/services/crm/closerDashboard.ts`
-- `type CloserDashboardParams` (tenantId, userId, period, startDate?, endDate?).
-- `getCloserDashboardData(params)` → chama `supabase.rpc('crm_get_closer_dashboard_data', ...)` e devolve o JSON tipado.
+### 2.1 Tipos — `src/types/dashboard/closer.ts`
+Acrescentar:
+```ts
+export type CloserPaceStatus = 'Acima do pace' | 'No pace' | 'Atrasado' | 'Crítico' | 'Meta não configurada';
+export type CloserPaceSeverity = 'success' | 'info' | 'attention' | 'critical' | 'warning';
+export interface CloserPaceData {
+  available: boolean;
+  reason?: string;
+  goal_value?: number; realized_value?: number; goal_attainment_percent?: number;
+  business_days_total?: number; business_days_elapsed?: number; business_days_remaining?: number;
+  expected_pace_today?: number; pace_gap_value?: number; remaining_to_goal?: number;
+  required_daily_rate?: number; current_daily_average?: number; pace_percent?: number;
+  status: CloserPaceStatus; severity: CloserPaceSeverity;
+  business_days_rule?: string; why_here?: string;
+}
+```
+Adicionar `pace?: CloserPaceData` em `CloserDashboardData`.
 
-### 3.2 Tipos `src/types/dashboard/closer.ts`
-- `CloserDashboardData`, `CloserDashboardKpis`, `CloserCentralDoDia`, `CloserNextAction`, `CloserRiskDeal`, `CloserOverdueFollowup`, `CloserViewedProposal`, `CloserPeriodKey`, `CloserWidgetAvailability`.
+### 2.2 Componentes Pace — `src/components/dashboard/closer/`
+- **`CloserPaceSection.tsx`** — Header + status card grande + grid 8 cards + barra de progresso da meta. Trata `available=false` com aviso amigável.
+- **`CloserPaceCard.tsx`** — Card reutilizável (label, valor, hint, severity opcional).
+- **`CloserPaceStatusBadge.tsx`** — Badge colorido por severity.
+- **`CloserPaceProgress.tsx`** — Barra horizontal (realizado vs meta) com marcador de pace esperado hoje.
 
-### 3.3 Hook `src/hooks/dashboard/useCloserDashboardData.ts`
-- React Query (`useQuery`) chaveado por `['closer-dashboard', tenantId, userId, period, customRange]`.
-- `enabled` apenas quando: tenantId + userId + caller Owner/Admin no preview (recebido por prop/contexto, sem lógica nova de auth).
-- Estado local de `period` + `customRange` + setters.
-- Retorna `{ data, isLoading, error, refetch, period, setPeriod, customRange, setCustomRange, isEmpty, unavailableWidgets }`.
+### 2.3 Inserir Pace no `CloserDashboard.tsx`
+Nova ordem: `CentralDoDia` → **`CloserPaceSection`** → `CloserTopActions` → listas → `CloserKpiGrid` → `CloserRiskDealsList`. Manter KPIs intactos (sem duplicar destaque da meta).
 
-### 3.4 Componentes `src/components/dashboard/closer/`
-Estrutura enxuta (consolidando alguns arquivos para evitar inflação):
-- `CloserDashboard.tsx` (orquestrador: header + filtro + Central do Dia + Próximas Ações + Propostas que exigem ação + Deals em risco + KpiGrid + Pipeline por etapa).
-- `CloserDashboardHeader.tsx` + `CloserPeriodFilter.tsx`.
-- `CentralDoDiaSection.tsx` (cards + 4 listas internas).
-- `CloserKpiGrid.tsx` (8 cards: pipeline, propostas na mesa, propostas visualizadas, follow-ups, risco, meta, win rate, ticket).
-- `CloserNextActionsList.tsx`.
-- `CloserRiskDealsList.tsx`.
-- `CloserProposalsActionList.tsx`.
-- `CloserPipelineByStage.tsx` (barras simples com `div` — sem nova lib).
-- `CloserDashboardSkeleton.tsx`, `CloserDashboardEmptyState.tsx`, `CloserDashboardErrorState.tsx`, `CloserNotACloserState.tsx`.
-- Cards de KPI usam `Card`/`CardContent` do design system existente; formatação monetária via util já existente em `src/lib/utils.ts` se houver, senão `Intl.NumberFormat('pt-BR')`.
+### 2.4 Serviço de piloto — `src/services/crm/closerDashboardPilot.ts` (novo)
+Wrappers para as 3 RPCs + listagem dos logs (`select * from crm_dynamic_dashboard_pilot_logs ... order by created_at desc limit 50`).
 
-### 3.5 Integração com `DynamicDashboardShell`
-- Estender props com `targetUserId?: string` e `tenantId?: string` (opcionais; default mantém comportamento atual).
-- No corpo do shell, antes de renderizar widgets placeholder:
-  - Se `profile?.key === 'dashboard_sales_closer_placeholder'` **e** `tenantId` **e** `targetUserId` presentes → renderizar `<CloserDashboard tenantId targetUserId />` em vez do grid placeholder.
-  - Caso contrário (sem targetUserId), manter alerta + grid placeholder atual.
-- O alerta "Este shell ainda não exibe dados reais" só aparece quando NÃO estamos no caminho Closer real.
+### 2.5 Hooks — `src/hooks/dashboard/useCloserDashboardPilot.ts` (novo)
+- `useEnableCloserPilot()`, `useDisableCloserPilot()`, `useDisableTenantDynamicDashboards()` (mutations com invalidação de `crm_feature_flags`, `crm_user_contexts` e `dynamic-dashboard-guard`).
+- `usePilotEligibleClosers(tenantId)` — lista usuários com `business_function_key='closer'`, `status='active'`, expondo `requires_review`.
+- `useTenantDynamicFlag(tenantId)` — leitura de `crm_feature_flags`.
+- `usePilotLogs(tenantId)`.
 
-### 3.6 `DashboardPreviewModal`
-- Passar `tenantId` e `targetUserId={row?.user_id}` ao `DynamicDashboardShell`.
-- Quando profile resolvido for `dashboard_sales_closer_placeholder`:
-  - Adicionar Alert info: "Este dashboard usa dados reais do CRM, mas ainda não altera a tela principal do usuário."
-  - Se `requires_review`, manter alerta de revisão já existente em `DashboardResolutionDetails`.
+### 2.6 UI do piloto — `src/components/settings/userContext/CloserPilotSection.tsx` (novo)
+Render dentro do `UserContextTab` (acima da tabela atual) com:
+- Tenant atual (read‑only).
+- Combobox de Closers elegíveis com badge de revisão (Validado / Revisar / Incompleto).
+- Status de `dynamic_dashboards_enabled` (tenant) e `is_dashboard_dynamic_enabled` (user).
+- Botões: **Habilitar piloto** (desabilitado se `requires_review`), **Desligar piloto deste Closer**, **Desligar dashboard dinâmico neste tenant**.
+- Texto de rollback imediato.
+- Apenas visível para Owner/Admin (reusar guarda existente do `UserContextTab`).
 
-Nenhuma outra tela (sidebar, login, Dashboard real, AdminCenterPage) é tocada. AdminCenterPage continua com placeholder admin e não chama o Closer.
+### 2.7 Botão opt‑in no dashboard legado
+- **Hook novo** `src/hooks/dashboard/useCloserPilotEntrypoint.ts`: usa `useCurrentUser` + `useDynamicDashboardGuard(tenantId, userId)` — retorna `{visible: boolean}` apenas se **todas** as condições passarem (global flag, user flag, `bfKey='closer'`, resolver OK, profile resolvido, `requires_review=false`).
+- **Componente novo** `src/components/dashboard/closer/CloserPilotEntryButton.tsx`: card discreto com título "Experimentar novo Dashboard Closer", subtexto, botão que `navigate('/app/dynamic-dashboard')`. Renderiza `null` se `visible=false`.
+- **Integração** em `RepDashboard.tsx`: inserir o componente logo após `DashboardHeader` (antes do `RepKPICards`). Sem alterar nenhum outro dashboard.
 
----
+### 2.8 Página dinâmica — `DynamicDashboardPage.tsx`
+Já existe e já loga runtime view. Atualizar `metadata` enviado para incluir `{sprint:'6.3', entrypoint:'direct_url', pilot_enabled, global_flag, user_flag}` (entrypoint baseado em `location.state?.from === 'legacy_button'` quando vier do botão; fallback `direct_url`). Botão "Voltar ao dashboard atual" já existe no `DynamicDashboardSafeBanner` (apenas navegação, não desliga flags) — manter como está.
 
-## 4. Estados, segurança e performance
+### 2.9 Auditoria UI — Admin Center
+Reusar `CloserDashboardAuditLog` existente; adicionar nova aba/seção **"Logs de piloto"** (`PilotActivationLog.tsx`) que lista entradas de `crm_dynamic_dashboard_pilot_logs` (action, target, changed_by, reason, flags antes/depois, data).
 
-- Loading: `CloserDashboardSkeleton`.
-- Erro RPC: `CloserDashboardErrorState` ("Não foi possível carregar o Dashboard Closer. O dashboard atual do CRM permanece seguro.").
-- `data.error === 'not_a_closer'` → `CloserNotACloserState`.
-- KPIs com `availability !== 'ready'` → card mostra "Não disponível" + reason.
-- `availability.goals='unavailable'` quando não houver `sales_goals` nem `seller_targets`.
-- Listas hard-cap em 10 itens (já no SQL via `LIMIT 10`).
-- Toda query via RPC (uma round-trip), sem N+1 no frontend.
-- Tenant/user validados dentro da RPC; nenhum service-role no client.
-
----
-
-## 5. Validações finais
-
-- Build/TS verde.
-- Flags continuam `false` (verificado por SQL).
-- 1 profile `dashboard_sales_closer_placeholder` por tenant (já garantido pela Sprint 4.1.1).
-- Smoke test manual: abrir preview de Closer existente → renderiza Central do Dia + KPIs com dados reais; alterar filtro de período → React Query refaz query; abrir preview de não-Closer → mantém placeholder atual; Dashboard real (`/`) inalterado; sidebar inalterada.
+### 2.10 Tipos Supabase
+`src/integrations/supabase/types.ts` será regenerado automaticamente pela migration. Não editar manualmente.
 
 ---
 
-## 6. Riscos / pendências para Sprint 6.1
-- "Deal parado" depende de `opportunity_stage_history`; em tenants sem histórico, sinal cai silenciosamente.
-- Win-rate por período pode divergir do CEO Dashboard se filtros customizados forem usados — manteremos a regra global da memória (closed_at, exclui soft-delete, sales pipeline). KPI "Realizado no mês" sempre usa mês corrente para evitar conflito com a unified rule.
-- Próxima sprint (6.1) pode introduzir runtime real opt-in via flag e rota `/dashboard/closer-preview` se necessário.
+## Segurança e regras invioláveis
+
+- `auth.uid()` obrigatório como `targetUserId` no runtime. Preview admin continua aceitando outro target.
+- Nenhuma flag global ativada fora do tenant atual do caller.
+- `function_automations_enabled` permanece **false**.
+- `dynamic_user_context_enabled` permanece **false** (guard atual não exige).
+- Sem redirect automático em lugar nenhum (sem `<Navigate>` para `/app/dynamic-dashboard`).
+- Sidebar global, login, permissões, dashboards de SDR/CS/Manager/Admin/Owner: **intactos**.
+- Sem criação de tarefas, notificações, automações ou alterações em propostas/negócios/atividades.
 
 ---
 
-## Arquivos a criar/editar
+## Critérios de validação (queries entregues no final)
 
-Criar:
-- `supabase/migrations/<ts>_crm_get_closer_dashboard_data.sql`
-- `src/services/crm/closerDashboard.ts`
-- `src/types/dashboard/closer.ts`
-- `src/hooks/dashboard/useCloserDashboardData.ts`
-- `src/components/dashboard/closer/CloserDashboard.tsx`
-- `src/components/dashboard/closer/CloserDashboardHeader.tsx`
-- `src/components/dashboard/closer/CloserPeriodFilter.tsx`
-- `src/components/dashboard/closer/CentralDoDiaSection.tsx`
-- `src/components/dashboard/closer/CloserKpiGrid.tsx`
-- `src/components/dashboard/closer/CloserNextActionsList.tsx`
-- `src/components/dashboard/closer/CloserRiskDealsList.tsx`
-- `src/components/dashboard/closer/CloserProposalsActionList.tsx`
-- `src/components/dashboard/closer/CloserPipelineByStage.tsx`
-- `src/components/dashboard/closer/CloserDashboardSkeleton.tsx`
-- `src/components/dashboard/closer/CloserDashboardEmptyState.tsx`
-- `src/components/dashboard/closer/CloserDashboardErrorState.tsx`
-- `src/components/dashboard/closer/CloserNotACloserState.tsx`
+```sql
+-- Apenas tenant piloto com flag ligada
+select tenant_id, key, enabled from crm_feature_flags where key='dynamic_dashboards_enabled';
 
-Editar (mínimo):
-- `src/components/dashboard/dynamic/DynamicDashboardShell.tsx` — props `tenantId`/`targetUserId` + branch para Closer.
-- `src/components/settings/dashboardResolver/DashboardPreviewModal.tsx` — passar props + alert informativo.
+-- Apenas o usuário piloto com user flag
+select tenant_id, user_id, is_dashboard_dynamic_enabled
+from crm_user_contexts where is_dashboard_dynamic_enabled = true;
+
+-- Logs por ação
+select action, count(*) from crm_dynamic_dashboard_pilot_logs group by action;
+
+-- Views runtime/preview
+select source, period, count(*) from crm_closer_dashboard_views group by source, period;
+
+-- Confirmar function_automations_enabled = false
+select count(*) from crm_feature_flags where key='function_automations_enabled' and enabled=true;
+```
+
+---
+
+## Entregáveis
+
+1. **Migration** com tabela `crm_dynamic_dashboard_pilot_logs`, 3 RPCs de piloto e RPC `crm_get_closer_dashboard_data` estendida com `pace`.
+2. **Componentes novos**: `CloserPaceSection`, `CloserPaceCard`, `CloserPaceStatusBadge`, `CloserPaceProgress`, `CloserPilotEntryButton`, `CloserPilotSection`, `PilotActivationLog`.
+3. **Hooks/Serviços novos**: `useCloserDashboardPilot`, `useCloserPilotEntrypoint`, `closerDashboardPilot.ts`.
+4. **Edições**: `CloserDashboard.tsx` (ordem + Pace), `closer.ts` (tipos), `RepDashboard.tsx` (botão opt‑in), `UserContextTab.tsx` (seção de piloto), `AdminCenterPage.tsx` (logs de piloto), `DynamicDashboardPage.tsx` (metadata `entrypoint`).
+5. Resumo final com instruções de habilitar piloto / rollback individual / rollback de tenant + resultado das queries de validação.
+
+---
+
+## Riscos e mitigação
+
+- **Meta indisponível**: Pace renderiza warning sem quebrar o dashboard.
+- **Flag global afetando outros usuários do tenant**: Mitigado pelo botão opt‑in só aparecer com 5 condições combinadas; outros usuários não veem botão e caem no fallback se acessarem URL.
+- **Closer trocando de função após habilitar piloto**: Guard recalcula a cada query (`staleTime 30s`); botão e runtime caem automaticamente.
+- **Divisão por zero no Pace**: NULLIF + fallbacks explícitos.
