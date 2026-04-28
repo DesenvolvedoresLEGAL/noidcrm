@@ -160,6 +160,23 @@ export function ProposalEditorHeader({
 
         {/* Action Buttons */}
         <div className="flex items-center gap-2 ml-11 md:ml-0">
+          {isTerminal && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleReopen}
+              disabled={isReopening || !proposalId}
+              title='Reabrir proposta (volta para "Aberta")'
+            >
+              {isReopening ? (
+                <Loader2 className="h-4 w-4 animate-spin md:mr-2" />
+              ) : (
+                <RotateCcw className="h-4 w-4 md:mr-2" />
+              )}
+              <span className="hidden md:inline">Reabrir Proposta</span>
+            </Button>
+          )}
+
           <Button 
             variant="outline" 
             size="sm"
