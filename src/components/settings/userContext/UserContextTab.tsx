@@ -262,6 +262,13 @@ export default function UserContextTab() {
         organizationId={organizationId}
         canEdit={isAdmin}
       />
+
+      <DashboardPreviewModal
+        open={!!previewing}
+        onOpenChange={(v) => !v && setPreviewing(null)}
+        row={previewing}
+        tenantId={tenantId}
+      />
     </div>
   );
 }
