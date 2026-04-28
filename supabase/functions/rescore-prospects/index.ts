@@ -179,7 +179,7 @@ async function processRescore(
       }
 
       const scoreUpdates: any[] = [];
-      const prospectUpdates: { id: string; score: number }[] = [];
+      
 
       for (const score of (scores ?? []) as Score[]) {
         try {
