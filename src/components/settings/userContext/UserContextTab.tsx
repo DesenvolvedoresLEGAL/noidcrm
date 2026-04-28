@@ -20,6 +20,7 @@ import type { UserContextRow } from '@/services/crm/userContext';
 import { UserContextStatsCards } from './UserContextStatsCards';
 import { ReviewStatusBadge, PermissionBadge, DepartmentBadge } from './UserContextBadges';
 import { EditUserContextModal } from './EditUserContextModal';
+import { UserDynamicDashboardToggle } from './UserDynamicDashboardToggle';
 
 const REVIEW_FILTER: Array<{ value: 'all' | ReviewStatus; label: string }> = [
   { value: 'all', label: 'Todos' },
@@ -189,6 +190,7 @@ export default function UserContextTab() {
                     <TableHead className="hidden md:table-cell">Área</TableHead>
                     <TableHead>Função</TableHead>
                     <TableHead>Revisão</TableHead>
+                    <TableHead className="text-center" title="Habilitar dashboard dinâmico individual">Dashboard dinâmico</TableHead>
                     <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -221,6 +223,14 @@ export default function UserContextTab() {
                         </TableCell>
                         <TableCell>
                           <ReviewStatusBadge status={status} />
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <UserDynamicDashboardToggle
+                            tenantId={tenantId}
+                            userId={row.user_id}
+                            enabled={!!row.is_dashboard_dynamic_enabled}
+                            disabled={!isAdmin || !row.context_id}
+                          />
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">

@@ -46,6 +46,7 @@ export interface UserContextRow {
   business_function_key: string | null;
   business_function_name: string | null;
   manager_user_id: string | null;
+  is_dashboard_dynamic_enabled: boolean;
   metadata: Record<string, any>;
   // Member info
   full_name: string | null;
@@ -150,6 +151,7 @@ export async function fetchUserContexts(tenantId: string, organizationId: string
       business_function_key: c?.business_function_key ?? null,
       business_function_name: c?.business_function_name ?? null,
       manager_user_id: c?.manager_user_id ?? null,
+      is_dashboard_dynamic_enabled: !!c?.is_dashboard_dynamic_enabled,
       metadata: c?.metadata ?? {},
       full_name: p?.full_name ?? null,
       email: p?.email ?? null,
