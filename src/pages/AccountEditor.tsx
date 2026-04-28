@@ -21,12 +21,13 @@ import { ArrowLeft, Save, Loader2, Building2, MapPin, Mail, Users, Briefcase, Fi
 import { createContact } from '@/services/crm/contacts';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
-import { accountKeys, contactKeys, opportunityKeys } from '@/lib/query-keys';
+import { accountKeys, contactKeys } from '@/lib/query-keys';
 import { cnaeToSegmento } from '@/lib/cnae-to-segmento';
 import { TIPO_EMPRESA_OPTIONS, SEGMENTO_OPTIONS, normalizeTipoEmpresa, withCurrentValue } from '@/lib/account-options';
 import { normalizeSegmento } from '@/lib/segment-normalizer';
 import { AccountTagsSelector } from '@/components/accounts/AccountTagsSelector';
 import { useAccountTagIds, useSetAccountTags } from '@/hooks/useAccountTags';
+import { invalidateAccount } from '@/lib/cache-invalidation';
 // Helper: transforma string vazia em null para campos UUID/opcionais
 const emptyToNull = (v: string | null | undefined) => (v === '' ? null : v);
 
@@ -363,10 +364,11 @@ export default function AccountEditor() {
       }
       return result;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: accountKeys.lists() });
-      queryClient.invalidateQueries({ queryKey: accountKeys.detailExtended(id) });
-      queryClient.invalidateQueries({ queryKey: opportunityKeys.lists() });
+    onSuccess: async (updatedAccount) => {
+      await invalidateAccount(queryClient, id);
+      queryClient.setQueryData(accountKeys.detailExtended(id), (current: any) =>
+        current ? { ...current, ...updatedAccount } : updatedAccount,
+      );
       toast({ title: 'Conta atualizada com sucesso!' });
       navigate(`/app/accounts/${id}`);
     },
