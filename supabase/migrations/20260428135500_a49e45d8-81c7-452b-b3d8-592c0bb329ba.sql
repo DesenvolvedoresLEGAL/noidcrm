@@ -1,0 +1,1 @@
+alter view public.crm_user_context_backfill_preview set (security_invoker = true);

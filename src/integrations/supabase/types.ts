@@ -7832,6 +7832,69 @@ export type Database = {
         }
         Relationships: []
       }
+      crm_user_context_backfill_logs: {
+        Row: {
+          action: string
+          created_at: string
+          error_message: string | null
+          id: string
+          legacy_commercial_function: string | null
+          legacy_org_role: string | null
+          legacy_user_type: string | null
+          mapped_business_function_key: string | null
+          mapped_department_key: string | null
+          mapped_permission_key: string | null
+          mapping_confidence: string | null
+          metadata: Json
+          organization_member_id: string | null
+          requires_review: boolean
+          review_reason: string | null
+          status: string
+          tenant_id: string
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          legacy_commercial_function?: string | null
+          legacy_org_role?: string | null
+          legacy_user_type?: string | null
+          mapped_business_function_key?: string | null
+          mapped_department_key?: string | null
+          mapped_permission_key?: string | null
+          mapping_confidence?: string | null
+          metadata?: Json
+          organization_member_id?: string | null
+          requires_review?: boolean
+          review_reason?: string | null
+          status: string
+          tenant_id: string
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          legacy_commercial_function?: string | null
+          legacy_org_role?: string | null
+          legacy_user_type?: string | null
+          mapped_business_function_key?: string | null
+          mapped_department_key?: string | null
+          mapped_permission_key?: string | null
+          mapping_confidence?: string | null
+          metadata?: Json
+          organization_member_id?: string | null
+          requires_review?: boolean
+          review_reason?: string | null
+          status?: string
+          tenant_id?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       crm_user_contexts: {
         Row: {
           business_function_id: string | null
@@ -25621,6 +25684,41 @@ export type Database = {
           },
         ]
       }
+      crm_user_context_backfill_preview: {
+        Row: {
+          action: string | null
+          deleted_at: string | null
+          legacy_org_role: string | null
+          legacy_status: string | null
+          legacy_user_type: string | null
+          mapped_business_function_key: string | null
+          mapped_department_key: string | null
+          mapped_permission_key: string | null
+          mapped_status: string | null
+          mapping_confidence: string | null
+          organization_member_id: string | null
+          requires_review: boolean | null
+          review_reason: string | null
+          tenant_id: string | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_members_organization_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_members_organization_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "v_report_legacy_retirement_readiness_v2"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
       crm_user_context_view: {
         Row: {
           automation_profile_key: string | null
@@ -28607,6 +28705,18 @@ export type Database = {
         }
         Returns: string
       }
+      crm_resolve_user_context_mapping: {
+        Args: { _org_role: string; _user_app_role: string }
+        Returns: {
+          business_function_key: string
+          department_key: string
+          mapping_confidence: string
+          permission_key: string
+          requires_review: boolean
+          review_reason: string
+        }[]
+      }
+      crm_run_user_context_backfill: { Args: never; Returns: Json }
       delete_contract: { Args: { contract_id: string }; Returns: boolean }
       delete_email: {
         Args: { message_id: number; queue_name: string }

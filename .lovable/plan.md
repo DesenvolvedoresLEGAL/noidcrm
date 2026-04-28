@@ -1,100 +1,102 @@
-## Sprint 1 — Fundação de Permissão / Área / Função (silenciosa, com feature flags desligadas)
+## Sprint 2 — Backfill seguro do contexto de usuários
 
-Auditoria do projeto atual confirmou:
+### Auditoria de fontes legadas (já feita)
 
-- **Tabela de tenants**: `public.organizations`
-- **Vínculo usuário ↔ tenant**: `public.organization_members` (com `organization_id`, `user_id`, `org_role` enum, `status`, `deleted_at`)
-- Função `get_user_organization_id()` já existe (retorna org do usuário via `profiles`)
-- Função `is_admin_or_owner(_user_id uuid)` já existe (checa `org_role IN ('owner','admin')` no `organization_members`)
-- **NÃO existem** `user_belongs_to_tenant(uuid)` nem `is_tenant_admin_or_owner(uuid)` → serão criadas como helpers novos (não substituem nada existente)
-- Auth via `auth.uid()`
-- `set_updated_at()` não existe globalmente → será criada (idempotente)
+| Fonte | Campos úteis | Observação |
+|---|---|---|
+| `organization_members` | `org_role` (enum: owner, admin, manager, sales, viewer, cs, finance, operations), `status`, `deleted_at` | **Fonte primária** — vínculo usuário↔tenant |
+| `user_roles` | `role` (app_role enum: admin, manager, sales, cs) — sem `organization_id` | **Fonte secundária**, global ao usuário |
+| `profiles` | `full_name`, `email`, `monthly_goal`, `default_pipeline_id` | **Não possui** campo de tipo/função/área legada |
+| `team_members` | `role` text | **Vazio** (0 linhas) — desconsiderar |
 
-Nesta sprint **nenhuma tela, hook, serviço ou rota muda**. Apenas migration de banco. Nenhuma RLS existente é tocada. Nada legado é removido.
+**Conclusão**: não existe no schema atual um campo de "função comercial" granular (sdr/closer/bdr/hunter/farmer/am/etc). O único sinal disponível é `org_role` em `organization_members` complementado por `user_roles.role`. Portanto:
 
----
+- **Permissão** → mapeamento de alta confiança (org_role tem owner/admin/manager/viewer; user_roles complementa admin/manager para quem tem só sales/cs no org_members).
+- **Área e função** → mapeamento de **confiança média/baixa** baseado em fallbacks da spec. Todos os `sales`, `cs`, `finance`, `operations` do org_role serão mapeados via regras especiais com `requires_review = true` quando aplicável (vendedor sem função comercial → sales/closer com review, etc).
 
-## O que será criado (1 migration única)
-
-### 1. Helpers de segurança (novos, não substituem nada)
-
-- `public.user_belongs_to_tenant(_tenant_id uuid) returns boolean` — SECURITY DEFINER, `search_path=public`. Verifica `organization_members` com `status='active'` e `deleted_at is null` para `auth.uid()`.
-- `public.is_tenant_admin_or_owner(_tenant_id uuid) returns boolean` — SECURITY DEFINER, `search_path=public`. Mesma checagem com `org_role IN ('owner','admin')`.
-- `public.set_updated_at()` — trigger genérica idempotente (`CREATE OR REPLACE`).
-
-### 2. Tabelas (todas com `tenant_id uuid not null` referenciando `organizations(id)` lógicamente — sem FK explícita para evitar cascade surpresa, igual ao padrão atual do projeto)
-
-- `crm_permission_roles`
-- `crm_departments`
-- `crm_business_functions` (FK para `crm_departments`)
-- `crm_user_contexts` (FKs para as 3 acima; `legacy_user_type`, `legacy_commercial_function` para futuro backfill; flags individuais de dashboard/automação dinâmica em `false`)
-- `crm_feature_flags`
-
-Todas com: `id uuid pk default gen_random_uuid()`, `created_at`, `updated_at`, `metadata jsonb default '{}'`, `is_active`/`enabled` default conforme spec, constraints CHECK e UNIQUE `(tenant_id, key)` (ou `(tenant_id, user_id)` em contexts).
-
-### 3. Índices
-
-Todos os listados na spec: por `(tenant_id, key)`, `(tenant_id, is_active)`, FKs em `crm_user_contexts` e `crm_business_functions`.
-
-### 4. Triggers `updated_at`
-
-Uma por tabela, usando `set_updated_at()`.
-
-### 5. RLS
-
-- `ENABLE ROW LEVEL SECURITY` nas 5 tabelas.
-- Policy SELECT por tabela: `using (public.user_belongs_to_tenant(tenant_id))`.
-- Policy ALL (insert/update/delete) por tabela: `using/with check (public.is_tenant_admin_or_owner(tenant_id))`.
-- Nenhuma policy existente em outras tabelas é tocada.
-
-### 6. Seeds idempotentes
-
-Um bloco `DO $$ ... $$` que itera sobre `SELECT id FROM organizations` e faz `INSERT ... ON CONFLICT (tenant_id, key) DO UPDATE SET name=EXCLUDED.name, description=EXCLUDED.description, ...` para:
-
-- **5 permissões**: owner(100), admin(90), manager(70), user(40), viewer(10) — todas `is_system=true`
-- **7 áreas**: pre_sales, sales, customer_success, finance, operations, it, executive — todas `is_system=true`
-- **19 funções** ligadas às áreas via lookup por `(tenant_id, department_key)`: sdr/bdr/ldr (pre_sales), ae/closer/hunter (sales), cs/am/farmer (customer_success), finance/finance_admin (finance), operations/support (operations), technical_support/dev/automation (it), director/owner/viewer (executive). Cada uma com `function_group`, `dashboard_profile_key`, `automation_profile_key`, `is_sales_related` conforme spec.
-- **3 feature flags**, todas com `enabled=false`: `dynamic_user_context_enabled`, `dynamic_dashboards_enabled`, `function_automations_enabled`, com `config` jsonb conforme spec.
-
-Nenhum seed em `crm_user_contexts` (sem backfill nesta sprint).
-
-### 7. View de leitura futura
-
-`public.crm_user_context_view` — SELECT-only join de contexts + permissions + departments + business_functions. **Sem `security definer`**. RLS das tabelas base continua valendo.
+Volume atual: **19 membros ativos** (18 active + 1 suspended), 11 deletados (serão pulados), 8 organizações.
 
 ---
 
-## Validações pós-migration (executadas via `supabase--read_query` após aplicar)
+### Migration única — o que será criado
 
-1. Existência das 5 tabelas.
-2. RLS ativa em todas (`pg_class.relrowsecurity`).
-3. Contagem de policies por tabela (esperado: 2 por tabela).
-4. Contagem de seeds por tenant (5 permissões + 7 áreas + 19 funções + 3 flags por org).
-5. `enabled=false` em todas as 3 flags.
-6. View criada e SELECT-able.
+**1. Tabela de auditoria `crm_user_context_backfill_logs`**
+- Campos exatamente como na spec
+- RLS habilitada
+- SELECT: apenas owner/admin do tenant (padrão mais seguro) via `is_tenant_admin_or_owner`
+- INSERT/UPDATE/DELETE: apenas owner/admin do tenant
+- Índice por `(tenant_id, action, status)` e `(tenant_id, user_id)`
+
+**2. Função de mapeamento `crm_resolve_user_context_mapping(_org_role text, _user_app_role text)` (SECURITY INVOKER, search_path=public)**
+Retorna `(permission_key, department_key, business_function_key, mapping_confidence, requires_review, review_reason)`.
+
+Lógica (prioridade):
+1. **Permissão**: cruza `org_role` + melhor papel do `user_roles` (admin > manager > resto). owner→owner; admin→admin; manager→manager; viewer→viewer; sales/cs/finance/operations→user (com complemento se user_roles disser admin/manager).
+2. **Área/Função** via fallbacks da spec:
+   - owner → executive/owner (high)
+   - admin sem função → operations/operations (medium, requires_review)
+   - manager sem função → sales/director (medium, requires_review="Manager sem área legada explícita...")
+   - org_role=sales → sales/closer (medium, requires_review="Vendedor sem função comercial explícita...")
+   - org_role=cs → customer_success/cs (medium)
+   - org_role=finance → finance/finance_admin (medium)
+   - org_role=operations → operations/operations (medium)
+   - org_role=viewer → executive/viewer (medium)
+   - sem nada → null/null (low, requires_review="Área e função não identificadas no backfill")
+
+**3. View de DRY RUN `crm_user_context_backfill_preview` (security_invoker)**
+Junta `organization_members` (deleted_at IS NULL) + `user_roles` + função de mapeamento → retorna por usuário: tenant_id, user_id, org_role, user_app_role, status legado e mapeado, mapped_*, mapping_confidence, requires_review, review_reason, action (`would_create` | `would_update` | `would_skip_existing_filled`).
+
+**4. Função de execução `crm_run_user_context_backfill()` (SECURITY DEFINER, search_path=public, restrita a service_role)**
+- Itera membros não deletados
+- Para cada: resolve permission_role_id, department_id, business_function_id por `(tenant_id, key)`
+- Se contexto **não existe** → INSERT com `metadata.created_by_sprint='user_context_sprint_2'`, `legacy.org_role/user_type/commercial_function`, `mapping_confidence`, `requires_review`
+- Se contexto **existe**: preserva campos não-nulos. Só preenche o que estiver `NULL` (regra de preservação da spec)
+- Mapeia `status` (active/suspended/pending/blocked/inactive) conforme spec; `suspended` → `blocked`
+- Insere log em `crm_user_context_backfill_logs` por linha (`created_context` | `updated_context` | `skipped_existing_complete` | `requires_review` adicional)
+- Insere log `skipped_deleted_member` para cada deleted (varre uma vez)
+- Retorna jsonb com contadores
+
+**5. Execução do backfill**
+- Rodar `SELECT * FROM crm_user_context_backfill_preview;` e validar:
+  - missing_permission = 0
+  - requires_review_pct ≤ 30%
+- Se válido, executar `SELECT crm_run_user_context_backfill();`
+- Se exceder threshold, abortar e reportar.
+
+**6. Validações pós-execução** — as 10 queries da spec via `read_query`.
 
 ---
 
-## Garantias de não-quebra
+### Garantias de não-quebra
 
-- Zero alteração em `profiles`, `organization_members`, `user_roles`, `app_role` enum, ou qualquer tabela existente.
-- Zero alteração em policies existentes.
-- Zero alteração em código TS/React/hooks/serviços/edge functions.
-- Helpers novos têm nomes únicos (`user_belongs_to_tenant`, `is_tenant_admin_or_owner`) — não conflitam com nada.
-- Tabelas prefixadas `crm_*` para isolar do schema atual.
-- Feature flags desligadas → consumidores futuros (Sprint 2+) caem em fallback.
-
----
-
-## Riscos
-
-- **Baixíssimo**. Migration aditiva pura. Reversível com `DROP TABLE IF EXISTS crm_*` + `DROP FUNCTION user_belongs_to_tenant, is_tenant_admin_or_owner`.
-- Único ponto de atenção: `set_updated_at()` usa `CREATE OR REPLACE` — se já houver uma versão idêntica no projeto, é no-op; se houver versão divergente, ela é sobrescrita pela versão padrão. Vou verificar antes via `pg_proc` e, se já existir, **não sobrescrever** (usar `CREATE FUNCTION IF NOT EXISTS` via bloco condicional).
+- **Zero alteração** em `profiles`, `organization_members`, `user_roles`, `team_members`, enums, ou qualquer policy existente.
+- **Zero alteração** em código TS/React/edge functions.
+- Feature flags continuam todas em `enabled=false`.
+- `crm_user_contexts` é tabela nova da Sprint 1 — ninguém em produção lê dela hoje.
+- Novos registros marcados em `metadata.created_by_sprint='user_context_sprint_2'` para rollback cirúrgico.
 
 ---
 
-## Próximos passos (após aprovação)
+### Rollback (NÃO executado, apenas documentado no resumo final)
 
-1. Aplicar a migration única (helpers + tabelas + índices + triggers + RLS + seeds + view).
-2. Rodar as 6 validações via `read_query`.
-3. Entregar resumo final: tabelas, policies, seeds por tenant, flags, e confirmação de zero impacto em telas/usuários.
+```sql
+DELETE FROM crm_user_contexts WHERE metadata->>'created_by_sprint' = 'user_context_sprint_2';
+DELETE FROM crm_user_context_backfill_logs WHERE metadata->>'created_by_sprint' = 'user_context_sprint_2';
+```
+
+---
+
+### Riscos
+
+- **Baixo**. Tabela alvo é nova, não consumida por nenhuma tela. Função de mapeamento é determinística e auditável via logs.
+- Único ponto de atenção: ~todos os `sales`/`cs`/`admin`/`manager` ficarão com `requires_review=true` por **falta de função comercial granular no schema atual**. Esperado e por design — Sprint 3+ deve oferecer UI de revisão. Reportarei o percentual no resumo final; se passar de 30%, **paro o backfill real** (provavelmente passará: estimativa ~80% requires_review). Vou confirmar a tolerância contigo no momento do dry run, em vez de abortar silenciosamente.
+
+---
+
+### Próximos passos após aprovação
+
+1. Aplicar migration (logs table + RPC mapeamento + view preview + RPC backfill).
+2. Rodar `crm_user_context_backfill_preview` e reportar contadores.
+3. Se `requires_review` > 30%, **pausar e perguntar**: aceita prosseguir mesmo assim (esperado dado a ausência de função comercial legada) ou aguarda Sprint 3 para revisão manual antes do backfill?
+4. Se aprovado, executar `crm_run_user_context_backfill()`.
+5. Rodar as 10 validações e entregar resumo final.
