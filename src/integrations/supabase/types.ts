@@ -28895,6 +28895,10 @@ export type Database = {
       }
       crm_run_user_context_backfill: { Args: never; Returns: Json }
       crm_save_user_context: { Args: { payload: Json }; Returns: Json }
+      crm_seed_default_dashboard_profiles: {
+        Args: { p_tenant_id: string }
+        Returns: number
+      }
       delete_contract: { Args: { contract_id: string }; Returns: boolean }
       delete_email: {
         Args: { message_id: number; queue_name: string }
