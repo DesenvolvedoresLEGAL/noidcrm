@@ -28,6 +28,7 @@ import { normalizeSegmento } from '@/lib/segment-normalizer';
 import { AccountTagsSelector } from '@/components/accounts/AccountTagsSelector';
 import { useAccountTagIds, useSetAccountTags } from '@/hooks/useAccountTags';
 import { invalidateAccount } from '@/lib/cache-invalidation';
+import { useAccountResponsibleOptions } from '@/hooks/useAccountResponsibleOptions';
 // Helper: transforma string vazia em null para campos UUID/opcionais
 const emptyToNull = (v: string | null | undefined) => (v === '' ? null : v);
 
@@ -93,19 +94,6 @@ const accountSchema = z.object({
 
 type AccountFormData = z.infer<typeof accountSchema>;
 
-type ResponsibleOption = { id: string; name: string; email?: string | null; role?: string | null };
-
-const normalizeRole = (role?: string | null) =>
-  (role || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .trim();
-
-const SALES_OWNER_ROLES = new Set(['vendedor', 'closer']);
-const PRE_SALES_ROLES = new Set(['sdr', 'bdr', 'pre vendas', 'pre-vendas', 'pre vendedor', 'pre-vendedor', 'pre sales']);
-const CS_ROLES = new Set(['cs', 'customer success', 'onboarding']);
-
 export default function AccountEditor() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -129,58 +117,7 @@ export default function AccountEditor() {
   const setAccountTagsMutation = useSetAccountTags();
 
   const { data: account, isLoading: accountLoading, error: accountError } = useAccountDetails(id!);
-  const { data: responsibleOptions, isLoading: usersLoading } = useQuery({
-    queryKey: ['account-responsible-options', id],
-    queryFn: async () => {
-      const { data: orgId, error: orgError } = await supabase.rpc('get_user_organization_id');
-      if (orgError || !orgId) throw orgError || new Error('Organização não encontrada');
-
-      const [{ data: members, error: membersError }, { data: sellers, error: sellersError }, { data: roles, error: rolesError }] = await Promise.all([
-        supabase.from('organization_members').select('user_id, org_role, status').eq('organization_id', orgId).eq('status', 'active'),
-        supabase.from('sellers').select('user_id, name, email, role, active').eq('organization_id', orgId).eq('active', true),
-        supabase.from('user_roles').select('user_id, role'),
-      ]);
-
-      if (membersError) throw membersError;
-      if (sellersError) throw sellersError;
-      if (rolesError) throw rolesError;
-
-      const activeSalesMembers = new Set(
-        (members || [])
-          .filter((member) => normalizeRole(member.org_role) === 'sales')
-          .map((member) => member.user_id),
-      );
-      const salesRoleUsers = new Set(
-        (roles || [])
-          .filter((role) => normalizeRole(role.role) === 'sales')
-          .map((role) => role.user_id),
-      );
-
-      const commercialUsers = (sellers || [])
-        .filter((seller) => seller.user_id && activeSalesMembers.has(seller.user_id) && salesRoleUsers.has(seller.user_id))
-        .map((seller) => ({
-          id: seller.user_id!,
-          name: seller.name || seller.email || 'Usuário sem nome',
-          email: seller.email,
-          role: seller.role,
-        })) as ResponsibleOption[];
-
-      const byRole = (allowed: Set<string>) =>
-        commercialUsers.filter((user) => allowed.has(normalizeRole(user.role)));
-
-      return {
-        owners: byRole(SALES_OWNER_ROLES),
-        preSales: byRole(PRE_SALES_ROLES),
-        cs: byRole(CS_ROLES),
-      };
-    },
-    staleTime: 0,
-    refetchOnMount: 'always',
-  });
-
-  const ownerUsers = responsibleOptions?.owners || [];
-  const preSalesUsers = responsibleOptions?.preSales || [];
-  const csUsers = responsibleOptions?.cs || [];
+  const { ownerUsers, preSalesUsers, csUsers, isLoading: usersLoading } = useAccountResponsibleOptions();
 
   const { data: originsData } = useQuery({
     queryKey: ['origins'],
