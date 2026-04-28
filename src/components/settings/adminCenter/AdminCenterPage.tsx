@@ -4,6 +4,7 @@ import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useAdminCenterProfile } from '@/hooks/dashboard/useDashboardResolver';
 import { DynamicDashboardShell } from '@/components/dashboard/dynamic/DynamicDashboardShell';
 import { AdminCenterExplainer } from './AdminCenterExplainer';
+import { CloserDashboardAuditLog } from './CloserDashboardAuditLog';
 
 export function AdminCenterPage() {
   const { organization, isOrgAdmin, loading: loadingUser } = useCurrentUser();
@@ -69,6 +70,8 @@ export function AdminCenterPage() {
           loading={isLoading}
         />
       )}
+
+      <CloserDashboardAuditLog tenantId={tenantId} />
     </div>
   );
 }
