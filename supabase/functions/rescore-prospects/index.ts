@@ -101,13 +101,11 @@ Deno.serve(async (req) => {
     }
 
     // Marca início
-    await supabase.from("system_events").insert({
-      organization_id: orgId,
-      event_type: "rescore.started",
-      entity_id: entityId,
-      entity_type: run_id ? "playbook_run" : "prospect_batch",
-      payload: { total: targets.length, run_id, prospect_ids: prospect_ids?.length ?? null },
-    } as any);
+    await logEvent(supabase, orgId, "rescore.started", entityId, run_id, {
+      total: targets.length,
+      run_id,
+      prospect_ids: prospect_ids?.length ?? null,
+    });
 
     // Background processing
     EdgeRuntime.waitUntil(processRescore(supabase, targets, orgId, entityId, run_id));
@@ -247,36 +245,49 @@ async function processRescore(
     }
 
     const durationMs = Date.now() - startedAt;
-    await supabase.from("system_events").insert({
-      organization_id: orgId,
-      event_type: "rescore.completed",
-      entity_id: entityId,
-      entity_type: runId ? "playbook_run" : "prospect_batch",
-      payload: {
-        rescored,
-        unchanged,
-        failed,
-        total: targets.length,
-        avg_adjustment:
-          adjustments.length > 0 ? adjustments.reduce((a, b) => a + b, 0) / adjustments.length : 0,
-        learning_signals_active: learnMap.size,
-        duration_ms: durationMs,
-      },
-    } as any);
+    await logEvent(supabase, orgId, "rescore.completed", entityId, runId, {
+      rescored,
+      unchanged,
+      failed,
+      total: targets.length,
+      avg_adjustment:
+        adjustments.length > 0 ? adjustments.reduce((a, b) => a + b, 0) / adjustments.length : 0,
+      learning_signals_active: learnMap.size,
+      duration_ms: durationMs,
+    });
 
     console.log(
       `[rescore-prospects] done entity=${entityId} rescored=${rescored}/${targets.length} duration=${durationMs}ms`,
     );
   } catch (e: any) {
     console.error("[rescore-prospects] background error", e);
-    await supabase.from("system_events").insert({
-      organization_id: orgId,
-      event_type: "rescore.failed",
-      entity_id: entityId,
-      entity_type: runId ? "playbook_run" : "prospect_batch",
-      payload: { error: e.message, total: targets.length },
-    } as any);
+    await logEvent(supabase, orgId, "rescore.failed", entityId, runId, {
+      error: e.message,
+      total: targets.length,
+    });
   }
+}
+
+async function logEvent(
+  supabase: any,
+  orgId: string,
+  eventType: string,
+  entityId: string,
+  runId: string | undefined,
+  payload: Record<string, unknown>,
+) {
+  const { error } = await supabase.from("system_events").insert({
+    organization_id: orgId,
+    trace_id: crypto.randomUUID(),
+    actor_type: "system",
+    event_type: eventType,
+    event_category: "intelligence",
+    action: eventType.split(".")[1] ?? eventType,
+    entity_type: runId ? "playbook_run" : "prospect_batch",
+    entity_id: entityId,
+    payload,
+  });
+  if (error) console.error("[rescore] system_events insert error", error.message);
 }
 
 function json(data: any, status = 200) {
