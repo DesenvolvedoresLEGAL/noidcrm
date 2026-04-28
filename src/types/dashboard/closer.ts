@@ -6,6 +6,8 @@ export type CloserPeriodKey =
   | 'custom';
 
 export type CloserWidgetAvailability = 'ready' | 'unavailable';
+export type CloserSeverity = 'critical' | 'attention' | 'opportunity' | 'info';
+export type CloserItemKind = 'activity' | 'proposal' | 'opportunity';
 
 export interface CloserDashboardKpis {
   open_pipeline_value: number;
@@ -24,7 +26,7 @@ export interface CloserDashboardKpis {
   average_ticket_value: number | null;
 }
 
-export interface CloserCentralDoDia {
+export interface CloserCentralCounts {
   today_activities_count: number;
   overdue_followups_count: number;
   proposals_expiring_today: number;
@@ -35,61 +37,29 @@ export interface CloserCentralDoDia {
   stalled_opportunities: number;
 }
 
-export interface CloserRiskDeal {
+export interface CloserListItem {
   id: string;
-  title: string;
-  valor_previsto: number | null;
-  stage_name: string | null;
-  nome_fantasia: string | null;
-  razao_social: string | null;
-  last_contact_date: string | null;
-  risk_reason: string;
-}
-
-export interface CloserOverdueFollowup {
-  id: string;
-  title: string;
-  scheduled_date: string;
-  type: string;
-  opportunity_id: string | null;
-  deal_title: string | null;
-  customer_name: string | null;
-  days_overdue: number;
-}
-
-export interface CloserViewedProposal {
-  id: string;
-  title: string | null;
-  value: number | null;
-  last_viewed_at: string;
-  views_count: number | null;
-  opportunity_id: string;
-  customer_name: string | null;
-}
-
-export interface CloserProposalAction {
-  id: string;
-  title: string | null;
-  value: number | null;
-  status: string;
-  expires_at: string | null;
-  last_viewed_at: string | null;
-  opportunity_id: string;
-  customer_name: string | null;
-  reason: string;
-}
-
-export interface CloserAgendaItem {
-  id: string;
-  title: string;
-  type: string;
-  scheduled_date: string;
-  opportunity_id: string | null;
-  customer_name: string | null;
+  kind: CloserItemKind;
+  title?: string | null;
+  type?: string | null;
+  value?: number | null;
+  scheduled_date?: string | null;
+  expires_at?: string | null;
+  last_viewed_at?: string | null;
+  last_contact_date?: string | null;
+  customer_name?: string | null;
+  opportunity_id?: string | null;
+  stage_name?: string | null;
+  days_overdue?: number;
+  days_in_stage?: number;
+  risk_reason?: string;
+  severity: CloserSeverity;
+  why_here: string;
 }
 
 export interface CloserNextAction {
   priority: number;
+  severity: CloserSeverity;
   type: string;
   title: string;
   action_label: string;
@@ -97,6 +67,14 @@ export interface CloserNextAction {
   opportunity_id: string | null;
   customer_name: string | null;
   value: number | null;
+  why_here: string;
+}
+
+export interface CloserGoalWarning {
+  severity: CloserSeverity;
+  audience: 'admin' | 'user';
+  message: string;
+  reason: string;
 }
 
 export interface CloserDashboardData {
@@ -110,16 +88,21 @@ export interface CloserDashboardData {
   };
   period: { key: CloserPeriodKey; start_date: string; end_date: string };
   kpis: CloserDashboardKpis;
-  central_do_dia: CloserCentralDoDia;
+  central_do_dia: CloserCentralCounts;
   lists: {
-    risk_deals: CloserRiskDeal[];
-    overdue_followups: CloserOverdueFollowup[];
-    viewed_proposals: CloserViewedProposal[];
-    proposals_action_required: CloserProposalAction[];
-    today_agenda: CloserAgendaItem[];
-    next_actions: CloserNextAction[];
+    today_agenda: CloserListItem[];
+    overdue_followups: CloserListItem[];
+    proposals_expiring_today: CloserListItem[];
+    proposals_expiring_48h: CloserListItem[];
+    proposals_expired: CloserListItem[];
+    proposals_viewed_no_followup: CloserListItem[];
+    opportunities_without_next_activity: CloserListItem[];
+    stalled_opportunities: CloserListItem[];
+    risk_deals: CloserListItem[];
+    top_actions_today: CloserNextAction[];
   };
   availability: Record<string, CloserWidgetAvailability>;
+  goal_warning: CloserGoalWarning | null;
   metadata: {
     generated_at: string;
     source: string;
