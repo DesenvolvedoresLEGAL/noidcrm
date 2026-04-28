@@ -16,7 +16,7 @@ import { accountKeys, opportunityKeys } from '@/lib/query-keys';
 import { cnaeToSegmento } from '@/lib/cnae-to-segmento';
 import { TIPO_EMPRESA_OPTIONS, SEGMENTO_OPTIONS, normalizeTipoEmpresa, withCurrentValue } from '@/lib/account-options';
 import { normalizeSegmento } from '@/lib/segment-normalizer';
-import { useOrganizationUsers } from '@/hooks/useOrganizationUsers';
+import { useAccountResponsibleOptions } from '@/hooks/useAccountResponsibleOptions';
 import { useState, useEffect } from 'react';
 import { Search, Loader2, Building2, MapPin, Mail, Users, Briefcase, FileText, User, GitBranch } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -101,11 +101,7 @@ export function AccountModalTabs({ open, onOpenChange, account }: AccountModalTa
   const queryClient = useQueryClient();
   const isEditing = !!account;
   const acc = account as any;
-  const { users } = useOrganizationUsers([
-    acc?.owner_user_id,
-    acc?.cs_user_id,
-    acc?.pre_sales_user_id,
-  ]);
+  const { ownerUsers, preSalesUsers, csUsers, isLoading: usersLoading } = useAccountResponsibleOptions();
   
   const [isLoadingCNPJ, setIsLoadingCNPJ] = useState(false);
   const [cnpjToLookup, setCnpjToLookup] = useState('');
