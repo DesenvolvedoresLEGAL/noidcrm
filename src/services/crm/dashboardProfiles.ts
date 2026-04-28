@@ -12,6 +12,7 @@ export type DashboardResolutionSource =
   | 'business_function'
   | 'department'
   | 'permission_role'
+  | 'owner_override'
   | 'default'
   | 'legacy_fallback'
   | 'error_fallback';
