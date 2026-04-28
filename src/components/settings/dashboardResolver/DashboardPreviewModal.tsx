@@ -39,6 +39,9 @@ export function DashboardPreviewModal({ open, onOpenChange, row, tenantId }: Pro
   }, [open, row?.user_id, tenantId]);
 
   const requiresReview = !!row?.metadata?.requires_review;
+  const permissionKey = (result?.context.permission_key || '').toLowerCase();
+  const isAdminPermission = permissionKey === 'admin';
+  const isOwnerOverride = !!result?.owner_override || result?.resolution_source === 'owner_override';
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -55,6 +58,24 @@ export function DashboardPreviewModal({ open, onOpenChange, row, tenantId }: Pro
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>
               Este usuário ainda está marcado para revisão. Confirme a função antes de ativar dashboard dinâmico.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {isAdminPermission && (
+          <Alert>
+            <Info className="h-4 w-4" />
+            <AlertDescription>
+              Permissão <strong>Admin</strong> libera gestão do CRM (Admin Center), mas o dashboard principal segue a função/área do usuário.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {isOwnerOverride && (
+          <Alert>
+            <Info className="h-4 w-4" />
+            <AlertDescription>
+              Override de <strong>Owner</strong>: usuários com permissão Owner sempre resolvem para o cockpit executivo, mesmo com função ou área mapeadas.
             </AlertDescription>
           </Alert>
         )}

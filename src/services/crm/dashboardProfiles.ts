@@ -12,6 +12,7 @@ export type DashboardResolutionSource =
   | 'business_function'
   | 'department'
   | 'permission_role'
+  | 'owner_override'
   | 'default'
   | 'legacy_fallback'
   | 'error_fallback';
@@ -69,6 +70,7 @@ export interface DashboardResolutionResult {
     dynamic_dashboards_enabled: boolean;
     dynamic_user_context_enabled: boolean;
   };
+  owner_override?: boolean;
 }
 
 export interface DashboardResolutionLog {
