@@ -179,7 +179,7 @@ export function EditPipelineModal({ open, onClose, onSave, pipeline }: EditPipel
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[560px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{pipeline ? 'Editar Funil' : 'Novo Funil'}</DialogTitle>
           <DialogDescription>
