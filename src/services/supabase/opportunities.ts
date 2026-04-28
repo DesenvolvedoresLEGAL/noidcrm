@@ -304,6 +304,31 @@ export async function createOpportunity(dto: unknown): Promise<Opportunity> {
   // Handle temperature from either field name (temperatura or temperature)
   const temperatureValue = validated.temperatura || validated.temperature || 'warm';
 
+  // If no owner specified and pipeline has lead distribution configured, try claim
+  let resolvedOwner: string | null = validated.owner_user_id || null;
+  if (!resolvedOwner && pipelineId) {
+    try {
+      let accountUf: string | null = null;
+      if (validated.account_id) {
+        const { data: acc } = await supabase
+          .from('accounts')
+          .select('uf')
+          .eq('id', validated.account_id)
+          .maybeSingle();
+        accountUf = acc?.uf ?? null;
+      }
+      const { data: claimed } = await supabase.rpc('claim_next_owner_v2', {
+        _organization_id: orgId as any,
+        _pipeline_id: pipelineId,
+        _account_uf: accountUf,
+      });
+      if (claimed) resolvedOwner = claimed as string;
+    } catch (e) {
+      console.warn('[createOpportunity] claim_next_owner_v2 failed', e);
+    }
+  }
+  resolvedOwner = resolvedOwner || user.id;
+
   const insertData: any = {
     title: validated.title || 'Nova Oportunidade',
     account_id: validated.account_id,
@@ -312,7 +337,7 @@ export async function createOpportunity(dto: unknown): Promise<Opportunity> {
     stage_id: stageId,
     produto: validated.produto,
     valor_previsto: validated.valor_previsto,
-    owner_user_id: validated.owner_user_id || user.id,
+    owner_user_id: resolvedOwner,
     status: validated.status || 'new',
     temperature: temperatureValue,
     prob: probValue,
@@ -332,6 +357,41 @@ export async function createOpportunity(dto: unknown): Promise<Opportunity> {
   if (error) {
     console.error('Error creating opportunity:', error);
     throw error;
+  }
+
+  // Auto-fill account responsibles based on pipeline type if missing
+  if (validated.account_id) {
+    try {
+      const { data: pipelineRow } = await supabase
+        .from('pipelines')
+        .select('pipeline_type')
+        .eq('id', pipelineId)
+        .maybeSingle();
+      const ptype = pipelineRow?.pipeline_type;
+
+      const { data: acc } = await supabase
+        .from('accounts')
+        .select('owner_user_id, cs_user_id, pre_sales_user_id')
+        .eq('id', validated.account_id)
+        .maybeSingle();
+
+      if (acc) {
+        const updates: Record<string, string> = {};
+        const ownerToSet = resolvedOwner || user.id;
+        if (ptype === 'qualification' && !acc.pre_sales_user_id) {
+          updates.pre_sales_user_id = ownerToSet;
+        } else if (ptype === 'sales' && !acc.owner_user_id) {
+          updates.owner_user_id = ownerToSet;
+        } else if ((ptype === 'onboarding' || ptype === 'renewal') && !acc.cs_user_id) {
+          updates.cs_user_id = ownerToSet;
+        }
+        if (Object.keys(updates).length > 0) {
+          await supabase.from('accounts').update(updates).eq('id', validated.account_id);
+        }
+      }
+    } catch (e) {
+      console.warn('[createOpportunity] auto-fill account responsibles failed', e);
+    }
   }
 
   return data as Opportunity;

@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Plus, Search, Building2, Download, Filter, X } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { listAccounts, deleteAccount, type Account } from '@/services/supabase/accounts';
+import { listAccounts, deleteAccount, getAccountsPorteSummary, type Account } from '@/services/supabase/accounts';
 import { supabase } from '@/integrations/supabase/client';
 import { AccountModalTabs } from '@/components/accounts/AccountModalTabs';
 import { AccountCard } from '@/components/accounts/AccountCard';
@@ -49,25 +49,28 @@ export default function Accounts() {
   const [showFilters, setShowFilters] = useState(false);
   const debouncedSearchQuery = useDebounce(searchQuery.trim(), 300);
 
-  // Buscar contas com tratamento de erro
+  // Buscar contas com tratamento de erro (porte/segmento/origem agora server-side)
   const { data: accountsData, isLoading, error: accountsError } = useQuery({
-    queryKey: [...accountKeys.lists(), debouncedSearchQuery],
+    queryKey: [...accountKeys.lists(), debouncedSearchQuery, segmentoFilter, porteFilter, origemFilter],
     queryFn: async () => {
       try {
         const result = await listAccounts({
           q: debouncedSearchQuery,
-          page_size: debouncedSearchQuery ? 200 : 60,
+          page_size: debouncedSearchQuery ? 200 : 200,
+          segmento: segmentoFilter !== 'all' ? segmentoFilter : undefined,
+          porte: porteFilter !== 'all' ? porteFilter : undefined,
+          origem_principal: origemFilter !== 'all' ? origemFilter : undefined,
         });
-        
-        // Log para debug em desenvolvimento
+
         if (import.meta.env.DEV) {
           console.log('[Accounts] Query successful:', {
             count: result.data.length,
             total: result.total,
-            query: debouncedSearchQuery
+            query: debouncedSearchQuery,
+            filters: { segmentoFilter, porteFilter, origemFilter },
           });
         }
-        
+
         return result;
       } catch (error) {
         console.error('[Accounts] Query failed:', error);
@@ -76,6 +79,13 @@ export default function Accounts() {
     },
     retry: 2,
     retryDelay: 1000,
+  });
+
+  // KPIs agregados de toda a organização (sem paginação)
+  const { data: porteSummary } = useQuery({
+    queryKey: ['accounts-porte-summary'],
+    queryFn: getAccountsPorteSummary,
+    staleTime: 60_000,
   });
 
   // Buscar contatos para busca global
@@ -171,15 +181,9 @@ export default function Accounts() {
   // Server-side: todos os account_ids vinculados à tag selecionada (paginado, sem limite de 1000)
   const { data: tagAccountIdsSet } = useAccountIdsByTag(tagFilter !== 'all' ? tagFilter : undefined);
 
-  // Filtrar contas localmente
+  // Filtrar contas localmente apenas para filtros que ainda não são server-side
   const filteredAccounts = useMemo(() => {
     return accounts.filter(account => {
-      if (segmentoFilter !== 'all' && account.segmento !== segmentoFilter) return false;
-      if (porteFilter !== 'all') {
-        const norm = normalizePorte(account.porte);
-        if (norm !== porteFilter) return false;
-      }
-      if (origemFilter !== 'all' && account.origem_principal !== origemFilter) return false;
       if (scoreFinanceiroFilter !== 'all') {
         const score = (account as Account & { score_financeiro?: number | null }).score_financeiro;
         if (scoreFinanceiroFilter === 'none') {
@@ -192,37 +196,34 @@ export default function Accounts() {
         else if (scoreFinanceiroFilter === 'bad' && (score < 0 || score >= 40)) return false;
       }
       if (tagFilter !== 'all') {
-        // Usa o Set paginado server-side em vez de tagsByAccount (que é truncado em 1000 rows)
         if (!tagAccountIdsSet || !tagAccountIdsSet.has(account.id)) return false;
       }
       return true;
     });
-  }, [accounts, segmentoFilter, porteFilter, origemFilter, scoreFinanceiroFilter, tagFilter, tagAccountIdsSet]);
+  }, [accounts, scoreFinanceiroFilter, tagFilter, tagAccountIdsSet]);
 
   // Extrair valores únicos para filtros
-  const uniqueSegmentos = useMemo(() => 
+  const uniqueSegmentos = useMemo(() =>
     [...new Set(accounts.map(a => a.segmento).filter(Boolean))],
     [accounts]
   );
-  
-  const uniqueOrigens = useMemo(() => 
+
+  const uniqueOrigens = useMemo(() =>
     [...new Set(accounts.map(a => a.origem_principal).filter(Boolean))],
     [accounts]
   );
 
-  // Estatísticas por porte canônico (MEI, ME, EPP, Médio Porte, Grande Porte)
+  // Estatísticas por porte canônico — agregadas via RPC (org-wide, não pagina)
   const stats = useMemo(() => {
-    const byPorte = (target: CanonicalPorte) =>
-      filteredAccounts.filter(a => normalizePorte(a.porte) === target).length;
     return {
-      total: accountsData?.total || filteredAccounts.length,
-      mei: byPorte('MEI'),
-      me: byPorte('ME'),
-      epp: byPorte('EPP'),
-      medio: byPorte('Médio Porte'),
-      grande: byPorte('Grande Porte'),
+      total: porteSummary?.total ?? accountsData?.total ?? 0,
+      mei: porteSummary?.mei ?? 0,
+      me: porteSummary?.me ?? 0,
+      epp: porteSummary?.epp ?? 0,
+      medio: porteSummary?.medio ?? 0,
+      grande: porteSummary?.grande ?? 0,
     };
-  }, [accountsData, filteredAccounts]);
+  }, [porteSummary, accountsData]);
 
   // Export para CSV
   const handleExportCSV = () => {

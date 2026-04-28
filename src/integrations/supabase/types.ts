@@ -16836,6 +16836,9 @@ export type Database = {
           created_at: string | null
           id: string
           is_primary: boolean | null
+          lead_distribution_role: string | null
+          lead_distribution_strategy: string | null
+          lead_distribution_user_ids: string[] | null
           name: string
           organization_id: string
           pipeline_type: string | null
@@ -16847,6 +16850,9 @@ export type Database = {
           created_at?: string | null
           id: string
           is_primary?: boolean | null
+          lead_distribution_role?: string | null
+          lead_distribution_strategy?: string | null
+          lead_distribution_user_ids?: string[] | null
           name: string
           organization_id: string
           pipeline_type?: string | null
@@ -16858,6 +16864,9 @@ export type Database = {
           created_at?: string | null
           id?: string
           is_primary?: boolean | null
+          lead_distribution_role?: string | null
+          lead_distribution_strategy?: string | null
+          lead_distribution_user_ids?: string[] | null
           name?: string
           organization_id?: string
           pipeline_type?: string | null
@@ -28255,6 +28264,14 @@ export type Database = {
         Args: { _organization_id: string; _role_filter?: string }
         Returns: string
       }
+      claim_next_owner_v2: {
+        Args: {
+          _account_uf?: string
+          _organization_id: string
+          _pipeline_id?: string
+        }
+        Returns: string
+      }
       cleanup_expired_dedup_keys: { Args: never; Returns: number }
       cleanup_expired_oauth_nonces: { Args: never; Returns: number }
       cleanup_expired_snapshots: { Args: never; Returns: number }
@@ -28413,6 +28430,18 @@ export type Database = {
       generate_proposal_public_token: { Args: never; Returns: string }
       generate_public_form_token: { Args: never; Returns: string }
       generate_trace_id: { Args: never; Returns: string }
+      get_accounts_porte_summary: {
+        Args: { _organization_id: string }
+        Returns: {
+          epp: number
+          grande: number
+          me: number
+          medio: number
+          mei: number
+          sem_porte: number
+          total: number
+        }[]
+      }
       get_active_opportunities_count: {
         Args: {
           p_organization_id: string
