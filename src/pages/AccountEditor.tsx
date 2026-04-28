@@ -12,8 +12,8 @@ import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { updateAccount, lookupCNPJ, type Account } from '@/services/crm/accounts';
 import { listOrigins, type OriginWithGroup } from '@/services/crm/origins';
-import { useOrganizationUsers } from '@/hooks/useOrganizationUsers';
 import { useAccountDetails } from '@/hooks/useAccountDetails';
+import { supabase } from '@/integrations/supabase/client';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -92,6 +92,19 @@ const accountSchema = z.object({
 });
 
 type AccountFormData = z.infer<typeof accountSchema>;
+
+type ResponsibleOption = { id: string; name: string; email?: string | null; role?: string | null };
+
+const normalizeRole = (role?: string | null) =>
+  (role || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+
+const SALES_OWNER_ROLES = new Set(['vendedor', 'closer']);
+const PRE_SALES_ROLES = new Set(['sdr', 'bdr', 'pre vendas', 'pre-vendas', 'pre vendedor', 'pre-vendedor', 'pre sales']);
+const CS_ROLES = new Set(['cs', 'customer success', 'onboarding']);
 
 export default function AccountEditor() {
   const { id } = useParams<{ id: string }>();
