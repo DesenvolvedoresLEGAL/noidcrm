@@ -1,153 +1,131 @@
-# Sprint 3 — UI segura de revisão e edição do contexto de usuários
+# Sprint 4 — Motor de Dashboards Dinâmicos (preview only)
 
-## Auditoria da tela atual (Equipes e Usuários)
+Objetivo: criar a infraestrutura silenciosa que resolve qual dashboard cada usuário deveria ver, com fallback total e somente em modo preview. O dashboard real, sidebar, login, rotas e flags permanecem intocados.
 
-| Item | Onde está hoje |
-|---|---|
-| Página | `src/pages/settings/TeamsAndUsers.tsx` (Tabs: Usuários / Equipes) |
-| Listagem | `src/components/settings/UsersContent.tsx` (sub-tabs: Ativos, Inativos, Excluídos, Aguardando, Histórico) |
-| Hook tenant + admin | `useCurrentUser` (`organization`, `isOrgAdmin`) |
-| Convite | `InviteUserModal`, `BulkCreateUsersModal` |
-| Edição legada | navega para `/app/settings/users/:id/edit` |
-| Padrões UI | `Card`, `Tabs`, `Table`, `Badge`, `Select`, `Dialog`, `sonner toast` |
-| Filtros | busca + select de função (`org_role`) |
+## 1. Migration de schema
 
-Decisão: **adicionar uma terceira aba "Contexto CRM"** no `TeamsAndUsers.tsx`, ao lado de Usuários/Equipes. Não tocar em `UsersContent.tsx`. Risco mínimo, isolamento total, fácil rollback.
+Arquivo: `supabase/migrations/<timestamp>_sprint4_dashboard_resolver.sql`
 
-## Estratégia geral
+### Tabela `crm_dashboard_profiles`
+- Campos exatamente como especificado (id, tenant_id, key, name, description, scope_type, scope_key, layout/widgets/filters/permissions/metadata jsonb, is_system, is_active, timestamps).
+- Constraints: key/name não vazios, `scope_type in ('user','business_function','department','permission_role','default')`, unique (tenant_id, key) e (tenant_id, scope_type, scope_key).
+- Índices: (tenant_id, key), (tenant_id, scope_type, scope_key), (tenant_id, is_active).
+- Trigger `set_updated_at()`.
+- RLS on. Policies:
+  - SELECT: `user_belongs_to_tenant(tenant_id)`.
+  - ALL (manage): `is_tenant_admin_or_owner(tenant_id)`.
 
-- Aditivo, sem reescrever nada existente.
-- Toda escrita protegida por RLS (`is_tenant_admin_or_owner`).
-- Nenhuma feature flag é ativada.
-- Frontend bloqueia edição para não-admin, mas a segurança real está na RLS.
-- Fallback gracioso se `crm_user_context_view` falhar — aba mostra erro discreto, demais abas continuam.
+### Tabela `crm_dashboard_resolution_logs`
+- Campos como especificado (append-only, sem updated_at).
+- FK `resolved_profile_id` → `crm_dashboard_profiles(id)` ON DELETE SET NULL.
+- Check em `resolution_source` com os 7 valores permitidos.
+- Índices: (tenant_id, user_id, created_at desc), (tenant_id, resolution_source, created_at desc), (tenant_id, fallback_used, created_at desc).
+- RLS on. Apenas policy de SELECT para Owner/Admin. Inserção exclusivamente via RPC SECURITY DEFINER.
 
-## 1. Banco — migração única
+## 2. Seeds idempotentes
 
-### Tabela `public.crm_user_context_change_logs`
-Conforme spec: `id, tenant_id, user_id, changed_by, change_type, previous/new (permission_key, department_key, business_function_key), previous/new status, review_note, metadata jsonb, created_at`. Check constraint em `change_type ∈ {manual_context_update, manual_review_completed, context_created_from_ui}`. Append-only (sem update/delete).
+Mesma migration, bloco `DO $$ ... $$` que itera por todos os tenants distintos de `crm_user_contexts` e faz `INSERT ... ON CONFLICT (tenant_id, key) DO NOTHING` para os 10 placeholders:
 
-### Índices
-- `(tenant_id, user_id)`
-- `(tenant_id, created_at desc)`
+1. `dashboard_legacy_default` (default/default)
+2. `dashboard_owner_placeholder` (permission_role/owner)
+3. `dashboard_admin_placeholder` (permission_role/admin)
+4. `dashboard_manager_placeholder` (permission_role/manager)
+5. `dashboard_user_placeholder` (permission_role/user)
+6. `dashboard_sales_closer_placeholder` (business_function/closer)
+7. `dashboard_pre_sales_sdr_placeholder` (business_function/sdr)
+8. `dashboard_cs_placeholder` (business_function/cs)
+9. `dashboard_operations_placeholder` (department/operations)
+10. `dashboard_finance_placeholder` (department/finance)
 
-### RLS
-- ENABLE RLS
-- SELECT: `is_tenant_admin_or_owner(tenant_id)`
-- INSERT: `is_tenant_admin_or_owner(tenant_id)` com `WITH CHECK` validando também `changed_by = auth.uid()`
-- Sem policies de UPDATE/DELETE
+Todos `is_system=true`, `is_active=true`, layout/widgets exatos do briefing.
 
-### RPC `public.crm_save_user_context(payload jsonb) returns jsonb`
-SECURITY DEFINER, `search_path = public`. Faz tudo em uma transação:
-1. Valida `is_tenant_admin_or_owner(_tenant_id)` — caso contrário, raise.
-2. Valida que `business_function.department_id = department_id` informado.
-3. Lê contexto anterior (se existir) para resolver previous keys.
-4. UPSERT em `crm_user_contexts` por `(tenant_id, user_id)`:
-   - Faz `metadata = coalesce(prev.metadata, '{}'::jsonb) || novo_metadata` (merge não destrutivo).
-   - Adiciona `last_manual_review_at`, `last_manual_review_by`, `review_source = 'user_context_sprint_3_ui'`.
-   - Se mudou permissão/área/função → grava `previous_context` em metadata.
-   - Se `mark_as_reviewed = true` → `requires_review = false`.
-   - Se contexto novo → `created_by_sprint = 'user_context_sprint_3_ui'`, flags dinâmicas false.
-5. INSERT em `crm_user_context_change_logs` com previous/new keys + change_type adequado.
-6. Retorna `{context_id, change_type, requires_review}`.
+## 3. RPC `crm_resolve_dashboard_profile(p_tenant_id, p_user_id, p_preview default true)`
 
-Motivo do RPC: garante atomicidade contexto+log e valida cross-field (função pertence à área) sem confiar no cliente.
+`security definer`, `set search_path = public`, `grant execute to authenticated`.
 
-### Não fazer no banco
-- Sem alterar `organization_members`, `user_roles`, `profiles`, `team_members`.
-- Sem mexer em feature flags.
-- Sem trigger `updated_at` na tabela de logs (append-only).
+Fluxo:
+1. Validar `auth.uid()` não nulo.
+2. Validar `user_belongs_to_tenant(p_tenant_id)` — caller.
+3. Validar p_user_id pertence ao tenant via `organization_members` (status active/suspended).
+4. Buscar contexto em `crm_user_context_view` (permission_key, department_key, business_function_key, is_dashboard_dynamic_enabled).
+5. Buscar flag `dynamic_dashboards_enabled` e `dynamic_user_context_enabled` em `crm_feature_flags` para o tenant.
+6. Montar lista de candidatos em ordem (user → business_function → department → permission_role → default), descartando entradas com scope_key nulo.
+7. Buscar primeiro profile `is_active=true` que bata; armazenar `candidate_profiles` (array com tentativas avaliadas).
+8. Definir `resolution_source` e `fallback_used`/`fallback_reason`:
+   - sem contexto → `legacy_fallback` + `missing_user_context`.
+   - sem match → `legacy_fallback` + `no_matching_profile` (resolve `dashboard_legacy_default`).
+   - exception → `error_fallback` + mensagem segura.
+   - se flag global desligada e profile não-legacy resolvido → `fallback_reason = 'dynamic_dashboards_disabled'` (mas `resolution_source` continua sendo a real, `fallback_used = true` apenas quando caímos no legacy).
+9. `should_use_dynamic_dashboard = true` SOMENTE se: `p_preview=false` AND `dynamic_dashboards_enabled=true` AND `is_dashboard_dynamic_enabled=true` AND profile encontrado AND `fallback_used=false` AND `layout->>'type' <> 'legacy'`.
+10. Inserir log em `crm_dashboard_resolution_logs` com snapshot de contexto, candidatos, flags e metadata `{created_by_sprint:'dashboard_resolver_sprint_4', preview:p_preview, caller_user_id:auth.uid()}`.
+11. Retornar jsonb no formato do briefing.
 
-## 2. Frontend — novos arquivos
+Bloco `EXCEPTION WHEN OTHERS` para garantir error_fallback + log.
 
-### Hooks (`src/hooks/userContext/`)
-- `useUserContextOptions.ts` — busca paralela: `crm_permission_roles`, `crm_departments`, `crm_business_functions` ativas do tenant, ordenadas. React Query, `staleTime: 5min`.
-- `useUserContexts.ts` — lista de `crm_user_context_view` filtrada por tenant. Faz LEFT JOIN client-side com membros ativos de `organization_members` para mostrar usuários **sem contexto** também. Retorna `{ rows, byUserId }`. Trata erro retornando `error` sem quebrar.
-- `useUserContextStats.ts` — derivado de `useUserContexts`: total, requires_review, sem_contexto, incompletos.
-- `useSaveUserContext.ts` — mutation que chama RPC `crm_save_user_context`, invalida `useUserContexts` + `useUserContextStats`, toast sonner sucesso/erro.
+## 4. Frontend (preview only, Owner/Admin)
 
-### Serviço (`src/services/crm/userContext.ts`)
-- `fetchUserContexts(tenantId)`
-- `fetchContextOptions(tenantId)`
-- `saveUserContext(payload)` → invoca RPC
+### Service
+`src/services/crm/dashboardProfiles.ts`
+- `getDashboardProfiles(tenantId)`
+- `resolveDashboardProfilePreview(tenantId, userId)` → chama RPC com `p_preview=true`
+- `getDashboardResolutionLogs(tenantId, { limit=50 })`
 
-Padrão idêntico ao resto de `src/services/crm/`.
+### Hook
+`src/hooks/dashboard/useDashboardResolver.ts`
+- `useDashboardProfiles()`, `useResolveDashboardPreview()` (mutation), `useDashboardResolutionLogs()`
+- Stub não-usado: `useResolvedDashboardForCurrentUser()` (criado mas NÃO importado pelo dashboard real).
 
-### Componentes (`src/components/settings/userContext/`)
-- `UserContextTab.tsx` — entrypoint. Renderiza:
-  - 4 cards de resumo no topo (`UserContextStatsCards`)
-  - Filtros: busca, Permissão, Área, Função, Status revisão
-  - Tabela `UserContextTable`
-  - Estados loading / error / empty
-  - Aviso fixo: "Esta tela prepara dashboards e automações futuras. Não altera permissões reais."
-- `UserContextStatsCards.tsx` — 4 cards pequenos (com contexto / a revisar / sem contexto / incompletos).
-- `UserContextTable.tsx` — colunas: Usuário, Email, Permissão, Área, Função, Status, Revisão, Confiança, Ações (Editar contexto). Mobile-first responsive.
-- `UserContextBadges.tsx` — badges padronizados (review status + permissão + área).
-- `EditUserContextModal.tsx` — Dialog com:
-  - Campos: Permissão*, Área*, Função* (filtrada por área, limpa ao trocar área), Status*, "Marcar como revisado" (checkbox), "Observação da revisão" (textarea opcional)
-  - Bloco read-only "Dados legados": legacy_user_type, legacy_commercial_function, mapping_confidence, review_reason, requires_review original
-  - Aviso fixo destacado
-  - Validação Zod + react-hook-form (já padrão do projeto)
-  - Botões: Cancelar / Salvar contexto
-  - Bloqueia abertura/edição se `!isOrgAdmin` (defesa em profundidade — RLS é a real)
+### Componentes
+`src/components/settings/dashboardResolver/`
+- `DashboardPreviewModal.tsx` — Dialog com seções: Usuário, Permissão/Área/Função, Flags (global + individual), Dashboard resolvido, Fonte, Fallback + motivo, Lista de candidatos avaliados, Widgets placeholder, Aviso "Uso real: Não, dashboard atual permanece ativo". Se `requires_review=true`, exibe Alert amarelo. Botão único: Fechar.
+- `DashboardResolutionBadge.tsx` — badge colorido por `resolution_source`.
+- `DashboardCandidateList.tsx` — lista das tentativas (ordem + match/miss).
+- `DashboardPlaceholderWidgets.tsx` — render dos widgets jsonb como cards "placeholder".
 
-### Integração
-- `src/pages/settings/TeamsAndUsers.tsx` — adicionar terceira `TabsTrigger value="context"` com ícone `ShieldCheck`, label "Contexto CRM", visível apenas para `isOrgAdmin` (manager/user/viewer não veem a aba). Renderiza `<UserContextTab />`.
+### Integração na aba existente
+`src/components/settings/userContext/UserContextTab.tsx`:
+- Adicionar coluna/ação "Preview Dashboard" por linha (ícone + tooltip), visível só para Owner/Admin (já é o caso da aba inteira).
+- Ao clicar, abrir `DashboardPreviewModal` com `tenant_id` + `user_id` da linha.
+- (Opcional, se não inflar) subaba "Logs de resolução" com tabela simples (Data, Usuário, Dashboard, Fonte, Fallback, Motivo, Preview), top 50. Se ficar pesado, omitir nesta sprint conforme o briefing autoriza.
 
-## 3. Mapas e labels (constantes em `src/components/settings/userContext/labels.ts`)
+Nenhuma mudança em sidebar, rotas, login, dashboard real ou no componente `Dashboard.tsx`.
 
-```ts
-PERMISSION_LABELS: { owner, admin, manager, user, viewer }
-DEPARTMENT_LABELS: { presales: 'Pré vendas', sales: 'Vendas', cs: 'Customer Success', finance: 'Financeiro', operations: 'Operações', it: 'TI', executive: 'Diretoria' }
-FUNCTION_LABELS: SDR, BDR, LDR, AE, Closer, Hunter, CS, Account Manager, Farmer, Financeiro, ADM Financeiro, Operacional, Suporte, Suporte Técnico, Dev, Automação, Diretor, Owner, Visualizador
-REVIEW_STATUS: validated | needs_review | incomplete | no_context
-```
+## 5. Validações pós-deploy
 
-Labels exibidas vêm primeiro de `crm_*` (`name`) e caem em fallback para o mapa local quando faltar.
+Rodar via `supabase--read_query`:
+1. `select tenant_id, count(*) from crm_dashboard_profiles group by 1` → 10 por tenant (7 tenants → 70 total).
+2. `select count(*) from crm_dashboard_resolution_logs` → 0.
+3. Flags: 3 chaves × 8 tenants, todas `false`.
+4. Sem duplicatas em (tenant_id, scope_type, scope_key).
+5. Após preview manual no UI, logs > 0 com `resolution_source` esperado e `fallback_used` correto.
 
-## 4. Comportamento esperado
+## 6. Garantias de não-regressão
 
-- 19 contextos visíveis para Owner/Admin.
-- 6 com badge "Revisar".
-- Editar abre modal, troca de área filtra funções, salvar → atualiza linha + log + invalida cache + toast.
-- Usuário sem contexto: linha aparece com badge "Sem contexto" e ação "Criar contexto" (mesmo modal, change_type `context_created_from_ui`).
-- Erros de RLS / rede: toast de erro, modal permanece aberto, dados intactos.
-- Falha da view: aba mostra mensagem "Não foi possível carregar contexto CRM. Tente novamente." sem afetar Usuários/Equipes.
+- Não toca: `Dashboard.tsx`, `App.tsx`, sidebar, rotas, login, `organization_members`, `user_roles`, `profiles`, `crm_user_contexts`, `crm_feature_flags`.
+- Não habilita nenhuma flag.
+- RPC isolada, sem efeitos colaterais além do log.
+- Rollback documentado: drop da RPC + 2 tabelas, nada mais.
 
-## 5. Validação pós-deploy (queries da spec)
-Rodar as 8 queries de validação via `read_query` e reportar resultados no resumo final.
+## Arquivos a criar/editar
 
-## Garantias
+**Criar**
+- `supabase/migrations/<ts>_sprint4_dashboard_resolver.sql`
+- `src/services/crm/dashboardProfiles.ts`
+- `src/hooks/dashboard/useDashboardResolver.ts`
+- `src/components/settings/dashboardResolver/DashboardPreviewModal.tsx`
+- `src/components/settings/dashboardResolver/DashboardResolutionBadge.tsx`
+- `src/components/settings/dashboardResolver/DashboardCandidateList.tsx`
+- `src/components/settings/dashboardResolver/DashboardPlaceholderWidgets.tsx`
 
-- ❌ Não toca `UsersContent.tsx`, convite, edição legada, dashboard, sidebar, login, rotas.
-- ❌ Não altera `organization_members`, `user_roles`, `profiles`, `team_members`.
-- ❌ Não ativa `dynamic_user_context_enabled`, `dynamic_dashboards_enabled`, `function_automations_enabled`.
-- ✅ RLS protege escrita; service role nunca usado no client.
-- ✅ Logs append-only.
-- ✅ Merge de metadata não destrutivo.
-- ✅ Aba só aparece para Owner/Admin.
-
-## Rollback
-
-```sql
--- Reverter logs
-DROP TABLE IF EXISTS public.crm_user_context_change_logs;
--- Reverter RPC
-DROP FUNCTION IF EXISTS public.crm_save_user_context(jsonb);
--- Identificar/reverter edições manuais (se necessário, manualmente):
--- SELECT * FROM crm_user_contexts WHERE metadata->>'review_source' = 'user_context_sprint_3_ui';
-```
-Frontend rollback = remover a aba e os arquivos novos. Zero impacto no resto.
+**Editar (mínimo)**
+- `src/components/settings/userContext/UserContextTab.tsx` — adicionar ação "Preview Dashboard" na linha.
 
 ## Riscos
 
-- **Baixo**. Tudo aditivo. Único ponto de atenção: garantir que `crm_save_user_context` valide cross-tenant (defesa contra payload manipulado) — coberto pela checagem `is_tenant_admin_or_owner(_tenant_id)` no início do RPC.
-- Se a tabela `crm_user_context_view` mudar de schema futuramente, hook `useUserContexts` precisa ser revisitado — documentado no service.
+- View `crm_user_context_view` precisa estar acessível dentro da RPC (já é definer + search_path public). ✅
+- Logs append-only podem crescer; índices cobrem consultas; sem retenção nesta sprint (aceitável).
+- Se `is_dashboard_dynamic_enabled` na view vier `null` para usuários não-revisados, tratar como `false` no resolver.
 
-## Entregáveis ao final
+## Definição de pronto
 
-1. Migração SQL (logs + RPC + policies)
-2. Hooks + service + componentes listados acima
-3. Aba "Contexto CRM" em Equipes e Usuários (Owner/Admin only)
-4. Resultado das 8 queries de validação
-5. Confirmação: feature flags off, dashboard/login/menu intactos, 19 contextos visíveis, 6 marcados para revisão.
+Owner/Admin abre Configurações → Equipes e Usuários → Contexto CRM → Preview Dashboard em qualquer linha; modal mostra profile resolvido, candidatos e fallback; logs registram cada chamada; `should_use_dynamic_dashboard` retorna sempre `false`; nenhuma flag ativada; dashboard real, sidebar, login e rotas inalterados.

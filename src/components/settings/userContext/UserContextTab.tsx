@@ -6,7 +6,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Loader2, Search, Edit, Info, AlertTriangle } from 'lucide-react';
+import { Loader2, Search, Edit, Info, AlertTriangle, LayoutDashboard } from 'lucide-react';
+import { DashboardPreviewModal } from '@/components/settings/dashboardResolver/DashboardPreviewModal';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import {
   useUserContexts,
@@ -50,6 +51,7 @@ export default function UserContextTab() {
   const [reviewFilter, setReviewFilter] = useState<'all' | ReviewStatus>('all');
 
   const [editing, setEditing] = useState<UserContextRow | null>(null);
+  const [previewing, setPreviewing] = useState<UserContextRow | null>(null);
 
   const filtered = useMemo(() => {
     if (!rows) return [];
@@ -221,15 +223,26 @@ export default function UserContextTab() {
                           <ReviewStatusBadge status={status} />
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setEditing(row)}
-                            title={row.context_id ? 'Editar contexto' : 'Criar contexto'}
-                          >
-                            <Edit className="h-4 w-4 mr-1" />
-                            {row.context_id ? 'Editar' : 'Criar'}
-                          </Button>
+                          <div className="flex items-center justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setPreviewing(row)}
+                              title="Preview do dashboard dinâmico"
+                            >
+                              <LayoutDashboard className="h-4 w-4 mr-1" />
+                              Preview
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setEditing(row)}
+                              title={row.context_id ? 'Editar contexto' : 'Criar contexto'}
+                            >
+                              <Edit className="h-4 w-4 mr-1" />
+                              {row.context_id ? 'Editar' : 'Criar'}
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     );
@@ -248,6 +261,13 @@ export default function UserContextTab() {
         tenantId={tenantId}
         organizationId={organizationId}
         canEdit={isAdmin}
+      />
+
+      <DashboardPreviewModal
+        open={!!previewing}
+        onOpenChange={(v) => !v && setPreviewing(null)}
+        row={previewing}
+        tenantId={tenantId}
       />
     </div>
   );

@@ -7712,6 +7712,122 @@ export type Database = {
           },
         ]
       }
+      crm_dashboard_profiles: {
+        Row: {
+          created_at: string
+          description: string | null
+          filters: Json
+          id: string
+          is_active: boolean
+          is_system: boolean
+          key: string
+          layout: Json
+          metadata: Json
+          name: string
+          permissions: Json
+          scope_key: string
+          scope_type: string
+          tenant_id: string
+          updated_at: string
+          widgets: Json
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          filters?: Json
+          id?: string
+          is_active?: boolean
+          is_system?: boolean
+          key: string
+          layout?: Json
+          metadata?: Json
+          name: string
+          permissions?: Json
+          scope_key: string
+          scope_type: string
+          tenant_id: string
+          updated_at?: string
+          widgets?: Json
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          filters?: Json
+          id?: string
+          is_active?: boolean
+          is_system?: boolean
+          key?: string
+          layout?: Json
+          metadata?: Json
+          name?: string
+          permissions?: Json
+          scope_key?: string
+          scope_type?: string
+          tenant_id?: string
+          updated_at?: string
+          widgets?: Json
+        }
+        Relationships: []
+      }
+      crm_dashboard_resolution_logs: {
+        Row: {
+          candidate_profiles: Json
+          context_snapshot: Json
+          created_at: string
+          dynamic_dashboards_enabled: boolean
+          fallback_reason: string | null
+          fallback_used: boolean
+          id: string
+          metadata: Json
+          resolution_source: string
+          resolved_profile_id: string | null
+          resolved_profile_key: string | null
+          tenant_id: string
+          user_dashboard_enabled: boolean
+          user_id: string
+        }
+        Insert: {
+          candidate_profiles?: Json
+          context_snapshot?: Json
+          created_at?: string
+          dynamic_dashboards_enabled?: boolean
+          fallback_reason?: string | null
+          fallback_used?: boolean
+          id?: string
+          metadata?: Json
+          resolution_source: string
+          resolved_profile_id?: string | null
+          resolved_profile_key?: string | null
+          tenant_id: string
+          user_dashboard_enabled?: boolean
+          user_id: string
+        }
+        Update: {
+          candidate_profiles?: Json
+          context_snapshot?: Json
+          created_at?: string
+          dynamic_dashboards_enabled?: boolean
+          fallback_reason?: string | null
+          fallback_used?: boolean
+          id?: string
+          metadata?: Json
+          resolution_source?: string
+          resolved_profile_id?: string | null
+          resolved_profile_key?: string | null
+          tenant_id?: string
+          user_dashboard_enabled?: boolean
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_dashboard_resolution_logs_resolved_profile_id_fkey"
+            columns: ["resolved_profile_id"]
+            isOneToOne: false
+            referencedRelation: "crm_dashboard_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       crm_departments: {
         Row: {
           created_at: string
@@ -28761,6 +28877,10 @@ export type Database = {
           p_user_id: string
         }
         Returns: string
+      }
+      crm_resolve_dashboard_profile: {
+        Args: { p_preview?: boolean; p_tenant_id: string; p_user_id: string }
+        Returns: Json
       }
       crm_resolve_user_context_mapping: {
         Args: { _org_role: string; _user_app_role: string }
