@@ -34,10 +34,10 @@ function getInitials(name: string | null) {
 }
 
 export default function UserContextTab() {
-  const { data: currentUser, isLoading: loadingUser } = useCurrentUser();
-  const tenantId = currentUser?.organization?.id ?? null;
-  const organizationId = currentUser?.organization?.id ?? null;
-  const isAdmin = !!currentUser?.isOrgAdmin;
+  const { organization, isOrgAdmin, loading: loadingUser } = useCurrentUser();
+  const tenantId = organization?.id ?? null;
+  const organizationId = organization?.id ?? null;
+  const isAdmin = !!isOrgAdmin;
 
   const { data: rows, isLoading, error } = useUserContexts(tenantId, organizationId);
   const { data: options } = useUserContextOptions(tenantId);
