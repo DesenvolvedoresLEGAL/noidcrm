@@ -1,0 +1,1 @@
+alter view public.crm_user_context_view set (security_invoker = true);
