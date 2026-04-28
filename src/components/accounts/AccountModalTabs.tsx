@@ -633,16 +633,20 @@ export function AccountModalTabs({ open, onOpenChange, account }: AccountModalTa
                     name="owner_user_id"
                     control={control}
                     render={({ field }) => (
-                      <Select value={field.value} onValueChange={field.onChange}>
+                      <Select value={field.value || ''} onValueChange={field.onChange} disabled={usersLoading}>
                         <SelectTrigger>
-                          <SelectValue placeholder="Selecione" />
+                          <SelectValue placeholder={usersLoading ? 'Carregando...' : 'Selecione'} />
                         </SelectTrigger>
                         <SelectContent>
-                          {users.map((user) => (
-                            <SelectItem key={user.id} value={user.id}>
-                              {user.name}
-                            </SelectItem>
-                          ))}
+                          {usersLoading ? (
+                            <SelectItem value="_loading" disabled>Carregando usuários...</SelectItem>
+                          ) : ownerUsers.length === 0 ? (
+                            <SelectItem value="_empty" disabled>Nenhum vendedor encontrado</SelectItem>
+                          ) : (
+                            ownerUsers.map((user) => (
+                              <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>
+                            ))
+                          )}
                         </SelectContent>
                       </Select>
                     )}
@@ -656,16 +660,20 @@ export function AccountModalTabs({ open, onOpenChange, account }: AccountModalTa
                   name="cs_user_id"
                   control={control}
                   render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
+                    <Select value={field.value || ''} onValueChange={field.onChange} disabled={usersLoading}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Selecione (opcional)" />
+                        <SelectValue placeholder={usersLoading ? 'Carregando...' : 'Selecione (opcional)'} />
                       </SelectTrigger>
                       <SelectContent>
-                        {users.map((user) => (
-                          <SelectItem key={user.id} value={user.id}>
-                            {user.name}
-                          </SelectItem>
-                        ))}
+                        {usersLoading ? (
+                          <SelectItem value="_loading" disabled>Carregando usuários...</SelectItem>
+                        ) : csUsers.length === 0 ? (
+                          <SelectItem value="_empty" disabled>Nenhum CS encontrado</SelectItem>
+                        ) : (
+                          csUsers.map((user) => (
+                            <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>
+                          ))
+                        )}
                       </SelectContent>
                     </Select>
                   )}
@@ -678,16 +686,20 @@ export function AccountModalTabs({ open, onOpenChange, account }: AccountModalTa
                   name="pre_sales_user_id"
                   control={control}
                   render={({ field }) => (
-                    <Select value={field.value || ''} onValueChange={field.onChange}>
+                    <Select value={field.value || ''} onValueChange={field.onChange} disabled={usersLoading}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Selecione (opcional)" />
+                        <SelectValue placeholder={usersLoading ? 'Carregando...' : 'Selecione (opcional)'} />
                       </SelectTrigger>
                       <SelectContent>
-                        {users.map((user) => (
-                          <SelectItem key={user.id} value={user.id}>
-                            {user.name}
-                          </SelectItem>
-                        ))}
+                        {usersLoading ? (
+                          <SelectItem value="_loading" disabled>Carregando usuários...</SelectItem>
+                        ) : preSalesUsers.length === 0 ? (
+                          <SelectItem value="_empty" disabled>Nenhum pré-vendedor encontrado</SelectItem>
+                        ) : (
+                          preSalesUsers.map((user) => (
+                            <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>
+                          ))
+                        )}
                       </SelectContent>
                     </Select>
                   )}
