@@ -54,22 +54,29 @@ export function useOrganizationUsers(extraUserIds: Array<string | null | undefin
           return;
         }
 
+        // Profiles for all union ids — fetch even if inactive so the form
+        // displays the saved owner/CS/pre-sales values.
         const { data: profiles, error: profilesError } = await supabase
           .from('profiles')
           .select('user_id, full_name, email, avatar_url')
           .in('user_id', unionIds)
-          .eq('organization_id', orgId.data)
           .order('full_name');
 
         if (profilesError) throw profilesError;
 
+        // Mark non-active extras with "(Inativo)" suffix for clarity
+        const memberSet = new Set(memberIds);
         setUsers(
-          (profiles || []).map((p) => ({
-            id: p.user_id,
-            name: p.full_name || 'Sem nome',
-            email: p.email || undefined,
-            avatar_url: p.avatar_url || undefined,
-          })),
+          (profiles || []).map((p) => {
+            const isInactive = !memberSet.has(p.user_id);
+            const baseName = p.full_name || 'Sem nome';
+            return {
+              id: p.user_id,
+              name: isInactive ? `${baseName} (Inativo)` : baseName,
+              email: p.email || undefined,
+              avatar_url: p.avatar_url || undefined,
+            };
+          }),
         );
       } catch (err) {
         setError(err as Error);
