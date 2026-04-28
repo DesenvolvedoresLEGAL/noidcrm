@@ -66,6 +66,8 @@ export function DashboardPreviewModal({ open, onOpenChange, row, tenantId }: Pro
               resolution={result ?? null}
               mode="preview"
               loading={mutation.isPending}
+              tenantId={tenantId}
+              targetUserId={row?.user_id}
             />
 
             {result && (
