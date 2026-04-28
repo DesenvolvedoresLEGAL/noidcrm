@@ -1,10 +1,12 @@
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Info, AlertTriangle } from 'lucide-react';
+import { Info, AlertTriangle, ShieldAlert } from 'lucide-react';
 import { useCloserDashboardData } from '@/hooks/dashboard/useCloserDashboardData';
 import { CloserPeriodFilter } from './CloserPeriodFilter';
 import { CloserKpiGrid } from './CloserKpiGrid';
 import { CentralDoDiaSection } from './CentralDoDiaSection';
 import { CloserRiskDealsList } from './CloserRiskDealsList';
+import { CloserSectionList } from './CloserSectionList';
+import { CloserTopActions } from './CloserTopActions';
 import { CloserDashboardSkeleton } from './CloserDashboardSkeleton';
 import { CloserDashboardErrorState } from './CloserDashboardErrorState';
 import { CloserNotACloserState } from './CloserNotACloserState';
@@ -24,6 +26,8 @@ export function CloserDashboard({ tenantId, targetUserId }: Props) {
   if (error) return <CloserDashboardErrorState message={(error as Error).message} />;
   if (!data) return <CloserDashboardEmptyState />;
   if (data.error === 'not_a_closer') return <CloserNotACloserState />;
+
+  const lists = data.lists;
 
   return (
     <div className="space-y-4">
@@ -54,6 +58,15 @@ export function CloserDashboard({ tenantId, targetUserId }: Props) {
         </Alert>
       )}
 
+      {data.goal_warning && (
+        <Alert>
+          <ShieldAlert className="h-4 w-4" />
+          <AlertDescription>
+            <strong>Aviso administrativo:</strong> {data.goal_warning.message}
+          </AlertDescription>
+        </Alert>
+      )}
+
       {unavailableWidgets.length > 0 && (
         <Alert>
           <Info className="h-4 w-4" />
@@ -63,17 +76,62 @@ export function CloserDashboard({ tenantId, targetUserId }: Props) {
         </Alert>
       )}
 
-      <CentralDoDiaSection
-        central={data.central_do_dia}
-        agenda={data.lists.today_agenda ?? []}
-        overdue={data.lists.overdue_followups ?? []}
-        proposalsAction={data.lists.proposals_action_required ?? []}
-        nextActions={data.lists.next_actions ?? []}
-      />
+      <CentralDoDiaSection central={data.central_do_dia} />
+
+      <CloserTopActions actions={lists.top_actions_today ?? []} />
+
+      <div className="grid md:grid-cols-2 gap-4">
+        <CloserSectionList
+          title="Minha agenda de hoje"
+          description="Atividades agendadas para hoje, ordenadas por horário."
+          items={lists.today_agenda ?? []}
+          emptyText="Nenhuma atividade agendada para hoje."
+          showValue={false}
+        />
+        <CloserSectionList
+          title="Follow ups vencidos"
+          description="Atividades vencidas que precisam ser executadas."
+          items={lists.overdue_followups ?? []}
+          emptyText="Sem follow ups vencidos."
+          showValue={false}
+        />
+        <CloserSectionList
+          title="Propostas vencendo hoje"
+          items={lists.proposals_expiring_today ?? []}
+          emptyText="Nenhuma proposta com prazo final hoje."
+        />
+        <CloserSectionList
+          title="Propostas vencendo em 48h"
+          items={lists.proposals_expiring_48h ?? []}
+          emptyText="Nenhuma proposta vencendo nas próximas 48h."
+        />
+        <CloserSectionList
+          title="Propostas vencidas"
+          items={lists.proposals_expired ?? []}
+          emptyText="Nenhuma proposta vencida sem aceite."
+        />
+        <CloserSectionList
+          title="Propostas visualizadas sem ação"
+          description="Cliente abriu, ninguém deu sequência."
+          items={lists.proposals_viewed_no_followup ?? []}
+          emptyText="Todas as propostas visualizadas tiveram follow up."
+        />
+        <CloserSectionList
+          title="Sem próxima atividade"
+          items={lists.opportunities_without_next_activity ?? []}
+          emptyText="Todas as oportunidades têm próxima atividade."
+        />
+        <CloserSectionList
+          title="Oportunidades paradas"
+          description="Mais de 7 dias na mesma etapa do funil."
+          items={lists.stalled_opportunities ?? []}
+          emptyText="Nenhuma oportunidade parada."
+        />
+      </div>
 
       <CloserKpiGrid kpis={data.kpis} availability={data.availability} />
 
-      <CloserRiskDealsList deals={data.lists.risk_deals ?? []} />
+      <CloserRiskDealsList deals={lists.risk_deals ?? []} />
 
       {isEmpty && <CloserDashboardEmptyState />}
     </div>
