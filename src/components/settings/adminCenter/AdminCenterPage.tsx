@@ -5,6 +5,7 @@ import { useAdminCenterProfile } from '@/hooks/dashboard/useDashboardResolver';
 import { DynamicDashboardShell } from '@/components/dashboard/dynamic/DynamicDashboardShell';
 import { AdminCenterExplainer } from './AdminCenterExplainer';
 import { CloserDashboardAuditLog } from './CloserDashboardAuditLog';
+import { PilotActivationLog } from './PilotActivationLog';
 
 export function AdminCenterPage() {
   const { organization, isOrgAdmin, loading: loadingUser } = useCurrentUser();
@@ -72,6 +73,8 @@ export function AdminCenterPage() {
       )}
 
       <CloserDashboardAuditLog tenantId={tenantId} />
+
+      <PilotActivationLog tenantId={tenantId} />
     </div>
   );
 }
