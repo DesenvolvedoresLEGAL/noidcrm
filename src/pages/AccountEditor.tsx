@@ -428,9 +428,15 @@ export default function AccountEditor() {
     console.log('🔵 AccountEditor.onSubmit - dados recebidos:', data);
     setIsSaving(true);
     try {
+      const protectedResponsibles = {
+        owner_user_id: data.owner_user_id || account.owner_user_id || null,
+        cs_user_id: data.cs_user_id || account.cs_user_id || null,
+        pre_sales_user_id: data.pre_sales_user_id || (account as any).pre_sales_user_id || null,
+      };
+
       // Pré-processar: converter strings vazias em null
       const processedData = Object.fromEntries(
-        Object.entries(data).map(([key, value]) => [
+        Object.entries({ ...data, ...protectedResponsibles }).map(([key, value]) => [
           key,
           value === '' ? null : value
         ])
