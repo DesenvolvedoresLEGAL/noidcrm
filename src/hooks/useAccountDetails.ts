@@ -187,5 +187,7 @@ export function useAccountDetails(accountId: string) {
       } as AccountDetails;
     },
     enabled: !!accountId,
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 }
