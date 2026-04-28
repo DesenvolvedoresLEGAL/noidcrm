@@ -25,8 +25,8 @@ interface ProposalEditorHeaderProps {
 
 const statusConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
   draft: { label: 'Rascunho', variant: 'secondary' },
-  sent: { label: 'Enviada', variant: 'default' },
-  viewed: { label: 'Visualizada', variant: 'outline' },
+  sent: { label: 'Aberta', variant: 'default' },
+  viewed: { label: 'Aberta · Visualizada', variant: 'outline' },
   accepted: { label: 'Aceita', variant: 'default' },
   rejected: { label: 'Recusada', variant: 'destructive' },
   expired: { label: 'Expirada', variant: 'destructive' },
