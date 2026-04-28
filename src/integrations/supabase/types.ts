@@ -7895,6 +7895,63 @@ export type Database = {
         }
         Relationships: []
       }
+      crm_user_context_change_logs: {
+        Row: {
+          change_type: string
+          changed_by: string
+          created_at: string
+          id: string
+          metadata: Json
+          new_business_function_key: string | null
+          new_department_key: string | null
+          new_permission_key: string | null
+          new_status: string | null
+          previous_business_function_key: string | null
+          previous_department_key: string | null
+          previous_permission_key: string | null
+          previous_status: string | null
+          review_note: string | null
+          tenant_id: string
+          user_id: string
+        }
+        Insert: {
+          change_type: string
+          changed_by: string
+          created_at?: string
+          id?: string
+          metadata?: Json
+          new_business_function_key?: string | null
+          new_department_key?: string | null
+          new_permission_key?: string | null
+          new_status?: string | null
+          previous_business_function_key?: string | null
+          previous_department_key?: string | null
+          previous_permission_key?: string | null
+          previous_status?: string | null
+          review_note?: string | null
+          tenant_id: string
+          user_id: string
+        }
+        Update: {
+          change_type?: string
+          changed_by?: string
+          created_at?: string
+          id?: string
+          metadata?: Json
+          new_business_function_key?: string | null
+          new_department_key?: string | null
+          new_permission_key?: string | null
+          new_status?: string | null
+          previous_business_function_key?: string | null
+          previous_department_key?: string | null
+          previous_permission_key?: string | null
+          previous_status?: string | null
+          review_note?: string | null
+          tenant_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       crm_user_contexts: {
         Row: {
           business_function_id: string | null
@@ -28717,6 +28774,7 @@ export type Database = {
         }[]
       }
       crm_run_user_context_backfill: { Args: never; Returns: Json }
+      crm_save_user_context: { Args: { payload: Json }; Returns: Json }
       delete_contract: { Args: { contract_id: string }; Returns: boolean }
       delete_email: {
         Args: { message_id: number; queue_name: string }
