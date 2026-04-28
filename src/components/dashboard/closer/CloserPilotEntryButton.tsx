@@ -3,11 +3,16 @@ import { Button } from '@/components/ui/button';
 import { Sparkles, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useCloserPilotEntrypoint } from '@/hooks/dashboard/useCloserPilotEntrypoint';
+import { useDynamicDashboardRuntimeGate } from '@/hooks/dashboard/useDynamicDashboardRuntimeGate';
 
 export function CloserPilotEntryButton() {
   const navigate = useNavigate();
   const { visible } = useCloserPilotEntrypoint();
+  const gate = useDynamicDashboardRuntimeGate();
 
+  // If the runtime gate is already substituting the home for this user,
+  // hide the legacy opt-in (a session-return banner handles the inverse case).
+  if (gate.isPilotEligible) return null;
   if (!visible) return null;
 
   return (

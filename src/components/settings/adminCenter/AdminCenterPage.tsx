@@ -6,6 +6,7 @@ import { DynamicDashboardShell } from '@/components/dashboard/dynamic/DynamicDas
 import { AdminCenterExplainer } from './AdminCenterExplainer';
 import { CloserDashboardAuditLog } from './CloserDashboardAuditLog';
 import { PilotActivationLog } from './PilotActivationLog';
+import { RuntimeAccessLog } from './RuntimeAccessLog';
 
 export function AdminCenterPage() {
   const { organization, isOrgAdmin, loading: loadingUser } = useCurrentUser();
@@ -75,6 +76,8 @@ export function AdminCenterPage() {
       <CloserDashboardAuditLog tenantId={tenantId} />
 
       <PilotActivationLog tenantId={tenantId} />
+
+      <RuntimeAccessLog tenantId={tenantId} />
     </div>
   );
 }

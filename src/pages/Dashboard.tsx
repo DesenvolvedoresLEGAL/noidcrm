@@ -10,6 +10,7 @@ import { CSDashboard } from '@/components/dashboards/cs/CSDashboard';
 import { FinanceDashboard } from '@/components/dashboards/finance/FinanceDashboard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { lazy, Suspense } from 'react';
+import { DynamicDashboardRuntimeGate } from '@/components/dashboard/runtime/DynamicDashboardRuntimeGate';
 
 // Lazy load GTM dashboards (from pages/gtm)
 const SDRCommandCenter = lazy(() => import('@/pages/gtm/SDRCommandCenter'));
@@ -126,7 +127,7 @@ export default function Dashboard() {
 
   return (
     <Layout>
-      {renderDashboard()}
+      <DynamicDashboardRuntimeGate legacyDashboard={renderDashboard()} />
     </Layout>
   );
 }
