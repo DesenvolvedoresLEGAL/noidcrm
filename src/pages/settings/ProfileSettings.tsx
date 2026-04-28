@@ -309,6 +309,8 @@ export default function ProfileSettings() {
 
         {/* Tab: Dados */}
         <TabsContent value="dados" className="space-y-4">
+          <CurrentUserContextCard />
+
           <Card>
             <CardHeader>
               <div className="flex items-center gap-2">
