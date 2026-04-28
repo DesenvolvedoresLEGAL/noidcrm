@@ -213,6 +213,15 @@ export async function updatePipeline(id: string, data: Partial<Pipeline>): Promi
   if (data.is_primary !== undefined) {
     updates.is_primary = data.is_primary;
   }
+  if (data.lead_distribution_strategy !== undefined) {
+    updates.lead_distribution_strategy = data.lead_distribution_strategy;
+  }
+  if (data.lead_distribution_role !== undefined) {
+    updates.lead_distribution_role = data.lead_distribution_role;
+  }
+  if (data.lead_distribution_user_ids !== undefined) {
+    updates.lead_distribution_user_ids = data.lead_distribution_user_ids;
+  }
 
   if (data.bu !== undefined) {
     updates.type = data.bu[0] ?? 'CUSTOM';
