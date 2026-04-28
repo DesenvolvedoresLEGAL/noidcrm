@@ -207,24 +207,19 @@ async function processRescore(
           const newGrade = newTotal >= 280 ? "A" : newTotal >= 230 ? "B" : newTotal >= 180 ? "C" : "D";
           const finalScore = Math.max(0, newTotal);
 
+          // NOTE: prospect_scores.priority_score é coluna GERADA (sem learning_adjustment).
+          // Persistimos só grade + reasoning. O ajuste vive em reasoning.learning_adjustment
+          // e o consumidor (UI/queries) deve somar ao priority_score base se quiser o "score V3".
           scoreUpdates.push({
             id: score.id,
-            prospect_id: score.prospect_id,
-            organization_id: score.organization_id,
-            icp_fit_score: score.icp_fit_score,
-            signal_score: score.signal_score,
-            data_quality_score: score.data_quality_score,
-            source_trust_score: score.source_trust_score,
-            penalty_score: score.penalty_score,
-            priority_score: finalScore,
             grade: newGrade,
             reasoning: {
               ...(score.reasoning || {}),
               learning_adjustment: learningAdjustment,
+              effective_score: finalScore,
               rescored_at: new Date().toISOString(),
             },
           });
-          prospectUpdates.push({ id: score.prospect_id, score: finalScore });
           adjustments.push(learningAdjustment);
           rescored++;
         } catch (e) {
@@ -233,17 +228,21 @@ async function processRescore(
         }
       }
 
-      // Bulk writes (2 round-trips por lote em vez de 2*N)
-      if (scoreUpdates.length > 0) {
-        const { error: upErr } = await supabase
-          .from("prospect_scores")
-          .upsert(scoreUpdates, { onConflict: "id" });
-        if (upErr) console.error("[rescore] upsert prospect_scores error", upErr);
-
-        const { error: rpcErr } = await supabase.rpc("bulk_update_prospect_priority", {
-          p_updates: prospectUpdates,
-        });
-        if (rpcErr) console.error("[rescore] bulk_update_prospect_priority error", rpcErr);
+      // Bulk update via PATCH em paralelo limitado (upsert não funciona para colunas geradas)
+      const CONCURRENCY = 10;
+      for (let j = 0; j < scoreUpdates.length; j += CONCURRENCY) {
+        const slice = scoreUpdates.slice(j, j + CONCURRENCY);
+        await Promise.all(
+          slice.map((u) =>
+            supabase
+              .from("prospect_scores")
+              .update({ grade: u.grade, reasoning: u.reasoning })
+              .eq("id", u.id)
+              .then((r: any) => {
+                if (r.error) console.error("[rescore] update score error", u.id, r.error.message);
+              }),
+          ),
+        );
       }
     }
 
