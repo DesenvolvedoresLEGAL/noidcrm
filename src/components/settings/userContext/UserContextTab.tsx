@@ -6,7 +6,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Loader2, Search, Edit, Info, AlertTriangle } from 'lucide-react';
+import { Loader2, Search, Edit, Info, AlertTriangle, LayoutDashboard } from 'lucide-react';
+import { DashboardPreviewModal } from '@/components/settings/dashboardResolver/DashboardPreviewModal';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import {
   useUserContexts,
