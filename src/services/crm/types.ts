@@ -46,6 +46,8 @@ export interface Lead {
   updated_at: string;
 }
 
+export type LeadDistributionStrategy = 'none' | 'round_robin' | 'load_balanced' | 'random' | 'territory';
+
 export interface Pipeline {
   id: string;
   name: string;
@@ -53,6 +55,9 @@ export interface Pipeline {
   is_primary?: boolean;
   bu: ('ALUGUE' | 'HUMANOID')[]; // Legacy field
   business_unit_ids: string[];
+  lead_distribution_strategy?: LeadDistributionStrategy;
+  lead_distribution_role?: string | null;
+  lead_distribution_user_ids?: string[];
   stages: Stage[];
   created_at: string;
 }

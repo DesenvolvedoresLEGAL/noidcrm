@@ -20,6 +20,8 @@ const stageSchema = z.object({
   allow_lose_opportunity: z.boolean().optional(),
 });
 
+export type LeadDistributionStrategy = 'none' | 'round_robin' | 'load_balanced' | 'random' | 'territory';
+
 interface DBPipeline {
   id: string;
   name: string;
@@ -28,6 +30,9 @@ interface DBPipeline {
   is_primary: boolean | null;
   color: string | null;
   business_unit_ids: string[] | null;
+  lead_distribution_strategy: string | null;
+  lead_distribution_role: string | null;
+  lead_distribution_user_ids: string[] | null;
   created_at: string;
 }
 
@@ -53,6 +58,9 @@ export interface Pipeline {
   is_primary?: boolean;
   bu: ('ALUGUE' | 'HUMANOID')[]; // Legacy field for compatibility
   business_unit_ids: string[];
+  lead_distribution_strategy?: LeadDistributionStrategy;
+  lead_distribution_role?: string | null;
+  lead_distribution_user_ids?: string[];
   stages: Stage[];
   created_at: string;
 }
@@ -90,6 +98,10 @@ function mapDBToPipeline(dbPipeline: DBPipeline, dbStages: DBStage[]): Pipeline 
     is_primary: dbPipeline.is_primary ?? false,
     bu: normalizeLegacyType(dbPipeline.type),
     business_unit_ids: dbPipeline.business_unit_ids || [],
+    lead_distribution_strategy:
+      (dbPipeline.lead_distribution_strategy as LeadDistributionStrategy) || 'none',
+    lead_distribution_role: dbPipeline.lead_distribution_role,
+    lead_distribution_user_ids: dbPipeline.lead_distribution_user_ids || [],
     stages: dbStages.map(mapDBToStage),
     created_at: dbPipeline.created_at,
   };
@@ -200,6 +212,15 @@ export async function updatePipeline(id: string, data: Partial<Pipeline>): Promi
   }
   if (data.is_primary !== undefined) {
     updates.is_primary = data.is_primary;
+  }
+  if (data.lead_distribution_strategy !== undefined) {
+    updates.lead_distribution_strategy = data.lead_distribution_strategy;
+  }
+  if (data.lead_distribution_role !== undefined) {
+    updates.lead_distribution_role = data.lead_distribution_role;
+  }
+  if (data.lead_distribution_user_ids !== undefined) {
+    updates.lead_distribution_user_ids = data.lead_distribution_user_ids;
   }
 
   if (data.bu !== undefined) {
