@@ -7,14 +7,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useState, useEffect, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { User, Calendar, Mail, Settings, Loader2, KeyRound, Eye, EyeOff, Camera } from 'lucide-react';
+import { User, Calendar, Mail, Settings, Loader2, KeyRound, Eye, EyeOff, Camera, Info } from 'lucide-react';
 import { useOrganizationPipelines } from '@/hooks/useOrganizationPipelines';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { SmtpSettings } from '@/components/settings/SmtpSettings';
 import { GmailSyncSettings } from '@/components/settings/GmailSyncSettings';
 import { AvatarCropEditor } from '@/components/avatar/AvatarCropEditor';
+import { CurrentUserContextCard } from '@/components/settings/profile/CurrentUserContextCard';
 
 const roleLabels: Record<string, string> = {
   owner: 'Proprietário',
@@ -56,6 +58,7 @@ const formatPhone = (value: string) => {
 export default function ProfileSettings() {
   const { user } = useSupabaseAuth();
   const { pipelines } = useOrganizationPipelines();
+  const queryClient = useQueryClient();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -195,18 +198,29 @@ export default function ProfileSettings() {
     if (!user) return;
     setSaving(true);
     try {
+      // Use upsert keyed on user_id so the row is created if missing,
+      // ensuring default_pipeline_id always persists.
       const { error } = await supabase
         .from('profiles')
-        .update({
-          full_name: fullName,
-          phone: phone.replace(/\D/g, ''),
-          cpf: cpf.replace(/\D/g, ''),
-          birth_date: birthDate || null,
-          default_pipeline_id: defaultPipelineId || null,
-        })
-        .eq('user_id', user.id);
+        .upsert(
+          {
+            user_id: user.id,
+            full_name: fullName,
+            phone: phone.replace(/\D/g, ''),
+            cpf: cpf.replace(/\D/g, ''),
+            birth_date: birthDate || null,
+            default_pipeline_id: defaultPipelineId || null,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'user_id' },
+        );
 
       if (error) throw error;
+
+      // Invalidate the cached current user so default_pipeline_id is re-read fresh
+      // across the app (Opportunities page, hooks, etc.) without a manual reload.
+      await queryClient.invalidateQueries({ queryKey: ['current-user'] });
+
       toast.success('Dados atualizados com sucesso');
     } catch (error) {
       console.error('Error updating profile:', error);
@@ -295,6 +309,8 @@ export default function ProfileSettings() {
 
         {/* Tab: Dados */}
         <TabsContent value="dados" className="space-y-4">
+          <CurrentUserContextCard />
+
           <Card>
             <CardHeader>
               <div className="flex items-center gap-2">
@@ -360,12 +376,21 @@ export default function ProfileSettings() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="orgRole">Função Organizacional</Label>
+                  <Label htmlFor="orgRole" className="flex items-center gap-1.5">
+                    Função Organizacional
+                    <span className="text-[10px] font-normal uppercase tracking-wide text-muted-foreground border border-border rounded px-1 py-0.5">
+                      Legado
+                    </span>
+                  </Label>
                   <div className="flex items-center h-10">
                     <Badge variant="outline" className="text-sm">
                       {roleLabels[orgRole] || orgRole || 'Não definida'}
                     </Badge>
                   </div>
+                  <p className="text-xs text-muted-foreground flex items-start gap-1">
+                    <Info className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                    Configuração legada. A função usada para dashboards dinâmicos fica em <strong>Contexto CRM</strong>.
+                  </p>
                 </div>
 
                 <div className="space-y-2">
