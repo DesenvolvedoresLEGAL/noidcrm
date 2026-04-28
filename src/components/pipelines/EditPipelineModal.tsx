@@ -19,9 +19,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { AlertCircle, Info, Star } from 'lucide-react';
+import { AlertCircle, Info, Star, Users, Shuffle, Scale, Dice5, MapPin, Ban } from 'lucide-react';
 import { useBusinessUnits } from '@/hooks/useBusinessUnits';
-import { Pipeline } from '@/services/crm/types';
+import { useOrganizationUsers } from '@/hooks/useOrganizationUsers';
+import { Pipeline, LeadDistributionStrategy } from '@/services/crm/types';
 
 interface EditPipelineModalProps {
   open: boolean;
