@@ -680,10 +680,10 @@ export default function AccountEditor() {
                             <SelectContent>
                               {usersLoading ? (
                                 <SelectItem value="_loading" disabled>Carregando usuários...</SelectItem>
-                              ) : users.length === 0 ? (
+                              ) : selectUsers.length === 0 ? (
                                 <SelectItem value="_empty" disabled>Nenhum usuário encontrado</SelectItem>
                               ) : (
-                                users.map((user) => (
+                                selectUsers.map((user) => (
                                   <SelectItem key={user.id} value={user.id}>
                                     {user.name}
                                   </SelectItem>
@@ -711,10 +711,10 @@ export default function AccountEditor() {
                             <SelectContent>
                               {usersLoading ? (
                                 <SelectItem value="_loading" disabled>Carregando usuários...</SelectItem>
-                              ) : users.length === 0 ? (
+                              ) : selectUsers.length === 0 ? (
                                 <SelectItem value="_empty" disabled>Nenhum usuário encontrado</SelectItem>
                               ) : (
-                                users.map((user) => (
+                                selectUsers.map((user) => (
                                   <SelectItem key={user.id} value={user.id}>
                                     {user.name}
                                   </SelectItem>
@@ -745,10 +745,10 @@ export default function AccountEditor() {
                             <SelectContent>
                               {usersLoading ? (
                                 <SelectItem value="_loading" disabled>Carregando usuários...</SelectItem>
-                              ) : users.length === 0 ? (
+                              ) : selectUsers.length === 0 ? (
                                 <SelectItem value="_empty" disabled>Nenhum usuário encontrado</SelectItem>
                               ) : (
-                                users.map((user) => (
+                                selectUsers.map((user) => (
                                   <SelectItem key={user.id} value={user.id}>
                                     {user.name}
                                   </SelectItem>
