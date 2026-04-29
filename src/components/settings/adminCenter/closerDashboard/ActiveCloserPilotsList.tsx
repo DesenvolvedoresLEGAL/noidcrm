@@ -43,12 +43,12 @@ export function ActiveCloserPilotsList({ tenantId, adoption }: Props) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Pilotos ativos</CardTitle>
+        <CardTitle className="text-base">Usuários comerciais piloto</CardTitle>
         <CardDescription>Adoção e status individual nos últimos 7 dias.</CardDescription>
       </CardHeader>
       <CardContent>
         {adoption.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Nenhum Closer piloto ativo.</p>
+          <p className="text-sm text-muted-foreground">Nenhum usuário comercial com piloto ativo.</p>
         ) : (
           <div className="space-y-2">
             {adoption.map((row) => (
@@ -72,7 +72,7 @@ export function ActiveCloserPilotsList({ tenantId, adoption }: Props) {
                     disabled={disableMut.isPending}
                   >
                     {disableMut.isPending && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
-                    Desligar
+                    Desligar piloto
                   </Button>
                 </div>
               </div>

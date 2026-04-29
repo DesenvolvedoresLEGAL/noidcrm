@@ -44,20 +44,23 @@ export function CloserRollbackPanel({ tenantId }: Props) {
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Rollback rápido</CardTitle>
-        <CardDescription>Desligue pilotos individuais, todos os Closers ou o tenant inteiro.</CardDescription>
+        <CardDescription>
+          Desligar o piloto faz o usuário voltar imediatamente ao dashboard atual.
+        </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col md:flex-row gap-2">
         <AlertDialog>
           <AlertDialogTrigger asChild>
             <Button variant="outline" disabled={disableAll.isPending}>
-              Desligar todos os Closers pilotos
+              Desligar todos os pilotos do Dashboard Comercial
             </Button>
           </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Desligar todos os Closers pilotos?</AlertDialogTitle>
+              <AlertDialogTitle>Desligar todos os pilotos do Dashboard Comercial?</AlertDialogTitle>
               <AlertDialogDescription>
-                Isso remove o novo dashboard de todos os Closers pilotos deste tenant. O dashboard atual volta imediatamente.
+                Isso remove o Dashboard Comercial de todos os usuários piloto deste tenant. O
+                dashboard atual volta imediatamente.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
