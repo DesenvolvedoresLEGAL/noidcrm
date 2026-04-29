@@ -380,6 +380,19 @@ export default function AccountEditor() {
       queryClient.setQueryData(accountKeys.detailExtended(id), (current: any) =>
         current ? { ...current, ...updatedAccount } : updatedAccount,
       );
+      // Sprint Scoring 1.1 — fire-and-forget immediate recalculation so the
+      // user sees the new lead score without waiting for the cron flush.
+      void supabase.functions
+        .invoke('calculate-account-scores', { body: { accountId: id } })
+        .then(() => {
+          invalidateScoreRelatedQueries(queryClient, {
+            organizationId: (updatedAccount as any)?.organization_id ?? null,
+            accountId: id,
+          });
+        })
+        .catch((err) => {
+          console.warn('[scoring] immediate recalc failed (queue will retry):', err);
+        });
       toast({ title: 'Conta atualizada com sucesso!' });
       navigate(`/app/accounts/${id}`);
     },
