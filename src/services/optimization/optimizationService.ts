@@ -143,3 +143,26 @@ export async function triggerGenerateRecommendations(organizationId?: string) {
   if (error) throw error;
   return data;
 }
+
+export async function rollbackRecommendation(recommendationId: string) {
+  const { data, error } = await supabase.functions.invoke('rollback-recommendation', {
+    body: { recommendation_id: recommendationId },
+  });
+  if (error) throw error;
+  return data;
+}
+
+export async function fetchImpactSummary(organizationId: string): Promise<OptimizationImpactSummary> {
+  const { data, error } = await supabase.rpc('get_optimization_impact_summary' as any, {
+    _org_id: organizationId,
+  });
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : data;
+  return {
+    applied_last_7d: Number(row?.applied_last_7d ?? 0),
+    rolled_back_last_7d: Number(row?.rolled_back_last_7d ?? 0),
+    impact_estimate_sum: Number(row?.impact_estimate_sum ?? 0),
+    pending_count: Number(row?.pending_count ?? 0),
+    failed_last_7d: Number(row?.failed_last_7d ?? 0),
+  };
+}
