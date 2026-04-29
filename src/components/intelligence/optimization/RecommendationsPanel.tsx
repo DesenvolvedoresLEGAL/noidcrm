@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { Loader2, Check, X, Sparkles } from 'lucide-react';
+import { Loader2, Check, X, Sparkles, Undo2 } from 'lucide-react';
 
 const TYPE_LABEL: Record<string, string> = {
   score_adjustment: 'Ajuste de score',
@@ -19,10 +19,11 @@ const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'destructive' | '
   auto_applied: 'default',
   dismissed: 'outline',
   failed: 'destructive',
+  rolled_back: 'outline',
 };
 
 export function RecommendationsPanel() {
-  const { data, isLoading, apply, dismiss } = useOptimizationRecommendations();
+  const { data, isLoading, apply, dismiss, rollback } = useOptimizationRecommendations();
 
   return (
     <Card>
@@ -83,6 +84,27 @@ export function RecommendationsPanel() {
                   <X className="h-4 w-4 mr-1" /> Ignorar
                 </Button>
               </div>
+            )}
+            {(r.status === 'accepted' || r.status === 'auto_applied') && (
+              <div className="flex gap-2 pt-1">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    if (confirm('Reverter esta recomendação? A mudança aplicada será desfeita.')) {
+                      rollback.mutate(r.id);
+                    }
+                  }}
+                  disabled={rollback.isPending}
+                >
+                  <Undo2 className="h-4 w-4 mr-1" /> Reverter
+                </Button>
+              </div>
+            )}
+            {r.status === 'rolled_back' && r.rolled_back_at && (
+              <p className="text-xs text-muted-foreground pt-1">
+                Revertida em {new Date(r.rolled_back_at).toLocaleString('pt-BR')}
+              </p>
             )}
           </div>
         ))}

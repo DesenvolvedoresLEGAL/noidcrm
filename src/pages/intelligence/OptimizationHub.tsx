@@ -5,6 +5,7 @@ import { InsightsFeed } from '@/components/intelligence/optimization/InsightsFee
 import { RecommendationsPanel } from '@/components/intelligence/optimization/RecommendationsPanel';
 import { AutoModeToggle } from '@/components/intelligence/optimization/AutoModeToggle';
 import { ActionsHistoryTable } from '@/components/intelligence/optimization/ActionsHistoryTable';
+import { ImpactSummaryCard } from '@/components/intelligence/optimization/ImpactSummaryCard';
 
 export default function OptimizationHub() {
   return (
@@ -17,6 +18,8 @@ export default function OptimizationHub() {
           badge={{ label: 'Inteligência', icon: Sparkles }}
           variant="indigo"
         />
+
+        <ImpactSummaryCard />
 
         <div className="grid gap-4 md:gap-6 lg:grid-cols-3">
           <div className="lg:col-span-2 space-y-4 md:space-y-6">
