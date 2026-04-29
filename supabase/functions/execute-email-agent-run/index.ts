@@ -9,6 +9,7 @@ import {
 import { callAI } from "../_shared/ai-client.ts";
 import { buildOpportunityBrief, detectHallucinations, renderBriefForPrompt } from "../_shared/opportunity-context.ts";
 import { checkEmailStyle } from "../_shared/email-style-guard.ts";
+import { normalizeRecipientEmail } from "../_shared/normalize-recipient-email.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
