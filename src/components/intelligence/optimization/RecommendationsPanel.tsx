@@ -23,7 +23,7 @@ const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'destructive' | '
 };
 
 export function RecommendationsPanel() {
-  const { data, isLoading, apply, dismiss } = useOptimizationRecommendations();
+  const { data, isLoading, apply, dismiss, rollback } = useOptimizationRecommendations();
 
   return (
     <Card>
