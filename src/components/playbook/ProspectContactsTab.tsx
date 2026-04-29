@@ -53,6 +53,11 @@ export function ProspectContactsTab({
   contactScore,
 }: ProspectContactsTabProps) {
   const { data: contacts = [], isLoading, enrich, setPrimary } = useEnrichedContacts(prospectId);
+  const { data: mergedContacts = [] } = useQuery({
+    queryKey: ["merged-contacts", prospectId],
+    queryFn: () => listMergedContacts(prospectId),
+    enabled: !!prospectId,
+  });
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   const handleConfirm = async () => {
