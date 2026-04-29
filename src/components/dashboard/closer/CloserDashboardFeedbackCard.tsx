@@ -5,9 +5,20 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
 import { Star, CheckCircle2 } from 'lucide-react';
 import { useDynamicDashboardFeedback } from '@/hooks/dashboard/useDynamicDashboardFeedback';
 import { useToast } from '@/hooks/use-toast';
+
+const MISSING_CHIPS = [
+  'Mais clareza nas propostas',
+  'Mais clareza nas atividades',
+  'Melhor cálculo do pace',
+  'Mais velocidade',
+  'CTAs melhores',
+  'Outra informação',
+] as const;
+
 
 interface Props {
   tenantId: string;
@@ -21,7 +32,14 @@ export function CloserDashboardFeedbackCard({ tenantId }: Props) {
   const [isConfusing, setIsConfusing] = useState<boolean | null>(null);
   const [isSlow, setIsSlow] = useState<boolean | null>(null);
   const [missingInfo, setMissingInfo] = useState('');
+  const [missingCategories, setMissingCategories] = useState<string[]>([]);
   const [comment, setComment] = useState('');
+
+  const toggleChip = (chip: string) => {
+    setMissingCategories((prev) =>
+      prev.includes(chip) ? prev.filter((c) => c !== chip) : [...prev, chip],
+    );
+  };
 
   if (submitted) {
     return (
