@@ -27,7 +27,7 @@ export function LegacySessionReturnBanner() {
         onClick={() => gate.setUseLegacyForSession(false)}
         className="self-start md:self-auto"
       >
-        Abrir novo Dashboard Closer
+        Abrir novo Dashboard Comercial
       </Button>
     </Alert>
   );

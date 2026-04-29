@@ -5,10 +5,11 @@ export function CloserNotACloserState() {
   return (
     <Alert>
       <Info className="h-4 w-4" />
-      <AlertTitle>Dashboard exclusivo para Closer</AlertTitle>
+      <AlertTitle>Dashboard Comercial indisponível</AlertTitle>
       <AlertDescription>
-        Este dashboard é exclusivo para usuários com função Closer. O usuário selecionado tem outra
-        função no contexto do CRM.
+        O Dashboard Comercial é carregado para usuários cuja função técnica no Contexto CRM é{' '}
+        <strong>Closer</strong> (responsável por fechamento). Ajuste o Contexto CRM deste usuário
+        para habilitá-lo.
       </AlertDescription>
     </Alert>
   );

@@ -52,7 +52,7 @@ export function AdminCenterPage() {
     <Tabs defaultValue="overview" className="space-y-4">
       <TabsList>
         <TabsTrigger value="overview">Visão geral</TabsTrigger>
-        <TabsTrigger value="closer">Dashboard Closer</TabsTrigger>
+        <TabsTrigger value="closer">Dashboard Comercial</TabsTrigger>
       </TabsList>
 
       <TabsContent value="overview" className="space-y-4">
