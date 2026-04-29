@@ -17,6 +17,7 @@ import { HandoffWrapper } from '@/components/reports/wrappers/HandoffWrapper';
 import { AIInsightsPanel } from '@/components/reports/AIInsightsPanel';
 import { TeamPerformanceWrapper } from '@/components/reports/wrappers/TeamPerformanceWrapper';
 import { OriginReportWrapper } from '@/components/reports/wrappers/OriginReportWrapper';
+import { EnrichedDecisionMakersWrapper } from '@/components/reports/wrappers/EnrichedDecisionMakersWrapper';
 import { useOrganizationPipelines } from '@/hooks/useOrganizationPipelines';
 import { useOrganizationUsers } from '@/hooks/useOrganizationUsers';
 import { ReportFiltersProvider, useReportFiltersContext } from '@/contexts/ReportFiltersContext';
@@ -70,6 +71,8 @@ function ReportsContent() {
         return <TeamPerformanceWrapper />;
       case 'handoff':
         return <HandoffWrapper />;
+      case 'enriched-decision-makers':
+        return <EnrichedDecisionMakersWrapper />;
       default:
         return <GeneralOverviewWrapper />;
     }
