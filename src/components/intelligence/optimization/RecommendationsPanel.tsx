@@ -85,6 +85,27 @@ export function RecommendationsPanel() {
                 </Button>
               </div>
             )}
+            {(r.status === 'accepted' || r.status === 'auto_applied') && (
+              <div className="flex gap-2 pt-1">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    if (confirm('Reverter esta recomendação? A mudança aplicada será desfeita.')) {
+                      rollback.mutate(r.id);
+                    }
+                  }}
+                  disabled={rollback.isPending}
+                >
+                  <Undo2 className="h-4 w-4 mr-1" /> Reverter
+                </Button>
+              </div>
+            )}
+            {r.status === 'rolled_back' && r.rolled_back_at && (
+              <p className="text-xs text-muted-foreground pt-1">
+                Revertida em {new Date(r.rolled_back_at).toLocaleString('pt-BR')}
+              </p>
+            )}
           </div>
         ))}
       </CardContent>
