@@ -14349,6 +14349,8 @@ export type Database = {
         Row: {
           account_id: string | null
           activated_features: Json | null
+          ai_win_probability_metadata: Json
+          ai_win_probability_updated_at: string | null
           arr_value: number | null
           automation_enabled: boolean | null
           client_loss_reason_id: string | null
@@ -14359,13 +14361,20 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           days_since_contact: number | null
+          deal_health: string | null
+          deal_health_metadata: Json
+          deal_health_score: number | null
+          deal_health_updated_at: string | null
           deleted_at: string | null
           diagnostic_classification: string | null
           diagnostic_score: number | null
           energy_score: number | null
+          engagement_metadata: Json
           engagement_score: number | null
+          engagement_updated_at: string | null
           fonte: string | null
           id: string
+          indicators_updated_at: string | null
           is_recoverable: string | null
           last_contact_date: string | null
           lead_type: string | null
@@ -14402,7 +14411,10 @@ export type Database = {
           qualified_by_user_id: string | null
           requires_seller_classification: boolean
           response_velocity: number | null
+          risk_level: string | null
+          risk_metadata: Json
           risk_score: number | null
+          risk_updated_at: string | null
           score_confidence: string | null
           score_updated_at: string | null
           scoring_factors: Json | null
@@ -14420,7 +14432,9 @@ export type Database = {
           updated_at: string | null
           urgency_score: number | null
           valor_previsto: number | null
+          velocity_metadata: Json
           velocity_score: number | null
+          velocity_updated_at: string | null
           vibe_state: string | null
           win_probability_ai: number | null
           won_at: string | null
@@ -14428,6 +14442,8 @@ export type Database = {
         Insert: {
           account_id?: string | null
           activated_features?: Json | null
+          ai_win_probability_metadata?: Json
+          ai_win_probability_updated_at?: string | null
           arr_value?: number | null
           automation_enabled?: boolean | null
           client_loss_reason_id?: string | null
@@ -14438,13 +14454,20 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           days_since_contact?: number | null
+          deal_health?: string | null
+          deal_health_metadata?: Json
+          deal_health_score?: number | null
+          deal_health_updated_at?: string | null
           deleted_at?: string | null
           diagnostic_classification?: string | null
           diagnostic_score?: number | null
           energy_score?: number | null
+          engagement_metadata?: Json
           engagement_score?: number | null
+          engagement_updated_at?: string | null
           fonte?: string | null
           id?: string
+          indicators_updated_at?: string | null
           is_recoverable?: string | null
           last_contact_date?: string | null
           lead_type?: string | null
@@ -14481,7 +14504,10 @@ export type Database = {
           qualified_by_user_id?: string | null
           requires_seller_classification?: boolean
           response_velocity?: number | null
+          risk_level?: string | null
+          risk_metadata?: Json
           risk_score?: number | null
+          risk_updated_at?: string | null
           score_confidence?: string | null
           score_updated_at?: string | null
           scoring_factors?: Json | null
@@ -14499,7 +14525,9 @@ export type Database = {
           updated_at?: string | null
           urgency_score?: number | null
           valor_previsto?: number | null
+          velocity_metadata?: Json
           velocity_score?: number | null
+          velocity_updated_at?: string | null
           vibe_state?: string | null
           win_probability_ai?: number | null
           won_at?: string | null
@@ -14507,6 +14535,8 @@ export type Database = {
         Update: {
           account_id?: string | null
           activated_features?: Json | null
+          ai_win_probability_metadata?: Json
+          ai_win_probability_updated_at?: string | null
           arr_value?: number | null
           automation_enabled?: boolean | null
           client_loss_reason_id?: string | null
@@ -14517,13 +14547,20 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           days_since_contact?: number | null
+          deal_health?: string | null
+          deal_health_metadata?: Json
+          deal_health_score?: number | null
+          deal_health_updated_at?: string | null
           deleted_at?: string | null
           diagnostic_classification?: string | null
           diagnostic_score?: number | null
           energy_score?: number | null
+          engagement_metadata?: Json
           engagement_score?: number | null
+          engagement_updated_at?: string | null
           fonte?: string | null
           id?: string
+          indicators_updated_at?: string | null
           is_recoverable?: string | null
           last_contact_date?: string | null
           lead_type?: string | null
@@ -14560,7 +14597,10 @@ export type Database = {
           qualified_by_user_id?: string | null
           requires_seller_classification?: boolean
           response_velocity?: number | null
+          risk_level?: string | null
+          risk_metadata?: Json
           risk_score?: number | null
+          risk_updated_at?: string | null
           score_confidence?: string | null
           score_updated_at?: string | null
           scoring_factors?: Json | null
@@ -14578,7 +14618,9 @@ export type Database = {
           updated_at?: string | null
           urgency_score?: number | null
           valor_previsto?: number | null
+          velocity_metadata?: Json
           velocity_score?: number | null
+          velocity_updated_at?: string | null
           vibe_state?: string | null
           win_probability_ai?: number | null
           won_at?: string | null
@@ -15142,6 +15184,48 @@ export type Database = {
             referencedColumns: ["user_id"]
           },
         ]
+      }
+      opportunity_indicators_recalc_queue: {
+        Row: {
+          account_id: string | null
+          created_at: string
+          error_message: string | null
+          id: string
+          metadata: Json
+          opportunity_id: string
+          organization_id: string
+          processed_at: string | null
+          status: string
+          trigger_action: string
+          trigger_source: string
+        }
+        Insert: {
+          account_id?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          metadata?: Json
+          opportunity_id: string
+          organization_id: string
+          processed_at?: string | null
+          status?: string
+          trigger_action: string
+          trigger_source: string
+        }
+        Update: {
+          account_id?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          metadata?: Json
+          opportunity_id?: string
+          organization_id?: string
+          processed_at?: string | null
+          status?: string
+          trigger_action?: string
+          trigger_source?: string
+        }
+        Relationships: []
       }
       opportunity_notes: {
         Row: {
@@ -29551,6 +29635,16 @@ export type Database = {
       enqueue_email: {
         Args: { payload: Json; queue_name: string }
         Returns: number
+      }
+      enqueue_opportunity_indicators_recalc: {
+        Args: {
+          _account_id: string
+          _opportunity_id: string
+          _organization_id: string
+          _trigger_action: string
+          _trigger_source: string
+        }
+        Returns: undefined
       }
       find_similar_accounts:
         | {
