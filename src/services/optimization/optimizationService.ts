@@ -7,7 +7,7 @@ export type RecommendationType =
   | 'template_change'
   | 'channel_shift'
   | 'playbook_change';
-export type RecommendationStatus = 'pending' | 'accepted' | 'dismissed' | 'auto_applied' | 'failed';
+export type RecommendationStatus = 'pending' | 'accepted' | 'dismissed' | 'auto_applied' | 'failed' | 'rolled_back';
 
 export interface OptimizationInsight {
   id: string;
