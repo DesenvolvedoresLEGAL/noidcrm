@@ -154,6 +154,7 @@ const ManagerDashboard = lazy(() => import("./pages/gtm/ManagerDashboard"));
 const CEODashboard = lazy(() => import("./pages/gtm/CEODashboard"));
 const PlaybooksHub = lazy(() => import("./pages/intelligence/PlaybooksHub"));
 const KairosHub = lazy(() => import("./pages/intelligence/KairosHub"));
+const OptimizationHub = lazy(() => import("./pages/intelligence/OptimizationHub"));
 const WinLossHub = lazy(() => import("./pages/intelligence/WinLossHub"));
 const VibeSelling = lazy(() => import("./pages/intelligence/VibeSelling"));
 const KnowledgeGraph = lazy(() => import("./pages/app/intelligence/KnowledgeGraph"));
@@ -1017,6 +1018,16 @@ const App = () => (
                   <ProtectedRoute>
                     <LazyRoute>
                       <KairosHub />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/intelligence/optimization"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <OptimizationHub />
                     </LazyRoute>
                   </ProtectedRoute>
                 }

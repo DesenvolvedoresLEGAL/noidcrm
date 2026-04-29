@@ -15732,6 +15732,203 @@ export type Database = {
           },
         ]
       }
+      optimization_actions_log: {
+        Row: {
+          action_type: string
+          error_message: string | null
+          executed: boolean
+          executed_at: string
+          executed_by: string | null
+          id: string
+          organization_id: string
+          recommendation_id: string | null
+          result: Json | null
+        }
+        Insert: {
+          action_type: string
+          error_message?: string | null
+          executed?: boolean
+          executed_at?: string
+          executed_by?: string | null
+          id?: string
+          organization_id: string
+          recommendation_id?: string | null
+          result?: Json | null
+        }
+        Update: {
+          action_type?: string
+          error_message?: string | null
+          executed?: boolean
+          executed_at?: string
+          executed_by?: string | null
+          id?: string
+          organization_id?: string
+          recommendation_id?: string | null
+          result?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "optimization_actions_log_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "optimization_actions_log_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_report_legacy_retirement_readiness_v2"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "optimization_actions_log_recommendation_id_fkey"
+            columns: ["recommendation_id"]
+            isOneToOne: false
+            referencedRelation: "optimization_recommendations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      optimization_insights: {
+        Row: {
+          baseline_value: number | null
+          confidence_score: number
+          created_at: string
+          delta: number | null
+          detected_at: string
+          entity_id: string | null
+          entity_label: string | null
+          id: string
+          insight_type: string
+          metric_name: string | null
+          metric_value: number | null
+          organization_id: string
+          sample_size: number
+        }
+        Insert: {
+          baseline_value?: number | null
+          confidence_score?: number
+          created_at?: string
+          delta?: number | null
+          detected_at?: string
+          entity_id?: string | null
+          entity_label?: string | null
+          id?: string
+          insight_type: string
+          metric_name?: string | null
+          metric_value?: number | null
+          organization_id: string
+          sample_size?: number
+        }
+        Update: {
+          baseline_value?: number | null
+          confidence_score?: number
+          created_at?: string
+          delta?: number | null
+          detected_at?: string
+          entity_id?: string | null
+          entity_label?: string | null
+          id?: string
+          insight_type?: string
+          metric_name?: string | null
+          metric_value?: number | null
+          organization_id?: string
+          sample_size?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "optimization_insights_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "optimization_insights_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_report_legacy_retirement_readiness_v2"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
+      optimization_recommendations: {
+        Row: {
+          action_payload: Json
+          confidence_score: number
+          created_at: string
+          description: string | null
+          id: string
+          impact_estimate: number | null
+          insight_id: string | null
+          organization_id: string
+          recommendation_type: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          target_id: string | null
+          target_type: string | null
+          title: string
+        }
+        Insert: {
+          action_payload?: Json
+          confidence_score?: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          impact_estimate?: number | null
+          insight_id?: string | null
+          organization_id: string
+          recommendation_type: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          target_id?: string | null
+          target_type?: string | null
+          title: string
+        }
+        Update: {
+          action_payload?: Json
+          confidence_score?: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          impact_estimate?: number | null
+          insight_id?: string | null
+          organization_id?: string
+          recommendation_type?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          target_id?: string | null
+          target_type?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "optimization_recommendations_insight_id_fkey"
+            columns: ["insight_id"]
+            isOneToOne: false
+            referencedRelation: "optimization_insights"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "optimization_recommendations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "optimization_recommendations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_report_legacy_retirement_readiness_v2"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
       org_billing_snapshots: {
         Row: {
           active_seats: number
@@ -29172,6 +29369,10 @@ export type Database = {
         Args: { p_proposal_id: string; p_viewer_ip: string }
         Returns: boolean
       }
+      dismiss_optimization_recommendation: {
+        Args: { _rec_id: string }
+        Returns: string
+      }
       enqueue_email: {
         Args: { payload: Json; queue_name: string }
         Returns: number
@@ -29481,8 +29682,16 @@ export type Database = {
         Args: { p_organization_id: string }
         Returns: undefined
       }
+      is_active_org_member: {
+        Args: { _org_id: string; _user_id: string }
+        Returns: boolean
+      }
       is_admin_or_owner: { Args: { _user_id: string }; Returns: boolean }
       is_feature_enabled: { Args: { _flag_key: string }; Returns: boolean }
+      is_org_admin: {
+        Args: { _org_id: string; _user_id: string }
+        Returns: boolean
+      }
       is_platform_admin: { Args: { _user_id?: string }; Returns: boolean }
       is_platform_admin_for_rls: { Args: { user_id: string }; Returns: boolean }
       is_platform_super_admin: { Args: { _user_id: string }; Returns: boolean }
@@ -29688,6 +29897,10 @@ export type Database = {
       seed_default_decision_rules: {
         Args: { _org_id: string }
         Returns: undefined
+      }
+      set_optimization_auto_mode: {
+        Args: { _enabled: boolean; _org_id: string }
+        Returns: boolean
       }
       try_acquire_dedup_lock: {
         Args: {

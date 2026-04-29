@@ -1,158 +1,177 @@
+## Sprint D — AI Optimization Layer (Kairós)
 
-# Sprint 6.7: Finalização e Homologação do Dashboard Comercial
+Transformar dados históricos (`learning_signals`, `outreach_performance`, `revenue_events`) em insights, recomendações e ajustes automáticos — fechando o loop **Executa → Aprende → Otimiza**.
 
-Sprint de **polimento, auditoria e homologação**. Zero migrations, zero novas RPCs (a auditoria/reconciliação são derivadas no frontend a partir dos dados que o `crm_get_closer_dashboard_data` já retorna). Mantém todas as keys técnicas (`closer`, `dashboard_type='closer'`, `business_function_key='closer'`).
+### Princípios de adaptação ao NOID
 
-## Estratégia
+- Multitenancy: usar `organization_id` (não `workspace_id`) para alinhar com `learning_signals`, `decision_rules`, `outreach_performance` já existentes.
+- RLS: Org members podem `SELECT`; apenas Owners/Admins podem aplicar recomendações; service_role para edge functions.
+- Auto-mode OFF por padrão; `apply-recommendation` exige aprovação manual no início.
+- Reaproveitar serviços existentes (`useLearningSignals`, `useOutreachPerformance`, `decisionService`) e padrões da `NoidIntelligenceHub`.
 
-A maior parte das informações pedidas (auditoria, reconciliação, checklist) é **derivada do payload já existente** + observabilidade já existente. Não precisamos criar novas fontes — apenas apresentar o que já temos com mais clareza.
+---
 
-## Mudanças
+### 1. Banco de dados (1 migration)
 
-### 1. Polimento da UI do Dashboard Comercial (`src/components/dashboard/closer/`)
+**`optimization_insights`**
+- `id`, `organization_id` (FK organizations, ON DELETE CASCADE), `insight_type` CHECK in (`signal`,`template`,`channel`,`playbook`,`provider`)
+- `entity_id`, `entity_label`, `metric_name`, `metric_value`, `baseline_value`, `delta`
+- `sample_size INT`, `confidence_score NUMERIC` (0-1, CHECK)
+- `detected_at TIMESTAMPTZ DEFAULT now()`, `created_at`
+- UNIQUE (organization_id, insight_type, entity_id, metric_name) → upsert idempotente por ciclo
+- Index: (organization_id, detected_at DESC), (organization_id, insight_type)
 
-**`CloserDashboard.tsx`** — reorganizar e adicionar botão "Atualizar":
-- Cabeçalho ganha botão **"Atualizar dashboard"** (chama `query.refetch()` + `paceQuery.refetch()`).
-- Reorganiza para ordem definitiva: Central do Dia → Pace Diário → Top 10 ações → Propostas que exigem ação (agrupadas em Tabs) → Follow ups e atividades (agrupadas) → Deals em risco → KPIs comerciais → Feedback.
-- Melhora copy do alerta de widgets indisponíveis.
+**`optimization_recommendations`**
+- `id`, `organization_id`, `insight_id` (FK optimization_insights ON DELETE SET NULL)
+- `recommendation_type` CHECK in (`score_adjustment`,`rule_change`,`template_change`,`channel_shift`,`playbook_change`)
+- `target_type`, `target_id`, `title`, `description`
+- `impact_estimate NUMERIC`, `confidence_score NUMERIC` (CHECK 0-1)
+- `action_payload JSONB NOT NULL` (instruções idempotentes para `apply-recommendation`)
+- `status` CHECK in (`pending`,`accepted`,`dismissed`,`auto_applied`,`failed`) DEFAULT `pending`
+- `reviewed_by UUID`, `reviewed_at`, `created_at`
+- Index: (organization_id, status, created_at DESC)
 
-**`CentralDoDiaSection.tsx`** — copy clara e estado vazio agregado:
-- Tooltip por card com a descrição dos textos do enunciado (Atividades de hoje, Follow ups vencidos etc.).
-- Quando `Σ counts === 0`: mensagem **"Nada crítico para agora. Revise o pipeline e busque novas oportunidades de avanço."**
+**`optimization_actions_log`**
+- `id`, `organization_id`, `recommendation_id` (FK ON DELETE CASCADE)
+- `action_type`, `executed BOOLEAN`, `result JSONB`, `error_message TEXT`
+- `executed_by UUID` (NULL para auto), `executed_at TIMESTAMPTZ DEFAULT now()`
 
-**`CloserPaceSection.tsx`** — proteções e tooltip de regra:
-- Substituir `pace_gap_value ?? 0` por proteções explícitas (meta nula/zero, dia útil zero, realizado > meta).
-- Tooltip junto ao título do Pace: **"Cálculo baseado em dias úteis de segunda a sexta, sem feriados nesta versão."** (usa `pace.business_days_rule` se vier do backend).
-- Subtítulo já está correto.
+**`organization_settings` (extensão)**
+- Adicionar coluna `optimization_auto_mode BOOLEAN DEFAULT false` (criar tabela + linha por org se não existir, ou usar config JSONB existente).
+- `max_score_adjustment_per_cycle NUMERIC DEFAULT 10`
+- `min_sample_size_for_insight INT DEFAULT 20`
 
-**`CloserTopActions.tsx`**:
-- Título "Top 10 ações do dia" mantido; subtítulo passa para **"As 10 prioridades comerciais de hoje, em ordem de impacto."**.
-- Garante CTA seguro (já há fallback disabled+tooltip via `buildCloserCtaHref`).
-- Quando `actions.length === 0`: **"Sem ações prioritárias agora. Bom momento para prospectar."**
+**RLS**
+- Todas as 3 tabelas: `SELECT` para membros da org via `organization_members`
+- `UPDATE status` em `optimization_recommendations` só para Owner/Admin (via `has_role`)
+- `INSERT/UPDATE` em insights/log: apenas service_role (edge functions)
 
-**Nova `CloserProposalsActionGroup.tsx`** — agrupa em Tabs (`@/components/ui/tabs`) as 4 listas de propostas:
-- Vencendo hoje, Vencendo em 48h, Vencidas, Visualizadas sem follow up.
-- Empty geral: **"Nenhuma proposta exigindo ação agora."**
+---
 
-**Nova `CloserActivitiesGroup.tsx`** — agrupa Agenda de hoje + Follow ups vencidos lado a lado.
-- Empty: **"Nenhuma atividade agendada para hoje."**
+### 2. Edge Functions (3 novas)
 
-**`CloserRiskDealsList.tsx`** — manter, com tooltip explicando o cálculo de risco:
-**"Risco calculado por sinais comerciais como silêncio, proposta sem resposta, follow up vencido ou tempo parado na etapa."**
+**`compute-optimization-insights`**
+- Input: `{ organization_id?: string }` (se omitido, processa todas as orgs ativas)
+- Lê `learning_signals` (>= min_sample_size), `outreach_performance` (sent >= 100), `revenue_events` últimos 90d
+- Detecta padrões:
+  - **Sinal forte**: `positive_outcomes/occurrences > baseline_org + 0.20` → insight `signal`
+  - **Template ruim**: `replied/sent < 0.05` AND `sent >= 100` → insight `template`
+  - **Canal vencedor**: `channel.reply_rate > other.reply_rate * 2` → insight `channel`
+- UPSERT em `optimization_insights` (idempotente por `(org, type, entity, metric)`)
+- Logs estruturados, retorna contagem de insights gerados
 
-**`CloserPeriodFilter.tsx`** — adiciona tooltip com regra de período:
-**"Central do Dia usa o dia atual. Pace Diário usa a meta mensal. Os demais indicadores respeitam o período selecionado quando aplicável."**
+**`generate-recommendations`**
+- Input: `{ organization_id?, since?: ISO }`
+- Para cada insight recente sem recomendação ativa, gera 1 recomendação com `action_payload`:
+  - `signal` + delta positivo → `score_adjustment` (+N pontos, cap ±10)
+  - `template` baixa resposta → `template_change` (sugere deprecar / criar variante)
+  - `channel` vencedor → `channel_shift` (sugere priorizar canal X)
+- `confidence_score` = função de `sample_size` e `delta`
+- Skip se já existe recomendação `pending` ou `accepted` para mesmo target
 
-**Empty/Error states** — atualizar copy de:
-- `CloserDashboardEmptyState.tsx`
-- `CloserDashboardErrorState.tsx` (mensagem segura, sem stack trace)
+**`apply-recommendation`**
+- Input: `{ recommendation_id: string }` — chamada manual ou pelo cron quando `auto_mode=true`
+- Valida JWT + role Owner/Admin (manual) OU origem service_role (auto)
+- Switch por `recommendation_type`:
+  - `score_adjustment` → UPDATE `learning_signals.impact_score` respeitando cap ±10/ciclo e CHECK ±20
+  - `rule_change` → UPDATE `decision_rules` (ex: `is_active=false` ou ajusta `min_score`)
+  - `template_change` → marca template/variant como `deprecated` em `outreach_performance` (adicionar coluna `status` se necessário) ou em tabela de templates
+  - `channel_shift` → grava preferência em `organization_settings`
+- INSERT em `optimization_actions_log` (com `result` ou `error_message`)
+- UPDATE recommendation.status → `accepted` (manual) / `auto_applied` / `failed`
 
-### 2. Feedback Card aprimorado (`CloserDashboardFeedbackCard.tsx`)
+**Cron (pg_cron, a cada 24h às 04:00 UTC)**
+1. `compute-optimization-insights`
+2. `generate-recommendations`
+3. Se org tem `optimization_auto_mode=true`: aplica recomendações com `confidence_score >= 0.8` e `impact_estimate` dentro do limite
 
-- Renomeia label do `missing_info` para **"O que faltou para esse dashboard virar sua tela principal?"**.
-- Adiciona chips opcionais (que pré-preenchem o textarea ou são salvos em `metadata.missing_categories[]`):
-  Mais clareza nas propostas / Mais clareza nas atividades / Melhor cálculo do pace / Mais velocidade / CTAs melhores / Outra informação.
+---
 
-### 3. Auditoria de dados (Admin Center)
+### 3. Frontend
 
-Sprint não cria RPC. Em vez disso, criamos um **service derivado client-side** que chama o mesmo `getCloserDashboardData` para o usuário piloto selecionado e classifica cada métrica em: `validated` (tem dados ou contagem ≥ 0), `empty` (zero — pode ser legítimo), `unavailable` (vem de `availability` como `unavailable`).
+**Nova rota: `/intelligence/optimization` → `OptimizationHub.tsx`**
+- Adicionar entry no `AppSidebar` (sob Intelligence) e em `App.tsx`
+- Layout padrão `Layout` + `PageHeader` (icon `Sparkles`, variant `indigo`)
 
-**Novo:** `src/services/crm/closerDashboardAudit.ts`
-- Função `auditCommercialDashboard(tenantId, userId)` → roda `getCloserDashboardData` + `getCloserPaceData` e retorna lista de métricas com fonte, status, observação e ação recomendada.
+**Componentes (em `src/components/intelligence/optimization/`)**
+- `InsightsFeed.tsx` — lista insights ordenada por `detected_at`, com chip do tipo, delta visual e sample_size
+- `RecommendationsPanel.tsx` — grid de cards com:
+  - Título, descrição, badge de tipo
+  - Impacto estimado + barra de confiança
+  - Botões **Aplicar** (chama `apply-recommendation`) e **Ignorar** (`status=dismissed`)
+  - Estado `auto_applied` exibe badge + log
+- `AutoModeToggle.tsx` — Switch que persiste `optimization_auto_mode` em `organization_settings` (apenas Owner/Admin)
+- `PerformanceComparison.tsx` — gráfico antes/depois (reply_rate, meeting_rate, win_rate) usando `outreach_performance` agregado por janela pré/pós aplicação
+- `ActionsHistoryTable.tsx` — `optimization_actions_log` com filtro por tipo/status
 
-**Novo:** `src/components/settings/adminCenter/closerDashboard/CloserDashboardAuditTable.tsx` — tabela das 18 métricas pedidas + select de "usuário piloto a auditar" + botão "Revalidar".
+**Hooks (em `src/hooks/optimization/`)**
+- `useOptimizationInsights(orgId)` — React Query, realtime opcional
+- `useOptimizationRecommendations(status?)` — com mutations `apply` e `dismiss`
+- `useOptimizationAutoMode()` — leitura/escrita do toggle
+- `useOptimizationActionsLog()`
 
-### 4. Reconciliação debug (Owner/Admin)
+**Integração no Prospect Drawer**
+- No componente onde score é exibido, mostrar badge "Score boosted by learning (+12)" quando o prospect tem sinais com `impact_score > 0` aplicados via recomendações `auto_applied` recentes (computado client-side a partir de `learning_signals` já carregado).
 
-**Novo:** `src/components/settings/adminCenter/closerDashboard/CloserDashboardReconciliation.tsx`
-- Bloco visível apenas no Admin Center (já restrito por `isOrgAdmin`).
-- Mostra os 10 totais pedidos (open opportunities, open proposals, activities today/overdue, won/lost month, goal/realized, pace), reaproveitando o mesmo payload da auditoria.
-- Sem RPC nova.
+---
 
-### 5. Checklist de Homologação
+### 4. Serviços
 
-**Novo:** `src/components/settings/adminCenter/closerDashboard/CloserHomologationChecklist.tsx`
-- 13 itens conforme enunciado (Usuário piloto validado, Contexto CRM completo, Função técnica closer, Dashboard dinâmico ativo, Flag global ativa, Pipeline Padrão configurado, Meta encontrada, Central do Dia carregando, Pace carregando, CTAs validados, Sem erro runtime recente, Feedback coletado, Rollback disponível).
-- Cada item: badge `OK` / `Atenção` / `Pendente`, derivado de:
-  - obs (active pilots, errors recentes nos runtime logs)
-  - audit (Pace `available`, Central do Dia retornou)
-  - feedback summary (`total > 0`)
-- Botão **"Revalidar checklist"** que chama `obs.refetch()` + reroda audit.
+**`src/services/optimization/optimizationService.ts`**
+- `fetchInsights`, `fetchRecommendations`, `applyRecommendation` (invoke edge function), `dismissRecommendation`, `setAutoMode`
+- Reusa cliente supabase já configurado
 
-### 6. Runbook operacional
+---
 
-**Novo:** `src/components/settings/adminCenter/closerDashboard/CloserRunbookCard.tsx`
-- Card com os 6 passos do enunciado em texto direto (Para habilitar / testar / voltar / desligar usuário / desligar tudo / analisar).
-- Conteúdo estático.
+### 5. Proteções
 
-### 7. Integração no `CloserDashboardHealthPanel.tsx`
+- `min_sample_size_for_insight` (default 20) bloqueia geração de insights com base estatística fraca
+- `max_score_adjustment_per_cycle` (default 10) limita drift de `impact_score`
+- `auto_mode=false` por padrão; UI exige duas confirmações para ligar
+- `apply-recommendation` é idempotente: se status != `pending`, retorna no-op
+- Logs estruturados em todas as edge functions
 
-Reordena para incluir as novas seções:
-1. Aviso técnico (já existe)
-2. Saúde
-3. Ativação controlada (rollout)
-4. Usuários comerciais piloto
-5. Performance
-6. Feedback
-7. **Auditoria de Dados** (novo)
-8. **Reconciliação** (novo)
-9. **Checklist de Homologação** (novo)
-10. **Runbook** (novo)
-11. Decisão de expansão
-12. Rollback
+---
 
-### 8. Pipeline Padrão
+### 6. Testes manuais (documentados no PR)
 
-Sprint 6.4.1 já corrigiu via `upsert({user_id,...},{onConflict:'user_id'}) + invalidateQueries(['current-user'])`. **Sem mudança nesta sprint** — apenas validação manual documentada no resumo.
+1. Seed de `learning_signals` com sinal `participa_evento` (positive_outcomes alto, sample 30+) → rodar `compute-optimization-insights` → verificar insight criado
+2. Rodar `generate-recommendations` → recomendação `score_adjustment` com `+N` no payload
+3. Aplicar via UI → verificar UPDATE em `learning_signals.impact_score`, log em `optimization_actions_log`, badge no Prospect Drawer
+4. Template com sent>100 reply_rate<5% → recomendação `template_change`
+5. Ligar `auto_mode` + cron mockado → recomendação `auto_applied`
 
-### 9. NÃO muda
+---
 
-- Schema, RPCs, RLS, permissões, sidebar, login, dashboard legado, automações, notificações, propostas, oportunidades, atividades, metas: intactos.
-- `dashboard_type='closer'` e `business_function_key='closer'` permanecem.
-- Limite backend de 3 pilotos permanece.
-- Runtime gate inalterado.
+### Arquivos a criar/editar
 
-## Detalhes técnicos
+**Migration**
+- `supabase/migrations/<ts>_optimization_layer.sql`
 
-```text
-Novos arquivos:
-  src/services/crm/closerDashboardAudit.ts
-  src/components/dashboard/closer/CloserProposalsActionGroup.tsx
-  src/components/dashboard/closer/CloserActivitiesGroup.tsx
-  src/components/settings/adminCenter/closerDashboard/CloserDashboardAuditTable.tsx
-  src/components/settings/adminCenter/closerDashboard/CloserDashboardReconciliation.tsx
-  src/components/settings/adminCenter/closerDashboard/CloserHomologationChecklist.tsx
-  src/components/settings/adminCenter/closerDashboard/CloserRunbookCard.tsx
+**Edge functions**
+- `supabase/functions/compute-optimization-insights/index.ts`
+- `supabase/functions/generate-recommendations/index.ts`
+- `supabase/functions/apply-recommendation/index.ts`
 
-Editados:
-  src/components/dashboard/closer/CloserDashboard.tsx       (reorganização + Atualizar)
-  src/components/dashboard/closer/CentralDoDiaSection.tsx   (copy + empty agregado)
-  src/components/dashboard/closer/CloserPaceSection.tsx     (proteções + tooltip)
-  src/components/dashboard/closer/CloserTopActions.tsx      (copy)
-  src/components/dashboard/closer/CloserPeriodFilter.tsx    (tooltip)
-  src/components/dashboard/closer/CloserRiskDealsList.tsx   (tooltip de risco)
-  src/components/dashboard/closer/CloserDashboardEmptyState.tsx
-  src/components/dashboard/closer/CloserDashboardErrorState.tsx
-  src/components/dashboard/closer/CloserDashboardFeedbackCard.tsx (chips + label)
-  src/components/settings/adminCenter/closerDashboard/CloserDashboardHealthPanel.tsx (integração)
+**Frontend**
+- `src/pages/intelligence/OptimizationHub.tsx`
+- `src/components/intelligence/optimization/{InsightsFeed,RecommendationsPanel,AutoModeToggle,PerformanceComparison,ActionsHistoryTable}.tsx`
+- `src/hooks/optimization/{useOptimizationInsights,useOptimizationRecommendations,useOptimizationAutoMode,useOptimizationActionsLog}.ts`
+- `src/services/optimization/optimizationService.ts`
+- Editar: `src/App.tsx` (rota), `src/components/AppSidebar.tsx` (item), Prospect Drawer (badge)
 
-Inalterados (mantidos como estão):
-  CloserKpiGrid (já bom)
-  CloserPaceCard / CloserPaceProgress / CloserPaceStatusBadge
-  CloserSectionList / CloserListItemRow
-  closerCta.ts (já garante CTAs seguros)
-  Migrations / RPCs / config.toml
-```
+**Cron**
+- SQL via insert tool (não migration) com `cron.schedule` chamando as 3 edge functions em sequência diária
 
-## Critérios de pronto
+---
 
-- Dashboard Comercial reordenado, com todos os tooltips/empty/error claros, botão Atualizar e Tabs de propostas.
-- Admin Center contém: Auditoria, Reconciliação, Checklist de Homologação, Runbook.
-- Feedback inclui chips opcionais.
-- Pipeline Padrão validado manualmente (sem mudança de código).
-- Build passa, TS sem erro, sem console errors.
-- Zero mudança em schema/RPC/permissões.
+### Riscos
 
-## Riscos
+- Drift de score se `max_adjustment_per_cycle` for relaxado → manter cap rígido
+- Recomendação aplicada sobre dado obsoleto → `apply-recommendation` re-valida snapshot do insight antes de executar
+- Loop infinito se `compute` rodar antes do log do `apply` propagar → cron sequencial, não paralelo
+- Auto-mode pode aprovar mudanças ruins → exigir `confidence >= 0.8` AND limite por ciclo
 
-- Baixo. Toda lógica nova é derivada de dados já existentes. Único ponto de atenção: garantir que a Auditoria/Reconciliação tolere `data` parcialmente nulo (já há padrão `?? null` em todo o fluxo atual).
+### Próximos passos (pós-aprovação)
+
+Implementar na ordem: migration → edge functions → service/hooks → UI → cron → testes manuais documentados.
