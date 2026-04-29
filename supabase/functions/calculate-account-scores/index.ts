@@ -211,15 +211,31 @@ async function runBulkRecalc(supabase: any, organizationId: string, jobId: strin
   }
 }
 
+function leadGradeFor(score: number): 'A' | 'B' | 'C' | 'D' | 'F' {
+  if (score >= 80) return 'A';
+  if (score >= 60) return 'B';
+  if (score >= 40) return 'C';
+  if (score >= 20) return 'D';
+  return 'F';
+}
+
 async function processAccount(supabase: any, account: AccountData) {
   const fitScore = await calculateFitScore(supabase, account);
   const intentScore = await calculateIntentScore(supabase, account);
+  const leadScore = Math.round(fitScore.score * 0.4 + intentScore.score * 0.6);
+  const leadGrade = leadGradeFor(leadScore);
+  const previousLeadScore = Math.round(
+    (account.fit_score || 0) * 0.4 + (account.intent_score || 0) * 0.6
+  );
 
   const { error: updateError } = await supabase
     .from('accounts')
     .update({
       fit_score: fitScore.score,
       intent_score: intentScore.score,
+      lead_score: leadScore,
+      lead_grade: leadGrade,
+      score_updated_at: new Date().toISOString(),
       scoring_factors: {
         fit: fitScore.factors,
         intent: intentScore.factors,
@@ -232,7 +248,8 @@ async function processAccount(supabase: any, account: AccountData) {
 
   if (
     Math.abs(fitScore.score - (account.fit_score || 0)) >= 5 ||
-    Math.abs(intentScore.score - (account.intent_score || 0)) >= 5
+    Math.abs(intentScore.score - (account.intent_score || 0)) >= 5 ||
+    Math.abs(leadScore - previousLeadScore) >= 5
   ) {
     await logScoreHistory(
       supabase,
@@ -256,13 +273,25 @@ async function processAccount(supabase: any, account: AccountData) {
       'recalculation',
       intentScore.factors
     );
+    await logScoreHistory(
+      supabase,
+      account.organization_id,
+      'account',
+      account.id,
+      'lead',
+      previousLeadScore,
+      leadScore,
+      'recalculation',
+      { fit: fitScore.score, intent: intentScore.score, grade: leadGrade }
+    );
   }
 
   return {
     accountId: account.id,
     fitScore: fitScore.score,
     intentScore: intentScore.score,
-    leadScore: Math.round(fitScore.score * 0.4 + intentScore.score * 0.6),
+    leadScore,
+    leadGrade,
     hasWonDeals: (intentScore.factors.cliente_ativo || 0) > 0,
   };
 }
