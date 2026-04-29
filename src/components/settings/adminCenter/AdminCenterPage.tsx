@@ -1,4 +1,5 @@
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Info, AlertTriangle, Loader2 } from 'lucide-react';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useAdminCenterProfile } from '@/hooks/dashboard/useDashboardResolver';
@@ -7,6 +8,7 @@ import { AdminCenterExplainer } from './AdminCenterExplainer';
 import { CloserDashboardAuditLog } from './CloserDashboardAuditLog';
 import { PilotActivationLog } from './PilotActivationLog';
 import { RuntimeAccessLog } from './RuntimeAccessLog';
+import { CloserDashboardHealthPanel } from './closerDashboard/CloserDashboardHealthPanel';
 
 export function AdminCenterPage() {
   const { organization, isOrgAdmin, loading: loadingUser } = useCurrentUser();
@@ -47,37 +49,46 @@ export function AdminCenterPage() {
   }
 
   return (
-    <div className="space-y-4">
-      <Alert>
-        <Info className="h-4 w-4" />
-        <AlertDescription>
-          O <strong>Admin Center</strong> é uma área de gestão do CRM. O dashboard
-          principal dos usuários continua sendo definido por função, área e contexto.
-        </AlertDescription>
-      </Alert>
+    <Tabs defaultValue="overview" className="space-y-4">
+      <TabsList>
+        <TabsTrigger value="overview">Visão geral</TabsTrigger>
+        <TabsTrigger value="closer">Dashboard Closer</TabsTrigger>
+      </TabsList>
 
-      <AdminCenterExplainer />
-
-      {!isLoading && !profile ? (
+      <TabsContent value="overview" className="space-y-4">
         <Alert>
           <Info className="h-4 w-4" />
           <AlertDescription>
-            Admin Center ainda não foi configurado para esta organização.
+            O <strong>Admin Center</strong> é uma área de gestão do CRM. O dashboard
+            principal dos usuários continua sendo definido por função, área e contexto.
           </AlertDescription>
         </Alert>
-      ) : (
-        <DynamicDashboardShell
-          profile={profile ?? null}
-          mode="admin_center"
-          loading={isLoading}
-        />
-      )}
 
-      <CloserDashboardAuditLog tenantId={tenantId} />
+        <AdminCenterExplainer />
 
-      <PilotActivationLog tenantId={tenantId} />
+        {!isLoading && !profile ? (
+          <Alert>
+            <Info className="h-4 w-4" />
+            <AlertDescription>
+              Admin Center ainda não foi configurado para esta organização.
+            </AlertDescription>
+          </Alert>
+        ) : (
+          <DynamicDashboardShell
+            profile={profile ?? null}
+            mode="admin_center"
+            loading={isLoading}
+          />
+        )}
 
-      <RuntimeAccessLog tenantId={tenantId} />
-    </div>
+        <CloserDashboardAuditLog tenantId={tenantId} />
+        <PilotActivationLog tenantId={tenantId} />
+        <RuntimeAccessLog tenantId={tenantId} />
+      </TabsContent>
+
+      <TabsContent value="closer">
+        <CloserDashboardHealthPanel tenantId={tenantId} />
+      </TabsContent>
+    </Tabs>
   );
 }
