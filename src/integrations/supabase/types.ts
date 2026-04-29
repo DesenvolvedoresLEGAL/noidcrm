@@ -15866,6 +15866,9 @@ export type Database = {
           recommendation_type: string
           reviewed_at: string | null
           reviewed_by: string | null
+          rollback_payload: Json | null
+          rolled_back_at: string | null
+          rolled_back_by: string | null
           status: string
           target_id: string | null
           target_type: string | null
@@ -15883,6 +15886,9 @@ export type Database = {
           recommendation_type: string
           reviewed_at?: string | null
           reviewed_by?: string | null
+          rollback_payload?: Json | null
+          rolled_back_at?: string | null
+          rolled_back_by?: string | null
           status?: string
           target_id?: string | null
           target_type?: string | null
@@ -15900,6 +15906,9 @@ export type Database = {
           recommendation_type?: string
           reviewed_at?: string | null
           reviewed_by?: string | null
+          rollback_payload?: Json | null
+          rolled_back_at?: string | null
+          rolled_back_by?: string | null
           status?: string
           target_id?: string | null
           target_type?: string | null
@@ -29565,6 +29574,16 @@ export type Database = {
           status: string
         }[]
       }
+      get_optimization_impact_summary: {
+        Args: { _org_id: string }
+        Returns: {
+          applied_last_7d: number
+          failed_last_7d: number
+          impact_estimate_sum: number
+          pending_count: number
+          rolled_back_last_7d: number
+        }[]
+      }
       get_org_seat_metrics: { Args: { org_id: string }; Returns: Json }
       get_platform_admin_role: {
         Args: { _user_id?: string }
@@ -29732,6 +29751,10 @@ export type Database = {
           p_payload?: Json
           p_trace_id: string
         }
+        Returns: string
+      }
+      mark_recommendation_rolled_back: {
+        Args: { _payload: Json; _rec_id: string; _user_id: string }
         Returns: string
       }
       mask_document: { Args: { doc: string }; Returns: string }
