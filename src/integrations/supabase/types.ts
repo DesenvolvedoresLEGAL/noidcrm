@@ -14381,7 +14381,10 @@ export type Database = {
           nrhs_last_calculated_at: string | null
           nrhs_score: number | null
           nrhs_tier: string | null
+          opportunity_grade: string | null
+          opportunity_health: string | null
           opportunity_score: number | null
+          opportunity_score_metadata: Json
           opportunity_type: string | null
           organization_id: string
           origem: string | null
@@ -14457,7 +14460,10 @@ export type Database = {
           nrhs_last_calculated_at?: string | null
           nrhs_score?: number | null
           nrhs_tier?: string | null
+          opportunity_grade?: string | null
+          opportunity_health?: string | null
           opportunity_score?: number | null
+          opportunity_score_metadata?: Json
           opportunity_type?: string | null
           organization_id: string
           origem?: string | null
@@ -14533,7 +14539,10 @@ export type Database = {
           nrhs_last_calculated_at?: string | null
           nrhs_score?: number | null
           nrhs_tier?: string | null
+          opportunity_grade?: string | null
+          opportunity_health?: string | null
           opportunity_score?: number | null
+          opportunity_score_metadata?: Json
           opportunity_type?: string | null
           organization_id?: string
           origem?: string | null
@@ -15533,6 +15542,119 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
+          },
+        ]
+      }
+      opportunity_score_recalc_queue: {
+        Row: {
+          account_id: string | null
+          created_at: string
+          error_message: string | null
+          id: string
+          metadata: Json
+          opportunity_id: string
+          organization_id: string
+          processed_at: string | null
+          status: string
+          trigger_action: string
+          trigger_source: string
+        }
+        Insert: {
+          account_id?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          metadata?: Json
+          opportunity_id: string
+          organization_id: string
+          processed_at?: string | null
+          status?: string
+          trigger_action: string
+          trigger_source: string
+        }
+        Update: {
+          account_id?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          metadata?: Json
+          opportunity_id?: string
+          organization_id?: string
+          processed_at?: string | null
+          status?: string
+          trigger_action?: string
+          trigger_source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "opportunity_score_recalc_queue_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_score_recalc_queue_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_ai_reports_context_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_score_recalc_queue_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_loss_classification_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_score_recalc_queue_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_score_recalc_queue_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_score_recalc_queue_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunities_hygiene_base"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_score_recalc_queue_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_score_recalc_queue_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_stage_age_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_score_recalc_queue_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_report_losses_detail_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_score_recalc_queue_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_reporting_opportunities_v2"
+            referencedColumns: ["opportunity_id"]
           },
         ]
       }
