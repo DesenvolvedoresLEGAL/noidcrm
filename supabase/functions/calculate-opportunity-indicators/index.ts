@@ -48,7 +48,7 @@ Deno.serve(async (req) => {
 
     const { data: opp, error: oppErr } = await supabase
       .from('opportunities')
-      .select('id, organization_id, account_id, contact_id, owner_user_id, status, stage_id, pipeline_id, amount, probability, opportunity_score, opportunity_grade, won_at, lost_at, created_at, updated_at, deleted_at')
+      .select('id, organization_id, account_id, contact_id, owner_user_id, status, stage_id, pipeline_id, valor_previsto, prob, opportunity_score, opportunity_grade, won_at, lost_at, created_at, updated_at, deleted_at')
       .eq('id', body.opportunity_id)
       .maybeSingle();
 
@@ -234,7 +234,7 @@ Deno.serve(async (req) => {
     else if (daysSinceLastActivity >= 14) { risk += 30; riskEvents.push('Sem interação há 14+ dias (+30)'); }
     else if (daysSinceLastActivity >= 7) { risk += 15; riskEvents.push('Sem interação há 7+ dias (+15)'); }
 
-    if (!opp.amount || opp.amount <= 0) { risk += 25; riskEvents.push('Sem valor definido (+25)'); }
+    if (!opp.valor_previsto || opp.valor_previsto <= 0) { risk += 25; riskEvents.push('Sem valor definido (+25)'); }
     if (expiredProposal) { risk += 25; riskEvents.push('Proposta vencida (+25)'); }
 
     if (daysSinceUpdate > 30) { risk += 60; riskEvents.push('Parada há 30+ dias (+60)'); }
@@ -251,12 +251,12 @@ Deno.serve(async (req) => {
     if (!primaryContact) blockers.push('no_primary_contact');
     if (!hasDecisor) blockers.push('no_decisor');
     if (futureActivities.length === 0) blockers.push('no_next_activity');
-    if (!opp.amount) blockers.push('no_amount');
+    if (!opp.valor_previsto) blockers.push('no_amount');
     if (overdueActivities.length > 0) blockers.push('overdue_activity');
     if (daysSinceUpdate > 14) blockers.push('stale_stage');
 
     const dataCompleteness =
-      (opp.amount ? 8 : 0) +
+      (opp.valor_previsto ? 8 : 0) +
       (opp.stage_id ? 5 : 0) +
       (opp.account_id ? 6 : 0) +
       (opp.contact_id ? 6 : 0); // /25
@@ -264,8 +264,8 @@ Deno.serve(async (req) => {
       (primaryContact ? 10 : 0) + (hasDecisor ? 10 : 0); // /20
     const dealHygiene =
       (opp.owner_user_id ? 10 : 0) +
-      (opp.amount ? 10 : 0) +
-      (opp.probability ? 5 : 0); // /25
+      (opp.valor_previsto ? 10 : 0) +
+      (opp.prob ? 5 : 0); // /25
     const activityHygiene =
       (futureActivities.length > 0 ? 12 : 0) +
       (completedActivities.length > 0 ? 5 : 0) +
@@ -310,7 +310,7 @@ Deno.serve(async (req) => {
     // AI WIN PROBABILITY (0-100) — explainable, with caps
     // Components: Opp Score 45% + Probability 25% + Lead 15% + NRHS 10% + History 5%
     // ============================================================
-    const probability = Number(opp.probability ?? 0);
+    const probability = Number(opp.prob ?? 0);
     const leadScore = Number(account?.lead_score ?? 50);
     const history = 50; // neutral until real history model exists
 
@@ -337,7 +337,7 @@ Deno.serve(async (req) => {
       if (!hasDecisor && aiWin > 69) { aiWin = 69; capsApplied.push('no_decisor_max=69'); }
       if (engagement < 20 && aiWin > 69) { aiWin = 69; capsApplied.push('low_engagement_max=69'); }
       if (!primaryContact && aiWin > 69) { aiWin = 69; capsApplied.push('no_primary_contact_max=69'); }
-      if (!opp.amount && aiWin > 59) { aiWin = 59; capsApplied.push('no_amount_max=59'); }
+      if (!opp.valor_previsto && aiWin > 59) { aiWin = 59; capsApplied.push('no_amount_max=59'); }
     }
 
     // ============================================================
