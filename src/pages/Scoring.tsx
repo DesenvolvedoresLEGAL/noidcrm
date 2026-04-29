@@ -4,8 +4,15 @@ import { OpportunityScoreDashboard } from '@/components/scoring/opportunity/Oppo
 import { RevenueHygieneDashboard } from '@/components/scoring/nrhs/RevenueHygieneDashboard';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Users, Target, Shield } from 'lucide-react';
+import { useScoringRealtime } from '@/hooks/scoring/useScoringRealtime';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 
 export default function Scoring() {
+  const { organization } = useCurrentUser();
+  // Sprint Scoring 1.1 — keep dashboards in sync when scores recalc anywhere.
+  useScoringRealtime(organization?.id ?? null);
+
+
   return (
     <Layout>
       <div className="p-6">

@@ -1,177 +1,169 @@
-## Sprint D — AI Optimization Layer (Kairós)
+## Sprint Scoring 1.1 — Auto-Recalculate Lead Score
 
-Transformar dados históricos (`learning_signals`, `outreach_performance`, `revenue_events`) em insights, recomendações e ajustes automáticos — fechando o loop **Executa → Aprende → Otimiza**.
+Recalcular Lead Score automaticamente quando dados relevantes da conta/contato/oportunidade/atividade mudarem, e propagar via realtime para todas as telas que mostram score, sem hard refresh.
 
-### Princípios de adaptação ao NOID
+### Mapeamento ao schema real do NOID
 
-- Multitenancy: usar `organization_id` (não `workspace_id`) para alinhar com `learning_signals`, `decision_rules`, `outreach_performance` já existentes.
-- RLS: Org members podem `SELECT`; apenas Owners/Admins podem aplicar recomendações; service_role para edge functions.
-- Auto-mode OFF por padrão; `apply-recommendation` exige aprovação manual no início.
-- Reaproveitar serviços existentes (`useLearningSignals`, `useOutreachPerformance`, `decisionService`) e padrões da `NoidIntelligenceHub`.
+Antes de tudo, traduzir os nomes do briefing para o schema atual:
 
----
+- `companies` → **`accounts`**
+- `contacts` → **`contacts`**
+- `deals` → **`opportunities`**
+- `tenant_id` → **`organization_id`**
+- Campos da conta: `legal_name`→`razao_social`, `trade_name`→`nome_fantasia`, `tax_id`/`cnpj`→`cnpj`, `segment`→`segmento`, `company_size`→`porte`/`tamanho`, `city`→`cidade`, `state`→`uf`, `cnae`→`cnae` etc.
+- Score já vive em `accounts.fit_score`, `accounts.intent_score`, `accounts.lead_score`, `accounts.lead_grade`, `accounts.score_updated_at`.
+- Já existe edge function `calculate-account-scores` (modo `accountId`) que faz exatamente FIT + INTENT + persiste no `accounts`.
+- Já existe tabela `score_history` (reutilizar — não criar `lead_score_history` duplicada).
+- Já existe `score_recalc_jobs` para batch — manter.
 
-### 1. Banco de dados (1 migration)
-
-**`optimization_insights`**
-- `id`, `organization_id` (FK organizations, ON DELETE CASCADE), `insight_type` CHECK in (`signal`,`template`,`channel`,`playbook`,`provider`)
-- `entity_id`, `entity_label`, `metric_name`, `metric_value`, `baseline_value`, `delta`
-- `sample_size INT`, `confidence_score NUMERIC` (0-1, CHECK)
-- `detected_at TIMESTAMPTZ DEFAULT now()`, `created_at`
-- UNIQUE (organization_id, insight_type, entity_id, metric_name) → upsert idempotente por ciclo
-- Index: (organization_id, detected_at DESC), (organization_id, insight_type)
-
-**`optimization_recommendations`**
-- `id`, `organization_id`, `insight_id` (FK optimization_insights ON DELETE SET NULL)
-- `recommendation_type` CHECK in (`score_adjustment`,`rule_change`,`template_change`,`channel_shift`,`playbook_change`)
-- `target_type`, `target_id`, `title`, `description`
-- `impact_estimate NUMERIC`, `confidence_score NUMERIC` (CHECK 0-1)
-- `action_payload JSONB NOT NULL` (instruções idempotentes para `apply-recommendation`)
-- `status` CHECK in (`pending`,`accepted`,`dismissed`,`auto_applied`,`failed`) DEFAULT `pending`
-- `reviewed_by UUID`, `reviewed_at`, `created_at`
-- Index: (organization_id, status, created_at DESC)
-
-**`optimization_actions_log`**
-- `id`, `organization_id`, `recommendation_id` (FK ON DELETE CASCADE)
-- `action_type`, `executed BOOLEAN`, `result JSONB`, `error_message TEXT`
-- `executed_by UUID` (NULL para auto), `executed_at TIMESTAMPTZ DEFAULT now()`
-
-**`organization_settings` (extensão)**
-- Adicionar coluna `optimization_auto_mode BOOLEAN DEFAULT false` (criar tabela + linha por org se não existir, ou usar config JSONB existente).
-- `max_score_adjustment_per_cycle NUMERIC DEFAULT 10`
-- `min_sample_size_for_insight INT DEFAULT 20`
-
-**RLS**
-- Todas as 3 tabelas: `SELECT` para membros da org via `organization_members`
-- `UPDATE status` em `optimization_recommendations` só para Owner/Admin (via `has_role`)
-- `INSERT/UPDATE` em insights/log: apenas service_role (edge functions)
+A sprint **NÃO altera fórmula nem cria tabela duplicada**: reutiliza o que existe e adiciona apenas a fila de eventos + triggers + realtime + invalidação centralizada.
 
 ---
 
-### 2. Edge Functions (3 novas)
+### Parte 1 — Banco (1 migration)
 
-**`compute-optimization-insights`**
-- Input: `{ organization_id?: string }` (se omitido, processa todas as orgs ativas)
-- Lê `learning_signals` (>= min_sample_size), `outreach_performance` (sent >= 100), `revenue_events` últimos 90d
-- Detecta padrões:
-  - **Sinal forte**: `positive_outcomes/occurrences > baseline_org + 0.20` → insight `signal`
-  - **Template ruim**: `replied/sent < 0.05` AND `sent >= 100` → insight `template`
-  - **Canal vencedor**: `channel.reply_rate > other.reply_rate * 2` → insight `channel`
-- UPSERT em `optimization_insights` (idempotente por `(org, type, entity, metric)`)
-- Logs estruturados, retorna contagem de insights gerados
+**Nova tabela `lead_score_recalc_queue`** (fila de eventos, distinta de `score_recalc_jobs` que é batch admin):
 
-**`generate-recommendations`**
-- Input: `{ organization_id?, since?: ISO }`
-- Para cada insight recente sem recomendação ativa, gera 1 recomendação com `action_payload`:
-  - `signal` + delta positivo → `score_adjustment` (+N pontos, cap ±10)
-  - `template` baixa resposta → `template_change` (sugere deprecar / criar variante)
-  - `channel` vencedor → `channel_shift` (sugere priorizar canal X)
-- `confidence_score` = função de `sample_size` e `delta`
-- Skip se já existe recomendação `pending` ou `accepted` para mesmo target
+```text
+id uuid pk default gen_random_uuid()
+organization_id uuid not null
+account_id uuid not null references accounts(id) on delete cascade
+trigger_source text not null  -- 'accounts'|'contacts'|'opportunities'|'activities'|'manual'
+trigger_action text not null  -- 'insert'|'update'|'delete'
+status text not null default 'pending'  -- pending|processing|completed|failed|skipped
+error_message text
+created_at timestamptz default now()
+processed_at timestamptz
+```
 
-**`apply-recommendation`**
-- Input: `{ recommendation_id: string }` — chamada manual ou pelo cron quando `auto_mode=true`
-- Valida JWT + role Owner/Admin (manual) OU origem service_role (auto)
-- Switch por `recommendation_type`:
-  - `score_adjustment` → UPDATE `learning_signals.impact_score` respeitando cap ±10/ciclo e CHECK ±20
-  - `rule_change` → UPDATE `decision_rules` (ex: `is_active=false` ou ajusta `min_score`)
-  - `template_change` → marca template/variant como `deprecated` em `outreach_performance` (adicionar coluna `status` se necessário) ou em tabela de templates
-  - `channel_shift` → grava preferência em `organization_settings`
-- INSERT em `optimization_actions_log` (com `result` ou `error_message`)
-- UPDATE recommendation.status → `accepted` (manual) / `auto_applied` / `failed`
+Índices: `(organization_id, account_id, status)`, `(status, created_at)`, `(account_id, created_at desc)`.
+RLS: `SELECT` para membros da org via `is_active_org_member`; `INSERT/UPDATE` apenas service role (triggers e edge functions usam service role).
 
-**Cron (pg_cron, a cada 24h às 04:00 UTC)**
-1. `compute-optimization-insights`
-2. `generate-recommendations`
-3. Se org tem `optimization_auto_mode=true`: aplica recomendações com `confidence_score >= 0.8` e `impact_estimate` dentro do limite
+**Função `enqueue_lead_score_recalc()`** (SECURITY DEFINER, `search_path=public`):
 
----
+- Resolve `organization_id` e `account_id` a partir da `TG_TABLE_NAME` e `NEW`/`OLD`:
+  - `accounts`: direto.
+  - `contacts`: usa `NEW.account_id`.
+  - `opportunities`: usa `NEW.account_id`.
+  - `activities`: usa `NEW.account_id` (se NULL, sai sem enfileirar).
+- **Debounce**: se já existe linha `pending` para o mesmo `(organization_id, account_id, trigger_source)` criada nos últimos 2 minutos, retorna sem inserir.
+- Se relevante, insere `pending`.
 
-### 3. Frontend
+**Triggers `AFTER INSERT/UPDATE/DELETE`** com `WHEN` nos campos relevantes:
 
-**Nova rota: `/intelligence/optimization` → `OptimizationHub.tsx`**
-- Adicionar entry no `AppSidebar` (sob Intelligence) e em `App.tsx`
-- Layout padrão `Layout` + `PageHeader` (icon `Sparkles`, variant `indigo`)
+- `accounts`: `razao_social, nome_fantasia, cnpj, segmento, tamanho, porte, capital_social, cidade, uf, type, status, owner_id, telefones, emails, cnae, tags`.
+- `contacts`: `name, email, telefone, cargo, is_primary, account_id`.
+- `opportunities`: `stage_id, status, valor_previsto, probabilidade, expected_close_date, won_at, lost_at, account_id`.
+- `activities`: `status, type, completed_at, due_at, account_id`.
 
-**Componentes (em `src/components/intelligence/optimization/`)**
-- `InsightsFeed.tsx` — lista insights ordenada por `detected_at`, com chip do tipo, delta visual e sample_size
-- `RecommendationsPanel.tsx` — grid de cards com:
-  - Título, descrição, badge de tipo
-  - Impacto estimado + barra de confiança
-  - Botões **Aplicar** (chama `apply-recommendation`) e **Ignorar** (`status=dismissed`)
-  - Estado `auto_applied` exibe badge + log
-- `AutoModeToggle.tsx` — Switch que persiste `optimization_auto_mode` em `organization_settings` (apenas Owner/Admin)
-- `PerformanceComparison.tsx` — gráfico antes/depois (reply_rate, meeting_rate, win_rate) usando `outreach_performance` agregado por janela pré/pós aplicação
-- `ActionsHistoryTable.tsx` — `optimization_actions_log` com filtro por tipo/status
-
-**Hooks (em `src/hooks/optimization/`)**
-- `useOptimizationInsights(orgId)` — React Query, realtime opcional
-- `useOptimizationRecommendations(status?)` — com mutations `apply` e `dismiss`
-- `useOptimizationAutoMode()` — leitura/escrita do toggle
-- `useOptimizationActionsLog()`
-
-**Integração no Prospect Drawer**
-- No componente onde score é exibido, mostrar badge "Score boosted by learning (+12)" quando o prospect tem sinais com `impact_score > 0` aplicados via recomendações `auto_applied` recentes (computado client-side a partir de `learning_signals` já carregado).
+Triggers apenas enfileiram — zero cálculo síncrono — para não atrasar saves.
 
 ---
 
-### 4. Serviços
+### Parte 2 — Edge Functions
 
-**`src/services/optimization/optimizationService.ts`**
-- `fetchInsights`, `fetchRecommendations`, `applyRecommendation` (invoke edge function), `dismissRecommendation`, `setAutoMode`
-- Reusa cliente supabase já configurado
+**Reusar** `calculate-account-scores` (modo `accountId`) como o "recalculator". Apenas adicionar:
 
----
+1. Espelhar `lead_score` e `lead_grade` em `accounts` no final do `processAccount` (hoje grava `fit_score`/`intent_score`/`scoring_factors` mas não `lead_score`/`lead_grade`/`score_updated_at`).
+2. Inserir snapshot em `score_history` com `previous_*` e `new_*` (`fit`, `intent`, `lead` consolidado) — reutilizar formato existente, adicionando entrada `kind='lead'`.
 
-### 5. Proteções
+**Nova edge function `process-lead-score-queue`**:
 
-- `min_sample_size_for_insight` (default 20) bloqueia geração de insights com base estatística fraca
-- `max_score_adjustment_per_cycle` (default 10) limita drift de `impact_score`
-- `auto_mode=false` por padrão; UI exige duas confirmações para ligar
-- `apply-recommendation` é idempotente: se status != `pending`, retorna no-op
-- Logs estruturados em todas as edge functions
+- Chamada pelo cron a cada 1 min e também invocada pelo frontend para flushing imediato (best-effort).
+- `SELECT … FOR UPDATE SKIP LOCKED LIMIT 50` em `lead_score_recalc_queue` onde `status='pending'`.
+- Marca `processing`, deduplica por `account_id` (1x por ciclo), invoca `calculate-account-scores` com `{ accountId }`.
+- Marca `completed` ou `failed` com `error_message`.
+- Idempotente.
 
----
-
-### 6. Testes manuais (documentados no PR)
-
-1. Seed de `learning_signals` com sinal `participa_evento` (positive_outcomes alto, sample 30+) → rodar `compute-optimization-insights` → verificar insight criado
-2. Rodar `generate-recommendations` → recomendação `score_adjustment` com `+N` no payload
-3. Aplicar via UI → verificar UPDATE em `learning_signals.impact_score`, log em `optimization_actions_log`, badge no Prospect Drawer
-4. Template com sent>100 reply_rate<5% → recomendação `template_change`
-5. Ligar `auto_mode` + cron mockado → recomendação `auto_applied`
+Cron: `pg_cron` `* * * * *` chamando `process-lead-score-queue` (via `net.http_post`).
 
 ---
 
-### Arquivos a criar/editar
+### Parte 3 — Frontend: recálculo imediato + invalidação centralizada
 
-**Migration**
-- `supabase/migrations/<ts>_optimization_layer.sql`
+**`src/lib/scoring/invalidateScoreQueries.ts`** (novo helper):
 
-**Edge functions**
-- `supabase/functions/compute-optimization-insights/index.ts`
-- `supabase/functions/generate-recommendations/index.ts`
-- `supabase/functions/apply-recommendation/index.ts`
+```text
+invalidateScoreRelatedQueries(queryClient, { organizationId, accountId })
+```
 
-**Frontend**
-- `src/pages/intelligence/OptimizationHub.tsx`
-- `src/components/intelligence/optimization/{InsightsFeed,RecommendationsPanel,AutoModeToggle,PerformanceComparison,ActionsHistoryTable}.tsx`
-- `src/hooks/optimization/{useOptimizationInsights,useOptimizationRecommendations,useOptimizationAutoMode,useOptimizationActionsLog}.ts`
-- `src/services/optimization/optimizationService.ts`
-- Editar: `src/App.tsx` (rota), `src/components/AppSidebar.tsx` (item), Prospect Drawer (badge)
+Invalida (mapeando para chaves reais já em `src/lib/query-keys.ts` — `accountKeys.detail`, `accountKeys.scoring`, `accountKeys.scoringLite`, `opportunityKeys.*`, `pipelineKeys.*`) e também:
+`['lead-score-ai', accountId]`, `['scoring']`, `['scoring-dashboard']`, `['lead-scoring']`, `['account-opportunities', accountId]`.
 
-**Cron**
-- SQL via insert tool (não migration) com `cron.schedule` chamando as 3 edge functions em sequência diária
+**`useAccountScoring.recalculate`** já existe e chama `calculate-account-scores`. Estender o `onSuccess` para usar o helper acima (hoje só invalida 3 chaves).
+
+**Hook `updateAccount`** (no fluxo de save da edição da conta): após `updateAccount` resolver, disparar:
+
+1. `supabase.functions.invoke('calculate-account-scores', { body: { accountId } })` (fire-and-forget, não bloqueia UI).
+2. Em `onSuccess` da invocação → `invalidateScoreRelatedQueries`.
+
+Não esperar o cron para a tela do usuário que acabou de salvar.
 
 ---
+
+### Parte 4 — Realtime
+
+Habilitar `REPLICA IDENTITY FULL` e adicionar `accounts` à publication `supabase_realtime` (se ainda não estiver — verificar antes).
+
+**Novo hook `useLeadScoreRealtime(accountId)`**:
+
+- Subscreve `postgres_changes` UPDATE em `accounts` filtrado por `id=eq.{accountId}`.
+- Em mudança de `lead_score`, `fit_score`, `intent_score` ou `lead_grade` → `invalidateScoreRelatedQueries`.
+
+**Novo hook `useScoringRealtime(organizationId)`** (para Pipeline / Scoring Hub / Dashboard):
+
+- Subscreve UPDATE em `accounts` filtrado por `organization_id=eq.{orgId}`.
+- Em mudança dos 4 campos de score → invalida `['scoring']`, `['scoring-dashboard']`, `['pipeline']`, `['opportunities']`, `accountKeys.scoringLite(id)` para o `id` mudado.
+
+Usar nas páginas: `Scoring.tsx`, `Pipeline`, `OpportunityDetail`, `AccountDetail` sidebar.
+
+---
+
+### Parte 5 — Componentes consumindo fonte única
+
+Auditar e padronizar os componentes que hoje leem score para todos consumirem `accounts.lead_score`/`fit_score`/`intent_score`/`lead_grade` (sem cálculo local):
+
+- `AccountSidebar.tsx`, `AccountCard.tsx`, `OpportunityCard.tsx`, `SidebarDataSection.tsx`, `LeadScoreTable.tsx`, `ScoringDashboard.tsx`, `LeadScoreInsights.tsx`, `ScoreBreakdownCard.tsx`.
+- Onde houver fórmula local (`fit*0.4+intent*0.6`), substituir por `account.lead_score` direto. Se faltar, calcular UMA vez em `useAccountScore` e expor.
+
+Atualizar `useAccountScore` / `useAccountScoring` para incluir `lead_score`, `lead_grade`, `score_updated_at` (hoje `useAccountScore` já busca; `useAccountScoring` não busca `lead_score` — adicionar).
+
+---
+
+### Parte 6 — Estados de UI
+
+- Durante `isRecalculating` (já existe no hook): badge sutil "Atualizando score…" no `AccountSidebar` LeadScoreCard.
+- Em erro: toast discreto + tooltip "Não foi possível atualizar o score agora. Último score válido mantido." Tela não quebra (silenciar erro de invoke não-bloqueante).
+
+---
+
+### Critérios de aceite (espelhando o briefing)
+
+1–15: cobertos por triggers (1–5), realtime + invalidação (6–10), `score_history` (11), debounce 2 min (12), trigger só enfileira (13), RLS por `organization_id` em fila e history (14–15).
+
+---
+
+### Fora de escopo
+
+Fórmula geral, novo modelo preditivo, refactor visual, Opportunity Score, Account Score novo.
+
+---
+
+### Arquivos impactados (resumo)
+
+**Migration nova**: `lead_score_recalc_queue` + `enqueue_lead_score_recalc()` + 4 triggers + cron.
+**Edge functions**: editar `calculate-account-scores/index.ts` (gravar `lead_score`/`lead_grade`/`score_updated_at` + `score_history`); criar `process-lead-score-queue/index.ts`.
+**Frontend**:
+- novo `src/lib/scoring/invalidateScoreQueries.ts`
+- novo `src/hooks/scoring/useLeadScoreRealtime.ts`
+- novo `src/hooks/scoring/useScoringRealtime.ts`
+- editar `src/hooks/useAccountScoring.ts` (incluir `lead_score`/`lead_grade` + invalidação ampliada)
+- editar serviço/hook de update de conta (`src/services/supabase/accounts.ts` consumers) para disparar recálculo imediato
+- editar `AccountSidebar.tsx` (estado "Atualizando score…")
+- montar `useScoringRealtime` em `Scoring.tsx`, página de Pipeline e detalhe da Oportunidade
 
 ### Riscos
 
-- Drift de score se `max_adjustment_per_cycle` for relaxado → manter cap rígido
-- Recomendação aplicada sobre dado obsoleto → `apply-recommendation` re-valida snapshot do insight antes de executar
-- Loop infinito se `compute` rodar antes do log do `apply` propagar → cron sequencial, não paralelo
-- Auto-mode pode aprovar mudanças ruins → exigir `confidence >= 0.8` AND limite por ciclo
-
-### Próximos passos (pós-aprovação)
-
-Implementar na ordem: migration → edge functions → service/hooks → UI → cron → testes manuais documentados.
+- Triggers em `activities` podem gerar muito tráfego: debounce de 2 min mitiga.
+- Realtime em `accounts` org-wide pode ser "barulhento" em orgs grandes: filtrar payload no cliente para apenas updates dos 4 campos de score antes de invalidar.
+- `score_history` tem schema atual diferente (`kind`/`previous_value`/`new_value`); validar colunas antes de inserir snapshot consolidado.

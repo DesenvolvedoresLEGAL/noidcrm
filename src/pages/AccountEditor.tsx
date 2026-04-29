@@ -18,6 +18,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { ArrowLeft, Save, Loader2, Building2, MapPin, Mail, Users, Briefcase, FileText, Search, UserPlus } from 'lucide-react';
 import { createContact } from '@/services/crm/contacts';
+import { supabase } from '@/integrations/supabase/client';
+import { invalidateScoreRelatedQueries } from '@/lib/scoring/invalidateScoreQueries';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { accountKeys, contactKeys } from '@/lib/query-keys';
@@ -380,6 +382,19 @@ export default function AccountEditor() {
       queryClient.setQueryData(accountKeys.detailExtended(id), (current: any) =>
         current ? { ...current, ...updatedAccount } : updatedAccount,
       );
+      // Sprint Scoring 1.1 — fire-and-forget immediate recalculation so the
+      // user sees the new lead score without waiting for the cron flush.
+      void supabase.functions
+        .invoke('calculate-account-scores', { body: { accountId: id } })
+        .then(() => {
+          invalidateScoreRelatedQueries(queryClient, {
+            organizationId: (updatedAccount as any)?.organization_id ?? null,
+            accountId: id,
+          });
+        })
+        .catch((err) => {
+          console.warn('[scoring] immediate recalc failed (queue will retry):', err);
+        });
       toast({ title: 'Conta atualizada com sucesso!' });
       navigate(`/app/accounts/${id}`);
     },
