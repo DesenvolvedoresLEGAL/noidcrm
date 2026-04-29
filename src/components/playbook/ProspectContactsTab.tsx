@@ -6,6 +6,10 @@ import { Sparkles, Loader2, Star, Mail, Phone, Linkedin, Copy, CheckCircle2, Ale
 import { toast } from "sonner";
 import { useEnrichedContacts } from "@/hooks/useEnrichedContacts";
 import { ApolloConfirmModal } from "./enrichment/ApolloConfirmModal";
+import { ContactsQualityPanel } from "./enrichment/ContactsQualityPanel";
+import { MergedContactsAccordion } from "./enrichment/MergedContactsAccordion";
+import { useQuery } from "@tanstack/react-query";
+import { listMergedContacts } from "@/services/enrichment/apolloService";
 import { cn } from "@/lib/utils";
 
 interface ProspectContactsTabProps {
