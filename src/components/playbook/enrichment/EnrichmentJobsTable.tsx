@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -77,9 +77,8 @@ export function EnrichmentJobsTable({ prospectId }: Props) {
                 ? (j.error ?? "Falhou").slice(0, 60)
                 : `${summary.contacts_found ?? j.contacts_found ?? 0} contatos${summary.decision_makers_found ? ` · ${summary.decision_makers_found} decisor(es)` : ""}`;
             return (
-              <>
+              <Fragment key={j.id}>
                 <TableRow
-                  key={j.id}
                   className="cursor-pointer"
                   onClick={() => setExpanded(isOpen ? null : j.id)}
                 >
