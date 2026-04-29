@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { useDynamicDashboardRuntimeGate } from '@/hooks/dashboard/useDynamicDashboardRuntimeGate';
@@ -25,59 +25,113 @@ function GateSkeleton() {
   );
 }
 
+function classifyPerformance(totalMs: number | null): 'good' | 'attention' | 'slow' {
+  if (totalMs == null) return 'attention';
+  if (totalMs < 2000) return 'good';
+  if (totalMs <= 5000) return 'attention';
+  return 'slow';
+}
+
 export function DynamicDashboardRuntimeGate({ legacyDashboard }: DynamicDashboardRuntimeGateProps) {
+  const gateMountRef = useRef<number>(performance.now());
   const gate = useDynamicDashboardRuntimeGate();
   const { toast } = useToast();
   const allowedLoggedRef = useRef(false);
   const errorToastShownRef = useRef(false);
-  const loadStartRef = useRef<number | null>(null);
+  const shellStartRef = useRef<number | null>(null);
+  const gateLoadMsRef = useRef<number | null>(null);
+  const [closerDataMs, setCloserDataMs] = useState<number | null>(null);
+  const [paceMs, setPaceMs] = useState<number | null>(null);
+  const [shellRenderMs, setShellRenderMs] = useState<number | null>(null);
 
-  // Mark load start when we decide to render dynamic
+  // Gate load time = quando o gate parou de carregar
   useEffect(() => {
-    if (gate.shouldRenderDynamic && loadStartRef.current === null) {
-      loadStartRef.current = performance.now();
+    if (!gate.isLoading && gateLoadMsRef.current === null) {
+      gateLoadMsRef.current = Math.round(performance.now() - gateMountRef.current);
+    }
+  }, [gate.isLoading]);
+
+  // Shell start = quando decidimos renderizar dinâmico
+  useEffect(() => {
+    if (gate.shouldRenderDynamic && shellStartRef.current === null) {
+      shellStartRef.current = performance.now();
+      // Mede tempo até próximo paint para representar shell render
+      requestAnimationFrame(() => {
+        if (shellStartRef.current != null) {
+          setShellRenderMs(Math.round(performance.now() - shellStartRef.current));
+        }
+      });
     }
   }, [gate.shouldRenderDynamic]);
 
-  // Log runtime_allowed once per pilot session render
+  // Log runtime_allowed quando todas as fases conhecidas estão prontas, com timeout de 8s
   useEffect(() => {
     if (!gate.shouldRenderDynamic) return;
     if (allowedLoggedRef.current) return;
     if (!gate.tenantId || !gate.userId) return;
-    allowedLoggedRef.current = true;
-    const startedAt = loadStartRef.current ?? performance.now();
-    // Defer slightly so first paint roughly captured
-    const handle = setTimeout(() => {
-      const loadMs = Math.max(0, Math.round(performance.now() - startedAt));
+
+    const ready = closerDataMs != null && shellRenderMs != null;
+    const timeoutMs = 8000;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const flush = () => {
+      if (allowedLoggedRef.current) return;
+      allowedLoggedRef.current = true;
+      const totalInteractive =
+        closerDataMs != null && shellRenderMs != null
+          ? (gateLoadMsRef.current ?? 0) + shellRenderMs + closerDataMs
+          : null;
+      const performanceStatus = classifyPerformance(totalInteractive);
       const meta: Record<string, any> = {
-        sprint: '6.4',
+        sprint: '6.5',
         entrypoint: 'dashboard_home_gate',
         render_mode: 'dynamic_runtime',
         profile_key: gate.resolvedProfile?.key ?? null,
         guard_result: 'allowed',
-        load_started_at: new Date(Date.now() - loadMs).toISOString(),
+        gate_load_ms: gateLoadMsRef.current,
+        shell_render_ms: shellRenderMs,
+        closer_data_load_ms: closerDataMs,
+        pace_load_ms: paceMs,
+        total_interactive_ms: totalInteractive,
+        performance_status: performanceStatus,
         loaded_at: new Date().toISOString(),
       };
-      if (loadMs > 5000) meta.warning = 'slow_load';
       logDynamicDashboardRuntimeEvent({
         tenantId: gate.tenantId!,
         userId: gate.userId!,
         eventType: 'runtime_allowed',
         profileKey: gate.resolvedProfile?.key ?? null,
         guardAllowed: true,
-        loadMs,
+        loadMs: totalInteractive,
         metadata: meta,
       });
-    }, 50);
-    return () => clearTimeout(handle);
-  }, [gate.shouldRenderDynamic, gate.tenantId, gate.userId, gate.resolvedProfile]);
+    };
+
+    if (ready) {
+      // pequeno delay para captar o último frame
+      timer = setTimeout(flush, 50);
+    } else {
+      timer = setTimeout(flush, timeoutMs);
+    }
+
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [
+    gate.shouldRenderDynamic,
+    gate.tenantId,
+    gate.userId,
+    gate.resolvedProfile,
+    closerDataMs,
+    paceMs,
+    shellRenderMs,
+  ]);
 
   if (gate.isLoading) {
     return <GateSkeleton />;
   }
 
   if (!gate.shouldRenderDynamic) {
-    // Legacy path. Show return banner for pilots who chose legacy this session.
     return (
       <>
         <LegacySessionReturnBanner />
@@ -98,7 +152,7 @@ export function DynamicDashboardRuntimeGate({ legacyDashboard }: DynamicDashboar
         fallbackReason: 'runtime_exception',
         errorMessage: error?.message ?? 'unknown_error',
         metadata: {
-          sprint: '6.4',
+          sprint: '6.5',
           entrypoint: 'dashboard_home_gate',
           render_mode: 'dynamic_runtime',
         },
@@ -124,6 +178,12 @@ export function DynamicDashboardRuntimeGate({ legacyDashboard }: DynamicDashboar
           mode="runtime"
           tenantId={gate.tenantId!}
           targetUserId={gate.userId!}
+          onCloserDataReady={(ms) => {
+            if (closerDataMs == null) setCloserDataMs(ms);
+          }}
+          onCloserPaceReady={(ms) => {
+            if (paceMs == null) setPaceMs(ms);
+          }}
         />
       </div>
     </RuntimeErrorBoundary>
