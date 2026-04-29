@@ -7906,6 +7906,51 @@ export type Database = {
         }
         Relationships: []
       }
+      crm_dynamic_dashboard_feedback: {
+        Row: {
+          comment: string | null
+          created_at: string
+          dashboard_type: string
+          id: string
+          is_confusing: boolean | null
+          is_slow: boolean | null
+          is_useful: boolean | null
+          metadata: Json
+          missing_info: string | null
+          rating: number
+          tenant_id: string
+          user_id: string
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string
+          dashboard_type: string
+          id?: string
+          is_confusing?: boolean | null
+          is_slow?: boolean | null
+          is_useful?: boolean | null
+          metadata?: Json
+          missing_info?: string | null
+          rating: number
+          tenant_id: string
+          user_id: string
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string
+          dashboard_type?: string
+          id?: string
+          is_confusing?: boolean | null
+          is_slow?: boolean | null
+          is_useful?: boolean | null
+          metadata?: Json
+          missing_info?: string | null
+          rating?: number
+          tenant_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       crm_dynamic_dashboard_pilot_logs: {
         Row: {
           action: string
@@ -29008,6 +29053,10 @@ export type Database = {
         }
         Returns: string
       }
+      crm_disable_all_closer_dashboard_pilots: {
+        Args: { p_reason?: string; p_tenant_id: string }
+        Returns: Json
+      }
       crm_disable_closer_dashboard_pilot: {
         Args: {
           p_reason?: string
@@ -29091,6 +29140,20 @@ export type Database = {
       crm_set_user_dynamic_dashboard: {
         Args: { p_enabled: boolean; p_tenant_id: string; p_user_id: string }
         Returns: boolean
+      }
+      crm_submit_dynamic_dashboard_feedback: {
+        Args: {
+          p_comment?: string
+          p_dashboard_type: string
+          p_is_confusing?: boolean
+          p_is_slow?: boolean
+          p_is_useful?: boolean
+          p_metadata?: Json
+          p_missing_info?: string
+          p_rating: number
+          p_tenant_id: string
+        }
+        Returns: Json
       }
       delete_contract: { Args: { contract_id: string }; Returns: boolean }
       delete_email: {
