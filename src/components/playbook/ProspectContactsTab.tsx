@@ -6,6 +6,10 @@ import { Sparkles, Loader2, Star, Mail, Phone, Linkedin, Copy, CheckCircle2, Ale
 import { toast } from "sonner";
 import { useEnrichedContacts } from "@/hooks/useEnrichedContacts";
 import { ApolloConfirmModal } from "./enrichment/ApolloConfirmModal";
+import { ContactsQualityPanel } from "./enrichment/ContactsQualityPanel";
+import { MergedContactsAccordion } from "./enrichment/MergedContactsAccordion";
+import { useQuery } from "@tanstack/react-query";
+import { listMergedContacts } from "@/services/enrichment/apolloService";
 import { cn } from "@/lib/utils";
 
 interface ProspectContactsTabProps {
@@ -49,6 +53,11 @@ export function ProspectContactsTab({
   contactScore,
 }: ProspectContactsTabProps) {
   const { data: contacts = [], isLoading, enrich, setPrimary } = useEnrichedContacts(prospectId);
+  const { data: mergedContacts = [] } = useQuery({
+    queryKey: ["merged-contacts", prospectId],
+    queryFn: () => listMergedContacts(prospectId),
+    enabled: !!prospectId,
+  });
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   const handleConfirm = async () => {
@@ -103,6 +112,10 @@ export function ProspectContactsTab({
       />
 
       {isLoading && <div className="text-sm text-muted-foreground py-4 text-center">Carregando contatos…</div>}
+
+      {!isLoading && contacts.length > 0 && (
+        <ContactsQualityPanel contacts={contacts} mergedCount={mergedContacts.length} />
+      )}
 
       {!isLoading && contacts.length === 0 && (
         <Card className="p-6 text-center text-sm text-muted-foreground border-dashed">
@@ -180,6 +193,10 @@ export function ProspectContactsTab({
           )}
         </Card>
       ))}
+
+      {!isLoading && mergedContacts.length > 0 && (
+        <MergedContactsAccordion prospectId={prospectId} />
+      )}
     </div>
   );
 }

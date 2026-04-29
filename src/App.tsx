@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-route
 import React, { Suspense, lazy } from "react";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useRealtimeContacts } from "@/hooks/useRealtimeContacts";
 import { useOnboardingStatus } from "@/hooks/useOnboardingStatus";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { LoadingPage } from "@/components/LoadingPage";
@@ -291,7 +292,13 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   }
 
   // Wrap content with TrialGuard for trial blocking
-  return <TrialGuard>{children}</TrialGuard>;
+  return <TrialGuard><GlobalRealtimeListeners />{children}</TrialGuard>;
+}
+
+// Mounts global realtime subscriptions (one per authenticated session)
+function GlobalRealtimeListeners() {
+  useRealtimeContacts();
+  return null;
 }
 
 // Suspense wrapper for lazy routes

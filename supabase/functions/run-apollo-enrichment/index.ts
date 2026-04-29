@@ -283,14 +283,21 @@ Deno.serve(async (req: Request) => {
       if (!insErr && ins) {
         inserted += 1;
         if (cScore > maxScore) { maxScore = cScore; topProfileId = ins.id; }
+      } else if (insErr && (insErr as any).code === "23505") {
+        // duplicate by unique index — count as known but don't fail
+        console.log("contact already exists (unique conflict), skipping", payload.email);
+      } else if (insErr) {
+        console.warn("insert contact failed", insErr);
       }
     }
 
-    if (topProfileId) {
-      await sb.from("enriched_contact_profiles")
-        .update({ is_primary: false }).eq("prospect_id", prospect_id).neq("id", topProfileId);
-      await sb.from("enriched_contact_profiles")
-        .update({ is_primary: true }).eq("id", topProfileId);
+    // Dedupe + resolve primary atomically via RPCs
+    const { data: dedupedCount } = await sb.rpc("dedupe_prospect_contacts", { p_prospect_id: prospect_id });
+    await sb.rpc("resolve_primary_contact", { p_prospect_id: prospect_id });
+    if ((dedupedCount as number | null) && (dedupedCount as number) > 0) {
+      await trackEvent(sb, prospect.organization_id, "lead.deduped", {
+        prospect_id, deduped_count: dedupedCount,
+      });
     }
 
     const finalStatus = inserted === 0 ? "partial" : "done";
