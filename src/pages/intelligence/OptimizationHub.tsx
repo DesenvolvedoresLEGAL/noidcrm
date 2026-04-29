@@ -5,6 +5,7 @@ import { InsightsFeed } from '@/components/intelligence/optimization/InsightsFee
 import { RecommendationsPanel } from '@/components/intelligence/optimization/RecommendationsPanel';
 import { AutoModeToggle } from '@/components/intelligence/optimization/AutoModeToggle';
 import { ActionsHistoryTable } from '@/components/intelligence/optimization/ActionsHistoryTable';
+import { ImpactSummaryCard } from '@/components/intelligence/optimization/ImpactSummaryCard';
 
 export default function OptimizationHub() {
   return (
