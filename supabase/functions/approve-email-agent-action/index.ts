@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.76.1";
 import { dispatchAgentEmail } from "../_shared/email-dispatch.ts";
+import { normalizeRecipientEmail } from "../_shared/normalize-recipient-email.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
