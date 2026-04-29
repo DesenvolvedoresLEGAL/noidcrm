@@ -1022,6 +1022,16 @@ const App = () => (
                   </ProtectedRoute>
                 }
               />
+              <Route
+                path="/app/intelligence/optimization"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <OptimizationHub />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
 
               {/* Intelligence Routes */}
               <Route
