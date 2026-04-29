@@ -173,7 +173,9 @@ Deno.serve(async (req) => {
     }).eq("id", run_id);
 
     // Check if contact has valid email
-    const contactEmail = context.contact?.emails?.[0] || context.contact?.email;
+    const contactEmail = normalizeRecipientEmail(
+      context.contact?.emails ?? context.contact?.email,
+    );
     if (!contactEmail) {
       await supabase.from("ai_agent_execution_runs").update({
         execution_status: "skipped",
