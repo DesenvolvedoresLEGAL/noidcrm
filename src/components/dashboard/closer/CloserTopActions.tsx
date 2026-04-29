@@ -12,11 +12,15 @@ export function CloserTopActions({ actions }: { actions: CloserNextAction[] }) {
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-base">Top 10 ações do dia</CardTitle>
-        <p className="text-xs text-muted-foreground">Ranking determinístico do que precisa de ação agora.</p>
+        <p className="text-xs text-muted-foreground">
+          As 10 prioridades comerciais de hoje, em ordem de impacto.
+        </p>
       </CardHeader>
       <CardContent>
         {actions.length === 0 ? (
-          <p className="text-xs text-muted-foreground">Sem ações sugeridas no momento.</p>
+          <p className="text-sm text-muted-foreground py-2">
+            Sem ações prioritárias agora. Bom momento para prospectar.
+          </p>
         ) : (
           <ol className="space-y-1">
             {actions.map((a, idx) => {
