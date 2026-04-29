@@ -77,6 +77,18 @@ export async function listPilotLogs(tenantId: string, limit = 50): Promise<Pilot
   return (data || []) as unknown as PilotLogRow[];
 }
 
+export async function disableAllCloserDashboardPilots(params: {
+  tenantId: string;
+  reason?: string;
+}) {
+  const { data, error } = await supabase.rpc('crm_disable_all_closer_dashboard_pilots' as any, {
+    p_tenant_id: params.tenantId,
+    p_reason: params.reason ?? null,
+  });
+  if (error) throw error;
+  return data as { success: boolean; disabled_count: number };
+}
+
 export async function getCloserPaceData(tenantId: string, userId: string) {
   const { data, error } = await supabase.rpc('crm_get_closer_pace_data' as any, {
     p_tenant_id: tenantId,

@@ -12,16 +12,34 @@ import { CloserDashboardSkeleton } from './CloserDashboardSkeleton';
 import { CloserDashboardErrorState } from './CloserDashboardErrorState';
 import { CloserNotACloserState } from './CloserNotACloserState';
 import { CloserDashboardEmptyState } from './CloserDashboardEmptyState';
+import { CloserDashboardFeedbackCard } from './CloserDashboardFeedbackCard';
+import { useEffect, useRef } from 'react';
 
 interface Props {
   tenantId: string;
   targetUserId: string;
+  mode?: 'preview' | 'runtime';
+  onDataReady?: (loadMs: number) => void;
+  onPaceReady?: (loadMs: number) => void;
 }
 
-export function CloserDashboard({ tenantId, targetUserId }: Props) {
+export function CloserDashboard({ tenantId, targetUserId, mode = 'preview', onDataReady, onPaceReady }: Props) {
   const {
     data, isLoading, error, period, setPeriod, unavailableWidgets, isEmpty,
   } = useCloserDashboardData({ tenantId, userId: targetUserId });
+
+  const startRef = useRef<number>(performance.now());
+  const dataReportedRef = useRef(false);
+
+  useEffect(() => {
+    if (!dataReportedRef.current && data) {
+      dataReportedRef.current = true;
+      const ms = Math.round(performance.now() - startRef.current);
+      onDataReady?.(ms);
+      // Pace é parte do mesmo payload — reporta junto.
+      onPaceReady?.(ms);
+    }
+  }, [data, onDataReady, onPaceReady]);
 
   if (isLoading) return <CloserDashboardSkeleton />;
   if (error) return <CloserDashboardErrorState message={(error as Error).message} />;
@@ -42,13 +60,15 @@ export function CloserDashboard({ tenantId, targetUserId }: Props) {
         <CloserPeriodFilter value={period} onChange={setPeriod} />
       </div>
 
-      <Alert>
-        <Info className="h-4 w-4" />
-        <AlertDescription>
-          Este dashboard usa dados reais do CRM, mas ainda está em modo preview. O dashboard
-          principal do usuário continua inalterado.
-        </AlertDescription>
-      </Alert>
+      {mode === 'preview' && (
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertDescription>
+            Este dashboard usa dados reais do CRM, mas ainda está em modo preview. O dashboard
+            principal do usuário continua inalterado.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {data.context.requires_review && (
         <Alert variant="destructive">
@@ -137,6 +157,8 @@ export function CloserDashboard({ tenantId, targetUserId }: Props) {
       <CloserRiskDealsList deals={lists.risk_deals ?? []} />
 
       {isEmpty && <CloserDashboardEmptyState />}
+
+      {mode === 'runtime' && <CloserDashboardFeedbackCard tenantId={tenantId} />}
     </div>
   );
 }

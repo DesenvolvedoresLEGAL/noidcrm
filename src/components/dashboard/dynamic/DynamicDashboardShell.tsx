@@ -25,6 +25,8 @@ export type DynamicDashboardShellProps = {
   className?: string;
   tenantId?: string;
   targetUserId?: string;
+  onCloserDataReady?: (loadMs: number) => void;
+  onCloserPaceReady?: (loadMs: number) => void;
 };
 
 export function DynamicDashboardShell({
@@ -36,6 +38,8 @@ export function DynamicDashboardShell({
   className,
   tenantId,
   targetUserId,
+  onCloserDataReady,
+  onCloserPaceReady,
 }: DynamicDashboardShellProps) {
   const shell = useDynamicDashboardShell(profile, { mode, resolution });
 
@@ -51,6 +55,7 @@ export function DynamicDashboardShell({
 
   const isCloserProfile = profile.key === 'dashboard_sales_closer_placeholder';
   const canRenderCloserReal = isCloserProfile && !!tenantId && !!targetUserId;
+  const closerMode: 'runtime' | 'preview' = mode === 'runtime' ? 'runtime' : 'preview';
 
   return (
     <Card className={cn('border-dashed', className)}>
@@ -61,7 +66,13 @@ export function DynamicDashboardShell({
         {shell.isUnsupported && <DynamicDashboardState state="unsupported" />}
 
         {canRenderCloserReal ? (
-          <CloserDashboard tenantId={tenantId!} targetUserId={targetUserId!} />
+          <CloserDashboard
+            tenantId={tenantId!}
+            targetUserId={targetUserId!}
+            mode={closerMode}
+            onDataReady={onCloserDataReady}
+            onPaceReady={onCloserPaceReady}
+          />
         ) : (
           shell.isPlaceholder && (
             <>
