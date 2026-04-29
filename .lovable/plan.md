@@ -1,125 +1,126 @@
-## Sprint E.1 — Apollo Decision-Maker Enrichment (Kairós)
+## Sprint E.1.1 — Apollo Control & Audit (Padrão NOID)
 
-Adicionar enriquecimento de **decisores** via Apollo.io ao pipeline Kairós, reusando o que já existe (tabelas `enriched_contact_profiles`, `contact_enrichment_queue`, `prospect_scores`, `enrichment_runs`) e protegendo crédito.
+Adiciona governança, transparência e ROI ao enriquecimento Apollo: preview de custo antes de rodar, modal de confirmação, histórico auditável por prospect, relatório exportável de decisores e proteções contra abuso.
 
-### Estado atual (descoberto na exploração)
-- `enriched_contact_profiles` JÁ EXISTE com workspace_id, prospect_id, account_id, full_name, role_title, seniority, department, email, email_status, phone, linkedin_url, confidence, etc. **Sem provider/score/is_primary**.
-- `contact_enrichment_queue` JÁ EXISTE (workspace_id, prospect_id, status, priority).
-- `prospect_scores.priority_score` já é gerado (icp + signal + dq + trust − penalty).
-- `quality_label` mora em `enrichment_runs` (não em prospects).
-- Não há provider Apollo nem coluna `enrichment_status`/`contact_score`/`decision_maker_found` em `prospects`.
+### 1. Banco de Dados (migration)
 
-### 1. Banco (migration)
+**ALTER `enrichment_jobs`** (campos de auditoria/controle):
+- `estimated_credits INT` — quanto foi previsto antes da chamada
+- `trigger_source TEXT` (`user` | `system` | `automation`)
+- `skip_reason TEXT` — motivo padronizado (`already_enriched`, `low_score`, `low_quality`, `dm_already_found`, `no_domain`, `rate_limited`, `daily_limit`)
+- `response_summary JSONB` — `{contacts_found, emails_found, phones_found, top_seniority}`
 
-Aproveitar tudo que existe; apenas estender:
+**Índice**: `idx_enrichment_jobs_prospect_created (prospect_id, created_at DESC)`
 
-```sql
--- prospects: flags de enrichment Apollo
-ALTER TABLE prospects
-  ADD COLUMN IF NOT EXISTS enrichment_status text,         -- pending | running | done | partial | failed | skipped
-  ADD COLUMN IF NOT EXISTS contact_score int,              -- 0..100
-  ADD COLUMN IF NOT EXISTS decision_maker_found boolean DEFAULT false,
-  ADD COLUMN IF NOT EXISTS apollo_enriched_at timestamptz;
+**RLS**: já existe SELECT por organização — manter. Adicionar policy de INSERT/UPDATE só via service role (já é o padrão atual via edge function).
 
--- enriched_contact_profiles: campos Apollo
-ALTER TABLE enriched_contact_profiles
-  ADD COLUMN IF NOT EXISTS provider text,                  -- 'apollo'
-  ADD COLUMN IF NOT EXISTS confidence_score int,           -- 0..100
-  ADD COLUMN IF NOT EXISTS is_primary boolean DEFAULT false,
-  ADD COLUMN IF NOT EXISTS apollo_person_id text,
-  ADD COLUMN IF NOT EXISTS raw jsonb DEFAULT '{}'::jsonb;
+### 2. Edge Functions
 
-CREATE UNIQUE INDEX IF NOT EXISTS uniq_ectp_prospect_email
-  ON enriched_contact_profiles (workspace_id, prospect_id, lower(email))
-  WHERE email IS NOT NULL;
+**Nova: `preview-apollo-enrichment`**
+- Input: `{ prospect_id }`
+- Carrega prospect, último `enrichment_runs.quality_label`, `prospect_scores.priority_score`, último `enrichment_jobs` Apollo
+- Aplica os mesmos guards do `run-apollo-enrichment`
+- Retorna:
+  ```
+  {
+    eligible, reason,
+    estimated_credits: 2,
+    domain, company_name,
+    score, quality_label,
+    already_enriched, last_job_at,
+    warning  // ex.: "Prospect já possui contatos enriquecidos"
+  }
+  ```
+- Não consome crédito Apollo, não escreve nada (puro read).
 
--- enrichment_jobs: log/auditoria Apollo (não substitui contact_enrichment_queue)
-CREATE TABLE IF NOT EXISTS enrichment_jobs (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  workspace_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-  prospect_id uuid REFERENCES prospects(id) ON DELETE SET NULL,
-  provider text NOT NULL,                                  -- 'apollo'
-  status text NOT NULL DEFAULT 'pending',                  -- pending|running|done|failed|skipped
-  credits_used int DEFAULT 0,
-  contacts_found int DEFAULT 0,
-  decision_makers_found int DEFAULT 0,
-  error text,
-  request jsonb DEFAULT '{}'::jsonb,
-  response jsonb DEFAULT '{}'::jsonb,
-  created_at timestamptz DEFAULT now(),
-  completed_at timestamptz
-);
-CREATE INDEX idx_enrichment_jobs_ws_provider_prospect
-  ON enrichment_jobs(workspace_id, provider, prospect_id);
-ALTER TABLE enrichment_jobs ENABLE ROW LEVEL SECURITY;
-CREATE POLICY enrichment_jobs_org_select ON enrichment_jobs FOR SELECT
-  USING (workspace_id IN (SELECT organization_id FROM organization_members WHERE user_id = auth.uid()));
-```
+**Atualizar: `run-apollo-enrichment`**
+- Aceita `trigger_source` no body (default `user`).
+- Substitui o `skip()` atual: passa a gravar `skip_reason` padronizado e `estimated_credits` no row.
+- Ao concluir, calcula e grava `response_summary`:
+  - `contacts_found`, `emails_found` (com email != null), `phones_found`, `top_seniority`
+- Anti-spam: bloqueia se houver job `done` ou `running` nas últimas **24h** para o mesmo prospect → skip `already_enriched`.
+- Rate-limit por workspace: rejeita se >20 jobs Apollo nos últimos 60s → skip `rate_limited`.
+- Emite eventos via `track-event` existente: `apollo_enrichment_started`, `apollo_enrichment_completed`, `decision_maker_found` (quando `decision_makers_found > 0`).
 
-Service-role faz inserts via edge function; sem policy de insert para client.
+### 3. Frontend — Confirmação
 
-### 2. Edge functions
+**Novo: `src/components/playbook/enrichment/ApolloConfirmModal.tsx`** (usa `Dialog`)
+- Aberto pelo botão "Enriquecer (Apollo)" no `ProspectContactsTab`.
+- Chama `preview-apollo-enrichment` ao abrir, mostra:
+  - Empresa + domínio
+  - Score atual + quality label (badges)
+  - Status: **Elegível** / **Não elegível** (com `reason`)
+  - Estimativa: **2 créditos**
+  - Warning amarelo se `already_enriched`
+- Footer: `[Cancelar]` + `[Confirmar enriquecimento]` (disabled se `!eligible`).
+- Ao confirmar → chama `runApolloEnrichment(prospect_id)` (já existe).
 
-#### `run-apollo-enrichment` (nova)
-Input: `{ prospect_id }`. Fluxo:
-1. Carrega prospect + último `enrichment_runs.quality_label` + `prospect_scores.priority_score`.
-2. **Trigger guard** (anti-custo):
-   - aborta se `quality_label !== 'high_confidence'` → status `skipped`
-   - aborta se `priority_score < 180` → `skipped`
-   - aborta se `decision_maker_found = true` → `skipped`
-   - aborta se já existe `enrichment_jobs` provider=apollo status in (`done`,`running`) para o prospect → `skipped` (max 1 chamada)
-3. Cria `enrichment_jobs` status=running.
-4. Resolve domínio (`normalized_domain` ou `website`).
-5. Chama Apollo `mixed_people/search` filtrando `person_titles=[CEO, Founder, Co-Founder, Head, Director, VP, Marketing, Sales, Growth, Events, Manager]` e `q_organization_domains=<domain>`. Limite: 10 pessoas.
-6. Para cada pessoa: filtra por título relevante, calcula:
-   - `seniority_bonus`: CEO/Founder=30, VP/Head/Director=20, Manager=10, outros=0
-   - `contact_score`: email +30, email_status valid +20, linkedin +15, phone +15, seniority_bonus → cap 100
-7. Insere em `enriched_contact_profiles` com `provider='apollo'`, `confidence_score`, `apollo_person_id`, `raw`. **Anti-duplicação** via `ON CONFLICT (workspace_id, prospect_id, lower(email)) DO NOTHING`.
-8. Marca o de maior score como `is_primary=true`.
-9. Atualiza prospect: `decision_maker_found=true se algum decisor`, `contact_score=max`, `enrichment_status='done'|'partial'|'failed'`, `apollo_enriched_at=now()`.
-10. Atualiza `enrichment_jobs` com `credits_used`, `contacts_found`, `decision_makers_found`, `response`, `status`, `completed_at`.
+**Atualizar `ProspectContactsTab`**: trocar chamada direta por abrir `ApolloConfirmModal`.
 
-CORS standard, valida JWT no header, usa `SERVICE_ROLE_KEY` para writes.
+### 4. Histórico no Drawer
 
-#### `enqueue-apollo-enrichment` (nova, opcional batch)
-Lê `contact_enrichment_queue` status=`queued` priority desc, chama `run-apollo-enrichment` para cada (limite N por execução). Pode ser cron diário.
+**Nova aba "Histórico"** em `ProspectDetailDrawer` (entre Contatos e Enrichment).
 
-### 3. Apollo API key
-Apollo é um direct API (não usa connector gateway). Vou pedir `APOLLO_API_KEY` via `add_secret` antes de implementar a edge function.
+**Novo: `src/components/playbook/enrichment/EnrichmentJobsTable.tsx`**
+- Hook `useEnrichmentJobs(prospectId)` — query em `enrichment_jobs` por `prospect_id`, order desc.
+- Tabela (`Table` shadcn):
+  - Data | Provider | Status (badge colorido) | Créditos | Origem (`trigger_source`) | Motivo skip | Resultado (resumo)
+- Linha expansível mostrando `response_summary` formatado + `request`/`response` JSON colapsado.
 
-### 4. Merge rules (sem sobrescrever contexto interno)
-- `summary`, `pains` → continuam vindo do enrichment interno (`enriched_company_profiles`/`commercial_briefs`).
-- Apollo escreve **apenas** em `enriched_contact_profiles` (contatos) e atualiza flags em `prospects`. Nunca toca `summary`/`pains`/`company-level fields`.
+### 5. Relatório `/reports` — "Decisores Enriquecidos"
 
-### 5. Frontend
+**Novo wrapper**: `src/components/reports/wrappers/EnrichedDecisionMakersWrapper.tsx`
 
-#### `ProspectDetailDrawer` — nova aba "Contatos"
-- Lista contatos de `enriched_contact_profiles` para o prospect.
-- Por contato: avatar/initials, full_name, role_title (badge seniority), email + status, telefone, LinkedIn (link), `confidence_score` badge.
-- Ações: marcar como principal (toggle `is_primary`, garante apenas 1), copiar email/telefone, "Criar atividade" (prefilla nova activity vinculada à conta/prospect).
-- Badge global "🎯 Decisor encontrado" no header do drawer quando `decision_maker_found = true`.
-- Botão "Enriquecer com Apollo" se `enrichment_status` é null/failed E elegível (mostra tooltip com motivo se não-elegível).
+**Adicionar em `ReportTabs`** novo item: `enriched-decision-makers` (label "Decisores Enriquecidos", ícone `Users`).
 
-Hook novo: `useEnrichedContacts(prospectId)` em `src/hooks/useEnrichedContacts.ts` (React Query + Supabase realtime na tabela).
+**Adicionar em `Reports.tsx`** novo case no `renderReport`.
 
-Service: `src/services/enrichment/apolloService.ts` com `runApolloEnrichment(prospectId)` invocando a edge function.
+**Conteúdo**:
+- KPIs no topo: total de prospects enriquecidos, taxa de decisor encontrado, score médio, créditos consumidos no período.
+- Tabela de contatos (`enriched_contact_profiles` join `prospects`):
+  - company_name, domain, decision_maker_name, role, seniority, email, email_status, phone, linkedin, contact_score, provider, enriched_at
+- Filtros locais: período (usa filtros globais de Reports), score mínimo, provider, status.
+- Botão **Exportar CSV** (helper local `exportToCSV`).
 
-### 6. Critérios de sucesso
-- Decisor encontrado em >50% dos prospects elegíveis.
-- Email válido (status=valid) >60%.
-- Sem duplicidade (idx único `prospect_id+email`).
-- Máx 1 chamada Apollo por prospect (job dedupe).
-- `contact_score` calculado e exibido.
+### 6. Proteções
+
+- Anti-spam (24h) — server-side em `run-apollo-enrichment`.
+- Rate-limit workspace (20/min) — server-side.
+- UI: botão "Confirmar" do modal vira loading + disabled enquanto a mutation roda.
+- Hook `useEnrichedContacts.enrich` continua invalidando contatos; adicionar invalidação de `enrichment_jobs` query.
+
+### Critérios de aceite
+
+- Usuário vê custo estimado antes de rodar Apollo.
+- Segunda chamada em 24h vira `skipped` com `skip_reason=already_enriched`.
+- Aba Histórico lista todos os jobs com motivo claro.
+- Relatório `/reports → Decisores Enriquecidos` exporta CSV com colunas pedidas.
+- Eventos `apollo_enrichment_*` aparecem em `system_events`.
+
+### Detalhes técnicos
+
+**Arquivos novos**:
+- `supabase/migrations/<ts>_apollo_audit_controls.sql`
+- `supabase/functions/preview-apollo-enrichment/index.ts`
+- `src/components/playbook/enrichment/ApolloConfirmModal.tsx`
+- `src/components/playbook/enrichment/EnrichmentJobsTable.tsx`
+- `src/hooks/useEnrichmentJobs.ts`
+- `src/services/enrichment/apolloPreview.ts`
+- `src/components/reports/wrappers/EnrichedDecisionMakersWrapper.tsx`
+- `src/hooks/reports/useEnrichedDecisionMakersReport.ts`
+
+**Arquivos editados**:
+- `supabase/functions/run-apollo-enrichment/index.ts` — skip_reason, response_summary, anti-spam 24h, rate-limit, track-event, trigger_source.
+- `src/components/playbook/ProspectContactsTab.tsx` — abre modal em vez de chamar direto.
+- `src/components/playbook/ProspectDetailDrawer.tsx` — nova aba "Histórico".
+- `src/components/reports/ReportTabs.tsx` — novo tab.
+- `src/pages/Reports.tsx` — novo case.
+- `src/services/enrichment/apolloService.ts` — passa `trigger_source: 'user'`.
+
+**Memória a atualizar** (`mem://architectural-decision/intelligence/apollo-decision-maker-enrichment`): registrar guards de 24h, rate-limit 20/min, modal de confirmação e histórico auditável.
 
 ### Riscos
-- **Custo Apollo** mitigado pelo triple-guard (quality_label + priority_score + decision_maker_found + dedupe job).
-- Apollo retorna emails "guess" — armazenamos `email_status` para o frontend exibir confiança.
-- RLS: service-role bypassa, mas SELECT continua escopado a `organization_members`.
-- Sem afetar nada do CRM existente — Apollo é write-only em tabelas dedicadas.
 
-### Próximos passos após aprovação
-1. Pedir `APOLLO_API_KEY` via add_secret (única dependência externa).
-2. Executar migration.
-3. Criar edge functions `run-apollo-enrichment` e `enqueue-apollo-enrichment`.
-4. Criar hook + service + nova aba "Contatos" no `ProspectDetailDrawer`.
-5. Salvar memory: triggers/score formula/anti-duplication.
+- Migration `ALTER TABLE` em prod: campos nullable, sem default destrutivo — seguro.
+- Rate-limit por workspace é janela móvel via query — adequado para volume baixo atual; se crescer, mover para Redis/edge cache.
+- Eventos `track-event` dependem da função existente; verificar payload aceito antes de enviar.

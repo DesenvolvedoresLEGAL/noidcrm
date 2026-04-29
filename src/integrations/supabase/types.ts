@@ -10202,12 +10202,16 @@ export type Database = {
           credits_used: number | null
           decision_makers_found: number | null
           error: string | null
+          estimated_credits: number | null
           id: string
           prospect_id: string | null
           provider: string
           request: Json | null
           response: Json | null
+          response_summary: Json | null
+          skip_reason: string | null
           status: string
+          trigger_source: string | null
           workspace_id: string
         }
         Insert: {
@@ -10217,12 +10221,16 @@ export type Database = {
           credits_used?: number | null
           decision_makers_found?: number | null
           error?: string | null
+          estimated_credits?: number | null
           id?: string
           prospect_id?: string | null
           provider: string
           request?: Json | null
           response?: Json | null
+          response_summary?: Json | null
+          skip_reason?: string | null
           status?: string
+          trigger_source?: string | null
           workspace_id: string
         }
         Update: {
@@ -10232,12 +10240,16 @@ export type Database = {
           credits_used?: number | null
           decision_makers_found?: number | null
           error?: string | null
+          estimated_credits?: number | null
           id?: string
           prospect_id?: string | null
           provider?: string
           request?: Json | null
           response?: Json | null
+          response_summary?: Json | null
+          skip_reason?: string | null
           status?: string
+          trigger_source?: string | null
           workspace_id?: string
         }
         Relationships: [

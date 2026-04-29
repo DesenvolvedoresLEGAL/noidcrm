@@ -1,9 +1,11 @@
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Sparkles, Loader2, Star, Mail, Phone, Linkedin, Copy, CheckCircle2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useEnrichedContacts } from "@/hooks/useEnrichedContacts";
+import { ApolloConfirmModal } from "./enrichment/ApolloConfirmModal";
 import { cn } from "@/lib/utils";
 
 interface ProspectContactsTabProps {
@@ -47,8 +49,9 @@ export function ProspectContactsTab({
   contactScore,
 }: ProspectContactsTabProps) {
   const { data: contacts = [], isLoading, enrich, setPrimary } = useEnrichedContacts(prospectId);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
-  const handleEnrich = async () => {
+  const handleConfirm = async () => {
     try {
       const res = await enrich.mutateAsync();
       if (res.status === "skipped") {
@@ -82,7 +85,7 @@ export function ProspectContactsTab({
         <Button
           size="sm"
           variant="outline"
-          onClick={handleEnrich}
+          onClick={() => setConfirmOpen(true)}
           disabled={enrich.isPending}
           className="gap-1.5"
         >
@@ -90,6 +93,14 @@ export function ProspectContactsTab({
           Enriquecer (Apollo)
         </Button>
       </div>
+
+      <ApolloConfirmModal
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        prospectId={prospectId}
+        onConfirm={handleConfirm}
+        isRunning={enrich.isPending}
+      />
 
       {isLoading && <div className="text-sm text-muted-foreground py-4 text-center">Carregando contatos…</div>}
 
