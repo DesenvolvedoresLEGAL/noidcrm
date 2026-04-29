@@ -1025,23 +1025,11 @@ const App = () => (
               />
               <Route
                 path="/app/intelligence/optimization"
-                element={
-                  <ProtectedRoute>
-                    <LazyRoute>
-                      <OptimizationHub />
-                    </LazyRoute>
-                  </ProtectedRoute>
-                }
+                element={<Navigate to="/app/intelligence/kairos?tab=optimization" replace />}
               />
               <Route
                 path="/app/intelligence/experiments"
-                element={
-                  <ProtectedRoute>
-                    <LazyRoute>
-                      <ExperimentsHub />
-                    </LazyRoute>
-                  </ProtectedRoute>
-                }
+                element={<Navigate to="/app/intelligence/kairos?tab=experiments" replace />}
               />
 
               {/* Intelligence Routes */}
