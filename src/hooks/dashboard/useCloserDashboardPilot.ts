@@ -3,6 +3,7 @@ import {
   enableCloserPilot,
   disableCloserPilot,
   disableTenantDynamicDashboards,
+  disableAllCloserDashboardPilots,
   getTenantDynamicFlag,
   listPilotLogs,
 } from '@/services/crm/closerDashboardPilot';
