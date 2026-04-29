@@ -40,6 +40,7 @@ export function useOptimizationRecommendations(status?: RecommendationStatus) {
       toast({ title: 'Recomendação aplicada' });
       qc.invalidateQueries({ queryKey: ['optimization-recommendations'] });
       qc.invalidateQueries({ queryKey: ['optimization-actions-log'] });
+      qc.invalidateQueries({ queryKey: ['optimization-impact'] });
     },
     onError: (e: any) => toast({ title: 'Falha ao aplicar', description: e?.message, variant: 'destructive' }),
   });
