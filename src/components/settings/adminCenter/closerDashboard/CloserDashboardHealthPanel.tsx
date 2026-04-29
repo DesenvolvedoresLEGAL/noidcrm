@@ -1,4 +1,6 @@
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Info } from 'lucide-react';
 import { useCloserDashboardObservability } from '@/hooks/dashboard/useCloserDashboardObservability';
 import { CloserDashboardHealthCards } from './CloserDashboardHealthCards';
 import { CloserPilotRolloutPanel } from './CloserPilotRolloutPanel';
@@ -17,9 +19,18 @@ export function CloserDashboardHealthPanel({ tenantId }: Props) {
 
   return (
     <div className="space-y-4">
+      <Alert>
+        <Info className="h-4 w-4" />
+        <AlertDescription>
+          <strong>Importante:</strong> o nome comercial da tela é{' '}
+          <strong>Dashboard Comercial</strong>. A função técnica usada pelo NOID continua sendo{' '}
+          <strong>Closer</strong>, pois representa o usuário responsável por fechamento.
+        </AlertDescription>
+      </Alert>
+
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Saúde do Dashboard Closer</CardTitle>
+          <CardTitle className="text-base">Saúde do Dashboard Comercial</CardTitle>
           <CardDescription>
             Acompanhe uso real, fallback, erros, performance e feedback dos pilotos.
           </CardDescription>
