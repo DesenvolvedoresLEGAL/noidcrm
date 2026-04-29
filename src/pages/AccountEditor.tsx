@@ -18,6 +18,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { ArrowLeft, Save, Loader2, Building2, MapPin, Mail, Users, Briefcase, FileText, Search, UserPlus } from 'lucide-react';
 import { createContact } from '@/services/crm/contacts';
+import { supabase } from '@/integrations/supabase/client';
+import { invalidateScoreRelatedQueries } from '@/lib/scoring/invalidateScoreQueries';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { accountKeys, contactKeys } from '@/lib/query-keys';
