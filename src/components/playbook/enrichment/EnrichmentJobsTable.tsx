@@ -97,7 +97,7 @@ export function EnrichmentJobsTable({ prospectId }: Props) {
                   <TableCell className="text-xs truncate max-w-[200px]">{resultText}</TableCell>
                 </TableRow>
                 {isOpen && (
-                  <TableRow key={j.id + "-x"} className="bg-muted/30">
+                  <TableRow className="bg-muted/30">
                     <TableCell colSpan={7} className="p-3">
                       <div className="space-y-2 text-xs">
                         {summary && Object.keys(summary).length > 0 && (
@@ -120,7 +120,7 @@ export function EnrichmentJobsTable({ prospectId }: Props) {
                     </TableCell>
                   </TableRow>
                 )}
-              </>
+              </Fragment>
             );
           })}
         </TableBody>
