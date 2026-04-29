@@ -113,6 +113,10 @@ export function ProspectContactsTab({
 
       {isLoading && <div className="text-sm text-muted-foreground py-4 text-center">Carregando contatos…</div>}
 
+      {!isLoading && contacts.length > 0 && (
+        <ContactsQualityPanel contacts={contacts} mergedCount={mergedContacts.length} />
+      )}
+
       {!isLoading && contacts.length === 0 && (
         <Card className="p-6 text-center text-sm text-muted-foreground border-dashed">
           <AlertCircle className="h-5 w-5 mx-auto mb-2 opacity-50" />
