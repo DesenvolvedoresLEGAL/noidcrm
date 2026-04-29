@@ -9,6 +9,7 @@ import {
 import { callAI } from "../_shared/ai-client.ts";
 import { buildOpportunityBrief, detectHallucinations, renderBriefForPrompt } from "../_shared/opportunity-context.ts";
 import { checkEmailStyle } from "../_shared/email-style-guard.ts";
+import { normalizeRecipientEmail } from "../_shared/normalize-recipient-email.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -172,7 +173,9 @@ Deno.serve(async (req) => {
     }).eq("id", run_id);
 
     // Check if contact has valid email
-    const contactEmail = context.contact?.emails?.[0] || context.contact?.email;
+    const contactEmail = normalizeRecipientEmail(
+      context.contact?.emails ?? context.contact?.email,
+    );
     if (!contactEmail) {
       await supabase.from("ai_agent_execution_runs").update({
         execution_status: "skipped",
