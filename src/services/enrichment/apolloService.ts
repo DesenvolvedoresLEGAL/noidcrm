@@ -73,21 +73,28 @@ export async function listEnrichedContacts(prospectId: string): Promise<Enriched
     .from("enriched_contact_profiles")
     .select("id, prospect_id, full_name, first_name, last_name, role_title, seniority, department, email, email_status, phone, linkedin_url, provider, confidence_score, is_primary, created_at")
     .eq("prospect_id", prospectId)
+    .eq("is_merged" as any, false)
     .order("is_primary", { ascending: false })
     .order("confidence_score", { ascending: false, nullsFirst: false });
   if (error) throw error;
   return (data ?? []) as EnrichedContact[];
 }
 
+export async function listMergedContacts(prospectId: string): Promise<EnrichedContact[]> {
+  const { data, error } = await supabase
+    .from("enriched_contact_profiles")
+    .select("id, prospect_id, full_name, first_name, last_name, role_title, seniority, department, email, email_status, phone, linkedin_url, provider, confidence_score, is_primary, created_at")
+    .eq("prospect_id", prospectId)
+    .eq("is_merged" as any, true)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as EnrichedContact[];
+}
+
 export async function setPrimaryContact(prospectId: string, contactId: string): Promise<void> {
-  const { error: e1 } = await supabase
-    .from("enriched_contact_profiles")
-    .update({ is_primary: false })
-    .eq("prospect_id", prospectId);
-  if (e1) throw e1;
-  const { error: e2 } = await supabase
-    .from("enriched_contact_profiles")
-    .update({ is_primary: true })
-    .eq("id", contactId);
-  if (e2) throw e2;
+  const { error } = await supabase.rpc("resolve_primary_contact_manual" as any, {
+    p_prospect_id: prospectId,
+    p_contact_id: contactId,
+  });
+  if (error) throw error;
 }
