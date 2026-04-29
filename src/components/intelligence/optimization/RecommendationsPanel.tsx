@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { Loader2, Check, X, Sparkles } from 'lucide-react';
+import { Loader2, Check, X, Sparkles, Undo2 } from 'lucide-react';
 
 const TYPE_LABEL: Record<string, string> = {
   score_adjustment: 'Ajuste de score',
