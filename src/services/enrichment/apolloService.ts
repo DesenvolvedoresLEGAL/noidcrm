@@ -8,12 +8,45 @@ export interface ApolloEnrichmentResult {
   max_contact_score?: number;
 }
 
-export async function runApolloEnrichment(prospectId: string): Promise<ApolloEnrichmentResult> {
+export async function runApolloEnrichment(
+  prospectId: string,
+  trigger_source: "user" | "system" | "automation" = "user",
+): Promise<ApolloEnrichmentResult> {
   const { data, error } = await supabase.functions.invoke("run-apollo-enrichment", {
-    body: { prospect_id: prospectId },
+    body: { prospect_id: prospectId, trigger_source },
   });
   if (error) throw error;
   return data as ApolloEnrichmentResult;
+}
+
+export interface EnrichmentJob {
+  id: string;
+  prospect_id: string | null;
+  workspace_id: string;
+  provider: string;
+  status: string;
+  credits_used: number | null;
+  estimated_credits: number | null;
+  contacts_found: number | null;
+  decision_makers_found: number | null;
+  trigger_source: string | null;
+  skip_reason: string | null;
+  error: string | null;
+  request: any;
+  response: any;
+  response_summary: any;
+  created_at: string;
+  completed_at: string | null;
+}
+
+export async function listEnrichmentJobs(prospectId: string): Promise<EnrichmentJob[]> {
+  const { data, error } = await supabase
+    .from("enrichment_jobs" as any)
+    .select("*")
+    .eq("prospect_id", prospectId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as unknown as EnrichmentJob[];
 }
 
 export interface EnrichedContact {
