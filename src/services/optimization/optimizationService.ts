@@ -40,7 +40,17 @@ export interface OptimizationRecommendation {
   status: RecommendationStatus;
   reviewed_by: string | null;
   reviewed_at: string | null;
+  rolled_back_at: string | null;
+  rolled_back_by: string | null;
   created_at: string;
+}
+
+export interface OptimizationImpactSummary {
+  applied_last_7d: number;
+  rolled_back_last_7d: number;
+  impact_estimate_sum: number;
+  pending_count: number;
+  failed_last_7d: number;
 }
 
 export interface OptimizationActionLog {
