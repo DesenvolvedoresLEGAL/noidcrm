@@ -147,14 +147,31 @@ export function CloserDashboardFeedbackCard({ tenantId }: Props) {
           </div>
         </div>
 
-        <div>
-          <Label htmlFor="missing" className="text-sm">Faltou alguma informação?</Label>
+        <div className="space-y-2">
+          <Label htmlFor="missing" className="text-sm">
+            O que faltou para esse dashboard virar sua tela principal?
+          </Label>
+          <div className="flex flex-wrap gap-1.5">
+            {MISSING_CHIPS.map((chip) => {
+              const active = missingCategories.includes(chip);
+              return (
+                <Badge
+                  key={chip}
+                  variant={active ? 'default' : 'outline'}
+                  className="cursor-pointer select-none"
+                  onClick={() => toggleChip(chip)}
+                >
+                  {chip}
+                </Badge>
+              );
+            })}
+          </div>
           <Input
             id="missing"
             value={missingInfo}
             onChange={(e) => setMissingInfo(e.target.value)}
             maxLength={500}
-            placeholder="Ex: faltou ver propostas em revisão"
+            placeholder="Ou descreva com suas palavras (opcional)"
           />
         </div>
 
