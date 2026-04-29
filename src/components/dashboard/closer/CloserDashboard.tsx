@@ -157,6 +157,8 @@ export function CloserDashboard({ tenantId, targetUserId, mode = 'preview', onDa
       <CloserRiskDealsList deals={lists.risk_deals ?? []} />
 
       {isEmpty && <CloserDashboardEmptyState />}
+
+      {mode === 'runtime' && <CloserDashboardFeedbackCard tenantId={tenantId} />}
     </div>
   );
 }
