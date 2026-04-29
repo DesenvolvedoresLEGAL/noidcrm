@@ -291,7 +291,13 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   }
 
   // Wrap content with TrialGuard for trial blocking
-  return <TrialGuard>{children}</TrialGuard>;
+  return <TrialGuard><GlobalRealtimeListeners />{children}</TrialGuard>;
+}
+
+// Mounts global realtime subscriptions (one per authenticated session)
+function GlobalRealtimeListeners() {
+  useRealtimeContacts();
+  return null;
 }
 
 // Suspense wrapper for lazy routes
