@@ -69,11 +69,11 @@ export interface EnrichedContact {
 }
 
 export async function listEnrichedContacts(prospectId: string): Promise<EnrichedContact[]> {
-  const { data, error } = await supabase
-    .from("enriched_contact_profiles")
+  const { data, error } = await (supabase
+    .from("enriched_contact_profiles") as any)
     .select("id, prospect_id, full_name, first_name, last_name, role_title, seniority, department, email, email_status, phone, linkedin_url, provider, confidence_score, is_primary, created_at")
     .eq("prospect_id", prospectId)
-    .eq("is_merged" as any, false)
+    .eq("is_merged", false)
     .order("is_primary", { ascending: false })
     .order("confidence_score", { ascending: false, nullsFirst: false });
   if (error) throw error;
@@ -81,18 +81,18 @@ export async function listEnrichedContacts(prospectId: string): Promise<Enriched
 }
 
 export async function listMergedContacts(prospectId: string): Promise<EnrichedContact[]> {
-  const { data, error } = await supabase
-    .from("enriched_contact_profiles")
-    .select("id, prospect_id, full_name, first_name, last_name, role_title, seniority, department, email, email_status, phone, linkedin_url, provider, confidence_score, is_primary, created_at")
+  const { data, error } = await (supabase
+    .from("enriched_contact_profiles") as any)
+    .select("id, prospect_id, full_name, first_name, last_name, role_title, seniority, department, email, email_status, phone, linkedin_url, provider, confidence_score, is_primary, created_at, merged_into")
     .eq("prospect_id", prospectId)
-    .eq("is_merged" as any, true)
+    .eq("is_merged", true)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return (data ?? []) as EnrichedContact[];
 }
 
 export async function setPrimaryContact(prospectId: string, contactId: string): Promise<void> {
-  const { error } = await supabase.rpc("resolve_primary_contact_manual" as any, {
+  const { error } = await (supabase.rpc as any)("resolve_primary_contact_manual", {
     p_prospect_id: prospectId,
     p_contact_id: contactId,
   });
