@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { accountKeys } from '@/lib/query-keys';
+import { invalidateScoreRelatedQueries } from '@/lib/scoring/invalidateScoreQueries';
 
 interface AccountScoring {
   lead_score: number | null;
@@ -8,6 +9,7 @@ interface AccountScoring {
   intent_score: number | null;
   lead_grade: string | null;
   score_updated_at: string | null;
+  organization_id?: string | null;
 }
 
 export function useAccountScoring(accountId: string | undefined) {
@@ -20,7 +22,9 @@ export function useAccountScoring(accountId: string | undefined) {
 
       const { data, error } = await supabase
         .from('accounts')
-        .select('lead_score, fit_score, intent_score, lead_grade, score_updated_at')
+        .select(
+          'lead_score, fit_score, intent_score, lead_grade, score_updated_at, organization_id',
+        )
         .eq('id', accountId)
         .single();
 
@@ -33,18 +37,20 @@ export function useAccountScoring(accountId: string | undefined) {
   const recalculateMutation = useMutation({
     mutationFn: async () => {
       if (!accountId) throw new Error('Account ID required');
-      
-      const { data, error } = await supabase.functions.invoke('calculate-account-scores', {
-        body: { accountId },
-      });
+
+      const { data, error } = await supabase.functions.invoke(
+        'calculate-account-scores',
+        { body: { accountId } },
+      );
 
       if (error) throw error;
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: accountKeys.scoring(accountId) });
-      queryClient.invalidateQueries({ queryKey: accountKeys.scoringLite(accountId) });
-      queryClient.invalidateQueries({ queryKey: accountKeys.detail(accountId) });
+      invalidateScoreRelatedQueries(queryClient, {
+        organizationId: scoring?.organization_id ?? null,
+        accountId,
+      });
     },
   });
 
@@ -65,7 +71,7 @@ export function useAccountScore(accountId: string | undefined) {
 
       const { data, error } = await supabase
         .from('accounts')
-        .select('lead_score, fit_score, intent_score, lead_grade')
+        .select('lead_score, fit_score, intent_score, lead_grade, score_updated_at')
         .eq('id', accountId)
         .single();
 
