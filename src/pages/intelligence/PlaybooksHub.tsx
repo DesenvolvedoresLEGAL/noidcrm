@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { Layout } from '@/components/Layout';
 import { PageHeader } from '@/components/ui/page-header';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { 
   Loader2, Plus, Search, LayoutGrid, List, Sparkles, 
@@ -22,8 +22,6 @@ import {
 import { PlaybookCard } from '@/components/playbook/PlaybookCard';
 import { PlaybookEditor } from '@/components/playbook/PlaybookEditor';
 import { PlaybookVersionHistory } from '@/components/playbook/PlaybookVersionHistory';
-import { LeadSourcingEngine } from '@/components/playbook/LeadSourcingEngine';
-import { PlaybookPerformance } from '@/components/playbook/PlaybookPerformance';
 
 const CATEGORIES = [
   { id: 'all', label: 'Todos' },
