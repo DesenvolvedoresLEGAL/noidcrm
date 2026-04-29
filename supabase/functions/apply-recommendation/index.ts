@@ -97,9 +97,6 @@ Deno.serve(async (req) => {
         let parsed: any = null; try { parsed = JSON.parse(text); } catch (_) {}
         if (!resp.ok || !parsed?.ok) throw new Error(parsed?.error || `promote failed (${resp.status})`);
         result = { promoted: true, hypothesis_id: payload.hypothesis_id, applied: parsed.applied };
-        break_switch_label: {
-          // Skip the regular switch; logging + status update below still runs.
-        }
       } else {
       switch (rec.recommendation_type) {
         case "score_adjustment": {
