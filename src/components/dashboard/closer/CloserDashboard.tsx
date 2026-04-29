@@ -60,13 +60,15 @@ export function CloserDashboard({ tenantId, targetUserId, mode = 'preview', onDa
         <CloserPeriodFilter value={period} onChange={setPeriod} />
       </div>
 
-      <Alert>
-        <Info className="h-4 w-4" />
-        <AlertDescription>
-          Este dashboard usa dados reais do CRM, mas ainda está em modo preview. O dashboard
-          principal do usuário continua inalterado.
-        </AlertDescription>
-      </Alert>
+      {mode === 'preview' && (
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertDescription>
+            Este dashboard usa dados reais do CRM, mas ainda está em modo preview. O dashboard
+            principal do usuário continua inalterado.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {data.context.requires_review && (
         <Alert variant="destructive">
