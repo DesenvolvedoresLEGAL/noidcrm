@@ -53,7 +53,27 @@ export function useOptimizationRecommendations(status?: RecommendationStatus) {
     onError: (e: any) => toast({ title: 'Erro', description: e?.message, variant: 'destructive' }),
   });
 
-  return { ...query, apply, dismiss };
+  const rollback = useMutation({
+    mutationFn: rollbackRecommendation,
+    onSuccess: () => {
+      toast({ title: 'Recomendação revertida' });
+      qc.invalidateQueries({ queryKey: ['optimization-recommendations'] });
+      qc.invalidateQueries({ queryKey: ['optimization-actions-log'] });
+      qc.invalidateQueries({ queryKey: ['optimization-impact'] });
+    },
+    onError: (e: any) => toast({ title: 'Falha ao reverter', description: e?.message, variant: 'destructive' }),
+  });
+
+  return { ...query, apply, dismiss, rollback };
+}
+
+export function useOptimizationImpact() {
+  const { organization } = useCurrentOrganization();
+  return useQuery({
+    queryKey: ['optimization-impact', organization?.id],
+    queryFn: () => fetchImpactSummary(organization!.id),
+    enabled: !!organization?.id,
+  });
 }
 
 export function useOptimizationActionsLog() {
