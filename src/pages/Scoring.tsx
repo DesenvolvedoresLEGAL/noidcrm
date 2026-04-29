@@ -5,12 +5,16 @@ import { RevenueHygieneDashboard } from '@/components/scoring/nrhs/RevenueHygien
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Users, Target, Shield } from 'lucide-react';
 import { useScoringRealtime } from '@/hooks/scoring/useScoringRealtime';
+import { usePipelineIndicatorsRealtime } from '@/hooks/scoring/usePipelineIndicatorsRealtime';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 
 export default function Scoring() {
   const { organization } = useCurrentUser();
   // Sprint Scoring 1.1 — keep dashboards in sync when scores recalc anywhere.
   useScoringRealtime(organization?.id ?? null);
+  // Sprint Scoring 1.3 — react to NRHS / Engagement / Velocity / Risk / AI Win
+  // updates without hard refresh.
+  usePipelineIndicatorsRealtime(organization?.id ?? null);
 
 
   return (
