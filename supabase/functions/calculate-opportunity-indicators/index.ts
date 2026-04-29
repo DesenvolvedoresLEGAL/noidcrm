@@ -124,9 +124,9 @@ Deno.serve(async (req) => {
       ? daysBetween(now, new Date(lastCompleted.completed_at))
       : 999;
 
-    const primaryContact = contacts.find((c: any) => c.is_primary) || contacts[0] || null;
+    const primaryContact = contacts[0] || null;
     const hasDecisor = contacts.some((c: any) =>
-      typeof c.title === 'string' && /diretor|ceo|gerente|head|c-?level|presidente|s[oó]cio|owner|founder/i.test(c.title)
+      typeof c.cargo === 'string' && /diretor|ceo|gerente|head|c-?level|presidente|s[oó]cio|owner|founder/i.test(c.cargo)
     );
 
     const acceptedProposal = proposals.find((p: any) => p.status === 'accepted');
