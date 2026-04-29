@@ -389,7 +389,10 @@ export default function ProfileSettings() {
                   </div>
                   <p className="text-xs text-muted-foreground flex items-start gap-1">
                     <Info className="h-3 w-3 mt-0.5 flex-shrink-0" />
-                    Configuração legada. A função usada para dashboards dinâmicos fica em <strong>Contexto CRM</strong>.
+                    <span>
+                      <strong>Função Organizacional</strong> é uma configuração antiga do CRM.
+                      Para dashboards dinâmicos, use o <strong>Contexto CRM</strong> acima.
+                    </span>
                   </p>
                 </div>
 
