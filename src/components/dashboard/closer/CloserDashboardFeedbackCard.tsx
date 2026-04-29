@@ -5,9 +5,20 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
 import { Star, CheckCircle2 } from 'lucide-react';
 import { useDynamicDashboardFeedback } from '@/hooks/dashboard/useDynamicDashboardFeedback';
 import { useToast } from '@/hooks/use-toast';
+
+const MISSING_CHIPS = [
+  'Mais clareza nas propostas',
+  'Mais clareza nas atividades',
+  'Melhor cálculo do pace',
+  'Mais velocidade',
+  'CTAs melhores',
+  'Outra informação',
+] as const;
+
 
 interface Props {
   tenantId: string;
@@ -21,7 +32,14 @@ export function CloserDashboardFeedbackCard({ tenantId }: Props) {
   const [isConfusing, setIsConfusing] = useState<boolean | null>(null);
   const [isSlow, setIsSlow] = useState<boolean | null>(null);
   const [missingInfo, setMissingInfo] = useState('');
+  const [missingCategories, setMissingCategories] = useState<string[]>([]);
   const [comment, setComment] = useState('');
+
+  const toggleChip = (chip: string) => {
+    setMissingCategories((prev) =>
+      prev.includes(chip) ? prev.filter((c) => c !== chip) : [...prev, chip],
+    );
+  };
 
   if (submitted) {
     return (
@@ -54,7 +72,11 @@ export function CloserDashboardFeedbackCard({ tenantId }: Props) {
         isSlow,
         missingInfo: missingInfo.trim() || null,
         comment: comment.trim() || null,
-        metadata: { sprint: '6.6', source: 'runtime' },
+        metadata: {
+          sprint: '6.7',
+          source: 'runtime',
+          missing_categories: missingCategories,
+        },
       },
       {
         onError: (e: any) => {
@@ -125,14 +147,31 @@ export function CloserDashboardFeedbackCard({ tenantId }: Props) {
           </div>
         </div>
 
-        <div>
-          <Label htmlFor="missing" className="text-sm">Faltou alguma informação?</Label>
+        <div className="space-y-2">
+          <Label htmlFor="missing" className="text-sm">
+            O que faltou para esse dashboard virar sua tela principal?
+          </Label>
+          <div className="flex flex-wrap gap-1.5">
+            {MISSING_CHIPS.map((chip) => {
+              const active = missingCategories.includes(chip);
+              return (
+                <Badge
+                  key={chip}
+                  variant={active ? 'default' : 'outline'}
+                  className="cursor-pointer select-none"
+                  onClick={() => toggleChip(chip)}
+                >
+                  {chip}
+                </Badge>
+              );
+            })}
+          </div>
           <Input
             id="missing"
             value={missingInfo}
             onChange={(e) => setMissingInfo(e.target.value)}
             maxLength={500}
-            placeholder="Ex: faltou ver propostas em revisão"
+            placeholder="Ou descreva com suas palavras (opcional)"
           />
         </div>
 

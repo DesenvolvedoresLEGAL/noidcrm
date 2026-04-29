@@ -6,7 +6,7 @@ export function CloserDashboardEmptyState() {
     <Alert>
       <Inbox className="h-4 w-4" />
       <AlertDescription>
-        Nenhuma oportunidade encontrada para este período.
+        Nenhum dado encontrado para o período selecionado.
       </AlertDescription>
     </Alert>
   );

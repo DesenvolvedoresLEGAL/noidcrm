@@ -1,13 +1,11 @@
 import { supabase } from '@/integrations/supabase/client';
 
-export type CloserDashboardViewSource = 'preview' | 'runtime';
-
-export interface CloserDashboardView {
+export interface CloserDashboardViewRow {
   id: string;
   tenant_id: string;
   viewer_user_id: string;
   target_user_id: string;
-  source: CloserDashboardViewSource;
+  source: 'preview' | 'runtime';
   period: string | null;
   metadata: Record<string, any>;
   created_at: string;
@@ -20,7 +18,7 @@ export interface CloserDashboardView {
 export async function logCloserDashboardView(params: {
   tenantId: string;
   targetUserId: string;
-  source: CloserDashboardViewSource;
+  source: 'preview' | 'runtime';
   period?: string | null;
   metadata?: Record<string, any>;
 }): Promise<string | null> {
@@ -32,45 +30,43 @@ export async function logCloserDashboardView(params: {
     p_metadata: params.metadata ?? {},
   });
   if (error) {
-    // Best-effort logging — do not break UI
-    console.warn('[closer-audit] log failed', error);
+    // soft fail — telemetria não deve quebrar UX
     return null;
   }
-  return (data as string) ?? null;
+  return (data as unknown as string) ?? null;
 }
 
 export async function listCloserDashboardViews(
   tenantId: string,
-  opts: { limit?: number } = {},
-): Promise<CloserDashboardView[]> {
-  const { data, error } = await supabase
-    .from('crm_closer_dashboard_views' as any)
+  options: { limit?: number } = {},
+): Promise<CloserDashboardViewRow[]> {
+  const { data, error } = await (supabase as any)
+    .from('crm_closer_dashboard_views')
     .select('*')
     .eq('tenant_id', tenantId)
     .order('created_at', { ascending: false })
-    .limit(opts.limit ?? 100);
-  if (error) throw error;
+    .limit(options.limit ?? 100);
+  if (error || !data) return [];
+  const rows = data as CloserDashboardViewRow[];
 
-  const rows = (data || []) as unknown as CloserDashboardView[];
-  if (rows.length === 0) return rows;
-
-  // Hydrate viewer/target names from profiles (best-effort)
-  const ids = Array.from(new Set(rows.flatMap((r) => [r.viewer_user_id, r.target_user_id])));
-  const { data: profiles } = await supabase
+  // Enriquece com nomes/emails dos profiles em uma única query
+  const userIds = Array.from(
+    new Set(rows.flatMap((r) => [r.viewer_user_id, r.target_user_id]).filter(Boolean)),
+  );
+  if (userIds.length === 0) return rows;
+  const { data: profiles } = await (supabase as any)
     .from('profiles')
     .select('user_id, full_name, email')
-    .in('user_id', ids);
-
-  const map = new Map<string, { name: string | null; email: string | null }>();
-  (profiles || []).forEach((p: any) => {
-    map.set(p.user_id, { name: p.full_name ?? null, email: p.email ?? null });
-  });
-
+    .in('user_id', userIds);
+  const map = new Map<string, { full_name: string | null; email: string | null }>();
+  for (const p of (profiles ?? []) as any[]) {
+    map.set(p.user_id, { full_name: p.full_name ?? null, email: p.email ?? null });
+  }
   return rows.map((r) => ({
     ...r,
-    viewer_name: map.get(r.viewer_user_id)?.name ?? null,
+    viewer_name: map.get(r.viewer_user_id)?.full_name ?? null,
     viewer_email: map.get(r.viewer_user_id)?.email ?? null,
-    target_name: map.get(r.target_user_id)?.name ?? null,
+    target_name: map.get(r.target_user_id)?.full_name ?? null,
     target_email: map.get(r.target_user_id)?.email ?? null,
   }));
 }
@@ -86,5 +82,5 @@ export async function setUserDynamicDashboard(params: {
     p_enabled: params.enabled,
   });
   if (error) throw error;
-  return data as boolean;
+  return !!data;
 }
