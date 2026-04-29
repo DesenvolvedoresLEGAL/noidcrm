@@ -87,6 +87,39 @@ Deno.serve(async (req) => {
       .eq("run_id", queueItem.run_id).limit(1).single();
     if (!emailMsg) return jsonResp({ error: "Email message not found" }, 404);
 
+    // Normalize recipient (defensive: legacy rows may store contact JSON object)
+    const normalizedRecipient = normalizeRecipientEmail(emailMsg.recipient_email);
+    if (!normalizedRecipient) {
+      const failureMessage = "Destinatário inválido — não foi possível extrair um e-mail válido do contato.";
+      const failureCode = "invalid_recipient";
+      const nowIso = new Date().toISOString();
+      await supabase.from("ai_email_messages").update({
+        send_status: "failed",
+        delivery_status: "failed",
+        send_failure_reason: `[${failureCode}] ${failureMessage}`,
+        send_failed_at: nowIso,
+      }).eq("id", emailMsg.id);
+      await supabase.from("ai_agent_approval_queue").update({
+        status: "send_failed",
+        decided_at: nowIso,
+        rejection_reason: `Falha no envio: [${failureCode}] ${failureMessage}`,
+      }).eq("id", queue_id);
+      return jsonResp({
+        status: "approved_but_send_failed",
+        email_id: emailMsg.id,
+        error: failureMessage,
+        code: failureCode,
+        retryable: false,
+      }, 502);
+    }
+    // Heal the row if it was stored in non-canonical form so future retries are clean
+    if (typeof emailMsg.recipient_email !== "string" || emailMsg.recipient_email !== normalizedRecipient) {
+      await supabase.from("ai_email_messages")
+        .update({ recipient_email: normalizedRecipient })
+        .eq("id", emailMsg.id);
+      emailMsg.recipient_email = normalizedRecipient;
+    }
+
     const wasEdited = !!(edited_subject || edited_body_html || edited_body_text);
     const finalSubject = (edited_subject ?? emailMsg.subject) || "(sem assunto)";
     const finalBodyHtml = (edited_body_html ?? emailMsg.body_html) || "";
