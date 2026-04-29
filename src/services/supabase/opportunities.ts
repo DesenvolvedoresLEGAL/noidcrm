@@ -410,6 +410,18 @@ export async function advanceOpportunity(id: string, targetStageId: string): Pro
     throw error;
   }
 
+  // Sprint Scoring 1.2 — recalc opportunity score immediately so the card
+  // updates score/grade/health in the pipeline without hard refresh.
+  // Triggers will also enqueue, but this fires the calc straight away.
+  try {
+    const { triggerOpportunityScoreRecalc } = await import(
+      '@/lib/scoring/triggerOpportunityScoreRecalc'
+    );
+    triggerOpportunityScoreRecalc(id);
+  } catch {
+    // never block the move on a score recalc failure
+  }
+
   return data as Opportunity;
 }
 
@@ -525,6 +537,17 @@ export async function updateOpportunity(id: string, updates: Partial<any>): Prom
     contact_email: extractStr(data.contact?.emails, ['email', 'value', 'address']),
     contact_phone: extractStr(data.contact?.telefones, ['numero', 'phone', 'value', 'number']),
   };
+
+  // Sprint Scoring 1.2 — fire-and-forget recalculation so the new score is
+  // visible in the UI within a couple of seconds. Triggers enqueue too.
+  try {
+    const { triggerOpportunityScoreRecalc } = await import(
+      '@/lib/scoring/triggerOpportunityScoreRecalc'
+    );
+    triggerOpportunityScoreRecalc(id);
+  } catch {
+    // never block the save on score failure
+  }
 
   return mapped as Opportunity;
 }
