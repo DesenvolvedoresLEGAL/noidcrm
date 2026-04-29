@@ -12,6 +12,14 @@ const CHUNK_ERROR_PATTERNS = [
   'Loading CSS chunk',
   'Unable to preload CSS',
   'NetworkError when attempting to fetch resource',
+  'Failed to fetch',
+  'dynamically imported module',
+  'Unexpected token',
+  '<!doctype',
+  '<!DOCTYPE',
+  'expected expression, got',
+  'mime type',
+  "Cannot use import statement outside a module",
 ];
 
 const RECOVERY_KEY = 'chunk_recovery_attempt';
