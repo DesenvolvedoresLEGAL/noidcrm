@@ -18,6 +18,7 @@ import { EnrichmentSignalsList } from './enrichment/EnrichmentSignalsList';
 import { EnrichmentTimeline } from './enrichment/EnrichmentTimeline';
 import { DecisionDetailPanel } from '@/components/decision-engine/DecisionDetailPanel';
 import { ProspectLifecycleTimeline } from '@/components/learning/ProspectLifecycleTimeline';
+import { ProspectContactsTab } from './ProspectContactsTab';
 
 interface ProspectDetailDrawerProps {
   prospect: Prospect | null;
@@ -141,10 +142,20 @@ export function ProspectDetailDrawer({
         <Tabs defaultValue="details" className="mt-2">
           <TabsList className="w-full">
             <TabsTrigger value="details" className="flex-1">Detalhes</TabsTrigger>
+            <TabsTrigger value="contacts" className="flex-1">Contatos</TabsTrigger>
             <TabsTrigger value="enrichment" className="flex-1">Enrichment</TabsTrigger>
             <TabsTrigger value="decision" className="flex-1">Decisão</TabsTrigger>
             <TabsTrigger value="timeline" className="flex-1">Timeline</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="contacts">
+            <ProspectContactsTab
+              prospectId={prospect.id}
+              decisionMakerFound={(prospect as any).decision_maker_found}
+              enrichmentStatus={(prospect as any).enrichment_status}
+              contactScore={(prospect as any).contact_score}
+            />
+          </TabsContent>
 
           <TabsContent value="details">
             <div className="space-y-6 py-4">

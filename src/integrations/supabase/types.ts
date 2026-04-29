@@ -10090,7 +10090,9 @@ export type Database = {
       enriched_contact_profiles: {
         Row: {
           account_id: string | null
+          apollo_person_id: string | null
           confidence: number | null
+          confidence_score: number | null
           created_at: string | null
           department: string | null
           email: string | null
@@ -10098,11 +10100,14 @@ export type Database = {
           first_name: string | null
           full_name: string | null
           id: string
+          is_primary: boolean | null
           last_name: string | null
           linkedin_url: string | null
           phone: string | null
           prospect_id: string | null
+          provider: string | null
           provider_priority: Json | null
+          raw: Json | null
           role_title: string | null
           seniority: string | null
           updated_at: string | null
@@ -10110,7 +10115,9 @@ export type Database = {
         }
         Insert: {
           account_id?: string | null
+          apollo_person_id?: string | null
           confidence?: number | null
+          confidence_score?: number | null
           created_at?: string | null
           department?: string | null
           email?: string | null
@@ -10118,11 +10125,14 @@ export type Database = {
           first_name?: string | null
           full_name?: string | null
           id?: string
+          is_primary?: boolean | null
           last_name?: string | null
           linkedin_url?: string | null
           phone?: string | null
           prospect_id?: string | null
+          provider?: string | null
           provider_priority?: Json | null
+          raw?: Json | null
           role_title?: string | null
           seniority?: string | null
           updated_at?: string | null
@@ -10130,7 +10140,9 @@ export type Database = {
         }
         Update: {
           account_id?: string | null
+          apollo_person_id?: string | null
           confidence?: number | null
+          confidence_score?: number | null
           created_at?: string | null
           department?: string | null
           email?: string | null
@@ -10138,11 +10150,14 @@ export type Database = {
           first_name?: string | null
           full_name?: string | null
           id?: string
+          is_primary?: boolean | null
           last_name?: string | null
           linkedin_url?: string | null
           phone?: string | null
           prospect_id?: string | null
+          provider?: string | null
           provider_priority?: Json | null
+          raw?: Json | null
           role_title?: string | null
           seniority?: string | null
           updated_at?: string | null
@@ -10172,6 +10187,76 @@ export type Database = {
           },
           {
             foreignKeyName: "enriched_contact_profiles_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "v_report_legacy_retirement_readiness_v2"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
+      enrichment_jobs: {
+        Row: {
+          completed_at: string | null
+          contacts_found: number | null
+          created_at: string | null
+          credits_used: number | null
+          decision_makers_found: number | null
+          error: string | null
+          id: string
+          prospect_id: string | null
+          provider: string
+          request: Json | null
+          response: Json | null
+          status: string
+          workspace_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          contacts_found?: number | null
+          created_at?: string | null
+          credits_used?: number | null
+          decision_makers_found?: number | null
+          error?: string | null
+          id?: string
+          prospect_id?: string | null
+          provider: string
+          request?: Json | null
+          response?: Json | null
+          status?: string
+          workspace_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          contacts_found?: number | null
+          created_at?: string | null
+          credits_used?: number | null
+          decision_makers_found?: number | null
+          error?: string | null
+          id?: string
+          prospect_id?: string | null
+          provider?: string
+          request?: Json | null
+          response?: Json | null
+          status?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "enrichment_jobs_prospect_id_fkey"
+            columns: ["prospect_id"]
+            isOneToOne: false
+            referencedRelation: "prospects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "enrichment_jobs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "enrichment_jobs_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
@@ -20796,6 +20881,7 @@ export type Database = {
       }
       prospects: {
         Row: {
+          apollo_enriched_at: string | null
           approval_status: string | null
           approved_at: string | null
           approved_by: string | null
@@ -20808,12 +20894,15 @@ export type Database = {
           cnpj: string | null
           company_name: string
           confidence: number | null
+          contact_score: number | null
           country: string | null
           created_at: string | null
+          decision_maker_found: boolean | null
           dedupe_status: string | null
           duplicate_candidate: boolean | null
           email_public: string | null
           endereco: string | null
+          enrichment_status: string | null
           event_name: string | null
           event_url: string | null
           exhibitor_profile_url: string | null
@@ -20849,6 +20938,7 @@ export type Database = {
           website: string | null
         }
         Insert: {
+          apollo_enriched_at?: string | null
           approval_status?: string | null
           approved_at?: string | null
           approved_by?: string | null
@@ -20861,12 +20951,15 @@ export type Database = {
           cnpj?: string | null
           company_name: string
           confidence?: number | null
+          contact_score?: number | null
           country?: string | null
           created_at?: string | null
+          decision_maker_found?: boolean | null
           dedupe_status?: string | null
           duplicate_candidate?: boolean | null
           email_public?: string | null
           endereco?: string | null
+          enrichment_status?: string | null
           event_name?: string | null
           event_url?: string | null
           exhibitor_profile_url?: string | null
@@ -20902,6 +20995,7 @@ export type Database = {
           website?: string | null
         }
         Update: {
+          apollo_enriched_at?: string | null
           approval_status?: string | null
           approved_at?: string | null
           approved_by?: string | null
@@ -20914,12 +21008,15 @@ export type Database = {
           cnpj?: string | null
           company_name?: string
           confidence?: number | null
+          contact_score?: number | null
           country?: string | null
           created_at?: string | null
+          decision_maker_found?: boolean | null
           dedupe_status?: string | null
           duplicate_candidate?: boolean | null
           email_public?: string | null
           endereco?: string | null
+          enrichment_status?: string | null
           event_name?: string | null
           event_url?: string | null
           exhibitor_profile_url?: string | null
