@@ -43,6 +43,10 @@ Deno.serve(async (req) => {
     // 2. Generate recommendations (todas as orgs)
     summary.steps.generate = await invokeFn("generate-recommendations", {});
 
+    // 2.1 Sprint E — Generate experiment hypotheses & evaluate running ones
+    summary.steps.generate_hypotheses = await invokeFn("generate-experiment-hypothesis", {});
+    summary.steps.evaluate_experiments = await invokeFn("evaluate-experiment", {});
+
     // 3. Auto-apply: somente onde auto-mode está ON
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
     const { data: orgs, error: orgsErr } = await admin
