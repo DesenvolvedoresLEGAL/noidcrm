@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { Layout } from '@/components/Layout';
 import { PageHeader } from '@/components/ui/page-header';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { 
   Loader2, Plus, Search, LayoutGrid, List, Sparkles, 
@@ -22,8 +22,6 @@ import {
 import { PlaybookCard } from '@/components/playbook/PlaybookCard';
 import { PlaybookEditor } from '@/components/playbook/PlaybookEditor';
 import { PlaybookVersionHistory } from '@/components/playbook/PlaybookVersionHistory';
-import { LeadSourcingEngine } from '@/components/playbook/LeadSourcingEngine';
-import { PlaybookPerformance } from '@/components/playbook/PlaybookPerformance';
 
 const CATEGORIES = [
   { id: 'all', label: 'Todos' },
@@ -41,7 +39,7 @@ export default function PlaybooksHub() {
   const deployMutation = useDeployPlaybookVersion();
   const generateFromWinLoss = useGeneratePlaybookFromWinLoss();
 
-  const [activeTab, setActiveTab] = useState('strategy');
+  
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('all');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -137,173 +135,151 @@ export default function PlaybooksHub() {
           }
         />
 
-        {/* Main 3 Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-3 max-w-md">
-            <TabsTrigger value="strategy">🎯 Estratégia</TabsTrigger>
-            <TabsTrigger value="execution">🔥 Execução</TabsTrigger>
-            <TabsTrigger value="performance">📊 Performance</TabsTrigger>
-          </TabsList>
-
-          {/* === TAB 1: ESTRATÉGIA === */}
-          <TabsContent value="strategy" className="space-y-6">
-            {/* Stats Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <Card>
-                <CardContent className="pt-4">
-                  <div className="text-2xl font-bold">{totalPlaybooks}</div>
-                  <div className="text-sm text-muted-foreground">Total Playbooks</div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="pt-4">
-                  <div className="text-2xl font-bold text-green-500">{activeCount}</div>
-                  <div className="text-sm text-muted-foreground">Ativos</div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="pt-4">
-                  <div className="text-2xl font-bold text-destructive">{autoDisabledCount}</div>
-                  <div className="text-sm text-muted-foreground">Auto-desativados</div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="pt-4">
-                  <div className="text-2xl font-bold">
-                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(totalRevenue)}
-                  </div>
-                  <div className="text-sm text-muted-foreground">Revenue Total</div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Filters */}
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar playbooks..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="pl-10"
-                />
+        {/* Stats Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="pt-4">
+              <div className="text-2xl font-bold">{totalPlaybooks}</div>
+              <div className="text-sm text-muted-foreground">Total Playbooks</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-4">
+              <div className="text-2xl font-bold text-green-500">{activeCount}</div>
+              <div className="text-sm text-muted-foreground">Ativos</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-4">
+              <div className="text-2xl font-bold text-destructive">{autoDisabledCount}</div>
+              <div className="text-sm text-muted-foreground">Auto-desativados</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-4">
+              <div className="text-2xl font-bold">
+                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(totalRevenue)}
               </div>
-              <Tabs value={category} onValueChange={setCategory}>
-                <TabsList>
-                  {CATEGORIES.map(cat => (
-                    <TabsTrigger key={cat.id} value={cat.id} className="text-xs sm:text-sm">
-                      {cat.label}
-                    </TabsTrigger>
+              <div className="text-sm text-muted-foreground">Revenue Total</div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Filters */}
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar playbooks..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          <Tabs value={category} onValueChange={setCategory}>
+            <TabsList>
+              {CATEGORIES.map(cat => (
+                <TabsTrigger key={cat.id} value={cat.id} className="text-xs sm:text-sm">
+                  {cat.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+          <div className="flex gap-1">
+            <Button
+              variant={viewMode === 'grid' ? 'default' : 'ghost'}
+              size="icon"
+              onClick={() => setViewMode('grid')}
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={viewMode === 'list' ? 'default' : 'ghost'}
+              size="icon"
+              onClick={() => setViewMode('list')}
+            >
+              <List className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Content */}
+        {isLoading ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : filteredPlaybooks.length === 0 ? (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-12">
+              <div className="text-muted-foreground mb-4">
+                {search || category !== 'all' 
+                  ? 'Nenhum playbook encontrado com os filtros aplicados'
+                  : 'Você ainda não tem playbooks'}
+              </div>
+              <Button onClick={() => {
+                setEditingPlaybook(null);
+                setEditorOpen(true);
+              }}>
+                <Plus className="h-4 w-4 mr-2" />
+                Criar Primeiro Playbook
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-6">
+            {activePlaybooks.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-lg font-semibold">Playbooks Ativos</h2>
+                  <Badge variant="secondary">{activePlaybooks.length}</Badge>
+                </div>
+                <div className={viewMode === 'grid' 
+                  ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+                  : "space-y-3"
+                }>
+                  {activePlaybooks.map(playbook => (
+                    <PlaybookCard
+                      key={playbook.id}
+                      playbook={playbook}
+                      onToggle={handleToggle}
+                      onEdit={handleEdit}
+                      onDeploy={handleDeploy}
+                      onViewVersions={handleViewVersions}
+                      onDuplicate={handleDuplicate}
+                    />
                   ))}
-                </TabsList>
-              </Tabs>
-              <div className="flex gap-1">
-                <Button
-                  variant={viewMode === 'grid' ? 'default' : 'ghost'}
-                  size="icon"
-                  onClick={() => setViewMode('grid')}
-                >
-                  <LayoutGrid className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant={viewMode === 'list' ? 'default' : 'ghost'}
-                  size="icon"
-                  onClick={() => setViewMode('list')}
-                >
-                  <List className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-
-            {/* Content */}
-            {isLoading ? (
-              <div className="flex justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-              </div>
-            ) : filteredPlaybooks.length === 0 ? (
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center py-12">
-                  <div className="text-muted-foreground mb-4">
-                    {search || category !== 'all' 
-                      ? 'Nenhum playbook encontrado com os filtros aplicados'
-                      : 'Você ainda não tem playbooks'}
-                  </div>
-                  <Button onClick={() => {
-                    setEditingPlaybook(null);
-                    setEditorOpen(true);
-                  }}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Criar Primeiro Playbook
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-6">
-                {activePlaybooks.length > 0 && (
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <h2 className="text-lg font-semibold">Playbooks Ativos</h2>
-                      <Badge variant="secondary">{activePlaybooks.length}</Badge>
-                    </div>
-                    <div className={viewMode === 'grid' 
-                      ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
-                      : "space-y-3"
-                    }>
-                      {activePlaybooks.map(playbook => (
-                        <PlaybookCard
-                          key={playbook.id}
-                          playbook={playbook}
-                          onToggle={handleToggle}
-                          onEdit={handleEdit}
-                          onDeploy={handleDeploy}
-                          onViewVersions={handleViewVersions}
-                          onDuplicate={handleDuplicate}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {disabledPlaybooks.length > 0 && (
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <h2 className="text-lg font-semibold text-muted-foreground">
-                        Playbooks Inativos / Auto-desativados
-                      </h2>
-                      <Badge variant="secondary">{disabledPlaybooks.length}</Badge>
-                    </div>
-                    <div className={viewMode === 'grid' 
-                      ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
-                      : "space-y-3"
-                    }>
-                      {disabledPlaybooks.map(playbook => (
-                        <PlaybookCard
-                          key={playbook.id}
-                          playbook={playbook}
-                          onToggle={handleToggle}
-                          onEdit={handleEdit}
-                          onDeploy={handleDeploy}
-                          onViewVersions={handleViewVersions}
-                          onDuplicate={handleDuplicate}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
+                </div>
               </div>
             )}
-          </TabsContent>
 
-          {/* === TAB 2: EXECUÇÃO === */}
-          <TabsContent value="execution" className="space-y-6">
-            <LeadSourcingEngine />
-          </TabsContent>
-
-          {/* === TAB 3: PERFORMANCE === */}
-          <TabsContent value="performance" className="space-y-6">
-            <PlaybookPerformance />
-          </TabsContent>
-        </Tabs>
+            {disabledPlaybooks.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-lg font-semibold text-muted-foreground">
+                    Playbooks Inativos / Auto-desativados
+                  </h2>
+                  <Badge variant="secondary">{disabledPlaybooks.length}</Badge>
+                </div>
+                <div className={viewMode === 'grid' 
+                  ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+                  : "space-y-3"
+                }>
+                  {disabledPlaybooks.map(playbook => (
+                    <PlaybookCard
+                      key={playbook.id}
+                      playbook={playbook}
+                      onToggle={handleToggle}
+                      onEdit={handleEdit}
+                      onDeploy={handleDeploy}
+                      onViewVersions={handleViewVersions}
+                      onDuplicate={handleDuplicate}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Editor Modal */}
         <PlaybookEditor
