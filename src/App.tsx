@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-route
 import React, { Suspense, lazy } from "react";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useRealtimeContacts } from "@/hooks/useRealtimeContacts";
 import { useOnboardingStatus } from "@/hooks/useOnboardingStatus";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { LoadingPage } from "@/components/LoadingPage";
