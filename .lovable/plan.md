@@ -1,98 +1,106 @@
-# Sprint Scoring 1.3 — Auditoria Forense + Filtro por Pipeline
+## Diagnóstico forense
 
-## Diagnóstico confirmado
+A falha atual do Pipeline não é mais um problema genérico de cache/chunk. O print mostra erro real de runtime:
 
-- **AI Win inflado**: 68 oportunidades abertas (`status='new'`) com `win_probability_ai = 100`. Bug crítico.
-- **Status**: oportunidades usam `won`, `new`, `lost`, `open`. Não existe `disqualified` no enum atual — tratar via pipeline `qualification` + `lost`.
-- **Schema já existente** em `opportunities`: `opportunity_score`, `opportunity_grade` (a confirmar — não veio na query, vou validar antes), `opportunity_health`, `opportunity_score_metadata`, `nrhs_score`, `nrhs_tier`, `nrhs_blockers`, `nrhs_breakdown`, `nrhs_last_calculated_at`, `engagement_score`, `velocity_score`, `risk_score`, `win_probability_ai`. **Reutilizar tudo isso, não duplicar.**
-- **Faltam**: `ai_win_probability_metadata`, `ai_win_probability_updated_at`, `deal_health` + metadata, `risk_level`, `engagement_metadata`, `velocity_metadata`, `risk_metadata`, `nrhs_status` (já existe `nrhs_tier` — reutilizar como sinônimo).
-- **Pipelines**: existem múltiplos com mesmo nome (3x "PRÉ VENDAS", 5x "Vendas/VENDAS"). O filtro deve listar todos, agrupar por `pipeline_type`, e default por `pipeline_type='sales'` (não por nome).
-- **Tabelas auxiliares disponíveis**: `proposals`, `opportunity_emails`, `activities`, `score_history`, `nrhs_events`, `v_opportunities_hygiene_base`. Não criar duplicatas.
+```text
+TypeError: Cannot read properties of undefined (reading 'bgColor')
+at NRHSBadge
+```
 
-## O que será construído
+Causa raiz confirmada:
 
-### 1. Auditoria documentada
-Criar `src/lib/scoring/SCORING_INDICATORS_AUDIT.md` listando cada indicador (Lead Score, Lead Grade, Opportunity Score/Grade/Health, NRHS, Probabilidade Comercial, AI Win, Deal Health, Engagement, Velocity, Risk) com: onde aparece, fonte atual no código, fórmula encontrada, problemas, fonte oficial recomendada.
+1. A Sprint Scoring 1.3 passou a gravar `nrhs_tier` com novos valores:
+   - `healthy`
+   - `attention`
+   - `critical`
 
-### 2. Schema (migração mínima)
-Adicionar apenas o que falta em `opportunities`:
-- `deal_health text`, `deal_health_score int`, `deal_health_updated_at timestamptz`, `deal_health_metadata jsonb default '{}'`
-- `risk_level text`, `risk_updated_at timestamptz`, `risk_metadata jsonb default '{}'`
-- `engagement_updated_at`, `engagement_metadata jsonb`
-- `velocity_updated_at`, `velocity_metadata jsonb`
-- `ai_win_probability_updated_at`, `ai_win_probability_metadata jsonb`
+2. O frontend antigo do NRHS só reconhece estes valores:
+   - `elite`
+   - `healthy`
+   - `risk`
+   - `critical`
+   - `insalubrious`
 
-Criar `opportunity_indicators_recalc_queue` (mesmo padrão das filas 1.1/1.2: debounce 2min, batch 50, cron 1min).
+3. O banco já tem oportunidades com `nrhs_tier = 'attention'`:
 
-Triggers `enqueue_opportunity_indicators_recalc()` em: `opportunities` (stage_id, status, amount, owner_id, primary_contact_id, won_at, lost_at), `activities` (status, completed_at, due_at), `proposals` (status, viewed_at, accepted_at, expires_at), `opportunity_emails` (opened_at, replied_at). Verificar existência de cada coluna antes (defensivo).
+```text
+attention: 33 oportunidades
+critical: 102
+healthy: 43
+```
 
-### 3. Edge function `calculate-opportunity-indicators`
-Consolida indicadores derivados (não recalcula Lead Score nem Opportunity Score — esses já têm functions próprias). Calcula: NRHS, Engagement, Velocity, Risk, Deal Health, AI Win — com fórmulas e caps exatos do spec. Persiste tudo + metadata explicável + `score_history`.
+4. Quando o Pipeline tenta renderizar um card com `nrhs_tier = 'attention'`, `getNRHSTierConfig('attention')` retorna `undefined`; em seguida o componente tenta acessar `tierConfig.bgColor` e derruba a página inteira via ErrorBoundary.
 
-**AI Win — caps obrigatórios**:
-- `won` → 100; `lost` → 0
-- `new`/`open` → máx 95 (nunca 100)
-- sem next activity → máx 59
-- sem responsável → máx 49
-- parada >14d → máx 49
-- sem decisor → máx 69
-- engagement <20 → máx 69
+## Fix imediato
 
-**Backfill one-shot** ao deploy: enfileirar todas as opps abertas para corrigir os 68 com 100%.
+Vou aplicar uma correção pequena e segura em duas camadas:
 
-### 4. Edge function `process-opportunity-indicators-queue` + cron 1min.
+### 1. Blindar o componente que derruba o Pipeline
 
-### 5. Realtime + invalidação
-- `src/hooks/scoring/useOpportunityIndicatorsRealtime.ts` (escopo single opp)
-- `src/hooks/scoring/usePipelineIndicatorsRealtime.ts` (escopo org_id, filtra só campos de indicadores)
-- `src/lib/scoring/invalidateOpportunityIndicatorsQueries.ts` (reusa helpers existentes)
+Arquivo:
 
-### 6. Filtro por pipeline na tela Scoring
-Adicionar `<PipelineFilter>` no header de `Scoring.tsx`, propagado para as 3 abas via context/props. Buscar pipelines reais (`usePipelines`), agrupar por `pipeline_type`. Defaults:
-- **Opportunity Score**: `pipeline_type='sales'` + `status IN ('new','open')` + ocultar won/lost/operacional
-- **Lead Score**: contas com opp em sales/qualification, ou contas sem opp
-- **NRHS**: `pipeline_type='sales'` + abertas
+```text
+src/components/nrhs/NRHSBadge.tsx
+```
 
-Toggles manuais: "Mostrar ganhas", "Mostrar perdidas", "Mostrar operacionais".
+Mudanças:
+- Aceitar tiers legados e novos sem quebrar a UI.
+- Normalizar `attention` para o visual equivalente a `risk`/atenção.
+- Se vier qualquer valor desconhecido no futuro, usar fallback seguro em vez de lançar erro.
+- Nunca acessar `tierConfig.bgColor` quando `tierConfig` estiver indefinido.
 
-### 7. Correção `OpportunityScoreDashboard` (causa raiz do print)
-Atualizar `useOpportunityScoreAnalytics` para aplicar os defaults acima. **Valor em Risco** passa a considerar só abertas filtradas com `risk_level='high'` ou `risk_score>=70` ou `deal_health IN ('risk','stalled')` — nunca won.
+Resultado: o Pipeline volta a abrir imediatamente mesmo com dados mistos no banco.
 
-### 8. Tooltips explicáveis
-Componente reutilizável `<IndicatorTooltip>` que lê `*_metadata` JSONB e renderiza: o que é, fórmula, componentes, caps aplicados, blockers. Aplicar em PipelineCard, OpportunityDetail, sidebar.
+### 2. Corrigir a origem da inconsistência no cálculo novo
 
-### 9. Renomear UI
-Remover "machine learning preditivo" do `OpportunityScoreDashboard` → "Estimativa inteligente baseada em score e sinais comerciais".
+Arquivo:
 
-## Arquivos impactados (estimativa)
+```text
+supabase/functions/calculate-opportunity-indicators/index.ts
+```
 
-**Criar:**
-- `src/lib/scoring/SCORING_INDICATORS_AUDIT.md`
-- `src/lib/scoring/invalidateOpportunityIndicatorsQueries.ts`
-- `src/hooks/scoring/useOpportunityIndicatorsRealtime.ts`
-- `src/hooks/scoring/usePipelineIndicatorsRealtime.ts`
-- `src/components/scoring/IndicatorTooltip.tsx`
-- `src/components/scoring/PipelineScopeFilter.tsx`
-- `supabase/functions/calculate-opportunity-indicators/index.ts`
-- `supabase/functions/process-opportunity-indicators-queue/index.ts`
-- 1 migration (schema + queue + triggers + cron + realtime publication)
+Mudança:
+- Trocar a geração de `nrhs_tier = 'attention'` para o vocabulário oficial existente:
 
-**Editar:**
-- `src/pages/Scoring.tsx` (header com filtro de pipeline)
-- `src/components/scoring/opportunity/OpportunityScoreDashboard.tsx` (rename + filtros)
-- `src/hooks/useOpportunityScoreAnalytics.ts` (defaults: sales + abertas)
-- `src/hooks/useNRHSAnalytics.ts` (default sales + abertas)
-- `src/components/scoring/lead/LeadScoreDashboard.tsx` (filtro pipeline)
-- `src/components/scoring/nrhs/RevenueHygieneDashboard.tsx` (filtro pipeline)
-- `src/components/pipeline/*Card*` (tooltips explicáveis nos badges de score)
+```text
+>= 90  elite
+>= 75  healthy
+>= 60  risk
+>= 40  critical
+< 40   insalubrious
+```
 
-## Riscos e mitigações
+Resultado: novos recálculos não continuarão gravando valores incompatíveis.
 
-- **Breaking 1.1/1.2**: zero alteração em `calculate-account-scores`, `calculate-opportunity-score` ou suas filas. Esta sprint adiciona uma terceira camada paralela.
-- **Triggers em tabela inexistente**: cada `CREATE TRIGGER` precedido de `DO $$ ... IF EXISTS ... $$`.
-- **Multi-tenant**: toda query nova filtra `organization_id`; RLS preservada nas tabelas novas.
-- **Backfill em massa**: enfileirar via SQL, processar via cron normal (50/min) — sem pico.
-- **Pipelines duplicados**: filtro UI lista todos, agrega por `pipeline_type` para defaults.
+## Correção opcional de dados existentes
 
-## Fora do escopo (não fazer)
-Account Score, Forecast V2, modelo ML real, alterar fórmulas das Sprints 1.1/1.2, refazer visual do pipeline.
+Como já existem registros com `attention`, vou incluir migração para normalizar dados atuais:
+
+```sql
+update public.opportunities
+set nrhs_tier = 'risk'
+where nrhs_tier = 'attention';
+```
+
+Essa atualização é segura porque `attention` era o mesmo conceito operacional de “atenção / risco moderado”.
+
+## Arquivos impactados
+
+```text
+src/components/nrhs/NRHSBadge.tsx
+supabase/functions/calculate-opportunity-indicators/index.ts
+supabase/migrations/<nova_migration>_normalize_nrhs_attention_tier.sql
+```
+
+## Validação após o fix
+
+Vou verificar:
+
+1. Que não existe mais acesso direto a `tierConfig.bgColor` sem fallback.
+2. Que o cálculo novo não grava mais `attention`.
+3. Que o banco não mantém `nrhs_tier = 'attention'` após a migração.
+4. Que o Pipeline não pode mais cair por tier NRHS desconhecido.
+
+## Riscos
+
+Baixo risco. A alteração é localizada e não mexe em RLS, permissões, filtros comerciais, nem fluxo de pipeline. O único efeito visual é que oportunidades que estavam como `attention` aparecerão como “Em Risco”/atenção, sem quebrar a tela.

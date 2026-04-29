@@ -276,7 +276,14 @@ Deno.serve(async (req) => {
     const nrhsRaw = dataCompleteness + contactQuality + dealHygiene + activityHygiene + timelineHygiene
       - blockers.length * 3;
     const nrhs = clamp(nrhsRaw);
-    const nrhsTier = nrhs >= 75 ? 'healthy' : nrhs >= 50 ? 'attention' : 'critical';
+    // Canonical NRHS tier vocabulary (must match src/services/crm/nrhs-calculator.ts):
+    // elite >= 90, healthy >= 75, risk >= 60, critical >= 40, insalubrious < 40.
+    const nrhsTier =
+      nrhs >= 90 ? 'elite'
+      : nrhs >= 75 ? 'healthy'
+      : nrhs >= 60 ? 'risk'
+      : nrhs >= 40 ? 'critical'
+      : 'insalubrious';
 
     // ============================================================
     // DEAL HEALTH (categorical)

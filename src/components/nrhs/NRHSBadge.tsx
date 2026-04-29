@@ -40,7 +40,32 @@ export function NRHSBadge({
     return null;
   }
 
-  const tierConfig = getNRHSTierConfig(tier);
+  // Sprint 1.3 hotfix: tolerate legacy/new tier vocabularies without crashing the page.
+  // Map any unknown value (e.g. "attention" emitted by calculate-opportunity-indicators)
+  // to the closest canonical tier instead of throwing on undefined config.
+  const TIER_ALIASES: Record<string, NRHSTier> = {
+    attention: 'risk',
+    moderate: 'risk',
+    warning: 'risk',
+    danger: 'critical',
+    bad: 'critical',
+    good: 'healthy',
+    ok: 'healthy',
+    excellent: 'elite',
+    top: 'elite',
+    worst: 'insalubrious',
+  };
+  const canonicalTier: NRHSTier =
+    (['elite', 'healthy', 'risk', 'critical', 'insalubrious'] as NRHSTier[]).includes(tier as NRHSTier)
+      ? (tier as NRHSTier)
+      : (TIER_ALIASES[String(tier).toLowerCase()] ?? 'risk');
+
+  const tierConfig = getNRHSTierConfig(canonicalTier) ?? {
+    label: '—',
+    color: 'text-muted-foreground',
+    bgColor: 'bg-muted',
+    borderColor: 'border-muted',
+  };
   const hasBlockers = blockers.length > 0;
 
   const sizeClasses = size === 'xs'
