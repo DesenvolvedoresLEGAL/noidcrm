@@ -8,9 +8,10 @@ import { useScoringRealtime } from '@/hooks/scoring/useScoringRealtime';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 
 export default function Scoring() {
-  const { organizationId } = useCurrentUser();
+  const { organization } = useCurrentUser();
   // Sprint Scoring 1.1 — keep dashboards in sync when scores recalc anywhere.
-  useScoringRealtime(organizationId);
+  useScoringRealtime(organization?.id ?? null);
+
 
   return (
     <Layout>
