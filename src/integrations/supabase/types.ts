@@ -10096,13 +10096,16 @@ export type Database = {
           created_at: string | null
           department: string | null
           email: string | null
+          email_normalized: string | null
           email_status: string | null
           first_name: string | null
           full_name: string | null
           id: string
+          is_merged: boolean
           is_primary: boolean | null
           last_name: string | null
           linkedin_url: string | null
+          merged_into: string | null
           phone: string | null
           prospect_id: string | null
           provider: string | null
@@ -10121,13 +10124,16 @@ export type Database = {
           created_at?: string | null
           department?: string | null
           email?: string | null
+          email_normalized?: string | null
           email_status?: string | null
           first_name?: string | null
           full_name?: string | null
           id?: string
+          is_merged?: boolean
           is_primary?: boolean | null
           last_name?: string | null
           linkedin_url?: string | null
+          merged_into?: string | null
           phone?: string | null
           prospect_id?: string | null
           provider?: string | null
@@ -10146,13 +10152,16 @@ export type Database = {
           created_at?: string | null
           department?: string | null
           email?: string | null
+          email_normalized?: string | null
           email_status?: string | null
           first_name?: string | null
           full_name?: string | null
           id?: string
+          is_merged?: boolean
           is_primary?: boolean | null
           last_name?: string | null
           linkedin_url?: string | null
+          merged_into?: string | null
           phone?: string | null
           prospect_id?: string | null
           provider?: string | null
@@ -10169,6 +10178,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "enriched_contact_profiles_merged_into_fkey"
+            columns: ["merged_into"]
+            isOneToOne: false
+            referencedRelation: "enriched_contact_profiles"
             referencedColumns: ["id"]
           },
           {
@@ -30049,6 +30065,10 @@ export type Database = {
         }
         Returns: Json
       }
+      dedupe_prospect_contacts: {
+        Args: { p_prospect_id: string }
+        Returns: number
+      }
       delete_contract: { Args: { contract_id: string }; Returns: boolean }
       delete_email: {
         Args: { message_id: number; queue_name: string }
@@ -30654,6 +30674,14 @@ export type Database = {
         }
       }
       reset_monthly_volts: { Args: never; Returns: undefined }
+      resolve_primary_contact: {
+        Args: { p_prospect_id: string }
+        Returns: string
+      }
+      resolve_primary_contact_manual: {
+        Args: { p_contact_id: string; p_prospect_id: string }
+        Returns: string
+      }
       restore_from_snapshot: {
         Args: { p_snapshot_id: string; p_user_id?: string }
         Returns: Json

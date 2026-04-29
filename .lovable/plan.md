@@ -1,126 +1,110 @@
-## Sprint E.1.1 — Apollo Control & Audit (Padrão NOID)
+## Sprint E.1.2 — Apollo Realtime & Contact Governance
 
-Adiciona governança, transparência e ROI ao enriquecimento Apollo: preview de custo antes de rodar, modal de confirmação, histórico auditável por prospect, relatório exportável de decisores e proteções contra abuso.
+Objetivo: contatos enriquecidos chegando em tempo real, sem duplicação, com 1 único decisor principal confiável e protegido contra race conditions.
 
-### 1. Banco de Dados (migration)
+---
 
-**ALTER `enrichment_jobs`** (campos de auditoria/controle):
-- `estimated_credits INT` — quanto foi previsto antes da chamada
-- `trigger_source TEXT` (`user` | `system` | `automation`)
-- `skip_reason TEXT` — motivo padronizado (`already_enriched`, `low_score`, `low_quality`, `dm_already_found`, `no_domain`, `rate_limited`, `daily_limit`)
-- `response_summary JSONB` — `{contacts_found, emails_found, phones_found, top_seniority}`
+### 1. Migration de schema (`enriched_contact_profiles`)
 
-**Índice**: `idx_enrichment_jobs_prospect_created (prospect_id, created_at DESC)`
+- Adicionar `email_normalized text` (gerado via trigger: `lower(trim(email))`).
+- Adicionar `is_merged boolean default false` (soft-merge, nunca delete físico).
+- Adicionar `merged_into uuid` referenciando o contato vencedor (auditoria).
+- Backfill: `update set email_normalized = lower(trim(email))` em todos existentes.
+- Substituir índice atual `uniq_ectp_prospect_email` por:
+  - `idx_unique_contact_email_org`: UNIQUE em `(workspace_id, email_normalized)` WHERE `email is not null AND is_merged = false`. Dedupe global por org.
+  - `idx_one_primary_contact`: UNIQUE em `(prospect_id)` WHERE `is_primary = true AND is_merged = false`. Garante 1 primary por prospect.
+- Trigger `trg_normalize_contact_email` BEFORE INSERT/UPDATE para preencher `email_normalized` automaticamente.
 
-**RLS**: já existe SELECT por organização — manter. Adicionar policy de INSERT/UPDATE só via service role (já é o padrão atual via edge function).
+### 2. RPC `resolve_primary_contact(p_prospect_id uuid)` (SECURITY DEFINER, search_path=public)
 
-### 2. Edge Functions
+Roda numa única transação para evitar race condition:
+1. Seleciona melhor contato não-merged ordenado por: `confidence_score DESC, seniority_rank DESC, created_at ASC`.
+2. `update ... set is_primary = false where prospect_id = p_prospect_id`.
+3. `update ... set is_primary = true where id = vencedor`.
+4. Retorna o ID do primary.
 
-**Nova: `preview-apollo-enrichment`**
-- Input: `{ prospect_id }`
-- Carrega prospect, último `enrichment_runs.quality_label`, `prospect_scores.priority_score`, último `enrichment_jobs` Apollo
-- Aplica os mesmos guards do `run-apollo-enrichment`
-- Retorna:
-  ```
-  {
-    eligible, reason,
-    estimated_credits: 2,
-    domain, company_name,
-    score, quality_label,
-    already_enriched, last_job_at,
-    warning  // ex.: "Prospect já possui contatos enriquecidos"
-  }
-  ```
-- Não consome crédito Apollo, não escreve nada (puro read).
+### 3. RPC `dedupe_prospect_contacts(p_prospect_id uuid)` (SECURITY DEFINER)
 
-**Atualizar: `run-apollo-enrichment`**
-- Aceita `trigger_source` no body (default `user`).
-- Substitui o `skip()` atual: passa a gravar `skip_reason` padronizado e `estimated_credits` no row.
-- Ao concluir, calcula e grava `response_summary`:
-  - `contacts_found`, `emails_found` (com email != null), `phones_found`, `top_seniority`
-- Anti-spam: bloqueia se houver job `done` ou `running` nas últimas **24h** para o mesmo prospect → skip `already_enriched`.
-- Rate-limit por workspace: rejeita se >20 jobs Apollo nos últimos 60s → skip `rate_limited`.
-- Emite eventos via `track-event` existente: `apollo_enrichment_started`, `apollo_enrichment_completed`, `decision_maker_found` (quando `decision_makers_found > 0`).
+1. Agrupa por `email_normalized` (não nulo).
+2. Para cada grupo com >1, mantém o de maior `confidence_score` e marca os outros com `is_merged = true, merged_into = vencedor.id`.
+3. Retorna contagem deduped.
+4. Insere `system_event` `lead.deduped` com `{ prospect_id, deduped_count }`.
 
-### 3. Frontend — Confirmação
+### 4. Edge function `run-apollo-enrichment` — pós-processamento
 
-**Novo: `src/components/playbook/enrichment/ApolloConfirmModal.tsx`** (usa `Dialog`)
-- Aberto pelo botão "Enriquecer (Apollo)" no `ProspectContactsTab`.
-- Chama `preview-apollo-enrichment` ao abrir, mostra:
-  - Empresa + domínio
-  - Score atual + quality label (badges)
-  - Status: **Elegível** / **Não elegível** (com `reason`)
-  - Estimativa: **2 créditos**
-  - Warning amarelo se `already_enriched`
-- Footer: `[Cancelar]` + `[Confirmar enriquecimento]` (disabled se `!eligible`).
-- Ao confirmar → chama `runApolloEnrichment(prospect_id)` (já existe).
+Após inserir os contatos, no lugar do bloco atual de "set primary manual":
+```ts
+await sb.rpc("dedupe_prospect_contacts", { p_prospect_id: prospect_id });
+await sb.rpc("resolve_primary_contact", { p_prospect_id: prospect_id });
+```
+Remover a lógica manual de `is_primary` que existe hoje (lines 289-294). Tratar conflito de UNIQUE no insert (`23505`) como contato já existente — não falhar o job, só pular.
 
-**Atualizar `ProspectContactsTab`**: trocar chamada direta por abrir `ApolloConfirmModal`.
+Eventos adicionais via `trackEvent`:
+- `lead.enriched` (já existe como `apollo_enrichment_completed`, manter).
+- `decision_maker_found` (já existe, manter).
+- `lead.deduped` se RPC retornar >0.
 
-### 4. Histórico no Drawer
+### 5. Hook `useRealtimeContacts` (global)
 
-**Nova aba "Histórico"** em `ProspectDetailDrawer` (entre Contatos e Enrichment).
+Novo hook em `src/hooks/useRealtimeContacts.ts` registrado no layout autenticado (uma única subscription por usuário, escopada por `organization_id` via filtro):
+- Escuta `INSERT` em `enriched_contact_profiles` da org → toast `🎯 Novo decisor encontrado: <nome> · <cargo>`.
+- Escuta `UPDATE` quando `is_primary` muda para `true` → toast `🔄 Decisor principal atualizado`.
+- Escuta `UPDATE` quando `is_merged` vira `true` → silencioso (só invalida query).
 
-**Novo: `src/components/playbook/enrichment/EnrichmentJobsTable.tsx`**
-- Hook `useEnrichmentJobs(prospectId)` — query em `enrichment_jobs` por `prospect_id`, order desc.
-- Tabela (`Table` shadcn):
-  - Data | Provider | Status (badge colorido) | Créditos | Origem (`trigger_source`) | Motivo skip | Resultado (resumo)
-- Linha expansível mostrando `response_summary` formatado + `request`/`response` JSON colapsado.
+`useEnrichedContacts(prospectId)` permanece com a subscription local (granular do drawer), mas filtra `is_merged = false` na listagem.
 
-### 5. Relatório `/reports` — "Decisores Enriquecidos"
+### 6. Frontend: `ProspectContactsTab`
 
-**Novo wrapper**: `src/components/reports/wrappers/EnrichedDecisionMakersWrapper.tsx`
+- Listagem filtra `is_merged = false`.
+- Card do primary recebe badge dourado `⭐ Decisor Principal`.
+- Botão `Marcar como principal` chama nova função `setPrimaryContact` que faz `supabase.rpc('resolve_primary_contact_manual', { p_prospect_id, p_contact_id })` — RPC similar mas força um ID específico (override manual).
+- Novo grupo "Duplicados resolvidos" expansível embaixo (collapse), mostrando contatos com `is_merged=true` somente para admins, com link "ver original".
 
-**Adicionar em `ReportTabs`** novo item: `enriched-decision-makers` (label "Decisores Enriquecidos", ícone `Users`).
+### 7. Quality Panel (header da aba Contatos)
 
-**Adicionar em `Reports.tsx`** novo case no `renderReport`.
+Cards compactos mostrando:
+- Total de contatos ativos
+- Decisores encontrados (c_level + vp + director)
+- Emails válidos (`email_status = verified`)
+- Score médio
+- Duplicados resolvidos (count `is_merged=true`)
 
-**Conteúdo**:
-- KPIs no topo: total de prospects enriquecidos, taxa de decisor encontrado, score médio, créditos consumidos no período.
-- Tabela de contatos (`enriched_contact_profiles` join `prospects`):
-  - company_name, domain, decision_maker_name, role, seniority, email, email_status, phone, linkedin, contact_score, provider, enriched_at
-- Filtros locais: período (usa filtros globais de Reports), score mínimo, provider, status.
-- Botão **Exportar CSV** (helper local `exportToCSV`).
+Dados derivados client-side a partir do array já carregado.
 
-### 6. Proteções
+### 8. Tipos / serviços
 
-- Anti-spam (24h) — server-side em `run-apollo-enrichment`.
-- Rate-limit workspace (20/min) — server-side.
-- UI: botão "Confirmar" do modal vira loading + disabled enquanto a mutation roda.
-- Hook `useEnrichedContacts.enrich` continua invalidando contatos; adicionar invalidação de `enrichment_jobs` query.
+- Atualizar `apolloService.setPrimaryContact` para usar RPC `resolve_primary_contact_manual` ao invés do double-update atual (que tem race condition).
+- Adicionar `listEnrichedContacts` filtrando `is_merged = false`.
 
-### Critérios de aceite
+---
 
-- Usuário vê custo estimado antes de rodar Apollo.
-- Segunda chamada em 24h vira `skipped` com `skip_reason=already_enriched`.
-- Aba Histórico lista todos os jobs com motivo claro.
-- Relatório `/reports → Decisores Enriquecidos` exporta CSV com colunas pedidas.
-- Eventos `apollo_enrichment_*` aparecem em `system_events`.
+### Arquivos impactados
 
-### Detalhes técnicos
+**Novos:**
+- `supabase/migrations/<ts>_apollo_dedupe_governance.sql` (schema + RPCs + trigger)
+- `src/hooks/useRealtimeContacts.ts` (listener global)
+- `src/components/playbook/enrichment/ContactsQualityPanel.tsx`
+- `src/components/playbook/enrichment/MergedContactsAccordion.tsx`
 
-**Arquivos novos**:
-- `supabase/migrations/<ts>_apollo_audit_controls.sql`
-- `supabase/functions/preview-apollo-enrichment/index.ts`
-- `src/components/playbook/enrichment/ApolloConfirmModal.tsx`
-- `src/components/playbook/enrichment/EnrichmentJobsTable.tsx`
-- `src/hooks/useEnrichmentJobs.ts`
-- `src/services/enrichment/apolloPreview.ts`
-- `src/components/reports/wrappers/EnrichedDecisionMakersWrapper.tsx`
-- `src/hooks/reports/useEnrichedDecisionMakersReport.ts`
+**Editados:**
+- `supabase/functions/run-apollo-enrichment/index.ts` (chamar RPCs, remover lógica manual de primary)
+- `src/services/enrichment/apolloService.ts` (RPC para setPrimary, filtro is_merged)
+- `src/hooks/useEnrichedContacts.ts` (filtro is_merged na query)
+- `src/components/playbook/ProspectContactsTab.tsx` (quality panel + accordion duplicados)
+- `src/App.tsx` ou layout autenticado (montar `useRealtimeContacts()` uma vez)
+- `src/integrations/supabase/types.ts` (regenerado automaticamente)
 
-**Arquivos editados**:
-- `supabase/functions/run-apollo-enrichment/index.ts` — skip_reason, response_summary, anti-spam 24h, rate-limit, track-event, trigger_source.
-- `src/components/playbook/ProspectContactsTab.tsx` — abre modal em vez de chamar direto.
-- `src/components/playbook/ProspectDetailDrawer.tsx` — nova aba "Histórico".
-- `src/components/reports/ReportTabs.tsx` — novo tab.
-- `src/pages/Reports.tsx` — novo case.
-- `src/services/enrichment/apolloService.ts` — passa `trigger_source: 'user'`.
+### Riscos e mitigações
 
-**Memória a atualizar** (`mem://architectural-decision/intelligence/apollo-decision-maker-enrichment`): registrar guards de 24h, rate-limit 20/min, modal de confirmação e histórico auditável.
+- **Conflito no UNIQUE global por org**: contato com mesmo email em prospects diferentes hoje seria duplicado. Mitigação: o índice é `WHERE is_merged = false` — se houver colisão real no backfill, deduplicamos antes de criar o índice (CTE no migration mantendo o mais recente).
+- **Race condition**: resolvido via RPC SECURITY DEFINER em transação única.
+- **Realtime spam**: filtro por `organization_id` no channel + dedupe via toast id evita N toasts simultâneos.
+- **Override manual sumindo**: campo opcional `is_primary_locked boolean` (futuro) — fora do escopo desta sprint, mas RPC já recebe `p_force` para não sobrescrever quando flag estiver presente.
 
-### Riscos
+### Critério de sucesso
 
-- Migration `ALTER TABLE` em prod: campos nullable, sem default destrutivo — seguro.
-- Rate-limit por workspace é janela móvel via query — adequado para volume baixo atual; se crescer, mover para Redis/edge cache.
-- Eventos `track-event` dependem da função existente; verificar payload aceito antes de enviar.
+- Nenhum contato duplicado visível na UI (filtro `is_merged=false`).
+- Sempre exatamente 1 `is_primary=true` por prospect (garantido por índice UNIQUE).
+- Toast aparece <2s após Apollo retornar.
+- Re-rodar enrichment não cria duplicatas (UNIQUE + dedupe RPC).
+- User pode trocar primary e mudança persiste.
