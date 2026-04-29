@@ -72,7 +72,11 @@ export function CloserDashboardFeedbackCard({ tenantId }: Props) {
         isSlow,
         missingInfo: missingInfo.trim() || null,
         comment: comment.trim() || null,
-        metadata: { sprint: '6.6', source: 'runtime' },
+        metadata: {
+          sprint: '6.7',
+          source: 'runtime',
+          missing_categories: missingCategories,
+        },
       },
       {
         onError: (e: any) => {
