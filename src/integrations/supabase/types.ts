@@ -1159,6 +1159,54 @@ export type Database = {
         }
         Relationships: []
       }
+      agent_guardrails: {
+        Row: {
+          allow_auto_apply: boolean
+          allowed_hypothesis_types: string[]
+          created_at: string
+          experiments_enabled: boolean
+          id: string
+          max_experiments_per_day: number
+          max_variants_per_test: number
+          min_lift_to_promote: number
+          min_sample_size: number
+          organization_id: string
+          require_approval: boolean
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          allow_auto_apply?: boolean
+          allowed_hypothesis_types?: string[]
+          created_at?: string
+          experiments_enabled?: boolean
+          id?: string
+          max_experiments_per_day?: number
+          max_variants_per_test?: number
+          min_lift_to_promote?: number
+          min_sample_size?: number
+          organization_id: string
+          require_approval?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          allow_auto_apply?: boolean
+          allowed_hypothesis_types?: string[]
+          created_at?: string
+          experiments_enabled?: boolean
+          id?: string
+          max_experiments_per_day?: number
+          max_variants_per_test?: number
+          min_lift_to_promote?: number
+          min_sample_size?: number
+          organization_id?: string
+          require_approval?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       ai_actions: {
         Row: {
           action_type: string
@@ -10633,6 +10681,256 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
+          },
+        ]
+      }
+      experiment_hypotheses: {
+        Row: {
+          completed_at: string | null
+          confidence_score: number
+          created_at: string
+          created_by: string
+          deleted_at: string | null
+          description: string
+          hypothesis_type: string
+          id: string
+          organization_id: string
+          promoted_at: string | null
+          rejection_reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          source_insight_id: string | null
+          started_at: string | null
+          status: string
+          target_entity: string
+          target_id: string | null
+          updated_at: string
+          winner_variant_id: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          confidence_score?: number
+          created_at?: string
+          created_by?: string
+          deleted_at?: string | null
+          description: string
+          hypothesis_type: string
+          id?: string
+          organization_id: string
+          promoted_at?: string | null
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source_insight_id?: string | null
+          started_at?: string | null
+          status?: string
+          target_entity: string
+          target_id?: string | null
+          updated_at?: string
+          winner_variant_id?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          confidence_score?: number
+          created_at?: string
+          created_by?: string
+          deleted_at?: string | null
+          description?: string
+          hypothesis_type?: string
+          id?: string
+          organization_id?: string
+          promoted_at?: string | null
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source_insight_id?: string | null
+          started_at?: string | null
+          status?: string
+          target_entity?: string
+          target_id?: string | null
+          updated_at?: string
+          winner_variant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "experiment_hypotheses_source_insight_id_fkey"
+            columns: ["source_insight_id"]
+            isOneToOne: false
+            referencedRelation: "optimization_insights"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      experiment_results: {
+        Row: {
+          computed_at: string
+          hypothesis_id: string
+          id: string
+          meeting_rate: number
+          meetings: number
+          organization_id: string
+          replies: number
+          reply_rate: number
+          sample_size: number
+          score: number
+          sent: number
+          statistical_confidence: number
+          variant_id: string
+          win_rate: number
+          wins: number
+        }
+        Insert: {
+          computed_at?: string
+          hypothesis_id: string
+          id?: string
+          meeting_rate?: number
+          meetings?: number
+          organization_id: string
+          replies?: number
+          reply_rate?: number
+          sample_size?: number
+          score?: number
+          sent?: number
+          statistical_confidence?: number
+          variant_id: string
+          win_rate?: number
+          wins?: number
+        }
+        Update: {
+          computed_at?: string
+          hypothesis_id?: string
+          id?: string
+          meeting_rate?: number
+          meetings?: number
+          organization_id?: string
+          replies?: number
+          reply_rate?: number
+          sample_size?: number
+          score?: number
+          sent?: number
+          statistical_confidence?: number
+          variant_id?: string
+          win_rate?: number
+          wins?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "experiment_results_hypothesis_id_fkey"
+            columns: ["hypothesis_id"]
+            isOneToOne: false
+            referencedRelation: "experiment_hypotheses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "experiment_results_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "experiment_variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      experiment_runs: {
+        Row: {
+          assigned_at: string
+          contact_id: string | null
+          created_at: string
+          hypothesis_id: string
+          id: string
+          opportunity_id: string | null
+          organization_id: string
+          prospect_id: string | null
+          result: string
+          result_at: string | null
+          result_event: string | null
+          sent_at: string | null
+          variant_id: string
+        }
+        Insert: {
+          assigned_at?: string
+          contact_id?: string | null
+          created_at?: string
+          hypothesis_id: string
+          id?: string
+          opportunity_id?: string | null
+          organization_id: string
+          prospect_id?: string | null
+          result?: string
+          result_at?: string | null
+          result_event?: string | null
+          sent_at?: string | null
+          variant_id: string
+        }
+        Update: {
+          assigned_at?: string
+          contact_id?: string | null
+          created_at?: string
+          hypothesis_id?: string
+          id?: string
+          opportunity_id?: string | null
+          organization_id?: string
+          prospect_id?: string | null
+          result?: string
+          result_at?: string | null
+          result_event?: string | null
+          sent_at?: string | null
+          variant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "experiment_runs_hypothesis_id_fkey"
+            columns: ["hypothesis_id"]
+            isOneToOne: false
+            referencedRelation: "experiment_hypotheses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "experiment_runs_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "experiment_variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      experiment_variants: {
+        Row: {
+          allocation_percentage: number
+          content: Json
+          created_at: string
+          hypothesis_id: string
+          id: string
+          is_control: boolean
+          organization_id: string
+          variant_label: string
+        }
+        Insert: {
+          allocation_percentage?: number
+          content?: Json
+          created_at?: string
+          hypothesis_id: string
+          id?: string
+          is_control?: boolean
+          organization_id: string
+          variant_label: string
+        }
+        Update: {
+          allocation_percentage?: number
+          content?: Json
+          created_at?: string
+          hypothesis_id?: string
+          id?: string
+          is_control?: boolean
+          organization_id?: string
+          variant_label?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "experiment_variants_hypothesis_id_fkey"
+            columns: ["hypothesis_id"]
+            isOneToOne: false
+            referencedRelation: "experiment_hypotheses"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -29366,6 +29664,37 @@ export type Database = {
         Returns: boolean
       }
       admin_delete_organization: { Args: { org_id: string }; Returns: boolean }
+      approve_hypothesis: {
+        Args: { _hypothesis_id: string }
+        Returns: {
+          completed_at: string | null
+          confidence_score: number
+          created_at: string
+          created_by: string
+          deleted_at: string | null
+          description: string
+          hypothesis_type: string
+          id: string
+          organization_id: string
+          promoted_at: string | null
+          rejection_reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          source_insight_id: string | null
+          started_at: string | null
+          status: string
+          target_entity: string
+          target_id: string | null
+          updated_at: string
+          winner_variant_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "experiment_hypotheses"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       block_expired_trial: { Args: { org_id: string }; Returns: boolean }
       build_knowledge_graph: {
         Args: { p_build_type?: string; p_organization_id: string }
@@ -29844,6 +30173,30 @@ export type Database = {
           rolled_back_last_7d: number
         }[]
       }
+      get_or_create_agent_guardrails: {
+        Args: { _org_id: string }
+        Returns: {
+          allow_auto_apply: boolean
+          allowed_hypothesis_types: string[]
+          created_at: string
+          experiments_enabled: boolean
+          id: string
+          max_experiments_per_day: number
+          max_variants_per_test: number
+          min_lift_to_promote: number
+          min_sample_size: number
+          organization_id: string
+          require_approval: boolean
+          updated_at: string
+          updated_by: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "agent_guardrails"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       get_org_seat_metrics: { Args: { org_id: string }; Returns: Json }
       get_platform_admin_role: {
         Args: { _user_id?: string }
@@ -30159,6 +30512,37 @@ export type Database = {
           p_user_id?: string
         }
         Returns: string
+      }
+      reject_hypothesis: {
+        Args: { _hypothesis_id: string; _reason?: string }
+        Returns: {
+          completed_at: string | null
+          confidence_score: number
+          created_at: string
+          created_by: string
+          deleted_at: string | null
+          description: string
+          hypothesis_type: string
+          id: string
+          organization_id: string
+          promoted_at: string | null
+          rejection_reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          source_insight_id: string | null
+          started_at: string | null
+          status: string
+          target_entity: string
+          target_id: string | null
+          updated_at: string
+          winner_variant_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "experiment_hypotheses"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       reset_monthly_volts: { Args: never; Returns: undefined }
       restore_from_snapshot: {

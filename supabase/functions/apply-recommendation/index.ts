@@ -81,6 +81,23 @@ Deno.serve(async (req) => {
 
     try {
       const payload = (rec.action_payload ?? {}) as any;
+
+      // Sprint E — Route experiment-driven promotions to the dedicated function.
+      if (payload?.promote_via === "promote-winning-variant" && payload?.hypothesis_id) {
+        const resp = await fetch(`${SUPABASE_URL}/functions/v1/promote-winning-variant`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_KEY}` },
+          body: JSON.stringify({
+            hypothesis_id: payload.hypothesis_id,
+            recommendation_id: rec.id,
+            executed_by: userId,
+          }),
+        });
+        const text = await resp.text();
+        let parsed: any = null; try { parsed = JSON.parse(text); } catch (_) {}
+        if (!resp.ok || !parsed?.ok) throw new Error(parsed?.error || `promote failed (${resp.status})`);
+        result = { promoted: true, hypothesis_id: payload.hypothesis_id, applied: parsed.applied };
+      } else {
       switch (rec.recommendation_type) {
         case "score_adjustment": {
           const { signal_type, signal_value, adjustment } = payload;
@@ -130,6 +147,7 @@ Deno.serve(async (req) => {
         default:
           throw new Error(`Unsupported recommendation_type: ${rec.recommendation_type}`);
       }
+      } // end else (non-experiment branch)
     } catch (e) {
       success = false;
       errorMessage = e instanceof Error ? e.message : "Unknown error";

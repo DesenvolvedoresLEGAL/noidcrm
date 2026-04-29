@@ -1,84 +1,103 @@
-# Fix: Email Agent — "Aprovar e enviar" retornando 502
+# Sprint E — Agent-Driven Experimentation (Kairós)
 
-## Diagnóstico forense
+Loop fechado: insights → hipóteses → variantes → distribuição → resultados → vencedor → (opcional) promoção. Tudo dentro de guardrails, com aprovação humana por padrão.
 
-Quando você clicou em **Aprovar e enviar**, o edge function `approve-email-agent-action` chamou o dispatcher e o SMTP retornou:
+## Aderência ao padrão NOID
 
-```
-[smtp_send_failed] Falha SMTP: No valid emails provided!
-```
+- Multi-tenant via `**organization_id**` (memória obrigatória — nunca `workspace_id`/`tenant_id`).
+- RLS em todas as tabelas (read = membros da org, write = service role / RPC).
+- Edge functions seguem o padrão existente (`compute-optimization-insights`, `apply-recommendation`, `run-optimization-cycle`).
+- Soft-delete (`deleted_at`) e `created_by` em registros de hipótese/variante.
+- Reuso da infra de Optimization: hipóteses são geradas a partir de `optimization_insights`; promoção emite `optimization_recommendations` (`recommendation_type='template_change'` etc.) — **não cria caminho paralelo**.
 
-Investigando o registro `ai_email_messages.id = 905fa24a-…`, descobri que `recipient_email` foi salvo como **objeto JSON do contato**, não como string de e-mail:
+## 1. Banco de dados (1 migration)
 
-```json
-{"type":"personal","value":"j.brene@hotmail.com","is_primary":false}
-```
+Tabelas novas — **todas com `organization_id` + RLS**:
 
-### Causa raiz
+- `**experiment_hypotheses**` — `id, organization_id, hypothesis_type ('template'|'channel'|'timing'|'icp'), target_entity, target_id, description, source_insight_id (FK optimization_insights), created_by ('system'|user_id), confidence_score, status ('pending'|'approved'|'running'|'completed'|'rejected'|'promoted'), winner_variant_id, started_at, completed_at, created_at, deleted_at`
+- `**experiment_variants**` — `id, organization_id, hypothesis_id, variant_label ('A'|'B'|'C'), is_control bool, content jsonb, allocation_percentage int, created_at`
+- `**experiment_runs**` — `id, organization_id, hypothesis_id, variant_id, prospect_id, opportunity_id, contact_id, assigned_at, sent_at, result ('success'|'fail'|'neutral'|'pending'), result_event ('reply'|'meeting'|'win'|'no_response'), created_at`. Índices: `(hypothesis_id, variant_id)`, `(opportunity_id)`.
+- `**experiment_results**` — agregado materializado por variante: `sent, replies, meetings, wins, reply_rate, meeting_rate, win_rate, score, sample_size, statistical_confidence`. Recalculado pela função `evaluate-experiment`.
+- `**agent_guardrails**` — 1 linha por org: `max_experiments_per_day (5), max_variants_per_test (3), min_sample_size (20), min_lift_to_promote (0.10), allow_auto_apply (false), require_approval (true), allowed_hypothesis_types text[], updated_by, updated_at`. RPC `get_or_create_agent_guardrails(org)` para auto-bootstrap.
 
-Em `supabase/functions/execute-email-agent-run/index.ts` (linha 175):
+RLS: `SELECT` para membros da org via `has_org_access(auth.uid(), organization_id)` (helper já existente no projeto). `INSERT/UPDATE` apenas via service role nas edge functions, **exceto** `agent_guardrails` (admin pode editar) e `experiment_hypotheses.status` em `approved/rejected` (RPC `approve_hypothesis(id)` / `reject_hypothesis(id, reason)` validando role admin/manager).
 
-```ts
-const contactEmail = context.contact?.emails?.[0] || context.contact?.email;
-```
+## 2. Edge functions (6 novas + 1 ajuste)
 
-Para contatos no formato estruturado novo (`emails` como array de objetos `{type, value, is_primary}`), `emails?.[0]` devolve o objeto inteiro — que é gravado como string JSON na coluna `recipient_email`. O SMTP recebe isso e rejeita.
+Todas: CORS padrão, service role client, validação Zod-like simples, log estruturado, idempotência onde fizer sentido.
 
-Contatos no formato legado (string simples) continuam funcionando — por isso outros agentes funcionaram normalmente.
+1. `**generate-experiment-hypothesis**`
+  - Lê `optimization_insights` recentes (status sem hipótese ligada) + `learning_signals` agregados.
+  - Aplica heurística: insight de baixa reply rate em template → hipótese `template`; baixa meeting rate em canal → `channel`; padrão de horário ruim → `timing`; ICP underperforming → `icp`.
+  - Valida guardrails (`max_experiments_per_day`).
+  - Insere `experiment_hypotheses` com `status='pending'`, `created_by='system'`, `source_insight_id`.
+2. `**generate-variants**` (chamada após `approve_hypothesis`)
+  - Usa API da **OPEN AI** via tool calling para gerar N variantes (≤ `max_variants_per_test`) baseadas no template/canal/timing alvo + contexto da org (ICP, segmentos top).
+  - Inclui sempre 1 variante `is_control=true` clonando o conteúdo atual.
+  - Distribui `allocation_percentage` igualmente.
+  - Move hipótese para `status='running'`.
+3. `**assign-variant**`
+  - Invocada quando o agente de outreach (Email Agent / WhatsApp / cadência) vai disparar para um lead em segmento elegível.
+  - Verifica hipóteses `running` cobrindo aquele `target_entity` + ICP do lead.
+  - Hash determinístico `(opportunity_id, hypothesis_id) % 100` → bucket por `allocation_percentage` (estável em retries).
+  - Cria `experiment_runs` com `assigned_at`. Retorna `variant.content` para o caller substituir o template.
+  - Idempotente por `(hypothesis_id, opportunity_id)`.
+4. `**track-experiment-result**` (trigger DB + endpoint)
+  - Trigger AFTER INSERT em `lifecycle_events`/`activities`/`opportunities` (won/lost) → fila `pg_net` para esta função.
+  - Função casa `opportunity_id` com `experiment_runs` abertos e atualiza `result` + `result_event`.
+5. `**evaluate-experiment**` (chamada pelo orchestrator)
+  - Para cada hipótese `running`: recalcula `experiment_results` por variante.
+  - Se `min(sample_size_por_variante) >= guardrail.min_sample_size`: calcula `score = win_rate * 0.6 + meeting_rate * 0.3 + reply_rate * 0.1`, escolhe winner se lift sobre control ≥ `min_lift_to_promote`. Marca `status='completed'` + `winner_variant_id`.
+  - Cria `optimization_recommendations` (`recommendation_type='template_change'` etc., `action_payload={hypothesis_id, winner_variant_id, target}`) — entra no fluxo já existente de aprovação/auto-apply.
+6. `**promote-winning-variant**`
+  - Chamada por `apply-recommendation` quando a recomendação tem origem em experimento.
+  - Aplica conteúdo da variante vencedora ao `target_entity` (ex.: `email_templates.body`), versionando o anterior em `optimization_actions_log` para rollback. Marca hipótese `status='promoted'`.
+7. **Ajuste em `run-optimization-cycle**`: após `compute-optimization-insights` e `generate-recommendations`, encadear `generate-experiment-hypothesis` → `evaluate-experiment`. Auto-apply continua respeitando `agent_guardrails.allow_auto_apply` (OFF por padrão).
 
-## Correção (mínima, defensiva, sem quebrar o resto do Email Agent)
+## 3. Frontend — nova aba "Experiments" no Kairós
 
-### 1. Helper de normalização (novo)
+Reusa padrões de `optimization/`:
 
-`supabase/functions/_shared/normalize-recipient-email.ts`
+- `src/pages/intelligence/ExperimentsHub.tsx` (rota `/intelligence/experiments`, item no `AppSidebar` sob Kairós).
+- `src/components/intelligence/experiments/`:
+  - `ExperimentsFeed.tsx` — lista hipóteses com status, tipo, score, sample size, badges.
+  - `HypothesisDetailDrawer.tsx` — variantes lado a lado, métricas (reply/meeting/win), gráfico de evolução, botões **Aprovar / Rejeitar** (chamam RPCs).
+  - `VariantViewer.tsx` — diff visual de mensagens A/B/C, badge `Control` e `🏆 Winner`.
+  - `GuardrailsCard.tsx` — edita `agent_guardrails` (admin only). Toggle `allow_auto_apply` com confirm modal duplo (memory: padrão NOID).
+  - `ExperimentImpactSummary.tsx` — KPIs: hipóteses ativas, lift médio, promoções últimos 7d.
+- Hooks em `src/hooks/experiments/` (`useHypotheses`, `useApproveHypothesis`, `useGuardrails`) com React Query + invalidations + realtime no canal `experiment_hypotheses` (memory: arquitetura de reatividade).
+- No editor de template (`email_templates`), badge: **"Versão promovida automaticamente em DD/MM via experimento #123"** com link para o drawer.
 
-Função `normalizeRecipientEmail(input)`:
-- Aceita string, objeto `{value}`, ou string JSON contendo qualquer um dos dois (defensivo contra dados antigos)
-- Prefere o objeto com `is_primary: true` se receber um array
-- Valida regex de e-mail; retorna `null` se inválido
+## 4. Guardrails (críticos — não-negociáveis)
 
-### 2. `execute-email-agent-run/index.ts` — corrigir na origem
+- `allow_auto_apply = false` por padrão.
+- `require_approval = true` ⇒ `generate-variants` não roda enquanto hipótese estiver `pending`.
+- Hard cap `max_experiments_per_day` checado em `generate-experiment-hypothesis`.
+- `evaluate-experiment` **nunca** decide com `sample_size < min_sample_size`.
+- Promoção bloqueada se `lift < min_lift_to_promote` (default 10%).
+- Toda promoção registra estado anterior em `optimization_actions_log` → rollback via função `rollback-recommendation` já existente.
+- Logs estruturados em `system_events` (memory: comprehensive audit infrastructure).
 
-Substituir linha 175 para usar o helper:
-```ts
-const contactEmail = normalizeRecipientEmail(
-  context.contact?.emails ?? context.contact?.email
-);
-```
-Mantém comportamento atual quando já é string; corrige quando é objeto/array.
+## 5. Riscos & mitigações
 
-### 3. `approve-email-agent-action/index.ts` — defesa em profundidade
+- **Sobreposição de experimentos no mesmo template**: `generate-experiment-hypothesis` checa unicidade `(target_entity, target_id, status='running')`.
+- **Viés de alocação em retries**: hash determinístico em `assign-variant` evita realocação.
+- **Quebra de Email Agent atual**: `assign-variant` é opt-in — o caller decide chamar. Sem chamada → comportamento idêntico ao de hoje. Integração inicial será apenas no `execute-email-agent-run` atrás de feature flag por org (`agent_guardrails.experiments_enabled`).
+- **Custo de IA em `generate-variants**`: limitado por `max_variants_per_test` e só roda após aprovação humana (auto-mode OFF).
 
-Antes de chamar `dispatchAgentEmail`, normalizar `emailMsg.recipient_email`:
-```ts
-const normalizedRecipient = normalizeRecipientEmail(emailMsg.recipient_email);
-if (!normalizedRecipient) {
-  // marca falha com código claro, retorna 502 estruturado (UI já trata)
-  ...errorCode: "invalid_recipient"
-}
-```
-Isso garante que **nenhum e-mail antigo na fila** quebre na aprovação — ele será normalizado on-the-fly. Também grava de volta o valor corrigido em `ai_email_messages.recipient_email` para os próximos retries.
+## 6. Entregáveis
 
-### 4. Healing do registro travado
+- 1 migration (5 tabelas + RLS + RPCs `approve_hypothesis`, `reject_hypothesis`, `get_or_create_agent_guardrails`, trigger em `lifecycle_events`).
+- 6 edge functions novas + ajuste em `run-optimization-cycle`.
+- 1 página + 5 componentes + 3 hooks no frontend.
+- Item de menu sob Kairós; entrada de memory documentando o padrão de experimentação.
 
-Atualizar via SQL o `ai_email_messages.id = 905fa24a-…` (e qualquer outro com `recipient_email` em formato JSON) para o e-mail extraído (`j.brene@hotmail.com`), e resetar o item da fila `ai_agent_approval_queue` correspondente de `send_failed` → `pending` para você poder reaprovar imediatamente.
+## 7. Critério de sucesso (validação manual após deploy)
 
-## Arquivos alterados
-
-- **novo** `supabase/functions/_shared/normalize-recipient-email.ts`
-- `supabase/functions/execute-email-agent-run/index.ts` (1 linha — uso do helper)
-- `supabase/functions/approve-email-agent-action/index.ts` (validação + persistência do valor normalizado antes do dispatch)
-- migration SQL para curar registros existentes em formato JSON
-
-## Riscos
-
-- **Baixo.** Helper é puro, idempotente, e mantém 100% compatibilidade com strings já válidas.
-- A normalização no `approve` roda **antes** de qualquer mudança de estado de envio, então e-mails que já funcionavam continuam funcionando exatamente igual.
-- Não toco em nenhum outro caminho do Email Agent (rejeição, retry, auto-send, dashboards, atribuição).
-
-## Próximos passos pós-aprovação
-
-1. Implementar os 3 arquivos
-2. Deploy das 2 edge functions
-3. Rodar migration de healing
-4. Validar reaprovando o e-mail travado da Spot Mediatech
+1. Insight existente gera hipótese `pending` automaticamente no próximo ciclo.
+2. Admin aprova → variantes A/B/C aparecem em ≤ 30s.
+3. Próximos envios do Email Agent (na org, dentro do segmento alvo) entram em `experiment_runs` distribuídos ~igualmente.
+4. Replies/meetings/wins atualizam `experiment_results` em tempo real.
+5. Atingido `min_sample_size`, vencedor é marcado e recomendação aparece em `OptimizationHub`.
+6. Com `allow_auto_apply=false`, nada muda no template até admin aplicar a recomendação.
+7. Com `allow_auto_apply=true` + lift ≥ 10%, template é trocado e badge aparece no editor; rollback funciona.

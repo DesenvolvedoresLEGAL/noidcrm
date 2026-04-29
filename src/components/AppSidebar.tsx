@@ -74,6 +74,7 @@ const ALL_MENU_ITEMS: MenuItem[] = [
   { path: '/app/insights', label: 'Insights', icon: Lightbulb, section: 'inteligencia' },
   { path: '/app/intelligence/kairos', label: 'Kairós', icon: Compass, section: 'inteligencia' },
   { path: '/app/intelligence/optimization', label: 'Optimization', icon: Zap, section: 'inteligencia' },
+  { path: '/app/intelligence/experiments', label: 'Experiments', icon: Sparkles, section: 'inteligencia' },
   { path: '/app/intelligence/graph', label: 'Knowledge Graph', icon: Network, section: 'inteligencia' },
   { path: '/app/intelligence/memories', label: 'Memórias', icon: Brain, section: 'inteligencia' },
   { path: '/app/intelligence/playbooks', label: 'Playbooks', icon: BookOpen, section: 'inteligencia' },
