@@ -2,12 +2,15 @@ import { Target, RefreshCw, Sparkles, Brain } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { recalculateAllScores } from '@/services/crm/scoring';
 import { useOpportunityScoreAnalytics } from '@/hooks/useOpportunityScoreAnalytics';
 import { opportunityKeys } from '@/lib/query-keys';
+import { PipelineScopeFilter } from '@/components/scoring/PipelineScopeFilter';
 import { OpportunityScoreKPIs } from './OpportunityScoreKPIs';
 import { OpportunityScoreDistribution } from './OpportunityScoreDistribution';
 import { OpportunityWinPredictions } from './OpportunityWinPredictions';
@@ -64,14 +67,14 @@ export function OpportunityScoreDashboard() {
                   </Badge>
                 </h2>
                 <p className="text-muted-foreground">
-                  Probabilidade de fechamento com machine learning preditivo
+                  Estimativa inteligente baseada em score, NRHS e sinais comerciais
                 </p>
               </div>
             </div>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={() => recalculateMutation.mutate()}
                   disabled={recalculateMutation.isPending}
                   className="bg-background/50 backdrop-blur-sm"
@@ -85,6 +88,45 @@ export function OpportunityScoreDashboard() {
               </TooltipContent>
             </Tooltip>
           </div>
+        </div>
+
+        {/* Sprint 1.3 — Pipeline + visibility filters */}
+        <div className="flex flex-wrap items-center gap-4 rounded-lg border bg-card/50 p-3">
+          <div className="flex items-center gap-2">
+            <Label className="text-xs uppercase text-muted-foreground">Pipeline</Label>
+            <PipelineScopeFilter
+              value={filters.pipelineId ?? null}
+              onChange={(v) => setFilters((p) => ({ ...p, pipelineId: v }))}
+              className="w-[220px]"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <Switch
+              id="show-won"
+              checked={!!filters.showWon}
+              onCheckedChange={(v) => setFilters((p) => ({ ...p, showWon: v }))}
+            />
+            <Label htmlFor="show-won" className="text-xs">Mostrar ganhas</Label>
+          </div>
+          <div className="flex items-center gap-2">
+            <Switch
+              id="show-lost"
+              checked={!!filters.showLost}
+              onCheckedChange={(v) => setFilters((p) => ({ ...p, showLost: v }))}
+            />
+            <Label htmlFor="show-lost" className="text-xs">Mostrar perdidas</Label>
+          </div>
+          <div className="flex items-center gap-2">
+            <Switch
+              id="show-op"
+              checked={!!filters.showOperational}
+              onCheckedChange={(v) => setFilters((p) => ({ ...p, showOperational: v }))}
+            />
+            <Label htmlFor="show-op" className="text-xs">Mostrar operacionais</Label>
+          </div>
+          <p className="ml-auto text-xs text-muted-foreground">
+            Padrão: Vendas · oportunidades abertas
+          </p>
         </div>
 
         {/* KPIs */}
