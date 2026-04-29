@@ -193,6 +193,10 @@ export function ProspectContactsTab({
           )}
         </Card>
       ))}
+
+      {!isLoading && mergedContacts.length > 0 && (
+        <MergedContactsAccordion prospectId={prospectId} />
+      )}
     </div>
   );
 }
