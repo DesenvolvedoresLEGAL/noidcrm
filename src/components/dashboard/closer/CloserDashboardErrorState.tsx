@@ -5,7 +5,7 @@ export function CloserDashboardErrorState({ message }: { message?: string }) {
   return (
     <Alert variant="destructive">
       <AlertTriangle className="h-4 w-4" />
-      <AlertTitle>Não foi possível carregar o Dashboard Closer</AlertTitle>
+      <AlertTitle>Não foi possível carregar o Dashboard Comercial</AlertTitle>
       <AlertDescription>
         O dashboard atual do CRM permanece seguro. {message ? `Detalhe: ${message}` : ''}
       </AlertDescription>

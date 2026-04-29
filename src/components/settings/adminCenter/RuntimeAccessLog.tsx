@@ -43,7 +43,7 @@ export function RuntimeAccessLog({ tenantId }: Props) {
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <Activity className="h-4 w-4" />
-          Runtime do Dashboard Closer
+          Runtime do Dashboard Comercial
         </CardTitle>
         <CardDescription>
           Eventos de substituição automática da home, fallbacks e escolhas manuais do usuário.
