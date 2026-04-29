@@ -12499,6 +12499,50 @@ export type Database = {
         }
         Relationships: []
       }
+      lead_score_recalc_queue: {
+        Row: {
+          account_id: string
+          created_at: string
+          error_message: string | null
+          id: string
+          organization_id: string
+          processed_at: string | null
+          status: string
+          trigger_action: string
+          trigger_source: string
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          organization_id: string
+          processed_at?: string | null
+          status?: string
+          trigger_action: string
+          trigger_source: string
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          organization_id?: string
+          processed_at?: string | null
+          status?: string
+          trigger_action?: string
+          trigger_source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_score_recalc_queue_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lead_search_results: {
         Row: {
           city: string | null
