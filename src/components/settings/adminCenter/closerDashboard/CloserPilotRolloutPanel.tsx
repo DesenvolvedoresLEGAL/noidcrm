@@ -6,7 +6,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { Loader2 } from 'lucide-react';
-import { useEnableCloserPilot, MAX_CLOSER_PILOTS } from '@/hooks/dashboard/useCloserDashboardObservability';
+import { MAX_CLOSER_PILOTS } from '@/hooks/dashboard/useCloserDashboardObservability';
 import type { ActiveCloserPilot, EligibleCloser } from '@/services/crm/closerDashboardObservability';
 import { useEnableCloserPilot as useEnableMut } from '@/hooks/dashboard/useCloserDashboardPilot';
 import { useToast } from '@/hooks/use-toast';
