@@ -14,7 +14,16 @@ const invalidateGuards = (qc: ReturnType<typeof useQueryClient>) => {
   qc.invalidateQueries({ queryKey: ['user-contexts'] });
   qc.invalidateQueries({ queryKey: ['pilot-logs'] });
   qc.invalidateQueries({ queryKey: ['closer-pilot-entrypoint'] });
+  qc.invalidateQueries({ queryKey: ['closer-observability'] });
 };
+
+export function useDisableAllCloserPilots() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: disableAllCloserDashboardPilots,
+    onSuccess: () => invalidateGuards(qc),
+  });
+}
 
 export function useEnableCloserPilot() {
   const qc = useQueryClient();
