@@ -39,7 +39,7 @@ export function CloserDashboardHealthCards({ health }: Props) {
     : '—';
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-      <StatCard label="Pilotos ativos" value={health.activePilots} hint="Closers com piloto ON" />
+      <StatCard label="Pilotos ativos" value={health.activePilots} hint="Usuários comerciais com piloto ON" />
       <StatCard label="Acessos (7d)" value={health.allowedCount} />
       <StatCard label="Voltaram ao legado (7d)" value={health.choseLegacyCount} />
       <StatCard label="Fallbacks (7d)" value={health.fallbackCount} />

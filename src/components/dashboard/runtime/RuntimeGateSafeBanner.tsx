@@ -14,8 +14,8 @@ export function RuntimeGateSafeBanner() {
       <div className="flex items-start gap-2">
         <ShieldCheck className="h-4 w-4 mt-0.5 text-primary" />
         <AlertDescription>
-          <strong>Novo Dashboard Closer em piloto.</strong> Você está usando a nova home comercial.
-          O dashboard antigo continua disponível a qualquer momento.
+          <strong>Novo Dashboard Comercial em piloto.</strong> Você está usando a nova home
+          comercial. O dashboard atual continua disponível a qualquer momento.
         </AlertDescription>
       </div>
       <Button

@@ -54,7 +54,7 @@ export function CloserDashboardFeedbackCard({ tenantId }: Props) {
         isSlow,
         missingInfo: missingInfo.trim() || null,
         comment: comment.trim() || null,
-        metadata: { sprint: '6.5', source: 'runtime' },
+        metadata: { sprint: '6.6', source: 'runtime' },
       },
       {
         onError: (e: any) => {
@@ -71,7 +71,7 @@ export function CloserDashboardFeedbackCard({ tenantId }: Props) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Como está esse novo Dashboard Closer?</CardTitle>
+        <CardTitle className="text-base">Como está esse novo Dashboard Comercial?</CardTitle>
         <CardDescription>Sua resposta ajuda a decidir o próximo rollout.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

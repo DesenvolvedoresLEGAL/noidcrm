@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
@@ -29,25 +28,25 @@ export function CloserPilotRolloutPanel({ tenantId, activePilots, eligibleCloser
     if (!selectedId) return;
     if (!canEnableMore) {
       toast({
-        title: 'Limite atingido',
-        description: `Limite de ${MAX_CLOSER_PILOTS} Closers pilotos nesta fase. Desligue um piloto antes de adicionar outro.`,
+        title: 'Não foi possível habilitar',
+        description: 'Já existe um piloto ativo. Desligue o piloto atual antes de habilitar outro.',
         variant: 'destructive',
       });
       return;
     }
     enableMut.mutate(
-      { tenantId, targetUserId: selectedId, reason: 'sprint_6_5_rollout' },
+      { tenantId, targetUserId: selectedId, reason: 'sprint_6_6_rollout' },
       {
         onSuccess: () => {
-          toast({ title: 'Closer piloto habilitado.' });
+          toast({ title: 'Piloto do Dashboard Comercial habilitado.' });
           setSelectedId('');
         },
         onError: (e: any) => {
           const msg = String(e?.message ?? '');
           const friendly = msg.includes('pilot_limit_reached')
-            ? `Limite de ${MAX_CLOSER_PILOTS} Closers pilotos nesta fase. Desligue um piloto antes de adicionar outro.`
+            ? `Já existe um piloto ativo nesta fase. Desligue um usuário antes de habilitar outro. (limite técnico: ${MAX_CLOSER_PILOTS})`
             : msg.includes('requires_review')
-              ? 'Este usuário precisa de revisão de contexto antes de virar piloto.'
+              ? 'Este usuário precisa de revisão de Contexto CRM antes de virar piloto.'
               : msg;
           toast({ title: 'Falha ao habilitar', description: friendly, variant: 'destructive' });
         },
@@ -58,28 +57,22 @@ export function CloserPilotRolloutPanel({ tenantId, activePilots, eligibleCloser
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <CardTitle className="text-base">Rollout controlado do Dashboard Closer</CardTitle>
-            <CardDescription>
-              Nesta fase, libere no máximo {MAX_CLOSER_PILOTS} Closers por tenant.
-            </CardDescription>
-          </div>
-          <Badge variant={canEnableMore ? 'default' : 'destructive'}>
-            {activePilots.length} / {MAX_CLOSER_PILOTS}
-          </Badge>
-        </div>
+        <CardTitle className="text-base">Ativação controlada do Dashboard Comercial</CardTitle>
+        <CardDescription>
+          Habilite o Dashboard Comercial para um usuário comercial validado por vez. O dashboard
+          atual continua disponível como fallback.
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="flex flex-col md:flex-row gap-2">
           <Select value={selectedId} onValueChange={setSelectedId}>
             <SelectTrigger className="md:flex-1">
-              <SelectValue placeholder="Selecione um Closer elegível" />
+              <SelectValue placeholder="Selecione um usuário comercial elegível" />
             </SelectTrigger>
             <SelectContent>
               {eligible.length === 0 && (
                 <SelectItem value="__none__" disabled>
-                  Nenhum Closer elegível
+                  Nenhum usuário comercial elegível
                 </SelectItem>
               )}
               {eligible.map((c) => (
@@ -94,11 +87,16 @@ export function CloserPilotRolloutPanel({ tenantId, activePilots, eligibleCloser
             Habilitar piloto
           </Button>
         </div>
-        {!canEnableMore && (
+        {activePilots.length > 0 && (
           <p className="text-xs text-muted-foreground">
-            Limite de {MAX_CLOSER_PILOTS} Closers pilotos nesta fase. Desligue um piloto antes de adicionar outro.
+            {activePilots.length === 1
+              ? '1 usuário comercial está com o piloto ativo no momento.'
+              : `${activePilots.length} usuários estão com o piloto ativo no momento.`}
           </p>
         )}
+        <p className="text-xs text-muted-foreground">
+          Desligar o piloto faz o usuário voltar imediatamente ao dashboard atual.
+        </p>
       </CardContent>
     </Card>
   );

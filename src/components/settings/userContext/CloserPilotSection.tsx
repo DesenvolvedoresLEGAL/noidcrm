@@ -99,11 +99,11 @@ export function CloserPilotSection({ tenantId, organizationId }: Props) {
       <CardHeader>
         <CardTitle className="text-base flex items-center gap-2">
           <ShieldAlert className="h-4 w-4 text-primary" />
-          Piloto do Dashboard Closer
+          Piloto do Dashboard Comercial
         </CardTitle>
         <p className="text-sm text-muted-foreground">
-          Escolha 1 Closer para testar o novo dashboard. Rollback imediato a qualquer momento por
-          usuário ou pelo tenant inteiro.
+          Escolha 1 usuário comercial para testar o novo Dashboard Comercial. Rollback imediato a
+          qualquer momento por usuário ou pelo tenant inteiro.
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -123,20 +123,20 @@ export function CloserPilotSection({ tenantId, organizationId }: Props) {
         </div>
 
         <div className="space-y-2">
-          <label className="text-sm font-medium">Usuário piloto (Closer ativo)</label>
+          <label className="text-sm font-medium">Usuário comercial piloto (função técnica Closer)</label>
           <Popover open={open} onOpenChange={setOpen}>
             <PopoverTrigger asChild>
               <Button variant="outline" className="w-full justify-start font-normal">
                 {selected
                   ? `${selected.full_name ?? selected.email ?? 'Sem nome'}`
-                  : 'Selecionar Closer...'}
+                  : 'Selecionar usuário comercial...'}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="p-0 w-[--radix-popover-trigger-width]" align="start">
               <Command>
-                <CommandInput placeholder="Buscar Closer..." />
+                <CommandInput placeholder="Buscar usuário comercial..." />
                 <CommandList>
-                  <CommandEmpty>Nenhum Closer ativo encontrado.</CommandEmpty>
+                  <CommandEmpty>Nenhum usuário comercial elegível encontrado.</CommandEmpty>
                   <CommandGroup>
                     {eligible.map((r) => {
                       const rs = getReviewStatus(r);
@@ -213,7 +213,7 @@ export function CloserPilotSection({ tenantId, organizationId }: Props) {
             className="gap-1"
           >
             <PlayCircle className="h-4 w-4" />
-            Habilitar piloto para este Closer
+            Habilitar piloto para este usuário
           </Button>
           <Button
             variant="outline"
@@ -222,7 +222,7 @@ export function CloserPilotSection({ tenantId, organizationId }: Props) {
             className="gap-1"
           >
             <RefreshCw className="h-4 w-4" />
-            Desligar piloto deste Closer
+            Desligar piloto deste usuário
           </Button>
           <Button
             variant="destructive"

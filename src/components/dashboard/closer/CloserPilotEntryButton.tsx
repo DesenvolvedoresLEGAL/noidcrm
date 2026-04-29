@@ -23,7 +23,7 @@ export function CloserPilotEntryButton() {
             <Sparkles className="h-4 w-4 text-primary" />
           </div>
           <div>
-            <div className="font-semibold text-sm">Experimentar novo Dashboard Closer</div>
+            <div className="font-semibold text-sm">Experimentar novo Dashboard Comercial</div>
             <p className="text-xs text-muted-foreground mt-0.5">
               Nova visão com Central do Dia, pace diário, propostas e ações prioritárias.
               Você pode voltar ao dashboard atual a qualquer momento.

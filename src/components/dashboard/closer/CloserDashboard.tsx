@@ -52,9 +52,9 @@ export function CloserDashboard({ tenantId, targetUserId, mode = 'preview', onDa
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <h3 className="text-lg font-semibold">Dashboard Closer</h3>
+          <h3 className="text-lg font-semibold">Dashboard Comercial</h3>
           <p className="text-sm text-muted-foreground">
-            Visão de fechamento, propostas, follow ups e risco comercial.
+            Central diária de vendas, propostas, follow ups, pace e oportunidades em risco.
           </p>
         </div>
         <CloserPeriodFilter value={period} onChange={setPeriod} />

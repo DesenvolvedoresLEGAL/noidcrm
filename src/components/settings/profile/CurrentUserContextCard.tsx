@@ -1,7 +1,8 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ShieldCheck, Edit, Loader2 } from 'lucide-react';
+import { ShieldCheck, Edit, Loader2, Sparkles, AlertTriangle } from 'lucide-react';
 import { useUserContextSelf } from '@/hooks/userContext/useUserContextSelf';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { getReviewStatus, type ReviewStatus } from '@/hooks/userContext/useUserContextData';
@@ -30,6 +31,8 @@ export function CurrentUserContextCard() {
   const [editing, setEditing] = useState(false);
 
   const reviewStatus: ReviewStatus = row ? getReviewStatus(row) : 'no_context';
+  const isCloser = row?.business_function_key === 'closer';
+  const requiresReview = reviewStatus === 'needs_review';
 
   return (
     <>
@@ -58,30 +61,57 @@ export function CurrentUserContextCard() {
             )}
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           {isLoading ? (
             <div className="flex items-center justify-center py-6">
               <Loader2 className="h-5 w-5 animate-spin text-primary" />
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-              <Field label="Permissão" value={row?.permission_name} />
-              <Field label="Área" value={row?.department_name} />
-              <Field label="Função" value={row?.business_function_name} />
-              <div className="space-y-1">
-                <div className="text-xs text-muted-foreground">Status</div>
-                <Badge variant={REVIEW_VARIANT[reviewStatus]}>{REVIEW_LABEL[reviewStatus]}</Badge>
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                <Field label="Permissão" value={row?.permission_name} />
+                <Field label="Área" value={row?.department_name} />
+                <Field label="Função técnica" value={row?.business_function_name} />
+                <div className="space-y-1">
+                  <div className="text-xs text-muted-foreground">Status</div>
+                  <Badge variant={REVIEW_VARIANT[reviewStatus]}>{REVIEW_LABEL[reviewStatus]}</Badge>
+                </div>
+                <div className="space-y-1">
+                  <div className="text-xs text-muted-foreground">Dashboard dinâmico</div>
+                  <Badge variant={row?.is_dashboard_dynamic_enabled ? 'default' : 'outline'}>
+                    {row?.is_dashboard_dynamic_enabled ? 'Ativo' : 'Inativo'}
+                  </Badge>
+                </div>
               </div>
-              <div className="space-y-1">
-                <div className="text-xs text-muted-foreground">Dashboard dinâmico</div>
-                <Badge variant={row?.is_dashboard_dynamic_enabled ? 'default' : 'outline'}>
-                  {row?.is_dashboard_dynamic_enabled ? 'Ativo' : 'Inativo'}
-                </Badge>
-              </div>
-            </div>
+
+              <p className="text-xs text-muted-foreground">
+                A <strong>função técnica</strong> define qual dashboard e quais regras o NOID usa.
+                Para vendedores responsáveis por fechamento, use <strong>Vendas</strong> e{' '}
+                <strong>Closer</strong>. A função técnica <strong>Closer</strong> carrega o{' '}
+                <strong>Dashboard Comercial</strong>.
+              </p>
+
+              {isCloser && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="default" className="gap-1">
+                    <Sparkles className="h-3 w-3" />
+                    Dashboard Comercial habilitável
+                  </Badge>
+                </div>
+              )}
+
+              {requiresReview && (
+                <Alert variant="destructive">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>
+                    Revise este contexto antes de ativar o dashboard.
+                  </AlertDescription>
+                </Alert>
+              )}
+            </>
           )}
           {!isOrgAdmin && (
-            <p className="mt-4 text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground">
               Apenas administradores podem alterar este contexto. Solicite ao admin da sua organização.
             </p>
           )}
