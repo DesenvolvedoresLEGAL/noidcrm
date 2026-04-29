@@ -150,6 +150,7 @@ Deno.serve(async (req) => {
         default:
           throw new Error(`Unsupported recommendation_type: ${rec.recommendation_type}`);
       }
+      } // end else (non-experiment branch)
     } catch (e) {
       success = false;
       errorMessage = e instanceof Error ? e.message : "Unknown error";
