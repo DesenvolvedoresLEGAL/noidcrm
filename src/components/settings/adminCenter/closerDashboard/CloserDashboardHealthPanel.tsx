@@ -9,6 +9,10 @@ import { CloserPerformanceMetrics } from './CloserPerformanceMetrics';
 import { CloserDashboardFeedbackSummary } from './CloserDashboardFeedbackSummary';
 import { CloserRolloutDecisionCard } from './CloserRolloutDecisionCard';
 import { CloserRollbackPanel } from './CloserRollbackPanel';
+import { CloserDashboardAuditTable } from './CloserDashboardAuditTable';
+import { CloserDashboardReconciliation } from './CloserDashboardReconciliation';
+import { CloserHomologationChecklist } from './CloserHomologationChecklist';
+import { CloserRunbookCard } from './CloserRunbookCard';
 
 interface Props {
   tenantId: string;
@@ -52,6 +56,29 @@ export function CloserDashboardHealthPanel({ tenantId }: Props) {
       <CloserPerformanceMetrics perf={obs.performanceSummary} />
 
       <CloserDashboardFeedbackSummary summary={obs.feedbackSummary} list={obs.feedbackList} />
+
+      <CloserDashboardAuditTable
+        tenantId={tenantId}
+        activePilots={obs.activePilots}
+        eligibleClosers={obs.eligibleClosers}
+      />
+
+      <CloserDashboardReconciliation
+        tenantId={tenantId}
+        activePilots={obs.activePilots}
+        eligibleClosers={obs.eligibleClosers}
+      />
+
+      <CloserHomologationChecklist
+        tenantId={tenantId}
+        activePilots={obs.activePilots}
+        eligibleClosers={obs.eligibleClosers}
+        health={obs.healthSummary}
+        feedback={obs.feedbackSummary}
+        onRefetch={obs.refetch}
+      />
+
+      <CloserRunbookCard />
 
       <CloserRolloutDecisionCard decision={obs.rolloutDecision} />
 
