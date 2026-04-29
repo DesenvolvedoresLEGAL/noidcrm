@@ -19,6 +19,7 @@ const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'destructive' | '
   auto_applied: 'default',
   dismissed: 'outline',
   failed: 'destructive',
+  rolled_back: 'outline',
 };
 
 export function RecommendationsPanel() {
