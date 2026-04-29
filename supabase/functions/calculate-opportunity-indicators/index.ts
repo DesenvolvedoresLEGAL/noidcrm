@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
         .limit(50),
       opp.account_id
         ? supabase.from('contacts')
-            .select('id, is_primary, role, title')
+            .select('id, cargo')
             .eq('account_id', opp.account_id)
             .is('deleted_at', null)
         : Promise.resolve({ data: [], error: null } as any),
