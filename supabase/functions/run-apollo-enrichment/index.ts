@@ -273,7 +273,7 @@ Deno.serve(async (req: Request) => {
       workspace_id: prospect.organization_id,
       prospect_id, provider: "apollo", status: "running",
       trigger_source, estimated_credits: ESTIMATED_CREDITS,
-      request: { domain, person_titles: RELEVANT_TITLES, review_required, quality_label: qLabel, trigger_source },
+      request: { domain, person_titles: titlesToUse, custom_titles_used: customTitles.length > 0, review_required, quality_label: qLabel, trigger_source },
     }).select("id").single();
 
     await trackEvent(sb, prospect.organization_id, "apollo_enrichment_started", {
@@ -295,7 +295,7 @@ Deno.serve(async (req: Request) => {
     {
       const r = await callApollo(APOLLO_PEOPLE_URL, {
         q_organization_domains: domain,
-        person_titles: RELEVANT_TITLES,
+        person_titles: titlesToUse,
         page: 1,
         per_page: 10,
       }, APOLLO_API_KEY);
@@ -393,7 +393,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // 7. Process contacts — accept everything, but score by relevance
-    const filtered = people.filter((p) => isRelevantTitle(p.title) || p.email || p.linkedin_url);
+    const filtered = people.filter((p) => isRelevantTitle(p.title, titlesToUse) || p.email || p.linkedin_url);
 
     let decisionMakers = 0;
     let emailsFound = 0;
