@@ -52,7 +52,10 @@ export function OpportunitySidebar({
   userRole,
   onNavigateToIntelligence,
 }: OpportunitySidebarProps) {
-  const { users } = useOrganizationUsers();
+  // Sprint Active Users SoT: passar o owner atual como extra para que o nome
+  // histórico apareça no rótulo mesmo se o usuário estiver inativo. O dropdown
+  // continua oferecendo apenas usuários ativos para nova atribuição.
+  const { users } = useOrganizationUsers([opportunity.owner?.user_id]);
 
   const isWon = opportunity.status === 'won';
   const isLost = opportunity.status === 'lost';
