@@ -2152,6 +2152,7 @@ ${chunk}`,
       metrics.exhibitors_extracted_raw = allExhibitors.length;
     }
   }
+  } // end if (!expofpHandled) — closes the Firecrawl block opened in Step 1
 
   // ── Step 5: Deduplicate intra-run and apply score threshold ──
   const seenNames = new Set<string>();
