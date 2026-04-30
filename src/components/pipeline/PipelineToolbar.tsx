@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -14,6 +15,7 @@ import {
 } from '@/components/ui/popover';
 import { Plus, Search, Filter, X, User, Shield } from 'lucide-react';
 import { Label } from '@/components/ui/label';
+import { toast } from 'sonner';
 import { Pipeline } from '@/services/crm/types';
 
 interface PipelineToolbarProps {
@@ -43,6 +45,17 @@ export function PipelineToolbar({
   hygieneFilter,
   onHygieneFilterChange,
 }: PipelineToolbarProps) {
+  // Sprint Active Users SoT: limpar filtro salvo se o usuário não está mais ativo.
+  useEffect(() => {
+    if (!selectedUserId || !onUserFilterChange || users.length === 0) return;
+    const exists = users.some((u) => u.id === selectedUserId);
+    if (!exists) {
+      onUserFilterChange('');
+      toast.info('Filtro de vendedor foi limpo (usuário não está mais ativo).');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedUserId, users]);
+
   return (
     <div className="flex flex-col md:flex-row md:items-center gap-2 px-3 md:px-4 py-2 bg-card border-b md:h-[48px]">
       {/* Row 1 mobile: Search + Create */}
