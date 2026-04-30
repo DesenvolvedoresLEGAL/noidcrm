@@ -135,3 +135,22 @@ export async function syncEnrichedContactsToAccount(
   if (error) throw error;
   return data as SyncEnrichedContactsResult;
 }
+
+export interface RevealApolloContactResult {
+  status: "revealed" | "partial" | "no_data" | "skipped" | "failed";
+  contact_id?: string;
+  email?: string | null;
+  phone?: string | null;
+  credits_used?: number;
+  reason?: string;
+  inaccessible?: boolean;
+}
+
+export async function revealApolloContact(contactId: string): Promise<RevealApolloContactResult> {
+  const { data, error } = await supabase.functions.invoke("reveal-apollo-contact", {
+    body: { contact_id: contactId },
+  });
+  if (error) throw error;
+  return data as RevealApolloContactResult;
+}
+
