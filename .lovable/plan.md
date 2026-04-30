@@ -1,75 +1,84 @@
-## Problema
+## Por que email e telefone aparecem vazios no Kairós
 
-Hoje o fluxo Apollo → CRM tem duas falhas:
+O Apollo trabalha em **dois passos**:
 
-1. **Os contatos enriquecidos vivem só em `enriched_contact_profiles`** (tabela paralela usada apenas pela aba "Contatos" do drawer do prospect). Eles não aparecem na conta do CRM porque a aba "Contatos" da conta lê da tabela `contacts`.
-2. **A RPC `import_prospect_to_pipeline`** (acionada pelo botão "Importar no CRM") cria **um único contato genérico** usando `prospect.email_public` / `prospect.phone_public` — por isso só apareceu "Laticinios Tirolez" com `contabilidade@tirolez.com.br`. Juliana, Otavio e os demais ficam órfãos.
+1. **Search** (`mixed_people/api_search`) — descobre quem trabalha na empresa, retorna nome, cargo, LinkedIn, mas **mascara email e telefone**. É o que rodamos hoje no enriquecimento.
+2. **Match/Enrich** (`people/match`) — "revela" email e telefone de um contato específico. **Cobra créditos por revelação** (1 crédito por email + 1 por telefone, normalmente).
 
-Resultado: o usuário marca "principal" no Apollo, mas Conta → Contatos não recebe nada.
+Quando você abre a Juliana direto no Apollo e clica em "Enriquecer contato", o Apollo executa o passo 2 e mostra os dados. Hoje o Kairós só faz o passo 1, por isso vem "sem e-mail / sem telefone".
 
-## Como vai funcionar (UX)
+A solução é adicionar o passo 2 no Kairós, **sob demanda e por contato** (não em massa, para não estourar créditos).
 
-1. Após o enriquecimento Apollo, na aba **Contatos** do drawer de prospect:
-   - Cada card de contato ganha um **checkbox de seleção** (decisor principal já vem marcado por padrão).
-   - Aparece um botão fixo no rodapé da aba: **"Importar selecionados na conta"** com contador (ex: `Importar 3 contatos no CRM`).
-2. Clique no botão:
-   - Se a conta no CRM ainda não existe (prospect não importado), avisa: "Importe o prospect primeiro" + atalho.
-   - Se a conta existe, faz **upsert** dos contatos selecionados em `contacts` daquela `account_id`, com email/telefone/cargo/linkedin populados.
-3. Toast de sucesso: `2 contatos criados, 1 atualizado`. A aba Contatos da conta passa a mostrar Juliana com email + telefone.
-4. Bônus: ao clicar em "Importar no CRM" pela primeira vez (botão atual no drawer), se já houver contatos enriquecidos com `is_primary=true`, eles entram **automaticamente** junto.
+## O que vai mudar
 
-## Mudanças técnicas
+### 1. Nova edge function `reveal-apollo-contact`
+Recebe `enriched_contact_id`, busca o registro, chama `POST https://api.apollo.io/api/v1/people/match` com:
+- `id` (apollo_person_id já salvo) **ou** `first_name + last_name + organization_name + domain` como fallback
+- `reveal_personal_emails: true`
+- `reveal_phone_number: true`
+- `webhook_url` opcional (telefone às vezes vem assíncrono — por enquanto, espera resposta síncrona; se vier vazio, registra "pending")
 
-### 1. Nova RPC `sync_enriched_contacts_to_account`
-`(p_prospect_id uuid, p_account_id uuid, p_contact_ids uuid[])` → SECURITY DEFINER, search_path=public.
+Atualiza `enriched_contact_profiles` com `email`, `email_status`, `phone`, e marca `revealed_at` + `reveal_credits_used`. Loga em `enrichment_jobs` (provider=`apollo_reveal`) para auditoria de créditos.
 
-- Valida que o usuário pertence à org do prospect.
-- Para cada `enriched_contact_profiles` em `p_contact_ids` (filtrando `is_merged=false` e mesma org):
-  - Monta `emails` jsonb (`[{value, type:'work', is_primary:true, status}]`) e `telefones` jsonb.
-  - **Upsert por email normalizado** dentro da conta:
-    - Se existir `contacts` com mesmo `organization_id` + email já presente → UPDATE (merge de telefones, atualiza cargo/linkedin se vazio, marca o decisor como principal).
-    - Senão → INSERT novo `contacts` com `account_id=p_account_id`, `nome=full_name`, `primeiro_nome`, `ultimo_nome`, `cargo=role_title`, `departamento`, `linkedin=linkedin_url`.
-  - Se for `is_primary=true` no enriquecimento, atualiza `opportunities.contact_id` da última oportunidade da conta para apontar pro novo contato (opcional, melhora UX).
-- Retorna `{created: int, updated: int, skipped: int}`.
+### 2. UI no painel de Contatos do prospect
+Em cada card de contato, quando **não houver email/telefone**:
+- Botão pequeno **"Revelar contato (1-2 créditos)"** ao lado dos campos vazios
+- Loading inline; ao revelar, atualiza realtime via cache invalidation
+- Confirmação leve antes de gastar créditos (modal pequeno: "Revelar contato da Juliana? Consome até 2 créditos Apollo.")
 
-### 2. Atualizar `import_prospect_to_pipeline`
-Após criar conta+oportunidade, ao invés de inserir um único contato com `email_public`:
-- Se existirem `enriched_contact_profiles` com `prospect_id` → chamar a mesma lógica de sync para todos com `is_primary=true OR seniority IN (c_level, vp, director, manager)`.
-- Mantém fallback atual (`email_public`/`phone_public`) só se não houver nenhum enriquecido.
-- Define `opportunities.contact_id` = contato com `is_primary=true` (ou primeiro decisor).
+Se a Apollo retornar email/telefone vazio mesmo após reveal, mostrar badge "não disponível na Apollo" e não cobrar de novo (cache da tentativa por 24h, mesma regra do enrichment).
 
-### 3. Frontend — `ProspectContactsTab.tsx`
-- Adicionar `useState<Set<string>>` para seleção, default = `[primary.id]` quando carrega.
-- Cada `Card` ganha `<Checkbox>` no canto superior esquerdo.
-- Rodapé sticky com botão **"Importar N contatos no CRM"** (disabled se `selected.size === 0`).
-- Handler chama nova mutation `useSyncEnrichedContacts({ prospectId, accountId, contactIds })`.
-- Se `prospect.matched_account_id` for null → mostra hint "Importe o prospect primeiro" com link/botão para o fluxo atual de importação.
+### 3. Importação no CRM
+Continua igual — agora os contatos selecionados que foram revelados vão para `contacts` da conta com email/telefone populados (já funciona, só precisava dos dados).
 
-### 4. Novo hook `src/hooks/useSyncEnrichedContacts.ts`
-- `useMutation` chamando `supabase.rpc('sync_enriched_contacts_to_account', {...})`.
-- Em sucesso: invalida `contactKeys.lists()`, `['enriched-contacts', prospectId]`, `accountKeys.detail(accountId)` e mostra toast detalhado.
+## Arquivos
 
-### 5. Service `src/services/enrichment/apolloService.ts`
-- Adicionar helper `syncEnrichedContacts(prospectId, accountId, contactIds)` que encapsula a chamada RPC.
+**Criar:**
+- `supabase/functions/reveal-apollo-contact/index.ts`
+- `src/components/playbook/enrichment/RevealContactButton.tsx`
+- `src/hooks/useRevealApolloContact.ts`
+- Migration: adicionar colunas `revealed_at timestamptz`, `reveal_credits_used int default 0`, `last_reveal_attempt_at timestamptz` em `enriched_contact_profiles`
 
-## Arquivos impactados
+**Editar:**
+- `src/services/enrichment/apolloService.ts` — função `revealApolloContact(contactId)`
+- `src/components/playbook/ProspectContactsTab.tsx` — botão de revelar em cada card sem email/telefone
+- `src/integrations/supabase/types.ts` — auto-regenerado pela migration
 
-- **Nova migration**: cria RPC `sync_enriched_contacts_to_account` + atualiza `import_prospect_to_pipeline`.
-- `src/components/playbook/ProspectContactsTab.tsx` — checkboxes + botão importar.
-- `src/hooks/useSyncEnrichedContacts.ts` — novo.
-- `src/services/enrichment/apolloService.ts` — novo helper.
-- (Opcional) `src/hooks/useProspectImport.ts` — passar a depender só da RPC atualizada (sem mudanças se a RPC já cuida).
+## Detalhes técnicos
+
+**Endpoint Apollo:** `POST https://api.apollo.io/api/v1/people/match` com header `x-api-key`. Body mínimo:
+```json
+{
+  "id": "<apollo_person_id>",
+  "reveal_personal_emails": true,
+  "reveal_phone_number": true
+}
+```
+Fallback quando não temos `apollo_person_id` salvo:
+```json
+{
+  "first_name": "Juliana",
+  "last_name": "Abreu",
+  "organization_name": "Tirolez",
+  "domain": "tirolez.com.br",
+  "reveal_personal_emails": true,
+  "reveal_phone_number": true
+}
+```
+
+**Anti-spam:** `last_reveal_attempt_at` < 24h bloqueia nova revelação do mesmo contato (igual lógica do enrichment), evitando double-charge se o usuário clicar duas vezes.
+
+**Telemetria:** insere em `enrichment_jobs` com `provider='apollo_reveal'`, `prospect_id`, `credits_used`, `response_summary={revealed_email, revealed_phone}` para o painel de auditoria já existente.
+
+**Segurança:** edge function valida JWT, confirma que o contato pertence à `organization_id` do usuário antes de chamar a Apollo.
 
 ## Riscos
 
-- **Duplicação de contatos**: mitigado pelo upsert por `email_normalized` + `organization_id`.
-- **Conflito com índice único `idx_unique_contact_email_org`** em `enriched_contact_profiles`: já existe e protege; a RPC só lê dali.
-- **Contato sem e-mail** (vários do print têm score 0 e nenhum email): pulamos e contamos em `skipped` no toast.
-- **opportunity.contact_id sobrescrita**: só atualizamos quando o contato sincronizado for o `is_primary` declarado pelo usuário, e somente nas oportunidades sem contato definido manualmente (via campo de auditoria simples).
+- Apollo às vezes retorna telefone via webhook assíncrono (delay de segundos). Se vier vazio na resposta síncrona, marcamos como "pendente" e o usuário pode tentar novamente em 1 min.
+- Plano Apollo precisa ter `people/match` habilitado. Se vier 403, mostramos a mesma mensagem clara que já usamos no enrichment.
+- Custo: cada clique consome 1-2 créditos. Por isso é por contato e com confirmação.
 
-## Próximos passos (após aprovação)
+## Próximos passos depois (não nesta entrega)
 
-1. Criar migration com as duas funções SQL.
-2. Implementar hook + service helper.
-3. Atualizar a aba Contatos com seleção e botão de importação.
-4. Testar com a Tirolez: marcar Juliana + Otavio, importar, abrir conta Laticinios Tirolez → ver os 2 contatos com e-mail/telefone na aba Contatos da conta.
+- Botão "Revelar todos os decisores selecionados" em lote, com cálculo prévio de créditos.
+- Toggle por organização: "auto-revelar contatos primários ao enriquecer".

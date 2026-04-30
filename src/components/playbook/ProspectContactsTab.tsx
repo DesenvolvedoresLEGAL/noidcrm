@@ -3,10 +3,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Sparkles, Loader2, Star, Mail, Phone, Linkedin, Copy, CheckCircle2, AlertCircle, PackageCheck } from "lucide-react";
+import { Sparkles, Loader2, Star, Mail, Phone, Linkedin, Copy, CheckCircle2, AlertCircle, PackageCheck, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { useEnrichedContacts } from "@/hooks/useEnrichedContacts";
 import { useSyncEnrichedContacts } from "@/hooks/useSyncEnrichedContacts";
+import { useRevealApolloContact } from "@/hooks/useRevealApolloContact";
 import { ApolloConfirmModal } from "./enrichment/ApolloConfirmModal";
 import { ContactsQualityPanel } from "./enrichment/ContactsQualityPanel";
 import { MergedContactsAccordion } from "./enrichment/MergedContactsAccordion";
@@ -65,6 +66,18 @@ export function ProspectContactsTab({
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const sync = useSyncEnrichedContacts();
+  const reveal = useRevealApolloContact();
+  const [revealingId, setRevealingId] = useState<string | null>(null);
+
+  const handleReveal = (contact: { id: string; full_name: string | null }) => {
+    const name = contact.full_name ?? "este contato";
+    if (!window.confirm(`Revelar email e telefone de ${name}?\n\nIsso consome até 2 créditos da Apollo.`)) return;
+    setRevealingId(contact.id);
+    reveal.mutate(
+      { contactId: contact.id, prospectId, contactName: contact.full_name ?? undefined },
+      { onSettled: () => setRevealingId(null) },
+    );
+  };
 
   // Default selection: primary + decisores (c_level/vp/director/manager) com email
   useEffect(() => {
@@ -269,6 +282,32 @@ export function ProspectContactsTab({
                 </a>
               )}
             </div>
+
+            {(!c.email || !c.phone) && (
+              <div className="pl-6 pt-1">
+                {c.reveal_status === "no_data" && !c.email && !c.phone ? (
+                  <div className="text-[11px] text-muted-foreground/70 italic">
+                    Apollo não tem email/telefone deste contato.
+                  </div>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-[11px] gap-1.5 w-full justify-center border-primary/30 text-primary hover:bg-primary/5"
+                    onClick={() => handleReveal({ id: c.id, full_name: c.full_name })}
+                    disabled={reveal.isPending && revealingId === c.id}
+                  >
+                    {reveal.isPending && revealingId === c.id ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Eye className="h-3 w-3" />
+                    )}
+                    {c.email || c.phone ? "Revelar restante" : "Revelar email + telefone"}
+                    <span className="opacity-60 ml-1">· até 2 créditos</span>
+                  </Button>
+                )}
+              </div>
+            )}
 
             {!c.is_primary && (
               <div className="flex justify-end pt-1">
