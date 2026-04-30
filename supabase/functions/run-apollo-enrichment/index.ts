@@ -43,10 +43,24 @@ function pickDomain(p: Prospect): string | null {
   } catch { return null; }
 }
 
-function isRelevantTitle(title: string | null | undefined): boolean {
+function isRelevantTitle(title: string | null | undefined, titles: string[] = RELEVANT_TITLES): boolean {
   if (!title) return false;
   const t = title.toLowerCase();
-  return RELEVANT_TITLES.some((kw) => t.includes(kw));
+  return titles.some((kw) => t.includes(kw.toLowerCase()));
+}
+
+function sanitizeCustomTitles(input: unknown): string[] {
+  if (!Array.isArray(input)) return [];
+  const out: string[] = [];
+  for (const v of input) {
+    if (typeof v !== "string") continue;
+    const t = v.trim();
+    if (!t) continue;
+    if (t.length > 80) continue;
+    out.push(t);
+    if (out.length >= 25) break;
+  }
+  return out;
 }
 
 function seniorityBonus(title: string | null | undefined): number {
@@ -171,6 +185,8 @@ Deno.serve(async (req: Request) => {
     const body = await req.json().catch(() => ({}));
     const prospect_id: string | undefined = body.prospect_id;
     const trigger_source: string = body.trigger_source ?? "user";
+    const customTitles = sanitizeCustomTitles(body.custom_titles);
+    const titlesToUse = customTitles.length > 0 ? customTitles : RELEVANT_TITLES;
     if (!prospect_id) {
       return new Response(JSON.stringify({ error: "prospect_id required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
