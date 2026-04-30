@@ -1854,7 +1854,7 @@ async function handleEventFirecrawl(
   //   "- **NOME DA EMPRESA**" em listas com logos antes
   // Roda ANTES da AI. Se já trouxer muitos resultados, a AI ainda roda
   // e os duplicados são removidos pelo dedupe intra-run mais adiante.
-  const allExhibitors: any[] = [];
+  // allExhibitors already declared at Step 0 (provider detection)
 
   const swapcardHtml = scrapedContents.find((item) => /swapcard|__NEXT_DATA__|Core_EventExhibitorListView/i.test(item.html || ""))?.html || scrapedContents[0]?.html || "";
   if (swapcardHtml) {
