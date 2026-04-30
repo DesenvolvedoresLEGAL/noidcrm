@@ -10104,6 +10104,7 @@ export type Database = {
           is_merged: boolean
           is_primary: boolean | null
           last_name: string | null
+          last_reveal_attempt_at: string | null
           linkedin_url: string | null
           merged_into: string | null
           phone: string | null
@@ -10111,6 +10112,9 @@ export type Database = {
           provider: string | null
           provider_priority: Json | null
           raw: Json | null
+          reveal_credits_used: number
+          reveal_status: string | null
+          revealed_at: string | null
           role_title: string | null
           seniority: string | null
           updated_at: string | null
@@ -10132,6 +10136,7 @@ export type Database = {
           is_merged?: boolean
           is_primary?: boolean | null
           last_name?: string | null
+          last_reveal_attempt_at?: string | null
           linkedin_url?: string | null
           merged_into?: string | null
           phone?: string | null
@@ -10139,6 +10144,9 @@ export type Database = {
           provider?: string | null
           provider_priority?: Json | null
           raw?: Json | null
+          reveal_credits_used?: number
+          reveal_status?: string | null
+          revealed_at?: string | null
           role_title?: string | null
           seniority?: string | null
           updated_at?: string | null
@@ -10160,6 +10168,7 @@ export type Database = {
           is_merged?: boolean
           is_primary?: boolean | null
           last_name?: string | null
+          last_reveal_attempt_at?: string | null
           linkedin_url?: string | null
           merged_into?: string | null
           phone?: string | null
@@ -10167,6 +10176,9 @@ export type Database = {
           provider?: string | null
           provider_priority?: Json | null
           raw?: Json | null
+          reveal_credits_used?: number
+          reveal_status?: string | null
+          revealed_at?: string | null
           role_title?: string | null
           seniority?: string | null
           updated_at?: string | null
