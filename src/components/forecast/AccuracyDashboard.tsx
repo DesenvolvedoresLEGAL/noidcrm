@@ -71,11 +71,13 @@ export function AccuracyDashboard({ pipelineId, userId }: AccuracyDashboardProps
           </div>
         </CardContent>
       </Card>
+      </div>
     );
   }
 
   return (
     <div className="space-y-6">
+      {snapshotSection}
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
