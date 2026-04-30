@@ -285,7 +285,8 @@ Deno.serve(async (req: Request) => {
     //    - accessible & empty -> try next
     //    - inaccessible (403/API_INACCESSIBLE) -> log and try next, do NOT abort
     const attempts: Array<{ endpoint: string; status: number; ok: boolean; inaccessible: boolean; count: number; error?: string }> = [];
-    const searchKeywords = [prospect.company_name, domain].filter(Boolean).join(" ") || domain;
+    const titlesKeyword = customTitles.length > 0 ? customTitles.slice(0, 3).join(" OR ") : "";
+    const searchKeywords = [prospect.company_name, domain, titlesKeyword].filter(Boolean).join(" ") || domain;
 
     let people: any[] = [];
     let endpointUsed: string | null = null;
