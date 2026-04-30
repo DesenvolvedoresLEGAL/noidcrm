@@ -82,12 +82,15 @@ export interface EnrichedContact {
   confidence_score: number | null;
   is_primary: boolean | null;
   created_at: string;
+  revealed_at?: string | null;
+  reveal_status?: string | null;
+  last_reveal_attempt_at?: string | null;
 }
 
 export async function listEnrichedContacts(prospectId: string): Promise<EnrichedContact[]> {
   const { data, error } = await (supabase
     .from("enriched_contact_profiles") as any)
-    .select("id, prospect_id, full_name, first_name, last_name, role_title, seniority, department, email, email_status, phone, linkedin_url, provider, confidence_score, is_primary, created_at")
+    .select("id, prospect_id, full_name, first_name, last_name, role_title, seniority, department, email, email_status, phone, linkedin_url, provider, confidence_score, is_primary, created_at, revealed_at, reveal_status, last_reveal_attempt_at")
     .eq("prospect_id", prospectId)
     .eq("is_merged", false)
     .order("is_primary", { ascending: false })
