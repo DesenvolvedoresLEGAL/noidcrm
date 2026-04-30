@@ -22,9 +22,14 @@ export interface ApolloEnrichmentResult {
 export async function runApolloEnrichment(
   prospectId: string,
   trigger_source: "user" | "system" | "automation" = "user",
+  customTitles?: string[],
 ): Promise<ApolloEnrichmentResult> {
   const { data, error } = await supabase.functions.invoke("run-apollo-enrichment", {
-    body: { prospect_id: prospectId, trigger_source },
+    body: {
+      prospect_id: prospectId,
+      trigger_source,
+      ...(customTitles && customTitles.length > 0 ? { custom_titles: customTitles } : {}),
+    },
   });
   if (error) throw error;
   return data as ApolloEnrichmentResult;

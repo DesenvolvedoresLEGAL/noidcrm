@@ -27,7 +27,8 @@ export function useEnrichedContacts(prospectId: string | null | undefined) {
   }, [prospectId, qc]);
 
   const enrich = useMutation({
-    mutationFn: () => runApolloEnrichment(prospectId!),
+    mutationFn: (vars?: { customTitles?: string[] }) =>
+      runApolloEnrichment(prospectId!, "user", vars?.customTitles),
     onSuccess: () => qc.invalidateQueries({ queryKey: key }),
   });
 

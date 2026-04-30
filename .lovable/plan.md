@@ -1,51 +1,57 @@
-Entendi o problema e já encontrei a causa real: o erro 502 que aparece na UI está mascarando um erro 403 da Apollo. Nos logs da tabela de jobs, o endpoint `mixed_people/search` está respondendo:
+## Resposta direta à sua pergunta
 
-```text
-Apollo HTTP 403 (mixed_people/search): api/v1/mixed_people/search is not accessible with this api_key
+**Hoje NÃO dá para escolher os cargos no Kairós.** A lista de títulos está **hardcoded** na edge function `run-apollo-enrichment` (constante `RELEVANT_TITLES`), com os mesmos termos genéricos para TODOS os prospects:
+
+```
+ceo, founder, head, director, vp, vice president,
+marketing, sales, growth, events, manager,
+diretor, diretora, presidente, fundador
 ```
 
-Ou seja: o KAIRÓS ainda tenta primeiro `mixed_people/search`; como a chave atual não tem acesso a esse endpoint, a função retorna 502 antes de tentar `contacts/search`. Isso bloqueia a operação.
+É por isso que a Juliana Abreu (Gerente Executiva de Trade Marketing) **deveria aparecer** — "marketing" e "manager" estão na lista. Se não apareceu, é porque o Apollo retornou ela em outro endpoint que o nosso fallback não cobre, ou o filtro `person_titles` do Apollo é literal demais (busca exata, não keyword).
 
-Plano de correção urgente:
+Para o caso da **LEGAL** (você quer "gerente de marketing", "analista de eventos", "analista de marketing"), você precisa poder **digitar os cargos por prospect** antes de clicar em Confirmar.
 
-1. Corrigir a estratégia de endpoints Apollo
-   - Parar de tratar `403 API_INACCESSIBLE` em `mixed_people/search` como falha final.
-   - Se `mixed_people/search` retornar 403/401/API_INACCESSIBLE, pular automaticamente para os endpoints disponíveis.
-   - Usar `contacts/search` como fallback prioritário para buscar contatos quando People Search não estiver acessível.
-   - Adicionar fallback adicional para endpoint de empresas/organizações, se necessário, usando domínio e nome da empresa para enriquecer dados corporativos.
+---
 
-2. Remover o 502 falso na experiência do usuário
-   - A função não deve retornar 502 quando apenas um endpoint da Apollo estiver indisponível, se ainda houver outro endpoint possível.
-   - O retorno só deve ser erro se todos os endpoints tentados falharem.
-   - A resposta deve informar claramente `endpoint_used`, `fallbacks_used`, `contacts_found` e erro real da Apollo quando não houver resultado.
+## Plano
 
-3. Melhorar tempo de resposta sem depender do plano rejeitado anteriormente
-   - Manter uma primeira correção síncrona e segura para uso imediato da operação.
-   - Reduzir chamadas sequenciais desnecessárias.
-   - Inserir contatos em lote em vez de um por um.
-   - Só rodar dedupe/primary depois do lote.
-   - Limitar cada chamada Apollo com timeout curto para não travar a tela.
+### 1. UI — Campo de cargos customizados no `ApolloConfirmModal`
+Adicionar antes do botão "Confirmar":
+- Input de tags (chips) "Cargos para buscar (opcional)"
+- Placeholder: `gerente de marketing, analista de eventos, head de trade...`
+- Sugestões rápidas (chips clicáveis): "Decisores Marketing", "Decisores Vendas", "Decisores Eventos", "C-Level" — cada um preenche um preset de títulos
+- Se o usuário deixar vazio → usa o `RELEVANT_TITLES` padrão (comportamento atual)
+- Se preencher → manda os títulos digitados para a edge function
 
-4. Ajustar frontend para erro operacional útil
-   - Em `src/services/enrichment/apolloService.ts`, traduzir erros da função para mensagens claras.
-   - Em `ProspectContactsTab`, trocar o toast genérico por algo como: “Endpoint Apollo X indisponível; tentei Y; nenhum contato retornado” ou “Contatos encontrados via contacts/search”.
-   - Invalidar contatos e jobs após a chamada para refletir resultado imediatamente.
+### 2. Service — `apolloService.ts` e `apolloPreview.ts`
+- `runApolloEnrichment(prospectId, trigger_source, custom_titles?: string[])`
+- Passar `custom_titles` no body da invocação
 
-5. Validar com logs reais
-   - Testar o fluxo contra a função `run-apollo-enrichment` usando um prospect real como `Tirolez`.
-   - Conferir a tabela `enrichment_jobs` para confirmar que o novo job não fica como failed por causa de `mixed_people/search`.
-   - Se `contacts/search` também falhar, expor exatamente o erro retornado pela Apollo para não mascarar como 502.
+### 3. Edge function — `run-apollo-enrichment/index.ts`
+- Aceitar `custom_titles: string[]` no payload
+- Se vier preenchido: usar como `person_titles` na chamada Apollo (Attempt 1) e como keywords no fallback (Attempt 2 — `contacts/search`)
+- Se vazio: manter `RELEVANT_TITLES` atual
+- Ajustar `isRelevantTitle()` para aceitar a lista dinâmica no pós-filtro (senão o backend descarta os contatos que não batem com a lista hardcoded)
+- Log no `enrichment_jobs.request` dos títulos efetivamente usados (auditoria)
 
-Arquivos impactados:
+### 4. Memória do prospect (opcional, mas recomendado)
+- Salvar os últimos `custom_titles` usados no prospect (`prospects.last_search_titles jsonb`) para pré-preencher na próxima vez que o usuário reabrir o modal daquele mesmo prospect.
 
-- `supabase/functions/run-apollo-enrichment/index.ts`
-- `src/services/enrichment/apolloService.ts`
-- `src/components/playbook/ProspectContactsTab.tsx`
-- Possivelmente `src/hooks/useEnrichedContacts.ts` apenas para invalidação/estado se necessário.
+---
 
-Critério de sucesso:
+## Detalhes técnicos
 
-- Clicar em “Confirmar enriquecimento” não retorna mais 502 por causa de `mixed_people/search` inacessível.
-- Se a chave tiver acesso a `contacts/search`, os contatos são buscados e salvos.
-- Se nenhum endpoint acessível retornar contato, a UI mostra uma mensagem clara com o endpoint tentado e o motivo real.
-- O fluxo fica mais rápido por batch insert e timeout curto.
+**Arquivos editados:**
+- `src/components/playbook/enrichment/ApolloConfirmModal.tsx` — novo input de chips + estado `customTitles`
+- `src/components/playbook/ProspectContactsTab.tsx` — passar `customTitles` no `onConfirm`
+- `src/services/enrichment/apolloService.ts` — assinatura aceitando `custom_titles`
+- `supabase/functions/run-apollo-enrichment/index.ts`:
+  - parse de `custom_titles` no body
+  - `const titlesToUse = custom_titles?.length ? custom_titles : RELEVANT_TITLES;`
+  - usar em `person_titles` (linha 282) e no `isRelevantTitle` dinâmico (linha 380)
+- (Opcional) migração: `ALTER TABLE prospects ADD COLUMN last_search_titles jsonb;`
+
+**Risco:** baixo. Mantém comportamento padrão quando o campo está vazio (zero regressão). Aumenta drasticamente a precisão da busca quando o SDR sabe o cargo-alvo.
+
+**Próximo passo após aprovação:** implemento, faço deploy da edge function e você testa no prospect TIROLEZ digitando "gerente de trade marketing, gerente executiva, head de marketing".

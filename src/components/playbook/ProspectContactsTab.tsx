@@ -60,10 +60,13 @@ export function ProspectContactsTab({
   });
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  const handleConfirm = async () => {
+  const handleConfirm = async (customTitles?: string[]) => {
     try {
-      const res = await enrich.mutateAsync();
+      const res = await enrich.mutateAsync({ customTitles });
       const ep = res.endpoint_used ? ` (via ${res.endpoint_used})` : "";
+      const titlesNote = customTitles && customTitles.length > 0
+        ? ` · cargos: ${customTitles.slice(0, 3).join(", ")}${customTitles.length > 3 ? "…" : ""}`
+        : "";
       if (res.status === "skipped") {
         toast.info(`Apollo pulou: ${res.reason ?? "não elegível"}`);
       } else if (res.status === "failed") {
@@ -75,9 +78,9 @@ export function ProspectContactsTab({
           { duration: 8000 },
         );
       } else if ((res.contacts_found ?? 0) > 0) {
-        toast.success(`${res.contacts_found} contato(s) encontrado(s) (${res.decision_makers_found ?? 0} decisor(es))${ep}`);
+        toast.success(`${res.contacts_found} contato(s) encontrado(s) (${res.decision_makers_found ?? 0} decisor(es))${ep}${titlesNote}`);
       } else {
-        toast.warning(`Nenhum contato encontrado${ep}. Tente outro domínio ou endpoint.`, { duration: 6000 });
+        toast.warning(`Nenhum contato encontrado${ep}${titlesNote}. Tente outros cargos ou domínio.`, { duration: 6000 });
       }
     } catch (e: any) {
       toast.error(e?.message || "Erro ao chamar Apollo");

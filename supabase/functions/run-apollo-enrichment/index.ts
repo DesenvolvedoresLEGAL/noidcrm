@@ -43,10 +43,24 @@ function pickDomain(p: Prospect): string | null {
   } catch { return null; }
 }
 
-function isRelevantTitle(title: string | null | undefined): boolean {
+function isRelevantTitle(title: string | null | undefined, titles: string[] = RELEVANT_TITLES): boolean {
   if (!title) return false;
   const t = title.toLowerCase();
-  return RELEVANT_TITLES.some((kw) => t.includes(kw));
+  return titles.some((kw) => t.includes(kw.toLowerCase()));
+}
+
+function sanitizeCustomTitles(input: unknown): string[] {
+  if (!Array.isArray(input)) return [];
+  const out: string[] = [];
+  for (const v of input) {
+    if (typeof v !== "string") continue;
+    const t = v.trim();
+    if (!t) continue;
+    if (t.length > 80) continue;
+    out.push(t);
+    if (out.length >= 25) break;
+  }
+  return out;
 }
 
 function seniorityBonus(title: string | null | undefined): number {
@@ -171,6 +185,8 @@ Deno.serve(async (req: Request) => {
     const body = await req.json().catch(() => ({}));
     const prospect_id: string | undefined = body.prospect_id;
     const trigger_source: string = body.trigger_source ?? "user";
+    const customTitles = sanitizeCustomTitles(body.custom_titles);
+    const titlesToUse = customTitles.length > 0 ? customTitles : RELEVANT_TITLES;
     if (!prospect_id) {
       return new Response(JSON.stringify({ error: "prospect_id required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -257,7 +273,7 @@ Deno.serve(async (req: Request) => {
       workspace_id: prospect.organization_id,
       prospect_id, provider: "apollo", status: "running",
       trigger_source, estimated_credits: ESTIMATED_CREDITS,
-      request: { domain, person_titles: RELEVANT_TITLES, review_required, quality_label: qLabel, trigger_source },
+      request: { domain, person_titles: titlesToUse, custom_titles_used: customTitles.length > 0, review_required, quality_label: qLabel, trigger_source },
     }).select("id").single();
 
     await trackEvent(sb, prospect.organization_id, "apollo_enrichment_started", {
@@ -269,7 +285,8 @@ Deno.serve(async (req: Request) => {
     //    - accessible & empty -> try next
     //    - inaccessible (403/API_INACCESSIBLE) -> log and try next, do NOT abort
     const attempts: Array<{ endpoint: string; status: number; ok: boolean; inaccessible: boolean; count: number; error?: string }> = [];
-    const searchKeywords = [prospect.company_name, domain].filter(Boolean).join(" ") || domain;
+    const titlesKeyword = customTitles.length > 0 ? customTitles.slice(0, 3).join(" OR ") : "";
+    const searchKeywords = [prospect.company_name, domain, titlesKeyword].filter(Boolean).join(" ") || domain;
 
     let people: any[] = [];
     let endpointUsed: string | null = null;
@@ -279,7 +296,7 @@ Deno.serve(async (req: Request) => {
     {
       const r = await callApollo(APOLLO_PEOPLE_URL, {
         q_organization_domains: domain,
-        person_titles: RELEVANT_TITLES,
+        person_titles: titlesToUse,
         page: 1,
         per_page: 10,
       }, APOLLO_API_KEY);
@@ -377,7 +394,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // 7. Process contacts — accept everything, but score by relevance
-    const filtered = people.filter((p) => isRelevantTitle(p.title) || p.email || p.linkedin_url);
+    const filtered = people.filter((p) => isRelevantTitle(p.title, titlesToUse) || p.email || p.linkedin_url);
 
     let decisionMakers = 0;
     let emailsFound = 0;
