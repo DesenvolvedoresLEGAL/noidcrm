@@ -81,7 +81,7 @@ Deno.serve(async (req: Request) => {
 
     // Tenant guard: ensure user belongs to this organization
     const { data: membership } = await sb
-      .from("user_organizations")
+      .from("organization_members")
       .select("organization_id")
       .eq("user_id", userRes.user.id)
       .eq("organization_id", contact.workspace_id)
