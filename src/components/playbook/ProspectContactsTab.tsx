@@ -197,7 +197,7 @@ export function ProspectContactsTab({
           <AlertCircle className="h-5 w-5 mx-auto mb-2 opacity-50" />
           Nenhum decisor mapeado ainda. Use <strong>Enriquecer (Apollo)</strong> para buscar contatos.
           <div className="text-xs mt-2 opacity-75">
-            Requer: quality_label = high_confidence, priority_score ≥ 180.
+            Modo teste Kairós: enriquecimento manual liberado para qualquer qualidade.
           </div>
         </Card>
       )}
