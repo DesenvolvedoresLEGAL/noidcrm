@@ -145,6 +145,32 @@ export function LeadResultsTable({
     });
   }, [prospects, activeFilter]);
 
+  const getDisplayScore = (p: Prospect) => {
+    const s = p.prospect_scores?.[0];
+    if (!s) return 0;
+    const total = (s.icp_fit_score || 0) + (s.signal_score || 0) + (s.data_quality_score || 0) + (s.source_trust_score || 0) - (s.penalty_score || 0);
+    return s.priority_score || total;
+  };
+
+  const sorted = useMemo(() => {
+    if (!sortKey) return filtered;
+    const arr = [...filtered];
+    const dir = sortDir === 'asc' ? 1 : -1;
+    arr.sort((a, b) => {
+      if (sortKey === 'company') {
+        return (a.company_name || '').localeCompare(b.company_name || '', 'pt-BR', { sensitivity: 'base' }) * dir;
+      }
+      if (sortKey === 'score') {
+        return (getDisplayScore(a) - getDisplayScore(b)) * dir;
+      }
+      // grade — A < B < C < D; "-" no fim
+      const ga = a.prospect_scores?.[0]?.grade ?? 'Z';
+      const gb = b.prospect_scores?.[0]?.grade ?? 'Z';
+      return ga.localeCompare(gb) * dir;
+    });
+    return arr;
+  }, [filtered, sortKey, sortDir]);
+
   const allSelected = filtered.length > 0 && filtered.every(p => selectedIds.has(p.id));
 
   const toggleAll = () => {
