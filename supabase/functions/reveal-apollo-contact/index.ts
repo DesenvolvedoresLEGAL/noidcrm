@@ -246,11 +246,14 @@ Deno.serve(async (req: Request) => {
     const apolloPersonId = person?.id ?? person?.person_id ?? contact.apollo_person_id ?? null;
 
     // Apollo charges roughly 1 credit per email + 1 per phone reveal. Approximate when missing actual cost.
+    // Telefone é assíncrono — virá pelo webhook (apollo-phone-webhook). Cobramos só email aqui.
+    const phonePending = !revealedPhone; // se não veio síncrono, está pendente via webhook
     const creditsCharged = (revealedEmail ? 1 : 0) + (revealedPhone ? 1 : 0);
 
     let nextStatus: string;
     if (revealedEmail && revealedPhone) nextStatus = "revealed";
     else if (revealedEmail || revealedPhone) nextStatus = "partial";
+    else if (phonePending) nextStatus = "pending"; // telefone virá pelo webhook
     else nextStatus = "no_data";
 
     const update: Record<string, unknown> = {
