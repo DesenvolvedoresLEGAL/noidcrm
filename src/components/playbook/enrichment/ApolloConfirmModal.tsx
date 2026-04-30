@@ -1,10 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, KeyboardEvent } from "react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Sparkles, AlertTriangle, CheckCircle2, XCircle, Coins } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Loader2, Sparkles, AlertTriangle, CheckCircle2, XCircle, Coins, X, Plus } from "lucide-react";
 import { previewApolloEnrichment, type ApolloPreview } from "@/services/enrichment/apolloPreview";
 import { cn } from "@/lib/utils";
 
@@ -12,32 +14,104 @@ interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   prospectId: string | null;
-  onConfirm: () => Promise<void> | void;
+  onConfirm: (customTitles?: string[]) => Promise<void> | void;
   isRunning: boolean;
+}
+
+const PRESETS: Array<{ label: string; titles: string[] }> = [
+  { label: "Marketing", titles: ["gerente de marketing", "head de marketing", "diretor de marketing", "analista de marketing", "trade marketing", "cmo"] },
+  { label: "Vendas", titles: ["gerente de vendas", "diretor comercial", "head de vendas", "vp de vendas", "chief revenue officer", "cro"] },
+  { label: "Eventos", titles: ["analista de eventos", "coordenador de eventos", "gerente de eventos", "head de eventos"] },
+  { label: "C-Level", titles: ["ceo", "cto", "coo", "cfo", "cmo", "founder", "presidente", "diretor executivo"] },
+  { label: "Compras", titles: ["gerente de compras", "comprador", "head de procurement", "diretor de suprimentos"] },
+];
+
+function parseInput(raw: string): string[] {
+  return raw
+    .split(/[,\n;]/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0 && s.length <= 80);
 }
 
 export function ApolloConfirmModal({ open, onOpenChange, prospectId, onConfirm, isRunning }: Props) {
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState<ApolloPreview | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [titles, setTitles] = useState<string[]>([]);
+  const [draft, setDraft] = useState("");
 
   useEffect(() => {
     if (!open || !prospectId) return;
     setPreview(null); setError(null); setLoading(true);
+    setTitles([]); setDraft("");
     previewApolloEnrichment(prospectId)
       .then(setPreview)
       .catch((e) => setError(e?.message ?? String(e)))
       .finally(() => setLoading(false));
   }, [open, prospectId]);
 
+  const addFromDraft = () => {
+    const parsed = parseInput(draft);
+    if (parsed.length === 0) return;
+    setTitles((prev) => {
+      const seen = new Set(prev.map((t) => t.toLowerCase()));
+      const merged = [...prev];
+      for (const p of parsed) {
+        if (!seen.has(p.toLowerCase()) && merged.length < 25) {
+          merged.push(p);
+          seen.add(p.toLowerCase());
+        }
+      }
+      return merged;
+    });
+    setDraft("");
+  };
+
+  const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault();
+      addFromDraft();
+    } else if (e.key === "Backspace" && draft === "" && titles.length > 0) {
+      setTitles((prev) => prev.slice(0, -1));
+    }
+  };
+
+  const removeTitle = (t: string) => {
+    setTitles((prev) => prev.filter((x) => x !== t));
+  };
+
+  const applyPreset = (presetTitles: string[]) => {
+    setTitles((prev) => {
+      const seen = new Set(prev.map((t) => t.toLowerCase()));
+      const merged = [...prev];
+      for (const p of presetTitles) {
+        if (!seen.has(p.toLowerCase()) && merged.length < 25) {
+          merged.push(p);
+          seen.add(p.toLowerCase());
+        }
+      }
+      return merged;
+    });
+  };
+
   const handleConfirm = async () => {
-    await onConfirm();
+    // Inclui draft pendente se o usuário esqueceu de pressionar Enter
+    const pending = parseInput(draft);
+    const finalTitles = [...titles];
+    const seen = new Set(finalTitles.map((t) => t.toLowerCase()));
+    for (const p of pending) {
+      if (!seen.has(p.toLowerCase()) && finalTitles.length < 25) {
+        finalTitles.push(p);
+        seen.add(p.toLowerCase());
+      }
+    }
+    await onConfirm(finalTitles.length > 0 ? finalTitles : undefined);
     onOpenChange(false);
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-primary" /> Enriquecer com Apollo
@@ -97,6 +171,80 @@ export function ApolloConfirmModal({ open, onOpenChange, prospectId, onConfirm, 
                 <span className="font-bold">{preview.estimated_credits}</span>
               </div>
             </div>
+
+            {/* Custom titles input */}
+            {preview.eligible && (
+              <div className="space-y-2 rounded-md border bg-background p-3">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-semibold uppercase tracking-wide">
+                    Cargos para buscar <span className="text-muted-foreground normal-case font-normal">(opcional)</span>
+                  </Label>
+                  {titles.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setTitles([])}
+                      className="text-[11px] text-muted-foreground hover:text-foreground"
+                    >
+                      Limpar
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap gap-1">
+                  {PRESETS.map((p) => (
+                    <button
+                      key={p.label}
+                      type="button"
+                      onClick={() => applyPreset(p.titles)}
+                      className="text-[11px] px-2 py-0.5 rounded-full border bg-muted/40 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      + {p.label}
+                    </button>
+                  ))}
+                </div>
+
+                {titles.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {titles.map((t) => (
+                      <Badge key={t} variant="secondary" className="gap-1 pr-1 font-normal">
+                        {t}
+                        <button
+                          type="button"
+                          onClick={() => removeTitle(t)}
+                          className="rounded-full hover:bg-background/60 p-0.5"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+
+                <div className="flex gap-1.5">
+                  <Input
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    onKeyDown={onKeyDown}
+                    placeholder="ex: gerente de marketing, analista de eventos…"
+                    className="h-8 text-xs"
+                    disabled={titles.length >= 25}
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={addFromDraft}
+                    disabled={!draft.trim() || titles.length >= 25}
+                    className="h-8 px-2"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+                <p className="text-[10px] text-muted-foreground leading-tight">
+                  Pressione Enter ou vírgula para adicionar. Vazio = busca decisores genéricos (CEO, Diretor, Gerente, Marketing, Sales…).
+                </p>
+              </div>
+            )}
 
             {!preview.eligible && preview.reason && (
               <div className={cn(
