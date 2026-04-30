@@ -140,7 +140,7 @@ export async function syncEnrichedContactsToAccount(
 }
 
 export interface RevealApolloContactResult {
-  status: "revealed" | "partial" | "no_data" | "skipped" | "failed";
+  status: "revealed" | "partial" | "pending" | "no_data" | "skipped" | "failed";
   contact_id?: string;
   email?: string | null;
   phone?: string | null;

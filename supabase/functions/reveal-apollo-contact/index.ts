@@ -146,9 +146,15 @@ Deno.serve(async (req: Request) => {
     }
 
     // Build Apollo payload — prefer apollo_person_id, otherwise identify by name+domain
+    // IMPORTANT: Apollo exige webhook_url HTTPS público quando reveal_phone_number=true (telefone é assíncrono).
+    const webhookToken = Deno.env.get("APOLLO_WEBHOOK_TOKEN") ?? "";
+    const webhookBase = `${SUPABASE_URL}/functions/v1/apollo-phone-webhook`;
+    const webhookUrl = `${webhookBase}?contact_id=${encodeURIComponent(contact_id)}${webhookToken ? `&token=${encodeURIComponent(webhookToken)}` : ""}`;
+
     const payload: Record<string, unknown> = {
       reveal_personal_emails: true,
       reveal_phone_number: true,
+      webhook_url: webhookUrl,
     };
     if (contact.apollo_person_id) {
       payload.id = contact.apollo_person_id;
@@ -240,11 +246,14 @@ Deno.serve(async (req: Request) => {
     const apolloPersonId = person?.id ?? person?.person_id ?? contact.apollo_person_id ?? null;
 
     // Apollo charges roughly 1 credit per email + 1 per phone reveal. Approximate when missing actual cost.
+    // Telefone é assíncrono — virá pelo webhook (apollo-phone-webhook). Cobramos só email aqui.
+    const phonePending = !revealedPhone; // se não veio síncrono, está pendente via webhook
     const creditsCharged = (revealedEmail ? 1 : 0) + (revealedPhone ? 1 : 0);
 
     let nextStatus: string;
     if (revealedEmail && revealedPhone) nextStatus = "revealed";
     else if (revealedEmail || revealedPhone) nextStatus = "partial";
+    else if (phonePending) nextStatus = "pending"; // telefone virá pelo webhook
     else nextStatus = "no_data";
 
     const update: Record<string, unknown> = {
