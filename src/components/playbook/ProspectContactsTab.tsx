@@ -66,6 +66,18 @@ export function ProspectContactsTab({
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const sync = useSyncEnrichedContacts();
+  const reveal = useRevealApolloContact();
+  const [revealingId, setRevealingId] = useState<string | null>(null);
+
+  const handleReveal = (contact: { id: string; full_name: string | null }) => {
+    const name = contact.full_name ?? "este contato";
+    if (!window.confirm(`Revelar email e telefone de ${name}?\n\nIsso consome até 2 créditos da Apollo.`)) return;
+    setRevealingId(contact.id);
+    reveal.mutate(
+      { contactId: contact.id, prospectId, contactName: contact.full_name ?? undefined },
+      { onSettled: () => setRevealingId(null) },
+    );
+  };
 
   // Default selection: primary + decisores (c_level/vp/director/manager) com email
   useEffect(() => {
