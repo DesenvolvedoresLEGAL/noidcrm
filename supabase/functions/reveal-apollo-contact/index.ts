@@ -253,8 +253,8 @@ Deno.serve(async (req: Request) => {
 
     let nextStatus: string;
     if (revealedEmail && revealedPhone) nextStatus = "revealed";
+    else if (phonePending) nextStatus = "pending"; // telefone virá pelo webhook, mesmo quando o e-mail já veio síncrono
     else if (revealedEmail || revealedPhone) nextStatus = "partial";
-    else if (phonePending) nextStatus = "pending"; // telefone virá pelo webhook
     else nextStatus = "no_data";
 
     const update: Record<string, unknown> = {
