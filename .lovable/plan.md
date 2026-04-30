@@ -1,110 +1,112 @@
-## Sprint E.1.2 — Apollo Realtime & Contact Governance
+## Diagnóstico
 
-Objetivo: contatos enriquecidos chegando em tempo real, sem duplicação, com 1 único decisor principal confiável e protegido contra race conditions.
+A página `apasshow.com/expositores` **não lista expositores em HTML**. Ela embute um iframe do **ExpoFP** (`apasshow2026.expofp.com`), que é uma plataforma SaaS de mapas virtuais usada por dezenas de feiras (APAS, NRF, Anuga, CES regionais, etc.). Por isso o scrape Firecrawl trouxe lixo — "Mapa do Evento", "Por que expor na APAS Show", "Localização" — que são seções da página de marketing, não expositores.
 
----
+**Boa notícia:** o ExpoFP serve os dados num JSON público, simples e estável.
 
-### 1. Migration de schema (`enriched_contact_profiles`)
+### Endpoint descoberto (validado agora)
 
-- Adicionar `email_normalized text` (gerado via trigger: `lower(trim(email))`).
-- Adicionar `is_merged boolean default false` (soft-merge, nunca delete físico).
-- Adicionar `merged_into uuid` referenciando o contato vencedor (auditoria).
-- Backfill: `update set email_normalized = lower(trim(email))` em todos existentes.
-- Substituir índice atual `uniq_ectp_prospect_email` por:
-  - `idx_unique_contact_email_org`: UNIQUE em `(workspace_id, email_normalized)` WHERE `email is not null AND is_merged = false`. Dedupe global por org.
-  - `idx_one_primary_contact`: UNIQUE em `(prospect_id)` WHERE `is_primary = true AND is_merged = false`. Garante 1 primary por prospect.
-- Trigger `trg_normalize_contact_email` BEFORE INSERT/UPDATE para preencher `email_normalized` automaticamente.
-
-### 2. RPC `resolve_primary_contact(p_prospect_id uuid)` (SECURITY DEFINER, search_path=public)
-
-Roda numa única transação para evitar race condition:
-1. Seleciona melhor contato não-merged ordenado por: `confidence_score DESC, seniority_rank DESC, created_at ASC`.
-2. `update ... set is_primary = false where prospect_id = p_prospect_id`.
-3. `update ... set is_primary = true where id = vencedor`.
-4. Retorna o ID do primary.
-
-### 3. RPC `dedupe_prospect_contacts(p_prospect_id uuid)` (SECURITY DEFINER)
-
-1. Agrupa por `email_normalized` (não nulo).
-2. Para cada grupo com >1, mantém o de maior `confidence_score` e marca os outros com `is_merged = true, merged_into = vencedor.id`.
-3. Retorna contagem deduped.
-4. Insere `system_event` `lead.deduped` com `{ prospect_id, deduped_count }`.
-
-### 4. Edge function `run-apollo-enrichment` — pós-processamento
-
-Após inserir os contatos, no lugar do bloco atual de "set primary manual":
-```ts
-await sb.rpc("dedupe_prospect_contacts", { p_prospect_id: prospect_id });
-await sb.rpc("resolve_primary_contact", { p_prospect_id: prospect_id });
 ```
-Remover a lógica manual de `is_primary` que existe hoje (lines 289-294). Tratar conflito de UNIQUE no insert (`23505`) como contato já existente — não falhar o job, só pular.
+GET https://<event>.expofp.com/data/version.js   → window.__fpDataVersion = "<v>"
+GET https://<event>.expofp.com/data/data.js?v=<v>  → var __data = { exhibitors: [...] }
+```
 
-Eventos adicionais via `trackEvent`:
-- `lead.enriched` (já existe como `apollo_enrichment_completed`, manter).
-- `decision_maker_found` (já existe, manter).
-- `lead.deduped` se RPC retornar >0.
+Resultado para APAS 2026: **578 expositores** com `id`, `externalId`, `name`, `categories[]`, `country`, `logo` (336/578 com categoria, 108/578 com país). Endpoint requer `Referer: https://<event>.expofp.com/` e User-Agent de browser.
 
-### 5. Hook `useRealtimeContacts` (global)
+**Limitação:** o JSON do ExpoFP só dá nome+categoria+país. Não traz site, CNPJ, descrição. Isso é OK — o nome é exatamente o input que o pipeline atual (Caramelo → enrichment → CNPJ lookup → Apollo) já sabe processar. O que estava errado era a **fonte do nome**, não o enriquecimento.
 
-Novo hook em `src/hooks/useRealtimeContacts.ts` registrado no layout autenticado (uma única subscription por usuário, escopada por `organization_id` via filtro):
-- Escuta `INSERT` em `enriched_contact_profiles` da org → toast `🎯 Novo decisor encontrado: <nome> · <cargo>`.
-- Escuta `UPDATE` quando `is_primary` muda para `true` → toast `🔄 Decisor principal atualizado`.
-- Escuta `UPDATE` quando `is_merged` vira `true` → silencioso (só invalida query).
+## Plano
 
-`useEnrichedContacts(prospectId)` permanece com a subscription local (granular do drawer), mas filtra `is_merged = false` na listagem.
+### 1. Novo provider: `ExpoFPProvider` (Edge Function)
 
-### 6. Frontend: `ProspectContactsTab`
+Criar `supabase/functions/lead-sourcing/providers/expofp.ts` com duas funções puras:
 
-- Listagem filtra `is_merged = false`.
-- Card do primary recebe badge dourado `⭐ Decisor Principal`.
-- Botão `Marcar como principal` chama nova função `setPrimaryContact` que faz `supabase.rpc('resolve_primary_contact_manual', { p_prospect_id, p_contact_id })` — RPC similar mas força um ID específico (override manual).
-- Novo grupo "Duplicados resolvidos" expansível embaixo (collapse), mostrando contatos com `is_merged=true` somente para admins, com link "ver original".
+- `detectExpoFP(eventUrl, html)`: dado o HTML da página do evento, procura iframe `*.expofp.com` ou atributo `data-event-id`. Retorna `{ subdomain, eventId } | null`.
+- `fetchExpoFPExhibitors(subdomain)`:
+  1. `GET /data/version.js` → extrai `__fpDataVersion`
+  2. `GET /data/data.js?v=<version>` (com Referer e UA de browser, BOM-safe)
+  3. Faz `eval` controlado da expressão `var __data = {...};` (parse com regex + `JSON.parse` da parte após `=`)
+  4. Resolve `categories[]` (IDs → nomes) usando o array `categories` no mesmo payload
+  5. Retorna `Array<{ name, country, categories[], external_id, source_url, raw }>`
 
-### 7. Quality Panel (header da aba Contatos)
+### 2. Detecção automática no handler de evento
 
-Cards compactos mostrando:
-- Total de contatos ativos
-- Decisores encontrados (c_level + vp + director)
-- Emails válidos (`email_status = verified`)
-- Score médio
-- Duplicados resolvidos (count `is_merged=true`)
+Em `handleEventFirecrawl` (lead-sourcing/index.ts, linha ~980), antes do `firecrawl.map`:
 
-Dados derivados client-side a partir do array já carregado.
+```text
+1. Fetch HTML da event_url (já feito hoje no fluxo)
+2. Tenta detectExpoFP(html)
+3. Se positivo:
+     - logRunEvent("ExpoFP detectado", { subdomain })
+     - exhibitors = fetchExpoFPExhibitors(subdomain)
+     - Pula Firecrawl map+scrape+AI chunking inteiramente
+     - Vai direto para a etapa de "extracted_raw" → dedupe → score → persist
+4. Se negativo: mantém pipeline Firecrawl atual (zero regressão)
+```
 
-### 8. Tipos / serviços
+Reaproveita 100% da pipeline downstream (`prospects` insert, scoring, dedupe, auto-import). Só substitui a fonte da lista bruta.
 
-- Atualizar `apolloService.setPrimaryContact` para usar RPC `resolve_primary_contact_manual` ao invés do double-update atual (que tem race condition).
-- Adicionar `listEnrichedContacts` filtrando `is_merged = false`.
+### 3. Provider registry (extensível)
 
----
+Estrutura para adicionar próximos SaaS de mapa de feira sem tocar no handler principal:
 
-### Arquivos impactados
+```text
+providers/
+  expofp.ts     ← este sprint
+  swapcard.ts   ← já existe inline, mover para cá depois
+  index.ts      ← detect(html, url) → tenta cada provider em ordem
+```
 
-**Novos:**
-- `supabase/migrations/<ts>_apollo_dedupe_governance.sql` (schema + RPCs + trigger)
-- `src/hooks/useRealtimeContacts.ts` (listener global)
-- `src/components/playbook/enrichment/ContactsQualityPanel.tsx`
-- `src/components/playbook/enrichment/MergedContactsAccordion.tsx`
+Esse sprint só implementa ExpoFP + scaffold do registry. Swapcard fica intocado.
 
-**Editados:**
-- `supabase/functions/run-apollo-enrichment/index.ts` (chamar RPCs, remover lógica manual de primary)
-- `src/services/enrichment/apolloService.ts` (RPC para setPrimary, filtro is_merged)
-- `src/hooks/useEnrichedContacts.ts` (filtro is_merged na query)
-- `src/components/playbook/ProspectContactsTab.tsx` (quality panel + accordion duplicados)
-- `src/App.tsx` ou layout autenticado (montar `useRealtimeContacts()` uma vez)
-- `src/integrations/supabase/types.ts` (regenerado automaticamente)
+### 4. UX — sinalizar a fonte ao usuário
 
-### Riscos e mitigações
+No `playbook_runs.stats` adicionar:
 
-- **Conflito no UNIQUE global por org**: contato com mesmo email em prospects diferentes hoje seria duplicado. Mitigação: o índice é `WHERE is_merged = false` — se houver colisão real no backfill, deduplicamos antes de criar o índice (CTE no migration mantendo o mais recente).
-- **Race condition**: resolvido via RPC SECURITY DEFINER em transação única.
-- **Realtime spam**: filtro por `organization_id` no channel + dedupe via toast id evita N toasts simultâneos.
-- **Override manual sumindo**: campo opcional `is_primary_locked boolean` (futuro) — fora do escopo desta sprint, mas RPC já recebe `p_force` para não sobrescrever quando flag estiver presente.
+- `provider: "expofp" | "firecrawl"`
+- `expofp_event_id`, `expofp_exhibitors_count`, `expofp_with_country`, `expofp_with_categories`
 
-### Critério de sucesso
+Na tela de resultados (Sourcing), badge ao lado do nome da execução: **"📍 ExpoFP · 578 expositores"** (componente já existe — só ler `stats.provider`).
 
-- Nenhum contato duplicado visível na UI (filtro `is_merged=false`).
-- Sempre exatamente 1 `is_primary=true` por prospect (garantido por índice UNIQUE).
-- Toast aparece <2s após Apollo retornar.
-- Re-rodar enrichment não cria duplicatas (UNIQUE + dedupe RPC).
-- User pode trocar primary e mudança persiste.
+### 5. Fallback gracioso
+
+Se o ExpoFP for detectado mas o fetch falhar (403, mudança de schema):
+
+- log_event "ExpoFP fetch falhou, caindo para Firecrawl"
+- Continua o fluxo Firecrawl normal
+- Sem failure visível pro SDR
+
+### 6. Limpeza dos resultados ruins da APAS
+
+Migration única para marcar como `rejected` (não deletar — manter auditoria) os 8 `lead_search_results` da execução `APAS SHOW 2026 · 29/04/26 às 20:50` cujos nomes batem com lixo conhecido: `MAPA DO EVENTO`, `Por que expor%`, `Vamos conversar?`, `ATENDIMENTO AO EXPOSITOR`, `Localização`, `Mapa Virtual%`. Adicional: flag `is_garbage = true` + `rejection_reason = "non-exhibitor content"`.
+
+## Arquivos impactados
+
+- **novo** `supabase/functions/lead-sourcing/providers/expofp.ts` (~120 linhas)
+- **novo** `supabase/functions/lead-sourcing/providers/index.ts` (registry, ~30 linhas)
+- **edit** `supabase/functions/lead-sourcing/index.ts` — inserir bloco de detecção no início de `handleEventFirecrawl` (~30 linhas)
+- **edit** `src/components/playbook/...` (componente do card de execução) — badge do provider
+- **migration** marcar resultados-lixo da execução APAS atual como rejected
+
+## Critério de sucesso
+
+Re-rodar a busca em `https://apasshow.com/expositores`:
+
+- ✔ retorna 500+ expositores (nomes reais: "101 do Brasil Bebidas", "Aurora Coop", "Bebidas do Brasil | Gin Eternity"...)
+- ✔ stats mostra `provider: "expofp"`
+- ✔ tempo de execução cai de ~150s (Firecrawl) para <10s (1 fetch JSON)
+- ✔ custo Firecrawl zera para esse evento
+- ✔ pipeline de enriquecimento (CNPJ, Apollo) funciona normal sobre os nomes ExpoFP
+- ✔ zero regressão em buscas de eventos não-ExpoFP (ABRINT, FEIMEC, BETT continuam via Firecrawl)
+
+## Riscos
+
+- **Schema do ExpoFP pode mudar** → mitigado pelo fallback automático para Firecrawl
+- **Eventos com ExpoFP privado/autenticado** → fetch retorna 403, fallback aciona, sem quebrar
+- **Outro SaaS similar (mapyourshow, a2zinc)** → fora de escopo deste sprint, mas o registry deixa pronto pra adicionar
+
+## Próximos passos (fora deste sprint)
+
+- Provider `mapyourshow` (NRF, IBIE)
+- Provider `a2zinc` (várias feiras industriais US)
+- Enriquecimento de `website` direto via Google Custom Search a partir do nome ExpoFP, antes de cair no Caramelo
