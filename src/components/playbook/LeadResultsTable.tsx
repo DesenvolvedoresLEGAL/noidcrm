@@ -9,7 +9,7 @@ import {
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Check, X, AlertTriangle, Download, PackageCheck } from 'lucide-react';
+import { Check, X, AlertTriangle, Download, PackageCheck, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Prospect } from '@/hooks/useLeadSourcingV2';
 import { DecisionBadge } from '@/components/decision-engine/DecisionBadge';
@@ -107,6 +107,22 @@ export function LeadResultsTable({
 }: LeadResultsTableProps) {
   const [activeFilter, setActiveFilter] = useState<FilterKey>('all');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [sortKey, setSortKey] = useState<'company' | 'score' | 'grade' | null>(null);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+
+  const toggleSort = (key: 'company' | 'score' | 'grade') => {
+    if (sortKey === key) {
+      setSortDir(d => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDir(key === 'company' ? 'asc' : 'desc');
+    }
+  };
+
+  const SortIcon = ({ k }: { k: 'company' | 'score' | 'grade' }) => {
+    if (sortKey !== k) return <ArrowUpDown className="h-3 w-3 opacity-50" />;
+    return sortDir === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />;
+  };
 
   const filtered = useMemo(() => {
     return prospects.filter(p => {
@@ -128,6 +144,32 @@ export function LeadResultsTable({
       }
     });
   }, [prospects, activeFilter]);
+
+  const getDisplayScore = (p: Prospect) => {
+    const s = p.prospect_scores?.[0];
+    if (!s) return 0;
+    const total = (s.icp_fit_score || 0) + (s.signal_score || 0) + (s.data_quality_score || 0) + (s.source_trust_score || 0) - (s.penalty_score || 0);
+    return s.priority_score || total;
+  };
+
+  const sorted = useMemo(() => {
+    if (!sortKey) return filtered;
+    const arr = [...filtered];
+    const dir = sortDir === 'asc' ? 1 : -1;
+    arr.sort((a, b) => {
+      if (sortKey === 'company') {
+        return (a.company_name || '').localeCompare(b.company_name || '', 'pt-BR', { sensitivity: 'base' }) * dir;
+      }
+      if (sortKey === 'score') {
+        return (getDisplayScore(a) - getDisplayScore(b)) * dir;
+      }
+      // grade — A < B < C < D; "-" no fim
+      const ga = a.prospect_scores?.[0]?.grade ?? 'Z';
+      const gb = b.prospect_scores?.[0]?.grade ?? 'Z';
+      return ga.localeCompare(gb) * dir;
+    });
+    return arr;
+  }, [filtered, sortKey, sortDir]);
 
   const allSelected = filtered.length > 0 && filtered.every(p => selectedIds.has(p.id));
 
@@ -217,7 +259,15 @@ export function LeadResultsTable({
                 <TableHead className="w-10">
                   <Checkbox checked={allSelected} onCheckedChange={toggleAll} />
                 </TableHead>
-                <TableHead>Empresa</TableHead>
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() => toggleSort('company')}
+                    className="inline-flex items-center gap-1 hover:text-foreground transition-colors"
+                  >
+                    Empresa <SortIcon k="company" />
+                  </button>
+                </TableHead>
                 <TableHead>Origem</TableHead>
                 <TableHead className="text-center">
                   <Tooltip>
@@ -229,8 +279,24 @@ export function LeadResultsTable({
                     </TooltipContent>
                   </Tooltip>
                 </TableHead>
-                <TableHead className="text-center">Score</TableHead>
-                <TableHead className="text-center">Grade</TableHead>
+                <TableHead className="text-center">
+                  <button
+                    type="button"
+                    onClick={() => toggleSort('score')}
+                    className="inline-flex items-center gap-1 hover:text-foreground transition-colors mx-auto"
+                  >
+                    Score <SortIcon k="score" />
+                  </button>
+                </TableHead>
+                <TableHead className="text-center">
+                  <button
+                    type="button"
+                    onClick={() => toggleSort('grade')}
+                    className="inline-flex items-center gap-1 hover:text-foreground transition-colors mx-auto"
+                  >
+                    Grade <SortIcon k="grade" />
+                  </button>
+                </TableHead>
                 <TableHead>Duplicidade</TableHead>
                 <TableHead>Sinais</TableHead>
                 <TableHead>Status</TableHead>
@@ -238,7 +304,7 @@ export function LeadResultsTable({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map(prospect => {
+              {sorted.map(prospect => {
                 const score = prospect.prospect_scores?.[0];
                 const priorityScore = score?.priority_score ?? 0;
                 const totalScore = score
