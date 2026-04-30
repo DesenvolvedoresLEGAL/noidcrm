@@ -2,12 +2,14 @@
  * Sprint 2.7 — Tela V2: Forecast de Receita.
  * Cenários e atingimento vêm do edge function (não do frontend).
  */
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
-  TrendingUp, Target, Activity, DollarSign, AlertCircle,
+  TrendingUp, Target, Activity, DollarSign, AlertCircle, Calculator,
 } from 'lucide-react';
+import { ForecastAuditDrawer } from './forecast-audit/ForecastAuditDrawer';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useTeamVisibility } from '@/hooks/useTeamVisibility';
 import { useReportFiltersContext } from '@/contexts/ReportFiltersContext';
@@ -51,6 +53,7 @@ export function RevenueForecastV2() {
   const { organization } = useCurrentUser();
   const { filters, effectiveDates } = useReportFiltersContext();
   const teamVisibility = useTeamVisibility();
+  const [auditOpen, setAuditOpen] = useState(false);
 
   const request = useMemo(() => {
     if (!organization?.id || teamVisibility.loading) return undefined;
@@ -86,8 +89,29 @@ export function RevenueForecastV2() {
 
   return (
     <div className="space-y-4">
-      <ReportMetaBar meta={meta} reportLabel="Forecast" />
+      <div className="flex items-center justify-between gap-2">
+        <ReportMetaBar meta={meta} reportLabel="Forecast" />
+        <Button
+          size="sm"
+          variant="ghost"
+          className="shrink-0 gap-1.5"
+          onClick={() => setAuditOpen(true)}
+          title="Auditar de onde saem os números"
+        >
+          <Calculator className="h-3.5 w-3.5" />
+          Ver cálculo
+        </Button>
+      </div>
       <ReportWarningsPanel confidence={meta?.confidence} />
+
+      <ForecastAuditDrawer
+        open={auditOpen}
+        onOpenChange={setAuditOpen}
+        organizationId={organization?.id}
+        pipelineId={view.primaryPipelineId}
+        periodStart={effectiveDates.startDate}
+        periodEnd={effectiveDates.endDate}
+      />
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <Card>
