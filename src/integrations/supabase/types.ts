@@ -11489,6 +11489,134 @@ export type Database = {
         }
         Relationships: []
       }
+      forecast_daily_snapshots: {
+        Row: {
+          accuracy_score: number | null
+          best_case_amount: number | null
+          closed_amount: number | null
+          closed_won_final_amount: number | null
+          commit_amount: number | null
+          created_at: string | null
+          data_quality_score: number | null
+          deals_count: number | null
+          excluded_deals_count: number | null
+          expired_close_date_count: number | null
+          forecast_confidence: number | null
+          forecast_error_amount: number | null
+          forecast_error_percentage: number | null
+          id: string
+          included_deals_count: number | null
+          low_nrhs_count: number | null
+          metadata: Json | null
+          monthly_goal: number | null
+          no_next_step_count: number | null
+          no_recent_activity_count: number | null
+          nrhs_avg: number | null
+          organization_id: string
+          period_end: string
+          period_start: string
+          period_type: string
+          pipeline_id: string | null
+          pipeline_total: number | null
+          risk_deals_count: number | null
+          run_id: string | null
+          scenario_best_case: number | null
+          scenario_optimistic: number | null
+          scenario_pessimistic: number | null
+          scenario_realistic: number | null
+          seller_id: string | null
+          slipping_deals_count: number | null
+          snapshot_date: string
+          updated_at: string | null
+        }
+        Insert: {
+          accuracy_score?: number | null
+          best_case_amount?: number | null
+          closed_amount?: number | null
+          closed_won_final_amount?: number | null
+          commit_amount?: number | null
+          created_at?: string | null
+          data_quality_score?: number | null
+          deals_count?: number | null
+          excluded_deals_count?: number | null
+          expired_close_date_count?: number | null
+          forecast_confidence?: number | null
+          forecast_error_amount?: number | null
+          forecast_error_percentage?: number | null
+          id?: string
+          included_deals_count?: number | null
+          low_nrhs_count?: number | null
+          metadata?: Json | null
+          monthly_goal?: number | null
+          no_next_step_count?: number | null
+          no_recent_activity_count?: number | null
+          nrhs_avg?: number | null
+          organization_id: string
+          period_end: string
+          period_start: string
+          period_type?: string
+          pipeline_id?: string | null
+          pipeline_total?: number | null
+          risk_deals_count?: number | null
+          run_id?: string | null
+          scenario_best_case?: number | null
+          scenario_optimistic?: number | null
+          scenario_pessimistic?: number | null
+          scenario_realistic?: number | null
+          seller_id?: string | null
+          slipping_deals_count?: number | null
+          snapshot_date: string
+          updated_at?: string | null
+        }
+        Update: {
+          accuracy_score?: number | null
+          best_case_amount?: number | null
+          closed_amount?: number | null
+          closed_won_final_amount?: number | null
+          commit_amount?: number | null
+          created_at?: string | null
+          data_quality_score?: number | null
+          deals_count?: number | null
+          excluded_deals_count?: number | null
+          expired_close_date_count?: number | null
+          forecast_confidence?: number | null
+          forecast_error_amount?: number | null
+          forecast_error_percentage?: number | null
+          id?: string
+          included_deals_count?: number | null
+          low_nrhs_count?: number | null
+          metadata?: Json | null
+          monthly_goal?: number | null
+          no_next_step_count?: number | null
+          no_recent_activity_count?: number | null
+          nrhs_avg?: number | null
+          organization_id?: string
+          period_end?: string
+          period_start?: string
+          period_type?: string
+          pipeline_id?: string | null
+          pipeline_total?: number | null
+          risk_deals_count?: number | null
+          run_id?: string | null
+          scenario_best_case?: number | null
+          scenario_optimistic?: number | null
+          scenario_pessimistic?: number | null
+          scenario_realistic?: number | null
+          seller_id?: string | null
+          slipping_deals_count?: number | null
+          snapshot_date?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "forecast_daily_snapshots_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "forecast_calculation_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       forecast_predictions: {
         Row: {
           actual_value: number | null
@@ -11642,6 +11770,51 @@ export type Database = {
             referencedColumns: ["organization_id"]
           },
         ]
+      }
+      forecast_snapshot_job_logs: {
+        Row: {
+          created_at: string | null
+          error_message: string | null
+          finished_at: string | null
+          id: string
+          metadata: Json | null
+          organization_id: string | null
+          pipeline_id: string | null
+          snapshots_attempted: number | null
+          snapshots_created: number | null
+          snapshots_failed: number | null
+          started_at: string | null
+          status: string
+        }
+        Insert: {
+          created_at?: string | null
+          error_message?: string | null
+          finished_at?: string | null
+          id?: string
+          metadata?: Json | null
+          organization_id?: string | null
+          pipeline_id?: string | null
+          snapshots_attempted?: number | null
+          snapshots_created?: number | null
+          snapshots_failed?: number | null
+          started_at?: string | null
+          status?: string
+        }
+        Update: {
+          created_at?: string | null
+          error_message?: string | null
+          finished_at?: string | null
+          id?: string
+          metadata?: Json | null
+          organization_id?: string | null
+          pipeline_id?: string | null
+          snapshots_attempted?: number | null
+          snapshots_created?: number | null
+          snapshots_failed?: number | null
+          started_at?: string | null
+          status?: string
+        }
+        Relationships: []
       }
       forecast_snapshots: {
         Row: {
@@ -30200,6 +30373,17 @@ export type Database = {
           score_range: string
         }[]
       }
+      create_forecast_daily_snapshot_v2: {
+        Args: {
+          p_organization_id: string
+          p_period_end: string
+          p_period_start: string
+          p_pipeline_id: string
+          p_seller_id?: string
+          p_snapshot_date?: string
+        }
+        Returns: Json
+      }
       create_organization_backup: {
         Args: { p_backup_type?: string; p_organization_id: string }
         Returns: string
@@ -30493,6 +30677,46 @@ export type Database = {
           p_organization_id: string
         }
         Returns: Json
+      }
+      get_forecast_snapshots_v2: {
+        Args: {
+          p_organization_id: string
+          p_period_end?: string
+          p_period_start?: string
+          p_pipeline_id?: string
+          p_seller_id?: string
+        }
+        Returns: {
+          accuracy_score: number
+          best_case_amount: number
+          closed_amount: number
+          commit_amount: number
+          created_at: string
+          data_quality_score: number
+          deals_count: number
+          excluded_deals_count: number
+          expired_close_date_count: number
+          forecast_confidence: number
+          included_deals_count: number
+          low_nrhs_count: number
+          monthly_goal: number
+          no_next_step_count: number
+          no_recent_activity_count: number
+          nrhs_avg: number
+          period_end: string
+          period_start: string
+          period_type: string
+          pipeline_total: number
+          risk_deals_count: number
+          scenario_best_case: number
+          scenario_optimistic: number
+          scenario_pessimistic: number
+          scenario_realistic: number
+          seller_id: string
+          slipping_deals_count: number
+          snapshot_date: string
+          snapshot_id: string
+        }[]
       }
       get_global_seat_metrics: { Args: never; Returns: Json }
       get_index_usage_stats: {
