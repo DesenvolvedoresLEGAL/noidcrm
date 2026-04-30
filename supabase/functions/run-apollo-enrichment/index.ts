@@ -237,7 +237,10 @@ Deno.serve(async (req: Request) => {
     const ALLOWED_QUALITY = ["high_confidence", "usable"];
     if (!ALLOWED_QUALITY.includes(qLabel as string)) return await skip("low_quality", `quality_label=${qLabel}`);
     if (pScore < 180) return await skip("low_score", `priority_score=${pScore} < 180`);
-    if (prospect.decision_maker_found) return await skip("dm_already_found", "decision_maker_found already true");
+    // Allow re-enrichment even when a decision maker exists — user may want to find additional roles (e.g. marketing managers)
+    if (prospect.decision_maker_found && trigger_source === "automation") {
+      return await skip("dm_already_found", "decision_maker_found already true (automation only)");
+    }
     if (qLabel === "usable" && trigger_source === "automation") {
       return await skip("review_required", "usable quality requires manual trigger");
     }

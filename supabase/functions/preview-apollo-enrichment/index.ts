@@ -77,8 +77,6 @@ Deno.serve(async (req: Request) => {
       eligible = false; reason = `Qualidade insuficiente (${qLabel ?? "sem run"}). Requer high_confidence ou usable.`;
     } else if (pScore < 180) {
       eligible = false; reason = `Score ${pScore} abaixo do mínimo (180).`;
-    } else if (prospect.decision_maker_found) {
-      eligible = false; reason = "Decisor já encontrado para este prospect.";
     } else if (!domain) {
       eligible = false; reason = "Sem domínio disponível para busca Apollo.";
     } else if (recentRunningJob) {
