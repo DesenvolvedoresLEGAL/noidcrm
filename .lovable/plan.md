@@ -1,84 +1,52 @@
-## Por que email e telefone aparecem vazios no Kairós
+## Objetivo
 
-O Apollo trabalha em **dois passos**:
+Permitir o enriquecimento Apollo em **qualquer prospect** (independente de `quality_label` e `priority_score`) durante a fase de testes do Kairós, **sem quebrar** nenhum dos fixes já feitos (reveal email/telefone, webhook de telefone, importação no CRM, anti-spam 24h, rate-limit, anti-duplicação).
 
-1. **Search** (`mixed_people/api_search`) — descobre quem trabalha na empresa, retorna nome, cargo, LinkedIn, mas **mascara email e telefone**. É o que rodamos hoje no enriquecimento.
-2. **Match/Enrich** (`people/match`) — "revela" email e telefone de um contato específico. **Cobra créditos por revelação** (1 crédito por email + 1 por telefone, normalmente).
+## O que será alterado
 
-Quando você abre a Juliana direto no Apollo e clica em "Enriquecer contato", o Apollo executa o passo 2 e mostra os dados. Hoje o Kairós só faz o passo 1, por isso vem "sem e-mail / sem telefone".
+Hoje existem **dois bloqueios duros** que impedem o botão "Confirmar enriquecimento":
 
-A solução é adicionar o passo 2 no Kairós, **sob demanda e por contato** (não em massa, para não estourar créditos).
+1. `quality_label` precisa ser `high_confidence` ou `usable` (bloqueia `low_confidence`, `sem run` etc.)
+2. `priority_score` precisa ser ≥ 180
 
-## O que vai mudar
+Ambos vivem em **dois lugares espelhados** (preview + run). Vou flexibilizar nos dois.
 
-### 1. Nova edge function `reveal-apollo-contact`
-Recebe `enriched_contact_id`, busca o registro, chama `POST https://api.apollo.io/api/v1/people/match` com:
-- `id` (apollo_person_id já salvo) **ou** `first_name + last_name + organization_name + domain` como fallback
-- `reveal_personal_emails: true`
-- `reveal_phone_number: true`
-- `webhook_url` opcional (telefone às vezes vem assíncrono — por enquanto, espera resposta síncrona; se vier vazio, registra "pending")
+### 1. `supabase/functions/preview-apollo-enrichment/index.ts`
+- Remover os bloqueios de `quality_label` e `priority_score` da decisão de `eligible`.
+- Manter como **warning informativo** (não bloqueante), para o usuário ver no modal: "Lead com qualidade `low_confidence` / score 80 — enriquecimento liberado em modo teste."
+- Manter intactos os outros bloqueios reais:
+  - `!domain` → ainda bloqueia (Apollo não funciona sem domínio)
+  - `recentRunningJob` → ainda bloqueia (evita duplicar job em execução)
+  - `recentSuccessfulJob` (anti-spam 24h) → ainda bloqueia
+- `auto_send_allowed` continua `true` só para `high_confidence`; demais qualidades viram `review_required = true` (sem efeito no teste manual, mas protege automações futuras).
 
-Atualiza `enriched_contact_profiles` com `email`, `email_status`, `phone`, e marca `revealed_at` + `reveal_credits_used`. Loga em `enrichment_jobs` (provider=`apollo_reveal`) para auditoria de créditos.
+### 2. `supabase/functions/run-apollo-enrichment/index.ts`
+- Remover os dois `skip()` de `low_quality` e `low_score` quando `trigger_source !== "automation"` (ou seja, em disparo manual pelo usuário).
+- Para `trigger_source === "automation"` continuam valendo as guardas (não queremos que automações disparem em massa em leads ruins).
+- Manter intactos:
+  - Anti-spam 24h
+  - Rate-limit 20/min por org
+  - Guarda de `no_domain`
+  - Bloqueio de `dm_already_found` em automação
 
-### 2. UI no painel de Contatos do prospect
-Em cada card de contato, quando **não houver email/telefone**:
-- Botão pequeno **"Revelar contato (1-2 créditos)"** ao lado dos campos vazios
-- Loading inline; ao revelar, atualiza realtime via cache invalidation
-- Confirmação leve antes de gastar créditos (modal pequeno: "Revelar contato da Juliana? Consome até 2 créditos Apollo.")
+### 3. `src/components/playbook/ProspectContactsTab.tsx` (linha 200)
+- Atualizar o texto "Requer: quality_label = high_confidence, priority_score ≥ 180" para algo como "Modo teste Kairós: enriquecimento liberado para qualquer qualidade." (apenas cosmético).
 
-Se a Apollo retornar email/telefone vazio mesmo após reveal, mostrar badge "não disponível na Apollo" e não cobrar de novo (cache da tentativa por 24h, mesma regra do enrichment).
+## O que **não** será tocado
 
-### 3. Importação no CRM
-Continua igual — agora os contatos selecionados que foram revelados vão para `contacts` da conta com email/telefone populados (já funciona, só precisava dos dados).
-
-## Arquivos
-
-**Criar:**
-- `supabase/functions/reveal-apollo-contact/index.ts`
-- `src/components/playbook/enrichment/RevealContactButton.tsx`
-- `src/hooks/useRevealApolloContact.ts`
-- Migration: adicionar colunas `revealed_at timestamptz`, `reveal_credits_used int default 0`, `last_reveal_attempt_at timestamptz` em `enriched_contact_profiles`
-
-**Editar:**
-- `src/services/enrichment/apolloService.ts` — função `revealApolloContact(contactId)`
-- `src/components/playbook/ProspectContactsTab.tsx` — botão de revelar em cada card sem email/telefone
-- `src/integrations/supabase/types.ts` — auto-regenerado pela migration
-
-## Detalhes técnicos
-
-**Endpoint Apollo:** `POST https://api.apollo.io/api/v1/people/match` com header `x-api-key`. Body mínimo:
-```json
-{
-  "id": "<apollo_person_id>",
-  "reveal_personal_emails": true,
-  "reveal_phone_number": true
-}
-```
-Fallback quando não temos `apollo_person_id` salvo:
-```json
-{
-  "first_name": "Juliana",
-  "last_name": "Abreu",
-  "organization_name": "Tirolez",
-  "domain": "tirolez.com.br",
-  "reveal_personal_emails": true,
-  "reveal_phone_number": true
-}
-```
-
-**Anti-spam:** `last_reveal_attempt_at` < 24h bloqueia nova revelação do mesmo contato (igual lógica do enrichment), evitando double-charge se o usuário clicar duas vezes.
-
-**Telemetria:** insere em `enrichment_jobs` com `provider='apollo_reveal'`, `prospect_id`, `credits_used`, `response_summary={revealed_email, revealed_phone}` para o painel de auditoria já existente.
-
-**Segurança:** edge function valida JWT, confirma que o contato pertence à `organization_id` do usuário antes de chamar a Apollo.
+- `reveal-apollo-contact` e `apollo-phone-webhook` (reveal de email/telefone)
+- `import_prospect_to_pipeline` (importação no CRM)
+- Anti-duplicação, rate-limit, anti-spam 24h
+- RLS, multitenancy, `workspace_id`
+- Lógica de `auto_send_allowed` para automações
 
 ## Riscos
 
-- Apollo às vezes retorna telefone via webhook assíncrono (delay de segundos). Se vier vazio na resposta síncrona, marcamos como "pendente" e o usuário pode tentar novamente em 1 min.
-- Plano Apollo precisa ter `people/match` habilitado. Se vier 403, mostramos a mesma mensagem clara que já usamos no enrichment.
-- Custo: cada clique consome 1-2 créditos. Por isso é por contato e com confirmação.
+- **Baixo**. As guardas de custo/abuso (anti-spam 24h + rate-limit 20/min + domínio obrigatório) continuam ativas, então o consumo de créditos Apollo segue protegido.
+- Automações continuam respeitando os filtros de qualidade — só o disparo **manual** fica livre.
 
-## Próximos passos depois (não nesta entrega)
+## Próximos passos após aprovação
 
-- Botão "Revelar todos os decisores selecionados" em lote, com cálculo prévio de créditos.
-- Toggle por organização: "auto-revelar contatos primários ao enriquecer".
+1. Editar as duas edge functions e o texto do componente.
+2. Deploy automático.
+3. Você testa com o lead "Italac" (que estava `low_confidence` / score 333) e qualquer outro.

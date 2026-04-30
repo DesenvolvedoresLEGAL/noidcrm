@@ -66,18 +66,17 @@ Deno.serve(async (req: Request) => {
     const recentRunningJob = recentJob && lastJobStatus === "running";
     const alreadyEnriched = recentSuccessfulJob;
 
-    const ALLOWED_QUALITY = ["high_confidence", "usable"];
+    // Modo teste Kairós: filtros de quality_label/priority_score viram apenas warnings
+    // (não bloqueiam disparo manual). Automações continuam respeitando-os no run-apollo-enrichment.
     let eligible = true;
     let reason: string | null = null;
     let warning: string | null = null;
     let review_required = false;
     let auto_send_allowed = false;
 
-    if (!ALLOWED_QUALITY.includes(qLabel as string)) {
-      eligible = false; reason = `Qualidade insuficiente (${qLabel ?? "sem run"}). Requer high_confidence ou usable.`;
-    } else if (pScore < 180) {
-      eligible = false; reason = `Score ${pScore} abaixo do mínimo (180).`;
-    } else if (!domain) {
+    const lowQuality = qLabel !== "high_confidence" && qLabel !== "usable";
+
+    if (!domain) {
       eligible = false; reason = "Sem domínio disponível para busca Apollo.";
     } else if (recentRunningJob) {
       eligible = false; reason = "Já existe enriquecimento Apollo em execução.";
@@ -90,13 +89,15 @@ Deno.serve(async (req: Request) => {
     }
 
     if (eligible) {
-      if (qLabel === "usable") {
-        review_required = true;
-        auto_send_allowed = false;
-        warning = "Lead com qualidade utilizável. Enriquecimento permitido, mas recomenda revisão humana antes de automação.";
-      } else if (qLabel === "high_confidence") {
+      if (qLabel === "high_confidence") {
         review_required = false;
         auto_send_allowed = true;
+      } else {
+        // usable, low_confidence, sem run → permitido manual, automação revisa
+        review_required = true;
+        auto_send_allowed = false;
+        const tag = qLabel ?? "sem run";
+        warning = warning ?? `Modo teste Kairós: lead com qualidade "${tag}" (score ${pScore}). Enriquecimento manual liberado — automações continuam respeitando o filtro.`;
       }
     }
 
