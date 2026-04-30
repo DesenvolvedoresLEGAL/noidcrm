@@ -20,6 +20,14 @@ export function useRevealApolloContact() {
       } else if (res.status === "partial") {
         const what = res.email ? "email" : "telefone";
         toast.success(`${what} revelado para ${who} (${res.credits_used ?? 1} crédito).`);
+      } else if (res.status === "pending") {
+        toast.info(
+          `Email revelado para ${who}. Telefone chegará em até 1 min (Apollo entrega assíncrono).`,
+          { duration: 7000 },
+        );
+        // Re-invalidar em 30s e 90s para pegar o telefone via webhook
+        setTimeout(() => qc.invalidateQueries({ queryKey: ["enriched-contacts", vars.prospectId] }), 30_000);
+        setTimeout(() => qc.invalidateQueries({ queryKey: ["enriched-contacts", vars.prospectId] }), 90_000);
       } else if (res.status === "skipped") {
         toast.info(res.reason ?? "Contato já revelado recentemente.");
       } else if (res.status === "no_data") {
