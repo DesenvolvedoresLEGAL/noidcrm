@@ -31,7 +31,9 @@ export function AccuracyDashboard({ pipelineId, userId }: AccuracyDashboardProps
 
   if (isEmpty) {
     return (
-      <Card className="border-border">
+      <div className="space-y-4">
+        {snapshotSection}
+        <Card className="border-border">
         <CardContent className="pt-12 pb-12">
           <div className="max-w-xl mx-auto text-center space-y-4">
             <div className="inline-flex p-3 rounded-full bg-muted">
