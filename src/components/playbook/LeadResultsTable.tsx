@@ -259,7 +259,15 @@ export function LeadResultsTable({
                 <TableHead className="w-10">
                   <Checkbox checked={allSelected} onCheckedChange={toggleAll} />
                 </TableHead>
-                <TableHead>Empresa</TableHead>
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() => toggleSort('company')}
+                    className="inline-flex items-center gap-1 hover:text-foreground transition-colors"
+                  >
+                    Empresa <SortIcon k="company" />
+                  </button>
+                </TableHead>
                 <TableHead>Origem</TableHead>
                 <TableHead className="text-center">
                   <Tooltip>
