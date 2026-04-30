@@ -15,6 +15,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { AlertTriangle, Trash2, Loader2, ArrowRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
+import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 interface DeleteUserModalProps {
@@ -37,6 +38,7 @@ interface ActiveMember {
 
 export function DeleteUserModal({ open, onOpenChange, userToDelete, onSuccess }: DeleteUserModalProps) {
   const { organization } = useCurrentUser();
+  const queryClient = useQueryClient();
   const [transferToUserId, setTransferToUserId] = useState('');
   const [confirmText, setConfirmText] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
@@ -112,6 +114,9 @@ export function DeleteUserModal({ open, onOpenChange, userToDelete, onSuccess }:
       toast.success('Usuário excluído com sucesso', {
         description: `${totalTransferred} registros transferidos para o novo proprietário.`,
       });
+
+      // Sprint Active Users SoT: invalidar caches de filtros/selects
+      queryClient.invalidateQueries({ queryKey: ['active-users'] });
 
       onOpenChange(false);
       onSuccess();

@@ -56,7 +56,11 @@ export function OwnerSelector({
 
   const handleSelectOwner = async (userId: string) => {
     if (userId === currentOwner?.user_id || isUpdating) return;
-    
+    // Sprint Active Users SoT: nunca permitir atribuir a usuário inativo.
+    const target = users.find((u) => u.id === userId);
+    if (!target || target.name?.toLowerCase().includes('(inativo)')) {
+      return;
+    }
     setIsUpdating(true);
     try {
       await onChangeOwner(userId);
@@ -64,6 +68,9 @@ export function OwnerSelector({
       setIsUpdating(false);
     }
   };
+
+  const isCurrentOwnerInactive =
+    !!currentOwner?.user_id && !users.some((u) => u.id === currentOwner.user_id);
 
   return (
     <DropdownMenu>
@@ -88,6 +95,11 @@ export function OwnerSelector({
         <span className="max-w-[60px] truncate">
           {getFirstName(currentOwner?.full_name)}
         </span>
+        {isCurrentOwnerInactive && (
+          <span className="text-[9px] px-1 py-0.5 rounded bg-destructive/10 text-destructive font-semibold">
+            Inativo
+          </span>
+        )}
         <ChevronDown className="h-3 w-3 text-muted-foreground" />
       </DropdownMenuTrigger>
       

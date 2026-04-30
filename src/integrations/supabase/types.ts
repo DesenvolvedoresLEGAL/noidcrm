@@ -26907,6 +26907,43 @@ export type Database = {
           },
         ]
       }
+      crm_active_users_view: {
+        Row: {
+          avatar_url: string | null
+          context_business_function_key: string | null
+          context_business_function_name: string | null
+          context_department_key: string | null
+          context_department_name: string | null
+          context_permission_key: string | null
+          created_at: string | null
+          email: string | null
+          full_name: string | null
+          is_active: boolean | null
+          is_dashboard_dynamic_enabled: boolean | null
+          org_role: string | null
+          profile_status: string | null
+          status: string | null
+          tenant_id: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_members_organization_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_members_organization_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "v_report_legacy_retirement_readiness_v2"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
       crm_user_context_backfill_preview: {
         Row: {
           action: string | null
