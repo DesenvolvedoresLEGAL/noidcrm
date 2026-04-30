@@ -76,7 +76,11 @@ export function ApolloConfirmModal({ open, onOpenChange, prospectId, onConfirm, 
               </div>
               <div className="flex justify-between gap-2 items-center">
                 <span className="text-muted-foreground">Status</span>
-                {preview.eligible ? (
+                {preview.eligible && preview.review_required ? (
+                  <Badge className="gap-1 bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30">
+                    <AlertTriangle className="h-3 w-3" /> Elegível com revisão
+                  </Badge>
+                ) : preview.eligible ? (
                   <Badge className="gap-1 bg-emerald-500/10 text-emerald-600 border-emerald-500/30">
                     <CheckCircle2 className="h-3 w-3" /> Elegível
                   </Badge>
