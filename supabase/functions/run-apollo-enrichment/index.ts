@@ -1,7 +1,7 @@
 // Apollo decision-maker enrichment for prospects (Sprint E.1 + E.1.1 controls/audit)
 // Resilient endpoint strategy: try multiple Apollo endpoints, gracefully fall back when
 // the API key does not have access to a given endpoint (403 API_INACCESSIBLE).
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { createClient } from "npm:@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
