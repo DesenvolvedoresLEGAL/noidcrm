@@ -235,16 +235,19 @@ Deno.serve(async (req: Request) => {
     const pScore = Number((score as any)?.priority_score ?? 0);
 
     const ALLOWED_QUALITY = ["high_confidence", "usable"];
-    if (!ALLOWED_QUALITY.includes(qLabel as string)) return await skip("low_quality", `quality_label=${qLabel}`);
-    if (pScore < 180) return await skip("low_score", `priority_score=${pScore} < 180`);
-    // Allow re-enrichment even when a decision maker exists — user may want to find additional roles (e.g. marketing managers)
-    if (prospect.decision_maker_found && trigger_source === "automation") {
-      return await skip("dm_already_found", "decision_maker_found already true (automation only)");
+    // Modo teste Kairós: filtros de qualidade/score só aplicam em automação.
+    // Disparo manual (trigger_source !== "automation") está liberado para qualquer qualidade.
+    if (trigger_source === "automation") {
+      if (!ALLOWED_QUALITY.includes(qLabel as string)) return await skip("low_quality", `quality_label=${qLabel}`);
+      if (pScore < 180) return await skip("low_score", `priority_score=${pScore} < 180`);
+      if (prospect.decision_maker_found) {
+        return await skip("dm_already_found", "decision_maker_found already true (automation only)");
+      }
+      if (qLabel === "usable") {
+        return await skip("review_required", "usable quality requires manual trigger");
+      }
     }
-    if (qLabel === "usable" && trigger_source === "automation") {
-      return await skip("review_required", "usable quality requires manual trigger");
-    }
-    const review_required = qLabel === "usable";
+    const review_required = qLabel !== "high_confidence";
 
     // 3. Anti-spam 24h
     const cutoff = new Date(Date.now() - ANTI_SPAM_HOURS * 3600 * 1000).toISOString();
