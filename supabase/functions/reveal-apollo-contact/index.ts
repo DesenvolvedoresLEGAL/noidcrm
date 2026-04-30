@@ -68,7 +68,7 @@ Deno.serve(async (req: Request) => {
     const { data: contact, error: cErr } = await sb
       .from("enriched_contact_profiles")
       .select(
-        "id, prospect_id, workspace_id, first_name, last_name, full_name, email, phone, apollo_person_id, last_reveal_attempt_at, revealed_at",
+        "id, prospect_id, workspace_id, first_name, last_name, full_name, email, phone, apollo_person_id, last_reveal_attempt_at, revealed_at, reveal_credits_used",
       )
       .eq("id", contact_id)
       .maybeSingle();
@@ -79,14 +79,53 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // Tenant guard: ensure user belongs to this organization
+    const { data: prospect, error: pErr } = await sb
+      .from("prospects")
+      .select("id, organization_id, company_name, normalized_domain, website")
+      .eq("id", contact.prospect_id!)
+      .maybeSingle();
+    if (pErr) console.warn("reveal-apollo-contact prospect lookup warning:", pErr.message);
+
+    const tenantId = prospect?.organization_id ?? contact.workspace_id;
+    if (!tenantId || (prospect?.organization_id && contact.workspace_id && prospect.organization_id !== contact.workspace_id)) {
+      console.warn("reveal-apollo-contact tenant mismatch", {
+        contact_id,
+        contact_workspace_id: contact.workspace_id,
+        prospect_organization_id: prospect?.organization_id ?? null,
+      });
+      return new Response(JSON.stringify({ error: "forbidden" }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Tenant guard: ensure user belongs to this organization.
+    // Older rows can reference either auth.users.id or profiles.id, so validate both safely.
+    const { data: profileRows } = await sb
+      .from("profiles")
+      .select("id, user_id, organization_id, email")
+      .or(`user_id.eq.${userRes.user.id},id.eq.${userRes.user.id}`)
+      .limit(5);
+    const candidateUserIds = Array.from(new Set([
+      userRes.user.id,
+      ...((profileRows ?? []).flatMap((p: any) => [p.id, p.user_id]).filter(Boolean) as string[]),
+    ]));
     const { data: membership } = await sb
       .from("organization_members")
       .select("organization_id")
-      .eq("user_id", userRes.user.id)
-      .eq("organization_id", contact.workspace_id)
+      .eq("organization_id", tenantId)
+      .in("user_id", candidateUserIds)
+      .eq("status", "active")
+      .is("deleted_at", null)
       .maybeSingle();
-    if (!membership) {
+    const profileMatchesTenant = (profileRows ?? []).some((p: any) => p.organization_id === tenantId);
+    if (!membership && !profileMatchesTenant) {
+      console.warn("reveal-apollo-contact forbidden", {
+        contact_id,
+        tenant_id: tenantId,
+        auth_user_id: userRes.user.id,
+        auth_email: userRes.user.email ?? null,
+        candidate_user_ids: candidateUserIds,
+      });
       return new Response(JSON.stringify({ error: "forbidden" }), {
         status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -105,13 +144,6 @@ Deno.serve(async (req: Request) => {
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
-
-    // Load prospect for fallback identity
-    const { data: prospect } = await sb
-      .from("prospects")
-      .select("id, organization_id, company_name, normalized_domain, website")
-      .eq("id", contact.prospect_id!)
-      .maybeSingle();
 
     // Build Apollo payload — prefer apollo_person_id, otherwise identify by name+domain
     const payload: Record<string, unknown> = {
