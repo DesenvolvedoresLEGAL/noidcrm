@@ -131,9 +131,10 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // Anti-spam: 24h cooldown
+    // Anti-spam: 24h cooldown only when the contact is already complete.
+    // If email arrived but phone is still missing, allow a new phone reveal attempt.
     const cutoff = new Date(Date.now() - ANTI_SPAM_HOURS * 3600 * 1000).toISOString();
-    if (contact.last_reveal_attempt_at && contact.last_reveal_attempt_at >= cutoff && (contact.email || contact.phone)) {
+    if (contact.last_reveal_attempt_at && contact.last_reveal_attempt_at >= cutoff && contact.email && contact.phone) {
       return new Response(
         JSON.stringify({
           status: "skipped",
@@ -152,7 +153,7 @@ Deno.serve(async (req: Request) => {
     const webhookUrl = `${webhookBase}?contact_id=${encodeURIComponent(contact_id)}${webhookToken ? `&token=${encodeURIComponent(webhookToken)}` : ""}`;
 
     const payload: Record<string, unknown> = {
-      reveal_personal_emails: true,
+      reveal_personal_emails: !contact.email,
       reveal_phone_number: true,
       webhook_url: webhookUrl,
     };
