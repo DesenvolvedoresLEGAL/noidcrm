@@ -280,7 +280,7 @@ export function LeadResultsTable({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map(prospect => {
+              {sorted.map(prospect => {
                 const score = prospect.prospect_scores?.[0];
                 const priorityScore = score?.priority_score ?? 0;
                 const totalScore = score
