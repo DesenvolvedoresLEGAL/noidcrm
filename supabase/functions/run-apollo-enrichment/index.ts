@@ -10,7 +10,7 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const APOLLO_PEOPLE_URL = "https://api.apollo.io/api/v1/mixed_people/search";
+const APOLLO_PEOPLE_URL = "https://api.apollo.io/api/v1/mixed_people/api_search";
 const APOLLO_CONTACTS_URL = "https://api.apollo.io/api/v1/contacts/search";
 const APOLLO_ORG_ENRICH_URL = "https://api.apollo.io/api/v1/organizations/enrich";
 const ESTIMATED_CREDITS = 2;
@@ -275,7 +275,7 @@ Deno.serve(async (req: Request) => {
     let endpointUsed: string | null = null;
     let credits_used = 0;
 
-    // Attempt 1: mixed_people/search by domain + decision-maker titles
+    // Attempt 1: mixed_people/api_search by domain + decision-maker titles
     {
       const r = await callApollo(APOLLO_PEOPLE_URL, {
         q_organization_domains: domain,
@@ -285,12 +285,12 @@ Deno.serve(async (req: Request) => {
       }, APOLLO_API_KEY);
       const list: any[] = r.json?.people ?? r.json?.contacts ?? [];
       attempts.push({
-        endpoint: "mixed_people/search",
+        endpoint: "mixed_people/api_search",
         status: r.status, ok: r.ok, inaccessible: r.inaccessible,
         count: list.length, error: r.errorMessage,
       });
       if (r.ok && list.length > 0) {
-        people = list; endpointUsed = "mixed_people/search"; credits_used += ESTIMATED_CREDITS;
+        people = list; endpointUsed = "mixed_people/api_search"; credits_used += ESTIMATED_CREDITS;
       } else if (r.ok) {
         // accessible but empty — counts as a credit consumed
         credits_used += ESTIMATED_CREDITS;
