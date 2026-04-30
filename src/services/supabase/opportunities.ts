@@ -497,6 +497,27 @@ export async function updateOpportunityStatus(
 
 // Update opportunity with partial data
 export async function updateOpportunity(id: string, updates: Partial<any>): Promise<Opportunity> {
+  // Sprint Active Users SoT: bloquear atribuição para usuários inativos.
+  const ASSIGN_FIELDS = ['owner_user_id', 'cs_user_id', 'pre_sales_user_id'] as const;
+  const assignTargets = ASSIGN_FIELDS
+    .filter((f) => updates[f] !== undefined && updates[f] !== null)
+    .map((f) => updates[f] as string);
+  if (assignTargets.length > 0) {
+    const { data: tenantId } = await supabase.rpc('get_user_organization_id');
+    if (tenantId) {
+      const { data: activeRows } = await (supabase as any)
+        .from('crm_active_users_view')
+        .select('user_id')
+        .eq('tenant_id', tenantId)
+        .in('user_id', assignTargets);
+      const activeSet = new Set((activeRows || []).map((r: any) => r.user_id));
+      const inactive = assignTargets.filter((u) => !activeSet.has(u));
+      if (inactive.length > 0) {
+        throw new Error('Não é possível atribuir registros para usuários inativos. Selecione um usuário ativo.');
+      }
+    }
+  }
+
   const { data, error } = await supabase
     .from('opportunities')
     .update(updates)
