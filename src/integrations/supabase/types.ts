@@ -11292,6 +11292,203 @@ export type Database = {
           },
         ]
       }
+      forecast_calculation_items: {
+        Row: {
+          activity_factor: number | null
+          adjusted_probability: number | null
+          adjusted_value: number | null
+          close_date: string | null
+          company_name: string | null
+          created_at: string | null
+          deal_name: string | null
+          deal_value: number | null
+          eligibility_status: string
+          exclusion_reasons: string[] | null
+          forecast_bucket: string
+          id: string
+          last_activity_at: string | null
+          manual_probability: number | null
+          metadata: Json | null
+          next_step_exists: boolean | null
+          nrhs_factor: number | null
+          nrhs_score: number | null
+          opportunity_id: string
+          organization_id: string
+          penalty_reasons: string[] | null
+          risk_factor: number | null
+          risk_level: string | null
+          run_id: string
+          seller_id: string | null
+          stage_factor: number | null
+          stage_id: string | null
+          stage_probability: number | null
+          time_factor: number | null
+        }
+        Insert: {
+          activity_factor?: number | null
+          adjusted_probability?: number | null
+          adjusted_value?: number | null
+          close_date?: string | null
+          company_name?: string | null
+          created_at?: string | null
+          deal_name?: string | null
+          deal_value?: number | null
+          eligibility_status: string
+          exclusion_reasons?: string[] | null
+          forecast_bucket: string
+          id?: string
+          last_activity_at?: string | null
+          manual_probability?: number | null
+          metadata?: Json | null
+          next_step_exists?: boolean | null
+          nrhs_factor?: number | null
+          nrhs_score?: number | null
+          opportunity_id: string
+          organization_id: string
+          penalty_reasons?: string[] | null
+          risk_factor?: number | null
+          risk_level?: string | null
+          run_id: string
+          seller_id?: string | null
+          stage_factor?: number | null
+          stage_id?: string | null
+          stage_probability?: number | null
+          time_factor?: number | null
+        }
+        Update: {
+          activity_factor?: number | null
+          adjusted_probability?: number | null
+          adjusted_value?: number | null
+          close_date?: string | null
+          company_name?: string | null
+          created_at?: string | null
+          deal_name?: string | null
+          deal_value?: number | null
+          eligibility_status?: string
+          exclusion_reasons?: string[] | null
+          forecast_bucket?: string
+          id?: string
+          last_activity_at?: string | null
+          manual_probability?: number | null
+          metadata?: Json | null
+          next_step_exists?: boolean | null
+          nrhs_factor?: number | null
+          nrhs_score?: number | null
+          opportunity_id?: string
+          organization_id?: string
+          penalty_reasons?: string[] | null
+          risk_factor?: number | null
+          risk_level?: string | null
+          run_id?: string
+          seller_id?: string | null
+          stage_factor?: number | null
+          stage_id?: string | null
+          stage_probability?: number | null
+          time_factor?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "forecast_calculation_items_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "forecast_calculation_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      forecast_calculation_runs: {
+        Row: {
+          calculation_version: string
+          created_at: string | null
+          created_by: string | null
+          data_quality_score: number | null
+          deals_count: number | null
+          excluded_deals_count: number | null
+          forecast_confidence: number | null
+          id: string
+          included_deals_count: number | null
+          metadata: Json | null
+          nrhs_avg: number | null
+          organization_id: string
+          period_end: string
+          period_start: string
+          period_type: string
+          pipeline_id: string | null
+          pipeline_total: number | null
+          risk_deals_count: number | null
+          scenario_best_case: number | null
+          scenario_optimistic: number | null
+          scenario_pessimistic: number | null
+          scenario_realistic: number | null
+          seller_id: string | null
+          slipping_deals_count: number | null
+          status: string
+          total_best_case: number | null
+          total_closed: number | null
+          total_commit: number | null
+        }
+        Insert: {
+          calculation_version?: string
+          created_at?: string | null
+          created_by?: string | null
+          data_quality_score?: number | null
+          deals_count?: number | null
+          excluded_deals_count?: number | null
+          forecast_confidence?: number | null
+          id?: string
+          included_deals_count?: number | null
+          metadata?: Json | null
+          nrhs_avg?: number | null
+          organization_id: string
+          period_end: string
+          period_start: string
+          period_type: string
+          pipeline_id?: string | null
+          pipeline_total?: number | null
+          risk_deals_count?: number | null
+          scenario_best_case?: number | null
+          scenario_optimistic?: number | null
+          scenario_pessimistic?: number | null
+          scenario_realistic?: number | null
+          seller_id?: string | null
+          slipping_deals_count?: number | null
+          status?: string
+          total_best_case?: number | null
+          total_closed?: number | null
+          total_commit?: number | null
+        }
+        Update: {
+          calculation_version?: string
+          created_at?: string | null
+          created_by?: string | null
+          data_quality_score?: number | null
+          deals_count?: number | null
+          excluded_deals_count?: number | null
+          forecast_confidence?: number | null
+          id?: string
+          included_deals_count?: number | null
+          metadata?: Json | null
+          nrhs_avg?: number | null
+          organization_id?: string
+          period_end?: string
+          period_start?: string
+          period_type?: string
+          pipeline_id?: string | null
+          pipeline_total?: number | null
+          risk_deals_count?: number | null
+          scenario_best_case?: number | null
+          scenario_optimistic?: number | null
+          scenario_pessimistic?: number | null
+          scenario_realistic?: number | null
+          seller_id?: string | null
+          slipping_deals_count?: number | null
+          status?: string
+          total_best_case?: number | null
+          total_closed?: number | null
+          total_commit?: number | null
+        }
+        Relationships: []
+      }
       forecast_predictions: {
         Row: {
           actual_value: number | null
@@ -29879,6 +30076,16 @@ export type Database = {
         Returns: number
       }
       calculate_edge_weight: { Args: { p_edge_id: string }; Returns: number }
+      calculate_forecast_audit_v2: {
+        Args: {
+          p_organization_id: string
+          p_period_end: string
+          p_period_start: string
+          p_pipeline_id: string
+          p_seller_id?: string
+        }
+        Returns: Json
+      }
       calculate_fraud_score: {
         Args: {
           p_browser_hash: string
