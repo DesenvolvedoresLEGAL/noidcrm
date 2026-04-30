@@ -95,6 +95,11 @@ export function OwnerSelector({
         <span className="max-w-[60px] truncate">
           {getFirstName(currentOwner?.full_name)}
         </span>
+        {isCurrentOwnerInactive && (
+          <span className="text-[9px] px-1 py-0.5 rounded bg-destructive/10 text-destructive font-semibold">
+            Inativo
+          </span>
+        )}
         <ChevronDown className="h-3 w-3 text-muted-foreground" />
       </DropdownMenuTrigger>
       
