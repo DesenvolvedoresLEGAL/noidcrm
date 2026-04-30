@@ -76,6 +76,7 @@ const roleColors: Record<string, string> = {
 
 export default function UsersContent() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { organization, isOrgAdmin: isAdmin } = useCurrentUser();
   const [activeTab, setActiveTab] = useState('active');
   const [members, setMembers] = useState<OrgMember[]>([]);
@@ -237,6 +238,8 @@ export default function UsersContent() {
       if (error) throw error;
 
       toast.success(newStatus === 'active' ? 'Usuário desbloqueado' : 'Usuário bloqueado');
+      // Sprint Active Users SoT: invalidar caches de filtros/selects
+      queryClient.invalidateQueries({ queryKey: ['active-users'] });
       fetchData();
       setBlockingUser(null);
     } catch (error: any) {
