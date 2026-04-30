@@ -114,7 +114,7 @@ serve(async (req) => {
       await runOne(payload.organization_id, payload.pipeline_id, payload.seller_id ?? null);
     } else {
       // Rotina geral: buscar orgs alvo
-      let orgsQuery = supabase.from('organizations').select('id').is('deleted_at', null);
+      let orgsQuery = supabase.from('organizations').select('id');
       if (payload.organization_id) orgsQuery = orgsQuery.eq('id', payload.organization_id);
       const { data: orgs, error: orgErr } = await orgsQuery;
       if (orgErr) throw orgErr;
