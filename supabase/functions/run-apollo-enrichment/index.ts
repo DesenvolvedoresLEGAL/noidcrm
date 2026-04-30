@@ -247,11 +247,11 @@ Deno.serve(async (req: Request) => {
     const cutoff = new Date(Date.now() - ANTI_SPAM_HOURS * 3600 * 1000).toISOString();
     const { data: recent } = await sb
       .from("enrichment_jobs")
-      .select("id, status")
+      .select("id, status, contacts_found")
       .eq("prospect_id", prospect_id).eq("provider", "apollo")
       .gte("created_at", cutoff)
-      .in("status", ["done", "running"]);
-    if (recent && recent.length > 0) return await skip("already_enriched", `apollo job exists in last ${ANTI_SPAM_HOURS}h`);
+      .or("status.eq.running,and(status.eq.done,contacts_found.gt.0)");
+    if (recent && recent.length > 0) return await skip("already_enriched", `apollo successful/running job exists in last ${ANTI_SPAM_HOURS}h`);
 
     // 4. Rate-limit per workspace (20/min)
     const oneMinAgo = new Date(Date.now() - 60_000).toISOString();
