@@ -59,8 +59,12 @@ Deno.serve(async (req: Request) => {
     const domain = pickDomain(prospect);
 
     const cutoff = new Date(Date.now() - ANTI_SPAM_HOURS * 3600 * 1000).toISOString();
-    const recentJob = lastJob && (lastJob as any).status !== "failed" && (lastJob as any).created_at >= cutoff;
-    const alreadyEnriched = !!recentJob && ((lastJob as any).contacts_found ?? 0) > 0;
+    const lastJobStatus = (lastJob as any)?.status ?? null;
+    const lastContactsFound = Number((lastJob as any)?.contacts_found ?? 0);
+    const recentJob = !!lastJob && (lastJob as any).created_at >= cutoff;
+    const recentSuccessfulJob = recentJob && ["done"].includes(lastJobStatus) && lastContactsFound > 0;
+    const recentRunningJob = recentJob && lastJobStatus === "running";
+    const alreadyEnriched = recentSuccessfulJob;
 
     const ALLOWED_QUALITY = ["high_confidence", "usable"];
     let eligible = true;
@@ -77,12 +81,14 @@ Deno.serve(async (req: Request) => {
       eligible = false; reason = "Decisor já encontrado para este prospect.";
     } else if (!domain) {
       eligible = false; reason = "Sem domínio disponível para busca Apollo.";
-    } else if (recentJob && (lastJob as any).status === "running") {
+    } else if (recentRunningJob) {
       eligible = false; reason = "Já existe enriquecimento Apollo em execução.";
-    } else if (recentJob) {
+    } else if (recentSuccessfulJob) {
       eligible = false;
       reason = `Enriquecimento recente (${ANTI_SPAM_HOURS}h). Aguarde para reprocessar.`;
       warning = "Prospect já possui contatos enriquecidos nas últimas 24h.";
+    } else if (recentJob) {
+      warning = "Última tentativa não encontrou contatos úteis. Nova busca liberada imediatamente.";
     }
 
     if (eligible) {
