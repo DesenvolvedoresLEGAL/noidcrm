@@ -1,101 +1,51 @@
-## Sprint: Apollo Eligibility — aceitar `usable` com revisão
-
-### Objetivo
-Liberar enriquecimento Apollo para leads `quality_label = usable` (mantendo `priority_score >= 180`, domínio obrigatório, sem decisor já encontrado, dedupe e anti-spam 24h), sinalizando claramente que esses leads exigem **revisão humana** e bloqueando auto-send nesta etapa.
-
----
-
-### Regra única de elegibilidade (compartilhada preview ↔ run)
+Entendi o problema e já encontrei a causa real: o erro 502 que aparece na UI está mascarando um erro 403 da Apollo. Nos logs da tabela de jobs, o endpoint `mixed_people/search` está respondendo:
 
 ```text
-ALLOWED_QUALITY = ["high_confidence", "usable"]
-
-eligible = true SE
-  quality_label ∈ ALLOWED_QUALITY
-  AND priority_score >= 180
-  AND domain != null
-  AND decision_maker_found != true
-  AND não existe job apollo (running OU done) nas últimas 24h
-
-review_required = (quality_label === "usable")
-auto_send_allowed = (quality_label === "high_confidence")  // usable nunca auto-send
+Apollo HTTP 403 (mixed_people/search): api/v1/mixed_people/search is not accessible with this api_key
 ```
 
-Bloqueios continuam valendo:
-- `low_confidence`, `insufficient`, `null` → não elegível
-- score < 180 → não elegível
-- sem domínio → não elegível
-- decisor já encontrado → não elegível
-- job `running` ou `done` < 24h → não elegível (skip `already_enriched` no run)
+Ou seja: o KAIRÓS ainda tenta primeiro `mixed_people/search`; como a chave atual não tem acesso a esse endpoint, a função retorna 502 antes de tentar `contacts/search`. Isso bloqueia a operação.
 
----
+Plano de correção urgente:
 
-### Mudanças por arquivo
+1. Corrigir a estratégia de endpoints Apollo
+   - Parar de tratar `403 API_INACCESSIBLE` em `mixed_people/search` como falha final.
+   - Se `mixed_people/search` retornar 403/401/API_INACCESSIBLE, pular automaticamente para os endpoints disponíveis.
+   - Usar `contacts/search` como fallback prioritário para buscar contatos quando People Search não estiver acessível.
+   - Adicionar fallback adicional para endpoint de empresas/organizações, se necessário, usando domínio e nome da empresa para enriquecer dados corporativos.
 
-**1. `supabase/functions/preview-apollo-enrichment/index.ts`**
-- Trocar `if (qLabel !== "high_confidence")` por checagem em set `["high_confidence", "usable"]`.
-- Quando `qLabel === "usable"` e demais critérios passam:
-  - `eligible = true`
-  - `review_required = true`
-  - `warning = "Lead com qualidade utilizável. Enriquecimento permitido, mas recomenda revisão humana antes de automação."`
-  - `auto_send_allowed = false`
-- Quando `qLabel === "high_confidence"`: `review_required = false`, `auto_send_allowed = true`.
-- Adicionar `review_required`, `auto_send_allowed` ao JSON de resposta.
+2. Remover o 502 falso na experiência do usuário
+   - A função não deve retornar 502 quando apenas um endpoint da Apollo estiver indisponível, se ainda houver outro endpoint possível.
+   - O retorno só deve ser erro se todos os endpoints tentados falharem.
+   - A resposta deve informar claramente `endpoint_used`, `fallbacks_used`, `contacts_found` e erro real da Apollo quando não houver resultado.
 
-**2. `supabase/functions/run-apollo-enrichment/index.ts`**
-- Substituir `if (qLabel !== "high_confidence") return await skip("low_quality", ...)` por:
-  ```ts
-  if (!["high_confidence", "usable"].includes(qLabel)) return await skip("low_quality", `quality_label=${qLabel}`);
-  ```
-- Demais guardas (score, decision_maker, anti-spam, rate-limit, domain) ficam idênticas — garante paridade total com preview.
-- Persistir `review_required` no `request` do `enrichment_jobs` para auditoria:
-  ```ts
-  request: { domain, person_titles: RELEVANT_TITLES, review_required: qLabel === "usable", trigger_source }
-  ```
-- No `trackEvent("apollo_enrichment_started")` incluir `review_required`.
-- Bloquear `trigger_source === "automation"` quando `qLabel === "usable"`:
-  ```ts
-  if (qLabel === "usable" && trigger_source === "automation")
-    return await skip("review_required", "usable quality requires manual trigger");
-  ```
+3. Melhorar tempo de resposta sem depender do plano rejeitado anteriormente
+   - Manter uma primeira correção síncrona e segura para uso imediato da operação.
+   - Reduzir chamadas sequenciais desnecessárias.
+   - Inserir contatos em lote em vez de um por um.
+   - Só rodar dedupe/primary depois do lote.
+   - Limitar cada chamada Apollo com timeout curto para não travar a tela.
 
-**3. `src/services/enrichment/apolloPreview.ts`**
-- Adicionar campos opcionais à interface `ApolloPreview`:
-  ```ts
-  review_required?: boolean;
-  auto_send_allowed?: boolean;
-  ```
+4. Ajustar frontend para erro operacional útil
+   - Em `src/services/enrichment/apolloService.ts`, traduzir erros da função para mensagens claras.
+   - Em `ProspectContactsTab`, trocar o toast genérico por algo como: “Endpoint Apollo X indisponível; tentei Y; nenhum contato retornado” ou “Contatos encontrados via contacts/search”.
+   - Invalidar contatos e jobs após a chamada para refletir resultado imediatamente.
 
-**4. `src/components/playbook/enrichment/ApolloConfirmModal.tsx`**
-- Status badge condicional:
-  - `eligible && review_required` → badge âmbar "Elegível com revisão" (ícone `AlertTriangle`)
-  - `eligible && !review_required` → badge verde "Elegível" (atual)
-  - `!eligible` → badge vermelho "Não elegível" (atual)
-- Botão "Confirmar enriquecimento" continua habilitado para `eligible` (inclui usable).
-- Para `review_required`: alterar label do botão para "Confirmar (revisão humana)" e manter o `warning` âmbar já renderizado pelo backend.
-- Não alterar lógica de `disabled` — `usable` agora tem `eligible=true` então será permitido manualmente.
+5. Validar com logs reais
+   - Testar o fluxo contra a função `run-apollo-enrichment` usando um prospect real como `Tirolez`.
+   - Conferir a tabela `enrichment_jobs` para confirmar que o novo job não fica como failed por causa de `mixed_people/search`.
+   - Se `contacts/search` também falhar, expor exatamente o erro retornado pela Apollo para não mascarar como 502.
 
----
+Arquivos impactados:
 
-### Critério de aceite (validação manual pós-deploy)
-1. Lead `high_confidence` + score ≥ 180 + domínio → badge "Elegível", botão habilitado, sem warning de revisão.
-2. Lead `usable` + score ≥ 180 + domínio → badge "Elegível com revisão", warning âmbar exibido, botão habilitado.
-3. Lead `low_confidence` ou `insufficient` → badge "Não elegível", botão desabilitado.
-4. Lead sem domínio → "Não elegível".
-5. Lead com `decision_maker_found = true` → "Não elegível".
-6. Lead com job apollo recente (24h) → "Não elegível" / `skip already_enriched` no run.
-7. Run com `trigger_source = "automation"` em lead `usable` → skip `review_required` (não consome créditos Apollo).
-8. Preview e run produzem o mesmo veredicto para os mesmos inputs.
-
----
-
-### Riscos
-- Aumento de consumo de créditos Apollo proporcional ao volume de leads `usable` ≥ 180 — mitigado por anti-spam 24h e rate-limit 20/min existentes.
-- Contatos vindos de leads `usable` podem ter qualidade inferior — mitigado pelo bloqueio de auto-send e flag `review_required` persistida em `enrichment_jobs.request` para análise futura.
-- Nenhuma migration de banco necessária.
-
-### Arquivos alterados
-- `supabase/functions/preview-apollo-enrichment/index.ts`
 - `supabase/functions/run-apollo-enrichment/index.ts`
-- `src/services/enrichment/apolloPreview.ts`
-- `src/components/playbook/enrichment/ApolloConfirmModal.tsx`
+- `src/services/enrichment/apolloService.ts`
+- `src/components/playbook/ProspectContactsTab.tsx`
+- Possivelmente `src/hooks/useEnrichedContacts.ts` apenas para invalidação/estado se necessário.
+
+Critério de sucesso:
+
+- Clicar em “Confirmar enriquecimento” não retorna mais 502 por causa de `mixed_people/search` inacessível.
+- Se a chave tiver acesso a `contacts/search`, os contatos são buscados e salvos.
+- Se nenhum endpoint acessível retornar contato, a UI mostra uma mensagem clara com o endpoint tentado e o motivo real.
+- O fluxo fica mais rápido por batch insert e timeout curto.

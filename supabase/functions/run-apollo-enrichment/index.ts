@@ -1,5 +1,6 @@
 // Apollo decision-maker enrichment for prospects (Sprint E.1 + E.1.1 controls/audit)
-// Triple-guard + anti-spam 24h + rate-limit 20/min + skip_reason + response_summary + tracking events.
+// Resilient endpoint strategy: try multiple Apollo endpoints, gracefully fall back when
+// the API key does not have access to a given endpoint (403 API_INACCESSIBLE).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
@@ -11,9 +12,11 @@ const corsHeaders = {
 
 const APOLLO_PEOPLE_URL = "https://api.apollo.io/api/v1/mixed_people/search";
 const APOLLO_CONTACTS_URL = "https://api.apollo.io/api/v1/contacts/search";
+const APOLLO_ORG_ENRICH_URL = "https://api.apollo.io/api/v1/organizations/enrich";
 const ESTIMATED_CREDITS = 2;
 const ANTI_SPAM_HOURS = 24;
 const RATE_LIMIT_PER_MIN = 20;
+const APOLLO_TIMEOUT_MS = 12_000;
 
 const RELEVANT_TITLES = [
   "ceo", "founder", "co-founder", "cofounder",
@@ -84,6 +87,70 @@ async function trackEvent(sb: any, organization_id: string, event_type: string, 
     });
   } catch (e) {
     console.warn("trackEvent failed", event_type, e);
+  }
+}
+
+interface ApolloCallResult {
+  ok: boolean;
+  status: number;
+  json: any;
+  inaccessible: boolean;
+  errorMessage?: string;
+}
+
+async function callApollo(
+  url: string,
+  payload: Record<string, unknown>,
+  apiKey: string,
+  method: "GET" | "POST" = "POST",
+): Promise<ApolloCallResult> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), APOLLO_TIMEOUT_MS);
+  try {
+    const init: RequestInit = {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "no-cache",
+        "x-api-key": apiKey,
+      },
+      signal: ctrl.signal,
+    };
+    let finalUrl = url;
+    if (method === "POST") {
+      init.body = JSON.stringify(payload);
+    } else {
+      const qs = new URLSearchParams(
+        Object.entries(payload).reduce<Record<string, string>>((acc, [k, v]) => {
+          if (v != null) acc[k] = String(v);
+          return acc;
+        }, {}),
+      );
+      finalUrl = `${url}?${qs.toString()}`;
+    }
+    const r = await fetch(finalUrl, init);
+    const json = await r.json().catch(() => ({}));
+    const inaccessible =
+      r.status === 403 ||
+      r.status === 401 ||
+      json?.error_code === "API_INACCESSIBLE";
+    return {
+      ok: r.ok,
+      status: r.status,
+      json,
+      inaccessible,
+      errorMessage: !r.ok ? (json?.error || json?.message || `HTTP ${r.status}`) : undefined,
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      status: 0,
+      json: { error: String(e) },
+      inaccessible: false,
+      errorMessage: String(e),
+    };
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -197,87 +264,129 @@ Deno.serve(async (req: Request) => {
       prospect_id, job_id: jobRow?.id, domain, trigger_source, review_required, quality_label: qLabel,
     });
 
-    // 6. Call Apollo — try mixed_people/search (net-new decision makers by domain+title)
-    //    then fallback to contacts/search (already in your Apollo contacts) if empty.
-    let apolloResp: any = null;
+    // 6. Try Apollo endpoints in order. Each endpoint can be:
+    //    - accessible & has results -> use it
+    //    - accessible & empty -> try next
+    //    - inaccessible (403/API_INACCESSIBLE) -> log and try next, do NOT abort
+    const attempts: Array<{ endpoint: string; status: number; ok: boolean; inaccessible: boolean; count: number; error?: string }> = [];
+    const searchKeywords = [prospect.company_name, domain].filter(Boolean).join(" ") || domain;
+
+    let people: any[] = [];
+    let endpointUsed: string | null = null;
     let credits_used = 0;
-    let apolloEndpoint = "mixed_people/search";
 
-    const callApollo = async (url: string, payload: Record<string, unknown>) => {
-      const r = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Cache-Control": "no-cache",
-          "x-api-key": APOLLO_API_KEY,
-        },
-        body: JSON.stringify(payload),
-      });
-      const json = await r.json().catch(() => ({}));
-      return { ok: r.ok, status: r.status, json };
-    };
-
-    try {
-      // Primary: mixed_people/search by company domain + decision-maker titles
-      let res = await callApollo(APOLLO_PEOPLE_URL, {
+    // Attempt 1: mixed_people/search by domain + decision-maker titles
+    {
+      const r = await callApollo(APOLLO_PEOPLE_URL, {
         q_organization_domains: domain,
         person_titles: RELEVANT_TITLES,
         page: 1,
         per_page: 10,
+      }, APOLLO_API_KEY);
+      const list: any[] = r.json?.people ?? r.json?.contacts ?? [];
+      attempts.push({
+        endpoint: "mixed_people/search",
+        status: r.status, ok: r.ok, inaccessible: r.inaccessible,
+        count: list.length, error: r.errorMessage,
       });
-
-      // Fallback: contacts/search by keywords (account contacts already in Apollo)
-      const peopleFound = (res.json?.people?.length ?? 0) + (res.json?.contacts?.length ?? 0);
-      if (res.ok && peopleFound === 0) {
-        apolloEndpoint = "contacts/search";
-        const searchKeywords = [prospect.company_name, domain].filter(Boolean).join(" ");
-        res = await callApollo(APOLLO_CONTACTS_URL, {
-          q_keywords: searchKeywords || domain,
-          page: 1,
-          per_page: 10,
-        });
+      if (r.ok && list.length > 0) {
+        people = list; endpointUsed = "mixed_people/search"; credits_used += ESTIMATED_CREDITS;
+      } else if (r.ok) {
+        // accessible but empty — counts as a credit consumed
+        credits_used += ESTIMATED_CREDITS;
       }
+    }
 
-      apolloResp = res.json;
-      credits_used = ESTIMATED_CREDITS;
-
-      if (!res.ok) {
-        await sb.from("enrichment_jobs").update({
-          status: "failed",
-          error: `Apollo HTTP ${res.status} (${apolloEndpoint}): ${JSON.stringify(apolloResp).slice(0, 500)}`,
-          response: apolloResp, credits_used,
-          response_summary: { error: true, http_status: res.status, endpoint: apolloEndpoint },
-          completed_at: new Date().toISOString(),
-        }).eq("id", jobRow!.id);
-        await sb.from("prospects").update({ enrichment_status: "failed" }).eq("id", prospect_id);
-        return new Response(JSON.stringify({ error: "apollo failed", endpoint: apolloEndpoint, details: apolloResp }), {
-          status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+    // Attempt 2: contacts/search by keywords (account contacts already in your Apollo)
+    if (!endpointUsed) {
+      const r = await callApollo(APOLLO_CONTACTS_URL, {
+        q_keywords: searchKeywords,
+        page: 1,
+        per_page: 25,
+      }, APOLLO_API_KEY);
+      const list: any[] = r.json?.contacts ?? r.json?.people ?? [];
+      attempts.push({
+        endpoint: "contacts/search",
+        status: r.status, ok: r.ok, inaccessible: r.inaccessible,
+        count: list.length, error: r.errorMessage,
+      });
+      if (r.ok && list.length > 0) {
+        people = list; endpointUsed = "contacts/search"; credits_used += ESTIMATED_CREDITS;
+      } else if (r.ok) {
+        credits_used += ESTIMATED_CREDITS;
       }
-    } catch (e) {
+    }
+
+    // Attempt 3: contacts/search by domain only (broader)
+    if (!endpointUsed) {
+      const r = await callApollo(APOLLO_CONTACTS_URL, {
+        q_keywords: domain,
+        page: 1,
+        per_page: 25,
+      }, APOLLO_API_KEY);
+      const list: any[] = r.json?.contacts ?? r.json?.people ?? [];
+      attempts.push({
+        endpoint: "contacts/search:domain",
+        status: r.status, ok: r.ok, inaccessible: r.inaccessible,
+        count: list.length, error: r.errorMessage,
+      });
+      if (r.ok && list.length > 0) {
+        people = list; endpointUsed = "contacts/search:domain"; credits_used += ESTIMATED_CREDITS;
+      } else if (r.ok) {
+        credits_used += ESTIMATED_CREDITS;
+      }
+    }
+
+    // Attempt 4: organizations/enrich — at least pull company-level info
+    let orgEnrichment: any = null;
+    {
+      const r = await callApollo(APOLLO_ORG_ENRICH_URL, { domain }, APOLLO_API_KEY, "GET");
+      attempts.push({
+        endpoint: "organizations/enrich",
+        status: r.status, ok: r.ok, inaccessible: r.inaccessible,
+        count: r.json?.organization ? 1 : 0, error: r.errorMessage,
+      });
+      if (r.ok && r.json?.organization) {
+        orgEnrichment = r.json.organization;
+      }
+    }
+
+    const allAttemptsFailed = attempts.every((a) => !a.ok);
+    const allInaccessible = attempts.every((a) => a.inaccessible);
+
+    // If absolutely nothing worked, mark failed and return 200 with details
+    // (we no longer return 502 — that masked the real issue in the UI)
+    if (allAttemptsFailed && people.length === 0) {
+      const errMsg = allInaccessible
+        ? `Sua chave Apollo não tem acesso a nenhum endpoint testado: ${attempts.map(a => a.endpoint).join(", ")}. Habilite People/Contacts Search no plano da Apollo.`
+        : `Falha ao consultar Apollo. Tentativas: ${attempts.map(a => `${a.endpoint}=${a.status}`).join(", ")}`;
       await sb.from("enrichment_jobs").update({
-        status: "failed", error: String(e), credits_used,
-        response_summary: { error: true, message: String(e) },
+        status: "failed",
+        error: errMsg,
+        response: { attempts },
+        credits_used,
+        response_summary: { error: true, attempts, all_inaccessible: allInaccessible },
         completed_at: new Date().toISOString(),
       }).eq("id", jobRow!.id);
       await sb.from("prospects").update({ enrichment_status: "failed" }).eq("id", prospect_id);
-      throw e;
+      return new Response(JSON.stringify({
+        status: "failed",
+        reason: errMsg,
+        attempts,
+      }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // mixed_people/search returns `people`, contacts/search returns `contacts` — accept both
-    const people: any[] = apolloResp?.people ?? apolloResp?.contacts ?? [];
-    const filtered = people.filter((p) => isRelevantTitle(p.title));
+    // 7. Process contacts — accept everything, but score by relevance
+    const filtered = people.filter((p) => isRelevantTitle(p.title) || p.email || p.linkedin_url);
 
-    let inserted = 0;
     let decisionMakers = 0;
     let emailsFound = 0;
     let phonesFound = 0;
     let maxScore = 0;
-    let topProfileId: string | null = null;
-    let topSeniorityRank = 0;
     let topSeniority: string | null = null;
+    let topSeniorityRank = 0;
 
-    for (const person of filtered) {
+    const rows = filtered.map((person) => {
       const cScore = computeContactScore(person);
       const seniority = detectSeniority(person.title);
       const isDM = seniority === "c_level" || seniority === "vp" || seniority === "director";
@@ -285,11 +394,11 @@ Deno.serve(async (req: Request) => {
       if (person.email) emailsFound += 1;
       const phone = person.phone_numbers?.[0]?.sanitized_number ?? person.sanitized_phone ?? person.organization?.phone ?? person.account?.phone ?? null;
       if (phone) phonesFound += 1;
-
       const rank = SENIORITY_RANK[seniority ?? "ic"] ?? 0;
       if (rank > topSeniorityRank) { topSeniorityRank = rank; topSeniority = seniority; }
+      if (cScore > maxScore) maxScore = cScore;
 
-      const payload = {
+      return {
         workspace_id: prospect.organization_id,
         prospect_id,
         full_name: person.name ?? [person.first_name, person.last_name].filter(Boolean).join(" "),
@@ -307,28 +416,39 @@ Deno.serve(async (req: Request) => {
         apollo_person_id: person.person_id ?? person.id ?? null,
         raw: person,
       };
+    });
 
-      const { data: ins, error: insErr } = await sb
-        .from("enriched_contact_profiles").insert(payload).select("id").maybeSingle();
-
-      if (!insErr && ins) {
-        inserted += 1;
-        if (cScore > maxScore) { maxScore = cScore; topProfileId = ins.id; }
-      } else if (insErr && (insErr as any).code === "23505") {
-        // duplicate by unique index — count as known but don't fail
-        console.log("contact already exists (unique conflict), skipping", payload.email);
-      } else if (insErr) {
-        console.warn("insert contact failed", insErr);
+    let inserted = 0;
+    if (rows.length > 0) {
+      // Batch insert. ignoreDuplicates so unique conflicts don't blow up.
+      const { data: insData, error: insErr } = await sb
+        .from("enriched_contact_profiles")
+        .upsert(rows, { onConflict: "prospect_id,email_normalized", ignoreDuplicates: true })
+        .select("id");
+      if (insErr) {
+        // Fallback: insert one by one to salvage what we can
+        console.warn("batch upsert failed, falling back per-row", insErr);
+        for (const row of rows) {
+          const { error: e2 } = await sb.from("enriched_contact_profiles").insert(row);
+          if (!e2) inserted += 1;
+          else if ((e2 as any).code !== "23505") console.warn("row insert failed", e2);
+        }
+      } else {
+        inserted = insData?.length ?? 0;
       }
     }
 
     // Dedupe + resolve primary atomically via RPCs
-    const { data: dedupedCount } = await sb.rpc("dedupe_prospect_contacts", { p_prospect_id: prospect_id });
-    await sb.rpc("resolve_primary_contact", { p_prospect_id: prospect_id });
-    if ((dedupedCount as number | null) && (dedupedCount as number) > 0) {
-      await trackEvent(sb, prospect.organization_id, "lead.deduped", {
-        prospect_id, deduped_count: dedupedCount,
-      });
+    try {
+      const { data: dedupedCount } = await sb.rpc("dedupe_prospect_contacts", { p_prospect_id: prospect_id });
+      await sb.rpc("resolve_primary_contact", { p_prospect_id: prospect_id });
+      if ((dedupedCount as number | null) && (dedupedCount as number) > 0) {
+        await trackEvent(sb, prospect.organization_id, "lead.deduped", {
+          prospect_id, deduped_count: dedupedCount,
+        });
+      }
+    } catch (e) {
+      console.warn("dedupe/resolve_primary failed", e);
     }
 
     const finalStatus = inserted === 0 ? "partial" : "done";
@@ -346,6 +466,9 @@ Deno.serve(async (req: Request) => {
       decision_makers_found: decisionMakers,
       top_seniority: topSeniority,
       max_contact_score: maxScore,
+      endpoint_used: endpointUsed,
+      attempts,
+      org_enrichment_found: !!orgEnrichment,
     };
 
     await sb.from("enrichment_jobs").update({
@@ -353,7 +476,7 @@ Deno.serve(async (req: Request) => {
       credits_used,
       contacts_found: inserted,
       decision_makers_found: decisionMakers,
-      response: { total_returned: people.length, filtered: filtered.length, inserted },
+      response: { total_returned: people.length, filtered: filtered.length, inserted, endpoint_used: endpointUsed, attempts, organization: orgEnrichment },
       response_summary,
       completed_at: new Date().toISOString(),
     }).eq("id", jobRow!.id);
@@ -372,6 +495,8 @@ Deno.serve(async (req: Request) => {
       contacts_found: inserted,
       decision_makers_found: decisionMakers,
       max_contact_score: maxScore,
+      endpoint_used: endpointUsed,
+      attempts,
       response_summary,
     }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
