@@ -107,6 +107,22 @@ export function LeadResultsTable({
 }: LeadResultsTableProps) {
   const [activeFilter, setActiveFilter] = useState<FilterKey>('all');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [sortKey, setSortKey] = useState<'company' | 'score' | 'grade' | null>(null);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+
+  const toggleSort = (key: 'company' | 'score' | 'grade') => {
+    if (sortKey === key) {
+      setSortDir(d => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDir(key === 'company' ? 'asc' : 'desc');
+    }
+  };
+
+  const SortIcon = ({ k }: { k: 'company' | 'score' | 'grade' }) => {
+    if (sortKey !== k) return <ArrowUpDown className="h-3 w-3 opacity-50" />;
+    return sortDir === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />;
+  };
 
   const filtered = useMemo(() => {
     return prospects.filter(p => {
