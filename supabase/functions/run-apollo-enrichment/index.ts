@@ -150,9 +150,14 @@ Deno.serve(async (req: Request) => {
     const qLabel = (lastRun as any)?.quality_label ?? null;
     const pScore = Number((score as any)?.priority_score ?? 0);
 
-    if (qLabel !== "high_confidence") return await skip("low_quality", `quality_label=${qLabel}`);
+    const ALLOWED_QUALITY = ["high_confidence", "usable"];
+    if (!ALLOWED_QUALITY.includes(qLabel as string)) return await skip("low_quality", `quality_label=${qLabel}`);
     if (pScore < 180) return await skip("low_score", `priority_score=${pScore} < 180`);
     if (prospect.decision_maker_found) return await skip("dm_already_found", "decision_maker_found already true");
+    if (qLabel === "usable" && trigger_source === "automation") {
+      return await skip("review_required", "usable quality requires manual trigger");
+    }
+    const review_required = qLabel === "usable";
 
     // 3. Anti-spam 24h
     const cutoff = new Date(Date.now() - ANTI_SPAM_HOURS * 3600 * 1000).toISOString();
