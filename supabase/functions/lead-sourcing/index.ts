@@ -1070,9 +1070,76 @@ async function handleEventFirecrawl(
     source_metadata: { ...config, sanitized_event_url: eventUrl },
   }).select().single();
 
+  // ── Step 0: Provider detection (ExpoFP, etc.) ──
+  // Some events embed a SaaS floor plan (ExpoFP) instead of listing exhibitors in HTML.
+  // Hitting their public data endpoint is faster, cheaper and more accurate than scraping.
+  // If detection succeeds, we pre-populate `allExhibitors` and let Steps 1-4 no-op
+  // (discoveredUrls stays empty → no Firecrawl spend → no AI chunking).
+  const allExhibitors: any[] = [];
+  let providerUsed: string = "firecrawl";
+  try {
+    const { tryExpoFPFromUrl } = await import("./providers/index.ts");
+    const expofp = await tryExpoFPFromUrl(eventUrl);
+    if (expofp.detection) {
+      await logRunEvent(supabase, organizationId, run.id, "info", "ExpoFP detectado na página do evento", {
+        subdomain: expofp.detection.subdomain,
+        origin: expofp.detection.origin,
+      });
+      if (expofp.result && expofp.result.exhibitors.length > 0) {
+        const r = expofp.result;
+        for (const ex of r.exhibitors) {
+          allExhibitors.push({
+            company_name: ex.name,
+            website: null,
+            category: ex.categories[0] || null,
+            description: null,
+            booth: null,
+            country: ex.country,
+            city: null,
+            exhibitor_profile_url: ex.source_url,
+            signals: ["expofp_official", ex.country ? "has_country" : null, ex.categories.length > 0 ? "has_category" : null].filter(Boolean) as string[],
+            confidence: 95,
+            _source_url: ex.source_url,
+            _page_type: "expofp_data",
+            _extraction_method: "expofp_data_js",
+            _expofp_external_id: ex.external_id,
+            _expofp_categories: ex.categories,
+          });
+        }
+        providerUsed = "expofp";
+        metrics.exhibitors_extracted_raw = allExhibitors.length;
+        metrics.html_hybrid_extracted = allExhibitors.length;
+        (metrics as any).provider = "expofp";
+        (metrics as any).expofp_subdomain = expofp.detection.subdomain;
+        (metrics as any).expofp_data_version = r.data_version;
+        (metrics as any).expofp_event_title = r.event_title;
+        (metrics as any).expofp_exhibitors_count = r.exhibitors_count;
+        (metrics as any).expofp_with_country = r.with_country;
+        (metrics as any).expofp_with_categories = r.with_categories;
+        await logRunEvent(supabase, organizationId, run.id, "info",
+          `ExpoFP forneceu ${r.exhibitors_count} expositores (${r.with_country} c/ país, ${r.with_categories} c/ categoria) — pulando Firecrawl`,
+          { provider: "expofp", count: r.exhibitors_count }
+        );
+      } else if (expofp.error) {
+        await logRunEvent(supabase, organizationId, run.id, "warn",
+          "ExpoFP detectado mas fetch falhou — caindo para Firecrawl",
+          { error: expofp.error }
+        );
+      }
+    }
+  } catch (providerErr) {
+    await logRunEvent(supabase, organizationId, run.id, "warn",
+      "Erro ao tentar provider ExpoFP — seguindo com Firecrawl",
+      { error: String(providerErr) }
+    );
+  }
+  (metrics as any).provider = providerUsed;
+  const expofpHandled = allExhibitors.length > 0;
+
   // ── Step 1: Map — discover all URLs ──
-  await logRunEvent(supabase, organizationId, run.id, "info", "Mapeando URL do evento", { eventUrl });
   let discoveredUrls: string[] = [];
+  if (!expofpHandled) {
+  await logRunEvent(supabase, organizationId, run.id, "info", "Mapeando URL do evento", { eventUrl });
   try {
     const formattedUrl = eventUrl.startsWith("http") ? eventUrl : `https://${eventUrl}`;
     const mapResp = await fetch("https://api.firecrawl.dev/v1/map", {
