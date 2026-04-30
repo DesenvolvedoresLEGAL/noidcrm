@@ -62,12 +62,15 @@ Deno.serve(async (req: Request) => {
     const recentJob = lastJob && (lastJob as any).status !== "failed" && (lastJob as any).created_at >= cutoff;
     const alreadyEnriched = !!recentJob && ((lastJob as any).contacts_found ?? 0) > 0;
 
+    const ALLOWED_QUALITY = ["high_confidence", "usable"];
     let eligible = true;
     let reason: string | null = null;
     let warning: string | null = null;
+    let review_required = false;
+    let auto_send_allowed = false;
 
-    if (qLabel !== "high_confidence") {
-      eligible = false; reason = `Qualidade insuficiente (${qLabel ?? "sem run"}). Requer high_confidence.`;
+    if (!ALLOWED_QUALITY.includes(qLabel as string)) {
+      eligible = false; reason = `Qualidade insuficiente (${qLabel ?? "sem run"}). Requer high_confidence ou usable.`;
     } else if (pScore < 180) {
       eligible = false; reason = `Score ${pScore} abaixo do mínimo (180).`;
     } else if (prospect.decision_maker_found) {
@@ -82,10 +85,23 @@ Deno.serve(async (req: Request) => {
       warning = "Prospect já possui contatos enriquecidos nas últimas 24h.";
     }
 
+    if (eligible) {
+      if (qLabel === "usable") {
+        review_required = true;
+        auto_send_allowed = false;
+        warning = "Lead com qualidade utilizável. Enriquecimento permitido, mas recomenda revisão humana antes de automação.";
+      } else if (qLabel === "high_confidence") {
+        review_required = false;
+        auto_send_allowed = true;
+      }
+    }
+
     return new Response(JSON.stringify({
       eligible,
       reason,
       warning,
+      review_required,
+      auto_send_allowed,
       estimated_credits: ESTIMATED_CREDITS,
       domain,
       company_name: (prospect as any).company_name,
