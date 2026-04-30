@@ -127,7 +127,7 @@ export function ApolloConfirmModal({ open, onOpenChange, prospectId, onConfirm, 
             className="gap-1.5"
           >
             {isRunning ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-            Confirmar enriquecimento
+            {preview?.review_required ? "Confirmar (revisão humana)" : "Confirmar enriquecimento"}
           </Button>
         </DialogFooter>
       </DialogContent>
