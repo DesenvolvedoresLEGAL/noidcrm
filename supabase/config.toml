@@ -384,3 +384,6 @@ verify_jwt = false
 
 [functions.lead-sourcing]
 verify_jwt = false
+
+[functions.apollo-phone-webhook]
+verify_jwt = false
