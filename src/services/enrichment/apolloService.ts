@@ -1,11 +1,22 @@
 import { supabase } from "@/integrations/supabase/client";
 
+export interface ApolloEnrichmentAttempt {
+  endpoint: string;
+  status: number;
+  ok: boolean;
+  inaccessible: boolean;
+  count: number;
+  error?: string;
+}
+
 export interface ApolloEnrichmentResult {
   status: "done" | "partial" | "failed" | "skipped";
   reason?: string;
   contacts_found?: number;
   decision_makers_found?: number;
   max_contact_score?: number;
+  endpoint_used?: string | null;
+  attempts?: ApolloEnrichmentAttempt[];
 }
 
 export async function runApolloEnrichment(

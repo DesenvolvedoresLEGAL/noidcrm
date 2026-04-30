@@ -63,12 +63,21 @@ export function ProspectContactsTab({
   const handleConfirm = async () => {
     try {
       const res = await enrich.mutateAsync();
+      const ep = res.endpoint_used ? ` (via ${res.endpoint_used})` : "";
       if (res.status === "skipped") {
         toast.info(`Apollo pulou: ${res.reason ?? "não elegível"}`);
-      } else if (res.status === "done" || res.status === "partial") {
-        toast.success(`${res.contacts_found ?? 0} contato(s) encontrado(s) (${res.decision_makers_found ?? 0} decisor(es))`);
+      } else if (res.status === "failed") {
+        const inaccessible = res.attempts?.every((a) => a.inaccessible);
+        toast.error(
+          inaccessible
+            ? "Sua chave Apollo não tem acesso a People/Contacts Search. Habilite no plano da Apollo."
+            : `Apollo falhou: ${res.reason ?? "erro desconhecido"}`,
+          { duration: 8000 },
+        );
+      } else if ((res.contacts_found ?? 0) > 0) {
+        toast.success(`${res.contacts_found} contato(s) encontrado(s) (${res.decision_makers_found ?? 0} decisor(es))${ep}`);
       } else {
-        toast.error(`Apollo falhou: ${res.reason ?? res.status}`);
+        toast.warning(`Nenhum contato encontrado${ep}. Tente outro domínio ou endpoint.`, { duration: 6000 });
       }
     } catch (e: any) {
       toast.error(e?.message || "Erro ao chamar Apollo");
