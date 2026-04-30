@@ -279,8 +279,24 @@ export function LeadResultsTable({
                     </TooltipContent>
                   </Tooltip>
                 </TableHead>
-                <TableHead className="text-center">Score</TableHead>
-                <TableHead className="text-center">Grade</TableHead>
+                <TableHead className="text-center">
+                  <button
+                    type="button"
+                    onClick={() => toggleSort('score')}
+                    className="inline-flex items-center gap-1 hover:text-foreground transition-colors mx-auto"
+                  >
+                    Score <SortIcon k="score" />
+                  </button>
+                </TableHead>
+                <TableHead className="text-center">
+                  <button
+                    type="button"
+                    onClick={() => toggleSort('grade')}
+                    className="inline-flex items-center gap-1 hover:text-foreground transition-colors mx-auto"
+                  >
+                    Grade <SortIcon k="grade" />
+                  </button>
+                </TableHead>
                 <TableHead>Duplicidade</TableHead>
                 <TableHead>Sinais</TableHead>
                 <TableHead>Status</TableHead>
