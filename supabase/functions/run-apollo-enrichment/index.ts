@@ -9,7 +9,8 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const APOLLO_URL = "https://api.apollo.io/api/v1/contacts/search";
+const APOLLO_PEOPLE_URL = "https://api.apollo.io/api/v1/mixed_people/search";
+const APOLLO_CONTACTS_URL = "https://api.apollo.io/api/v1/contacts/search";
 const ESTIMATED_CREDITS = 2;
 const ANTI_SPAM_HOURS = 24;
 const RATE_LIMIT_PER_MIN = 20;
@@ -196,37 +197,60 @@ Deno.serve(async (req: Request) => {
       prospect_id, job_id: jobRow?.id, domain, trigger_source, review_required, quality_label: qLabel,
     });
 
-    // 6. Call Apollo
+    // 6. Call Apollo — try mixed_people/search (net-new decision makers by domain+title)
+    //    then fallback to contacts/search (already in your Apollo contacts) if empty.
     let apolloResp: any = null;
     let credits_used = 0;
-    const searchKeywords = [prospect.company_name, domain].filter(Boolean).join(" ");
-    try {
-      const r = await fetch(APOLLO_URL, {
+    let apolloEndpoint = "mixed_people/search";
+
+    const callApollo = async (url: string, payload: Record<string, unknown>) => {
+      const r = await fetch(url, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Cache-Control": "no-cache",
           "x-api-key": APOLLO_API_KEY,
         },
-        body: JSON.stringify({
+        body: JSON.stringify(payload),
+      });
+      const json = await r.json().catch(() => ({}));
+      return { ok: r.ok, status: r.status, json };
+    };
+
+    try {
+      // Primary: mixed_people/search by company domain + decision-maker titles
+      let res = await callApollo(APOLLO_PEOPLE_URL, {
+        q_organization_domains: domain,
+        person_titles: RELEVANT_TITLES,
+        page: 1,
+        per_page: 10,
+      });
+
+      // Fallback: contacts/search by keywords (account contacts already in Apollo)
+      const peopleFound = (res.json?.people?.length ?? 0) + (res.json?.contacts?.length ?? 0);
+      if (res.ok && peopleFound === 0) {
+        apolloEndpoint = "contacts/search";
+        const searchKeywords = [prospect.company_name, domain].filter(Boolean).join(" ");
+        res = await callApollo(APOLLO_CONTACTS_URL, {
           q_keywords: searchKeywords || domain,
           page: 1,
           per_page: 10,
-          sort_ascending: false,
-        }),
-      });
-      apolloResp = await r.json();
+        });
+      }
+
+      apolloResp = res.json;
       credits_used = ESTIMATED_CREDITS;
-      if (!r.ok) {
+
+      if (!res.ok) {
         await sb.from("enrichment_jobs").update({
           status: "failed",
-          error: `Apollo HTTP ${r.status}: ${JSON.stringify(apolloResp).slice(0, 500)}`,
+          error: `Apollo HTTP ${res.status} (${apolloEndpoint}): ${JSON.stringify(apolloResp).slice(0, 500)}`,
           response: apolloResp, credits_used,
-          response_summary: { error: true, http_status: r.status },
+          response_summary: { error: true, http_status: res.status, endpoint: apolloEndpoint },
           completed_at: new Date().toISOString(),
         }).eq("id", jobRow!.id);
         await sb.from("prospects").update({ enrichment_status: "failed" }).eq("id", prospect_id);
-        return new Response(JSON.stringify({ error: "apollo failed", details: apolloResp }), {
+        return new Response(JSON.stringify({ error: "apollo failed", endpoint: apolloEndpoint, details: apolloResp }), {
           status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
@@ -240,7 +264,8 @@ Deno.serve(async (req: Request) => {
       throw e;
     }
 
-    const people: any[] = apolloResp?.contacts ?? [];
+    // mixed_people/search returns `people`, contacts/search returns `contacts` — accept both
+    const people: any[] = apolloResp?.people ?? apolloResp?.contacts ?? [];
     const filtered = people.filter((p) => isRelevantTitle(p.title));
 
     let inserted = 0;
