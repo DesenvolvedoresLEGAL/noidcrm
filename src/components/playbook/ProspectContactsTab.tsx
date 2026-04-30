@@ -283,6 +283,32 @@ export function ProspectContactsTab({
               )}
             </div>
 
+            {(!c.email || !c.phone) && (
+              <div className="pl-6 pt-1">
+                {c.reveal_status === "no_data" && !c.email && !c.phone ? (
+                  <div className="text-[11px] text-muted-foreground/70 italic">
+                    Apollo não tem email/telefone deste contato.
+                  </div>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-[11px] gap-1.5 w-full justify-center border-primary/30 text-primary hover:bg-primary/5"
+                    onClick={() => handleReveal({ id: c.id, full_name: c.full_name })}
+                    disabled={reveal.isPending && revealingId === c.id}
+                  >
+                    {reveal.isPending && revealingId === c.id ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Eye className="h-3 w-3" />
+                    )}
+                    {c.email || c.phone ? "Revelar restante" : "Revelar email + telefone"}
+                    <span className="opacity-60 ml-1">· até 2 créditos</span>
+                  </Button>
+                )}
+              </div>
+            )}
+
             {!c.is_primary && (
               <div className="flex justify-end pt-1">
                 <Button
