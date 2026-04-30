@@ -1,0 +1,31 @@
+export interface ForecastDailySnapshot {
+  snapshot_id: string;
+  snapshot_date: string;
+  period_start: string;
+  period_end: string;
+  period_type: string;
+  seller_id: string | null;
+  monthly_goal: number;
+  closed_amount: number;
+  commit_amount: number;
+  best_case_amount: number;
+  scenario_pessimistic: number;
+  scenario_realistic: number;
+  scenario_optimistic: number;
+  scenario_best_case: number;
+  pipeline_total: number;
+  forecast_confidence: number;
+  nrhs_avg: number;
+  data_quality_score: number;
+  deals_count: number;
+  included_deals_count: number;
+  excluded_deals_count: number;
+  risk_deals_count: number;
+  slipping_deals_count: number;
+  no_recent_activity_count: number;
+  no_next_step_count: number;
+  expired_close_date_count: number;
+  low_nrhs_count: number;
+  accuracy_score: number | null;
+  created_at: string;
+}
