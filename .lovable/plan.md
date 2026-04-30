@@ -1,141 +1,155 @@
-# Sprint F2.1 — Forecast Audit Layer
+# Sprint F2.2 — Forecast Snapshot Diário
 
-Adicionar uma camada de **rastreabilidade** ao módulo Forecast V2: cada número exibido passa a ter origem, fórmula, deals incluídos, deals excluídos e motivos de penalização — sem alterar visual nem quebrar o módulo atual.
+Camada de histórico diário do Forecast V2, totalmente isolada da F2.1 e da UI atual. Reaproveita `calculate_forecast_audit_v2`, `forecast_calculation_runs` e `forecast_calculation_items` como fonte. Falhas no snapshot **nunca** podem quebrar o módulo Forecast.
 
-## Estratégia
+---
 
-- Persistir cada cálculo de forecast em duas tabelas novas (`forecast_calculation_runs` + `forecast_calculation_items`).
-- Expor uma RPC `calculate_forecast_audit_v2` que classifica cada oportunidade em buckets (`closed`, `commit`, `best_case`, `realistic`, `optimistic`, `pipeline_only`, `excluded`) com motivos.
-- Adicionar dois hooks de leitura (`useForecastAuditRun`, `useForecastAuditItems`).
-- Adicionar **apenas um botão "Ver cálculo"** no `RevenueForecastV2` que abre um Drawer com o detalhamento. Nada mais muda na UI.
-- O módulo atual continua funcionando mesmo se a auditoria falhar (try/catch isolado, sem dependência hard).
+## 1. Banco de dados (migration)
 
-## Banco de dados (migration)
+### Tabela `forecast_daily_snapshots`
+Schema exatamente como especificado no prompt (id, organization_id, pipeline_id, snapshot_date, period_start/end, period_type='monthly', seller_id, run_id FK→`forecast_calculation_runs`, monthly_goal, todos os campos de valores/contagens/qualidade, accuracy_score nullable, metadata jsonb, timestamps).
 
-### Tabela `forecast_calculation_runs`
-Campos exatamente conforme especificação (id, organization_id, pipeline_id, period_start/end, period_type, seller_id, created_by, calculation_version='forecast_v2_audit_1', status, totais, scenarios, forecast_confidence, nrhs_avg, data_quality_score, pipeline_total, contagens, metadata, created_at).
+Índices:
+- `idx_forecast_daily_snapshots_org_date (organization_id, snapshot_date desc)`
+- `idx_forecast_daily_snapshots_org_pipeline_period (organization_id, pipeline_id, period_start, period_end)`
+- `idx_forecast_daily_snapshots_seller (organization_id, seller_id, snapshot_date desc)`
+- Único: `uq_forecast_daily_snapshot_scope` com COALESCE em pipeline_id e seller_id (zero-uuid sentinel) para garantir upsert idempotente por (org, pipeline, snapshot_date, period, seller).
 
-Índices: `(organization_id, created_at desc)`, `(organization_id, pipeline_id, period_start, period_end)`.
-
-### Tabela `forecast_calculation_items`
-Campos conforme especificação. CHECK constraints em:
-- `forecast_bucket IN ('closed','commit','best_case','realistic','optimistic','pipeline_only','excluded')`
-- `eligibility_status IN ('included','penalized','excluded','slipping')`
-
-Índices: `(run_id)`, `(organization_id, opportunity_id)`, `(run_id, forecast_bucket)`, `(run_id, eligibility_status)`.
+### Tabela `forecast_snapshot_job_logs`
+Conforme prompt (status: running|completed|completed_with_errors|failed).
 
 ### RLS
+Reaproveitar helpers já usados na F2.1 (`get_user_organization_id`, `has_role`). Padrão idêntico ao `forecast_calculation_runs`:
+- **SELECT** snapshots: org match + (admin/owner OR seller_id = auth.uid() OR seller_id IS NULL com permissão de Forecast global).
+- **INSERT/UPDATE**: apenas via SECURITY DEFINER (RPC) ou service role.
+- **Logs**: SELECT só para owner/admin/platform_admin da org. INSERT só service role.
 
-Ativar RLS nas duas tabelas. Reusar helpers existentes (`get_user_organization_id()`, `has_role()`) — sem duplicar.
+### Trigger updated_at
+Reutilizar `update_updated_at_column()` se existir no projeto; senão criar `set_forecast_daily_snapshots_updated_at()`.
 
-Políticas `SELECT`:
-- `runs`: `organization_id = get_user_organization_id()` AND (admin/owner/manager OR `seller_id IS NULL` OR `seller_id = auth.uid()` OR `created_by = auth.uid()`).
-- `items`: mesma lógica via join lógico (organização + role OR seller_id próprio).
+---
 
-Políticas `INSERT`: apenas via SECURITY DEFINER (a RPC). Sem políticas `UPDATE`/`DELETE` para usuários.
+## 2. RPCs (SECURITY DEFINER, search_path = public)
 
-## RPC `calculate_forecast_audit_v2`
+### `create_forecast_daily_snapshot_v2(p_organization_id, p_pipeline_id, p_period_start, p_period_end, p_seller_id default null, p_snapshot_date default current_date) returns jsonb`
 
-Assinatura:
+Fluxo:
+1. Validar `auth.uid()` pertence à org (ou caller é service role).
+2. Chamar `calculate_forecast_audit_v2(...)` → captura `run_id`.
+3. Ler totals do `forecast_calculation_runs` (closed/commit/best_case, scenarios, confidence, nrhs_avg, data_quality_score, pipeline_total, deals counts).
+4. Agregar de `forecast_calculation_items WHERE run_id = v_run_id`:
+   - `no_recent_activity_count`: `last_activity_at IS NULL OR last_activity_at < now() - interval '7 days'`
+   - `no_next_step_count`: `next_step_exists = false`
+   - `expired_close_date_count`: `close_date < current_date AND eligibility_status <> 'excluded'`
+   - `low_nrhs_count`: `nrhs_score < 60`
+5. Buscar `monthly_goal` da config existente da organização (se houver tabela de metas; senão 0).
+6. `INSERT ... ON CONFLICT (uq scope) DO UPDATE` setando todos os campos + `updated_at = now()`.
+7. Retornar `jsonb` do snapshot.
+
+Tudo dentro de bloco `BEGIN ... EXCEPTION WHEN OTHERS` que re-lança mas registra em log se chamado por edge function.
+
+### `get_forecast_snapshots_v2(p_organization_id, p_pipeline_id default null, p_period_start default null, p_period_end default null, p_seller_id default null) returns table(...)`
+
+Retorna todas as colunas listadas no prompt, ordenado por `snapshot_date asc`. Filtros opcionais via `WHERE (param IS NULL OR coluna = param)`. RLS já restringe automaticamente.
+
+---
+
+## 3. Edge Function `create-forecast-daily-snapshots`
+
+`supabase/functions/create-forecast-daily-snapshots/index.ts` — service role.
+
+Payload opcional: `{organization_id?, pipeline_id?, period_start?, period_end?, seller_id?}`.
+
+Fluxo:
+1. Criar registro em `forecast_snapshot_job_logs` (status=running).
+2. Se payload completo → executar apenas aquele escopo.
+3. Senão:
+   - Buscar organizações ativas.
+   - Para cada org, buscar pipelines comerciais (`is_primary=true` ou `pipeline_type='sales'`).
+   - Para cada (org, pipeline): snapshot global (seller_id=null).
+   - Para cada vendedor ativo (via `crm_active_users_view`) que tenha oportunidades no período: snapshot por seller.
+4. Período padrão: primeiro→último dia do mês corrente em `America/Sao_Paulo`.
+5. Cada chamada em try/catch; conta `attempted/created/failed`.
+6. Atualizar log final (`completed` | `completed_with_errors` | `failed`).
+7. Sempre retornar 200 com resumo (jamais quebrar caller).
+
+CORS padrão. Validação Zod do payload.
+
+---
+
+## 4. Cron diário 23h50
+
+Job `forecast_daily_snapshots_2350` (cron `50 23 * * *` em UTC-3 → ajustar conforme padrão usado em outros crons do projeto). Usar `pg_cron` + `pg_net` chamando a edge function via URL + anon key, padrão idêntico ao já usado em outros crons. Inserido via tool de insert (não migration), pois contém URL/key específicos.
+
+---
+
+## 5. Frontend
+
+### Tipo
+`src/types/forecast.ts` (criar se não existir) ou colocar em `src/hooks/useForecastAuditRun.ts`:
+
+```ts
+export interface ForecastDailySnapshot { /* todos os campos da tabela */ }
 ```
-calculate_forecast_audit_v2(
-  p_organization_id uuid,
-  p_pipeline_id uuid,
-  p_period_start date,
-  p_period_end date,
-  p_seller_id uuid default null
-) returns jsonb
-```
 
-`SECURITY DEFINER`, `set search_path = public`. Valida que `auth.uid()` pertence a `p_organization_id` antes de qualquer leitura.
+### Hook
+`src/hooks/forecast/useForecastSnapshots.ts`:
+- React Query, queryKey `['forecast-snapshots', org, pipeline, periodStart, periodEnd, seller]`.
+- Chama `supabase.rpc('get_forecast_snapshots_v2', {...})`.
+- Retorna `{snapshots, latestSnapshot, hasEnoughHistory (≥5), isLoading, error, refetch}`.
+- `staleTime: 5min`.
 
-### Fluxo
+Hook auxiliar `useCreateForecastSnapshot()` (mutation) para o botão manual → chama `create_forecast_daily_snapshot_v2`, invalida query, toast de sucesso/erro.
 
-1. INSERT em `forecast_calculation_runs` com `status='running'` → captura `v_run_id`.
-2. SELECT oportunidades da org+pipeline (filtro opcional por `owner_user_id = p_seller_id`), excluindo `deleted_at IS NOT NULL`. Janela: `closed_at` no período (para won/lost) OU `close_date_prevista` no período (para abertas) OU stage aberto sem close date (entram como `pipeline_only`).
-3. Para cada opp, calcular fatores e classificar (regras abaixo). INSERT em `forecast_calculation_items`.
-4. Recalcular agregados (somas por bucket, contagens, NRHS médio, data_quality_score) e UPDATE no run com `status='completed'`.
-5. Retornar `jsonb { run_id, total_closed, total_commit, total_best_case, scenario_*, deals_count, included_deals_count, excluded_deals_count }`.
+### UI da aba Acurácia
+Atualizar `src/components/forecast/AccuracyDashboard.tsx` adicionando uma nova **seção superior** com o snapshot history (mantendo o conteúdo legacy abaixo, intacto, para não quebrar nada já entregue).
 
-### Regras de classificação
+Estados:
+- **0 snapshots**: card "Acurácia em formação" + mini-card (snapshots: 0, status: aguardando, próxima coleta: 23h50).
+- **1–4 snapshots**: card "Histórico em formação" + lista (qtd, primeiro, último, último realista, último fechado, confiança).
+- **≥5 snapshots**: 6 cards (último realista, fechado atual, gap vs meta, confiança, deals em risco, sem atividade) + gráfico Recharts (LineChart já usado no arquivo) com 3 linhas (realistic, closed, monthly_goal) + tabela (data, fechado, realista, otimista, melhor caso, confiança, riscos, higiene).
 
-Variáveis derivadas por opp:
-- `prob = COALESCE(opp.prob, stage.probability, 0)`
-- `nrhs = COALESCE(opp.nrhs_score, 0)`
-- `value = COALESCE(opp.valor_previsto, opp.mrr_value*12+opp.arr_value, 0)`
-- `has_recent_activity = last_contact_date >= now() - interval '14 days'`
-- `has_next_step = next_followup_date IS NOT NULL`
-- `slipping = close_date_prevista < CURRENT_DATE AND status='open'`
+### Botão "Gerar snapshot agora"
+Visível apenas para owner/admin/platform_admin (usar hook de role já existente, ex: `useUserRole`). Chama mutation, mostra loading, refetch.
 
-Decisão (em ordem):
-| Condição | bucket | eligibility | exclusion/penalty |
-|---|---|---|---|
-| `status='won'` no período | `closed` | included | — |
-| `value <= 0` | `excluded` | excluded | `no_value` |
-| `prob IS NULL OR prob = 0` | `excluded` | excluded | `no_probability` |
-| `nrhs < 40` | `excluded` | excluded | `low_nrhs` |
-| `status='lost'` | `excluded` | excluded | `lost` |
-| `slipping` AND stage avançado (prob>=70) | `commit` | slipping | penalty `slipping_close_date` |
-| `slipping` (demais) | `realistic` | slipping | penalty `slipping_close_date` |
-| `prob>=70 AND nrhs>=70 AND close_date∈período AND has_recent_activity AND has_next_step` | `commit` | included | — |
-| `prob>=50 AND nrhs>=60 AND close_date∈período` | `realistic` | included/penalized | penalty se faltar atividade ou next step |
-| `prob>=25 AND nrhs>=50 AND status='open'` | `optimistic` | included/penalized | idem |
-| outras abertas | `pipeline_only` | included | — |
+---
 
-`adjusted_value = value * adjusted_probability/100`, com `adjusted_probability = prob × nrhs_factor × time_factor × activity_factor` (mesma lógica que já existe em `forecast.ts`/`useForecastData.ts`, reaproveitada).
+## 6. Testes
 
-Cenários do run (somatórios):
-- `scenario_pessimistic = sum(closed) + sum(commit)*0.7`
-- `scenario_realistic = sum(closed) + sum(commit) + sum(realistic)*0.5`
-- `scenario_optimistic = sum(closed) + sum(commit) + sum(realistic) + sum(optimistic)*0.5`
-- `scenario_best_case = sum(closed) + sum(commit) + sum(realistic) + sum(optimistic) + sum(best_case)`
-- `total_commit = sum(closed)+sum(commit)`, `total_best_case = scenario_best_case`.
+Após deploy, executar via `supabase--read_query` os testes 1–4 do prompt usando uma org real. Validar idempotência e RLS via query separada.
 
-`forecast_confidence` e `data_quality_score`: aproveitar lógica já existente em `services/crm/forecastConfidence.ts` (chamada inline ou via subquery sobre os items). `nrhs_avg = avg(nrhs_score) WHERE nrhs IS NOT NULL`.
+---
 
-## Frontend
+## 7. Detalhes técnicos / segurança
 
-### Hooks novos
-- **`src/hooks/useForecastAuditRun.ts`** — `useMutation` que invoca a RPC e cacheia o último run via React Query (`forecastKeys.audit(orgId, pipelineId, period)`). Exponde `{ run, runId, isLoading, error, runCalculation }`.
-- **`src/hooks/useForecastAuditItems.ts`** — `useQuery` que lê `forecast_calculation_items` por `run_id` com filtros opcionais (`bucket`, `seller_id`, `risk_level`, `eligibility_status`, `exclusion_reason`).
+- **search_path**: todas RPCs `SET search_path = public`.
+- **SECURITY DEFINER** com validação explícita de `organization_id` vs `auth.uid()` (exceto service role).
+- **Multitenancy**: jamais permitir snapshot cross-org — checagem na RPC e na RLS.
+- **Resiliência UI**: `useForecastSnapshots` com `enabled` flag; falha silenciosa não derruba a aba (mostra estado vazio).
+- **Edge function**: cada snapshot em try/catch isolado; falha em uma org não impede as outras.
+- **Idempotência**: garantida pelo índice único + `ON CONFLICT DO UPDATE`.
+- **Não tocar**: `RevenueForecastV2.tsx`, hooks F2.1, RPC `calculate_forecast_audit_v2`, demais abas do Forecast.
+- **Memória do projeto**: respeitar `closed_at` immutable, soft delete, `is_primary=true`, terminologia "Organization", AI date guards (não aplicável aqui).
 
-### UI mínima
-- **`src/components/reports/v2/forecast-audit/ForecastAuditButton.tsx`** — botão `variant="ghost"` com ícone `Calculator`, label "Ver cálculo", abre o drawer.
-- **`src/components/reports/v2/forecast-audit/ForecastAuditDrawer.tsx`** — usa `Sheet` (shadcn) lado direito. Seções:
-  1. Resumo do run (período, pipeline, totais, confiança, NRHS médio).
-  2. Fórmula textual de cada cenário.
-  3. Cards por bucket com contagem e soma.
-  4. Top 5 motivos de penalização (agregação client-side de `penalty_reasons`).
-  5. Top 5 motivos de exclusão (agregação de `exclusion_reasons`).
-  6. Lista paginada (20 por página) de deals com link para o detalhe.
-- **`src/components/reports/v2/RevenueForecastV2.tsx`** — adicionar **apenas** o `<ForecastAuditButton>` no header do componente, ao lado do título existente. Nada mais é alterado.
+## Arquivos
 
-### Isolamento de falhas
-O drawer faz seu próprio fetch. Se a RPC falhar, exibe `Alert` com retry — o restante do `RevenueForecastV2` continua renderizando normalmente.
+**Novos:**
+- `supabase/migrations/<ts>_forecast_daily_snapshots.sql`
+- `supabase/functions/create-forecast-daily-snapshots/index.ts`
+- `src/hooks/forecast/useForecastSnapshots.ts`
 
-## Arquivos a criar
-- `supabase/migrations/<timestamp>_forecast_audit_layer.sql`
-- `src/hooks/useForecastAuditRun.ts`
-- `src/hooks/useForecastAuditItems.ts`
-- `src/components/reports/v2/forecast-audit/ForecastAuditButton.tsx`
-- `src/components/reports/v2/forecast-audit/ForecastAuditDrawer.tsx`
-- `src/components/reports/v2/forecast-audit/ForecastAuditBucketCard.tsx`
-- `src/components/reports/v2/forecast-audit/ForecastAuditDealsList.tsx`
+**Editados:**
+- `src/components/forecast/AccuracyDashboard.tsx` (adiciona seção superior, mantém legacy)
+- `src/types/forecast.ts` ou hook compartilhado (novo tipo)
 
-## Arquivos a editar
-- `src/components/reports/v2/RevenueForecastV2.tsx` — inserir o botão no header.
-- `src/lib/query-keys.ts` — adicionar `forecastKeys.audit(...)`.
+**Insert (não migration):** cron job `forecast_daily_snapshots_2350`.
 
-## Riscos & Mitigações
-- **Custo de execução da RPC**: limitada a opps da org+pipeline+janela; índices já existem em `(organization_id, status, closed_at)` e `(organization_id) WHERE deleted_at IS NULL`.
-- **RLS**: políticas reusam `get_user_organization_id()`/`has_role()` — sem recursão.
-- **Não regressão**: nenhum hook/serviço existente do Forecast é tocado. O botão é aditivo.
-- **Multi-tenant**: a RPC valida `p_organization_id == get_user_organization_id()` antes de qualquer leitura.
-- **Permissões SDR/Sales**: vendedor comum só vê items do próprio `seller_id`, alinhado com [Permission model](mem://architectural-decision/access-control/unified-permission-and-visibility-model).
+## Riscos
 
-## Critérios de aceite
-- Botão "Ver cálculo" abre drawer e mostra resumo do run, buckets e top motivos.
-- Cada opp usada aparece em `forecast_calculation_items` com bucket e motivos.
-- Cada exclusão tem `exclusion_reasons` preenchido; cada penalização tem `penalty_reasons`.
-- Falha da RPC não derruba o `RevenueForecastV2`.
-- Nenhum item de outra organização é visível (validado via RLS + filtro server-side).
+- Tabela de metas (`monthly_goal`): se não existir fonte, default 0 — não bloqueia.
+- Volume: snapshot por seller pode gerar muitas linhas/dia em orgs grandes — mitigado pelo índice único e por filtrar apenas sellers com oportunidades no período.
+- Cron timezone: confirmar se `pg_cron` está em UTC e ajustar para `02:50 UTC` = 23h50 BRT.
+
+## Próximos passos (pós-aprovação)
+
+Implementar nesta ordem: migration → RPCs → edge function → cron → hook → UI Acurácia → testes RPC → testes UI manual.
