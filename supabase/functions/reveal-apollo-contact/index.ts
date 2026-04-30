@@ -146,9 +146,15 @@ Deno.serve(async (req: Request) => {
     }
 
     // Build Apollo payload — prefer apollo_person_id, otherwise identify by name+domain
+    // IMPORTANT: Apollo exige webhook_url HTTPS público quando reveal_phone_number=true (telefone é assíncrono).
+    const webhookToken = Deno.env.get("APOLLO_WEBHOOK_TOKEN") ?? "";
+    const webhookBase = `${SUPABASE_URL}/functions/v1/apollo-phone-webhook`;
+    const webhookUrl = `${webhookBase}?contact_id=${encodeURIComponent(contact_id)}${webhookToken ? `&token=${encodeURIComponent(webhookToken)}` : ""}`;
+
     const payload: Record<string, unknown> = {
       reveal_personal_emails: true,
       reveal_phone_number: true,
+      webhook_url: webhookUrl,
     };
     if (contact.apollo_person_id) {
       payload.id = contact.apollo_person_id;
