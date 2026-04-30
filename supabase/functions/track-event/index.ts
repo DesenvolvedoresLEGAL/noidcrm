@@ -1,7 +1,7 @@
 // Sprint C.1: Unified event router with action/outcome classification,
 // causal attribution metadata, and anti-overfitting delay queue.
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.76.1";
+import { createClient } from "npm:@supabase/supabase-js@2.76.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
