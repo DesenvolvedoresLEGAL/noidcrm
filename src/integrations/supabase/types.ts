@@ -30743,6 +30743,14 @@ export type Database = {
         Args: { _enabled: boolean; _org_id: string }
         Returns: boolean
       }
+      sync_enriched_contacts_to_account: {
+        Args: {
+          p_account_id: string
+          p_contact_ids: string[]
+          p_prospect_id: string
+        }
+        Returns: Json
+      }
       try_acquire_dedup_lock: {
         Args: {
           p_dedup_key: string

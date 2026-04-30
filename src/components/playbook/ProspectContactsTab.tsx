@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Sparkles, Loader2, Star, Mail, Phone, Linkedin, Copy, CheckCircle2, AlertCircle } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Sparkles, Loader2, Star, Mail, Phone, Linkedin, Copy, CheckCircle2, AlertCircle, PackageCheck } from "lucide-react";
 import { toast } from "sonner";
 import { useEnrichedContacts } from "@/hooks/useEnrichedContacts";
+import { useSyncEnrichedContacts } from "@/hooks/useSyncEnrichedContacts";
 import { ApolloConfirmModal } from "./enrichment/ApolloConfirmModal";
 import { ContactsQualityPanel } from "./enrichment/ContactsQualityPanel";
 import { MergedContactsAccordion } from "./enrichment/MergedContactsAccordion";
@@ -17,6 +19,7 @@ interface ProspectContactsTabProps {
   decisionMakerFound?: boolean | null;
   enrichmentStatus?: string | null;
   contactScore?: number | null;
+  matchedAccountId?: string | null;
 }
 
 function copy(text: string, label: string) {
@@ -51,6 +54,7 @@ export function ProspectContactsTab({
   decisionMakerFound,
   enrichmentStatus,
   contactScore,
+  matchedAccountId,
 }: ProspectContactsTabProps) {
   const { data: contacts = [], isLoading, enrich, setPrimary } = useEnrichedContacts(prospectId);
   const { data: mergedContacts = [] } = useQuery({
@@ -59,6 +63,36 @@ export function ProspectContactsTab({
     enabled: !!prospectId,
   });
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const sync = useSyncEnrichedContacts();
+
+  // Default selection: primary + decisores (c_level/vp/director/manager) com email
+  useEffect(() => {
+    if (contacts.length === 0) return;
+    setSelected((prev) => {
+      if (prev.size > 0) return prev;
+      const next = new Set<string>();
+      for (const c of contacts) {
+        const isDM = c.is_primary || ["c_level", "vp", "director", "manager"].includes(c.seniority ?? "");
+        if (isDM && (c.email || c.phone)) next.add(c.id);
+      }
+      return next;
+    });
+  }, [contacts]);
+
+  const toggle = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const selectedWithData = useMemo(
+    () => contacts.filter((c) => selected.has(c.id) && (c.email || c.phone || c.full_name)),
+    [contacts, selected],
+  );
 
   const handleConfirm = async (customTitles?: string[]) => {
     try {
@@ -87,8 +121,24 @@ export function ProspectContactsTab({
     }
   };
 
+  const handleImport = () => {
+    if (!matchedAccountId) {
+      toast.error("Importe o prospect no CRM primeiro (aba Detalhes → Importar no CRM)");
+      return;
+    }
+    if (selectedWithData.length === 0) {
+      toast.info("Selecione ao menos um contato com email ou telefone");
+      return;
+    }
+    sync.mutate({
+      prospectId,
+      accountId: matchedAccountId,
+      contactIds: selectedWithData.map((c) => c.id),
+    });
+  };
+
   return (
-    <div className="space-y-4 py-4">
+    <div className="space-y-4 py-4 pb-24 relative">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 flex-wrap">
           {decisionMakerFound && (
@@ -139,75 +189,126 @@ export function ProspectContactsTab({
         </Card>
       )}
 
-      {contacts.map((c) => (
-        <Card key={c.id} className={cn("p-3 space-y-2", c.is_primary && "ring-1 ring-primary/40 bg-primary/5")}>
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="font-semibold text-sm truncate">{c.full_name || "—"}</span>
-                {c.is_primary && <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />}
-                <SeniorityBadge s={c.seniority} />
+      {!matchedAccountId && contacts.length > 0 && (
+        <Card className="p-3 text-xs text-amber-700 bg-amber-500/5 border-amber-500/30 flex items-start gap-2">
+          <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+          <div>
+            Para importar contatos no CRM, primeiro importe o prospect (aba <strong>Detalhes</strong> → botão <strong>Importar no CRM</strong>).
+            Os decisores principais serão sincronizados automaticamente.
+          </div>
+        </Card>
+      )}
+
+      {contacts.map((c) => {
+        const isSelected = selected.has(c.id);
+        const hasData = !!(c.email || c.phone);
+        return (
+          <Card key={c.id} className={cn("p-3 space-y-2", c.is_primary && "ring-1 ring-primary/40 bg-primary/5", isSelected && "border-primary/40")}>
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex items-start gap-2 min-w-0">
+                <Checkbox
+                  checked={isSelected}
+                  disabled={!hasData && !c.full_name}
+                  onCheckedChange={() => toggle(c.id)}
+                  className="mt-0.5"
+                  aria-label={`Selecionar ${c.full_name ?? "contato"}`}
+                />
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="font-semibold text-sm truncate">{c.full_name || "—"}</span>
+                    {c.is_primary && <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />}
+                    <SeniorityBadge s={c.seniority} />
+                  </div>
+                  {c.role_title && (
+                    <div className="text-xs text-muted-foreground mt-0.5 truncate">{c.role_title}</div>
+                  )}
+                </div>
               </div>
-              {c.role_title && (
-                <div className="text-xs text-muted-foreground mt-0.5 truncate">{c.role_title}</div>
+              <ConfidenceBadge score={c.confidence_score} />
+            </div>
+
+            <div className="space-y-1 text-xs pl-6">
+              {c.email ? (
+                <button
+                  onClick={() => copy(c.email!, "Email")}
+                  className="flex items-center gap-1.5 w-full hover:bg-muted/50 rounded px-1 py-0.5 -mx-1 group"
+                >
+                  <Mail className="h-3 w-3 text-muted-foreground" />
+                  <span className="truncate font-mono">{c.email}</span>
+                  {c.email_status === "verified" && <CheckCircle2 className="h-3 w-3 text-green-600" />}
+                  <Copy className="h-3 w-3 ml-auto opacity-0 group-hover:opacity-50" />
+                </button>
+              ) : (
+                <div className="flex items-center gap-1.5 text-muted-foreground/60 italic">
+                  <Mail className="h-3 w-3" /> sem e-mail
+                </div>
+              )}
+              {c.phone ? (
+                <button
+                  onClick={() => copy(c.phone!, "Telefone")}
+                  className="flex items-center gap-1.5 w-full hover:bg-muted/50 rounded px-1 py-0.5 -mx-1 group"
+                >
+                  <Phone className="h-3 w-3 text-muted-foreground" />
+                  <span className="font-mono">{c.phone}</span>
+                  <Copy className="h-3 w-3 ml-auto opacity-0 group-hover:opacity-50" />
+                </button>
+              ) : (
+                <div className="flex items-center gap-1.5 text-muted-foreground/60 italic">
+                  <Phone className="h-3 w-3" /> sem telefone
+                </div>
+              )}
+              {c.linkedin_url && (
+                <a
+                  href={c.linkedin_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 hover:text-primary px-1 py-0.5 -mx-1"
+                >
+                  <Linkedin className="h-3 w-3" />
+                  <span className="truncate">LinkedIn</span>
+                </a>
               )}
             </div>
-            <ConfidenceBadge score={c.confidence_score} />
-          </div>
 
-          <div className="space-y-1 text-xs">
-            {c.email && (
-              <button
-                onClick={() => copy(c.email!, "Email")}
-                className="flex items-center gap-1.5 w-full hover:bg-muted/50 rounded px-1 py-0.5 -mx-1 group"
-              >
-                <Mail className="h-3 w-3 text-muted-foreground" />
-                <span className="truncate font-mono">{c.email}</span>
-                {c.email_status === "verified" && <CheckCircle2 className="h-3 w-3 text-green-600" />}
-                <Copy className="h-3 w-3 ml-auto opacity-0 group-hover:opacity-50" />
-              </button>
+            {!c.is_primary && (
+              <div className="flex justify-end pt-1">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 text-[11px] gap-1"
+                  onClick={() => setPrimary.mutate(c.id)}
+                  disabled={setPrimary.isPending}
+                >
+                  <Star className="h-3 w-3" /> Marcar principal
+                </Button>
+              </div>
             )}
-            {c.phone && (
-              <button
-                onClick={() => copy(c.phone!, "Telefone")}
-                className="flex items-center gap-1.5 w-full hover:bg-muted/50 rounded px-1 py-0.5 -mx-1 group"
-              >
-                <Phone className="h-3 w-3 text-muted-foreground" />
-                <span className="font-mono">{c.phone}</span>
-                <Copy className="h-3 w-3 ml-auto opacity-0 group-hover:opacity-50" />
-              </button>
-            )}
-            {c.linkedin_url && (
-              <a
-                href={c.linkedin_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 hover:text-primary px-1 py-0.5 -mx-1"
-              >
-                <Linkedin className="h-3 w-3" />
-                <span className="truncate">LinkedIn</span>
-              </a>
-            )}
-          </div>
-
-          {!c.is_primary && (
-            <div className="flex justify-end pt-1">
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-6 text-[11px] gap-1"
-                onClick={() => setPrimary.mutate(c.id)}
-                disabled={setPrimary.isPending}
-              >
-                <Star className="h-3 w-3" /> Marcar principal
-              </Button>
-            </div>
-          )}
-        </Card>
-      ))}
+          </Card>
+        );
+      })}
 
       {!isLoading && mergedContacts.length > 0 && (
         <MergedContactsAccordion prospectId={prospectId} />
+      )}
+
+      {contacts.length > 0 && (
+        <div className="sticky bottom-0 left-0 right-0 -mx-6 px-6 py-3 bg-background/95 backdrop-blur border-t flex items-center justify-between gap-3 z-10">
+          <div className="text-xs text-muted-foreground">
+            <span className="font-semibold text-foreground">{selectedWithData.length}</span> selecionado{selectedWithData.length === 1 ? "" : "s"}
+            {selected.size !== selectedWithData.length && (
+              <span className="ml-1 opacity-70">({selected.size - selectedWithData.length} sem dados)</span>
+            )}
+          </div>
+          <Button
+            size="sm"
+            onClick={handleImport}
+            disabled={sync.isPending || selectedWithData.length === 0 || !matchedAccountId}
+            className="gap-1.5"
+          >
+            {sync.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <PackageCheck className="h-3.5 w-3.5" />}
+            Importar {selectedWithData.length > 0 ? selectedWithData.length : ""} no CRM
+          </Button>
+        </div>
       )}
     </div>
   );

@@ -156,6 +156,7 @@ export function ProspectDetailDrawer({
               decisionMakerFound={(prospect as any).decision_maker_found}
               enrichmentStatus={(prospect as any).enrichment_status}
               contactScore={(prospect as any).contact_score}
+              matchedAccountId={prospect.matched_account_id}
             />
           </TabsContent>
 
