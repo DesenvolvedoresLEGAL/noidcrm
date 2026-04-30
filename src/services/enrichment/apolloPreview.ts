@@ -4,6 +4,8 @@ export interface ApolloPreview {
   eligible: boolean;
   reason: string | null;
   warning: string | null;
+  review_required?: boolean;
+  auto_send_allowed?: boolean;
   estimated_credits: number;
   domain: string | null;
   company_name: string | null;
