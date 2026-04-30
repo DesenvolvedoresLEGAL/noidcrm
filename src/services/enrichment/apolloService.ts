@@ -114,3 +114,24 @@ export async function setPrimaryContact(prospectId: string, contactId: string): 
   });
   if (error) throw error;
 }
+
+export interface SyncEnrichedContactsResult {
+  created: number;
+  updated: number;
+  skipped: number;
+  primary_contact_id: string | null;
+}
+
+export async function syncEnrichedContactsToAccount(
+  prospectId: string,
+  accountId: string,
+  contactIds: string[],
+): Promise<SyncEnrichedContactsResult> {
+  const { data, error } = await (supabase.rpc as any)("sync_enriched_contacts_to_account", {
+    p_prospect_id: prospectId,
+    p_account_id: accountId,
+    p_contact_ids: contactIds,
+  });
+  if (error) throw error;
+  return data as SyncEnrichedContactsResult;
+}
