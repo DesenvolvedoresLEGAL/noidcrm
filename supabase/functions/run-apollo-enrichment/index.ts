@@ -9,7 +9,7 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const APOLLO_URL = "https://api.apollo.io/api/v1/mixed_people/search";
+const APOLLO_URL = "https://api.apollo.io/api/v1/contacts/search";
 const ESTIMATED_CREDITS = 2;
 const ANTI_SPAM_HOURS = 24;
 const RATE_LIMIT_PER_MIN = 20;
@@ -59,7 +59,7 @@ function computeContactScore(person: any): number {
   if (person.email) s += 30;
   if (person.email_status === "verified") s += 20;
   if (person.linkedin_url) s += 15;
-  if (person.phone_numbers?.length || person.organization?.phone) s += 15;
+  if (person.phone_numbers?.length || person.sanitized_phone || person.organization?.phone || person.account?.phone) s += 15;
   s += seniorityBonus(person.title);
   return Math.min(100, s);
 }
@@ -199,6 +199,7 @@ Deno.serve(async (req: Request) => {
     // 6. Call Apollo
     let apolloResp: any = null;
     let credits_used = 0;
+    const searchKeywords = [prospect.company_name, domain].filter(Boolean).join(" ");
     try {
       const r = await fetch(APOLLO_URL, {
         method: "POST",
@@ -208,10 +209,10 @@ Deno.serve(async (req: Request) => {
           "x-api-key": APOLLO_API_KEY,
         },
         body: JSON.stringify({
-          q_organization_domains: domain,
-          person_titles: ["CEO", "Founder", "Co-Founder", "Head", "Director", "VP", "Manager", "Marketing", "Sales", "Growth"],
+          q_keywords: searchKeywords || domain,
           page: 1,
           per_page: 10,
+          sort_ascending: false,
         }),
       });
       apolloResp = await r.json();
@@ -239,7 +240,7 @@ Deno.serve(async (req: Request) => {
       throw e;
     }
 
-    const people: any[] = apolloResp?.people ?? [];
+    const people: any[] = apolloResp?.contacts ?? [];
     const filtered = people.filter((p) => isRelevantTitle(p.title));
 
     let inserted = 0;
@@ -257,7 +258,7 @@ Deno.serve(async (req: Request) => {
       const isDM = seniority === "c_level" || seniority === "vp" || seniority === "director";
       if (isDM) decisionMakers += 1;
       if (person.email) emailsFound += 1;
-      const phone = person.phone_numbers?.[0]?.sanitized_number ?? person.organization?.phone ?? null;
+      const phone = person.phone_numbers?.[0]?.sanitized_number ?? person.sanitized_phone ?? person.organization?.phone ?? person.account?.phone ?? null;
       if (phone) phonesFound += 1;
 
       const rank = SENIORITY_RANK[seniority ?? "ic"] ?? 0;
@@ -278,7 +279,7 @@ Deno.serve(async (req: Request) => {
         linkedin_url: person.linkedin_url ?? null,
         provider: "apollo",
         confidence_score: cScore,
-        apollo_person_id: person.id ?? null,
+        apollo_person_id: person.person_id ?? person.id ?? null,
         raw: person,
       };
 
