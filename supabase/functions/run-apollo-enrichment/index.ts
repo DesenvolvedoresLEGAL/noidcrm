@@ -189,11 +189,11 @@ Deno.serve(async (req: Request) => {
       workspace_id: prospect.organization_id,
       prospect_id, provider: "apollo", status: "running",
       trigger_source, estimated_credits: ESTIMATED_CREDITS,
-      request: { domain, person_titles: RELEVANT_TITLES },
+      request: { domain, person_titles: RELEVANT_TITLES, review_required, quality_label: qLabel, trigger_source },
     }).select("id").single();
 
     await trackEvent(sb, prospect.organization_id, "apollo_enrichment_started", {
-      prospect_id, job_id: jobRow?.id, domain, trigger_source,
+      prospect_id, job_id: jobRow?.id, domain, trigger_source, review_required, quality_label: qLabel,
     });
 
     // 6. Call Apollo
