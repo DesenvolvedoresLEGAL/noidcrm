@@ -204,6 +204,17 @@ export default function Forecast() {
               opportunitiesFallback={opportunities}
             />
           </TabsContent>
+
+          {/* Health Tab — F2.8 Saúde V2 (admin/manager) */}
+          {showHealth && (
+            <TabsContent value="health" className="mt-6">
+              <ForecastV2HealthPanel
+                periodStart={filters.periodStart}
+                periodEnd={filters.periodEnd}
+                pipelineId={filters.pipelineId}
+              />
+            </TabsContent>
+          )}
         </Tabs>
       </div>
     </Layout>
