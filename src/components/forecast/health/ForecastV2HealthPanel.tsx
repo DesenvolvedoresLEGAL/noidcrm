@@ -53,6 +53,10 @@ export function ForecastV2HealthPanel({ periodStart, periodEnd, pipelineId }: Pr
   const recalc = useRecalculateForecast();
   const snapshot = useGenerateSnapshot();
   const accuracy = useCalculateAccuracy();
+  const activate = useActivateForecastV2();
+  const bootstrap = useBootstrapForecastV2();
+  const [showSql, setShowSql] = useState(false);
+  const [bootstrapResults, setBootstrapResults] = useState<BootstrapStepResult[] | null>(null);
 
   if (!isPrivileged) {
     return <p className="text-sm text-muted-foreground">Esta área é restrita a administradores e gestores.</p>;
