@@ -31440,7 +31440,13 @@ export type Database = {
     }
     Enums: {
       accelerator_tier_type: "NONE" | "BRONZE" | "SILVER" | "GOLD" | "DIAMOND"
-      app_role: "admin" | "manager" | "sales" | "cs"
+      app_role:
+        | "admin"
+        | "manager"
+        | "sales"
+        | "cs"
+        | "owner"
+        | "platform_admin"
       archetype_level_type:
         | "Entrada"
         | "Intermediário"
@@ -31721,7 +31727,7 @@ export const Constants = {
   public: {
     Enums: {
       accelerator_tier_type: ["NONE", "BRONZE", "SILVER", "GOLD", "DIAMOND"],
-      app_role: ["admin", "manager", "sales", "cs"],
+      app_role: ["admin", "manager", "sales", "cs", "owner", "platform_admin"],
       archetype_level_type: [
         "Entrada",
         "Intermediário",
