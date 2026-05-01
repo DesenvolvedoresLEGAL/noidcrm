@@ -7,7 +7,9 @@ import { CheckCircle2, XCircle, AlertTriangle, RefreshCw, Activity, Calculator, 
 import { useUserRole } from '@/hooks/useUserRole';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { usePlatformAdmin } from '@/hooks/usePlatformAdmin';
-import { useForecastV2Health, useRecalculateForecast, useGenerateSnapshot, useCalculateAccuracy } from '@/hooks/forecast/useForecastV2Health';
+import { useForecastV2Health, useRecalculateForecast, useGenerateSnapshot, useCalculateAccuracy, useActivateForecastV2, useBootstrapForecastV2, type BootstrapStepResult } from '@/hooks/forecast/useForecastV2Health';
+import { useState } from 'react';
+import { Power, Rocket, ChevronDown } from 'lucide-react';
 import { CONSISTENCY_LABELS, HEALTH_LABELS, type DataConsistency, type HealthStatus } from '@/types/forecast-health';
 import { cn } from '@/lib/utils';
 
