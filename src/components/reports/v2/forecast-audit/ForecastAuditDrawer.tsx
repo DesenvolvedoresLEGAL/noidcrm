@@ -18,17 +18,35 @@ import { useForecastAuditItems, type ForecastAuditItem } from '@/hooks/useForeca
 import { formatCurrency, formatPct } from '@/lib/reports/formatReportNumbers';
 
 const PENALTY_LABELS: Record<string, string> = {
+  // legacy
   slipping_close_date: 'Close date vencida',
   no_recent_activity: 'Sem atividade recente (14d)',
   no_next_step: 'Sem próximo passo definido',
   missing_close_date: 'Close date não preenchida',
+  // V2 engine
+  stale_activity: 'Atividade parada (>14 dias)',
+  missing_next_step: 'Sem próximo passo definido',
+  expired_close_date: 'Close date vencida',
+  high_risk: 'Risco alto',
+  critical_risk: 'Risco crítico',
+  end_of_month_restriction: 'Restrição de fim de mês',
+  close_date_outside_period: 'Close date fora do período',
+  low_nrhs: 'NRHS baixo (40-59)',
+  weak_stage: 'Estágio fraco',
 };
 
 const EXCLUSION_LABELS: Record<string, string> = {
+  // legacy
   no_value: 'Sem valor preenchido',
   no_probability: 'Sem probabilidade',
   low_nrhs: 'NRHS abaixo de 40',
   lost: 'Oportunidade perdida',
+  // V2 engine
+  lost_opportunity: 'Oportunidade perdida',
+  missing_deal_value: 'Valor não preenchido',
+  zero_probability: 'Probabilidade zero',
+  nrhs_below_40: 'NRHS abaixo de 40',
+  missing_close_date: 'Close date não preenchida',
 };
 
 const BUCKET_LABELS: Record<ForecastAuditItem['forecast_bucket'], string> = {
@@ -39,6 +57,7 @@ const BUCKET_LABELS: Record<ForecastAuditItem['forecast_bucket'], string> = {
   optimistic: 'Otimista',
   pipeline_only: 'Apenas pipeline',
   excluded: 'Excluído',
+  slipping: 'Escorregando',
 };
 
 interface Props {
