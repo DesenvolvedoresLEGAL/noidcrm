@@ -30803,9 +30803,16 @@ export type Database = {
           p_seller_id?: string
         }
         Returns: {
+          accuracy_calculated_at: string
           accuracy_score: number
+          actual_closed_amount: number
           best_case_amount: number
+          best_case_error_amount: number
+          best_case_error_percentage: number
+          bias_direction: string
+          calculation_version: string
           closed_amount: number
+          closed_won_final_amount: number
           commit_amount: number
           created_at: string
           data_quality_score: number
@@ -30819,10 +30826,14 @@ export type Database = {
           no_next_step_count: number
           no_recent_activity_count: number
           nrhs_avg: number
+          optimistic_error_amount: number
+          optimistic_error_percentage: number
           period_end: string
           period_start: string
           period_type: string
           pipeline_total: number
+          realistic_error_amount: number
+          realistic_error_percentage: number
           risk_deals_count: number
           scenario_best_case: number
           scenario_optimistic: number
