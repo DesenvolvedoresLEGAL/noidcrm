@@ -12,6 +12,7 @@ import { SellerForecastTable } from '@/components/forecast/SellerForecastTable';
 import { SellerPerformanceSection } from '@/components/forecast/seller-performance/SellerPerformanceSection';
 import { DealInspectionTable } from '@/components/forecast/DealInspectionTable';
 import { ForecastRisksPanel } from '@/components/forecast/ForecastRisksPanel';
+import { ForecastRiskCenterPanel } from '@/components/forecast/risk-center/ForecastRiskCenterPanel';
 import { AIForecastInsightsPanel } from '@/components/forecast/AIForecastInsightsPanel';
 import { ForecastIntelligencePanel } from '@/components/forecast/ForecastIntelligencePanel';
 import { AccuracyDashboard } from '@/components/forecast/AccuracyDashboard';
@@ -183,9 +184,15 @@ export default function Forecast() {
             )}
           </TabsContent>
 
-          {/* Risks Tab */}
+          {/* Risks Tab — F2.7 Risk Center */}
           <TabsContent value="risks" className="mt-6">
-            <ForecastRisksPanel opportunities={opportunities} />
+            <ForecastRiskCenterPanel
+              periodStart={filters.periodStart}
+              periodEnd={filters.periodEnd}
+              pipelineId={filters.pipelineId}
+              sellerId={filters.userId ?? null}
+              opportunitiesFallback={opportunities}
+            />
           </TabsContent>
         </Tabs>
       </div>
