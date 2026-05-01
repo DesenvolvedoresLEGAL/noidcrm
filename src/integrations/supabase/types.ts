@@ -11494,8 +11494,13 @@ export type Database = {
       }
       forecast_daily_snapshots: {
         Row: {
+          accuracy_calculated_at: string | null
           accuracy_score: number | null
+          actual_closed_amount: number | null
           best_case_amount: number | null
+          best_case_error_amount: number | null
+          best_case_error_percentage: number | null
+          bias_direction: string | null
           calculation_version: string | null
           closed_amount: number | null
           closed_won_final_amount: number | null
@@ -11516,12 +11521,16 @@ export type Database = {
           no_next_step_count: number | null
           no_recent_activity_count: number | null
           nrhs_avg: number | null
+          optimistic_error_amount: number | null
+          optimistic_error_percentage: number | null
           organization_id: string
           period_end: string
           period_start: string
           period_type: string
           pipeline_id: string | null
           pipeline_total: number | null
+          realistic_error_amount: number | null
+          realistic_error_percentage: number | null
           risk_deals_count: number | null
           run_id: string | null
           scenario_best_case: number | null
@@ -11534,8 +11543,13 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          accuracy_calculated_at?: string | null
           accuracy_score?: number | null
+          actual_closed_amount?: number | null
           best_case_amount?: number | null
+          best_case_error_amount?: number | null
+          best_case_error_percentage?: number | null
+          bias_direction?: string | null
           calculation_version?: string | null
           closed_amount?: number | null
           closed_won_final_amount?: number | null
@@ -11556,12 +11570,16 @@ export type Database = {
           no_next_step_count?: number | null
           no_recent_activity_count?: number | null
           nrhs_avg?: number | null
+          optimistic_error_amount?: number | null
+          optimistic_error_percentage?: number | null
           organization_id: string
           period_end: string
           period_start: string
           period_type?: string
           pipeline_id?: string | null
           pipeline_total?: number | null
+          realistic_error_amount?: number | null
+          realistic_error_percentage?: number | null
           risk_deals_count?: number | null
           run_id?: string | null
           scenario_best_case?: number | null
@@ -11574,8 +11592,13 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          accuracy_calculated_at?: string | null
           accuracy_score?: number | null
+          actual_closed_amount?: number | null
           best_case_amount?: number | null
+          best_case_error_amount?: number | null
+          best_case_error_percentage?: number | null
+          bias_direction?: string | null
           calculation_version?: string | null
           closed_amount?: number | null
           closed_won_final_amount?: number | null
@@ -11596,12 +11619,16 @@ export type Database = {
           no_next_step_count?: number | null
           no_recent_activity_count?: number | null
           nrhs_avg?: number | null
+          optimistic_error_amount?: number | null
+          optimistic_error_percentage?: number | null
           organization_id?: string
           period_end?: string
           period_start?: string
           period_type?: string
           pipeline_id?: string | null
           pipeline_total?: number | null
+          realistic_error_amount?: number | null
+          realistic_error_percentage?: number | null
           risk_deals_count?: number | null
           run_id?: string | null
           scenario_best_case?: number | null
@@ -30255,6 +30282,16 @@ export type Database = {
         Returns: number
       }
       calculate_edge_weight: { Args: { p_edge_id: string }; Returns: number }
+      calculate_forecast_accuracy_v2: {
+        Args: {
+          p_organization_id: string
+          p_period_end?: string
+          p_period_start?: string
+          p_pipeline_id?: string
+          p_seller_id?: string
+        }
+        Returns: Json
+      }
       calculate_forecast_audit_v2: {
         Args: {
           p_organization_id: string
@@ -30683,6 +30720,38 @@ export type Database = {
           p_organization_id: string
         }
         Returns: Json
+      }
+      get_forecast_actual_closed_amount_v2: {
+        Args: {
+          p_organization_id: string
+          p_period_end?: string
+          p_period_start?: string
+          p_pipeline_id?: string
+          p_seller_id?: string
+        }
+        Returns: number
+      }
+      get_forecast_seller_accuracy_v2: {
+        Args: {
+          p_organization_id: string
+          p_period_end?: string
+          p_period_start?: string
+          p_pipeline_id?: string
+        }
+        Returns: {
+          accuracy_score: number
+          actual_closed_amount: number
+          avg_error_percentage: number
+          avg_realistic_forecast: number
+          bias_direction: string
+          calculation_version: string
+          forecast_trend: string
+          last_realistic_forecast: number
+          seller_email: string
+          seller_id: string
+          seller_name: string
+          snapshots_count: number
+        }[]
       }
       get_forecast_seller_performance_v2: {
         Args: {
