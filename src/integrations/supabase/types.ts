@@ -30684,6 +30684,47 @@ export type Database = {
         }
         Returns: Json
       }
+      get_forecast_seller_performance_v2: {
+        Args: {
+          p_organization_id: string
+          p_period_end: string
+          p_period_start: string
+          p_pipeline_id: string
+        }
+        Returns: {
+          calculation_version: string
+          closed_amount: number
+          coverage_ratio: number
+          deals_count: number
+          excluded_deals_count: number
+          expired_close_date_count: number
+          forecast_confidence: number
+          gap_to_goal: number
+          goal_attainment_percentage: number
+          has_goal: boolean
+          included_deals_count: number
+          low_nrhs_count: number
+          monthly_goal: number
+          no_next_step_count: number
+          no_recent_activity_count: number
+          nrhs_avg: number
+          pipeline_total: number
+          recommended_action: string
+          recommended_action_type: string
+          risk_amount: number
+          risk_deals_count: number
+          run_id: string
+          scenario_best_case: number
+          scenario_optimistic: number
+          scenario_realistic: number
+          seller_avatar_url: string
+          seller_email: string
+          seller_id: string
+          seller_name: string
+          slipping_amount: number
+          slipping_deals_count: number
+        }[]
+      }
       get_forecast_snapshots_v2: {
         Args: {
           p_organization_id: string
@@ -30847,6 +30888,15 @@ export type Database = {
       }
       get_revenue_context: { Args: { p_opportunity_id: string }; Returns: Json }
       get_scoring_summary: { Args: never; Returns: Json }
+      get_seller_monthly_goal_v2: {
+        Args: {
+          p_organization_id: string
+          p_period_end: string
+          p_period_start: string
+          p_seller_id: string
+        }
+        Returns: number
+      }
       get_tables_needing_indexes: {
         Args: never
         Returns: {
