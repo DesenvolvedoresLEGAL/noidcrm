@@ -7,7 +7,6 @@ import { CheckCircle2, XCircle, AlertTriangle, RefreshCw, Activity, Calculator, 
 import { useUserRole } from '@/hooks/useUserRole';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { usePlatformAdmin } from '@/hooks/usePlatformAdmin';
-import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { useForecastV2Health, useRecalculateForecast, useGenerateSnapshot, useCalculateAccuracy } from '@/hooks/forecast/useForecastV2Health';
 import { CONSISTENCY_LABELS, HEALTH_LABELS, type DataConsistency, type HealthStatus } from '@/types/forecast-health';
 import { cn } from '@/lib/utils';
@@ -34,10 +33,9 @@ function fmtDt(d: string | null): string {
 
 export function ForecastV2HealthPanel({ periodStart, periodEnd, pipelineId }: Props) {
   const { isAdmin, isManager } = useUserRole();
-  const { isOwner } = useCurrentOrganization();
+  const { isOwner, organization } = useCurrentOrganization();
   const { isPlatformAdmin } = usePlatformAdmin();
-  const isPrivileged = isAdmin || isManager;
-  const { organization } = useCurrentOrganization();
+  const isPrivileged = isAdmin || isManager || isOwner || isPlatformAdmin;
   const orgId = organization?.id ?? null;
   const periodStartStr = format(periodStart, 'yyyy-MM-dd');
   const periodEndStr = format(periodEnd, 'yyyy-MM-dd');
