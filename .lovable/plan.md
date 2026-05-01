@@ -1,102 +1,105 @@
-# Sprint F2.8 — Forecast V2 QA, Governança e Consolidação Final
+# Sprint F2.9 — Forecast V2 Activation, Fixes e Estabilização Final
 
-Sprint de fechamento. Foco: confiança, consistência e estados padronizados. Sem reescrever engine, sem nova inteligência.
+Objetivo: tirar o Forecast V2 do estado "ainda não pronto" para uso real em produção. Sem mudar a fórmula da Engine V2 (F2.3), sem alterar pesos NRHS oficiais, sem refatorar layout. Foco: ativação, correção de erros e textos legados.
 
-## 1. Backend (1 migration)
+## Diagnóstico (já validado no banco)
 
-### Schema
-- `ALTER TABLE public.forecast_snapshot_job_logs ADD COLUMN IF NOT EXISTS duration_ms integer;`
-- `ALTER TABLE public.forecast_calculation_runs ADD COLUMN IF NOT EXISTS duration_ms integer;`
-- Nova tabela `public.forecast_v2_health_logs` (id, organization_id, pipeline_id, period_start, period_end, status, warnings_count, errors_count, duration_ms, metadata jsonb, created_at). RLS: SELECT só admin/owner/manager/platform_admin da org; INSERT bloqueado (apenas SECURITY DEFINER da RPC grava).
+- `feature_flags` tem UNIQUE em `(organization_id, flag_key)` → suporta `ON CONFLICT` com upsert.
+- Causa raiz do erro `operator does not exist: text = uuid`: a coluna `forecast_calculation_items.pipeline_id` é **text**, enquanto `forecast_calculation_runs.pipeline_id` e o parâmetro `p_pipeline_id` são **uuid**. Comparações diretas em joins/filtros das RPCs de acurácia quebram.
+- 12 RPCs `*_v2` já existem; o problema não é "faltar função", é cast de tipo + ausência de run/snapshot inicial após ativar a flag.
 
-### RPC `get_forecast_v2_health_check(p_organization_id, p_period_start, p_period_end, p_pipeline_id)`
-- `SECURITY DEFINER`, `SET search_path = public`.
-- Permissão: apenas admin/owner/manager/platform_admin da org. Caso contrário retorna `{status:'forbidden'}`.
-- Lê:
-  - `feature_flags` para `forecast_v2_engine_enabled` (e `enable_forecast_v2` como fallback de chave já usado pela engine).
-  - `forecast_calculation_runs` mais recente do (org, pipeline, período) → `latest_run_at`, `calculation_version`, `total_closed`, scenarios, `total_commit`, `duration_ms`.
-  - `forecast_daily_snapshots` mais recente do período + count → `latest_snapshot_at`, `snapshots_count`, scenarios snapshot.
-  - `forecast_snapshot_job_logs` mais recente → `snapshot_job_last_status`, `duration_ms`.
-  - `forecast_calculation_items` do último run para checks de fim de mês contaminado.
-  - `sales_goals`/`seller_targets` para detectar vendedores com oportunidades sem meta no período.
-- Calcula validações de consistência (ver §2). Cada falha vira `errors[]` ou `warnings[]` com `code`, `message` e `severity`.
-- Calcula readiness por módulo: `accuracy_ready` (snapshots_count ≥ 5 e existe `accuracy_score`), `seller_performance_ready`, `intelligence_ready`, `risk_center_ready` (depende apenas de existir run recente).
-- Performance: lê `duration_ms` das tabelas de log. Se algum > 3000ms → warning; > 8000ms → error. Mede o tempo do próprio health-check via `clock_timestamp()` e devolve `last_health_check_ms`. Calcula `latest_run_age_minutes` e `latest_snapshot_age_hours`.
-- Status final agregado:
-  - `not_ready`: feature flag desligada ou nenhum run.
-  - `critical`: qualquer item em `errors[]`.
-  - `attention`: warnings sem errors.
-  - `healthy`: nenhum.
-- Insere uma linha em `forecast_v2_health_logs` (best-effort, dentro de `BEGIN/EXCEPTION`).
-- `GRANT EXECUTE TO authenticated`.
+## Mudanças (escopo fechado)
 
-## 2. Validações de consistência (todas dentro da RPC)
+### 1. Migration (1 arquivo)
 
-- `closed_matches_pessimistic`: `ABS(scenario_pessimistic - total_closed - total_commit*0.7) ≤ 1`. Se diferente → error "Pessimista não bate com fechado".
-- Ordem `pessimistic ≤ realistic ≤ optimistic ≤ best_case` → error se quebrar.
-- `commit_not_above_best_case`: `total_commit ≤ scenario_best_case + 1`.
-- `snapshot_matches_latest_run`: para cada um dos 5 campos comparar diferença ≤ R$ 1,00.
-- `realistic_protected_eom`: se `(period_end - current_date) ≤ 1`, conta deals no run com `forecast_bucket='realistic'` que falham em `last_activity_at ≥ now()-2d` AND `next_step_exists` AND `nrhs_score ≥ 70` AND `(adjusted_probability ≥ 70 OR manual_probability ≥ 70)`. Warning se >0; error se valor agregado > 30% do `scenario_realistic`.
-- `sellers_without_goal`: vendedores com items no run e sem `sales_goals`/`seller_targets` ativo no período → warning com contagem.
-- `accuracy_low_sample`: `snapshots_count < 5` → warning "Acurácia ainda em formação".
+**`supabase/migrations/<timestamp>_forecast_v2_f29_stabilization.sql`**
 
-## 3. Frontend
+- **1.1 Normalizar tipo de `forecast_calculation_items.pipeline_id`** para `uuid` (USING `nullif(pipeline_id,'')::uuid`). Atualiza índices envolvidos. Esta é a correção definitiva do `text = uuid`.
+- **1.2 RPC `activate_forecast_v2_engine(p_organization_id uuid)`** — `SECURITY DEFINER`, `search_path = public`. Valida que o caller é `admin`/`owner`/`manager`/`platform_admin` da org, executa o upsert canônico:
+  ```
+  INSERT INTO feature_flags(organization_id, flag_key, enabled)
+  VALUES (p_organization_id, 'forecast_v2_engine_enabled', true)
+  ON CONFLICT (organization_id, flag_key)
+  DO UPDATE SET enabled = true, updated_at = now();
+  ```
+  Retorna a linha resultante. Loga em `forecast_v2_health_logs`.
+- **1.3 Recriar 4 RPCs com cast seguro de `p_seller_id`** (`uuid` opcional) e qualquer outro `text vs uuid`:
+  - `calculate_forecast_accuracy_v2`
+  - `get_forecast_seller_accuracy_v2`
+  - `get_forecast_actual_closed_amount_v2`
+  - `get_forecast_snapshots_v2`
+  
+  Padrão aplicado: `(p_seller_id IS NULL OR seller_id = p_seller_id)` para colunas uuid; `(p_seller_id IS NULL OR seller_id::text = p_seller_id::text)` quando lado for `text`. Nunca cast cego sem `nullif` em parâmetros opcionais. Assinatura, retorno e regra de negócio preservados — só hardening de tipos.
+- **1.4 Health check (`get_forecast_v2_health_check`)** ganha 5 status diferenciados: `not_ready` (flag off / sem run), `attention` (flag on, run ok, <5 snapshots), `healthy` (tudo pronto), `critical` (erro de RPC/RLS/inconsistência), `forbidden`. Mensagens reaproveitam `data_consistency` existente.
 
-### Tipos — `src/types/forecast-health.ts` (novo)
-- `ForecastV2HealthCheck`, `HealthStatus`, `HealthIssue`, `DataConsistency`, `PerformanceStats`.
+Nada nas fórmulas da Engine V2 ou pesos NRHS é tocado.
 
-### Hook — `src/hooks/forecast/useForecastV2Health.ts` (novo)
-- `useQuery` `['forecast-v2-health', org, pipeline, start, end]`, `staleTime: 60s`.
-- Mutations: `useRecalculateForecast` (chama `calculate_forecast_audit_v2`), `useGenerateSnapshot` (`create_forecast_daily_snapshot_v2`), `useCalculateAccuracy` (`calculate_forecast_accuracy_v2`). Cada mutation invalida queries relacionadas e toast (sonner).
+### 2. Hooks (`src/hooks/forecast/`)
 
-### Componente — `src/components/forecast/health/ForecastV2HealthPanel.tsx` (+ subcomponentes)
-- `HealthStatusCard` (status geral colorido).
-- `HealthMetricsGrid` (Feature Flag, Último Cálculo, Último Snapshot, Snapshots, Acurácia, Engine, Risk Center, AI).
-- `HealthConsistencyChecks` (lista de checks com ✓/✗).
-- `HealthIssuesList` (warnings, errors, recommendations).
-- `HealthActionsBar` (4 botões admin com loading state).
-- `FeatureFlagOffBanner`: se `feature_flag_enabled=false`, mostra banner com SQL para ativar (não executa automaticamente).
+- **`useForecastV2Health.ts`** ganha duas mutations:
+  - `useActivateForecastV2()` → chama RPC `activate_forecast_v2_engine`. Invalida `forecast-v2-health` e `is_feature_enabled`.
+  - `useBootstrapForecastV2()` → executa em sequência, com try/catch independente em cada passo: `calculate_forecast_audit_v2` → `create_forecast_daily_snapshot_v2` → `calculate_forecast_accuracy_v2` → `get_forecast_intelligence_v2` → `get_forecast_risk_center_v2` → `get_forecast_v2_health_check`. Retorna relatório `{step, ok, error?}[]`. Toast final agregado.
+- `useForecastAccuracy.ts`: tratar erro de RPC retornando `{accuracy: null, sellerAccuracy: []}` em vez de throw, para a UI cair no estado "em formação" em vez de Alert vermelho. Erro técnico real continua propagando — só reclassificamos códigos `42883`/`42P01` quando vierem após bootstrap (mensagem amigável).
 
-### Permissão na UI
-- Usa `useUserRoles` (existente) para esconder o painel para non-admin/manager/owner/platform_admin.
+### 3. UI
 
-### Wiring — `src/pages/Forecast.tsx`
-- Nova `<TabsTrigger value="health">` chamada **"Saúde V2"**, escondida via condicional para non-privileged. Conteúdo `<ForecastV2HealthPanel periodStart periodEnd pipelineId />`.
+**`src/components/forecast/health/ForecastV2HealthPanel.tsx`**
+- Banner amarelo (flag desligada) ganha botão **"Ativar Forecast Engine V2"** chamando `useActivateForecastV2`. Bloco `<pre>` com SQL passa a ser collapsible secundário ("Ver SQL manual").
+- Quando flag estiver ligada mas sem run, exibir card de bootstrap com botão **"Inicializar Forecast V2 agora"** (`useBootstrapForecastV2`). Renderiza checklist do resultado por etapa.
+- Visibilidade já restrita a `admin/owner/manager/platform_admin`.
 
-## 4. Estados vazios e fallbacks padronizados
-Criar componente reutilizável `src/components/forecast/shared/ForecastEmptyState.tsx` (`title`, `description`, optional `action`). Substituir empty states inline em:
-- `AccuracyDashboard.tsx`
-- `ForecastIntelligencePanel.tsx`
-- `ForecastRiskCenterPanel.tsx` (já tem; usar componente compartilhado)
-- `seller-performance/SellerPerformanceSection.tsx`
-- `DealInspectionTable.tsx`
-- `ForecastDataQuality.tsx`
+**`src/components/forecast/ForecastAccuracyPanel.tsx`**
+- Distinguir `error` real de "RPC retornou vazio". Se `snapshots < 5` **e** `error == null`, manter card "Acurácia em formação" (já existe).
+- Se `error` existir, usar mensagem amigável (`FORECAST_RPC_FAILURE_MESSAGE` de `shared/ForecastEmptyState.tsx`) em vez de mostrar `error.message`.
 
-Fallback padrão: cada panel já tem fallback; padronizar mensagem via constante `FORECAST_RPC_FAILURE_MESSAGE`. Console.error apenas em `import.meta.env.DEV`.
+**`src/components/forecast/ForecastScenariosCard.tsx`**
+- Substituir badges fixos `90% / 60% / 40% / 20%` por labels `Fechado / Engine V2 / Cenário expandido / Teto comercial` quando flag V2 ativa (ler via `useFeatureFlag('forecast_v2_engine_enabled')`).
+- Substituir legenda inferior:
+  - Pessimista: "Somente receita fechada no período"
+  - Realista: "Fechado + deals elegíveis ajustados por probabilidade, NRHS, tempo, atividade, próximo passo, estágio e risco"
+  - Otimista: "Inclui deals com boa chance, mas com pendências operacionais"
+  - Melhor Caso: "Teto comercial do pipeline (não é previsão)"
+- Atualizar `scenarioConfig.optimistic.description/formula` removendo "Weighted × 1.2".
+- Quando flag V2 desligada, manter textos antigos (compatibilidade).
 
-## 5. Riscos & Mitigações
-- **Não duplicar snapshot do dia**: `create_forecast_daily_snapshot_v2` já faz UPSERT — basta confiar.
-- **RPC pesada**: health-check faz apenas SELECTs agregados (sem reler items inteiros, exceto contagem/agregação para EOM check com filtros indexados via run_id).
-- **Cross-tenant**: RPC enforce `p_organization_id = get_user_organization_id()`.
-- **Tabela `forecast_v2_health_logs`**: insert via SECURITY DEFINER bypass RLS (RLS bloqueia INSERT direto).
+**`src/components/forecast/ForecastDataQuality.tsx`** (linhas 359–364)
+- Substituir bloco "Como o NRHS afeta o Forecast" pela tabela oficial F2.3:
+  - NRHS ≥ 80: fator 1.00
+  - NRHS 70–79: fator 0.90
+  - NRHS 60–69: fator 0.75
+  - NRHS 40–59: fator 0.50
+  - NRHS < 40: excluído do forecast
+- Ajustar thresholds visuais (`avgNRHS >= 75` etc.) para refletir o novo corte de 80, sem alterar regra de cálculo (apenas texto/cores).
 
-## 6. Arquivos
-**Criar**
-- `supabase/migrations/<ts>_forecast_v2_health.sql`
-- `src/types/forecast-health.ts`
-- `src/hooks/forecast/useForecastV2Health.ts`
-- `src/components/forecast/health/ForecastV2HealthPanel.tsx`
-- `src/components/forecast/health/HealthStatusCard.tsx`
-- `src/components/forecast/health/HealthMetricsGrid.tsx`
-- `src/components/forecast/health/HealthConsistencyChecks.tsx`
-- `src/components/forecast/health/HealthIssuesList.tsx`
-- `src/components/forecast/health/HealthActionsBar.tsx`
-- `src/components/forecast/health/FeatureFlagOffBanner.tsx`
-- `src/components/forecast/shared/ForecastEmptyState.tsx`
+### 4. Tipos
 
-**Editar**
-- `src/pages/Forecast.tsx` (nova tab `Saúde V2` com permissão)
-- 3-4 panels existentes para adotar o `ForecastEmptyState` compartilhado
+- `src/types/forecast-health.ts`: adicionar campos `engine_active` e `bootstrap_required` ao `ForecastV2HealthCheck` para o Panel decidir qual CTA mostrar.
 
-## 7. Critérios de aceite cobertos
-RPC health, tabela de logs, painel admin-only, banner de feature flag, validações de consistência (cenários, snapshots, fim de mês, vendedor sem meta, baixa amostra), botões admin com loading/toast, fallbacks padronizados, empty states uniformes, performance medida e nada cross-tenant.
+## O que NÃO está no escopo
+
+- Não alterar fórmula nem pesos da Engine V2.
+- Não criar nova aba, não refazer layout.
+- Não mexer em Risk Center, AI Intelligence ou Seller Performance além de garantir que recebem cast seguro de `p_seller_id` (já cobertos pelo item 1.3 onde aplicável).
+- Não usar service role no frontend; toda ativação passa pela RPC `SECURITY DEFINER` com checagem de role.
+- Saúde V2 permanece restrita; vendedor comum não vê nada novo.
+
+## Critérios de aceite
+
+1. Owner clica em "Ativar Forecast Engine V2" → flag fica `true` (independente de já existir linha).
+2. Owner clica em "Inicializar Forecast V2 agora" → run + snapshot + acurácia + AI + risk center + health rodam em sequência, com relatório por etapa.
+3. Aba Acurácia não mostra mais `operator does not exist: text = uuid`. Com <5 snapshots, mostra "em formação" sem alerta vermelho.
+4. AI, Riscos e Vendedor saem de "em formação" assim que existir run válido para o período.
+5. Cenários sem badges fixos `90/60/40/20%` quando V2 ativa; legenda nova.
+6. Bloco NRHS exibe os 5 fatores oficiais da F2.3.
+7. Health Check distingue `not_ready / attention / healthy / critical / forbidden`.
+8. Build passa, RLS preservado, multi-tenant intacto.
+
+## Arquivos impactados
+
+- **Migration nova**: `supabase/migrations/<ts>_forecast_v2_f29_stabilization.sql`
+- **Editados**: `src/hooks/forecast/useForecastV2Health.ts`, `src/hooks/forecast/useForecastAccuracy.ts`, `src/components/forecast/health/ForecastV2HealthPanel.tsx`, `src/components/forecast/ForecastAccuracyPanel.tsx`, `src/components/forecast/ForecastScenariosCard.tsx`, `src/components/forecast/ForecastDataQuality.tsx`, `src/types/forecast-health.ts`
+
+## Riscos
+
+- Conversão `pipeline_id` text → uuid: se houver linhas com strings inválidas em `forecast_calculation_items`, a migration falha. Mitigação: `DELETE FROM forecast_calculation_items WHERE pipeline_id IS NOT NULL AND nullif(pipeline_id,'') !~* '^[0-9a-f-]{36}$'` antes do `ALTER TYPE` (linhas órfãs de runs antigos podem ser descartadas — serão regeradas no próximo bootstrap).
+- Recriar RPCs preserva assinatura (mesmos parâmetros e retorno) para não quebrar chamadas existentes.
