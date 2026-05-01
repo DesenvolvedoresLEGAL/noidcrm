@@ -13,6 +13,7 @@ import { SellerPerformanceSection } from '@/components/forecast/seller-performan
 import { DealInspectionTable } from '@/components/forecast/DealInspectionTable';
 import { ForecastRisksPanel } from '@/components/forecast/ForecastRisksPanel';
 import { AIForecastInsightsPanel } from '@/components/forecast/AIForecastInsightsPanel';
+import { ForecastIntelligencePanel } from '@/components/forecast/ForecastIntelligencePanel';
 import { AccuracyDashboard } from '@/components/forecast/AccuracyDashboard';
 import { useForecastData, useDefaultFilters, ForecastFilters as FilterType } from '@/hooks/useForecastData';
 import { BarChart3, Users, Search, Sparkles, AlertTriangle, ShieldCheck, Target, TrendingUp, Shield } from 'lucide-react';
@@ -164,10 +165,21 @@ export default function Forecast() {
             <DealInspectionTable opportunities={opportunities} filterCategory="all" />
           </TabsContent>
 
-          {/* AI Insights Tab */}
-          <TabsContent value="insights" className="mt-6">
+          {/* AI Insights Tab — F2.6 HUMANOID Forecast Intelligence */}
+          <TabsContent value="insights" className="mt-6 space-y-6">
+            <ForecastIntelligencePanel
+              periodStart={filters.periodStart}
+              periodEnd={filters.periodEnd}
+              pipelineId={filters.pipelineId}
+              sellerId={filters.userId ?? null}
+            />
             {kpis && (
-              <AIForecastInsightsPanel kpis={kpis} opportunities={opportunities} pipelineId={filters.pipelineId} />
+              <details className="border rounded-md p-3 text-sm">
+                <summary className="cursor-pointer text-muted-foreground">Ver insights legados (heurísticas locais)</summary>
+                <div className="mt-3">
+                  <AIForecastInsightsPanel kpis={kpis} opportunities={opportunities} pipelineId={filters.pipelineId} />
+                </div>
+              </details>
             )}
           </TabsContent>
 
