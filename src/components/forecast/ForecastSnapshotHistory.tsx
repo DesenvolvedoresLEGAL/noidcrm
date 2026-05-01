@@ -17,6 +17,8 @@ import { Camera, History, RefreshCw, Sparkles, AlertTriangle, Activity } from 'l
 import { useForecastSnapshots, useCreateForecastSnapshot } from '@/hooks/forecast/useForecastSnapshots';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useUserRole } from '@/hooks/useUserRole';
+import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
+import { usePlatformAdmin } from '@/hooks/usePlatformAdmin';
 
 interface ForecastSnapshotHistoryProps {
   pipelineId?: string | null;
@@ -59,6 +61,8 @@ function formatDate(iso: string | null | undefined) {
 export function ForecastSnapshotHistory({ pipelineId, sellerId }: ForecastSnapshotHistoryProps) {
   const { data: currentUser } = useCurrentUser();
   const { isAdmin, isManager } = useUserRole();
+  const { isOwner } = useCurrentOrganization();
+  const { isPlatformAdmin } = usePlatformAdmin();
 
   const organizationId = currentUser?.organization?.id ?? null;
   const range = useMemo(() => currentMonthRangeBR(), []);
@@ -74,7 +78,7 @@ export function ForecastSnapshotHistory({ pipelineId, sellerId }: ForecastSnapsh
 
   const createSnapshot = useCreateForecastSnapshot();
 
-  const canManage = isAdmin || isManager;
+  const canManage = isAdmin || isManager || isOwner || isPlatformAdmin;
 
   const handleGenerateNow = () => {
     if (!organizationId || !pipelineId) return;
