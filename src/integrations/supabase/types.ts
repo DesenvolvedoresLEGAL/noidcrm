@@ -30741,6 +30741,16 @@ export type Database = {
         }
         Returns: Json
       }
+      get_forecast_risk_center_v2: {
+        Args: {
+          p_organization_id: string
+          p_period_end: string
+          p_period_start: string
+          p_pipeline_id?: string
+          p_seller_id?: string
+        }
+        Returns: Json
+      }
       get_forecast_seller_accuracy_v2: {
         Args: {
           p_organization_id: string
