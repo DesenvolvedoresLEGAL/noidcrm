@@ -5,6 +5,7 @@ import { useForecastAccuracyMetrics, useAccuracyComparison } from '@/hooks/useFo
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, ResponsiveContainer, Legend } from 'recharts';
 import { TrendingUp, TrendingDown, Target, Brain, User, Info, History } from 'lucide-react';
 import { ForecastSnapshotHistory } from './ForecastSnapshotHistory';
+import { ForecastAccuracyPanel } from './ForecastAccuracyPanel';
 
 interface AccuracyDashboardProps {
   pipelineId?: string;
@@ -15,9 +16,12 @@ export function AccuracyDashboard({ pipelineId, userId }: AccuracyDashboardProps
   const { data: metrics, isLoading: metricsLoading } = useForecastAccuracyMetrics(pipelineId, userId);
   const { data: comparison, isLoading: comparisonLoading } = useAccuracyComparison(pipelineId, userId);
 
-  // F2.2: histórico de snapshots no topo (resiliente — não quebra se falhar)
+  // F2.5 + F2.2: painel de acurácia + histórico de snapshots no topo (resilientes)
   const snapshotSection = (
-    <ForecastSnapshotHistory pipelineId={pipelineId ?? null} sellerId={userId ?? null} />
+    <div className="space-y-4">
+      <ForecastAccuracyPanel pipelineId={pipelineId ?? null} sellerId={userId ?? null} />
+      <ForecastSnapshotHistory pipelineId={pipelineId ?? null} sellerId={userId ?? null} />
+    </div>
   );
 
   const winProbMetrics = metrics?.find(m => m.prediction_type === 'win_probability');
