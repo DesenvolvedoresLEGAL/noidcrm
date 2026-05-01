@@ -265,28 +265,50 @@ export function ForecastSnapshotHistory({ pipelineId, sellerId }: ForecastSnapsh
             <thead>
               <tr className="border-b text-left text-xs text-muted-foreground">
                 <th className="py-2 pr-3">Data</th>
-                <th className="py-2 pr-3">Fechado</th>
                 <th className="py-2 pr-3">Realista</th>
                 <th className="py-2 pr-3">Otimista</th>
-                <th className="py-2 pr-3">Melhor caso</th>
+                <th className="py-2 pr-3">Fechado Final</th>
+                <th className="py-2 pr-3">Erro R$</th>
+                <th className="py-2 pr-3">Erro %</th>
+                <th className="py-2 pr-3">Acurácia</th>
+                <th className="py-2 pr-3">Bias</th>
                 <th className="py-2 pr-3">Confiança</th>
-                <th className="py-2 pr-3">Riscos</th>
-                <th className="py-2 pr-3">Higiene</th>
+                <th className="py-2 pr-3">Versão</th>
               </tr>
             </thead>
             <tbody>
-              {snapshots.slice().reverse().slice(0, 30).map((s) => (
-                <tr key={s.snapshot_id} className="border-b last:border-0">
-                  <td className="py-2 pr-3">{formatDate(s.snapshot_date)}</td>
-                  <td className="py-2 pr-3">{formatBRL(s.closed_amount)}</td>
-                  <td className="py-2 pr-3">{formatBRL(s.scenario_realistic)}</td>
-                  <td className="py-2 pr-3">{formatBRL(s.scenario_optimistic)}</td>
-                  <td className="py-2 pr-3">{formatBRL(s.scenario_best_case)}</td>
-                  <td className="py-2 pr-3">{Math.round(s.forecast_confidence || 0)}%</td>
-                  <td className="py-2 pr-3">{s.risk_deals_count}</td>
-                  <td className="py-2 pr-3">{Math.round(s.data_quality_score || 0)}%</td>
-                </tr>
-              ))}
+              {snapshots.slice().reverse().slice(0, 30).map((s) => {
+                const actual = s.actual_closed_amount ?? s.closed_won_final_amount;
+                const pending = actual == null;
+                const biasMap: Record<string, string> = {
+                  overestimating: 'Inflando',
+                  underestimating: 'Subestimando',
+                  balanced: 'Equilibrado',
+                  unknown: '—',
+                };
+                return (
+                  <tr key={s.snapshot_id} className="border-b last:border-0">
+                    <td className="py-2 pr-3">{formatDate(s.snapshot_date)}</td>
+                    <td className="py-2 pr-3">{formatBRL(s.scenario_realistic)}</td>
+                    <td className="py-2 pr-3">{formatBRL(s.scenario_optimistic)}</td>
+                    <td className="py-2 pr-3">
+                      {pending ? <span className="text-muted-foreground italic">Em cálculo</span> : formatBRL(actual)}
+                    </td>
+                    <td className="py-2 pr-3">
+                      {s.realistic_error_amount != null ? formatBRL(s.realistic_error_amount) : '—'}
+                    </td>
+                    <td className="py-2 pr-3">
+                      {s.realistic_error_percentage != null ? `${Number(s.realistic_error_percentage).toFixed(1)}%` : '—'}
+                    </td>
+                    <td className="py-2 pr-3">
+                      {s.accuracy_score != null ? `${Math.round(s.accuracy_score)}%` : '—'}
+                    </td>
+                    <td className="py-2 pr-3">{s.bias_direction ? biasMap[s.bias_direction] : '—'}</td>
+                    <td className="py-2 pr-3">{Math.round(s.forecast_confidence || 0)}%</td>
+                    <td className="py-2 pr-3 text-xs text-muted-foreground">{s.calculation_version ?? '—'}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </CardContent>

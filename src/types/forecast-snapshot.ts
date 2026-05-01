@@ -27,5 +27,16 @@ export interface ForecastDailySnapshot {
   expired_close_date_count: number;
   low_nrhs_count: number;
   accuracy_score: number | null;
+  actual_closed_amount?: number | null;
+  closed_won_final_amount?: number | null;
+  realistic_error_amount?: number | null;
+  realistic_error_percentage?: number | null;
+  optimistic_error_amount?: number | null;
+  optimistic_error_percentage?: number | null;
+  best_case_error_amount?: number | null;
+  best_case_error_percentage?: number | null;
+  bias_direction?: 'overestimating' | 'underestimating' | 'balanced' | 'unknown' | null;
+  accuracy_calculated_at?: string | null;
+  calculation_version?: string | null;
   created_at: string;
 }
