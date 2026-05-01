@@ -11406,6 +11406,7 @@ export type Database = {
           created_by: string | null
           data_quality_score: number | null
           deals_count: number | null
+          duration_ms: number | null
           excluded_deals_count: number | null
           forecast_confidence: number | null
           id: string
@@ -11436,6 +11437,7 @@ export type Database = {
           created_by?: string | null
           data_quality_score?: number | null
           deals_count?: number | null
+          duration_ms?: number | null
           excluded_deals_count?: number | null
           forecast_confidence?: number | null
           id?: string
@@ -11466,6 +11468,7 @@ export type Database = {
           created_by?: string | null
           data_quality_score?: number | null
           deals_count?: number | null
+          duration_ms?: number | null
           excluded_deals_count?: number | null
           forecast_confidence?: number | null
           id?: string
@@ -11807,6 +11810,7 @@ export type Database = {
       forecast_snapshot_job_logs: {
         Row: {
           created_at: string | null
+          duration_ms: number | null
           error_message: string | null
           finished_at: string | null
           id: string
@@ -11821,6 +11825,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          duration_ms?: number | null
           error_message?: string | null
           finished_at?: string | null
           id?: string
@@ -11835,6 +11840,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          duration_ms?: number | null
           error_message?: string | null
           finished_at?: string | null
           id?: string
@@ -11944,6 +11950,48 @@ export type Database = {
             referencedColumns: ["organization_id"]
           },
         ]
+      }
+      forecast_v2_health_logs: {
+        Row: {
+          created_at: string | null
+          duration_ms: number | null
+          errors_count: number | null
+          id: string
+          metadata: Json | null
+          organization_id: string
+          period_end: string
+          period_start: string
+          pipeline_id: string | null
+          status: string
+          warnings_count: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          duration_ms?: number | null
+          errors_count?: number | null
+          id?: string
+          metadata?: Json | null
+          organization_id: string
+          period_end: string
+          period_start: string
+          pipeline_id?: string | null
+          status: string
+          warnings_count?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          duration_ms?: number | null
+          errors_count?: number | null
+          id?: string
+          metadata?: Json | null
+          organization_id?: string
+          period_end?: string
+          period_start?: string
+          pipeline_id?: string | null
+          status?: string
+          warnings_count?: number | null
+        }
+        Relationships: []
       }
       gate_executions: {
         Row: {
@@ -30864,6 +30912,15 @@ export type Database = {
           snapshot_date: string
           snapshot_id: string
         }[]
+      }
+      get_forecast_v2_health_check: {
+        Args: {
+          p_organization_id: string
+          p_period_end: string
+          p_period_start: string
+          p_pipeline_id?: string
+        }
+        Returns: Json
       }
       get_global_seat_metrics: { Args: never; Returns: Json }
       get_index_usage_stats: {

@@ -1,85 +1,102 @@
-# Sprint F2.7 — Risk Center, Slipping e Higiene Operacional
+# Sprint F2.8 — Forecast V2 QA, Governança e Consolidação Final
 
-Transformar a aba **Riscos** em uma central operacional de recuperação de receita, consolidando dados de `forecast_calculation_items`, `forecast_calculation_runs`, performance por vendedor (F2.4) e intelligence (F2.6) em uma única RPC determinística, sem LLM externa.
+Sprint de fechamento. Foco: confiança, consistência e estados padronizados. Sem reescrever engine, sem nova inteligência.
 
-## 1. Backend (1 nova migration)
+## 1. Backend (1 migration)
 
-### RPC `get_forecast_risk_center_v2(p_organization_id, p_pipeline_id, p_period_start, p_period_end, p_seller_id)`
+### Schema
+- `ALTER TABLE public.forecast_snapshot_job_logs ADD COLUMN IF NOT EXISTS duration_ms integer;`
+- `ALTER TABLE public.forecast_calculation_runs ADD COLUMN IF NOT EXISTS duration_ms integer;`
+- Nova tabela `public.forecast_v2_health_logs` (id, organization_id, pipeline_id, period_start, period_end, status, warnings_count, errors_count, duration_ms, metadata jsonb, created_at). RLS: SELECT só admin/owner/manager/platform_admin da org; INSERT bloqueado (apenas SECURITY DEFINER da RPC grava).
+
+### RPC `get_forecast_v2_health_check(p_organization_id, p_period_start, p_period_end, p_pipeline_id)`
 - `SECURITY DEFINER`, `SET search_path = public`.
-- Permissão: `admin`/`owner`/`manager`/`platform_admin` veem tudo da org; demais veem apenas `seller_id = auth.uid()`. Aplica `p_seller_id` como filtro adicional quando informado.
-- Localiza o **run mais recente** em `forecast_calculation_runs` para `(org, pipeline, período)`. Se não houver run, retorna estrutura vazia com `metadata.run_id = null` (não chama `calculate_forecast_audit_v2` automaticamente para evitar custo; admin pode disparar via UI).
-- Lê todos os `forecast_calculation_items` daquele run (com filtro de seller quando aplicável) e classifica cada deal nas 9 categorias:
-  - `critical_risk`: `risk_level = 'critical'` ou `'critical_risk' = ANY(penalty_reasons)`
-  - `attention_risk`: `risk_level = 'high'` ou `'high_risk' = ANY(penalty_reasons)`
-  - `slipping`: `eligibility_status = 'slipping'` OR `forecast_bucket = 'slipping'` OR `'end_of_month_restriction' = ANY(penalty_reasons)` OR `close_date NOT BETWEEN period_start AND period_end`
-  - `hygiene_issue`: união de problemas operacionais (próximo passo, atividade, close date, NRHS, valor, probabilidade)
-  - `no_activity`: `last_activity_at IS NULL` OR `< now() - interval '7 days'`
-  - `no_next_step`: `next_step_exists = false`
-  - `low_nrhs`: `nrhs_score < 60`
-  - `expired_close_date`: `close_date < current_date` AND `eligibility_status <> 'closed'` (deal aberto)
-  - `contaminated_realistic`: `forecast_bucket IN ('commit','realistic')` AND qualquer penalty/risco listado na spec
-- Para cada grupo calcula `deals_count`, `gross_amount` (sum `deal_value`), `adjusted_amount` (sum `adjusted_value`), `forecast_impact` (apenas itens em buckets que entram no realistic), `recoverable_amount` (deals com `nrhs_score ≥ 60` e `risk_level <> 'critical'`).
-- **Risk score (0-100)** conforme regras da spec, com `LEAST(100, GREATEST(0, score))`. Lê `confidence_score` e `accuracy` via subqueries em `forecast_daily_snapshots` mais recente; se ausente assume valores neutros.
-- **Seller ranking**: agrupa por `seller_id`, calcula `risk_amount`, `slipping_amount`, `contaminated_realistic_amount`, e um `risk_score` próprio (mesma fórmula em escala do vendedor). Recommended action determinística (`coach_risky_seller`, `fix_hygiene`, `fix_slipping`).
-- **Top risky deals (10)** ordenado por: `risk_level='critical' DESC`, `bucket='slipping' DESC`, `is_contaminated DESC`, `deal_value DESC`, `array_length(penalty_reasons,1) DESC`.
-- **Top recovery deals (10)**: `nrhs_score ≥ 60` AND `risk_level <> 'critical'` AND `bucket IN ('optimistic','best_case','slipping','realistic')` AND `activity_factor ≥ 0.30`, ordenado por `deal_value DESC`.
-- **Quick actions** agregadas: `fix_expired_close_date`, `reactivate_stale_deals`, `define_next_steps`, `review_contaminated_realistic`, `coach_risky_seller` (do top 1 do ranking), `move_slipping_to_next_month`. Cada uma com `deals_count`, `amount`, `priority` (`critical`/`high`/`medium`/`low` derivado do volume).
-- Retorna JSONB completo no shape da spec; em qualquer EXCEPTION devolve `jsonb_build_object('error', SQLERRM, 'summary', empty, ...)` para não quebrar a aba.
+- Permissão: apenas admin/owner/manager/platform_admin da org. Caso contrário retorna `{status:'forbidden'}`.
+- Lê:
+  - `feature_flags` para `forecast_v2_engine_enabled` (e `enable_forecast_v2` como fallback de chave já usado pela engine).
+  - `forecast_calculation_runs` mais recente do (org, pipeline, período) → `latest_run_at`, `calculation_version`, `total_closed`, scenarios, `total_commit`, `duration_ms`.
+  - `forecast_daily_snapshots` mais recente do período + count → `latest_snapshot_at`, `snapshots_count`, scenarios snapshot.
+  - `forecast_snapshot_job_logs` mais recente → `snapshot_job_last_status`, `duration_ms`.
+  - `forecast_calculation_items` do último run para checks de fim de mês contaminado.
+  - `sales_goals`/`seller_targets` para detectar vendedores com oportunidades sem meta no período.
+- Calcula validações de consistência (ver §2). Cada falha vira `errors[]` ou `warnings[]` com `code`, `message` e `severity`.
+- Calcula readiness por módulo: `accuracy_ready` (snapshots_count ≥ 5 e existe `accuracy_score`), `seller_performance_ready`, `intelligence_ready`, `risk_center_ready` (depende apenas de existir run recente).
+- Performance: lê `duration_ms` das tabelas de log. Se algum > 3000ms → warning; > 8000ms → error. Mede o tempo do próprio health-check via `clock_timestamp()` e devolve `last_health_check_ms`. Calcula `latest_run_age_minutes` e `latest_snapshot_age_hours`.
+- Status final agregado:
+  - `not_ready`: feature flag desligada ou nenhum run.
+  - `critical`: qualquer item em `errors[]`.
+  - `attention`: warnings sem errors.
+  - `healthy`: nenhum.
+- Insere uma linha em `forecast_v2_health_logs` (best-effort, dentro de `BEGIN/EXCEPTION`).
 - `GRANT EXECUTE TO authenticated`.
 
-## 2. Frontend
+## 2. Validações de consistência (todas dentro da RPC)
 
-### Tipos — `src/types/forecast-risk-center.ts` (novo)
-- `ForecastRiskCenterV2`, `ForecastRiskGroupV2`, `ForecastRiskDealV2`, `ForecastSellerRiskRankingV2`, `ForecastQuickActionV2`, `ForecastRiskSummaryV2`, `ForecastRiskMetadataV2`.
-- Enums: `RiskGroupKey`, `Severity`, `ActionType`.
+- `closed_matches_pessimistic`: `ABS(scenario_pessimistic - total_closed - total_commit*0.7) ≤ 1`. Se diferente → error "Pessimista não bate com fechado".
+- Ordem `pessimistic ≤ realistic ≤ optimistic ≤ best_case` → error se quebrar.
+- `commit_not_above_best_case`: `total_commit ≤ scenario_best_case + 1`.
+- `snapshot_matches_latest_run`: para cada um dos 5 campos comparar diferença ≤ R$ 1,00.
+- `realistic_protected_eom`: se `(period_end - current_date) ≤ 1`, conta deals no run com `forecast_bucket='realistic'` que falham em `last_activity_at ≥ now()-2d` AND `next_step_exists` AND `nrhs_score ≥ 70` AND `(adjusted_probability ≥ 70 OR manual_probability ≥ 70)`. Warning se >0; error se valor agregado > 30% do `scenario_realistic`.
+- `sellers_without_goal`: vendedores com items no run e sem `sales_goals`/`seller_targets` ativo no período → warning com contagem.
+- `accuracy_low_sample`: `snapshots_count < 5` → warning "Acurácia ainda em formação".
 
-### Hook — `src/hooks/forecast/useForecastRiskCenter.ts` (novo)
-- React Query (`['forecast-risk-center-v2', orgId, pipelineId, periodStart, periodEnd, sellerId]`).
-- Chama `supabase.rpc('get_forecast_risk_center_v2', {...})` com tipagem.
-- `staleTime: 60s`; expõe `{ riskCenter, isLoading, error, refetch }`.
+## 3. Frontend
 
-### Componente — `src/components/forecast/risk-center/ForecastRiskCenterPanel.tsx` (novo)
-Subdividido em arquivos pequenos para legibilidade:
-- `RiskSummaryCards.tsx` — 6 cards (Total em Risco, Deals em Risco, Slipping, Contaminado, Recuperável, Score com label/colorida).
-- `RiskQuickActions.tsx` — grid de cards de ações com count/valor/prioridade.
-- `RiskGroupsAccordion.tsx` — accordion com 9 grupos; cada grupo mostra descrição, métricas, ação recomendada e até 5 top deals (link p/ `/oportunidades/:id`).
-- `SellerRiskRankingTable.tsx` — tabela ordenada por `risk_amount`.
-- `TopDealsLists.tsx` — duas colunas (Perigosos × Recuperáveis), com Empresa/Deal/Vendedor/Valor/Bucket/Risco/Close date/Motivo.
+### Tipos — `src/types/forecast-health.ts` (novo)
+- `ForecastV2HealthCheck`, `HealthStatus`, `HealthIssue`, `DataConsistency`, `PerformanceStats`.
 
-### Estados de UI
-- **Sem run/dados**: empty state "Risk Center em formação" com texto da spec.
-- **Baixa amostra** (`total_risk_deals < 5`): badge `Baixa amostra` no header.
-- **Erro RPC**: alerta discreto + render fallback `<ForecastRisksPanel opportunities={...} />` (legacy preservado).
+### Hook — `src/hooks/forecast/useForecastV2Health.ts` (novo)
+- `useQuery` `['forecast-v2-health', org, pipeline, start, end]`, `staleTime: 60s`.
+- Mutations: `useRecalculateForecast` (chama `calculate_forecast_audit_v2`), `useGenerateSnapshot` (`create_forecast_daily_snapshot_v2`), `useCalculateAccuracy` (`calculate_forecast_accuracy_v2`). Cada mutation invalida queries relacionadas e toast (sonner).
+
+### Componente — `src/components/forecast/health/ForecastV2HealthPanel.tsx` (+ subcomponentes)
+- `HealthStatusCard` (status geral colorido).
+- `HealthMetricsGrid` (Feature Flag, Último Cálculo, Último Snapshot, Snapshots, Acurácia, Engine, Risk Center, AI).
+- `HealthConsistencyChecks` (lista de checks com ✓/✗).
+- `HealthIssuesList` (warnings, errors, recommendations).
+- `HealthActionsBar` (4 botões admin com loading state).
+- `FeatureFlagOffBanner`: se `feature_flag_enabled=false`, mostra banner com SQL para ativar (não executa automaticamente).
+
+### Permissão na UI
+- Usa `useUserRoles` (existente) para esconder o painel para non-admin/manager/owner/platform_admin.
 
 ### Wiring — `src/pages/Forecast.tsx`
-- Substituir conteúdo de `<TabsContent value="risks">` por `<ForecastRiskCenterPanel orgId pipelineId periodStart periodEnd opportunitiesFallback={opportunities} />`.
-- Derivar `periodStart`/`periodEnd` de `filters` (mesmo padrão usado pelo `useForecastIntelligence`).
-- Passar `opportunities` apenas para o fallback legado.
+- Nova `<TabsTrigger value="health">` chamada **"Saúde V2"**, escondida via condicional para non-privileged. Conteúdo `<ForecastV2HealthPanel periodStart periodEnd pipelineId />`.
 
-## 3. Permissões
-- RLS já existente em `forecast_calculation_items`/`runs` cobre cross-tenant; RPC reforça via `get_user_organization_id()` e checa role via `has_role`/`is_org_admin`.
-- Frontend não usa service role.
+## 4. Estados vazios e fallbacks padronizados
+Criar componente reutilizável `src/components/forecast/shared/ForecastEmptyState.tsx` (`title`, `description`, optional `action`). Substituir empty states inline em:
+- `AccuracyDashboard.tsx`
+- `ForecastIntelligencePanel.tsx`
+- `ForecastRiskCenterPanel.tsx` (já tem; usar componente compartilhado)
+- `seller-performance/SellerPerformanceSection.tsx`
+- `DealInspectionTable.tsx`
+- `ForecastDataQuality.tsx`
 
-## 4. Riscos & Mitigações
-- **Performance**: items podem ser milhares; RPC faz uma única leitura agregada com CTEs e arrays — sem N+1.
-- **Sem run no período**: empty state evita confusão; admin pode rodar auditoria pela aba existente.
-- **Quebra de outras abas**: nenhuma RPC/tabela existente é alterada; apenas adicionamos a nova RPC.
-- **Compatibilidade de buckets**: usamos os enums já existentes em `fci_bucket_check`; tratamos `slipping` via `eligibility_status` (já existe no CHECK) e via close_date fora do período.
+Fallback padrão: cada panel já tem fallback; padronizar mensagem via constante `FORECAST_RPC_FAILURE_MESSAGE`. Console.error apenas em `import.meta.env.DEV`.
 
-## 5. Arquivos
+## 5. Riscos & Mitigações
+- **Não duplicar snapshot do dia**: `create_forecast_daily_snapshot_v2` já faz UPSERT — basta confiar.
+- **RPC pesada**: health-check faz apenas SELECTs agregados (sem reler items inteiros, exceto contagem/agregação para EOM check com filtros indexados via run_id).
+- **Cross-tenant**: RPC enforce `p_organization_id = get_user_organization_id()`.
+- **Tabela `forecast_v2_health_logs`**: insert via SECURITY DEFINER bypass RLS (RLS bloqueia INSERT direto).
+
+## 6. Arquivos
 **Criar**
-- `supabase/migrations/<ts>_forecast_risk_center_v2.sql`
-- `src/types/forecast-risk-center.ts`
-- `src/hooks/forecast/useForecastRiskCenter.ts`
-- `src/components/forecast/risk-center/ForecastRiskCenterPanel.tsx`
-- `src/components/forecast/risk-center/RiskSummaryCards.tsx`
-- `src/components/forecast/risk-center/RiskQuickActions.tsx`
-- `src/components/forecast/risk-center/RiskGroupsAccordion.tsx`
-- `src/components/forecast/risk-center/SellerRiskRankingTable.tsx`
-- `src/components/forecast/risk-center/TopDealsLists.tsx`
+- `supabase/migrations/<ts>_forecast_v2_health.sql`
+- `src/types/forecast-health.ts`
+- `src/hooks/forecast/useForecastV2Health.ts`
+- `src/components/forecast/health/ForecastV2HealthPanel.tsx`
+- `src/components/forecast/health/HealthStatusCard.tsx`
+- `src/components/forecast/health/HealthMetricsGrid.tsx`
+- `src/components/forecast/health/HealthConsistencyChecks.tsx`
+- `src/components/forecast/health/HealthIssuesList.tsx`
+- `src/components/forecast/health/HealthActionsBar.tsx`
+- `src/components/forecast/health/FeatureFlagOffBanner.tsx`
+- `src/components/forecast/shared/ForecastEmptyState.tsx`
 
 **Editar**
-- `src/pages/Forecast.tsx` (apenas wiring da tab Riscos).
+- `src/pages/Forecast.tsx` (nova tab `Saúde V2` com permissão)
+- 3-4 panels existentes para adotar o `ForecastEmptyState` compartilhado
 
-## 6. Critérios de aceite cobertos
-RPC + hook + panel + 6 cards de resumo + quick actions + 9 grupos + slipping/contaminated como categorias próprias + ranking por vendedor + top deals perigosos/recuperáveis + RLS + fallback legado + nenhuma outra aba é tocada.
+## 7. Critérios de aceite cobertos
+RPC health, tabela de logs, painel admin-only, banner de feature flag, validações de consistência (cenários, snapshots, fim de mês, vendedor sem meta, baixa amostra), botões admin com loading/toast, fallbacks padronizados, empty states uniformes, performance medida e nada cross-tenant.

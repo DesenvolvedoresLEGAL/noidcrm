@@ -13,6 +13,8 @@ import { SellerPerformanceSection } from '@/components/forecast/seller-performan
 import { DealInspectionTable } from '@/components/forecast/DealInspectionTable';
 import { ForecastRisksPanel } from '@/components/forecast/ForecastRisksPanel';
 import { ForecastRiskCenterPanel } from '@/components/forecast/risk-center/ForecastRiskCenterPanel';
+import { ForecastV2HealthPanel } from '@/components/forecast/health/ForecastV2HealthPanel';
+import { useUserRole } from '@/hooks/useUserRole';
 import { AIForecastInsightsPanel } from '@/components/forecast/AIForecastInsightsPanel';
 import { ForecastIntelligencePanel } from '@/components/forecast/ForecastIntelligencePanel';
 import { AccuracyDashboard } from '@/components/forecast/AccuracyDashboard';
@@ -24,7 +26,9 @@ import { cn } from '@/lib/utils';
 export default function Forecast() {
   const defaultFilters = useDefaultFilters();
   const [filters, setFilters] = useState<FilterType>(defaultFilters);
-  
+  const { isAdmin, isManager } = useUserRole();
+  const showHealth = isAdmin || isManager;
+
   const { kpis, scenarios, opportunities, sellerForecasts, isLoading, isFetching, dataUpdatedAt, refetch } = useForecastData(filters);
 
   return (
@@ -117,6 +121,12 @@ export default function Forecast() {
                 <AlertTriangle className="h-3.5 w-3.5 md:h-4 md:w-4" />
                 <span>Riscos</span>
               </TabsTrigger>
+              {showHealth && (
+                <TabsTrigger value="health" className="gap-1.5 px-3 py-2 text-xs md:text-sm whitespace-nowrap">
+                  <ShieldCheck className="h-3.5 w-3.5 md:h-4 md:w-4" />
+                  <span>Saúde V2</span>
+                </TabsTrigger>
+              )}
             </TabsList>
           </div>
 
