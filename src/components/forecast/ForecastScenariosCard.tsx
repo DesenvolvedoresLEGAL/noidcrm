@@ -221,14 +221,23 @@ export function ForecastScenariosCard({
             );
           })}
 
-          {/* Legend */}
+          {/* Legend — F2.9: textos atualizados quando V2 ativa */}
           <div className="pt-4 mt-4 border-t border-border">
-            <p className="text-[10px] text-muted-foreground leading-relaxed">
-              <span className="text-red-500 font-medium">●</span> Pessimista: Deals ≥80% prob &nbsp;
-              <span className="text-amber-500 font-medium">●</span> Realista: Weighted pipeline &nbsp;
-              <span className="text-emerald-500 font-medium">●</span> Otimista: Weighted × 1.2 &nbsp;
-              <span className="text-blue-500 font-medium">●</span> Melhor Caso: Todo pipeline
-            </p>
+            {v2Enabled ? (
+              <div className="text-[10px] text-muted-foreground leading-relaxed space-y-1">
+                <p><span className="text-red-500 font-medium">●</span> <strong>Pessimista:</strong> somente receita fechada no período.</p>
+                <p><span className="text-amber-500 font-medium">●</span> <strong>Realista (Engine V2):</strong> fechado + deals elegíveis ajustados por probabilidade, NRHS, tempo, atividade, próximo passo, estágio e risco.</p>
+                <p><span className="text-emerald-500 font-medium">●</span> <strong>Otimista:</strong> inclui deals com boa chance, mas com pendências operacionais.</p>
+                <p><span className="text-blue-500 font-medium">●</span> <strong>Melhor Caso:</strong> teto comercial do pipeline (não é previsão).</p>
+              </div>
+            ) : (
+              <p className="text-[10px] text-muted-foreground leading-relaxed">
+                <span className="text-red-500 font-medium">●</span> Pessimista: Deals ≥80% prob &nbsp;
+                <span className="text-amber-500 font-medium">●</span> Realista: Pipeline ponderado &nbsp;
+                <span className="text-emerald-500 font-medium">●</span> Otimista: Cenário expandido &nbsp;
+                <span className="text-blue-500 font-medium">●</span> Melhor Caso: Todo pipeline
+              </p>
+            )}
             <p className="text-[10px] text-muted-foreground mt-1">
               🛡️ Valores ajustados por NRHS. Deals com NRHS &lt; 40 excluídos do forecast.
             </p>
