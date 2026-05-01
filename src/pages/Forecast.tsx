@@ -9,6 +9,7 @@ import { ForecastScenariosCard } from '@/components/forecast/ForecastScenariosCa
 import { ForecastWaterfallChart } from '@/components/forecast/ForecastWaterfallChart';
 import { ForecastDataQuality } from '@/components/forecast/ForecastDataQuality';
 import { SellerForecastTable } from '@/components/forecast/SellerForecastTable';
+import { SellerPerformanceSection } from '@/components/forecast/seller-performance/SellerPerformanceSection';
 import { DealInspectionTable } from '@/components/forecast/DealInspectionTable';
 import { ForecastRisksPanel } from '@/components/forecast/ForecastRisksPanel';
 import { AIForecastInsightsPanel } from '@/components/forecast/AIForecastInsightsPanel';
@@ -150,7 +151,12 @@ export default function Forecast() {
 
           {/* Sellers Tab */}
           <TabsContent value="sellers" className="mt-6">
-            <SellerForecastTable sellers={sellerForecasts} />
+            <SellerPerformanceSection
+              periodStart={filters.periodStart}
+              periodEnd={filters.periodEnd}
+              pipelineId={filters.pipelineId}
+              legacySellers={sellerForecasts}
+            />
           </TabsContent>
 
           {/* Deal Inspection Tab */}
