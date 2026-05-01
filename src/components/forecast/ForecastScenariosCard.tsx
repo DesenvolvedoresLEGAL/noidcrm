@@ -123,7 +123,7 @@ export function ForecastScenariosCard({
                           {scenario.label}
                         </span>
                         <span className="text-xs text-muted-foreground px-1.5 py-0.5 bg-muted/50 rounded">
-                          {scenario.probability}%
+                          {v2Enabled ? config.v2Label : `${scenario.probability}%`}
                         </span>
                       </TooltipTrigger>
                       <TooltipContent side="top" className="max-w-xs">
