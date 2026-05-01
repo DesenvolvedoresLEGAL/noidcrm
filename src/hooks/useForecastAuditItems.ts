@@ -21,10 +21,14 @@ export interface ForecastAuditItem {
   nrhs_factor: number | null;
   time_factor: number | null;
   activity_factor: number | null;
+  next_step_factor: number | null;
+  stage_factor: number | null;
+  risk_factor: number | null;
   adjusted_value: number;
   forecast_bucket:
     | 'closed' | 'commit' | 'best_case' | 'realistic'
-    | 'optimistic' | 'pipeline_only' | 'excluded';
+    | 'optimistic' | 'pipeline_only' | 'excluded' | 'slipping';
+  metadata?: Record<string, any> | null;
   eligibility_status: 'included' | 'penalized' | 'excluded' | 'slipping';
   risk_level: 'low' | 'medium' | 'high' | null;
   close_date: string | null;
