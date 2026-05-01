@@ -264,7 +264,7 @@ function FormulaSection({ version }: { version?: string }) {
 
 function BucketsSection({ buckets }: { buckets: Record<string, { count: number; sum: number }> }) {
   const order: ForecastAuditItem['forecast_bucket'][] = [
-    'closed','commit','realistic','optimistic','pipeline_only','excluded',
+    'closed','commit','realistic','optimistic','best_case','slipping','pipeline_only','excluded',
   ];
   return (
     <Card>
