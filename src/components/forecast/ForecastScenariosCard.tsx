@@ -9,6 +9,7 @@ import { motion } from 'framer-motion';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
 import { ForecastScenarioDetails } from './ForecastScenarioDetails';
+import { useFeatureFlag } from '@/hooks/useFeatureFlag';
 
 interface ForecastScenariosCardProps {
   scenarios: ForecastScenario[];
@@ -22,29 +23,33 @@ const scenarioConfig = {
     color: 'text-red-500',
     bgColor: 'bg-red-500',
     gradientFrom: 'from-red-500/20',
-    description: 'Cenário conservador: apenas deals com ≥80% de probabilidade de fechamento',
-    formula: 'Receita Fechada + Deals ≥80% prob',
+    description: 'Somente receita fechada no período.',
+    formula: 'Receita Fechada',
+    v2Label: 'Fechado',
   },
   realistic: {
     color: 'text-amber-500',
     bgColor: 'bg-amber-500',
     gradientFrom: 'from-amber-500/20',
-    description: 'Cenário mais provável: pipeline ponderado por probabilidade de cada deal',
-    formula: 'Receita Fechada + Σ(valor × prob/100)',
+    description: 'Fechado + deals elegíveis ajustados por probabilidade, NRHS, tempo, atividade, próximo passo, estágio e risco.',
+    formula: 'Engine V2 — pipeline ajustado',
+    v2Label: 'Engine V2',
   },
   optimistic: {
     color: 'text-emerald-500',
     bgColor: 'bg-emerald-500',
     gradientFrom: 'from-emerald-500/20',
-    description: 'Cenário otimista: weighted pipeline × 1.2 (20% acima do esperado)',
-    formula: 'Receita Fechada + (Weighted × 1.2)',
+    description: 'Inclui deals com boa chance, mas com pendências operacionais.',
+    formula: 'Engine V2 — cenário expandido',
+    v2Label: 'Cenário expandido',
   },
   best_case: {
     color: 'text-blue-500',
     bgColor: 'bg-blue-500',
     gradientFrom: 'from-blue-500/20',
-    description: 'Melhor cenário: se todos os deals do pipeline fecharem',
+    description: 'Teto comercial do pipeline (não é previsão).',
     formula: 'Receita Fechada + Todo Pipeline',
+    v2Label: 'Teto comercial',
   },
 };
 
@@ -67,6 +72,7 @@ export function ForecastScenariosCard({
 }: ForecastScenariosCardProps) {
   const [selectedScenario, setSelectedScenario] = useState<ForecastScenario | null>(null);
   const maxValue = Math.max(...scenarios.map(s => s.value), goal);
+  const { enabled: v2Enabled } = useFeatureFlag('forecast_v2_engine_enabled');
 
   return (
     <>
@@ -117,7 +123,7 @@ export function ForecastScenariosCard({
                           {scenario.label}
                         </span>
                         <span className="text-xs text-muted-foreground px-1.5 py-0.5 bg-muted/50 rounded">
-                          {scenario.probability}%
+                          {v2Enabled ? config.v2Label : `${scenario.probability}%`}
                         </span>
                       </TooltipTrigger>
                       <TooltipContent side="top" className="max-w-xs">
@@ -215,14 +221,23 @@ export function ForecastScenariosCard({
             );
           })}
 
-          {/* Legend */}
+          {/* Legend — F2.9: textos atualizados quando V2 ativa */}
           <div className="pt-4 mt-4 border-t border-border">
-            <p className="text-[10px] text-muted-foreground leading-relaxed">
-              <span className="text-red-500 font-medium">●</span> Pessimista: Deals ≥80% prob &nbsp;
-              <span className="text-amber-500 font-medium">●</span> Realista: Weighted pipeline &nbsp;
-              <span className="text-emerald-500 font-medium">●</span> Otimista: Weighted × 1.2 &nbsp;
-              <span className="text-blue-500 font-medium">●</span> Melhor Caso: Todo pipeline
-            </p>
+            {v2Enabled ? (
+              <div className="text-[10px] text-muted-foreground leading-relaxed space-y-1">
+                <p><span className="text-red-500 font-medium">●</span> <strong>Pessimista:</strong> somente receita fechada no período.</p>
+                <p><span className="text-amber-500 font-medium">●</span> <strong>Realista (Engine V2):</strong> fechado + deals elegíveis ajustados por probabilidade, NRHS, tempo, atividade, próximo passo, estágio e risco.</p>
+                <p><span className="text-emerald-500 font-medium">●</span> <strong>Otimista:</strong> inclui deals com boa chance, mas com pendências operacionais.</p>
+                <p><span className="text-blue-500 font-medium">●</span> <strong>Melhor Caso:</strong> teto comercial do pipeline (não é previsão).</p>
+              </div>
+            ) : (
+              <p className="text-[10px] text-muted-foreground leading-relaxed">
+                <span className="text-red-500 font-medium">●</span> Pessimista: Deals ≥80% prob &nbsp;
+                <span className="text-amber-500 font-medium">●</span> Realista: Pipeline ponderado &nbsp;
+                <span className="text-emerald-500 font-medium">●</span> Otimista: Cenário expandido &nbsp;
+                <span className="text-blue-500 font-medium">●</span> Melhor Caso: Todo pipeline
+              </p>
+            )}
             <p className="text-[10px] text-muted-foreground mt-1">
               🛡️ Valores ajustados por NRHS. Deals com NRHS &lt; 40 excluídos do forecast.
             </p>

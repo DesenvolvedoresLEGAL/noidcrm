@@ -7,7 +7,9 @@ import { CheckCircle2, XCircle, AlertTriangle, RefreshCw, Activity, Calculator, 
 import { useUserRole } from '@/hooks/useUserRole';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { usePlatformAdmin } from '@/hooks/usePlatformAdmin';
-import { useForecastV2Health, useRecalculateForecast, useGenerateSnapshot, useCalculateAccuracy } from '@/hooks/forecast/useForecastV2Health';
+import { useForecastV2Health, useRecalculateForecast, useGenerateSnapshot, useCalculateAccuracy, useActivateForecastV2, useBootstrapForecastV2, type BootstrapStepResult } from '@/hooks/forecast/useForecastV2Health';
+import { useState } from 'react';
+import { Power, Rocket, ChevronDown } from 'lucide-react';
 import { CONSISTENCY_LABELS, HEALTH_LABELS, type DataConsistency, type HealthStatus } from '@/types/forecast-health';
 import { cn } from '@/lib/utils';
 
@@ -51,6 +53,10 @@ export function ForecastV2HealthPanel({ periodStart, periodEnd, pipelineId }: Pr
   const recalc = useRecalculateForecast();
   const snapshot = useGenerateSnapshot();
   const accuracy = useCalculateAccuracy();
+  const activate = useActivateForecastV2();
+  const bootstrap = useBootstrapForecastV2();
+  const [showSql, setShowSql] = useState(false);
+  const [bootstrapResults, setBootstrapResults] = useState<BootstrapStepResult[] | null>(null);
 
   if (!isPrivileged) {
     return <p className="text-sm text-muted-foreground">Esta área é restrita a administradores e gestores.</p>;
@@ -84,22 +90,78 @@ export function ForecastV2HealthPanel({ periodStart, periodEnd, pipelineId }: Pr
         </CardContent>
       </Card>
 
-      {/* Feature flag banner */}
+      {/* Feature flag banner — F2.9: botão de ativação via upsert */}
       {!health.feature_flag_enabled && (
         <Card className="border-amber-500/40 bg-amber-500/5">
-          <CardContent className="p-4 space-y-2 text-sm">
+          <CardContent className="p-4 space-y-3 text-sm">
             <div className="flex items-center gap-2 font-medium text-amber-700">
               <AlertTriangle className="h-4 w-4" /> Forecast Engine V2 está desligada para esta organização
             </div>
             <p className="text-muted-foreground">
-              Para ativar, execute na configuração técnica:
+              Ative a engine para começar a calcular cenários, snapshots e acurácia. A ativação é segura e idempotente.
             </p>
-            <pre className="text-xs bg-background border rounded p-2 overflow-x-auto">
-{`UPDATE feature_flags
-SET enabled = true
-WHERE organization_id = '${orgId}'
-  AND flag_key = 'forecast_v2_engine_enabled';`}
-            </pre>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                size="sm"
+                onClick={() => orgId && activate.mutate({ organizationId: orgId })}
+                disabled={activate.isPending || !orgId}
+              >
+                <Power className={cn('h-3.5 w-3.5 mr-1.5', activate.isPending && 'animate-pulse')} />
+                Ativar Forecast Engine V2
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setShowSql((s) => !s)}>
+                <ChevronDown className={cn('h-3.5 w-3.5 mr-1 transition-transform', showSql && 'rotate-180')} />
+                Ver SQL manual
+              </Button>
+            </div>
+            {showSql && (
+              <pre className="text-xs bg-background border rounded p-2 overflow-x-auto">
+{`INSERT INTO feature_flags (organization_id, flag_key, enabled)
+VALUES ('${orgId}', 'forecast_v2_engine_enabled', true)
+ON CONFLICT (organization_id, flag_key)
+DO UPDATE SET enabled = true, updated_at = now();`}
+              </pre>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Bootstrap card — F2.9: ativada mas sem run/snapshot */}
+      {health.feature_flag_enabled && (health.bootstrap_required || !health.latest_run_at) && (
+        <Card className="border-primary/40 bg-primary/5">
+          <CardContent className="p-4 space-y-3 text-sm">
+            <div className="flex items-center gap-2 font-medium text-primary">
+              <Rocket className="h-4 w-4" /> Forecast V2 ativa, mas precisa de dados iniciais
+            </div>
+            <p className="text-muted-foreground">
+              Execute o bootstrap para gerar o primeiro cálculo, snapshot, acurácia, intelligence e risk center
+              em uma única operação.
+            </p>
+            <Button
+              size="sm"
+              onClick={() => bootstrap.mutateAsync(actionParams).then(setBootstrapResults).catch(() => {})}
+              disabled={bootstrap.isPending}
+            >
+              <Rocket className={cn('h-3.5 w-3.5 mr-1.5', bootstrap.isPending && 'animate-pulse')} />
+              {bootstrap.isPending ? 'Inicializando…' : 'Inicializar Forecast V2 agora'}
+            </Button>
+            {bootstrapResults && (
+              <ul className="text-xs space-y-1 mt-2">
+                {bootstrapResults.map((r) => (
+                  <li key={r.step} className="flex items-center gap-2">
+                    {r.ok ? (
+                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                    ) : (
+                      <XCircle className="h-3.5 w-3.5 text-red-600" />
+                    )}
+                    <span className={r.ok ? '' : 'text-red-600'}>
+                      {r.label}
+                      {!r.ok && r.error ? ` — ${r.error}` : ''}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </CardContent>
         </Card>
       )}

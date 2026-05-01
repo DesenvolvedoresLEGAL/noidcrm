@@ -28,6 +28,8 @@ export interface PerformanceStats {
 export interface ForecastV2HealthCheck {
   status: HealthStatus;
   feature_flag_enabled: boolean;
+  engine_active?: boolean;
+  bootstrap_required?: boolean;
   calculation_version: string | null;
   latest_run_at: string | null;
   latest_snapshot_at: string | null;

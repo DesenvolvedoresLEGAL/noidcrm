@@ -141,13 +141,14 @@ export function ForecastAccuracyPanel({ pipelineId, sellerId }: Props) {
     }
   };
 
+  // F2.9 — degradar erro técnico para mensagem amigável; histórico permanece visível
   if (error) {
     return (
-      <Alert variant="destructive">
+      <Alert>
         <AlertCircle className="h-4 w-4" />
-        <AlertTitle>Acurácia indisponível</AlertTitle>
+        <AlertTitle>Acurácia indisponível no momento</AlertTitle>
         <AlertDescription className="text-xs">
-          Continuamos exibindo o histórico abaixo. Detalhe: {error.message}
+          Não foi possível carregar este painel agora. O histórico e os demais dados continuam disponíveis.
         </AlertDescription>
       </Alert>
     );

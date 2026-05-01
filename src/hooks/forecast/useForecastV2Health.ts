@@ -113,3 +113,86 @@ export function useCalculateAccuracy() {
     onError: (e: any) => toast.error('Falha ao calcular acurácia', { description: e?.message }),
   });
 }
+
+// F2.9 — Safe activator (UPSERT) for the Forecast V2 engine feature flag.
+export function useActivateForecastV2() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (p: { organizationId: string; enabled?: boolean }) => {
+      const { data, error } = await supabase.rpc('activate_forecast_v2_engine' as any, {
+        p_organization_id: p.organizationId,
+        p_enabled: p.enabled ?? true,
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      toast.success('Forecast Engine V2 ativada');
+      qc.invalidateQueries({ queryKey: ['forecast-v2-health'] });
+      qc.invalidateQueries({ queryKey: ['feature-flag'] });
+    },
+    onError: (e: any) =>
+      toast.error('Não foi possível ativar a Forecast Engine V2', { description: e?.message }),
+  });
+}
+
+export interface BootstrapStepResult {
+  step: string;
+  label: string;
+  ok: boolean;
+  error?: string;
+}
+
+// F2.9 — Bootstrap: roda em sequência audit → snapshot → accuracy → intelligence → risk → health.
+// Cada etapa é independente: se uma falha, segue para a próxima.
+export function useBootstrapForecastV2() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (p: ActionParams): Promise<BootstrapStepResult[]> => {
+      const args = {
+        p_organization_id: p.organizationId,
+        p_pipeline_id: p.pipelineId ?? null,
+        p_period_start: p.periodStart,
+        p_period_end: p.periodEnd,
+      };
+      const steps: { step: string; label: string; rpc: string; payload: any }[] = [
+        { step: 'run', label: 'Cálculo de auditoria', rpc: 'calculate_forecast_audit_v2', payload: args },
+        { step: 'snapshot', label: 'Snapshot diário', rpc: 'create_forecast_daily_snapshot_v2', payload: args },
+        { step: 'accuracy', label: 'Acurácia', rpc: 'calculate_forecast_accuracy_v2', payload: args },
+        { step: 'intelligence', label: 'Forecast Intelligence', rpc: 'get_forecast_intelligence_v2', payload: { ...args, p_seller_id: null } },
+        { step: 'risk', label: 'Risk Center', rpc: 'get_forecast_risk_center_v2', payload: { ...args, p_seller_id: null } },
+        { step: 'health', label: 'Health Check', rpc: 'get_forecast_v2_health_check', payload: { p_organization_id: p.organizationId, p_period_start: p.periodStart, p_period_end: p.periodEnd, p_pipeline_id: p.pipelineId ?? null } },
+      ];
+      const results: BootstrapStepResult[] = [];
+      for (const s of steps) {
+        try {
+          const { error } = await supabase.rpc(s.rpc as any, s.payload);
+          if (error) throw error;
+          results.push({ step: s.step, label: s.label, ok: true });
+        } catch (err: any) {
+          results.push({ step: s.step, label: s.label, ok: false, error: err?.message ?? 'erro' });
+        }
+      }
+      return results;
+    },
+    onSuccess: (results) => {
+      const failed = results.filter((r) => !r.ok);
+      if (failed.length === 0) {
+        toast.success('Forecast V2 inicializado com sucesso');
+      } else {
+        toast.warning(`Forecast V2 inicializado com ${failed.length} alerta(s)`, {
+          description: failed.map((f) => f.label).join(', '),
+        });
+      }
+      qc.invalidateQueries({ queryKey: ['forecast-v2-health'] });
+      qc.invalidateQueries({ queryKey: ['forecast-snapshots-v2'] });
+      qc.invalidateQueries({ queryKey: ['forecast-snapshots'] });
+      qc.invalidateQueries({ queryKey: ['forecast-accuracy-v2'] });
+      qc.invalidateQueries({ queryKey: ['forecast-intelligence-v2'] });
+      qc.invalidateQueries({ queryKey: ['forecast-risk-center-v2'] });
+      qc.invalidateQueries({ queryKey: ['forecast-seller-performance-v2'] });
+    },
+    onError: (e: any) =>
+      toast.error('Falha ao inicializar Forecast V2', { description: e?.message }),
+  });
+}

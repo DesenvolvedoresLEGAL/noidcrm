@@ -30288,6 +30288,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      activate_forecast_v2_engine: {
+        Args: { p_enabled?: boolean; p_organization_id: string }
+        Returns: Json
+      }
       admin_delete_organization: { Args: { org_id: string }; Returns: boolean }
       approve_hypothesis: {
         Args: { _hypothesis_id: string }

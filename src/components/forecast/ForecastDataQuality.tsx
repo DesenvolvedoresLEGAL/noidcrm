@@ -357,10 +357,11 @@ export function ForecastDataQuality({ opportunities, goal, kpis }: ForecastDataQ
               <span className="text-xs font-medium">Como o NRHS afeta o Forecast</span>
             </div>
             <div className="text-[10px] text-muted-foreground space-y-1">
-              <p>• <span className="text-success">NRHS ≥ 75:</span> Peso 1.0 (valor integral)</p>
-              <p>• <span className="text-warning">NRHS 60-74:</span> Peso 0.7 (desconto de 30%)</p>
-              <p>• <span className="text-warning">NRHS 40-59:</span> Peso 0.4 (desconto de 60%)</p>
-              <p>• <span className="text-destructive">NRHS &lt; 40:</span> Excluído do forecast</p>
+              <p>• <span className="text-success">NRHS ≥ 80:</span> fator 1.00 (valor integral)</p>
+              <p>• <span className="text-success">NRHS 70–79:</span> fator 0.90</p>
+              <p>• <span className="text-warning">NRHS 60–69:</span> fator 0.75</p>
+              <p>• <span className="text-warning">NRHS 40–59:</span> fator 0.50</p>
+              <p>• <span className="text-destructive">NRHS &lt; 40:</span> excluído do forecast</p>
             </div>
             <Separator className="my-2" />
             <div className="flex items-center justify-between">
