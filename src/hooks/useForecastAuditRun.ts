@@ -8,6 +8,7 @@ import { forecastKeys } from '@/lib/query-keys';
 
 export interface ForecastAuditRunResult {
   run_id: string;
+  calculation_version?: string;
   total_closed: number;
   total_commit: number;
   total_best_case: number;
@@ -23,6 +24,9 @@ export interface ForecastAuditRunResult {
   excluded_deals_count: number;
   risk_deals_count: number;
   slipping_deals_count: number;
+  days_remaining?: number;
+  is_end_of_month_restricted?: boolean;
+  confidence_reasons?: string[];
 }
 
 export interface UseForecastAuditRunArgs {

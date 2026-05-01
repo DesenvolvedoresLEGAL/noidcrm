@@ -11310,6 +11310,7 @@ export type Database = {
           manual_probability: number | null
           metadata: Json | null
           next_step_exists: boolean | null
+          next_step_factor: number | null
           nrhs_factor: number | null
           nrhs_score: number | null
           opportunity_id: string
@@ -11341,6 +11342,7 @@ export type Database = {
           manual_probability?: number | null
           metadata?: Json | null
           next_step_exists?: boolean | null
+          next_step_factor?: number | null
           nrhs_factor?: number | null
           nrhs_score?: number | null
           opportunity_id: string
@@ -11372,6 +11374,7 @@ export type Database = {
           manual_probability?: number | null
           metadata?: Json | null
           next_step_exists?: boolean | null
+          next_step_factor?: number | null
           nrhs_factor?: number | null
           nrhs_score?: number | null
           opportunity_id?: string
@@ -11493,6 +11496,7 @@ export type Database = {
         Row: {
           accuracy_score: number | null
           best_case_amount: number | null
+          calculation_version: string | null
           closed_amount: number | null
           closed_won_final_amount: number | null
           commit_amount: number | null
@@ -11532,6 +11536,7 @@ export type Database = {
         Insert: {
           accuracy_score?: number | null
           best_case_amount?: number | null
+          calculation_version?: string | null
           closed_amount?: number | null
           closed_won_final_amount?: number | null
           commit_amount?: number | null
@@ -11571,6 +11576,7 @@ export type Database = {
         Update: {
           accuracy_score?: number | null
           best_case_amount?: number | null
+          calculation_version?: string | null
           closed_amount?: number | null
           closed_won_final_amount?: number | null
           commit_amount?: number | null

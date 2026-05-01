@@ -18,17 +18,35 @@ import { useForecastAuditItems, type ForecastAuditItem } from '@/hooks/useForeca
 import { formatCurrency, formatPct } from '@/lib/reports/formatReportNumbers';
 
 const PENALTY_LABELS: Record<string, string> = {
+  // legacy
   slipping_close_date: 'Close date vencida',
   no_recent_activity: 'Sem atividade recente (14d)',
   no_next_step: 'Sem próximo passo definido',
   missing_close_date: 'Close date não preenchida',
+  // V2 engine
+  stale_activity: 'Atividade parada (>14 dias)',
+  missing_next_step: 'Sem próximo passo definido',
+  expired_close_date: 'Close date vencida',
+  high_risk: 'Risco alto',
+  critical_risk: 'Risco crítico',
+  end_of_month_restriction: 'Restrição de fim de mês',
+  close_date_outside_period: 'Close date fora do período',
+  low_nrhs: 'NRHS baixo (40-59)',
+  weak_stage: 'Estágio fraco',
 };
 
 const EXCLUSION_LABELS: Record<string, string> = {
+  // legacy
   no_value: 'Sem valor preenchido',
   no_probability: 'Sem probabilidade',
   low_nrhs: 'NRHS abaixo de 40',
   lost: 'Oportunidade perdida',
+  // V2 engine
+  lost_opportunity: 'Oportunidade perdida',
+  missing_deal_value: 'Valor não preenchido',
+  zero_probability: 'Probabilidade zero',
+  nrhs_below_40: 'NRHS abaixo de 40',
+  missing_close_date: 'Close date não preenchida',
 };
 
 const BUCKET_LABELS: Record<ForecastAuditItem['forecast_bucket'], string> = {
@@ -39,6 +57,7 @@ const BUCKET_LABELS: Record<ForecastAuditItem['forecast_bucket'], string> = {
   optimistic: 'Otimista',
   pipeline_only: 'Apenas pipeline',
   excluded: 'Excluído',
+  slipping: 'Escorregando',
 };
 
 interface Props {
@@ -115,7 +134,8 @@ export function ForecastAuditDrawer({
             {run && (
               <>
                 <RunSummary run={run} periodStart={periodStart} periodEnd={periodEnd} />
-                <FormulaSection />
+                <FormulaSection version={run.calculation_version} />
+                <ConfidenceReasonsSection reasons={run.confidence_reasons ?? []} />
                 <BucketsSection buckets={buckets} />
                 <ReasonsSection title="Top motivos de penalização" reasons={topPenalties} emptyHint="Nenhuma penalização aplicada." />
                 <ReasonsSection title="Top motivos de exclusão" reasons={topExclusions} emptyHint="Nenhuma exclusão aplicada." />
@@ -142,15 +162,30 @@ function RunSummary({ run, periodStart, periodEnd }: { run: ForecastAuditRunResu
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm">Resumo do cálculo</CardTitle>
+        <CardTitle className="text-sm flex items-center justify-between gap-2">
+          <span>Resumo do cálculo</span>
+          {run.calculation_version && (
+            <Badge variant="outline" className="text-[10px] font-mono">
+              {run.calculation_version}
+            </Badge>
+          )}
+        </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="text-xs text-muted-foreground">
           Período: <strong className="text-foreground">{periodStart} → {periodEnd}</strong>
+          {typeof run.days_remaining === 'number' && (
+            <> · <strong className="text-foreground">{run.days_remaining}</strong> dias restantes</>
+          )}
+          {run.is_end_of_month_restricted && (
+            <Badge variant="destructive" className="ml-2 text-[10px]">Fim de período</Badge>
+          )}
         </div>
         <div className="grid grid-cols-2 gap-3">
           <Metric label="Receita fechada" value={formatCurrency(run.total_closed)} />
           <Metric label="Commit" value={formatCurrency(run.total_commit)} />
+          <Metric label="Realista" value={formatCurrency(run.scenario_realistic)} />
+          <Metric label="Otimista" value={formatCurrency(run.scenario_optimistic)} />
           <Metric label="Best case" value={formatCurrency(run.total_best_case)} />
           <Metric label="Confiança" value={formatPct(run.forecast_confidence)} />
           <Metric label="NRHS médio" value={`${Math.round(run.nrhs_avg)}`} />
@@ -169,20 +204,59 @@ function RunSummary({ run, periodStart, periodEnd }: { run: ForecastAuditRunResu
   );
 }
 
-function FormulaSection() {
+function ConfidenceReasonsSection({ reasons }: { reasons: string[] }) {
+  if (!reasons || reasons.length === 0) return null;
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm">Fórmulas dos cenários</CardTitle>
+        <CardTitle className="text-sm">Por que essa confiança?</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ul className="space-y-1.5 text-sm">
+          {reasons.map((r, i) => (
+            <li key={i} className="flex items-start gap-2">
+              <span className="text-muted-foreground">•</span>
+              <span>{r}</span>
+            </li>
+          ))}
+        </ul>
+      </CardContent>
+    </Card>
+  );
+}
+
+function FormulaSection({ version }: { version?: string }) {
+  const isV2 = version === 'forecast_v2_engine_1';
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm">Fórmula oficial</CardTitle>
       </CardHeader>
       <CardContent className="space-y-1.5 text-xs text-muted-foreground">
-        <div>• <strong>Pessimista</strong>: Fechado + 70% do Commit</div>
-        <div>• <strong>Realista</strong>: Fechado + Commit + 50% do Realista</div>
-        <div>• <strong>Otimista</strong>: Fechado + Commit + Realista + 50% do Otimista</div>
-        <div>• <strong>Best case</strong>: Fechado + Commit + Realista + Otimista (todos ponderados por probabilidade ajustada)</div>
-        <div className="pt-2">
-          Probabilidade ajustada = prob × NRHS_factor × time_factor × activity_factor.
-        </div>
+        {isV2 ? (
+          <>
+            <div className="font-mono text-[11px] rounded bg-muted/40 p-2 leading-relaxed">
+              adjusted_value = deal_value × adjusted_probability × nrhs_factor × time_factor × activity_factor × next_step_factor × stage_factor × risk_factor
+            </div>
+            <div className="pt-2">
+              <div>• <strong>Pessimista</strong>: somente receita fechada no período</div>
+              <div>• <strong>Realista</strong>: fechado + Σ adjusted_value (commit + realistic)</div>
+              <div>• <strong>Otimista</strong>: fechado + Σ adjusted_value (commit + realistic + optimistic)</div>
+              <div>• <strong>Best case</strong>: teto comercial — não é previsão</div>
+            </div>
+            <div className="pt-1">adjusted_probability = manual × 0,6 + estágio × 0,4 (ou o que existir)</div>
+          </>
+        ) : (
+          <>
+            <div>• <strong>Pessimista</strong>: Fechado + 70% do Commit</div>
+            <div>• <strong>Realista</strong>: Fechado + Commit + 50% do Realista</div>
+            <div>• <strong>Otimista</strong>: Fechado + Commit + Realista + 50% do Otimista</div>
+            <div>• <strong>Best case</strong>: Fechado + Commit + Realista + Otimista (todos ponderados por probabilidade ajustada)</div>
+            <div className="pt-2">
+              Probabilidade ajustada = prob × NRHS_factor × time_factor × activity_factor.
+            </div>
+          </>
+        )}
       </CardContent>
     </Card>
   );
@@ -190,7 +264,7 @@ function FormulaSection() {
 
 function BucketsSection({ buckets }: { buckets: Record<string, { count: number; sum: number }> }) {
   const order: ForecastAuditItem['forecast_bucket'][] = [
-    'closed','commit','realistic','optimistic','pipeline_only','excluded',
+    'closed','commit','realistic','optimistic','best_case','slipping','pipeline_only','excluded',
   ];
   return (
     <Card>
