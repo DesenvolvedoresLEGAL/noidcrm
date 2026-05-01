@@ -28,6 +28,8 @@ import { useForecastSnapshots } from '@/hooks/forecast/useForecastSnapshots';
 import { useForecastAccuracy } from '@/hooks/forecast/useForecastAccuracy';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useUserRole } from '@/hooks/useUserRole';
+import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
+import { usePlatformAdmin } from '@/hooks/usePlatformAdmin';
 import { toast } from '@/hooks/use-toast';
 import {
   BIAS_LABELS,
@@ -98,6 +100,8 @@ function accuracyTone(score: number) {
 export function ForecastAccuracyPanel({ pipelineId, sellerId }: Props) {
   const { data: currentUser } = useCurrentUser();
   const { isAdmin, isManager } = useUserRole();
+  const { isOwner } = useCurrentOrganization();
+  const { isPlatformAdmin } = usePlatformAdmin();
   const organizationId = currentUser?.organization?.id ?? null;
   const range = useMemo(() => currentMonthRangeBR(), []);
   const isPartial = range.end > range.today;
@@ -121,7 +125,7 @@ export function ForecastAccuracyPanel({ pipelineId, sellerId }: Props) {
       enabled: !!organizationId,
     });
 
-  const canManage = isAdmin || isManager;
+  const canManage = isAdmin || isManager || isOwner || isPlatformAdmin;
   const snapshotCount = snapshots.length;
 
   const handleRecalc = async () => {

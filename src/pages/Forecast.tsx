@@ -15,6 +15,8 @@ import { ForecastRisksPanel } from '@/components/forecast/ForecastRisksPanel';
 import { ForecastRiskCenterPanel } from '@/components/forecast/risk-center/ForecastRiskCenterPanel';
 import { ForecastV2HealthPanel } from '@/components/forecast/health/ForecastV2HealthPanel';
 import { useUserRole } from '@/hooks/useUserRole';
+import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
+import { usePlatformAdmin } from '@/hooks/usePlatformAdmin';
 import { AIForecastInsightsPanel } from '@/components/forecast/AIForecastInsightsPanel';
 import { ForecastIntelligencePanel } from '@/components/forecast/ForecastIntelligencePanel';
 import { AccuracyDashboard } from '@/components/forecast/AccuracyDashboard';
@@ -27,7 +29,9 @@ export default function Forecast() {
   const defaultFilters = useDefaultFilters();
   const [filters, setFilters] = useState<FilterType>(defaultFilters);
   const { isAdmin, isManager } = useUserRole();
-  const showHealth = isAdmin || isManager;
+  const { isOwner } = useCurrentOrganization();
+  const { isPlatformAdmin } = usePlatformAdmin();
+  const showHealth = isAdmin || isManager || isOwner || isPlatformAdmin;
 
   const { kpis, scenarios, opportunities, sellerForecasts, isLoading, isFetching, dataUpdatedAt, refetch } = useForecastData(filters);
 
