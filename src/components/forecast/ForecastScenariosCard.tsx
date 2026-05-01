@@ -9,6 +9,7 @@ import { motion } from 'framer-motion';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
 import { ForecastScenarioDetails } from './ForecastScenarioDetails';
+import { useFeatureFlag } from '@/hooks/useFeatureFlag';
 
 interface ForecastScenariosCardProps {
   scenarios: ForecastScenario[];
