@@ -1,122 +1,138 @@
-# Sprint F2.4 — Forecast por Vendedor e Metas Comerciais
+# Sprint F2.5 — Acurácia Real do Forecast
 
-Transformar a aba **Vendedor** em uma tela operacional de cobrança: meta real, gap, cobertura, risco, slipping, confiança e próxima ação — tudo alimentado pela engine V2 já existente, sem mexer nas demais abas.
-
----
-
-## 1. Diagnóstico do que já existe
-
-- **Engine V2 (F2.3)** já está implementada: `calculate_forecast_audit_v2(org, pipeline, start, end, p_seller_id)` aceita filtro por vendedor, popula `forecast_calculation_runs` e `forecast_calculation_items` com `forecast_bucket` (incluindo `slipping`), `risk_level`, `penalty_reasons`, `next_step_factor`, `nrhs_score`, `confidence_score` e `calculation_version`.
-- **Fontes de meta** existentes no banco (não criar nova):
-  - `sales_goals` — `user_id`, `pipeline_id`, `period_start`, `period_end`, `target_value` (oficial e flexível por período/pipeline).
-  - `seller_targets` — `user_id`, `period_month` (date), `monthly_revenue_target` (mensal puro).
-  - `ote_seller_config.custom_goal_override` + `ote_levels.target_revenue` com `effective_date`/`end_date` (override por OTE).
-- **Tela atual**: `src/pages/Forecast.tsx` aba `sellers` renderiza `SellerForecastTable` com hook legado `useForecastData → SellerForecast` que mostra `goal=0` quando não há meta e calcula `closedPercentage=0`, gerando o "0% falso".
+Medir se o Forecast acerta, infla ou subestima, comparando os snapshots diários (F2.2) com o que foi efetivamente fechado no período.
 
 ---
 
-## 2. Backend — RPCs auditáveis
+## 1. Diagnóstico
 
-### 2.1 `get_seller_monthly_goal_v2(p_org, p_seller, p_period_start, p_period_end) RETURNS numeric`
+- `forecast_daily_snapshots` já guarda `closed_won_final_amount`, `forecast_error_amount`, `forecast_error_percentage` e `accuracy_score`. Faltam os campos da F2.5: erros específicos por cenário, `bias_direction` e `accuracy_calculated_at`.
+- A engine V2 já define "fechado" como `o.status='won' AND o.closed_at::date BETWEEN start AND end` (com soft-delete excluído). Vamos reusar essa mesma fórmula numa nova RPC auxiliar.
+- A aba **Acurácia** hoje exibe `ForecastSnapshotHistory` no topo + `AccuracyDashboard` (métricas legadas IA vs humano por probabilidade). Vamos **inserir um novo painel `ForecastAccuracyPanel` acima** do histórico, sem remover o legado.
 
-Função `STABLE SECURITY DEFINER`, `search_path=public`. Ordem de prioridade (primeira não-nula vence; **retorna `NULL` se nenhuma**):
+---
 
-1. `sales_goals` com `user_id = p_seller`, `organization_id = p_org`, intervalo que cobre `[p_period_start, p_period_end]` (preferir `pipeline_id IS NULL`; se filtro de pipeline futuramente necessário, expor parâmetro opcional).
-2. `seller_targets.monthly_revenue_target` cujo `period_month` cai no mês de `p_period_start`.
-3. `ote_seller_config.custom_goal_override` vigente em `p_period_start` (`effective_date <= start AND (end_date IS NULL OR end_date >= end)`).
-4. Fallback `ote_levels.target_revenue` via `ote_seller_config.ote_level_id` vigente.
-5. Caso contrário `NULL`.
+## 2. Backend — Migration única
 
-### 2.2 `get_forecast_seller_performance_v2(p_org, p_pipeline, p_period_start, p_period_end)`
+### 2.1 Schema
+Adicionar (idempotente) em `forecast_daily_snapshots`:
+- `actual_closed_amount numeric` (espelha `closed_won_final_amount` — usaremos o novo nome em todo o pipeline V2; fallback de leitura para `closed_won_final_amount` quando NULL).
+- `realistic_error_amount`, `realistic_error_percentage` (numéricos)
+- `optimistic_error_amount`, `optimistic_error_percentage`
+- `best_case_error_amount`, `best_case_error_percentage`
+- `bias_direction text` com CHECK `IN ('overestimating','underestimating','balanced','unknown')`
+- `accuracy_calculated_at timestamptz`
 
-`SECURITY DEFINER`, `search_path=public`. Retorna a tabela exigida no prompt (todos os campos: `seller_id`, `seller_name`, `seller_email`, `seller_avatar_url`, `monthly_goal`, `has_goal`, `closed_amount`, `scenario_realistic/optimistic/best_case`, `gap_to_goal`, `goal_attainment_percentage`, `pipeline_total`, `coverage_ratio`, `deals_count`, `included_deals_count`, `excluded_deals_count`, `risk_deals_count`, `slipping_deals_count`, `no_recent_activity_count`, `no_next_step_count`, `expired_close_date_count`, `low_nrhs_count`, `nrhs_avg`, `forecast_confidence`, `risk_amount`, `slipping_amount`, `recommended_action`, `recommended_action_type`, `calculation_version`, `run_id`).
+### 2.2 RPC `get_forecast_actual_closed_amount_v2(org, pipeline, start, end, seller)`
+`STABLE SECURITY DEFINER`, `search_path=public`. Soma `proposal_value` (mesma lógica do `total_closed` da engine):
+```sql
+SELECT COALESCE(SUM(proposal_value),0)
+FROM opportunities
+WHERE organization_id = p_org
+  AND deleted_at IS NULL
+  AND status = 'won'
+  AND closed_at::date BETWEEN p_period_start AND p_period_end
+  AND (p_pipeline_id IS NULL OR pipeline_id = p_pipeline_id)
+  AND (p_seller_id IS NULL OR owner_user_id = p_seller_id);
+```
+Tenant guard: caller_org via `get_user_organization_id()`; rejeita mismatch (exceto `is_platform_admin`).
 
-Lógica:
+### 2.3 RPC `calculate_forecast_accuracy_v2(org, pipeline, start, end, seller)` → `jsonb`
+`SECURITY DEFINER`, `search_path=public`.
 
-1. **Tenant guard** — resolver `caller_org` via `get_user_organization_id(auth.uid())`; comparar com `p_org`. Se diferente e usuário não for `platform_admin`, abortar.
-2. **Scope de visibilidade**:
-   - `is_admin/owner/manager/platform_admin` (helpers existentes `has_role`, `is_organization_admin`) → todos os vendedores ativos da org via `crm_active_users_view`.
-   - Caso contrário, restringe a `seller_id = auth.uid()`.
-3. **Para cada vendedor** elegível:
-   - Chamar `calculate_forecast_audit_v2(p_org, p_pipeline, p_period_start, p_period_end, seller_id)` → recebe `run_id`, `calculation_version`, totais.
-   - Agregar `forecast_calculation_items WHERE run_id = v_run_id` para extrair contagens, `risk_amount` (sum `deal_value` onde `risk_level IN ('alto','crítico')` OR `forecast_bucket='slipping'` OR `penalty_reasons ?| array['high_risk','critical_risk','expired_close_date','stale_activity']`), `slipping_amount`, `nrhs_avg`, contagens de higiene (penalty_reasons contém `no_recent_activity`, `no_next_step`, `expired_close_date`, `low_nrhs`).
-   - `monthly_goal := get_seller_monthly_goal_v2(...)`; `has_goal := monthly_goal IS NOT NULL AND monthly_goal > 0`.
-   - `gap_to_goal`, `goal_attainment_percentage`, `coverage_ratio` → `NULL` quando `has_goal=false`.
-   - `recommended_action_type/text` calculado pela cadeia de prioridade (Casos 1–6 do prompt).
-4. Retorno como `RETURNS TABLE (...)`.
+Passos:
+1. Tenant + permissão (sellers comuns → força `seller := auth.uid()`).
+2. `actual := get_forecast_actual_closed_amount_v2(...)`.
+3. Carrega snapshots do escopo (`organization_id`, `period_start`, `period_end`, `pipeline_id` e `seller_id` com tratamento NULL exato).
+4. **Para cada snapshot**, calcula erros segundo as fórmulas da spec:
+   - `error_amt = scenario - actual`
+   - `error_pct = CASE WHEN actual>0 THEN abs(error_amt)/actual*100 WHEN scenario>0 THEN 100 ELSE 0 END`
+   - Repete para Realista/Otimista/Melhor Caso.
+   - `accuracy_score = GREATEST(0, 100 - realistic_error_percentage)`.
+   - `bias_direction` baseado em `scenario_realistic` vs `actual` × 1.10 / 0.90 (com `unknown` quando `actual=0` e `scenario=0`).
+   - `UPDATE` em massa via CTE/`UPDATE ... FROM (VALUES ...)` para preencher os 9 campos + `accuracy_calculated_at = now()`.
+5. Agrega resumo:
+   - `avg_realistic_forecast`, `last_realistic_forecast` (último por `snapshot_date`).
+   - `avg_error_amount`, `avg_error_percentage`, `mape` (média de `realistic_error_percentage`).
+   - `accuracy_score = GREATEST(0, 100 - mape)`.
+   - `bias_direction` consolidado (mesma regra usando médias).
+   - `best_snapshot` / `worst_snapshot`: jsonb com `{snapshot_date, realistic_error_percentage, scenario_realistic, actual_closed_amount}` (menor/maior `realistic_error_percentage`).
+   - `forecast_trend`: divide snapshots em primeira vs segunda metade (ordenadas por data); `improving` se segunda < primeira em mais de 10%, `worsening` se maior em mais de 10%, `stable` caso contrário; `unknown` com <5 snapshots.
+   - `calculation_version`: pega `MAX(calculation_version)` dos snapshots.
+6. Retorna o JSON com a forma exigida.
 
-### 2.3 Segurança
+### 2.4 RPC `get_forecast_seller_accuracy_v2(org, pipeline, start, end)` → TABLE
+Itera vendedores ativos via `crm_active_users_view` respeitando escopo (admin/owner/manager/platform_admin → todos; demais → só `auth.uid()`). Para cada vendedor:
+- Chama `calculate_forecast_accuracy_v2(..., seller_id)` reaproveitando a engine.
+- Devolve `seller_id`, `seller_name`, `seller_email`, `snapshots_count`, `actual_closed_amount`, `avg_realistic_forecast`, `last_realistic_forecast`, `avg_error_percentage`, `accuracy_score`, `bias_direction`, `forecast_trend`, `calculation_version`.
+- Não filtra por amostra mínima — UI mostra badge "Baixa amostra" quando `snapshots_count < 5`.
 
-- Reutilizar `has_role`, `is_organization_admin`, `crm_active_users_view`.
-- `GRANT EXECUTE` para `authenticated` em ambas as RPCs.
-- Sem RLS nova: a RPC é o gatekeeper.
+### 2.5 Confiança histórica (não invasiva)
+**Nesta sprint** vamos apenas marcar `metadata.historical_accuracy_penalty_ready = true` no run V2 (uma linha extra no `UPDATE forecast_calculation_runs.metadata`). A penalidade de confiança baseada em acurácia histórica fica **preparada** mas **desligada** — evita risco de regressão. Documentado para F2.6.
+
+### 2.6 Segurança
+- `GRANT EXECUTE ... TO authenticated` nas 3 RPCs.
+- Sem RLS nova; RPCs são gatekeepers.
+- Tenant guard explícito em todas (rejeita mismatch).
 
 ---
 
 ## 3. Frontend
 
-### 3.1 Tipos e hook
+### 3.1 Tipos — `src/types/forecast-accuracy.ts`
+```ts
+type ForecastBias = 'overestimating'|'underestimating'|'balanced'|'unknown';
+type ForecastTrend = 'improving'|'worsening'|'stable'|'unknown';
+interface ForecastAccuracySummary { actual_closed_amount, snapshots_count, avg_realistic_forecast, last_realistic_forecast, avg_error_amount, avg_error_percentage, mape, accuracy_score, bias_direction, best_snapshot, worst_snapshot, forecast_trend, calculation_version, seller_id }
+interface ForecastSellerAccuracy { seller_id, seller_name, seller_email, snapshots_count, actual_closed_amount, avg_realistic_forecast, last_realistic_forecast, avg_error_percentage, accuracy_score, bias_direction, forecast_trend, calculation_version }
+```
 
-- `src/types/forecast-seller.ts` — interface `ForecastSellerPerformance` com todos os campos da RPC (numéricos `null` quando `has_goal=false`).
-- `src/hooks/forecast/useForecastSellerPerformance.ts` — `useQuery` chamando `supabase.rpc('get_forecast_seller_performance_v2', ...)` com `enabled` e `queryKey` por org/pipeline/período. Retorna `{ sellers, isLoading, error, refetch }`.
+### 3.2 Hook — `src/hooks/forecast/useForecastAccuracy.ts`
+- `useQuery` (read) chamando `calculate_forecast_accuracy_v2` (a função já lê e atualiza; tratada como leitura idempotente — disparada apenas quando UI monta ou quando `calculateAccuracy` é invocado).
+- `useQuery` (read) chamando `get_forecast_seller_accuracy_v2`.
+- `calculateAccuracy()` força refetch das duas queries.
+- Retorna `{ accuracy, sellerAccuracy, isLoading, error, calculateAccuracy, refetch }`.
 
-### 3.2 UI da aba Vendedor (`src/pages/Forecast.tsx` + novo componente)
+### 3.3 Componente — `src/components/forecast/ForecastAccuracyPanel.tsx`
+- Lê snapshots existentes (reutiliza `useForecastSnapshots`) para decidir entre **estado <5 snapshots** ("Acurácia em formação", último realista, fechado, versão e botão admin) e **estado ≥5** com:
+  - 6 cards: Acurácia Geral, Erro Médio (%), Tendência, Bias, Melhor Previsão, Pior Previsão.
+  - Labels PT-BR (mapping fixo no componente).
+  - Botão **"Calcular acurácia agora"** visível apenas para `owner | admin | manager | platform_admin` (`useUserRole` + `useCurrentUser`), dispara `calculateAccuracy()` + toast.
+- **Tabela "Acurácia por Vendedor"** com colunas da spec; badge "Baixa amostra" para `snapshots_count < 5`.
+- **Resiliência**: erro da RPC → renderiza um `Alert` discreto e some o painel (mantém histórico legado abaixo).
+- **Período aberto**: badge "Parcial — mês em andamento" quando `period_end > today`.
 
-Substituir o uso atual de `SellerForecastTable` (hook legado) por um novo container `SellerPerformanceSection` localizado em `src/components/forecast/seller-performance/`:
+### 3.4 Atualização no histórico — `ForecastSnapshotHistory.tsx`
+- Adicionar colunas na tabela: **Erro R$**, **Erro %**, **Acurácia**, **Bias**, **Versão** (lendo `realistic_error_amount`, `realistic_error_percentage`, `accuracy_score`, `bias_direction`, `calculation_version`).
+- Quando `actual_closed_amount IS NULL` (snapshot ainda não calculado) → célula "Em cálculo".
+- Gráfico: adicionar linha **"Realizado final"** quando o último snapshot tem `actual_closed_amount` (linha horizontal de referência via `ReferenceLine` do recharts já importado indiretamente — usar a mesma `LineChart` com nova `Line` constante baseada em `actual_closed_amount`). Não instalar libs novas.
 
-- **4 cards superiores** (`SellerHighlightCards`):
-  1. **Maior Forecast Realista** — vendedor com maior `scenario_realistic`.
-  2. **Maior Gap** — maior `gap_to_goal` positivo. Quando nenhuma meta configurada → estado "Metas não configuradas" com CTA discreta.
-  3. **Maior Risco** — maior `risk_amount` (mostra valor + nº deals).
-  4. **Melhor Higiene** — maior `forecast_confidence` (desempate por `nrhs_avg`).
-
-- **Tabela** (`SellerPerformanceTable`) com as colunas obrigatórias (Vendedor, Meta, Fechado, Realista, Otimista, Melhor Caso, Gap, % Meta, Cobertura, Deals, Risco, Slipping, Confiança, Ação Recomendada).
-  - Regras de exibição: "Meta não configurada" / `-` / "Meta superada" conforme prompt.
-  - Badge de confiança: Alta ≥80, Moderada 60–79, Baixa 40–59, Crítica <40.
-  - Coluna de ação: badge clicável quando há rota disponível:
-    - `configure_goal` → navega para `/configuracoes/metas` (ou rota equivalente se existir; senão renderiza apenas o label, sem quebrar).
-    - `recover_risk_deals`, `reactivate_stale_deals`, `define_next_steps` → muda aba para `risks` ou `deals` aplicando filtro `seller_id` via query params (apenas quando filtros já existirem; caso contrário, label estático).
-  - Colunas com tooltips explicando a fórmula resumida.
-
-- **Estado vazio**: card central com texto exato do prompt.
-- **Loading**: skeleton da tabela.
-- **Error**: fallback para `SellerForecastTable` legado (não quebra a aba) + toast destrutivo discreto.
-
-### 3.3 Feature flag
-
-- Hook checa `forecast_v2_engine_enabled` (já em `feature_flags`) via util existente.
-- Flag **ON** → usa nova UI integralmente.
-- Flag **OFF** → usa nova UI mas a engine internamente já cai no ramo legado dentro de `calculate_forecast_audit_v2`; nenhum fallback adicional necessário (a tela continua funcional). Se a RPC falhar, `error` aciona o fallback para a tabela legada.
+### 3.5 Integração — `AccuracyDashboard.tsx`
+- Renderizar `<ForecastAccuracyPanel ... />` **acima** do `snapshotSection` existente. Não remover nem alterar a seção legada de IA vs Humano (mantém compatibilidade).
 
 ---
 
-## 4. Aceite e testes manuais
-
-Cobrir os 8 testes do prompt: vendedor com meta, sem meta, com risco, sem atividade, vendedor comum (escopo restrito), admin (escopo total), flag OFF (não quebra) e flag ON (`calculation_version = forecast_v2_engine_1` e bate com o drawer "Ver cálculo").
+## 4. Aceite & testes manuais
+Cobrir os 8 testes do prompt (forecast inflado, subestimado, equilibrado, <5 e ≥5 snapshots, vendedor restrito, admin total, período aberto vs encerrado).
 
 ---
 
 ## Arquivos impactados
 
 **Backend (1 migration)**
-- `supabase/migrations/<timestamp>_forecast_v2_seller_performance.sql` — cria `get_seller_monthly_goal_v2` e `get_forecast_seller_performance_v2`, com `GRANT EXECUTE` para `authenticated`.
+- `supabase/migrations/<ts>_forecast_v2_accuracy.sql` — schema additivo + 3 RPCs + GRANTs.
 
 **Frontend**
-- `src/types/forecast-seller.ts` *(novo)*
-- `src/hooks/forecast/useForecastSellerPerformance.ts` *(novo)*
-- `src/components/forecast/seller-performance/SellerPerformanceSection.tsx` *(novo)*
-- `src/components/forecast/seller-performance/SellerHighlightCards.tsx` *(novo)*
-- `src/components/forecast/seller-performance/SellerPerformanceTable.tsx` *(novo)*
-- `src/pages/Forecast.tsx` — troca conteúdo da aba `sellers` para o novo `SellerPerformanceSection` (mantém `SellerForecastTable` apenas como fallback de erro).
+- `src/types/forecast-accuracy.ts` *(novo)*
+- `src/hooks/forecast/useForecastAccuracy.ts` *(novo)*
+- `src/components/forecast/ForecastAccuracyPanel.tsx` *(novo)*
+- `src/components/forecast/ForecastSnapshotHistory.tsx` — colunas extras + linha de realizado
+- `src/components/forecast/AccuracyDashboard.tsx` — monta o painel acima
+- `src/integrations/supabase/types.ts` — auto-regen pós-migration
 
-## Riscos e mitigações
-
-- **Custo de execução** — chamar a engine N vezes (1 por vendedor) pode ser caro. Mitigação: `calculate_forecast_audit_v2` já é otimizado por org/período; em orgs grandes podemos depois adicionar caching no `forecast_calculation_runs` (fora do escopo desta sprint).
-- **Múltiplas fontes de meta** — divergência possível entre `sales_goals`, `seller_targets` e OTE. Mitigação: ordem de prioridade documentada na RPC `get_seller_monthly_goal_v2` e exposta via tooltip "Origem da meta" (futuro). Nesta sprint, registramos no log apenas em caso de divergência.
-- **Vendedor sem permissão** — RPC restringe via `auth.uid()`; fora isso a query retorna vazio.
-- **Compat tab atual** — fallback automático para a `SellerForecastTable` legada se a nova RPC falhar.
-
-## Próximos passos (fora desta sprint)
-
-- F2.5: acurácia matemática real (forecast vs realizado) usando snapshots da F2.2.
-- Filtros profundos por vendedor nas abas Deals/Riscos para suportar 100% das ações rápidas.
+## Riscos & mitigações
+- **Custo**: `get_forecast_seller_accuracy_v2` chama a RPC principal por vendedor. Lista limitada por org; aceitável. Caching futuro fica para F2.6.
+- **Conflito de campo `actual_closed_amount` × `closed_won_final_amount`**: a RPC popula AMBOS para preservar leitores legados; UI nova lê `actual_closed_amount` com fallback.
+- **Snapshot sem realizado ainda**: mantemos `bias_direction='unknown'` e `accuracy_score=NULL` quando `snapshots_count<5` no consolidado.
+- **Atualização lateral via SECURITY DEFINER**: RPC só atualiza linhas que casam com `p_organization_id` (tenant guard + WHERE `organization_id = p_org`).
+- **Confiança histórica**: deixada apenas em `metadata.historical_accuracy_penalty_ready=true`; não altera score atual da engine. Reduz risco de regressão.
