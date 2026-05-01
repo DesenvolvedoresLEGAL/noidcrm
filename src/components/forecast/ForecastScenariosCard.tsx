@@ -72,6 +72,7 @@ export function ForecastScenariosCard({
 }: ForecastScenariosCardProps) {
   const [selectedScenario, setSelectedScenario] = useState<ForecastScenario | null>(null);
   const maxValue = Math.max(...scenarios.map(s => s.value), goal);
+  const { enabled: v2Enabled } = useFeatureFlag('forecast_v2_engine_enabled');
 
   return (
     <>
