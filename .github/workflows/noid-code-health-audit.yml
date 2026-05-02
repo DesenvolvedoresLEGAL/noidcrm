@@ -1,0 +1,140 @@
+name: NOID Code Health Audit (Read-Only)
+
+on:
+  schedule:
+    # Daily at 07:00 UTC
+    - cron: '0 7 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  code-health-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run repository health checks (read-only)
+        id: checks
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p .tmp
+
+          security_hits=$(rg -n --no-ignore-vcs -S "(eval\\(|new Function\\(|innerHTML\\s*=|dangerouslySetInnerHTML|http://)" src supabase docs 2>/dev/null | wc -l || true)
+          rls_hits=$(rg -n --no-ignore-vcs -S "(alter policy|create policy|enable row level security|tenant_id|organization_id)" supabase database docs 2>/dev/null | wc -l || true)
+          service_role_hits=$(rg -n --no-ignore-vcs -S "service_role|SUPABASE_SERVICE_ROLE_KEY" . 2>/dev/null | wc -l || true)
+          edge_fn_hits=$(rg -n --no-ignore-vcs -S "Deno\.serve|serve\(|try\s*\{|catch\s*\(|console\.error|retry" supabase/functions 2>/dev/null | wc -l || true)
+          openai_hits=$(rg -n --no-ignore-vcs -S "openai|gpt-|token|max_tokens|input_tokens|output_tokens|usage" src supabase docs 2>/dev/null | wc -l || true)
+          dead_code_hits=$(rg -n --no-ignore-vcs -S "TODO: remove|FIXME: remove|deprecated|unused" src supabase docs 2>/dev/null | wc -l || true)
+          duplicate_logic_hits=$(rg -n --no-ignore-vcs -S "eslint-disable|duplicat|copy-paste|same as" src supabase docs 2>/dev/null | wc -l || true)
+          perf_hits=$(rg -n --no-ignore-vcs -S "N\+1|polling|setInterval|useMemo|useCallback|index|performance|slow query" src supabase docs database 2>/dev/null | wc -l || true)
+
+          cat > .tmp/audit-baseline.md <<EOF
+          # NOID Code Health Audit (Read-Only)
+
+          Date (UTC): $(date -u +"%Y-%m-%d %H:%M:%S")
+          Commit: $GITHUB_SHA
+          Workflow Run: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+
+          ## Baseline Signals (grep-based)
+          - Security signals: ${security_hits}
+          - Supabase/RLS signals: ${rls_hits}
+          - service_role exposure signals: ${service_role_hits}
+          - Edge Function reliability signals: ${edge_fn_hits}
+          - OpenAI token/cost usage signals: ${openai_hits}
+          - Dead code signals: ${dead_code_hits}
+          - Duplicated logic signals: ${duplicate_logic_hits}
+          - Performance regression signals: ${perf_hits}
+
+          ## Guardrails
+          - Read-only audit: **no files changed**
+          - No automatic PR creation
+          - No merge automation
+
+          ## Recommended Follow-ups
+          1. Manually inspect files contributing to high-signal categories.
+          2. Validate tenant scoping and RLS on Supabase-touching changes.
+          3. Verify service_role key usage is tightly scoped to trusted server contexts.
+          4. Confirm Edge Functions have robust logging/error handling and safe retries.
+          5. Review OpenAI usage for token ceilings, caching, and model cost optimization.
+          EOF
+
+      - name: Optional Codex narrative synthesis
+        id: codex
+        if: ${{ secrets.OPENAI_API_KEY != '' }}
+        continue-on-error: true
+        uses: openai/codex-action@v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          prompt: |
+            You are NOID Code Health Agent.
+            Summarize this read-only audit into concise production-focused findings.
+            Emphasize: security, Supabase RLS, service_role risk, Edge Function reliability,
+            OpenAI token/cost usage, dead code, duplicated logic, and performance regressions.
+            Do not propose automatic PRs or merge automation.
+
+      - name: Build issue body
+        id: issue_body
+        shell: bash
+        run: |
+          set -euo pipefail
+          title="[Automation PR-01] NOID Code Health Audit"
+
+          {
+            echo "## ${title}"
+            echo
+            cat .tmp/audit-baseline.md
+            echo
+            if [ "${{ steps.codex.outcome || 'skipped' }}" = "success" ]; then
+              echo "## Codex Synthesis"
+              echo "Codex action executed successfully in this run."
+            else
+              echo "## Codex Synthesis"
+              echo "Codex action unavailable or skipped; baseline report only."
+            fi
+          } > .tmp/issue-body.md
+
+          echo "title=${title}" >> "$GITHUB_OUTPUT"
+
+      - name: Create or update tracking issue
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const title = `${{ toJSON(steps.issue_body.outputs.title) }}`.replace(/^"|"$/g, '');
+            const body = fs.readFileSync('.tmp/issue-body.md', 'utf8');
+            const label = 'automation:code-health-audit';
+
+            const labelsResp = await github.rest.issues.listLabelsForRepo({ owner, repo, per_page: 100 });
+            if (!labelsResp.data.find(l => l.name === label)) {
+              await github.rest.issues.createLabel({ owner, repo, name: label, color: '5319E7', description: 'Automated code health audit reports' });
+            }
+
+            const issues = await github.paginate(github.rest.issues.listForRepo, {
+              owner,
+              repo,
+              state: 'open',
+              labels: label,
+              per_page: 100,
+            });
+
+            const existing = issues.find(i => i.title === title);
+            if (existing) {
+              await github.rest.issues.update({ owner, repo, issue_number: existing.number, body });
+              core.info(`Updated issue #${existing.number}`);
+            } else {
+              const created = await github.rest.issues.create({ owner, repo, title, body, labels: [label] });
+              core.info(`Created issue #${created.data.number}`);
+            }
+
+# Required secrets:
+# - OPENAI_API_KEY (optional): Enables optional Codex synthesis step.
+# - GITHUB_TOKEN (automatic): Used to create/update the audit issue.
