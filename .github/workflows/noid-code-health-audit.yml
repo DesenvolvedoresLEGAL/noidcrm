@@ -13,6 +13,8 @@ permissions:
 jobs:
   code-health-audit:
     runs-on: ubuntu-latest
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -66,7 +68,7 @@ jobs:
 
       - name: Optional Codex narrative synthesis
         id: codex
-        if: ${{ secrets.OPENAI_API_KEY != '' }}
+        if: ${{ env.OPENAI_API_KEY != '' }}
         continue-on-error: true
         uses: openai/codex-action@8f0e8f5e9c5b4f2f4f1e0f3a2b6c7d8e9f0a1b2c
         with:
