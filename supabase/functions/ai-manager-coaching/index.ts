@@ -43,6 +43,23 @@ serve(async (req) => {
 
     const { organizationId, teamMemberIds } = await req.json();
 
+    if (!organizationId) {
+      return new Response(JSON.stringify({ error: 'organizationId is required' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const { data: userOrgId, error: userOrgError } = await supabaseAuth
+      .rpc('get_user_organization_id');
+
+    if (userOrgError || !userOrgId || userOrgId !== organizationId) {
+      return new Response(JSON.stringify({ error: 'Forbidden' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     console.log(`[ai-manager-coaching] Generating coaching insights for manager: ${user.id}`);
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
@@ -56,7 +73,8 @@ serve(async (req) => {
       const { data: teams } = await supabase
         .from('teams')
         .select('id')
-        .eq('manager_id', user.id);
+        .eq('manager_id', user.id)
+        .eq('organization_id', organizationId);
 
       if (teams && teams.length > 0) {
         const teamIds = teams.map(t => t.id);
@@ -85,7 +103,8 @@ serve(async (req) => {
     const { data: profiles } = await supabase
       .from('profiles')
       .select('user_id, full_name')
-      .in('user_id', memberIds);
+      .in('user_id', memberIds)
+      .eq('organization_id', organizationId);
 
     const profilesMap = (profiles || []).reduce((acc, p) => {
       acc[p.user_id] = p.full_name;
@@ -97,6 +116,7 @@ serve(async (req) => {
       .from('opportunities')
       .select('id, owner_user_id, status, valor_previsto, created_at')
       .in('owner_user_id', memberIds)
+      .eq('organization_id', organizationId)
       .gte('created_at', last30Days);
 
     // Fetch activities per member
@@ -104,6 +124,7 @@ serve(async (req) => {
       .from('activities')
       .select('id, owner_user_id, type, status, scheduled_date, completed_at')
       .in('owner_user_id', memberIds)
+      .eq('organization_id', organizationId)
       .gte('created_at', last30Days);
 
     // Fetch proposals
