@@ -13,11 +13,22 @@ permissions:
 jobs:
   code-health-audit:
     runs-on: ubuntu-latest
-    env:
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Detect Codex secret availability
+        id: codex_secret
+        shell: bash
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -n "${OPENAI_API_KEY:-}" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Run repository health checks (read-only)
         id: checks
@@ -68,9 +79,11 @@ jobs:
 
       - name: Optional Codex narrative synthesis
         id: codex
-        if: ${{ env.OPENAI_API_KEY != '' }}
+        if: ${{ steps.codex_secret.outputs.available == 'true' }}
         continue-on-error: true
         uses: openai/codex-action@8f0e8f5e9c5b4f2f4f1e0f3a2b6c7d8e9f0a1b2c
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         with:
           sandbox: read-only
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
