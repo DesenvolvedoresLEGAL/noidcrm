@@ -86,7 +86,6 @@ export async function callOpenAIWithGuardrails(opts: OpenAITransportOptions): Pr
         }),
         signal: controller.signal,
       });
-      clearTimeout(timeoutId);
 
       if (!resp.ok) {
         const errBody = await resp.text();
@@ -113,13 +112,14 @@ export async function callOpenAIWithGuardrails(opts: OpenAITransportOptions): Pr
         },
       };
     } catch (err) {
-      clearTimeout(timeoutId);
       if (isRetryableError(err) && attempts <= maxRetries) {
         lastError = err instanceof Error ? err : new Error(String(err));
         await new Promise((r) => setTimeout(r, Math.min(1200, 250 * 2 ** (attempts - 1)) + Math.floor(Math.random() * 120)));
         continue;
       }
       throw err;
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
 
