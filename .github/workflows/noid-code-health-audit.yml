@@ -41,11 +41,11 @@ jobs:
           security_hits=$(rg -n --no-ignore-vcs -S "(eval\\(|new Function\\(|innerHTML\\s*=|dangerouslySetInnerHTML|http://)" src supabase docs 2>/dev/null | wc -l || true)
           rls_hits=$(rg -n --no-ignore-vcs -S "(alter policy|create policy|enable row level security|tenant_id|organization_id)" supabase database docs 2>/dev/null | wc -l || true)
           service_role_hits=$(rg -n --no-ignore-vcs -S "service_role|SUPABASE_SERVICE_ROLE_KEY" . 2>/dev/null | wc -l || true)
-          edge_fn_hits=$(rg -n --no-ignore-vcs -S "Deno\.serve|serve\(|try\s*\{|catch\s*\(|console\.error|retry" supabase/functions 2>/dev/null | wc -l || true)
+          edge_fn_hits=$(rg -n --no-ignore-vcs -S "Deno\\.serve|serve\\(|try\\s*\\{|catch\\s*\\(|console\\.error|retry" supabase/functions 2>/dev/null | wc -l || true)
           openai_hits=$(rg -n --no-ignore-vcs -S "openai|gpt-|token|max_tokens|input_tokens|output_tokens|usage" src supabase docs 2>/dev/null | wc -l || true)
           dead_code_hits=$(rg -n --no-ignore-vcs -S "TODO: remove|FIXME: remove|deprecated|unused" src supabase docs 2>/dev/null | wc -l || true)
           duplicate_logic_hits=$(rg -n --no-ignore-vcs -S "eslint-disable|duplicat|copy-paste|same as" src supabase docs 2>/dev/null | wc -l || true)
-          perf_hits=$(rg -n --no-ignore-vcs -S "N\+1|polling|setInterval|useMemo|useCallback|index|performance|slow query" src supabase docs database 2>/dev/null | wc -l || true)
+          perf_hits=$(rg -n --no-ignore-vcs -S "N\\+1|polling|setInterval|useMemo|useCallback|index|performance|slow query" src supabase docs database 2>/dev/null | wc -l || true)
 
           cat > .tmp/audit-baseline.md <<EOF
           # NOID Code Health Audit (Read-Only)
@@ -95,25 +95,106 @@ jobs:
             OpenAI token/cost usage, dead code, duplicated logic, and performance regressions.
             Do not propose automatic PRs or merge automation.
 
+      - name: Resolve Codex synthesis output
+        id: codex_output
+        shell: bash
+        env:
+          CODEX_FINAL_MESSAGE: ${{ steps.codex.outputs['final-message'] || '' }}
+          CODEX_SUMMARY: ${{ steps.codex.outputs.summary || '' }}
+          CODEX_RESULT: ${{ steps.codex.outputs.result || '' }}
+          CODEX_RESPONSE: ${{ steps.codex.outputs.response || '' }}
+          CODEX_OUTPUT: ${{ steps.codex.outputs.output || '' }}
+          CODEX_TEXT: ${{ steps.codex.outputs.text || '' }}
+          CODEX_MESSAGE: ${{ steps.codex.outputs.message || '' }}
+        run: |
+          set -euo pipefail
+          mkdir -p .tmp
+
+          codex_raw=""
+
+          # Prefer documented codex-action output, then fall back to likely aliases.
+          if [ -n "${CODEX_FINAL_MESSAGE:-}" ]; then
+            codex_raw="${CODEX_FINAL_MESSAGE}"
+          elif [ -n "${CODEX_SUMMARY:-}" ]; then
+            codex_raw="${CODEX_SUMMARY}"
+          elif [ -n "${CODEX_RESULT:-}" ]; then
+            codex_raw="${CODEX_RESULT}"
+          elif [ -n "${CODEX_RESPONSE:-}" ]; then
+            codex_raw="${CODEX_RESPONSE}"
+          elif [ -n "${CODEX_OUTPUT:-}" ]; then
+            codex_raw="${CODEX_OUTPUT}"
+          elif [ -n "${CODEX_TEXT:-}" ]; then
+            codex_raw="${CODEX_TEXT}"
+          elif [ -n "${CODEX_MESSAGE:-}" ]; then
+            codex_raw="${CODEX_MESSAGE}"
+          fi
+
+          if [ -n "${codex_raw}" ]; then
+            printf '%s\n' "${codex_raw}" > .tmp/codex-synthesis.md
+            echo "captured=true" >> "$GITHUB_OUTPUT"
+          else
+            printf '%s\n' "No Codex findings captured." > .tmp/codex-synthesis.md
+            echo "captured=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Build issue body
         id: issue_body
         shell: bash
         run: |
           set -euo pipefail
-          title="[Automation PR-01] NOID Code Health Audit"
+          title="[Automation PR-02] NOID Code Health Audit"
 
           {
             echo "## ${title}"
             echo
-            cat .tmp/audit-baseline.md
-            echo
-            if [ "${{ steps.codex.outcome || 'skipped' }}" = "success" ]; then
-              echo "## Codex Synthesis"
-              echo "Codex action executed successfully in this run."
+            echo "### Executive Summary"
+            if [ "${{ steps.codex_output.outputs.captured }}" = "true" ]; then
+              echo "Codex synthesis captured from action output."
             else
-              echo "## Codex Synthesis"
-              echo "Codex action unavailable or skipped; baseline report only."
+              echo "No Codex findings captured. Baseline report included below."
             fi
+            echo
+
+            echo "### P0 Critical"
+            echo '- Populate from Codex synthesis; if empty, keep as "No Codex findings captured."'
+            echo
+
+            echo "### P1 High"
+            echo '- Populate from Codex synthesis; if empty, keep as "No Codex findings captured."'
+            echo
+
+            echo "### P2 Medium"
+            echo '- Populate from Codex synthesis; if empty, keep as "No Codex findings captured."'
+            echo
+
+            echo "### P3 Low"
+            echo '- Populate from Codex synthesis; if empty, keep as "No Codex findings captured."'
+            echo
+
+            echo "### Suggested Safe PRs"
+            echo "- Read-only workflow; no PRs are created automatically by this job."
+            echo
+
+            echo "### Needs Wagner Approval"
+            echo "- Any code change derived from this report requires Wagner approval before implementation."
+            echo
+
+            echo "### Guardrails"
+            echo "- Read-only audit: **no files changed**"
+            echo "- No automatic PR creation"
+            echo "- No merge automation"
+            echo
+
+            echo "### Workflow Run"
+            echo "- https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo
+
+            echo "### Codex Synthesis"
+            cat .tmp/codex-synthesis.md
+            echo
+
+            echo "### Baseline"
+            cat .tmp/audit-baseline.md
           } > .tmp/issue-body.md
 
           echo "title=${title}" >> "$GITHUB_OUTPUT"
