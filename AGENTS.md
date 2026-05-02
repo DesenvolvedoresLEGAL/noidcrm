@@ -38,3 +38,39 @@ Stack: React, TypeScript, Supabase, Edge Functions, Postgres, RLS
 - Summary
 - Risks
 - Next steps
+## Pull Request Review Rules
+
+Every PR must be reviewed as if it could affect production.
+
+Review priorities:
+1. RLS and multi-tenant isolation
+2. Data loss or migration risk
+3. Broken imports or dead code
+4. Edge Function regressions
+5. React state/cache invalidation problems
+6. Performance regressions
+7. Security issues
+8. Hidden behavior drift
+
+For notification changes, always check:
+- notifications_v2
+- notification_events
+- notification_delivery_logs
+- push_delivery_jobs
+- legacy notifications table usage
+- inbox/history behavior
+- delivery status and retry behavior
+
+For Supabase changes, always check:
+- tenant or organization scoping
+- RLS policies
+- service_role usage
+- grants/revokes
+- rollback risk
+- indexes for polling/query performance
+
+For every PR, return:
+- Blockers
+- Warnings
+- Suggested fixes
+- Safe to merge: yes/no
