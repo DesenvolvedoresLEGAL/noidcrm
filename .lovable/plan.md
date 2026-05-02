@@ -1,105 +1,77 @@
-# Sprint F2.9 — Forecast V2 Activation, Fixes e Estabilização Final
+# Sprint F2.9.1 — Forecast V2: hotfix de operação 100%
 
-Objetivo: tirar o Forecast V2 do estado "ainda não pronto" para uso real em produção. Sem mudar a fórmula da Engine V2 (F2.3), sem alterar pesos NRHS oficiais, sem refatorar layout. Foco: ativação, correção de erros e textos legados.
+Foco: deixar o Forecast V2 totalmente funcional para o owner. Sem nova inteligência, sem refazer layout, apenas corrigir os bloqueios reais identificados nos prints + nos logs de banco.
 
-## Diagnóstico (já validado no banco)
+## Problemas confirmados
 
-- `feature_flags` tem UNIQUE em `(organization_id, flag_key)` → suporta `ON CONFLICT` com upsert.
-- Causa raiz do erro `operator does not exist: text = uuid`: a coluna `forecast_calculation_items.pipeline_id` é **text**, enquanto `forecast_calculation_runs.pipeline_id` e o parâmetro `p_pipeline_id` são **uuid**. Comparações diretas em joins/filtros das RPCs de acurácia quebram.
-- 12 RPCs `*_v2` já existem; o problema não é "faltar função", é cast de tipo + ausência de run/snapshot inicial após ativar a flag.
+1. **Tabs em duas linhas** — `TabsList` está com `md:grid-cols-7`, mas para owner/admin existem **8 abas** (Geral, Qualidade, Acurácia, Vendedor, Deals, AI, Riscos, Saúde V2). A 8ª quebra para a linha de baixo.
+2. **`column a.legal_name does not exist`** — confirmado via `\d accounts`: a coluna correta é `razao_social` (não existe `legal_name`). Isso quebra:
+   - `calculate_forecast_audit_v2` (Recalcular Forecast)
+   - `create_forecast_daily_snapshot_v2` (Gerar Snapshot + cron 23:50)
+   - Logs `forecast_snapshot_job_logs`: `status=failed` em 01/05 e 02/05 (2 dias sem coleta).
+3. **Banner "Forecast V2 ativa, mas precisa de dados iniciais" continua aparecendo** mesmo após inicializar — porque o bootstrap falha em 2 passos (audit + snapshot) e `bootstrap_required` segue `true`. Além disso, o banner não considera "já existe pelo menos 1 run + 1 snapshot bem-sucedidos".
+4. **Acurácia "calculada", mas aba Acurácia vazia** — a RPC `calculate_forecast_accuracy_v2` roda, mas como nunca houve snapshots (job falhando), `useForecastAccuracyMetrics` (legado, baseado em `forecast_predictions`) não tem dados → empty state. A aba precisa também consumir `forecast_accuracy_v2` quando ele existir.
+5. **Toast "Calcular Acurácia" diz sucesso mesmo sem dados** — UX confunde o owner.
 
-## Mudanças (escopo fechado)
+## Mudanças
 
-### 1. Migration (1 arquivo)
+### 1. Banco (migration única)
 
-**`supabase/migrations/<timestamp>_forecast_v2_f29_stabilization.sql`**
+Recriar as duas RPCs trocando `a.legal_name` por `COALESCE(a.nome_fantasia, a.razao_social)` (alias mantido como `company_name`):
 
-- **1.1 Normalizar tipo de `forecast_calculation_items.pipeline_id`** para `uuid` (USING `nullif(pipeline_id,'')::uuid`). Atualiza índices envolvidos. Esta é a correção definitiva do `text = uuid`.
-- **1.2 RPC `activate_forecast_v2_engine(p_organization_id uuid)`** — `SECURITY DEFINER`, `search_path = public`. Valida que o caller é `admin`/`owner`/`manager`/`platform_admin` da org, executa o upsert canônico:
-  ```
-  INSERT INTO feature_flags(organization_id, flag_key, enabled)
-  VALUES (p_organization_id, 'forecast_v2_engine_enabled', true)
-  ON CONFLICT (organization_id, flag_key)
-  DO UPDATE SET enabled = true, updated_at = now();
-  ```
-  Retorna a linha resultante. Loga em `forecast_v2_health_logs`.
-- **1.3 Recriar 4 RPCs com cast seguro de `p_seller_id`** (`uuid` opcional) e qualquer outro `text vs uuid`:
-  - `calculate_forecast_accuracy_v2`
-  - `get_forecast_seller_accuracy_v2`
-  - `get_forecast_actual_closed_amount_v2`
-  - `get_forecast_snapshots_v2`
-  
-  Padrão aplicado: `(p_seller_id IS NULL OR seller_id = p_seller_id)` para colunas uuid; `(p_seller_id IS NULL OR seller_id::text = p_seller_id::text)` quando lado for `text`. Nunca cast cego sem `nullif` em parâmetros opcionais. Assinatura, retorno e regra de negócio preservados — só hardening de tipos.
-- **1.4 Health check (`get_forecast_v2_health_check`)** ganha 5 status diferenciados: `not_ready` (flag off / sem run), `attention` (flag on, run ok, <5 snapshots), `healthy` (tudo pronto), `critical` (erro de RPC/RLS/inconsistência), `forbidden`. Mensagens reaproveitam `data_consistency` existente.
+```sql
+-- calculate_forecast_audit_v2: trocar a.legal_name por COALESCE(a.nome_fantasia, a.razao_social)
+-- create_forecast_daily_snapshot_v2: idem
+-- Manter assinatura, retorno e demais filtros idênticos.
+```
 
-Nada nas fórmulas da Engine V2 ou pesos NRHS é tocado.
+Reprocessar o último job de snapshot manualmente após o deploy:
+- Inserir 1 chamada de `create_forecast_daily_snapshot_v2` para a org do owner para validar fluxo.
 
-### 2. Hooks (`src/hooks/forecast/`)
+### 2. Tabs em uma linha (`src/pages/Forecast.tsx`)
 
-- **`useForecastV2Health.ts`** ganha duas mutations:
-  - `useActivateForecastV2()` → chama RPC `activate_forecast_v2_engine`. Invalida `forecast-v2-health` e `is_feature_enabled`.
-  - `useBootstrapForecastV2()` → executa em sequência, com try/catch independente em cada passo: `calculate_forecast_audit_v2` → `create_forecast_daily_snapshot_v2` → `calculate_forecast_accuracy_v2` → `get_forecast_intelligence_v2` → `get_forecast_risk_center_v2` → `get_forecast_v2_health_check`. Retorna relatório `{step, ok, error?}[]`. Toast final agregado.
-- `useForecastAccuracy.ts`: tratar erro de RPC retornando `{accuracy: null, sellerAccuracy: []}` em vez de throw, para a UI cair no estado "em formação" em vez de Alert vermelho. Erro técnico real continua propagando — só reclassificamos códigos `42883`/`42P01` quando vierem após bootstrap (mensagem amigável).
+- Trocar `md:grid-cols-7` por `md:grid-cols-8` quando `showHealth` for true; manter `md:grid-cols-7` quando for false.
+- Manter `overflow-x-auto` como fallback em viewports muito estreitos.
 
-### 3. UI
+### 3. Banner de bootstrap (`ForecastV2HealthPanel.tsx`)
 
-**`src/components/forecast/health/ForecastV2HealthPanel.tsx`**
-- Banner amarelo (flag desligada) ganha botão **"Ativar Forecast Engine V2"** chamando `useActivateForecastV2`. Bloco `<pre>` com SQL passa a ser collapsible secundário ("Ver SQL manual").
-- Quando flag estiver ligada mas sem run, exibir card de bootstrap com botão **"Inicializar Forecast V2 agora"** (`useBootstrapForecastV2`). Renderiza checklist do resultado por etapa.
-- Visibilidade já restrita a `admin/owner/manager/platform_admin`.
+- O banner "Forecast V2 ativa, mas precisa de dados iniciais" deve sumir quando `engine_active = true` E `latest_run_at IS NOT NULL` E `latest_snapshot_at IS NOT NULL`. Hoje só esconde por `bootstrap_required`, que fica `true` se qualquer passo falhou.
+- Após a correção do `legal_name`, o bootstrap completa todos os 5 passos e o banner desaparece naturalmente.
+- Ajustar `useBootstrapForecastV2` para tratar erro de cada etapa de forma idempotente (continuar com os próximos passos e reportar o resumo).
 
-**`src/components/forecast/ForecastAccuracyPanel.tsx`**
-- Distinguir `error` real de "RPC retornou vazio". Se `snapshots < 5` **e** `error == null`, manter card "Acurácia em formação" (já existe).
-- Se `error` existir, usar mensagem amigável (`FORECAST_RPC_FAILURE_MESSAGE` de `shared/ForecastEmptyState.tsx`) em vez de mostrar `error.message`.
+### 4. Aba Acurácia (`AccuracyDashboard.tsx`)
 
-**`src/components/forecast/ForecastScenariosCard.tsx`**
-- Substituir badges fixos `90% / 60% / 40% / 20%` por labels `Fechado / Engine V2 / Cenário expandido / Teto comercial` quando flag V2 ativa (ler via `useFeatureFlag('forecast_v2_engine_enabled')`).
-- Substituir legenda inferior:
-  - Pessimista: "Somente receita fechada no período"
-  - Realista: "Fechado + deals elegíveis ajustados por probabilidade, NRHS, tempo, atividade, próximo passo, estágio e risco"
-  - Otimista: "Inclui deals com boa chance, mas com pendências operacionais"
-  - Melhor Caso: "Teto comercial do pipeline (não é previsão)"
-- Atualizar `scenarioConfig.optimistic.description/formula` removendo "Weighted × 1.2".
-- Quando flag V2 desligada, manter textos antigos (compatibilidade).
+- `ForecastAccuracyPanel` (V2 oficial) já está renderizado no topo. Mover o empty-state legado para depois dele e mostrar o legado **apenas** se `forecast_accuracy_v2` também não tiver dados.
+- Quando o V2 traz `summary` válido, esconder o bloco "Aguardando histórico de previsões" para não passar a impressão de tela vazia.
 
-**`src/components/forecast/ForecastDataQuality.tsx`** (linhas 359–364)
-- Substituir bloco "Como o NRHS afeta o Forecast" pela tabela oficial F2.3:
-  - NRHS ≥ 80: fator 1.00
-  - NRHS 70–79: fator 0.90
-  - NRHS 60–69: fator 0.75
-  - NRHS 40–59: fator 0.50
-  - NRHS < 40: excluído do forecast
-- Ajustar thresholds visuais (`avgNRHS >= 75` etc.) para refletir o novo corte de 80, sem alterar regra de cálculo (apenas texto/cores).
+### 5. Toast honesto em "Calcular Acurácia"
 
-### 4. Tipos
+- Em `useForecastAccuracy.calculateAccuracy`, se a resposta voltar `null` ou `predictions_with_outcome = 0`, mostrar toast `info` ("Acurácia recalculada — sem deals fechados no período ainda") em vez de `success`.
 
-- `src/types/forecast-health.ts`: adicionar campos `engine_active` e `bootstrap_required` ao `ForecastV2HealthCheck` para o Panel decidir qual CTA mostrar.
+### 6. Cron snapshot 23:50
 
-## O que NÃO está no escopo
-
-- Não alterar fórmula nem pesos da Engine V2.
-- Não criar nova aba, não refazer layout.
-- Não mexer em Risk Center, AI Intelligence ou Seller Performance além de garantir que recebem cast seguro de `p_seller_id` (já cobertos pelo item 1.3 onde aplicável).
-- Não usar service role no frontend; toda ativação passa pela RPC `SECURITY DEFINER` com checagem de role.
-- Saúde V2 permanece restrita; vendedor comum não vê nada novo.
-
-## Critérios de aceite
-
-1. Owner clica em "Ativar Forecast Engine V2" → flag fica `true` (independente de já existir linha).
-2. Owner clica em "Inicializar Forecast V2 agora" → run + snapshot + acurácia + AI + risk center + health rodam em sequência, com relatório por etapa.
-3. Aba Acurácia não mostra mais `operator does not exist: text = uuid`. Com <5 snapshots, mostra "em formação" sem alerta vermelho.
-4. AI, Riscos e Vendedor saem de "em formação" assim que existir run válido para o período.
-5. Cenários sem badges fixos `90/60/40/20%` quando V2 ativa; legenda nova.
-6. Bloco NRHS exibe os 5 fatores oficiais da F2.3.
-7. Health Check distingue `not_ready / attention / healthy / critical / forbidden`.
-8. Build passa, RLS preservado, multi-tenant intacto.
+- Não há mudança de schedule. Após corrigir a RPC, o próximo run às 23:50 BRT vai gravar com sucesso. O painel "Próxima coleta 23:50 (BRT)" continua correto.
 
 ## Arquivos impactados
 
-- **Migration nova**: `supabase/migrations/<ts>_forecast_v2_f29_stabilization.sql`
-- **Editados**: `src/hooks/forecast/useForecastV2Health.ts`, `src/hooks/forecast/useForecastAccuracy.ts`, `src/components/forecast/health/ForecastV2HealthPanel.tsx`, `src/components/forecast/ForecastAccuracyPanel.tsx`, `src/components/forecast/ForecastScenariosCard.tsx`, `src/components/forecast/ForecastDataQuality.tsx`, `src/types/forecast-health.ts`
+- `supabase/migrations/<novo>_forecast_v2_fix_legal_name.sql` (novo)
+- `src/pages/Forecast.tsx`
+- `src/components/forecast/health/ForecastV2HealthPanel.tsx`
+- `src/components/forecast/AccuracyDashboard.tsx`
+- `src/hooks/forecast/useForecastAccuracy.ts` (toast)
+- `src/hooks/forecast/useForecastV2Health.ts` (bootstrap tolerante a erro)
 
 ## Riscos
 
-- Conversão `pipeline_id` text → uuid: se houver linhas com strings inválidas em `forecast_calculation_items`, a migration falha. Mitigação: `DELETE FROM forecast_calculation_items WHERE pipeline_id IS NOT NULL AND nullif(pipeline_id,'') !~* '^[0-9a-f-]{36}$'` antes do `ALTER TYPE` (linhas órfãs de runs antigos podem ser descartadas — serão regeradas no próximo bootstrap).
-- Recriar RPCs preserva assinatura (mesmos parâmetros e retorno) para não quebrar chamadas existentes.
+- Recriar as RPCs com `CREATE OR REPLACE` mantém grants/RLS. Risco baixo.
+- Mudar grid das tabs não afeta lógica. Risco zero.
+- Ajuste de banner é puramente cosmético.
+
+## Resultado esperado
+
+- Tabs em 1 linha para owner.
+- Recalcular Forecast, Gerar Snapshot e Bootstrap funcionam sem erro.
+- Cron 23:50 volta a coletar snapshot diário.
+- Banner "ainda não pronto" desaparece após bootstrap bem-sucedido.
+- Aba Acurácia mostra dados V2 reais; só cai em empty-state se realmente não houver fechado.
+- Toast de acurácia reflete a realidade (sucesso vs. sem dados).
