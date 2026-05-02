@@ -98,25 +98,35 @@ jobs:
       - name: Resolve Codex synthesis output
         id: codex_output
         shell: bash
+        env:
+          CODEX_FINAL_MESSAGE: ${{ steps.codex.outputs['final-message'] || '' }}
+          CODEX_SUMMARY: ${{ steps.codex.outputs.summary || '' }}
+          CODEX_RESULT: ${{ steps.codex.outputs.result || '' }}
+          CODEX_RESPONSE: ${{ steps.codex.outputs.response || '' }}
+          CODEX_OUTPUT: ${{ steps.codex.outputs.output || '' }}
+          CODEX_TEXT: ${{ steps.codex.outputs.text || '' }}
+          CODEX_MESSAGE: ${{ steps.codex.outputs.message || '' }}
         run: |
           set -euo pipefail
           mkdir -p .tmp
 
           codex_raw=""
 
-          # Attempt known/likely output names without failing if unavailable.
-          if [ -n "${{ steps.codex.outputs.summary || '' }}" ]; then
-            codex_raw="${{ steps.codex.outputs.summary }}"
-          elif [ -n "${{ steps.codex.outputs.result || '' }}" ]; then
-            codex_raw="${{ steps.codex.outputs.result }}"
-          elif [ -n "${{ steps.codex.outputs.response || '' }}" ]; then
-            codex_raw="${{ steps.codex.outputs.response }}"
-          elif [ -n "${{ steps.codex.outputs.output || '' }}" ]; then
-            codex_raw="${{ steps.codex.outputs.output }}"
-          elif [ -n "${{ steps.codex.outputs.text || '' }}" ]; then
-            codex_raw="${{ steps.codex.outputs.text }}"
-          elif [ -n "${{ steps.codex.outputs.message || '' }}" ]; then
-            codex_raw="${{ steps.codex.outputs.message }}"
+          # Prefer documented codex-action output, then fall back to likely aliases.
+          if [ -n "${CODEX_FINAL_MESSAGE:-}" ]; then
+            codex_raw="${CODEX_FINAL_MESSAGE}"
+          elif [ -n "${CODEX_SUMMARY:-}" ]; then
+            codex_raw="${CODEX_SUMMARY}"
+          elif [ -n "${CODEX_RESULT:-}" ]; then
+            codex_raw="${CODEX_RESULT}"
+          elif [ -n "${CODEX_RESPONSE:-}" ]; then
+            codex_raw="${CODEX_RESPONSE}"
+          elif [ -n "${CODEX_OUTPUT:-}" ]; then
+            codex_raw="${CODEX_OUTPUT}"
+          elif [ -n "${CODEX_TEXT:-}" ]; then
+            codex_raw="${CODEX_TEXT}"
+          elif [ -n "${CODEX_MESSAGE:-}" ]; then
+            codex_raw="${CODEX_MESSAGE}"
           fi
 
           if [ -n "${codex_raw}" ]; then
