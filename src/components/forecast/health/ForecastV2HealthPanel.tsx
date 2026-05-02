@@ -127,7 +127,7 @@ DO UPDATE SET enabled = true, updated_at = now();`}
       )}
 
       {/* Bootstrap card — F2.9: ativada mas sem run/snapshot */}
-      {health.feature_flag_enabled && (health.bootstrap_required || !health.latest_run_at) && (
+      {health.feature_flag_enabled && !health.latest_run_at && !health.latest_snapshot_at && (
         <Card className="border-primary/40 bg-primary/5">
           <CardContent className="p-4 space-y-3 text-sm">
             <div className="flex items-center gap-2 font-medium text-primary">

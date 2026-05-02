@@ -105,8 +105,21 @@ export function useCalculateAccuracy() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
-      toast.success('Acurácia recalculada');
+    onSuccess: (data: any) => {
+      const summary = data && typeof data === 'object' ? data : null;
+      const withOutcome = Number(summary?.predictions_with_outcome ?? 0);
+      const total = Number(summary?.total_predictions ?? 0);
+      if (!summary || (total === 0 && withOutcome === 0)) {
+        toast.info('Acurácia recalculada', {
+          description: 'Sem deals fechados com previsão registrada no período. Continue registrando previsões para acumular histórico.',
+        });
+      } else if (withOutcome === 0) {
+        toast.info('Acurácia recalculada', {
+          description: `${total} previsão(ões) registrada(s), aguardando deals serem fechados para medir acurácia.`,
+        });
+      } else {
+        toast.success('Acurácia recalculada');
+      }
       qc.invalidateQueries({ queryKey: ['forecast-v2-health'] });
       qc.invalidateQueries({ queryKey: ['forecast-accuracy-v2'] });
     },
