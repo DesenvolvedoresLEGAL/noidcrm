@@ -10,6 +10,25 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+function sanitizeUsageErrorMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error ?? 'unknown_error');
+  return message.slice(0, 500);
+}
+
+async function logAIUsage(
+  supabase: ReturnType<typeof createClient>,
+  payload: Record<string, unknown>,
+) {
+  try {
+    const { error } = await supabase.from('ai_usage_logs').insert(payload);
+    if (error) {
+      console.warn('[ai-manager-coaching] ai_usage_logs insert failed:', error.message);
+    }
+  } catch (err) {
+    console.warn('[ai-manager-coaching] ai_usage_logs insert exception:', sanitizeUsageErrorMessage(err));
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -200,16 +219,40 @@ Retorne JSON:
   "weekly_focus": "Foco sugerido para a semana"
 }`;
 
-    const aiResult = await callOpenAIWithGuardrails({
-      model: 'gpt-5-mini',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-      ],
-      max_completion_tokens: 1200,
-      timeoutMs: 20000,
-      maxRetries: 2,
-    });
+    let aiResult;
+    try {
+      aiResult = await callOpenAIWithGuardrails({
+        model: 'gpt-5-mini',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        max_completion_tokens: 1200,
+        timeoutMs: 20000,
+        maxRetries: 2,
+      });
+    } catch (err) {
+      await logAIUsage(supabase, {
+        organization_id: organizationId,
+        user_id: user.id,
+        feature: 'ai_manager_coaching',
+        action: 'generate_coaching',
+        entity_type: 'team',
+        entity_id: organizationId,
+        model_used: 'gpt-5-mini',
+        success: false,
+        error_message: sanitizeUsageErrorMessage(err),
+        request_metadata: {
+          function_name: 'ai-manager-coaching',
+          max_completion_tokens: 1200,
+          retry_count: 2,
+          attempts: 3,
+          timed_out: false,
+        },
+        response_metadata: { provider: 'openai' },
+      });
+      throw err;
+    }
     const aiData = aiResult.data;
     const aiContent = aiResult.content;
     console.log('[ai-manager-coaching] AI transport metadata:', {
@@ -217,6 +260,31 @@ Retorne JSON:
       retryCount: aiResult.metadata.retryCount,
       timedOut: aiResult.metadata.timedOut,
       usage: aiResult.usage ?? null,
+    });
+    await logAIUsage(supabase, {
+      organization_id: organizationId,
+      user_id: user.id,
+      feature: 'ai_manager_coaching',
+      action: 'generate_coaching',
+      entity_type: 'team',
+      entity_id: organizationId,
+      model_used: aiResult.metadata.model ?? 'gpt-5-mini',
+      tokens_input: aiResult.usage?.prompt_tokens ?? null,
+      tokens_output: aiResult.usage?.completion_tokens ?? null,
+      tokens_total: aiResult.usage?.total_tokens ?? null,
+      success: true,
+      latency_ms: aiResult.metadata.durationMs ?? null,
+      request_metadata: {
+        function_name: 'ai-manager-coaching',
+        max_completion_tokens: 1200,
+        retry_count: aiResult.metadata.retryCount,
+        attempts: (aiResult.metadata.retryCount ?? 0) + 1,
+        timed_out: aiResult.metadata.timedOut ?? false,
+      },
+      response_metadata: {
+        provider: 'openai',
+        finish_reason: aiResult.metadata.finishReason ?? null,
+      },
     });
 
     let insights;

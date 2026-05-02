@@ -17,6 +17,25 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+function sanitizeUsageErrorMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error ?? 'unknown_error');
+  return message.slice(0, 500);
+}
+
+async function logAIUsage(
+  supabase: ReturnType<typeof createClient>,
+  payload: Record<string, unknown>,
+) {
+  try {
+    const { error } = await supabase.from('ai_usage_logs').insert(payload);
+    if (error) {
+      console.warn('[run-agent-simulation] ai_usage_logs insert failed:', error.message);
+    }
+  } catch (err) {
+    console.warn('[run-agent-simulation] ai_usage_logs insert exception:', sanitizeUsageErrorMessage(err));
+  }
+}
+
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -153,6 +172,28 @@ Respond ONLY with a valid JSON object with this structure:
           timedOut: aiResult.metadata.timedOut,
           usage: aiResult.usage ?? null,
         });
+        await logAIUsage(supabase, {
+          organization_id: agent.organization_id,
+          user_id: user.id,
+          feature: 'run_agent_simulation',
+          action: 'deliberation',
+          entity_type: 'ai_agent_version',
+          entity_id: agent_version_id,
+          model_used: aiResult.metadata.model ?? 'gpt-5-mini',
+          tokens_input: aiResult.usage?.prompt_tokens ?? null,
+          tokens_output: aiResult.usage?.completion_tokens ?? null,
+          tokens_total: aiResult.usage?.total_tokens ?? null,
+          success: true,
+          latency_ms: aiResult.metadata.durationMs ?? null,
+          request_metadata: {
+            function_name: 'run-agent-simulation',
+            max_completion_tokens: 700,
+            retry_count: aiResult.metadata.retryCount,
+            attempts: (aiResult.metadata.retryCount ?? 0) + 1,
+            timed_out: aiResult.metadata.timedOut ?? false,
+          },
+          response_metadata: { provider: 'openai', finish_reason: aiResult.metadata.finishReason ?? null },
+        });
 
         try {
           const cleaned = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
@@ -161,6 +202,25 @@ Respond ONLY with a valid JSON object with this structure:
           deliberationResult = { raw_response_length: content.length, raw_response_hash: cryptoHash(content), parse_error: true };
         }
       } catch (aiErr: any) {
+        await logAIUsage(supabase, {
+          organization_id: agent.organization_id,
+          user_id: user.id,
+          feature: 'run_agent_simulation',
+          action: 'deliberation',
+          entity_type: 'ai_agent_version',
+          entity_id: agent_version_id,
+          model_used: 'gpt-5-mini',
+          success: false,
+          error_message: sanitizeUsageErrorMessage(aiErr),
+          request_metadata: {
+            function_name: 'run-agent-simulation',
+            max_completion_tokens: 700,
+            retry_count: 2,
+            attempts: 3,
+            timed_out: false,
+          },
+          response_metadata: { provider: 'openai' },
+        });
         deliberationResult = { error: aiErr.message };
       }
 
@@ -221,12 +281,54 @@ Generate the final output as JSON with structure:
             timedOut: genResult.metadata.timedOut,
             usage: genResult.usage ?? null,
           });
+          await logAIUsage(supabase, {
+            organization_id: agent.organization_id,
+            user_id: user.id,
+            feature: 'run_agent_simulation',
+            action: 'generation',
+            entity_type: 'ai_agent_version',
+            entity_id: agent_version_id,
+            model_used: genResult.metadata.model ?? 'gpt-5-mini',
+            tokens_input: genResult.usage?.prompt_tokens ?? null,
+            tokens_output: genResult.usage?.completion_tokens ?? null,
+            tokens_total: genResult.usage?.total_tokens ?? null,
+            success: true,
+            latency_ms: genResult.metadata.durationMs ?? null,
+            request_metadata: {
+              function_name: 'run-agent-simulation',
+              max_completion_tokens: 900,
+              retry_count: genResult.metadata.retryCount,
+              attempts: (genResult.metadata.retryCount ?? 0) + 1,
+              timed_out: genResult.metadata.timedOut ?? false,
+            },
+            response_metadata: { provider: 'openai', finish_reason: genResult.metadata.finishReason ?? null },
+          });
           try {
             outputPreview = JSON.parse(genContent.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim());
           } catch {
             outputPreview = { raw_content_length: genContent.length, raw_content_hash: cryptoHash(genContent) };
           }
-        } catch {}
+        } catch (genErr) {
+          await logAIUsage(supabase, {
+            organization_id: agent.organization_id,
+            user_id: user.id,
+            feature: 'run_agent_simulation',
+            action: 'generation',
+            entity_type: 'ai_agent_version',
+            entity_id: agent_version_id,
+            model_used: 'gpt-5-mini',
+            success: false,
+            error_message: sanitizeUsageErrorMessage(genErr),
+            request_metadata: {
+              function_name: 'run-agent-simulation',
+              max_completion_tokens: 900,
+              retry_count: 2,
+              attempts: 3,
+              timed_out: false,
+            },
+            response_metadata: { provider: 'openai' },
+          });
+        }
       }
     }
 
