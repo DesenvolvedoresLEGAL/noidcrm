@@ -1,11 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-
-const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY') ?? Deno.env.get('LOVABLE_API_KEY');
-
-const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-const LOVABLE_API_URL = 'https://api.openai.com/v1/chat/completions';
+import { callOpenAIWithGuardrails } from '../_shared/openai-client.ts';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_KEY = Deno.env.get('SUPABASE_PUBLISHABLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -14,6 +10,15 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
+
+function simpleHash(input: string): string {
+  let hash = 2166136261;
+  for (let i = 0; i < input.length; i++) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16);
+}
 
 // Input validation
 function validateInput(data: any): { valid: boolean; error?: string } {
@@ -302,33 +307,28 @@ Regras do JSON:
 
     // Call Lovable AI
     console.log('[ai-evaluate-session] Calling AI for evaluation...');
-    const aiResponse = await fetch(LOVABLE_API_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-5-mini',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
-        response_format: { type: 'json_object' },
-      }),
+    const aiResult = await callOpenAIWithGuardrails({
+      model: 'gpt-5-mini',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      response_format: { type: 'json_object' },
+      max_completion_tokens: 1000,
+      timeoutMs: 20000,
+      maxRetries: 2,
     });
 
-    if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      console.error('[ai-evaluate-session] AI API error:', errorText);
-      throw new Error(`AI evaluation failed: ${errorText}`);
-    }
+    const aiContent = aiResult.content;
 
-    const aiData = await aiResponse.json();
-    const aiContent = aiData.choices[0].message.content;
-
-    console.log('[ai-evaluate-session] AI raw response length:', aiContent.length);
-    console.log('[ai-evaluate-session] AI response preview:', aiContent.substring(0, 300));
+    console.log('[ai-evaluate-session] AI transport metadata:', {
+      model: aiResult.metadata.model,
+      retryCount: aiResult.metadata.retryCount,
+      timedOut: aiResult.metadata.timedOut,
+      usage: aiResult.usage ?? null,
+      responseLength: aiContent.length,
+      responseHash: simpleHash(aiContent),
+    });
 
     // Parse evaluation with robust error handling
     interface EvaluationResult {
@@ -350,7 +350,7 @@ Regras do JSON:
       try {
         // Attempt 1: Direct parse after sanitization
         const sanitized = sanitizeJsonString(aiContent);
-        console.log('[ai-evaluate-session] Sanitized content preview:', sanitized.substring(0, 200));
+        console.log('[ai-evaluate-session] Sanitized content metadata:', { length: sanitized.length, hash: simpleHash(sanitized) });
         evaluation = JSON.parse(sanitized) as EvaluationResult;
         console.log('[ai-evaluate-session] Direct parse successful');
       } catch (parseError) {
