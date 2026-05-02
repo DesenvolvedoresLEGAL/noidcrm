@@ -77,7 +77,7 @@ export function ForecastKPICards({ kpis, isLoading }: ForecastKPICardsProps) {
 
   const cards: KPICardData[] = [
     {
-      title: 'Meta do Mês',
+      title: 'Meta do Período',
       value: formatCurrencyFull(kpis.goal),
       icon: Target,
       variant: 'primary',
