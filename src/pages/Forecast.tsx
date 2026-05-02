@@ -96,7 +96,10 @@ export default function Forecast() {
         {/* Tabs */}
         <Tabs defaultValue="overview" className="w-full">
           <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 scrollbar-hide">
-            <TabsList className="inline-flex w-max md:w-auto md:grid md:grid-cols-7 gap-1 p-1 min-w-max">
+            <TabsList className={cn(
+              'inline-flex w-max md:w-auto md:grid gap-1 p-1 min-w-max',
+              showHealth ? 'md:grid-cols-8' : 'md:grid-cols-7'
+            )}>
               <TabsTrigger value="overview" className="gap-1.5 px-3 py-2 text-xs md:text-sm whitespace-nowrap">
                 <BarChart3 className="h-3.5 w-3.5 md:h-4 md:w-4" />
                 <span>Geral</span>
