@@ -68,8 +68,9 @@ jobs:
         id: codex
         if: ${{ secrets.OPENAI_API_KEY != '' }}
         continue-on-error: true
-        uses: openai/codex-action@v1
+        uses: openai/codex-action@8f0e8f5e9c5b4f2f4f1e0f3a2b6c7d8e9f0a1b2c
         with:
+          sandbox: read-only
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
           prompt: |
             You are NOID Code Health Agent.
