@@ -81,7 +81,8 @@ jobs:
         id: codex
         if: ${{ steps.codex_secret.outputs.available == 'true' }}
         continue-on-error: true
-        uses: openai/codex-action@8f0e8f5e9c5b4f2f4f1e0f3a2b6c7d8e9f0a1b2c
+        # TODO: Replace @v1 with a verified immutable commit SHA from the official openai/codex-action repository.
+        uses: openai/codex-action@v1
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         with:
