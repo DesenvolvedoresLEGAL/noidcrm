@@ -200,16 +200,15 @@ export function useForecastData(filters: ForecastFilters) {
     },
   });
 
-  // Fetch individual seller OTE goal when userId filter is active
+  // Fetch individual seller OTE goal when userId filter is active (scaled by period)
   const individualSellerGoalQuery = useQuery({
-    queryKey: salesGoalKeys.sellerIndividualGoal(userId),
+    queryKey: [...salesGoalKeys.sellerIndividualGoal(userId), periodType],
     queryFn: async () => {
       if (!userId) return null;
 
       const { data: orgData } = await supabase.rpc('get_user_organization_id');
       if (!orgData) return null;
 
-      // Buscar meta do vendedor específico
       const { data } = await supabase
         .from('ote_seller_config')
         .select(`
@@ -223,9 +222,9 @@ export function useForecastData(filters: ForecastFilters) {
         .maybeSingle();
 
       if (!data) return null;
-      
-      // Prioridade: custom_goal_override > ote_levels.monthly_goal
-      return (data as any).custom_goal_override || (data as any).ote_levels?.monthly_goal || 0;
+
+      const monthly = Number((data as any).custom_goal_override || (data as any).ote_levels?.monthly_goal || 0);
+      return monthly * periodMonthsMultiplier;
     },
     enabled: !!userId,
   });
