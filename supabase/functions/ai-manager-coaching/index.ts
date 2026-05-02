@@ -1,11 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-
-const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY') ?? Deno.env.get('LOVABLE_API_KEY');
-
-const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-const LOVABLE_API_URL = 'https://api.openai.com/v1/chat/completions';
+import { callOpenAIWithGuardrails } from '../_shared/openai-client.ts';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
@@ -204,29 +200,24 @@ Retorne JSON:
   "weekly_focus": "Foco sugerido para a semana"
 }`;
 
-    const aiResponse = await fetch(LOVABLE_API_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-5-mini',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-      }),
+    const aiResult = await callOpenAIWithGuardrails({
+      model: 'gpt-5-mini',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      max_completion_tokens: 1200,
+      timeoutMs: 20000,
+      maxRetries: 2,
     });
-
-    if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      console.error('[ai-manager-coaching] AI error:', errorText);
-      throw new Error('AI coaching generation failed');
-    }
-
-    const aiData = await aiResponse.json();
-    const aiContent = aiData.choices[0].message.content;
+    const aiData = aiResult.data;
+    const aiContent = aiResult.content;
+    console.log('[ai-manager-coaching] AI transport metadata:', {
+      model: aiResult.metadata.model,
+      retryCount: aiResult.metadata.retryCount,
+      timedOut: aiResult.metadata.timedOut,
+      usage: aiResult.usage ?? null,
+    });
 
     let insights;
     try {

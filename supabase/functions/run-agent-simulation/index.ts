@@ -1,14 +1,22 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.76.1';
 
+import { callOpenAIWithGuardrails } from '../_shared/openai-client.ts';
 
-const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY') ?? Deno.env.get('LOVABLE_API_KEY');
+
+function cryptoHash(input: string): string {
+  let hash = 2166136261;
+  for (let i = 0; i < input.length; i++) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16);
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const AI_GATEWAY = 'https://api.openai.com/v1/chat/completions';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -130,26 +138,27 @@ Respond ONLY with a valid JSON object with this structure:
       ];
 
       try {
-        const aiResp = await fetch(AI_GATEWAY, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ model: 'gpt-5-mini', messages: deliberationMessages }),
+        const aiResult = await callOpenAIWithGuardrails({
+          model: 'gpt-5-mini',
+          messages: deliberationMessages as any,
+          max_completion_tokens: 700,
+          timeoutMs: 20000,
+          maxRetries: 2,
+        });
+        const content = aiResult.content || '';
+        totalTokens = (aiResult.usage?.total_tokens) || 0;
+        console.log('[run-agent-simulation] Deliberation AI transport metadata:', {
+          model: aiResult.metadata.model,
+          retryCount: aiResult.metadata.retryCount,
+          timedOut: aiResult.metadata.timedOut,
+          usage: aiResult.usage ?? null,
         });
 
-        if (aiResp.ok) {
-          const aiData = await aiResp.json();
-          const content = aiData.choices?.[0]?.message?.content || '';
-          totalTokens = (aiData.usage?.total_tokens) || 0;
-
-          try {
-            const cleaned = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-            deliberationResult = JSON.parse(cleaned);
-          } catch {
-            deliberationResult = { raw_response: content, parse_error: true };
-          }
-        } else {
-          const errText = await aiResp.text();
-          deliberationResult = { error: `AI gateway error: ${aiResp.status}`, details: errText };
+        try {
+          const cleaned = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+          deliberationResult = JSON.parse(cleaned);
+        } catch {
+          deliberationResult = { raw_response_length: content.length, raw_response_hash: cryptoHash(content), parse_error: true };
         }
       } catch (aiErr: any) {
         deliberationResult = { error: aiErr.message };
@@ -176,18 +185,15 @@ Respond ONLY with a valid JSON object with this structure:
       }
 
       // 5. Output preview via generation prompt
-      if (prompts.generation_prompt && LOVABLE_API_KEY) {
+      if (prompts.generation_prompt) {
         try {
-          const genResp = await fetch(AI_GATEWAY, {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              model: 'gpt-5-mini',
-              messages: [
-                { role: 'system', content: prompts.generation_prompt },
-                {
-                  role: 'user',
-                  content: `Based on this deliberation, generate the output preview.
+          const genResult = await callOpenAIWithGuardrails({
+            model: 'gpt-5-mini',
+            messages: [
+              { role: 'system', content: prompts.generation_prompt },
+              {
+                role: 'user',
+                content: `Based on this deliberation, generate the output preview.
 
 DELIBERATION: ${JSON.stringify(deliberationResult)}
 CONTEXT: ${JSON.stringify(scenarioInput)}
@@ -201,20 +207,24 @@ Generate the final output as JSON with structure:
   "next_step": "recommended next step",
   "metadata": {}
 }`
-                },
-              ],
-            }),
+              },
+            ] as any,
+            max_completion_tokens: 900,
+            timeoutMs: 20000,
+            maxRetries: 2,
           });
-
-          if (genResp.ok) {
-            const genData = await genResp.json();
-            const genContent = genData.choices?.[0]?.message?.content || '';
-            totalTokens += (genData.usage?.total_tokens) || 0;
-            try {
-              outputPreview = JSON.parse(genContent.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim());
-            } catch {
-              outputPreview = { raw_content: genContent };
-            }
+          const genContent = genResult.content || '';
+          totalTokens += (genResult.usage?.total_tokens) || 0;
+          console.log('[run-agent-simulation] Generation AI transport metadata:', {
+            model: genResult.metadata.model,
+            retryCount: genResult.metadata.retryCount,
+            timedOut: genResult.metadata.timedOut,
+            usage: genResult.usage ?? null,
+          });
+          try {
+            outputPreview = JSON.parse(genContent.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim());
+          } catch {
+            outputPreview = { raw_content_length: genContent.length, raw_content_hash: cryptoHash(genContent) };
           }
         } catch {}
       }
