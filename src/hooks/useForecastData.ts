@@ -124,8 +124,16 @@ export interface ForecastScenario {
 }
 
 export function useForecastData(filters: ForecastFilters) {
-  const { periodStart, periodEnd, pipelineId, userId } = filters;
+  const { periodStart, periodEnd, pipelineId, userId, periodType } = filters;
   const queryClient = useQueryClient();
+
+  // F2.9.2: months in the selected period (used to scale monthly goals)
+  const periodMonthsMultiplier = periodType === 'yearly' ? 12 : periodType === 'quarterly' ? 3 : 1;
+  // F2.9.2: column from sales_config that matches the selected period
+  const orgGoalColumn: 'monthly_revenue_target' | 'quarterly_goal' | 'yearly_goal' =
+    periodType === 'yearly' ? 'yearly_goal'
+      : periodType === 'quarterly' ? 'quarterly_goal'
+      : 'monthly_revenue_target';
 
   // Fetch sales goals from sales_goals table
   const goalsQuery = useQuery({
@@ -146,43 +154,49 @@ export function useForecastData(filters: ForecastFilters) {
     },
   });
 
-  // Fetch organization's global goal from sales_config
+  // F2.9.2: Fetch org-wide goal from sales_config selecting the right column per period
   const orgGoalQuery = useQuery({
-    queryKey: salesGoalKeys.orgGoal(),
+    queryKey: salesGoalKeys.orgGoal(periodType),
     queryFn: async () => {
       const { data: orgData } = await supabase.rpc('get_user_organization_id');
       if (!orgData) return 0;
 
+      // Read all goal columns; pick the right one based on period, with monthly fallback scaled
       const { data } = await supabase
         .from('sales_config')
-        .select('monthly_revenue_target')
+        .select('monthly_revenue_target, quarterly_goal, semester_goal, yearly_goal')
         .eq('organization_id', orgData)
         .maybeSingle();
 
-      return data?.monthly_revenue_target || 0;
+      if (!data) return 0;
+      const periodValue = (data as any)[orgGoalColumn] as number | null | undefined;
+      if (periodValue && periodValue > 0) return Number(periodValue);
+      // Fallback: scale monthly_revenue_target if quarterly/yearly is empty
+      const monthly = Number(data.monthly_revenue_target ?? 0);
+      return monthly > 0 ? monthly * periodMonthsMultiplier : 0;
     },
   });
 
-  // Fetch seller goals from OTE config (sum of active sellers' monthly goals)
+  // Fetch seller goals from OTE (sum of active sellers' monthly goals × period months)
   const sellerGoalsQuery = useQuery({
-    queryKey: salesGoalKeys.sellerOteGoals(),
+    queryKey: salesGoalKeys.sellerOteGoals(periodType),
     queryFn: async () => {
       const { data: orgData } = await supabase.rpc('get_user_organization_id');
       if (!orgData) return 0;
 
-      // Buscar metas dos vendedores ativos (não gerentes, apenas metas em R$)
       const { data } = await supabase
         .from('ote_seller_config')
         .select(`
           user_id,
+          custom_goal_override,
           ote_levels!inner(monthly_goal, is_team_target, goal_type)
         `)
         .eq('organization_id', orgData)
         .is('end_date', null);
 
-      // Somar apenas vendedores com meta em R$ (is_team_target = false e goal_type = 'revenue')
-      return data?.filter((s: any) => !s.ote_levels?.is_team_target && s.ote_levels?.goal_type !== 'leads')
-        .reduce((sum: number, s: any) => sum + (s.ote_levels?.monthly_goal || 0), 0) || 0;
+      const monthlySum = data?.filter((s: any) => !s.ote_levels?.is_team_target && s.ote_levels?.goal_type !== 'leads')
+        .reduce((sum: number, s: any) => sum + Number(s.custom_goal_override || s.ote_levels?.monthly_goal || 0), 0) || 0;
+      return monthlySum * periodMonthsMultiplier;
     },
   });
 

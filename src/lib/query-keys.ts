@@ -154,8 +154,8 @@ export const salesGoalKeys = {
   list: (start: string, end: string, pipelineId?: string | null) =>
     ['sales-goals', start, end, pipelineId] as const,
   listAll: () => ['sales-goals'] as const,
-  orgGoal: () => ['org-goal'] as const,
-  sellerOteGoals: () => ['seller-ote-goals'] as const,
+  orgGoal: (periodType?: string) => ['org-goal', periodType ?? 'monthly'] as const,
+  sellerOteGoals: (periodType?: string) => ['seller-ote-goals', periodType ?? 'monthly'] as const,
   sellerIndividualGoal: (userId: Id) =>
     ['seller-individual-goal', userId] as const,
 };
