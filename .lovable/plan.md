@@ -1,77 +1,85 @@
-# Sprint F2.9.1 — Forecast V2: hotfix de operação 100%
 
-Foco: deixar o Forecast V2 totalmente funcional para o owner. Sem nova inteligência, sem refazer layout, apenas corrigir os bloqueios reais identificados nos prints + nos logs de banco.
+# Sprint F2.9.2 — Forecast V2: Metas Globais, Período Dinâmico e Estabilização Final
 
-## Problemas confirmados
+## Diagnóstico (causa raiz, confirmada no banco)
 
-1. **Tabs em duas linhas** — `TabsList` está com `md:grid-cols-7`, mas para owner/admin existem **8 abas** (Geral, Qualidade, Acurácia, Vendedor, Deals, AI, Riscos, Saúde V2). A 8ª quebra para a linha de baixo.
-2. **`column a.legal_name does not exist`** — confirmado via `\d accounts`: a coluna correta é `razao_social` (não existe `legal_name`). Isso quebra:
-   - `calculate_forecast_audit_v2` (Recalcular Forecast)
-   - `create_forecast_daily_snapshot_v2` (Gerar Snapshot + cron 23:50)
-   - Logs `forecast_snapshot_job_logs`: `status=failed` em 01/05 e 02/05 (2 dias sem coleta).
-3. **Banner "Forecast V2 ativa, mas precisa de dados iniciais" continua aparecendo** mesmo após inicializar — porque o bootstrap falha em 2 passos (audit + snapshot) e `bootstrap_required` segue `true`. Além disso, o banner não considera "já existe pelo menos 1 run + 1 snapshot bem-sucedidos".
-4. **Acurácia "calculada", mas aba Acurácia vazia** — a RPC `calculate_forecast_accuracy_v2` roda, mas como nunca houve snapshots (job falhando), `useForecastAccuracyMetrics` (legado, baseado em `forecast_predictions`) não tem dados → empty state. A aba precisa também consumir `forecast_accuracy_v2` quando ele existir.
-5. **Toast "Calcular Acurácia" diz sucesso mesmo sem dados** — UX confunde o owner.
+1. **`get_seller_monthly_goal_v2` quebrada**: o fallback referencia `ol.target_revenue`, coluna que **não existe** em `ote_levels` (a correta é `monthly_goal`). Isso quebra:
+   - Aba **Vendedor V2** → erro `column ol.target_revenue does not exist`
+   - Aba **AI** → como `get_forecast_intelligence_v2` chama essa função dentro de um `BEGIN/EXCEPTION`, ela retorna NULL e mostra "Sem meta configurada" mesmo com metas em `sales_config`.
+
+2. **`get_seller_monthly_goal_v2` ignora metas globais da organização**: quando `p_seller_id` é NULL (filtro "Todos os vendedores"), retorna NULL na linha 12-14. Não consulta `sales_config.monthly_revenue_target` / `quarterly_goal` / `yearly_goal`. Resultado: AI Hub e fallbacks ficam "no_goal_configured" mesmo com metas configuradas em `/app/settings/sales`.
+
+3. **Frontend `useForecastData` não muda meta por período**: `orgGoalQuery` sempre lê `monthly_revenue_target`. Quando o usuário troca o filtro para Trimestral/Anual, os KPIs continuam mostrando R$ 150.000,00 (a meta mensal). Deveria ler `quarterly_goal` no trimestral e `yearly_goal` no anual.
+
+4. **Loop "Inicializar Forecast V2"**: o painel exige `latest_run_at && latest_snapshot_at` para o **período exato** (`period_start = X AND period_end = Y`). Quando o usuário navega para outra página e volta, ou troca de período, não existe run para esse `period_start/end` específico → o card de bootstrap reaparece. Faltam runs por período além do mensal corrente, e o critério precisa ser mais tolerante (a engine ativa + qualquer run recente já basta para não mostrar bootstrap).
+
+5. **Risk Center "Não foi possível carregar"**: o RPC retorna `v_empty` quando não existe run. O hook trata o objeto vazio mas o UI legado abaixo mostra erro. Após corrigir item 4 (gerar runs por período), some.
 
 ## Mudanças
 
-### 1. Banco (migration única)
+### A. Database migration (RPCs)
 
-Recriar as duas RPCs trocando `a.legal_name` por `COALESCE(a.nome_fantasia, a.razao_social)` (alias mantido como `company_name`):
+**A1. Corrigir `get_seller_monthly_goal_v2`** (mantém ordem: vendedor específico → org global):
+- Remover referência inexistente `ol.target_revenue`; trocar fallback OTE para `ol.monthly_goal`.
+- Quando `p_seller_id IS NULL`, **buscar meta global da org** em `sales_config`, escolhendo a coluna por janela do período:
+  - duração ≤ 31 dias → `monthly_revenue_target`
+  - 32–95 dias → `quarterly_goal`
+  - 96–200 dias → `semester_goal`
+  - > 200 dias → `yearly_goal`
+- Adicionar fallback final: somar metas mensais ativas dos vendedores (`ote_seller_config.custom_goal_override` ou `ote_levels.monthly_goal`) e multiplicar pelo nº de meses do período quando for trimestral/anual.
 
-```sql
--- calculate_forecast_audit_v2: trocar a.legal_name por COALESCE(a.nome_fantasia, a.razao_social)
--- create_forecast_daily_snapshot_v2: idem
--- Manter assinatura, retorno e demais filtros idênticos.
+**A2. Tornar `calculate_forecast_audit_v2` resiliente**: já não usa `target_revenue`, mas verificar; nenhum efeito colateral.
+
+**A3. `get_forecast_v2_health_check`**: relaxar condição de `bootstrap_required`. Hoje exige run/snapshot para o período exato; passar a considerar:
+- `bootstrap_required = (engine_active AND total_runs_org = 0)` (qualquer run recente da org no último 30 dias).
+- Adicionar campo `latest_run_in_period` (run para o `period_start/end` atual) sem ditar bootstrap.
+
+### B. Frontend `src/hooks/useForecastData.ts`
+
+- Substituir `orgGoalQuery` para selecionar a coluna correta de `sales_config` baseada em `filters.periodType`:
+  ```ts
+  const col = periodType === 'yearly' ? 'yearly_goal'
+            : periodType === 'quarterly' ? 'quarterly_goal'
+            : 'monthly_revenue_target';
+  ```
+- Incluir `periodType` na `queryKey` (`salesGoalKeys.orgGoal(periodType)`).
+- Ajustar `sellerGoalsQuery` para multiplicar a soma por 3 (trim) ou 12 (anual) quando aplicável, usado apenas como fallback.
+
+### C. Frontend `src/components/forecast/health/ForecastV2HealthPanel.tsx`
+
+- Trocar a condição do banner de bootstrap por `health.bootstrap_required === true` (vem do RPC), em vez de checar `!latest_run_at && !latest_snapshot_at` no cliente.
+- Persistir o último resultado bem sucedido por organização em `sessionStorage` (chave `forecast_v2_bootstrapped:{orgId}`), para que o banner não pisque em remontagens enquanto o `useQuery` está revalidando.
+
+### D. Frontend (filtros mostram a meta correta)
+
+- `ForecastKPICards` já lê `kpis.goal`; após (B), o valor passa a refletir trim/anual.
+- `ForecastScenariosCard`: percentuais usam `goal` recebido por prop — automaticamente correto.
+
+### E. Forecast Risk Center fallback
+
+- `useForecastRiskCenter`: tratar `riskCenter?.summary?.total_risk_deals === 0 && !runId` como "sem dados ainda" (estado vazio amigável), não como erro. Remove o card vermelho "Não foi possível carregar" quando o RPC respondeu com `v_empty` válido.
+
+## Arquivos afetados
+
+```text
+supabase/migrations/<novo>.sql
+  - CREATE OR REPLACE get_seller_monthly_goal_v2
+  - CREATE OR REPLACE get_forecast_v2_health_check
+src/hooks/useForecastData.ts
+src/components/forecast/health/ForecastV2HealthPanel.tsx
+src/components/forecast/risk-center/ForecastRiskCenterPanel.tsx
+src/types/forecast-health.ts (novos campos opcionais)
+src/lib/query-keys.ts (queryKey de orgGoal aceitando periodType)
 ```
 
-Reprocessar o último job de snapshot manualmente após o deploy:
-- Inserir 1 chamada de `create_forecast_daily_snapshot_v2` para a org do owner para validar fluxo.
-
-### 2. Tabs em uma linha (`src/pages/Forecast.tsx`)
-
-- Trocar `md:grid-cols-7` por `md:grid-cols-8` quando `showHealth` for true; manter `md:grid-cols-7` quando for false.
-- Manter `overflow-x-auto` como fallback em viewports muito estreitos.
-
-### 3. Banner de bootstrap (`ForecastV2HealthPanel.tsx`)
-
-- O banner "Forecast V2 ativa, mas precisa de dados iniciais" deve sumir quando `engine_active = true` E `latest_run_at IS NOT NULL` E `latest_snapshot_at IS NOT NULL`. Hoje só esconde por `bootstrap_required`, que fica `true` se qualquer passo falhou.
-- Após a correção do `legal_name`, o bootstrap completa todos os 5 passos e o banner desaparece naturalmente.
-- Ajustar `useBootstrapForecastV2` para tratar erro de cada etapa de forma idempotente (continuar com os próximos passos e reportar o resumo).
-
-### 4. Aba Acurácia (`AccuracyDashboard.tsx`)
-
-- `ForecastAccuracyPanel` (V2 oficial) já está renderizado no topo. Mover o empty-state legado para depois dele e mostrar o legado **apenas** se `forecast_accuracy_v2` também não tiver dados.
-- Quando o V2 traz `summary` válido, esconder o bloco "Aguardando histórico de previsões" para não passar a impressão de tela vazia.
-
-### 5. Toast honesto em "Calcular Acurácia"
-
-- Em `useForecastAccuracy.calculateAccuracy`, se a resposta voltar `null` ou `predictions_with_outcome = 0`, mostrar toast `info` ("Acurácia recalculada — sem deals fechados no período ainda") em vez de `success`.
-
-### 6. Cron snapshot 23:50
-
-- Não há mudança de schedule. Após corrigir a RPC, o próximo run às 23:50 BRT vai gravar com sucesso. O painel "Próxima coleta 23:50 (BRT)" continua correto.
-
-## Arquivos impactados
-
-- `supabase/migrations/<novo>_forecast_v2_fix_legal_name.sql` (novo)
-- `src/pages/Forecast.tsx`
-- `src/components/forecast/health/ForecastV2HealthPanel.tsx`
-- `src/components/forecast/AccuracyDashboard.tsx`
-- `src/hooks/forecast/useForecastAccuracy.ts` (toast)
-- `src/hooks/forecast/useForecastV2Health.ts` (bootstrap tolerante a erro)
-
-## Riscos
-
-- Recriar as RPCs com `CREATE OR REPLACE` mantém grants/RLS. Risco baixo.
-- Mudar grid das tabs não afeta lógica. Risco zero.
-- Ajuste de banner é puramente cosmético.
+## O que NÃO será alterado
+- Lógica de cenários/Engine V2 e fórmula NRHS — preservada.
+- RLS, segurança e enums (sem novos roles).
+- AI / Risk Center / Acurácia — apenas correções de fallback/leitura.
 
 ## Resultado esperado
-
-- Tabs em 1 linha para owner.
-- Recalcular Forecast, Gerar Snapshot e Bootstrap funcionam sem erro.
-- Cron 23:50 volta a coletar snapshot diário.
-- Banner "ainda não pronto" desaparece após bootstrap bem-sucedido.
-- Aba Acurácia mostra dados V2 reais; só cai em empty-state se realmente não houver fechado.
-- Toast de acurácia reflete a realidade (sucesso vs. sem dados).
+- **AI tab**: mostra meta global (mensal/trim/anual) e sai do estado "Sem meta configurada".
+- **Aba Geral/KPIs**: "Meta do Mês" passa a "Meta do Período" e troca o valor ao trocar Mensal/Trim/Anual conforme `sales_config`.
+- **Aba Vendedor V2**: deixa de mostrar `column ol.target_revenue does not exist`.
+- **Aba Saúde V2**: o card "Inicializar Forecast V2 agora" só aparece quando realmente não há nenhum run; ao voltar de outra página, mantém estado.
+- **Aba Riscos**: estado vazio amigável quando ainda não há run para o período, sem o banner vermelho de erro.
