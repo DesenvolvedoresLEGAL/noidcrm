@@ -8,7 +8,6 @@ import { Badge } from '@/components/ui/badge';
 import { InfoCard } from '@/components/opportunity/InfoCard';
 import { useNRHS } from '@/hooks/useNRHS';
 import { getNRHSTierConfig } from '@/services/crm/nrhs-calculator';
-import { NRHS_ISSUES } from '@/services/crm/nrhs-issues';
 import { NRHSBreakdown } from './NRHSBreakdown';
 import { FixHygieneWizardModal } from './FixHygieneWizardModal';
 import { Skeleton } from '@/components/ui/skeleton';
