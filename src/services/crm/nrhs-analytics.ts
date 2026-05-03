@@ -54,8 +54,17 @@ export interface NRHSDeal {
   opportunityScore: number | null;
   nrhsScore: number | null;
   nrhsTier: NRHSTier | null;
+  nrhsStatus: string | null;
   nrhsIssuesCount: number;
-  nrhsBlockers: string[];
+  nrhsBlockers: any[];
+  pillars: {
+    integrity: number | null;
+    cadence: number | null;
+    stakeholders: number | null;
+    winloss: number | null;
+    adherence: number | null;
+    evidence: number | null;
+  };
   lastReviewedAt: string | null;
   createdAt: string;
 }
