@@ -26,19 +26,6 @@ export function RevenueHygieneDashboard() {
   const queryClient = useQueryClient();
   const [isRecalcing, setIsRecalcing] = useState(false);
 
-  // AUTH.1.3: aguarda contexto de organização antes de montar o dashboard.
-  // Evita disparar queries privadas com organizationId indefinido.
-  if (orgLoading || !organization?.id) {
-    return (
-      <div className="min-h-[400px] flex items-center justify-center">
-        <div className="text-center space-y-3">
-          <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-muted-foreground text-sm">Aguardando contexto da organização...</p>
-        </div>
-      </div>
-    );
-  }
-
   const {
     deals,
     kpis,
