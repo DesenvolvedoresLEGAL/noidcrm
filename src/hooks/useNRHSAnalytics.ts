@@ -96,6 +96,12 @@ export function useNRHSAnalytics(): NRHSAnalyticsData {
     if (filters.stageId) {
       result = result.filter(d => d.stageId === filters.stageId);
     }
+    if (filters.pipelineId) {
+      result = result.filter(d => d.pipelineId === filters.pipelineId);
+    }
+    if (!filters.showInactive) {
+      result = result.filter(d => !d.isInactiveOwner);
+    }
     if (filters.hasBlocker !== undefined) {
       if (filters.hasBlocker) {
         result = result.filter(d => d.nrhsBlockers.length > 0);
