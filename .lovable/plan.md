@@ -1,98 +1,83 @@
-# Sprint AUTH.1.3 — Boot privado, `usePrivateQueryEnabled` e isolamento NRHS
+# Sprint AUTH.1.4 — Observabilidade, testes forenses e zero hard refresh
 
-## Auditoria
+Sprint pequena, focada em **observabilidade segura** e **validação**. Nada em NRHS, Forecast ou Dashboards privados (já blindados nas sprints anteriores).
 
-**Tree atual:**
-```
-ErrorBoundary
-└── QueryClientProvider
-    └── ThemeProvider / TooltipProvider / UpdateBanner / Toasters
-        └── BrowserRouter
-            ├── Public routes ( /login /signup /forgot-password /p/:token /f/:token /docs ... )
-            └── Protected routes
-                └── ProtectedRoute (useCurrentUser + useOnboardingStatus)
-                    └── TrialGuard
-                        └── GlobalRealtimeListeners (useRealtimeContacts)
-                        └── LazyRoute → page
-```
+## Auditoria prévia de `window.location.*`
 
-**Achados:**
-- `RevenueHygieneDashboard` e os hooks NRHS (`useNRHSAnalytics`, `useNRHSAnalyticsRealtime`, `useNRHSKPIs`) **só montam dentro de `/app/scoring`** (route protegida). Não há mount global. ✅
-- O erro `PGRST200` que aparece "na tela de /Entrar" tem 2 causas reais possíveis:
-  1. **Cache do React Query** persistido entre logins: query antiga `['nrhs-analytics', orgId, ...]` continua viva e refetch dispara mesmo que o componente esteja desmontado, se outro hook reaproveitar a chave. (Mitigado: já temos `queryClient.clear()` no logout.)
-  2. **Service worker com chunk antigo**: NRHS chunk pré-fetched ainda referencia `pipeline_stages` (a v1.4 já foi corrigida para `stage:stages(name)`). Solução: garantir hard guard de `enabled` em todo hook privado, evitando execução com `organization?.id` indefinido / sem sessão.
-- `useCurrentOrganization` não aceita `enabled`. Hoje ele usa `useSupabaseAuth().user` e bloqueia se `!user`, OK — mas múltiplos consumers o invocam (cada um cria seu próprio state). Padronizar via `enabled` evita rodar fetch de org com user em estado intermediário.
-- Hooks privados que usam `enabled: !!organization?.id` são vulneráveis ao caso "sessão expirou mas `organization` já estava no cache" → continuariam disparando query 401/PGRST200. Faltam guards de `hasSession`.
+Resultado da varredura:
 
-## Mudanças
+| Arquivo | Linha | Uso | Classificação |
+|---|---|---|---|
+| `src/lib/auditContext.ts` | 18 | leitura `href` para audit log | SAFE_NON_AUTH_USAGE |
+| `src/lib/pwaUtils.ts` | 55-101 | `forceUpdate()` chama `replace`/`reload` | MANUAL_USER_ACTION (botão "Atualizar agora") — manter, mas confirmar que nenhum caller dispara sem clique |
+| `src/services/crm/sync.ts` | 112,186 | OAuth Google redirect | EXTERNAL_OAUTH_REDIRECT |
+| `src/components/ErrorFallback.tsx` | 96 | botão "Voltar para dashboard" | MANUAL_USER_ACTION |
+| `src/components/ErrorBoundary.tsx` | 69 | botão `handleReload` (clique) | MANUAL_USER_ACTION |
+| `src/hooks/useSupabaseAuth.ts` | 34 | leitura para auditoria | SAFE_NON_AUTH_USAGE |
+| `src/components/ote/GoalSystemModeSelector.tsx` | 37 | reload após salvar config | **DANGEROUS_AUTO_RELOAD** (não-auth, mas ruim de UX — substituir por invalidate de query) |
+| `src/hooks/useAppVersion.ts` | 80 | `applyUpdate()` chamado por botão | MANUAL_USER_ACTION |
+| `src/pages/settings/Account.tsx` | 588 | reload após mudar idioma/tema | aceitável (clique), manter |
+| `src/components/accounts/AccountContactsTab.tsx` | 59,63 | `mailto:` / `tel:` | SAFE_NON_AUTH_USAGE |
 
-### 1. `src/hooks/usePrivateQueryEnabled.ts` (novo)
-Helper único, alinhado a `useCurrentUser` (fonte da verdade da sessão = `hasSession`).
-```ts
-export function usePrivateQueryEnabled(extra: boolean = true) {
-  const { hasSession, sessionChecked, user, organization } = useCurrentUser();
-  const enabled =
-    sessionChecked && hasSession && !!user?.id && !!organization?.id && extra;
-  return {
-    enabled,
-    organizationId: organization?.id ?? null,
-    userId: user?.id ?? null,
-    organization,
-    hasSession,
-    sessionChecked,
-  };
-}
-```
-Não cria queries novas — só lê state já em cache via `useCurrentUser` (já é singleton via React Query).
+**Conclusão:** nenhum reload automático no fluxo crítico de auth. Único `DANGEROUS_AUTO_RELOAD` real é `GoalSystemModeSelector` (não-auth) — trocaremos por `queryClient.invalidateQueries`.
 
-### 2. `src/hooks/useCurrentOrganization.ts`
-- Manter assinatura atual (24+ consumers).
-- Adicionar early-return adicional: se `useSupabaseAuth().loading === true`, manter `loading=true` e não disparar fetch. (Hoje só checa `!user`, que pode dar falso negativo durante boot.)
+## O que vamos fazer
 
-### 3. `src/hooks/useNRHSAnalytics.ts` (`useNRHSAnalytics` + `useNRHSKPIs`)
-- Trocar `enabled: !!organization?.id` por `enabled` derivado de `usePrivateQueryEnabled()`.
-- Incluir `organizationId` na queryKey (já está) e adicionar guard `if (!organizationId) return [];` redundante no queryFn.
-- Substituir o sub-query `sessionKeys.currentUser()` (que chama `supabase.auth.getUser()`) por uso de `userId` retornado por `usePrivateQueryEnabled` — elimina query duplicada e race.
+### Parte 1 — `AuthDebugPanel` (DEV-only)
+Criar `src/components/system/AuthDebugPanel.tsx`:
+- `if (!import.meta.env.DEV) return null`
+- Lê `useCurrentUser()` (já compartilhado, sem query nova)
+- Mostra: `authLoading`, `sessionChecked`, `hasSession`, `hasUser`, `userId.slice(0,8)`, `organizationId.slice(0,8)`, `organizationLoading`, `pathname`, `lastAuthEvent`, `lastAuthEventAt`
+- **NÃO** expõe token, email completo, sessão
+- Posição: `fixed bottom-3 right-3 z-[9999]`
+- Montar em `App.tsx` dentro do `<BrowserRouter>` (fora de `ProtectedRoute` para ver auth na pública também)
 
-### 4. `src/hooks/scoring/useNRHSAnalyticsRealtime.ts`
-- Atual: `if (!organizationId) return;`. OK, mas adicionar guard `hasSession`:
-```ts
-const { hasSession, sessionChecked } = useCurrentUser();
-useEffect(() => {
-  if (!sessionChecked || !hasSession || !organizationId) return;
-  ...
-}, [organizationId, hasSession, sessionChecked, queryClient]);
-```
-Evita assinar canal Postgres sem auth (Realtime exige JWT válido — falha vira ruído/log).
+### Parte 2 — `lastAuthEvent` no `useSupabaseAuth`
+Editar `src/hooks/useSupabaseAuth.ts`:
+- Adicionar estados `lastAuthEvent: string | null` e `lastAuthEventAt: string | null`
+- No `onAuthStateChange`, após `setSession`: `setLastAuthEvent(event); setLastAuthEventAt(new Date().toISOString())`
+- Em DEV: `console.info('[AUTH_EVENT]', { event, hasSession: !!session, userId: session?.user?.id?.slice(0,8) ?? null })`
+- Expor `lastAuthEvent` e `lastAuthEventAt` no retorno
+- Propagar via `useCurrentUser` (já agrega `useSupabaseAuth`)
 
-### 5. `src/services/crm/nrhs-analytics.ts`
-- Já corrigido na v1.4.1 (`stage:stages(name)`). Sem mudanças.
-- Adicionar guarda no início de `fetchNRHSDeals`: `if (!organizationId) throw new Error('NRHS: organizationId required')` para falhar cedo e claro se algum chamador escapar.
+### Parte 3 — Log de query privada bloqueada
+Editar `src/hooks/usePrivateQueryEnabled.ts`:
+- Em DEV, quando `extra === true && !enabled`, emitir `console.debug('[PRIVATE_QUERY_BLOCKED]', { hasSession, hasUser, hasOrganization, sessionChecked })`
+- Usar `useRef` para evitar log em loop (só logar quando o snapshot mudar)
 
-### 6. `src/components/scoring/nrhs/RevenueHygieneDashboard.tsx`
-- Adicionar early-return se `!organization?.id`: skeleton+mensagem "Aguardando contexto..." em vez de renderizar o dashboard com queries em estado indefinido.
+### Parte 4 — Corrigir único auto-reload não-auth
+`src/components/ote/GoalSystemModeSelector.tsx` linha 37: substituir `window.location.reload()` por `queryClient.invalidateQueries({ queryKey: ['ote'] })` + toast. Fora do escopo de auth, mas único `DANGEROUS_AUTO_RELOAD` da varredura.
 
-### 7. **NÃO criar** `AppBootGate.tsx` separado
-A lógica pedida já vive em `ProtectedRoute` (App.tsx) com a Sprint AUTH.1.2: bloqueia render até `sessionChecked`, espera `userLoading`, oferece retry sem deslogar em erro de organização (via `userError`). Adicionar uma camada extra dobra o tempo de boot e duplica responsabilidade. Decisão: **manter ProtectedRoute como o gate**, e `usePrivateQueryEnabled` como o segundo cinto de segurança no nível de hook.
+### Parte 5 — Validar isolamento de `/login`
+`/login`, `/signup`, `/forgot-password`, `/reset-password`, `/`, `/p/:token`, `/f/:token`, `/docs/*` já estão **fora** de `ProtectedRoute` em `App.tsx`. Não há `MainLayout`/`Sidebar`/providers privados envolvendo a árvore de `<Routes>` — só `ThemeProvider`, `TooltipProvider`, `Toaster`, `PostHogProvider`, `QueryClientProvider`. Apenas confirmaremos via grep que nenhum desses dispara query privada e documentaremos no plan.md.
 
-### 8. Limpeza de cache no login (`src/pages/Login.tsx`)
-- Antes do `navigate('/app/dashboard')`, chamar `queryClient.clear()` para garantir que cache de qualquer sessão anterior (NRHS, dashboard, forecast) não dispare queries com `organizationId` antigo enquanto o novo perfil carrega.
+### Parte 6 — Documentar plano de teste
+Criar `docs/auth-session-test-plan.md` com os 8 cenários do briefing (template Passos / Esperado / Status), pronto para virar checklist de regressão.
 
-## Fora de escopo
-- Não auditar/refatorar `useForecast`, `useReports`, `useDashboard`, etc. nesta sprint — eles já dependem de `organization?.id` ou rodam apenas em rotas protegidas. Se um problema concreto aparecer, abrimos sprint dedicada.
-- Não criar RPC para NRHS+stages — a join `stage:stages(name)` funciona (hotfix 1.4.1).
+### Parte 7 — Atualizar `.lovable/plan.md`
+Registrar entrega da sprint AUTH.1.4 com lista classificada de `window.location.*` e confirmações.
 
-## Reload / Logout
-- Falha de organização **continua** mostrando retry (já implementado em AUTH.1.2). Sem signOut implícito.
+## Arquivos
 
-## Arquivos alterados
-- `src/hooks/usePrivateQueryEnabled.ts` (novo)
-- `src/hooks/useCurrentOrganization.ts` (gate de loading)
-- `src/hooks/useNRHSAnalytics.ts` (enabled + remove sub-query getUser)
-- `src/hooks/scoring/useNRHSAnalyticsRealtime.ts` (gate hasSession)
-- `src/services/crm/nrhs-analytics.ts` (guard organizationId)
-- `src/components/scoring/nrhs/RevenueHygieneDashboard.tsx` (skeleton se sem org)
-- `src/pages/Login.tsx` (queryClient.clear antes de navegar)
+**Criados**
+- `src/components/system/AuthDebugPanel.tsx`
+- `docs/auth-session-test-plan.md`
 
-## Risco
-Baixo. Mudanças são apenas mais restritivas (`enabled` mais rígido). Nenhum hook que hoje executa válido deixa de executar — só impede execuções com input indefinido.
+**Editados**
+- `src/hooks/useSupabaseAuth.ts` (lastAuthEvent + log DEV)
+- `src/hooks/useCurrentUser.ts` (propagar lastAuthEvent/lastAuthEventAt)
+- `src/hooks/usePrivateQueryEnabled.ts` (log DEV bloqueado, com ref anti-spam)
+- `src/App.tsx` (montar `<AuthDebugPanel />`)
+- `src/components/ote/GoalSystemModeSelector.tsx` (remover reload)
+- `.lovable/plan.md`
+
+## Riscos
+
+- **Spam de log:** mitigado com `useRef` comparando snapshot anterior em `usePrivateQueryEnabled`.
+- **Painel em produção:** guardado por `import.meta.env.DEV` (compilado fora do bundle prod).
+- **Vazamento de PII:** apenas `id.slice(0,8)`; sem token, sem email.
+- **`GoalSystemModeSelector`:** se a invalidate não cobrir tudo, usuário pode precisar refrescar manualmente — aceitável (era reload forçado antes).
+
+## Próximos passos pós-sprint
+
+Rodar manualmente os 8 testes de `docs/auth-session-test-plan.md` e marcar status. Se algum falhar, abrir AUTH.1.5 escopada no cenário específico.
