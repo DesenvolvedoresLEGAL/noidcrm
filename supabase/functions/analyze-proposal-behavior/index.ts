@@ -262,6 +262,8 @@ ${JSON.stringify(behaviorContext, null, 2)}
 Gere insights acionáveis baseados nos padrões observados.`;
 
     let content = '';
+    let usage: any = null;
+    let modelUsed = 'gpt-5-mini';
     try {
       const aiResult = await callAI({
         model: 'gpt-5-mini',
@@ -271,26 +273,45 @@ Gere insights acionáveis baseados nos padrões observados.`;
         ],
         response_format: { type: 'json_object' },
         reasoning_effort: 'low',
-        feature: 'analyze-proposal-behavior',
+        feature: 'proposal_analytics_ai_insights',
         organization_id: proposal.organization_id,
+        metadata: { proposal_id, reason: refreshReason, entity_type: 'proposal', entity_id: proposal_id },
       });
       content = aiResult.content;
+      usage = aiResult.usage;
+      modelUsed = (aiResult as any).model || modelUsed;
     } catch (aiErr) {
-      console.error('[analyze-proposal-behavior] AI error, using fallback:', aiErr);
-      const fallbackAnalysis = generateFallbackAnalysis(behaviorContext);
-      return new Response(
-        JSON.stringify({ ...fallbackAnalysis, metrics: behaviorContext.metrics, analyzed_at: new Date().toISOString() }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      console.error('[analyze-proposal-behavior] AI error', aiErr);
+      if (cacheRow) {
+        const payload = (cacheRow.insights_payload || {}) as any;
+        return new Response(JSON.stringify({
+          ...payload,
+          status: 'stale',
+          from_cache: true,
+          error: 'ai_failed',
+          analyzed_at: cacheRow.generated_at,
+          cached_signature: cacheRow.analytics_signature,
+          current_signature: currentSignature,
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      return new Response(JSON.stringify({
+        status: 'error',
+        error: 'ai_failed',
+        analyzed_at: new Date().toISOString(),
+      }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     if (!content) {
       console.error('No content in AI response');
-      const fallbackAnalysis = generateFallbackAnalysis(behaviorContext);
-      return new Response(
-        JSON.stringify({ ...fallbackAnalysis, metrics: behaviorContext.metrics, analyzed_at: new Date().toISOString() }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      if (cacheRow) {
+        const payload = (cacheRow.insights_payload || {}) as any;
+        return new Response(JSON.stringify({
+          ...payload, status: 'stale', from_cache: true, error: 'empty_ai_content',
+          analyzed_at: cacheRow.generated_at,
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      return new Response(JSON.stringify({ status: 'error', error: 'empty_ai_content' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     // Parse AI response
