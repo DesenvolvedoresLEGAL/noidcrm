@@ -22,13 +22,16 @@ import {
   NRHSOwnerStats,
   NRHSInsight,
   NRHSCorrelation,
+  NRHSFilterOptions,
 } from '@/services/crm/nrhs-analytics';
 
 export interface NRHSFilters {
   tier?: NRHSTier;
   ownerId?: string;
   stageId?: string;
+  pipelineId?: string;
   hasBlocker?: boolean;
+  showInactive?: boolean;
   search?: string;
 }
 
@@ -40,6 +43,7 @@ export interface NRHSAnalyticsData {
   ownerStats: NRHSOwnerStats[];
   insights: NRHSInsight[];
   correlations: NRHSCorrelation[];
+  filterOptions: NRHSFilterOptions | null;
   isLoading: boolean;
   error: Error | null;
   filters: NRHSFilters;
