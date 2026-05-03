@@ -128,6 +128,21 @@ serve(async (req) => {
     const avgDuration = totalViews > 0 ? totalDuration / totalViews : 0;
     const uniqueIPs = new Set(views?.map(v => v.viewer_ip).filter(Boolean)).size;
     const uniqueDevices = new Set(views?.map(v => v.device_type).filter(Boolean)).size;
+
+    // Insufficient data: do not call AI, do not log usage
+    if (totalViews === 0 && !cacheRow) {
+      return new Response(JSON.stringify({
+        status: 'insufficient_data',
+        from_cache: false,
+        current_signature: currentSignature,
+        analyzed_at: new Date().toISOString(),
+        metrics: {
+          total_views: 0, total_duration_seconds: 0, avg_duration_seconds: 0,
+          max_scroll_depth: 0, pricing_section_time_percent: 0,
+          is_currently_viewing: false, was_forwarded: false, downloaded_pdf: false,
+        },
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
     
     // Time analysis
     const now = new Date();
