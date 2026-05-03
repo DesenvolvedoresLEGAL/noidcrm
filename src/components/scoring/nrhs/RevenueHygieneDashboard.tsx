@@ -89,8 +89,8 @@ export function RevenueHygieneDashboard() {
       const enqueued = data?.enqueued ?? 0;
       const skipped = data?.skipped ?? 0;
       toast({
-        title: 'Atualização enfileirada',
-        description: `${enqueued} deals serão recalculados${skipped > 0 ? ` (${skipped} já estavam na fila)` : ''}.`,
+        title: 'NRHS em atualização',
+        description: `${enqueued} oportunidades comerciais abertas serão recalculadas${skipped > 0 ? ` (${skipped} já estavam na fila)` : ''}.`,
       });
       // Trigger immediate processing (best-effort, non-blocking)
       supabase.functions.invoke('process-nrhs-queue', {
