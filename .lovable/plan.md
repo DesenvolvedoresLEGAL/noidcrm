@@ -1,106 +1,103 @@
-# Sprint AUTH.1.4 — Observabilidade, testes forenses e zero hard refresh
 
-Sprint pequena, focada em **observabilidade segura** e **validação**. Nada em NRHS, Forecast ou Dashboards privados (já blindados nas sprints anteriores).
+# HOTFIX SCORING 1.4.2 — Aba Revenue Hygiene via RPC explícita
 
-## Auditoria prévia de `window.location.*`
+## Causa raiz confirmada
 
-Resultado da varredura:
+`src/services/crm/nrhs-analytics.ts` (linha 149-197) executa:
+```
+.from('opportunities').select(`..., accounts(...), stage:stages(name), profiles!opportunities_owner_user_id_fkey(full_name)`)
+```
+- Não existe FK formal `opportunities_owner_user_id_fkey` apontando para `profiles` (o vínculo lógico é `profiles.user_id = opportunities.owner_user_id`, mas a FK real, se houver, vai para `auth.users`). PostgREST devolve `PGRST200`.
+- O erro "pipeline_stages" anterior era variação do mesmo padrão; a tabela correta no schema é `stages` (já corrigida), mas o nested select ainda quebra por `profiles`.
+- `opportunities.stage_id` e `pipeline_id` são `text` (não uuid).
 
-| Arquivo | Linha | Uso | Classificação |
-|---|---|---|---|
-| `src/lib/auditContext.ts` | 18 | leitura `href` para audit log | SAFE_NON_AUTH_USAGE |
-| `src/lib/pwaUtils.ts` | 55-101 | `forceUpdate()` chama `replace`/`reload` | MANUAL_USER_ACTION (botão "Atualizar agora") — manter, mas confirmar que nenhum caller dispara sem clique |
-| `src/services/crm/sync.ts` | 112,186 | OAuth Google redirect | EXTERNAL_OAUTH_REDIRECT |
-| `src/components/ErrorFallback.tsx` | 96 | botão "Voltar para dashboard" | MANUAL_USER_ACTION |
-| `src/components/ErrorBoundary.tsx` | 69 | botão `handleReload` (clique) | MANUAL_USER_ACTION |
-| `src/hooks/useSupabaseAuth.ts` | 34 | leitura para auditoria | SAFE_NON_AUTH_USAGE |
-| `src/components/ote/GoalSystemModeSelector.tsx` | 37 | reload após salvar config | **DANGEROUS_AUTO_RELOAD** (não-auth, mas ruim de UX — substituir por invalidate de query) |
-| `src/hooks/useAppVersion.ts` | 80 | `applyUpdate()` chamado por botão | MANUAL_USER_ACTION |
-| `src/pages/settings/Account.tsx` | 588 | reload após mudar idioma/tema | aceitável (clique), manter |
-| `src/components/accounts/AccountContactsTab.tsx` | 59,63 | `mailto:` / `tel:` | SAFE_NON_AUTH_USAGE |
+## Estratégia
 
-**Conclusão:** nenhum reload automático no fluxo crítico de auth. Único `DANGEROUS_AUTO_RELOAD` real é `GoalSystemModeSelector` (não-auth) — trocaremos por `queryClient.invalidateQueries`.
+Mover toda a leitura do dashboard NRHS para uma RPC `public.get_nrhs_analytics` que faz LEFT JOIN explícito (sem depender do PostgREST schema cache), retorna JSONB único com tudo que a tela precisa, e cai em fallback de owner se o profile não existir. Frontend deixa de fazer `.from('opportunities').select(...)` para alimentar a tela NRHS.
 
-## O que vamos fazer
+## Mudanças
 
-### Parte 1 — `AuthDebugPanel` (DEV-only)
-Criar `src/components/system/AuthDebugPanel.tsx`:
-- `if (!import.meta.env.DEV) return null`
-- Lê `useCurrentUser()` (já compartilhado, sem query nova)
-- Mostra: `authLoading`, `sessionChecked`, `hasSession`, `hasUser`, `userId.slice(0,8)`, `organizationId.slice(0,8)`, `organizationLoading`, `pathname`, `lastAuthEvent`, `lastAuthEventAt`
-- **NÃO** expõe token, email completo, sessão
-- Posição: `fixed bottom-3 right-3 z-[9999]`
-- Montar em `App.tsx` dentro do `<BrowserRouter>` (fora de `ProtectedRoute` para ver auth na pública também)
+### 1. Migração SQL
 
-### Parte 2 — `lastAuthEvent` no `useSupabaseAuth`
-Editar `src/hooks/useSupabaseAuth.ts`:
-- Adicionar estados `lastAuthEvent: string | null` e `lastAuthEventAt: string | null`
-- No `onAuthStateChange`, após `setSession`: `setLastAuthEvent(event); setLastAuthEventAt(new Date().toISOString())`
-- Em DEV: `console.info('[AUTH_EVENT]', { event, hasSession: !!session, userId: session?.user?.id?.slice(0,8) ?? null })`
-- Expor `lastAuthEvent` e `lastAuthEventAt` no retorno
-- Propagar via `useCurrentUser` (já agrega `useSupabaseAuth`)
+Criar `public.get_nrhs_analytics(p_org_id uuid, p_owner_id uuid default null, p_only_privileged boolean default true, p_caller_user_id uuid default null)` retornando `jsonb`:
 
-### Parte 3 — Log de query privada bloqueada
-Editar `src/hooks/usePrivateQueryEnabled.ts`:
-- Em DEV, quando `extra === true && !enabled`, emitir `console.debug('[PRIVATE_QUERY_BLOCKED]', { hasSession, hasUser, hasOrganization, sessionChecked })`
-- Usar `useRef` para evitar log em loop (só logar quando o snapshot mudar)
+- `SECURITY DEFINER`, `SET search_path = public`.
+- Validação: `auth.uid()` precisa pertencer a `organization_members` ativo de `p_org_id`. Se não for privilegiado, força `owner_user_id = p_caller_user_id`.
+- Base CTE `deals` com:
+  ```
+  opportunities o
+  left join accounts a on a.id = o.account_id and a.organization_id = o.organization_id
+  left join stages s   on s.id = o.stage_id  and s.organization_id = o.organization_id
+  left join profiles p on p.user_id = o.owner_user_id and p.organization_id = o.organization_id
+  where o.organization_id = p_org_id
+    and o.deleted_at is null
+    and o.status not in ('won','lost','disqualified')
+  ```
+- `owner_name` resolvido com fallback:
+  ```
+  coalesce(
+    nullif(p.full_name,''),
+    case when o.owner_user_id is null then 'Sem responsável'
+         else 'Usuário ' || substring(o.owner_user_id::text,1,8)
+    end
+  )
+  ```
+  Nunca retorna NULL. Se `owner_user_id` é NULL → `'Sem responsável'`.
+- `account_name` = `coalesce(nullif(a.nome_fantasia,''), nullif(a.razao_social,''), 'Sem empresa')`.
+- `stage_name` = `coalesce(s.name, 'Sem estágio')`.
+- Limite 500 deals (mesmo do código atual).
+- Retorno JSONB com chaves: `summary`, `distribution`, `pillars`, `deals`, `owners`, `generated_at`. Insights/correlations continuam calculados no cliente (já são puros, dependem só de `deals`).
 
-### Parte 4 — Corrigir único auto-reload não-auth
-`src/components/ote/GoalSystemModeSelector.tsx` linha 37: substituir `window.location.reload()` por `queryClient.invalidateQueries({ queryKey: ['ote'] })` + toast. Fora do escopo de auth, mas único `DANGEROUS_AUTO_RELOAD` da varredura.
+Estrutura de cada item em `deals` espelha `NRHSDeal` (id, title, account_name, owner_name, owner_user_id, value, stage_name, stage_id, opportunity_score, nrhs_score, nrhs_tier, nrhs_status, nrhs_issues_count, nrhs_blockers, pillar scores, last_reviewed_at, created_at).
 
-### Parte 5 — Validar isolamento de `/login`
-`/login`, `/signup`, `/forgot-password`, `/reset-password`, `/`, `/p/:token`, `/f/:token`, `/docs/*` já estão **fora** de `ProtectedRoute` em `App.tsx`. Não há `MainLayout`/`Sidebar`/providers privados envolvendo a árvore de `<Routes>` — só `ThemeProvider`, `TooltipProvider`, `Toaster`, `PostHogProvider`, `QueryClientProvider`. Apenas confirmaremos via grep que nenhum desses dispara query privada e documentaremos no plan.md.
+`summary` calcula totalizadores e `value_at_risk` (NRHS<60) direto em SQL para baratear o frontend e bater com a primeira fila de cards. `distribution` é array por tier. `pillars` é objeto com média 0-100 normalizada por peso (mesma fórmula de `calculatePillarAverages`).
 
-### Parte 6 — Documentar plano de teste
-Criar `docs/auth-session-test-plan.md` com os 8 cenários do briefing (template Passos / Esperado / Status), pronto para virar checklist de regressão.
+GRANT EXECUTE para `authenticated`. Sem GRANT para `anon`.
 
-### Parte 7 — Atualizar `.lovable/plan.md`
-Registrar entrega da sprint AUTH.1.4 com lista classificada de `window.location.*` e confirmações.
+Criar também `public.enqueue_nrhs_recalc_for_filters(p_org_id uuid, p_owner_id uuid default null)` retornando `jsonb {enqueued, skipped}`:
+- Itera as mesmas opportunities (sem nested select), insere em `nrhs_recalc_queue` respeitando o anti-duplicação de 2min já presente no trigger.
+- `SECURITY DEFINER`, mesma validação de membership.
 
-## Arquivos
+### 2. Frontend
 
-**Criados**
-- `src/components/system/AuthDebugPanel.tsx`
-- `docs/auth-session-test-plan.md`
+`src/services/crm/nrhs-analytics.ts`
+- Remover por completo `.from('opportunities').select(...)` em `fetchNRHSDeals`.
+- Reescrever `fetchNRHSDeals` para chamar `supabase.rpc('get_nrhs_analytics', { p_org_id, p_owner_id: isAdmin ? null : userId, p_only_privileged: isAdmin, p_caller_user_id: userId })` e mapear `data.deals` para `NRHSDeal[]`.
+- Exportar nova função `fetchNRHSAnalytics` que devolve o payload completo (`summary`, `distribution`, `pillars`, `deals`) para evitar dupla varredura no `useNRHSAnalytics`.
+- `calculateNRHSKPIs`, `calculateTierDistribution`, `calculatePillarAverages` continuam existindo como fallback puro a partir de `deals` (caso o consumidor só tenha array). `useNRHSAnalytics` passa a preferir `summary`/`distribution`/`pillars` vindos da RPC quando disponíveis, mantendo o cálculo client-side só como fallback.
 
-**Editados**
-- `src/hooks/useSupabaseAuth.ts` (lastAuthEvent + log DEV)
-- `src/hooks/useCurrentUser.ts` (propagar lastAuthEvent/lastAuthEventAt)
-- `src/hooks/usePrivateQueryEnabled.ts` (log DEV bloqueado, com ref anti-spam)
-- `src/App.tsx` (montar `<AuthDebugPanel />`)
-- `src/components/ote/GoalSystemModeSelector.tsx` (remover reload)
-- `.lovable/plan.md`
+`src/hooks/useNRHSAnalytics.ts`
+- Substituir `fetchNRHSDeals` por `fetchNRHSAnalytics` e usar diretamente `summary`, `distribution`, `pillars` do payload.
+- `useNRHSKPIs` idem (chama RPC e devolve `data.summary`).
+- Manter `usePrivateQueryEnabled` e a chave atual `nrhsAnalyticsKeys`.
+
+`src/components/scoring/nrhs/RevenueHygieneDashboard.tsx`
+- `handleRecalcAll` passa a chamar `supabase.rpc('enqueue_nrhs_recalc_for_filters', { p_org_id: organization.id, p_owner_id: filters.ownerId ?? null })` em vez de `insert` direto na fila. Mantém o disparo best-effort de `process-nrhs-queue`.
+- Mensagem de erro vs vazio já está separada (bloco `error` + estado vazio nos componentes filhos); adicionar texto explícito "Nenhuma oportunidade aberta encontrada para os filtros atuais." quando `!error && deals.length === 0`.
+
+`src/services/crm/nrhs-calculator.ts`
+- Linhas 311-318 (`calculateNRHSClient`) e 446-456 (`saveNRHSResult`): permanecem. NÃO fazem nested select problemático; `stage:stages(name)` é o único join e usa relação real `opportunities.stage_id text → stages.id text`. Se o schema cache também rejeitar essa relação após a mudança, removeremos o join e buscaremos `stages` em query separada por `stage_id`. (Verificação será feita ao executar.)
+
+### 3. Realtime
+
+`useNRHSAnalyticsRealtime` continua igual — invalida `['nrhs-analytics']` e `['nrhs-kpis']`, que agora reexecutam a RPC.
+
+### 4. Fora de escopo (intocado)
+
+Lead Score, Opportunity Score, motor NRHS (cálculo individual de pilares), Forecast, OTE, layout, fórmulas de score.
+
+## Critérios de aceite (espelham o pedido)
+
+- Console sem `Could not find a relationship between 'opportunities' and 'profiles'`.
+- Console sem GET `/rest/v1/opportunities?select=...profiles...` ao abrir aba NRHS.
+- Cards superiores, distribuição, pilares, tabela de deals, owner ranking carregam via RPC.
+- Owner sem profile aparece como "Usuário XXXXXXXX"; sem owner aparece como "Sem responsável".
+- Estado de erro (alerta vermelho + Tentar novamente) ≠ estado vazio (mensagem neutra).
+- Botão "Atualizar NRHS" usa RPC `enqueue_nrhs_recalc_for_filters`, sem nested select.
+- RLS multi-tenant respeitado via validação de membership na RPC.
 
 ## Riscos
 
-- **Spam de log:** mitigado com `useRef` comparando snapshot anterior em `usePrivateQueryEnabled`.
-- **Painel em produção:** guardado por `import.meta.env.DEV` (compilado fora do bundle prod).
-- **Vazamento de PII:** apenas `id.slice(0,8)`; sem token, sem email.
-- **`GoalSystemModeSelector`:** se a invalidate não cobrir tudo, usuário pode precisar refrescar manualmente — aceitável (era reload forçado antes).
-
-## Próximos passos pós-sprint
-
-Rodar manualmente os 8 testes de `docs/auth-session-test-plan.md` e marcar status. Se algum falhar, abrir AUTH.1.5 escopada no cenário específico.
-
----
-
-## Sprint AUTH.1.4 — ENTREGUE
-
-**Criados:**
-- `src/components/system/AuthDebugPanel.tsx` — painel DEV-only (fixed bottom-right) com authLoading, sessionChecked, hasSession, hasUser, userId(8), organizationId(8), pathname, lastAuthEvent, lastAuthEventAt. Sem PII.
-- `docs/auth-session-test-plan.md` — checklist oficial dos 8 testes de regressão + tabela de classificação `window.location.*`.
-
-**Editados:**
-- `src/hooks/useSupabaseAuth.ts` — (sem alteração final; lastAuthEvent foi colocado em useCurrentUser que já é fonte de verdade compartilhada).
-- `src/hooks/useCurrentUser.ts` — registra `lastAuthEvent`/`lastAuthEventAt` no `onAuthStateChange`. Log DEV `[AUTH_EVENT]` (event, hasSession, userId.slice(0,8)). Expõe ambos no retorno.
-- `src/hooks/usePrivateQueryEnabled.ts` — log DEV `[PRIVATE_QUERY_BLOCKED]` quando `extra=true && !enabled`, com `useRef` anti-spam.
-- `src/App.tsx` — monta `<AuthDebugPanel />` dentro do `<BrowserRouter>` (fora de ProtectedRoute).
-- `src/components/ote/GoalSystemModeSelector.tsx` — removido único `DANGEROUS_AUTO_RELOAD` da varredura; agora usa `queryClient.invalidateQueries` para 'current-organization', 'current-user', 'ote' e 'organization'.
-
-**Auditoria final `window.location.*`:** 10 ocorrências classificadas, 0 `DANGEROUS_AUTO_RELOAD` no fluxo crítico de auth (ver tabela em `docs/auth-session-test-plan.md`).
-
-**Isolamento `/login`:** confirmado via `App.tsx` — rotas públicas (`/login`, `/signup`, `/forgot-password`, `/reset-password`, `/`, `/p/:token`, `/f/:token`, `/docs/*`) ficam fora de `ProtectedRoute`. A árvore global só monta providers neutros (Theme, Tooltip, Toaster, PostHog, QueryClient). Nenhum `MainLayout`/`Sidebar`/Dashboard/NRHS/Forecast provider é montado nessas rotas.
-
-**Riscos residuais:** nenhum bloqueante. Painel DEV é tree-shaken no build de produção (`import.meta.env.DEV` constante). Logs `[AUTH_EVENT]`/`[PRIVATE_QUERY_BLOCKED]` só em DEV.
-
-**Próximo:** rodar os 8 testes manuais de `docs/auth-session-test-plan.md` e marcar status. Abrir AUTH.1.5 escopada apenas se algum cenário falhar.
+- Se houver opportunities com `owner_user_id` apontando para usuários sem `profiles` na mesma `organization_id`, fallback "Usuário XXXXXXXX" será exibido (esperado).
+- A migração precisa garantir `pg_get_functiondef` idempotente (`CREATE OR REPLACE`).
+- `calculateNRHSClient` ainda usa `stage:stages(name)`. Se aparecer PGRST sobre essa relação ao recalcular um deal individual, faremos query em duas etapas. Sem mudança preventiva agora para manter o hotfix focado.

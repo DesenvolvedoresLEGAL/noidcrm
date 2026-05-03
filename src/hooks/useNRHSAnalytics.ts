@@ -7,13 +7,14 @@ import { usePrivateQueryEnabled } from '@/hooks/usePrivateQueryEnabled';
 import { NRHSTier } from '@/services/crm/nrhs-calculator';
 import { nrhsAnalyticsKeys } from '@/lib/query-keys';
 import {
-  fetchNRHSDeals,
+  fetchNRHSAnalytics,
   calculateNRHSKPIs,
   calculateTierDistribution,
   calculatePillarAverages,
   calculateOwnerStats,
   generateNRHSInsights,
   generateNRHSCorrelations,
+  NRHS_PILLARS,
   NRHSDeal,
   NRHSKPIs,
   NRHSTierDistribution,
@@ -55,20 +56,22 @@ export function useNRHSAnalytics(): NRHSAnalyticsData {
 
   const isPrivileged = isAdmin || isOwner;
 
-  // Fetch all deals with NRHS data
+  // HOTFIX 1.4.2: usa RPC get_nrhs_analytics. Sem nested select no PostgREST.
   const {
-    data: deals = [],
+    data,
     isLoading,
     error,
   } = useQuery({
     queryKey: nrhsAnalyticsKeys.byUser(organizationId ?? undefined, userId ?? undefined, isPrivileged),
     queryFn: async () => {
-      if (!organizationId) return [];
-      return fetchNRHSDeals(organizationId, userId, isPrivileged);
+      if (!organizationId) return null;
+      return fetchNRHSAnalytics(organizationId, userId, isPrivileged);
     },
     enabled,
     staleTime: 30000,
   });
+
+  const deals: NRHSDeal[] = data?.deals ?? [];
 
   // Apply client-side filters
   const filteredDeals = useMemo(() => {
@@ -101,11 +104,34 @@ export function useNRHSAnalytics(): NRHSAnalyticsData {
     return result;
   }, [deals, filters]);
 
-  // Calculate all analytics from deals
-  const kpis = useMemo(() => calculateNRHSKPIs(deals), [deals]);
-  const tierDistribution = useMemo(() => calculateTierDistribution(deals), [deals]);
-  const pillarAverages = useMemo(() => calculatePillarAverages(deals), [deals]);
-  const ownerStats = useMemo(() => calculateOwnerStats(deals), [deals]);
+  // Prefer server-side aggregates from the RPC; fall back to client-side calc.
+  const kpis = useMemo(
+    () => data?.summary ?? calculateNRHSKPIs(deals),
+    [data?.summary, deals]
+  );
+  const tierDistribution = useMemo(
+    () => data?.distribution ?? calculateTierDistribution(deals),
+    [data?.distribution, deals]
+  );
+  const pillarAverages = useMemo<NRHSPillarAverage[]>(() => {
+    if (data?.pillars) {
+      return NRHS_PILLARS.map(p => {
+        const avg = (data.pillars as any)?.[p.id] ?? 0;
+        return {
+          pillar: p.id,
+          label: p.label,
+          average: avg,
+          weight: p.weight,
+          hasAlert: avg < 60,
+        };
+      });
+    }
+    return calculatePillarAverages(deals);
+  }, [data?.pillars, deals]);
+  const ownerStats = useMemo(
+    () => data?.owners ?? calculateOwnerStats(deals),
+    [data?.owners, deals]
+  );
   const insights = useMemo(() => generateNRHSInsights(deals), [deals]);
   const correlations = useMemo(() => generateNRHSCorrelations(deals), [deals]);
 
@@ -139,8 +165,8 @@ export function useNRHSKPIs() {
     queryKey: nrhsAnalyticsKeys.kpis(organizationId ?? undefined, userId ?? undefined, isPrivileged),
     queryFn: async () => {
       if (!organizationId) return null;
-      const deals = await fetchNRHSDeals(organizationId, userId, isPrivileged);
-      return calculateNRHSKPIs(deals);
+      const payload = await fetchNRHSAnalytics(organizationId, userId, isPrivileged);
+      return payload.summary ?? calculateNRHSKPIs(payload.deals);
     },
     enabled,
     staleTime: 30000,
