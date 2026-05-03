@@ -161,6 +161,7 @@ export function useNRHSAnalytics(): NRHSAnalyticsData {
     ownerStats,
     insights,
     correlations,
+    filterOptions: data?.filterOptions ?? null,
     isLoading,
     error: error as Error | null,
     filters,
