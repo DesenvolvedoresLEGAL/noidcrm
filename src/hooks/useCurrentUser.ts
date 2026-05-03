@@ -168,6 +168,9 @@ export function useCurrentUser() {
   const queryClient = useQueryClient();
   const [sessionChecked, setSessionChecked] = useState(false);
   const [hasSession, setHasSession] = useState(false);
+  // AUTH.1.4 — observabilidade segura: registra último evento de auth (sem token).
+  const [lastAuthEvent, setLastAuthEvent] = useState<string | null>(null);
+  const [lastAuthEventAt, setLastAuthEventAt] = useState<string | null>(null);
 
   // Verificar sessão inicial
   useEffect(() => {
@@ -183,7 +186,18 @@ export function useCurrentUser() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setHasSession(!!session);
       setSessionChecked(true);
-      
+      setLastAuthEvent(event);
+      setLastAuthEventAt(new Date().toISOString());
+
+      if (import.meta.env.DEV) {
+        // eslint-disable-next-line no-console
+        console.info('[AUTH_EVENT]', {
+          event,
+          hasSession: !!session,
+          userId: session?.user?.id?.slice(0, 8) ?? null,
+        });
+      }
+
       // Só invalida no login real - refresh de token não altera dados do usuário
       if (event === 'SIGNED_IN') {
         queryClient.invalidateQueries({ queryKey: ['current-user'] });
@@ -268,5 +282,7 @@ export function useCurrentUser() {
     // Helpers adicionais
     sessionChecked,
     hasSession,
+    lastAuthEvent,
+    lastAuthEventAt,
   };
 }

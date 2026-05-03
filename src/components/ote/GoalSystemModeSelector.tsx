@@ -33,8 +33,13 @@ export function GoalSystemModeSelector() {
           : 'Modo Metas Simples ativado'
       );
       
-      // Force refresh
-      window.location.reload();
+      // AUTH.1.4: substituído reload automático por invalidação reativa de cache.
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['current-organization'] }),
+        queryClient.invalidateQueries({ queryKey: ['current-user'] }),
+        queryClient.invalidateQueries({ queryKey: ['ote'] }),
+        queryClient.invalidateQueries({ queryKey: ['organization'] }),
+      ]);
     } catch (error) {
       console.error('Error updating goal system mode:', error);
       toast.error('Erro ao atualizar configuração');

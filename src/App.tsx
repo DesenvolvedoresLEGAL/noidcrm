@@ -13,6 +13,7 @@ import { LoadingPage } from "@/components/LoadingPage";
 import { TrialGuard } from "@/components/trial/TrialGuard";
 import { UpdateBanner } from "@/components/UpdateBanner";
 import { setupGlobalChunkErrorHandlers, clearRecoveryAttempts } from "@/lib/chunkErrorRecovery";
+import { AuthDebugPanel } from "@/components/system/AuthDebugPanel";
 
 
 // Setup global chunk error handlers immediately
@@ -360,6 +361,7 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <PostHogProvider />
+            <AuthDebugPanel />
             <Routes>
               {/* Public Routes */}
               <Route path="/" element={<Index />} />
