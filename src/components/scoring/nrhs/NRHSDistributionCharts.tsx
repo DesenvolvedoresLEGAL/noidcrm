@@ -66,7 +66,7 @@ export function NRHSDistributionCharts({ tierDistribution, pillarAverages, isLoa
   const barData = pillarAverages.map(p => ({
     name: p.label,
     score: p.average,
-    weight: `${Math.round(p.weight * 100)}%`,
+    weight: `${p.weight}%`,
     hasAlert: p.hasAlert,
     pillar: p.pillar,
   }));
