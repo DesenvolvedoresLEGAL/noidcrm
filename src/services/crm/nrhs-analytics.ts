@@ -311,48 +311,22 @@ export function calculateTierDistribution(deals: NRHSDeal[]): NRHSTierDistributi
 }
 
 export function calculatePillarAverages(deals: NRHSDeal[]): NRHSPillarAverage[] {
-  // Calculate average issues per pillar
-  const pillarIssues: Record<string, number[]> = {};
-  
-  for (const pillar of NRHS_PILLARS) {
-    pillarIssues[pillar.id] = [];
-  }
-
-  for (const deal of deals) {
-    const breakdown = deal.nrhsBlockers || [];
-    const pillarScores: Record<string, number> = {};
-    
-    // Initialize all pillars with 100
-    for (const pillar of NRHS_PILLARS) {
-      pillarScores[pillar.id] = 100;
-    }
-    
-    // Deduct for each blocker/issue
-    for (const blockerId of breakdown) {
-      const pillarId = ISSUE_TO_PILLAR[blockerId];
-      if (pillarId && pillarScores[pillarId] !== undefined) {
-        pillarScores[pillarId] -= 20; // Deduct 20 points per issue
-      }
-    }
-    
-    // Add to pillar arrays
-    for (const pillar of NRHS_PILLARS) {
-      pillarIssues[pillar.id].push(Math.max(0, pillarScores[pillar.id]));
-    }
-  }
-
   return NRHS_PILLARS.map(pillar => {
-    const scores = pillarIssues[pillar.id];
-    const average = scores.length > 0 
-      ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
-      : 100;
-    
+    const scores = deals
+      .map(d => d.pillars?.[pillar.id])
+      .filter((v): v is number => typeof v === 'number');
+    const max = pillar.weight; // pillar max = its weight in the v1 formula
+    const avgPoints = scores.length > 0
+      ? scores.reduce((a, b) => a + b, 0) / scores.length
+      : 0;
+    // Normalize to 0-100 percentage of pillar potential
+    const average = max > 0 ? Math.round((avgPoints / max) * 100) : 0;
     return {
       pillar: pillar.id,
       label: pillar.label,
       average,
       weight: pillar.weight,
-      hasAlert: average < 70,
+      hasAlert: average < 60,
     };
   });
 }
