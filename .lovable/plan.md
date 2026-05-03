@@ -1,66 +1,47 @@
-# Hotfix Scoring 1.4.3 — get_nrhs_analytics: remover DDL e estabilizar retries
+# Hotfix Scoring 1.4.4 — `o.value` não existe em `opportunities`
 
 ## Causa raiz confirmada
 
-A RPC `public.get_nrhs_analytics(uuid, uuid, boolean, uuid)` (assinatura real do projeto) está marcada como `STABLE` e contém DDL vestigial:
+Auditei o schema real de `public.opportunities`. Não existem colunas `value` nem `amount`. O único campo de valor monetário do deal é **`valor_previsto numeric`** (também há `mrr_value`/`arr_value`/`commission_value`, mas o histórico do projeto e o resto do código usam `valor_previsto` como valor da oportunidade).
+
+A RPC atual `public.get_nrhs_analytics(uuid, uuid, boolean, uuid)` referencia `COALESCE(o.value, 0)::numeric AS value` em duas CTEs (`base` e `base2`), gerando `42703 — column o.value does not exist`.
+
+## Mudança (1 migration, cirúrgica)
+
+Recriar `public.get_nrhs_analytics` mantendo assinatura, retorno, fórmulas e payload — trocando apenas:
 
 ```sql
-CREATE TEMP TABLE IF NOT EXISTS _nrhs_base ON COMMIT DROP AS SELECT NULL::uuid AS id WHERE false;
-TRUNCATE _nrhs_base;
-DROP TABLE _nrhs_base;
+COALESCE(o.value, 0)::numeric AS value
 ```
 
-Postgres rejeita: `0A000 — CREATE TABLE AS is not allowed in a non-volatile function`. As linhas são lixo (a função já usa CTE `WITH base AS (...)` para o trabalho real), então a correção é cirúrgica: remover essas 3 linhas. O resto da função permanece intacto (mesma assinatura, mesma fórmula, mesmo payload — não há risco para frontend).
+por
 
-`enqueue_nrhs_recalc_for_filters` foi auditada e **não usa DDL** — usa `FOR r IN SELECT ... LOOP INSERT`. Fica como está.
-
-## Mudanças
-
-### 1. Migration SQL
-
-`CREATE OR REPLACE FUNCTION public.get_nrhs_analytics(p_org_id uuid, p_owner_id uuid, p_only_privileged boolean, p_caller_user_id uuid)` mantendo a assinatura atual (4 parâmetros — é o que o frontend chama em `nrhs-analytics.ts`). Mudanças mínimas:
-
-- Remover as 3 linhas de DDL (`CREATE TEMP TABLE` / `TRUNCATE` / `DROP TABLE`).
-- Manter `STABLE SECURITY DEFINER SET search_path = public` (sem DDL agora é válido).
-- Todo o resto (CTEs `base`, `base2`, owner ranking, `jsonb_build_object` final) preservado byte a byte.
-
-Não alterar a assinatura para a do briefing (11 params) porque quebraria o frontend existente sem ganho — a função atual já usa CTEs e atende todos os campos consumidos por `useNRHSAnalytics`.
-
-### 2. Frontend — anti-loop em `src/hooks/useNRHSAnalytics.ts`
-
-Adicionar config no `useQuery` de `useNRHSAnalytics` e `useNRHSKPIs`:
-
-```ts
-retry: (failureCount, error: any) => {
-  const status = error?.status ?? error?.code;
-  if (status === 400 || status === '400' || status === '0A000' || status === '42501') return false;
-  return failureCount < 1;
-},
-refetchOnWindowFocus: false,
-staleTime: 30_000,
+```sql
+COALESCE(o.valor_previsto, 0)::numeric AS value
 ```
 
-Isso evita o loop de POSTs 400 visto no console enquanto a migration não roda, e mantém o comportamento normal pós-fix.
+nas duas CTEs (`base` e `base2`). Nada mais muda. Alias interno `value` é preservado para que o resto da função (somatórios, distribuição, payload `deals`/`owners`/`summary`) continue idêntico, sem mexer em frontend.
 
-### 3. UI — estado de erro no `RevenueHygieneDashboard`
+## Auditoria adicional (fora da RPC)
 
-Verificar (sem refazer layout) que quando `error` está presente o dashboard mostra mensagem + botão "Tentar novamente" (chamando `refetch`). Se já existir, manter; se não, adicionar bloco mínimo acima dos skeletons.
+- `enqueue_nrhs_recalc_for_filters`: já auditada na 1.4.3, não usa `o.value`.
+- Edge functions `calculate-nrhs` / `process-nrhs-queue` e frontend (`useNRHSAnalytics`, `RevenueHygieneDashboard`): consomem campos via JSON com chave `value` (alias da RPC), não tocam `opportunities.value` direto. Sem mudança necessária.
+- Se o grep encontrar resíduos NRHS apontando `opportunities.value`, troco para `valor_previsto` no mesmo passo.
 
 ## Arquivos
 
-- `supabase/migrations/<novo>.sql` — recria `get_nrhs_analytics` sem DDL.
-- `src/hooks/useNRHSAnalytics.ts` — adiciona `retry`/`refetchOnWindowFocus` nos 2 `useQuery`.
-- `src/components/scoring/nrhs/RevenueHygieneDashboard.tsx` — garante render de erro com retry (edit mínimo se necessário).
+- 1 migration recriando `get_nrhs_analytics` com `valor_previsto`.
+- (Condicional) ajustes pontuais se a busca por `o\.value|opportunities\.value` em escopo NRHS retornar algo.
 
 ## Fora de escopo
 
-Motor NRHS, fórmula, edge functions, filas, layout, Forecast, OTE, Lead Score, Opportunity Score.
+Motor NRHS, fórmula, layout, Forecast, OTE, Lead Score, Opportunity Score.
 
 ## Critérios de aceite
 
-- Sem `CREATE TABLE` / `CREATE TEMP TABLE` / `CREATE TABLE AS` em `get_nrhs_analytics`.
-- Console sem erro `0A000` e sem loop de POSTs.
-- Aba NRHS sai do skeleton (dados reais ou estado vazio).
+- Sem `o.value` na função.
+- POST `/rpc/get_nrhs_analytics` retorna 200.
+- Console sem `42703`.
+- Aba Revenue Hygiene sai do estado de erro (dados reais ou estado vazio).
+- "Valor em Risco" usa `valor_previsto`.
 - Botão "Atualizar NRHS" continua funcionando.
-- Demais abas Scoring intactas.
-- Não mexa no layout. Não refaça o NRHS. Apenas corrija a RPC get_nrhs_analytics para usar CTEs e ajuste o hook para não retentar infinito em erro 400.
