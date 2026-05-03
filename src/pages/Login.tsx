@@ -69,8 +69,11 @@ export default function Login() {
       }
 
       if (data.user) {
+        // AUTH.1.3: limpa cache de qualquer sessão anterior antes de navegar.
+        // Garante que queries privadas com organizationId antigo não disparem.
+        queryClient.clear();
         await new Promise(resolve => setTimeout(resolve, 100));
-        
+
         toast({
           title: t('loginSuccess', { ns: 'auth' }),
           description: t('welcome', { ns: 'dashboard' }),
