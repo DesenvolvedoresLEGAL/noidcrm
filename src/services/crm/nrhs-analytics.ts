@@ -267,6 +267,7 @@ export async function fetchNRHSAnalytics(
     insalubriousPercent: o.insalubrious_percent ?? 0,
     valueAtRisk: Number(o.value_at_risk) || 0,
     evolution7d: o.evolution_7d ?? null,
+    isInactive: !!o.is_inactive,
   }));
 
   return {
@@ -275,6 +276,7 @@ export async function fetchNRHSAnalytics(
     distribution,
     pillars: payload.pillars || null,
     owners,
+    filterOptions: mapFilterOptions(payload.filters),
   };
 }
 
