@@ -153,7 +153,7 @@ export async function fetchNRHSDeals(
     `)
     .eq('organization_id', organizationId)
     .is('deleted_at', null)
-    .in('status', ['open', 'negotiation', 'proposal']);
+    .not('status', 'in', '("won","lost","disqualified")');
 
   // Apply permission filter
   if (!isAdmin && userId) {
