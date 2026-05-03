@@ -332,11 +332,15 @@ Gere insights acionáveis baseados nos padrões observados.`;
       analysis = JSON.parse(cleanContent);
     } catch (parseError) {
       console.error('Error parsing AI response:', parseError, content);
-      const fallbackAnalysis = generateFallbackAnalysis(behaviorContext);
-      return new Response(
-        JSON.stringify(fallbackAnalysis),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      if (cacheRow) {
+        const payload = (cacheRow.insights_payload || {}) as any;
+        return new Response(JSON.stringify({
+          ...payload, status: 'stale', from_cache: true, error: 'parse_failed',
+          analyzed_at: cacheRow.generated_at,
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      return new Response(JSON.stringify({ status: 'error', error: 'parse_failed' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     // Store insights as alerts
