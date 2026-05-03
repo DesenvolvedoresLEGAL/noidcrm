@@ -39,10 +39,14 @@ export async function forceUpdate(): Promise<void> {
       console.log('[PWA] Service workers unregistered');
     }
     
-    // Clear localStorage cache version to force fresh content
+    // AUTH.1.2: NUNCA tocar em chaves do Supabase Auth (sb-* / supabase-*).
+    // Removemos apenas marcadores próprios de versão de app/cache.
     try {
-      localStorage.removeItem('app_version');
-      localStorage.removeItem('cache_timestamp');
+      const SAFE_KEYS = ['app_version', 'cache_timestamp'];
+      for (const key of SAFE_KEYS) {
+        if (key.startsWith('sb-') || key.includes('supabase')) continue;
+        localStorage.removeItem(key);
+      }
     } catch {
       // Ignore localStorage errors
     }
