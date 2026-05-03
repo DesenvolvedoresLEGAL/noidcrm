@@ -134,7 +134,7 @@ export function RevenueHygieneDashboard() {
               <TooltipTrigger asChild>
                 <Button 
                   variant="outline" 
-                  disabled={isLoading || isRecalcing || deals.length === 0}
+                  disabled={isLoading || isRecalcing}
                   onClick={handleRecalcAll}
                   className="bg-background/50 backdrop-blur-sm"
                 >
