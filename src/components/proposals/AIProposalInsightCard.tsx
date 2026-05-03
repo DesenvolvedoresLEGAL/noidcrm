@@ -3,112 +3,38 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { 
-  Brain, 
-  RefreshCw, 
-  Phone, 
-  Mail, 
-  Calendar, 
-  Percent, 
-  Clock,
-  AlertTriangle,
-  CheckCircle,
-  Info,
-  TrendingUp,
-  TrendingDown,
-  Eye,
-  DollarSign,
-  Share2,
-  FileText,
-  Zap,
-  Plus,
-  Loader2
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
+  Brain, RefreshCw, Phone, Mail, Calendar, Percent, Clock,
+  AlertTriangle, CheckCircle, Info, TrendingUp, TrendingDown,
+  Eye, DollarSign, Share2, FileText, Zap, Plus, Loader2,
 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { createActivity } from '@/services/supabase/activities';
-
-interface ProposalInsight {
-  type: string;
-  title: string;
-  description: string;
-  severity: 'info' | 'warning' | 'success' | 'critical';
-}
-
-interface RecommendedAction {
-  type: 'call' | 'email' | 'meeting' | 'discount' | 'follow_up';
-  message: string;
-  priority: 'low' | 'medium' | 'high';
-}
-
-interface BehaviorAnalysis {
-  summary: string;
-  engagement_level: 'low' | 'medium' | 'high' | 'very_high';
-  concerns: string[];
-  recommended_actions: RecommendedAction[];
-  win_probability_delta: number;
-  best_contact_time: string | null;
-  insights: ProposalInsight[];
-  metrics?: {
-    total_views: number;
-    total_duration_seconds: number;
-    avg_duration_seconds: number;
-    max_scroll_depth: number;
-    pricing_section_time_percent: number;
-    is_currently_viewing: boolean;
-    was_forwarded: boolean;
-    downloaded_pdf: boolean;
-  };
-  analyzed_at?: string;
-}
+import { useProposalAIInsights } from '@/hooks/useProposalAIInsights';
 
 interface AIProposalInsightCardProps {
   proposalId: string;
-  autoLoad?: boolean;
+  autoLoad?: boolean; // kept for API compatibility (no-op: hook auto-loads from cache)
   opportunityId?: string;
 }
 
-export function AIProposalInsightCard({ proposalId, autoLoad = false, opportunityId }: AIProposalInsightCardProps) {
-  const [analysis, setAnalysis] = useState<BehaviorAnalysis | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [hasAutoLoaded, setHasAutoLoaded] = useState(false);
+export function AIProposalInsightCard({ proposalId, opportunityId }: AIProposalInsightCardProps) {
+  const { data, isLoading, isRefreshing, isFromCache, generatedAt, status, error, refresh } =
+    useProposalAIInsights(proposalId);
+
   const [creatingActivity, setCreatingActivity] = useState<number | null>(null);
-
-  // Auto-load analysis on mount if autoLoad is true
-  React.useEffect(() => {
-    if (autoLoad && proposalId && !hasAutoLoaded && !analysis) {
-      setHasAutoLoaded(true);
-      analyzeProposal();
-    }
-  }, [autoLoad, proposalId, hasAutoLoaded, analysis]);
-
-  const analyzeProposal = async () => {
-    setIsLoading(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('analyze-proposal-behavior', {
-        body: { proposal_id: proposalId }
-      });
-
-      if (error) throw error;
-      setAnalysis(data);
-      toast.success('Análise de comportamento concluída');
-    } catch (error) {
-      console.error('Error analyzing proposal:', error);
-      toast.error('Erro ao analisar comportamento');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const actionTypeMap: Record<string, string> = {
-    call: 'call',
-    email: 'email',
-    meeting: 'meeting',
-    discount: 'follow_up',
-    follow_up: 'follow_up',
+    call: 'call', email: 'email', meeting: 'meeting',
+    discount: 'follow_up', follow_up: 'follow_up',
   };
 
-  const handleCreateActivity = async (action: RecommendedAction, idx: number) => {
+  const handleCreateActivity = async (action: any, idx: number) => {
     if (!opportunityId) {
       toast.error('Oportunidade não vinculada');
       return;
@@ -116,41 +42,37 @@ export function AIProposalInsightCard({ proposalId, autoLoad = false, opportunit
     setCreatingActivity(idx);
     try {
       await createActivity({
-        title: action.message.slice(0, 100),
-        type: (actionTypeMap[action.type] || 'task') as 'call' | 'email' | 'meeting' | 'note' | 'task' | 'whatsapp',
-        description: `[AI Insight] ${action.message}\n\nPrioridade: ${action.priority}`,
+        title: (action.message || action.title || 'Ação recomendada').slice(0, 100),
+        type: (actionTypeMap[action.type] || 'task') as any,
+        description: `[AI Insight] ${action.message || action.description || ''}\n\nPrioridade: ${action.priority || 'medium'}`,
         opportunity_id: opportunityId,
         status: 'pending',
         scheduled_date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
       });
       toast.success('Atividade criada com sucesso');
-    } catch (error) {
-      console.error('Error creating activity from insight:', error);
+    } catch (e) {
       toast.error('Erro ao criar atividade');
     } finally {
       setCreatingActivity(null);
     }
   };
 
-  const getEngagementColor = (level: string) => {
-    switch (level) {
-      case 'very_high': return 'bg-green-500';
-      case 'high': return 'bg-emerald-500';
-      case 'medium': return 'bg-yellow-500';
-      case 'low': return 'bg-red-500';
-      default: return 'bg-muted';
+  const handleRefreshClick = () => {
+    if (isFromCache && status === 'ok') {
+      setConfirmOpen(true);
+    } else {
+      refresh({ force: true });
     }
   };
 
-  const getEngagementLabel = (level: string) => {
-    switch (level) {
-      case 'very_high': return 'Muito Alto';
-      case 'high': return 'Alto';
-      case 'medium': return 'Médio';
-      case 'low': return 'Baixo';
-      default: return level;
-    }
-  };
+  const getEngagementColor = (level?: string) => ({
+    very_high: 'bg-green-500', high: 'bg-emerald-500',
+    medium: 'bg-yellow-500', low: 'bg-red-500',
+  } as any)[level || ''] || 'bg-muted';
+
+  const getEngagementLabel = (level?: string) => ({
+    very_high: 'Muito Alto', high: 'Alto', medium: 'Médio', low: 'Baixo',
+  } as any)[level || ''] || level || '—';
 
   const getSeverityIcon = (severity: string) => {
     switch (severity) {
@@ -158,20 +80,6 @@ export function AIProposalInsightCard({ proposalId, autoLoad = false, opportunit
       case 'warning': return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
       case 'success': return <CheckCircle className="h-4 w-4 text-green-500" />;
       default: return <Info className="h-4 w-4 text-blue-500" />;
-    }
-  };
-
-  const getInsightIcon = (type: string) => {
-    switch (type) {
-      case 'pricing_focus': return <DollarSign className="h-4 w-4" />;
-      case 'detailed_review': return <FileText className="h-4 w-4" />;
-      case 'hesitation': return <AlertTriangle className="h-4 w-4" />;
-      case 'comparison': return <Eye className="h-4 w-4" />;
-      case 'urgency': return <Zap className="h-4 w-4" />;
-      case 'inactivity': return <Clock className="h-4 w-4" />;
-      case 'forwarded': return <Share2 className="h-4 w-4" />;
-      case 'high_engagement': return <TrendingUp className="h-4 w-4" />;
-      default: return <Info className="h-4 w-4" />;
     }
   };
 
@@ -185,53 +93,78 @@ export function AIProposalInsightCard({ proposalId, autoLoad = false, opportunit
     }
   };
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'high': return 'border-red-500 bg-red-500/10';
-      case 'medium': return 'border-yellow-500 bg-yellow-500/10';
-      default: return 'border-muted bg-muted/10';
-    }
-  };
+  const getPriorityColor = (priority: string) => ({
+    high: 'border-red-500 bg-red-500/10',
+    medium: 'border-yellow-500 bg-yellow-500/10',
+  } as any)[priority] || 'border-muted bg-muted/10';
 
-  if (!analysis && !isLoading) {
-    return (
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Brain className="h-5 w-5 text-primary" />
-            AI Insights de Comportamento
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground mb-4">
-            Analise o comportamento do cliente ao visualizar esta proposta e receba insights acionáveis.
-          </p>
-          <Button onClick={analyzeProposal} className="w-full">
-            <Brain className="h-4 w-4 mr-2" />
-            Analisar Comportamento
-          </Button>
-        </CardContent>
-      </Card>
-    );
-  }
-
+  // ---- Loading
   if (isLoading) {
     return (
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
             <Brain className="h-5 w-5 text-primary animate-pulse" />
-            Analisando...
+            Carregando análise...
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <Skeleton className="h-16 w-full" />
           <Skeleton className="h-24 w-full" />
-          <Skeleton className="h-20 w-full" />
         </CardContent>
       </Card>
     );
   }
+
+  // ---- Insufficient data
+  if (status === 'insufficient_data') {
+    return (
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Brain className="h-5 w-5 text-primary" />
+            AI Insights
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            Ainda não há visualizações suficientes para gerar uma análise confiável.
+            Envie a proposta ou aguarde novas interações do cliente.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // ---- Error without cache
+  if ((error || status === 'error') && !data) {
+    return (
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Brain className="h-5 w-5 text-primary" />
+            AI Insights
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Não foi possível gerar os insights agora. Tente novamente mais tarde.
+          </p>
+          <Button variant="outline" size="sm" onClick={() => refresh({ force: true })}>
+            <RefreshCw className="h-4 w-4 mr-2" /> Tentar novamente
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!data) return null;
+
+  const insights = data.insights || data.smart_alerts || [];
+  const recommendedActions = data.recommended_actions || [];
+  const engagementLevel = data.engagement?.level || data.engagement_level;
+  const winDelta = data.close_probability?.value ?? data.win_probability_delta ?? 0;
+  const isStale = data.status === 'stale';
 
   return (
     <Card>
@@ -241,86 +174,85 @@ export function AIProposalInsightCard({ proposalId, autoLoad = false, opportunit
             <Brain className="h-5 w-5 text-primary" />
             AI Insights
           </CardTitle>
-          <Button variant="ghost" size="icon" onClick={analyzeProposal} disabled={isLoading}>
-            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleRefreshClick}
+            disabled={isRefreshing}
+            title="Atualizar análise"
+          >
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
           </Button>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        {isRefreshing && (
+          <div className="text-xs text-muted-foreground italic">
+            Novas interações detectadas. Atualizando análise inteligente...
+          </div>
+        )}
+
+        {isStale && (
+          <div className="p-2 rounded-md border border-yellow-500/40 bg-yellow-500/10 text-xs text-yellow-700 dark:text-yellow-300">
+            Não foi possível atualizar os insights agora. Mantivemos a última análise disponível.
+          </div>
+        )}
+
         {/* Summary */}
-        <div className="p-3 bg-muted/50 rounded-lg">
-          <p className="text-sm font-medium">{analysis?.summary}</p>
-        </div>
+        {data.summary && (
+          <div className="p-3 bg-muted/50 rounded-lg">
+            <p className="text-sm font-medium">{data.summary}</p>
+          </div>
+        )}
 
         {/* Engagement & Probability */}
         <div className="grid grid-cols-2 gap-3">
           <div className="p-3 border rounded-lg">
             <span className="text-xs text-muted-foreground">Engajamento</span>
             <div className="flex items-center gap-2 mt-1">
-              <div className={`w-3 h-3 rounded-full ${getEngagementColor(analysis?.engagement_level || 'low')}`} />
-              <span className="font-medium text-sm">
-                {getEngagementLabel(analysis?.engagement_level || 'low')}
-              </span>
+              <div className={`w-3 h-3 rounded-full ${getEngagementColor(engagementLevel)}`} />
+              <span className="font-medium text-sm">{getEngagementLabel(engagementLevel)}</span>
             </div>
           </div>
           <div className="p-3 border rounded-lg">
             <span className="text-xs text-muted-foreground">Prob. de Fechamento</span>
             <div className="flex items-center gap-1 mt-1">
-              {(analysis?.win_probability_delta || 0) > 0 ? (
-                <TrendingUp className="h-4 w-4 text-green-500" />
-              ) : (analysis?.win_probability_delta || 0) < 0 ? (
-                <TrendingDown className="h-4 w-4 text-red-500" />
-              ) : null}
-              <span className={`font-medium text-sm ${
-                (analysis?.win_probability_delta || 0) > 0 ? 'text-green-600' : 
-                (analysis?.win_probability_delta || 0) < 0 ? 'text-red-600' : ''
-              }`}>
-                {(analysis?.win_probability_delta || 0) > 0 ? '+' : ''}
-                {analysis?.win_probability_delta || 0}%
+              {winDelta > 0 ? <TrendingUp className="h-4 w-4 text-green-500" /> :
+                winDelta < 0 ? <TrendingDown className="h-4 w-4 text-red-500" /> : null}
+              <span className={`font-medium text-sm ${winDelta > 0 ? 'text-green-600' : winDelta < 0 ? 'text-red-600' : ''}`}>
+                {winDelta > 0 ? '+' : ''}{winDelta}%
               </span>
             </div>
           </div>
         </div>
 
         {/* Best Contact Time */}
-        {analysis?.best_contact_time && (
+        {data.best_contact_time && (
           <div className="p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
             <div className="flex items-center gap-2">
               <Clock className="h-4 w-4 text-green-600" />
-              <span className="text-sm font-medium text-green-700">
-                {analysis.best_contact_time}
-              </span>
+              <span className="text-sm font-medium text-green-700">{data.best_contact_time}</span>
             </div>
           </div>
         )}
 
         {/* Insights */}
-        {analysis?.insights && analysis.insights.length > 0 && (
+        {insights.length > 0 && (
           <div className="space-y-2">
             <h4 className="text-sm font-medium">Insights</h4>
             <div className="space-y-2">
-              {analysis.insights.map((insight, idx) => (
-                <div 
-                  key={idx}
-                  className={`p-3 rounded-lg border ${
-                    insight.severity === 'critical' ? 'border-red-500/50 bg-red-500/5' :
-                    insight.severity === 'warning' ? 'border-yellow-500/50 bg-yellow-500/5' :
-                    insight.severity === 'success' ? 'border-green-500/50 bg-green-500/5' :
-                    'border-blue-500/50 bg-blue-500/5'
-                  }`}
-                >
+              {insights.map((insight: any, idx: number) => (
+                <div key={idx} className={`p-3 rounded-lg border ${
+                  insight.severity === 'critical' ? 'border-red-500/50 bg-red-500/5' :
+                  insight.severity === 'warning' ? 'border-yellow-500/50 bg-yellow-500/5' :
+                  insight.severity === 'success' ? 'border-green-500/50 bg-green-500/5' :
+                  'border-blue-500/50 bg-blue-500/5'
+                }`}>
                   <div className="flex items-start gap-2">
-                    <div className="mt-0.5">
-                      {getSeverityIcon(insight.severity)}
-                    </div>
+                    <div className="mt-0.5">{getSeverityIcon(insight.severity)}</div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        {getInsightIcon(insight.type)}
-                        <span className="font-medium text-sm">{insight.title}</span>
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {insight.description}
-                      </p>
+                      <span className="font-medium text-sm">{insight.title}</span>
+                      <p className="text-xs text-muted-foreground mt-1">{insight.description}</p>
                     </div>
                   </div>
                 </div>
@@ -330,36 +262,25 @@ export function AIProposalInsightCard({ proposalId, autoLoad = false, opportunit
         )}
 
         {/* Recommended Actions */}
-        {analysis?.recommended_actions && analysis.recommended_actions.length > 0 && (
+        {recommendedActions.length > 0 && (
           <div className="space-y-2">
             <h4 className="text-sm font-medium">Ações Recomendadas</h4>
             <div className="space-y-2">
-              {analysis.recommended_actions.map((action, idx) => (
-                <div 
-                  key={idx}
-                  className={`p-3 rounded-lg border-l-4 ${getPriorityColor(action.priority)}`}
-                >
+              {recommendedActions.map((action: any, idx: number) => (
+                <div key={idx} className={`p-3 rounded-lg border-l-4 ${getPriorityColor(action.priority)}`}>
                   <div className="flex items-center gap-2">
                     {getActionIcon(action.type)}
-                    <span className="text-sm flex-1">{action.message}</span>
+                    <span className="text-sm flex-1">{action.message || action.title}</span>
                     <Badge variant="outline" className="text-xs shrink-0">
                       {action.priority === 'high' ? 'Alta' : action.priority === 'medium' ? 'Média' : 'Baixa'}
                     </Badge>
                   </div>
                   {opportunityId && (
                     <div className="mt-2 flex justify-end">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-7 text-xs gap-1"
+                      <Button size="sm" variant="outline" className="h-7 text-xs gap-1"
                         disabled={creatingActivity === idx}
-                        onClick={() => handleCreateActivity(action, idx)}
-                      >
-                        {creatingActivity === idx ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                        ) : (
-                          <Plus className="h-3 w-3" />
-                        )}
+                        onClick={() => handleCreateActivity(action, idx)}>
+                        {creatingActivity === idx ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
                         Criar Atividade
                       </Button>
                     </div>
@@ -370,35 +291,31 @@ export function AIProposalInsightCard({ proposalId, autoLoad = false, opportunit
           </div>
         )}
 
-        {/* Quick Metrics */}
-        {analysis?.metrics && (
-          <div className="pt-3 border-t">
-            <div className="grid grid-cols-3 gap-2 text-center">
-              <div>
-                <div className="text-lg font-bold">{analysis.metrics.total_views}</div>
-                <div className="text-xs text-muted-foreground">Visualizações</div>
-              </div>
-              <div>
-                <div className="text-lg font-bold">
-                  {Math.round(analysis.metrics.total_duration_seconds / 60)}min
-                </div>
-                <div className="text-xs text-muted-foreground">Tempo Total</div>
-              </div>
-              <div>
-                <div className="text-lg font-bold">{analysis.metrics.max_scroll_depth}%</div>
-                <div className="text-xs text-muted-foreground">Scroll Máx.</div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Analysis timestamp */}
-        {analysis?.analyzed_at && (
+        {/* Footer timestamp */}
+        {generatedAt && (
           <p className="text-xs text-muted-foreground text-center pt-2">
-            Analisado em {new Date(analysis.analyzed_at).toLocaleString('pt-BR')}
+            Insights atualizados em {new Date(generatedAt).toLocaleString('pt-BR')}
+            {isFromCache && !isStale && ' • cache'}
           </p>
         )}
       </CardContent>
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Gerar nova análise?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Nenhuma nova interação foi detectada. Deseja gerar uma nova análise mesmo assim?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { setConfirmOpen(false); refresh({ force: true }); }}>
+              Gerar análise
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

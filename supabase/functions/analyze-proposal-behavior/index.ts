@@ -32,7 +32,9 @@ serve(async (req) => {
   }
 
   try {
-    const { proposal_id } = await req.json();
+    const body = await req.json();
+    const proposal_id: string | undefined = body?.proposal_id;
+    const force_refresh: boolean = !!body?.force_refresh;
 
     if (!proposal_id) {
       return new Response(
@@ -45,6 +47,33 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // ---- Signature + cache lookup ----
+    const { data: sigData, error: sigErr } = await supabase.rpc('get_proposal_analytics_signature', { p_proposal_id: proposal_id });
+    if (sigErr) console.error('[analyze-proposal-behavior] signature error', sigErr);
+    const currentSignature: string | null = (sigData as any) ?? null;
+
+    const { data: cacheRow } = await supabase
+      .from('proposal_ai_insights_cache')
+      .select('*')
+      .eq('proposal_id', proposal_id)
+      .maybeSingle();
+
+    const cacheValid = !!cacheRow && currentSignature && cacheRow.analytics_signature === currentSignature;
+
+    if (cacheValid && !force_refresh) {
+      const payload = (cacheRow!.insights_payload || {}) as any;
+      return new Response(JSON.stringify({
+        ...payload,
+        from_cache: true,
+        status: 'ok',
+        analyzed_at: cacheRow!.generated_at,
+        cached_signature: cacheRow!.analytics_signature,
+        current_signature: currentSignature,
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    const refreshReason = !cacheRow ? 'cache_miss' : (force_refresh ? 'manual_refresh' : 'signature_changed');
 
     // Fetch proposal data
     const { data: proposal, error: proposalError } = await supabase
@@ -99,6 +128,21 @@ serve(async (req) => {
     const avgDuration = totalViews > 0 ? totalDuration / totalViews : 0;
     const uniqueIPs = new Set(views?.map(v => v.viewer_ip).filter(Boolean)).size;
     const uniqueDevices = new Set(views?.map(v => v.device_type).filter(Boolean)).size;
+
+    // Insufficient data: do not call AI, do not log usage
+    if (totalViews === 0 && !cacheRow) {
+      return new Response(JSON.stringify({
+        status: 'insufficient_data',
+        from_cache: false,
+        current_signature: currentSignature,
+        analyzed_at: new Date().toISOString(),
+        metrics: {
+          total_views: 0, total_duration_seconds: 0, avg_duration_seconds: 0,
+          max_scroll_depth: 0, pricing_section_time_percent: 0,
+          is_currently_viewing: false, was_forwarded: false, downloaded_pdf: false,
+        },
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
     
     // Time analysis
     const now = new Date();
@@ -218,6 +262,8 @@ ${JSON.stringify(behaviorContext, null, 2)}
 Gere insights acionáveis baseados nos padrões observados.`;
 
     let content = '';
+    let usage: any = null;
+    let modelUsed = 'gpt-5-mini';
     try {
       const aiResult = await callAI({
         model: 'gpt-5-mini',
@@ -227,26 +273,44 @@ Gere insights acionáveis baseados nos padrões observados.`;
         ],
         response_format: { type: 'json_object' },
         reasoning_effort: 'low',
-        feature: 'analyze-proposal-behavior',
+        feature: 'proposal_analytics_ai_insights',
         organization_id: proposal.organization_id,
       });
       content = aiResult.content;
+      usage = aiResult.usage;
+      modelUsed = aiResult.model_used || modelUsed;
     } catch (aiErr) {
-      console.error('[analyze-proposal-behavior] AI error, using fallback:', aiErr);
-      const fallbackAnalysis = generateFallbackAnalysis(behaviorContext);
-      return new Response(
-        JSON.stringify({ ...fallbackAnalysis, metrics: behaviorContext.metrics, analyzed_at: new Date().toISOString() }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      console.error('[analyze-proposal-behavior] AI error', aiErr);
+      if (cacheRow) {
+        const payload = (cacheRow.insights_payload || {}) as any;
+        return new Response(JSON.stringify({
+          ...payload,
+          status: 'stale',
+          from_cache: true,
+          error: 'ai_failed',
+          analyzed_at: cacheRow.generated_at,
+          cached_signature: cacheRow.analytics_signature,
+          current_signature: currentSignature,
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      return new Response(JSON.stringify({
+        status: 'error',
+        error: 'ai_failed',
+        analyzed_at: new Date().toISOString(),
+      }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     if (!content) {
       console.error('No content in AI response');
-      const fallbackAnalysis = generateFallbackAnalysis(behaviorContext);
-      return new Response(
-        JSON.stringify({ ...fallbackAnalysis, metrics: behaviorContext.metrics, analyzed_at: new Date().toISOString() }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      if (cacheRow) {
+        const payload = (cacheRow.insights_payload || {}) as any;
+        return new Response(JSON.stringify({
+          ...payload, status: 'stale', from_cache: true, error: 'empty_ai_content',
+          analyzed_at: cacheRow.generated_at,
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      return new Response(JSON.stringify({ status: 'error', error: 'empty_ai_content' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     // Parse AI response
@@ -267,11 +331,15 @@ Gere insights acionáveis baseados nos padrões observados.`;
       analysis = JSON.parse(cleanContent);
     } catch (parseError) {
       console.error('Error parsing AI response:', parseError, content);
-      const fallbackAnalysis = generateFallbackAnalysis(behaviorContext);
-      return new Response(
-        JSON.stringify(fallbackAnalysis),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      if (cacheRow) {
+        const payload = (cacheRow.insights_payload || {}) as any;
+        return new Response(JSON.stringify({
+          ...payload, status: 'stale', from_cache: true, error: 'parse_failed',
+          analyzed_at: cacheRow.generated_at,
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      return new Response(JSON.stringify({ status: 'error', error: 'parse_failed' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     // Store insights as alerts
@@ -298,11 +366,57 @@ Gere insights acionáveis baseados nos padrões observados.`;
       }
     }
 
+    // ---- Persist cache ----
+    const engagementMap: Record<string, number> = { low: 25, medium: 55, high: 80, very_high: 95 };
+    const insightsPayload = {
+      summary: analysis.summary,
+      engagement: { score: engagementMap[analysis.engagement_level] ?? null, level: analysis.engagement_level },
+      close_probability: { value: analysis.win_probability_delta, trend: 'neutral' },
+      insights: analysis.insights,
+      recommended_actions: analysis.recommended_actions,
+      smart_alerts: analysis.insights,
+      best_contact_time: analysis.best_contact_time,
+      concerns: analysis.concerns,
+      metrics: behaviorContext.metrics,
+    };
+
+    const tokensIn = usage?.prompt_tokens ?? 0;
+    const tokensOut = usage?.completion_tokens ?? 0;
+    const tokensTot = usage?.total_tokens ?? (tokensIn + tokensOut);
+
+    if (currentSignature) {
+      const { error: upsertErr } = await supabase.rpc('upsert_proposal_ai_insights_cache', {
+        p_organization_id: proposal.organization_id,
+        p_opportunity_id: proposal.opportunity_id,
+        p_proposal_id: proposal_id,
+        p_analytics_signature: currentSignature,
+        p_insights_payload: insightsPayload,
+        p_engagement_score: engagementMap[analysis.engagement_level] ?? null,
+        p_engagement_level: analysis.engagement_level,
+        p_close_probability: analysis.win_probability_delta,
+        p_risk_level: null,
+        p_recommended_actions: analysis.recommended_actions as any,
+        p_smart_alerts: analysis.insights as any,
+        p_generated_summary: analysis.summary,
+        p_model_used: modelUsed,
+        p_tokens_input: tokensIn,
+        p_tokens_output: tokensOut,
+        p_total_tokens: tokensTot,
+      });
+      if (upsertErr) console.error('[analyze-proposal-behavior] cache upsert error', upsertErr);
+    }
+
     return new Response(
       JSON.stringify({
         ...analysis,
+        ...insightsPayload,
+        status: 'ok',
+        from_cache: false,
+        reason: refreshReason,
+        current_signature: currentSignature,
+        cached_signature: currentSignature,
         metrics: behaviorContext.metrics,
-        analyzed_at: new Date().toISOString()
+        analyzed_at: new Date().toISOString(),
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
