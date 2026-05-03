@@ -1,94 +1,174 @@
-# Hotfix NRHS 1.4.5 — Recriar `get_nrhs_analytics` do zero, mínima e sem joins
+## Sprint NRHS 1.5 — Pente fino do Revenue Hygiene
 
-## Causa raiz confirmada
+Objetivo: deixar a aba apresentável e confiável — escopo comercial correto, nomes reais (conta/owner/estágio/pipeline), filtros saudáveis, NRHS calibrado, detalhe da oportunidade sem crash, e card NRHS do detalhe consistente com a aba.
 
-Auditei o schema real:
+### Diagnóstico (auditoria já feita)
 
-- `opportunities` **não tem** colunas `value`, `amount`, `name`, `org_id`, `owner_id`. As reais são: `organization_id`, `owner_user_id`, `valor_previsto`, `title`, `account_id`, `stage_id`, `pipeline_id`, `status`, `won_at`, `lost_at`, `closed_at`, `deleted_at`, `created_at`, `updated_at` e os pilares NRHS (`nrhs_score`, `nrhs_tier`, `nrhs_status`, `nrhs_blockers`, `nrhs_issues_count`, `nrhs_data_integrity_score`, `nrhs_cadence_score`, `nrhs_stakeholders_score`, `nrhs_win_loss_score`, `nrhs_process_adherence_score`, `nrhs_evidence_score`, `nrhs_last_calculated_at`).
-- A função 1.4.4 quebra com `42702 column reference "value" is ambiguous` porque havia CTEs com colunas internas chamadas `value` colidindo no `jsonb_build_object`.
+Schema real confirmado:
+- `pipelines.pipeline_type` existe: `sales`, `qualification`, `onboarding`, `renewal`.
+- `stages` (não `pipeline_stages`) é a tabela ligada a `opportunities.stage_id` via FK.
+- `accounts` tem `nome_fantasia` / `razao_social` (sem `name`/`trade_name`).
+- Usuários ativos: `crm_active_users_view` (já é fonte oficial — Core memory).
+- Opportunities tem campos NRHS reais (`nrhs_score`, `nrhs_tier`, `nrhs_metadata`, `nrhs_blockers`, `nrhs_gaps`, pilares individuais).
+- Activities tem `opportunity_id`, `deleted_at`, `scheduled_date`, `completed_at`, `status`.
 
-## Mudança (1 migration)
+Causas dos sintomas:
+1. RPC mínima 1.4.5 não enriquece nomes (placeholders UUID) e não filtra escopo comercial → tudo aparece, inclusive operacional.
+2. Filtros do topo leem owners/stages dos placeholders.
+3. Calculadora client (`calculateNRHSClient`) faz join com `stages(name)` errado (`stage:stages(name)` deveria funcionar, mas auto-cálculo dispara para toda opp aberta sem score, gerando 400 por RLS/relationship em algum estágio) e a fórmula é severa.
+4. `NRHSBreakdown` espera `breakdown.pillars.integrity` etc., mas o `nrhs_breakdown` salvo vem como `nrhs_metadata` ou em formato diferente — `breakdown.pillars[...]` é `undefined` → `Cannot read properties of undefined (reading 'integrity')`.
+5. Card sidebar usa `useNRHS` (calculadora client antiga) enquanto a aba usa `nrhs_score` persistido vindo da edge `calculate-nrhs` → divergência 0/1 vs valor real.
 
-`DROP FUNCTION public.get_nrhs_analytics(uuid, uuid, boolean, uuid)` e recriar do zero, **mantendo a mesma assinatura** que o frontend já chama (`p_org_id`, `p_owner_id`, `p_only_privileged`, `p_caller_user_id`), preservando o contrato JSON consumido por `src/services/crm/nrhs-analytics.ts` (chaves `summary.{total,nrhs_avg,elite_count,healthy_count,risk_count,critical_count,insalubrious_count,value_at_risk,total_value}`, `distribution[].{tier,count,value}`, `pillars`, `deals`, `owners`).
+### Mudanças
 
-Regras da nova função:
+#### 1. Migration única — recriar `get_nrhs_analytics` com joins seguros e escopo comercial
 
-1. **Sem joins.** Apenas `public.opportunities` + checagem de membro em `public.organization_members` (não é join sobre opportunities).
-2. **Sem nested select** no PostgREST.
-3. **Sem `CREATE TEMP TABLE` / `CREATE TABLE AS**` — só CTEs.
-4. **Sem alias `value**` dentro de qualquer CTE. Internamente uso `deal_amount`, `tier_amount`, `total_amount`, `value_at_risk_amount`, `owner_value_at_risk`. A chave JSON `"value"` aparece **somente** dentro de `jsonb_build_object(...)` no payload final, onde não pode ser ambígua.
-5. **Sem coluna inexistente.** `valor_previsto` substitui qualquer `o.value`/`o.amount`. Names de account/owner/stage usam placeholders (`'Conta ' || left(account_id::text,8)`, `'Usuário ' || left(owner_user_id::text,8)`, `'Estágio ' || left(stage_id::text,8)`) — enriquecimento real fica para sprint separada.
-6. **Tier derivado em SQL** (`tier_bucket` via `CASE`) — não depende de `nrhs_tier` populado.
-7. **Filtros mantidos:** `organization_id = p_org_id`, `deleted_at IS NULL`, `status NOT IN (won/lost/disqualified)`, e `owner_user_id` quando privilegiado/owner solicitado.
-8. `**SECURITY DEFINER` + `SET search_path = public**` mantidos.
-9. **GRANT** apenas para `authenticated`, `REVOKE FROM PUBLIC`.
+Mantém assinatura `get_nrhs_analytics(uuid, uuid, boolean, uuid)`. Internamente:
 
-## Frontend
+- LEFT JOIN explícito (SQL puro, sem nested select PostgREST):
+  - `accounts a ON a.id = o.account_id AND a.organization_id = o.organization_id`
+  - `pipelines p ON p.id = o.pipeline_id AND p.organization_id = o.organization_id`
+  - `stages s ON s.id = o.stage_id AND s.organization_id = o.organization_id`
+  - `crm_active_users_view u ON u.user_id = o.owner_user_id AND u.tenant_id = o.organization_id`
+- **Escopo padrão comercial**: `p.pipeline_type IN ('sales','qualification')`.
+- **Status padrão**: `o.status NOT IN ('won','lost','disqualified')` AND `o.deleted_at IS NULL`.
+- Sem aliases internos chamados `value` (segue trava 1.4.5). Chave JSON `"value"` só em `jsonb_build_object`.
+- Owner: `COALESCE(NULLIF(u.full_name,''), NULLIF(u.email,''), 'Sem responsável')`. Flag `is_inactive` = `u.user_id IS NULL AND o.owner_user_id IS NOT NULL`.
+- Conta: `COALESCE(NULLIF(a.nome_fantasia,''), NULLIF(a.razao_social,''), 'Conta sem nome')`.
+- Estágio: `COALESCE(NULLIF(s.name,''), 'Estágio não informado')`.
+- Pipeline: `p.name` + `p.pipeline_type`.
+- Tier derivado por `CASE` no SQL (Elite ≥90, Saudável 75-89, Em Risco 50-74, Crítico 25-49, Insalubre <25).
+- **Valor em risco**: soma `valor_previsto` apenas para tiers `risk|critical|insalubrious`.
+- Acrescenta no JSON retornado:
+  ```json
+  "filters": {
+    "pipeline_options":[{id,name,pipeline_type}],
+    "owner_options":[{user_id,full_name,is_inactive}],
+    "stage_options":[{id,name,pipeline_id}],
+    "applied_scope":"commercial",
+    "included_pipeline_types":["sales","qualification"],
+    "excluded_pipeline_types":["onboarding","renewal"]
+  }
+  ```
+  Estas listas só incluem owners/stages/pipelines presentes no escopo aplicado, owners ativos por padrão (inativos só se ainda dono de deal aberto, marcados `is_inactive:true`).
+- `summary/distribution/pillars/owners/deals` permanecem com mesma forma (mais campos: `account_name`, `owner_name`, `stage_name`, `pipeline_name`, `pipeline_type`, `is_inactive_owner`).
+- `SECURITY DEFINER`, `SET search_path = public`, `GRANT EXECUTE ... TO authenticated`, membership check via `organization_members` quando `p_only_privileged=false` ou usuário não-admin.
 
-Nenhuma mudança. O service `nrhs-analytics.ts` já consome exatamente o payload que a nova função produz (mesmas chaves do contrato 1.4.2/1.4.3/1.4.4).
+#### 2. Migration — ajustar `enqueue_nrhs_recalc_for_filters` para escopo comercial
 
-## Auditoria adicional
+- Quando chamada da aba (sem owner específico além do filtro), enfileirar apenas opps com `pipelines.pipeline_type IN ('sales','qualification')`, status aberto, `deleted_at IS NULL`.
+- Toast da aba: "NRHS em atualização para oportunidades comerciais abertas."
 
-- `enqueue_nrhs_recalc_for_filters`: já validada (1.4.3), não usa `o.value`. Sem mudança.
-- Edge functions NRHS (`calculate-nrhs`, `process-nrhs-queue`) e hook `useNRHSAnalytics`: não tocam `opportunities.value`. Sem mudança.
-- Se grep dentro do escopo NRHS encontrar resíduos `o.value`/`opportunities.value`, troco para `valor_previsto` no mesmo passo.
+#### 3. Frontend — `RevenueHygieneDashboard`
 
-## Critérios de aceite
+- Adicionar barra de filtros acima da KPI:
+  - Pipeline (multi): default = comerciais; opção "Incluir operacional".
+  - Owner (lista vinda de `payload.filters.owner_options`, badge "Inativo").
+  - Estágio (lista vinda de `payload.filters.stage_options`).
+  - Faixa NRHS, Status (Abertas default; toggles para incluir Ganhas/Perdidas/Desqualificadas).
+- Estado de filtros propagado para a RPC via parâmetros já existentes + filtragem client-side dos `deals` quando o filtro é apenas visual (tier/owner/stage/status). RPC retorna sempre o universo comercial; ampliações operacionais re-disparam RPC.
 
-- POST `/rpc/get_nrhs_analytics` retorna 200 com `jsonb`.
-- Console limpo: sem `42702`, `42703`, `0A000`, `PGRST200`.
-- Aba Revenue Hygiene sai do estado de erro.
-- Cards e tabela carregam (dados reais ou estado vazio legítimo).
-- "Valor em Risco" baseado em `valor_previsto` somado para tiers risk/critical/insalubrious.
-- Botão "Atualizar NRHS" continua funcionando.
-- Lead Score, Opportunity Score, Forecast, OTE, layout: intactos.
+#### 4. Frontend — `useNRHSAnalytics` / `nrhs-analytics.ts`
 
-## Fora de escopo
+- `mapRpcDeal`: passa a ler `account_name`, `owner_name`, `stage_name`, `pipeline_name`, `pipeline_type`, `is_inactive_owner`.
+- Adiciona `pipelineName`, `pipelineType`, `isInactiveOwner` em `NRHSDeal`.
+- Expor `filterOptions` no hook (vindo de `payload.filters`) consumido pela barra de filtros.
 
-Enriquecer nomes (account/owner/stage), refatorar motor NRHS, mudar fórmula, layout, Forecast, OTE.
+#### 5. Frontend — `NRHSDealsTable` e `NRHSByOwner`
 
-&nbsp;
+- `NRHSDealsTable`: usar `accountName`/`ownerName`/`stageName` reais (sem prefixos "Conta XXX"). Badge "Inativo" quando `isInactiveOwner`.
+- `NRHSByOwner`: renomear título para **"Higiene Comercial por Responsável"**. Esconder inativos por padrão; toggle "Mostrar inativos" no header.
 
-Plano aprovado.
+#### 6. Calibragem v1.1 — `nrhs-calculator.ts`
 
-Execute o Hotfix NRHS 1.4.5 exatamente nesse escopo.
+Reescrever os 5 pilares com os pesos novos (Integridade 30, Cadência 25, Stakeholders 20, WinLoss 15, Aderência 10), regras dadas no brief, e:
+- Não zerar pilar inteiro quando uma fonte falha (ex.: activities). Aplicar fallback `updated_at`.
+- Decisor ausente em estágio inicial → **gap**, não blocker.
+- Penalidades como descritas, mas piso por pilar = 0 (não negativo) e somente penalidades aplicadas conforme contexto do estágio.
+- Separar saída em `blockers[]` e `gaps[]` distintos. Persistir em `opportunities.nrhs_blockers` (blockers reais) e `opportunities.nrhs_gaps`.
+- Edge function `calculate-nrhs` usa a mesma calculadora (já é o caso) — ajustar lá também.
 
-Travas obrigatórias:
+#### 7. Detalhe da oportunidade — fix do crash `metadata.integrity`
 
-1. Não usar joins com accounts, profiles, pipeline_stages, pipelines ou users.
+Criar `src/lib/scoring/normalizeNRHSMetadata.ts`:
 
-2. Usar apenas public.opportunities para analytics, com checagem de membership em public.organization_members.
+```ts
+export function normalizeNRHSMetadata(opp: any) {
+  const m = opp?.nrhs_metadata ?? opp?.nrhs_breakdown ?? {};
+  const p = m?.pillars ?? m ?? {};
+  const pillar = (k: string, fallback?: string) => p?.[k] ?? (fallback ? p?.[fallback] : undefined) ?? { score: 0, issues: [], passed: [] };
+  return {
+    pillars: {
+      integrity:        pillar('integrity', 'data_integrity'),
+      cadence:          pillar('cadence'),
+      stakeholders:     pillar('stakeholders'),
+      winloss:          pillar('winloss', 'win_loss'),
+      adherence:        pillar('adherence', 'process_adherence'),
+      evidence:         pillar('evidence'),
+    },
+    blockers: opp?.nrhs_blockers ?? [],
+    gaps: opp?.nrhs_gaps ?? [],
+    recommendations: opp?.nrhs_recommendations ?? [],
+    required_actions: m?.required_actions ?? [],
+  };
+}
+```
 
-3. Usar apenas colunas reais:
+- `NRHSSidebarCard` passa a ler `breakdown = normalizeNRHSMetadata(opportunity)` e nunca acessa `.integrity` direto.
+- `NRHSBreakdown` usa o objeto normalizado.
 
-organization_id, owner_user_id, valor_previsto, title, account_id, stage_id, pipeline_id, status, won_at, lost_at, closed_at, deleted_at, created_at, updated_at e campos NRHS reais.
+#### 8. Detalhe — fix do erro 400 em `/activities`
 
-4. Não usar alias interno chamado value em CTE, subquery ou SELECT intermediário.
+Localizar o componente que dispara `from('activities').select('opportunity_id...')` no detalhe. Adicionar:
+- Filtro `.is('deleted_at', null)`.
+- Wrapping em try/catch + estado vazio.
+- Sem propagar erro para o ErrorBoundary (retornar `[]` em falha).
 
-5. A chave JSON "value" só pode aparecer dentro do jsonb_build_object final.
+#### 9. Card NRHS no detalhe = mesma fonte da aba
 
-6. Manter exatamente a assinatura atual consumida pelo frontend:
+- Remover auto-cálculo client `calculateNRHSClient` no `useNRHS` (que estava sobrescrevendo `nrhs_score` com lógica antiga e gerando 1/0).
+- Botão "Recalcular" do card chama `supabase.functions.invoke('calculate-nrhs', { body: { opportunity_id, organization_id }})` — mesma função usada pela edge oficial.
+- Após recalcular: `invalidateOpportunity` + `queryClient.invalidateQueries({ queryKey: ['nrhs-analytics'] })`.
 
-public.get_nrhs_analytics(uuid, uuid, boolean, uuid)
+#### 10. Insights
 
-7. Não criar nova assinatura paralela.
+- `generateNRHSInsights`: só emite quando há sinal real. Frase de "continue mantendo" só se `eliteCount + healthyCount` ≥ 60% do total.
 
-8. Não alterar frontend.
+### Arquivos impactados (pré-aprovação)
 
-9. Não alterar Lead Score.
+Migrations (2):
+- `supabase/migrations/...recreate_get_nrhs_analytics_v15.sql`
+- `supabase/migrations/...enqueue_nrhs_commercial_scope.sql`
 
-10. Não alterar Opportunity Score.
+Frontend:
+- `src/services/crm/nrhs-analytics.ts` (mapper + tipos + filterOptions)
+- `src/hooks/useNRHSAnalytics.ts` (expor filterOptions)
+- `src/components/scoring/nrhs/RevenueHygieneDashboard.tsx` (barra filtros, toast)
+- `src/components/scoring/nrhs/NRHSDealsTable.tsx` (nomes reais, badge inativo)
+- `src/components/scoring/nrhs/NRHSByOwner.tsx` (rename + toggle inativos)
+- `src/components/scoring/nrhs/NRHSInsightsPanel.tsx` (insights condicionais)
+- `src/lib/scoring/normalizeNRHSMetadata.ts` (novo)
+- `src/components/nrhs/NRHSSidebarCard.tsx` (usa normalizer + recalc via edge)
+- `src/components/nrhs/NRHSBreakdown.tsx` (consome normalizado, pesos novos)
+- `src/hooks/useNRHS.ts` (remover auto-cálculo client; recalc chama edge)
+- `src/services/crm/nrhs-calculator.ts` (calibragem v1.1; blockers vs gaps)
+- `supabase/functions/calculate-nrhs/index.ts` (alinhar fórmula v1.1; popular `nrhs_gaps`)
+- Componente do detalhe que faz query `from('activities')` — corrigir filtro + try/catch (será localizado durante a execução).
 
-11. Não alterar Opportunity Indicators.
+### Travas mantidas
 
-12. Não alterar Forecast, OTE ou layout.
+- Sem nested select PostgREST.
+- Sem alias interno chamado `value` em CTE.
+- Assinatura da RPC inalterada.
+- `crm_active_users_view` é fonte única de usuários (Core memory).
+- RLS multi-tenant respeitado em todos os JOINs (`organization_id` em cada lado).
+- Não toca Lead Score, Opportunity Score, AI Win, Forecast, OTE, layout estrutural.
 
-13. Após migration, testar a RPC diretamente no SQL editor com organization_id real e user_id real.
+### Critérios de aceite
 
-14. A entrega só está concluída se /rpc/get_nrhs_analytics retornar 200 e o console ficar sem 42702, 42703, 0A000 e PGRST200.
-
-Importante:
-
-Se p_only_privileged = true, validar membership em organization_members.
-
-Se o usuário não tiver acesso, retornar payload vazio seguro no contrato JSON esperado, não erro bruto.
+Os 30 itens da seção "Critérios de aceite" do brief, com foco em:
+- Console limpo (sem ErrorBoundary `metadata undefined`, sem 400 de activities).
+- Default = Pré-Vendas + Vendas abertas.
+- Nomes reais em deals/owners/estágios.
+- NRHS do card == NRHS da aba para a mesma opp.
+- Botão "Atualizar NRHS" reprocessa apenas escopo comercial.
