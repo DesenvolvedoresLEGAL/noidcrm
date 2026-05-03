@@ -1,6 +1,6 @@
 // Revenue Hygiene Dashboard - Página principal NRHS
 
-import { Shield, RefreshCw, Sparkles } from 'lucide-react';
+import { Shield, RefreshCw, Sparkles, AlertTriangle } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
