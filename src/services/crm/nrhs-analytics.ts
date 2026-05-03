@@ -40,6 +40,7 @@ export interface NRHSOwnerStats {
   insalubriousPercent: number;
   valueAtRisk: number;
   evolution7d: number | null;
+  isInactive?: boolean;
 }
 
 export interface NRHSDeal {
