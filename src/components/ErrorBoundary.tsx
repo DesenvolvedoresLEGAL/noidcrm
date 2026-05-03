@@ -1,7 +1,7 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { ErrorFallback } from './ErrorFallback';
 import { logger } from '@/lib/logger';
-import { isChunkLoadError, attemptChunkRecovery } from '@/lib/chunkErrorRecovery';
+import { isChunkLoadError } from '@/lib/chunkErrorRecovery';
 
 interface Props {
   children: ReactNode;
