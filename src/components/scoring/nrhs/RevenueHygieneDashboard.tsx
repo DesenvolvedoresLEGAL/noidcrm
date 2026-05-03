@@ -41,6 +41,7 @@ export function RevenueHygieneDashboard() {
     setFilters,
     clearFilters,
     filteredDeals,
+    filterOptions,
   } = useNRHSAnalytics();
 
   useNRHSAnalyticsRealtime(organization?.id);
