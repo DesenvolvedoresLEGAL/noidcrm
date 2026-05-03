@@ -29,9 +29,9 @@ export class ErrorBoundary extends Component<Props, State> {
     return { hasError: true, error };
   }
 
-  public async componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+  public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     const { onError, section } = this.props;
-    
+
     // Log the error
     logger.error('ErrorBoundary caught an error', {
       error: error.message,
@@ -41,26 +41,18 @@ export class ErrorBoundary extends Component<Props, State> {
     });
 
     this.setState({ errorInfo });
-    
+
     // Call custom error handler if provided
     onError?.(error, errorInfo);
 
-    // Check if this is a chunk load error and attempt automatic recovery
+    // AUTH.1.2: NÃO recarregamos a página automaticamente em chunk error.
+    // Auto-reload derrubava sessão visual e podia entrar em loop. O fallback
+    // mostra botão "Recarregar agora" — clique manual do usuário.
     if (isChunkLoadError(error)) {
-      logger.warn('Chunk load error detected, attempting automatic recovery', {
+      logger.warn('Chunk load error detected (no auto reload)', {
         error: error.message,
         section: section || 'unknown',
       });
-      
-      this.setState({ isRecovering: true });
-      
-      // Attempt recovery (will reload page if successful)
-      const willRecover = await attemptChunkRecovery();
-      
-      if (!willRecover) {
-        // Max attempts reached, show error to user
-        this.setState({ isRecovering: false });
-      }
     }
   }
 
