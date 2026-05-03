@@ -1,6 +1,6 @@
 // Chunk Error Recovery - Detects and recovers from PWA/cache loading failures
 
-import { forceUpdate, skipWaitingAndReload, clearAllCaches } from './pwaUtils';
+import { forceUpdate } from './pwaUtils';
 
 const CHUNK_ERROR_PATTERNS = [
   'Failed to fetch dynamically imported module',
