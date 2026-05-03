@@ -164,8 +164,8 @@ export async function fetchNRHSDeals(
       nrhs_blockers,
       nrhs_last_calculated_at,
       created_at,
-      accounts!inner(razao_social, nome_fantasia),
-      pipeline_stages!inner(name),
+      accounts(razao_social, nome_fantasia),
+      stage:stages(name),
       profiles!opportunities_owner_user_id_fkey(full_name)
     `)
     .eq('organization_id', organizationId)
