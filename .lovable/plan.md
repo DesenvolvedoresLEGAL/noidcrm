@@ -1,102 +1,134 @@
+## Sprint Scoring 1.4 — Revenue Hygiene Engine (NRHS v1)
 
-# Sprint A — Proposal Analytics AI Insights Cache
+### Diagnóstico do que está quebrado hoje
 
-## Problem
-The Analytics tab inside an opportunity (`OpportunityAnalyticsTab` → `AIProposalInsightCard`) calls the `analyze-proposal-behavior` edge function on every mount via `autoLoad` + `useEffect`. The result is never persisted, so every tab open burns tokens even when nothing changed.
+Auditoria do schema/código mostrou:
 
-## Goal
-Persist AI Insights in the database keyed by a deterministic signature of the proposal + analytics state. Only call the LLM when the signature changes (new view, forwarding, status/value/due date/payment/items change) or when the user explicitly forces a refresh.
+- `opportunities` já tem `nrhs_score`, `nrhs_tier`, `nrhs_breakdown`, `nrhs_blockers`, `nrhs_issues_count`, `nrhs_last_calculated_at` (Sprint 1.3).
+- Existe `score_history`, `nrhs_events`, view `v_opportunities_hygiene_base` e edge `calculate-nrhs` — mas só funciona via mutação manual (`useNRHS.recalculate`), sem fila, sem triggers, sem cron.
+- A causa direta da aba zerada: `fetchNRHSDeals` filtra `status IN ('open','negotiation','proposal')`, porém os 278 deals abertos do projeto têm status `'new'` ou `'open'` apenas. Status `'negotiation'/'proposal'` não existem na enum.
+- A fórmula atual usa pesos % (30/25/20/15/10) e tier `elite>=90`, divergente da spec v1 (pontos absolutos somados, sem tier elite, com penalidades negativas).
+- Pilares “Win/Loss” e “Evidências” não existem como colunas separadas — só dentro de `nrhs_breakdown`.
+- Não há `forecast_hygiene_eligible` / `ote_hygiene_eligible`, fila `nrhs_recalc_queue`, triggers de enqueue, processador cron, hook realtime, helper de invalidação, nem learning signals separados.
 
-## Discovered context (real schema, will be used as-is)
-- Frontend entry: `src/components/opportunity/OpportunityAnalyticsTab.tsx` → `src/components/proposals/AIProposalInsightCard.tsx` (uses `autoLoad` and a manual `RefreshCw` button — both call the edge fn directly).
-- Edge function: `supabase/functions/analyze-proposal-behavior/index.ts` (uses service role, queries `proposals`, `proposal_views` filtered by `viewer_type='external'`, `proposal_view_events`).
-- Tables: `proposals (id, organization_id, opportunity_id, status, total_amount, updated_at)` — no `due_date`/`payment_method` columns (will use what exists, plus `valor_liquido` etc. via dynamic select). `proposal_views (proposal_id, viewed_at, viewer_ip, duration_seconds, sections_viewed, scroll_depth_percent, is_forwarded, viewer_type, viewer_user_id)`. `proposal_view_events`, `proposal_items`.
-- AI usage log already exists: `ai_usage_logs (organization_id, user_id, feature, action, entity_type, entity_id, model_used, tokens_input, tokens_output, tokens_total, success, request_metadata, response_metadata, created_at)` — reuse, do not duplicate.
-- RLS helpers: `get_user_organization_id()`, `user_is_org_member(uuid)`, `user_is_org_admin(uuid)`. No `user_belongs_to_organization` — the spec's example will be adapted to `user_is_org_member`.
-- `update_updated_at_column()` already exists — reuse for trigger.
+A spec pede que a fórmula seja v1 “oficial” (pontos absolutos), portanto vamos consolidar o motor todo nessa convenção e migrar a UI/breakdown.
 
-## Plan
+---
 
-### 1. Migration: cache table
-Create `public.proposal_ai_insights_cache` with the schema from the brief, but:
-- FKs: `organization_id → organizations(id)`, `opportunity_id → opportunities(id) ON DELETE CASCADE`, `proposal_id → proposals(id) ON DELETE CASCADE`.
-- `UNIQUE (proposal_id)` (proposal already implies opportunity/org; keeps upsert simple).
-- Indexes on `organization_id`, `opportunity_id`, `proposal_id`, `analytics_signature`.
-- Trigger `update_updated_at_column` on `BEFORE UPDATE`.
+### Escopo da entrega
 
-### 2. RLS
-Enable RLS and add three policies using existing helpers:
-- SELECT: `user_is_org_member(organization_id)`.
-- INSERT: `WITH CHECK (user_is_org_member(organization_id))`.
-- UPDATE: `USING + WITH CHECK (user_is_org_member(organization_id))`.
-Service role (edge fn) bypasses RLS, so upsert from the edge function works safely.
+#### 1. Migration de schema (`supabase/migrations/...`)
 
-### 3. RPC `get_proposal_analytics_signature(p_proposal_id uuid)`
-`SECURITY DEFINER`, fixed `search_path = public`. Returns md5 hash combining:
-- `proposals`: id, opportunity_id, organization_id, status, total_amount, updated_at (and `valor_liquido`, `due_date` only if those columns exist — use dynamic SQL `to_jsonb(p)` slice to be schema-tolerant).
-- Aggregates over `proposal_views` (external only): count, distinct viewer_ip, distinct viewer_user_id, sum/avg duration_seconds, max viewed_at, max scroll_depth_percent, bool_or(is_forwarded), array_agg(distinct sections_viewed) hashed.
-- Aggregates over `proposal_view_events`: count, max(timestamp).
-- Aggregates over `proposal_items`: count, max(updated_at).
-Single `SELECT md5(string_agg(...))` query with LEFT JOINs grouped by proposal id.
+- Adicionar colunas em `opportunities` (mantendo `nrhs_score`, `nrhs_tier`, `nrhs_blockers`, `nrhs_breakdown` existentes — apenas reusar):
+  - `nrhs_status text` (mapeia para `healthy|risk|critical|unhealthy`); manter `nrhs_tier` para retrocompatibilidade preenchendo igual.
+  - `nrhs_data_integrity_score`, `nrhs_cadence_score`, `nrhs_stakeholders_score`, `nrhs_win_loss_score`, `nrhs_process_adherence_score`, `nrhs_evidence_score` (integer null).
+  - `nrhs_gaps jsonb default '[]'`, `nrhs_recommendations jsonb default '[]'`, `nrhs_metadata jsonb default '{}'`, `nrhs_updated_at timestamptz`.
+  - `forecast_hygiene_eligible boolean`, `ote_hygiene_eligible boolean`.
+  - Constraints: `nrhs_score BETWEEN 0 AND 100`, `nrhs_status CHECK (in 'healthy','risk','critical','unhealthy')`. Backfill `nrhs_status` a partir de `nrhs_score`.
 
-### 4. RPC `get_proposal_ai_insights_cache(p_proposal_id uuid)`
-Returns JSON `{ has_cache, is_valid, current_signature, cached_signature, generated_at, insights_payload, engagement_score, engagement_level, close_probability, risk_level, recommended_actions, smart_alerts, generated_summary, model_used }`. Reads cache row scoped by RLS, computes current signature via the function above, sets `is_valid = (cached_signature = current_signature)`.
+- Tabela `nrhs_recalc_queue` (mesmo padrão das filas existentes `lead_score_recalc_queue`/`opportunity_score_recalc_queue`):
+  - Campos por spec, status default `pending`, índices em `(status, created_at)` e `(opportunity_id, created_at desc)`.
+  - RLS: leitura via `has_role(...)`, gravação via service role (igual às outras filas).
 
-### 5. RPC `upsert_proposal_ai_insights_cache(...)`
-`INSERT ... ON CONFLICT (proposal_id) DO UPDATE` overwriting all fields per spec, refreshing `generated_at` and `updated_at`. Validates the caller is org member (or service role).
+- Tabela `nrhs_learning_signals` por spec, com índice `(org_id, opportunity_id, created_at desc)` e RLS por org.
 
-### 6. Edge function: cache-aware
-Refactor `analyze-proposal-behavior/index.ts`:
-1. Accept `{ proposal_id, force_refresh?: boolean }`.
-2. Compute signature via `get_proposal_analytics_signature`.
-3. SELECT existing cache row.
-4. If `total_views === 0` and no cache → return `{ status: 'insufficient_data' }` without calling AI.
-5. If cache valid and not `force_refresh` → return cached payload with `from_cache: true`.
-6. Otherwise call existing `callAI(...)` flow; on success, upsert via `upsert_proposal_ai_insights_cache`, log to `ai_usage_logs` (`feature='proposal_analytics_ai_insights'`, `action=reason` ∈ `cache_miss|signature_changed|manual_refresh`, `entity_type='proposal'`, tokens, success).
-7. On AI failure, return existing cache with `stale: true, error: '...'` so UI can show fallback; do not delete cache.
-8. Never log `ai_usage_logs` for cache hits.
+- Triggers de enqueue (`AFTER INSERT/UPDATE`) em `opportunities`, `activities`, `contacts`, `proposals`, `opportunity_emails`. Comparar `OLD vs NEW` apenas em campos relevantes da spec; debounce de 2 min (checar `MAX(created_at)` na fila para o `opportunity_id` antes de inserir). Para activities/contacts/proposals: derivar `opportunity_id` (FK existente) e enfileirar.
 
-### 7. Frontend hook + service
-Create `src/services/supabase/proposal-ai-insights.ts`:
-- `getProposalAIInsights(proposalId)` → calls edge function with `force_refresh=false`.
-- `refreshProposalAIInsights(proposalId, { force })` → calls with `force_refresh=true`.
+- Cron `pg_cron`: a cada 1 min chama edge `process-nrhs-queue` (via insert tool, não migration, igual padrão de cron já adotado).
 
-Create `src/hooks/useProposalAIInsights.ts` using React Query:
-- `queryKey: ['proposal-ai-insights', proposalId]`.
-- `queryFn`: invokes edge function (cache-aware path).
-- Returns `{ data, isLoading, isRefreshing, isFromCache, generatedAt, status, error, refresh }`.
-- `staleTime: Infinity` (server is the source of truth — invalidation happens via signature).
+- Backfill: ao final da migration, `INSERT INTO nrhs_recalc_queue (opportunity_id, org_id, trigger_source, trigger_action) SELECT id, organization_id, 'backfill_sprint14', 'recalculate' FROM opportunities WHERE deleted_at IS NULL AND status NOT IN ('won','lost') LIMIT enqueue all`.
 
-### 8. Refactor `AIProposalInsightCard`
-- Remove `useEffect` auto-call and local `useState` AI call.
-- Consume `useProposalAIInsights({ proposalId, opportunityId })`.
-- Render existing cards with payload; map server payload (`engagement_score/level`, `recommended_actions`, `smart_alerts`, `summary`, `close_probability`, `insights`) — keep current visual layout untouched.
-- Add states:
-  - `insufficient_data` → "Ainda não há visualizações suficientes…".
-  - `from_cache` valid → small footer `Insights atualizados em DD/MM/YYYY HH:mm`.
-  - `refreshing` → "Novas interações detectadas. Atualizando análise inteligente…".
-  - `error_with_cache` → keep showing payload + warning banner.
-  - `error_no_cache` → "Não foi possível gerar os insights agora. Tente novamente mais tarde."
-- "Atualizar análise" button (existing `RefreshCw`):
-  - If signature unchanged (response had `from_cache=true`), open AlertDialog "Nenhuma nova interação foi detectada. Deseja gerar uma nova análise mesmo assim?" — only on confirm call `refresh({ force: true })`.
-  - Else call `refresh({ force: true })` directly.
-  - Visible only when `user_is_org_admin_or_manager` (reuse existing `usePermissions`).
+- Garantir `ALTER PUBLICATION supabase_realtime ADD TABLE opportunities` e `REPLICA IDENTITY FULL` (verificar; provavelmente já está).
 
-### 9. Tests / manual QA matrix
-Run all 7 manual tests from the brief. Optionally add a vitest unit for the signature computation parity (skip if too costly).
+#### 2. Edge functions
 
-## Files to change
-- New: `supabase/migrations/<ts>_proposal_ai_insights_cache.sql`
-- Edit: `supabase/functions/analyze-proposal-behavior/index.ts`
-- New: `src/services/supabase/proposal-ai-insights.ts`
-- New: `src/hooks/useProposalAIInsights.ts`
-- Edit: `src/components/proposals/AIProposalInsightCard.tsx`
+- **`calculate-nrhs`** — refatorar 100% para a fórmula v1:
+  - Buscar opp + pipeline_stage + account + contatos + atividades + propostas + emails.
+  - Calcular 6 pilares por pontos absolutos (Parts 3–8 da spec).
+  - Aplicar penalidades (Part 9), classificar `nrhs_status`, gerar `blockers[]` (objetos com `code/severity/label/description/how_to_fix`), `gaps[]`, `recommendations[]`.
+  - Persistir todos os campos novos em `opportunities` + `forecast_hygiene_eligible = score>=70` + `ote_hygiene_eligible = score>=75`.
+  - Inserir snapshot em `score_history` (`score_type='nrhs'`, metadata com componentes/blockers/gaps/recommendations/formula_version `'nrhs_v1'`).
+  - Inserir em `nrhs_learning_signals` evento `nrhs_recalculated`.
+  - Em caso de erro: preservar último valor válido, gravar `error_message` na fila.
 
-## Risks
-- Signature must be deterministic — avoid floating averages drift; cast to `numeric(12,2)` before hashing.
-- RLS: edge fn uses service role → bypasses RLS; ensure upsert function still scopes by `organization_id` from the proposal record (don't trust client).
-- Backwards compat: existing callers of `analyze-proposal-behavior` (only `AIProposalInsightCard`) — no other usage in repo.
-- `due_date`/`payment_method` not present on `proposals` — use `valor_liquido` if present; signature uses only existing columns to avoid migration errors.
+- **`process-nrhs-queue`** (nova) — pega até 50 itens `pending`, processa com debounce, marca `processing`/`completed`/`failed`. Padrão dos processadores existentes.
 
-## Out of scope
-- Layout redesign, Sprint B value sync, deleting old cache rows (signature naturally invalidates).
+- Triggers de eventos de negócio (won/lost/stage_advanced/regressed) inserem em `nrhs_learning_signals` via DB trigger pequena (sem precisar de edge).
+
+#### 3. Frontend — analytics e UI funcional
+
+- `src/services/crm/nrhs-analytics.ts`:
+  - Corrigir filtro de `status` para o conjunto real do banco (`status NOT IN ('won','lost')` + opcional `deleted_at IS NULL` + `pipeline_type='sales'` por default via join em `pipelines`).
+  - Selecionar os 6 scores de pilar reais (não recalcular client-side).
+  - `calculateTierDistribution`: usar buckets `healthy|risk|critical|unhealthy` da spec.
+  - `calculatePillarAverages`: usar colunas reais (`nrhs_data_integrity_score` etc.), labels da spec.
+  - Adicionar `valueAtRisk = sum(valor_previsto) WHERE nrhs_status IN ('risk','critical','unhealthy')`.
+  - Insights: gerar pelas regras da Part 26 a partir dos `blockers/gaps` reais.
+
+- `src/hooks/useNRHSAnalytics.ts`:
+  - Adicionar filtros novos: `pipelineId`, `stageId`, `blockerCode`, `period`, `showWon`, `showLost`, `showOperational` (defaults conforme spec — Vendas/abertas/sem ganhas/perdidas/operacionais).
+  - Buscar `pipelines` para resolver default “Vendas” via `is_primary=true AND pipeline_type='sales'`.
+
+- Novos hooks:
+  - `src/hooks/scoring/useNRHSRealtime.ts` — assina `opportunities` (filtra por org), invalida queries.
+  - `src/hooks/scoring/useNRHSAnalyticsRealtime.ts` — wrapper global montado no Dashboard de Hygiene.
+- `src/lib/scoring/invalidateNRHSQueries.ts` — invalida chaves listadas na Part 20.
+
+- `RevenueHygieneDashboard.tsx`:
+  - Wire-up do botão **Atualizar NRHS** → `supabase.from('nrhs_recalc_queue').insert(...)` em lote para deals filtrados (até 1000 por chamada), toast de progresso, montar realtime hook.
+  - Adicionar filtros no topo (Pipeline/Status/Owner/Estágio/Faixa/Blocker/Período + toggles ganhas/perdidas/operacionais).
+  - `NRHSDealsTable`: ação por linha “Reprocessar NRHS” → invoca edge `calculate-nrhs` direto.
+  - `NRHSByOwner`: usar `calculateOwnerStats` já calculado, expor blockers principais por owner.
+  - `NRHSGovernanceBox`: mostrar regras reais (Part 27) com thresholds 70/75 lidos do código (constantes).
+  - `NRHSInsightsPanel`: consumir `generateNRHSInsights` reformulado.
+
+- Tooltip/badge `NRHSBadge` e `NRHSBreakdown`: ajustar para 4 status oficiais e exibir blockers/gaps/recommendations do `nrhs_metadata`.
+
+#### 4. Integrações leves
+
+- Forecast: nada de refactor; `useForecastData` já lê deals — apenas garantir que `forecast_hygiene_eligible` esteja exposto via select para uso futuro. Sem mudança de cálculo nesta sprint.
+- Lead Score, Opportunity Score, Opportunity Indicators: **não tocados**. NRHS roda em paralelo.
+
+#### 5. RLS / segurança
+
+- Reutilizar `has_role` e padrão `org_id` das filas existentes. Service role processa fila. Reprocessamento manual permitido a admin/owner/manager (checagem na UI + RLS de insert na fila usando `has_role`).
+
+---
+
+### Arquivos impactados
+
+**Banco (migration única):**
+- Colunas em `opportunities`, tabelas `nrhs_recalc_queue`, `nrhs_learning_signals`, triggers de enqueue + signals, view `v_opportunities_hygiene_base` (refresh se necessário).
+
+**Cron (insert tool, não migration):** agendamento de `process-nrhs-queue`.
+
+**Edge functions:**
+- `supabase/functions/calculate-nrhs/index.ts` (reescrita v1).
+- `supabase/functions/process-nrhs-queue/index.ts` (novo).
+
+**Frontend:**
+- `src/services/crm/nrhs-analytics.ts` (filtros + pilares reais + insights).
+- `src/services/crm/nrhs-calculator.ts` (tipos `NRHSStatus`, `NRHS_THRESHOLDS`, helpers v1; manter `NRHSTier` como alias).
+- `src/hooks/useNRHSAnalytics.ts`, `src/hooks/useNRHS.ts` (mutate via fila).
+- `src/hooks/scoring/useNRHSRealtime.ts`, `src/hooks/scoring/useNRHSAnalyticsRealtime.ts` (novos).
+- `src/lib/scoring/invalidateNRHSQueries.ts` (novo).
+- `src/lib/query-keys.ts` (`nrhsKeys`, `nrhsAnalyticsKeys` ampliados).
+- `src/components/scoring/nrhs/RevenueHygieneDashboard.tsx` + filhos (`NRHSOverviewKPIs`, `NRHSDistributionCharts`, `NRHSDealsTable`, `NRHSByOwner`, `NRHSGovernanceBox`, `NRHSInsightsPanel`).
+- `src/components/nrhs/NRHSBadge.tsx`, `NRHSBreakdown.tsx`, `NRHSSidebarCard.tsx` (status v1 + metadata explicável).
+
+---
+
+### Riscos
+
+- Mudança de fórmula muda valores históricos de `nrhs_score`. Mitigação: gravar `formula_version` no metadata e em `score_history`; backfill recalcula tudo.
+- Tier antigo `elite` deixa de existir. Componentes que usam `NRHSTier === 'elite'` recebem mapeamento para `healthy`.
+- Triggers de enqueue mal calibrados podem inflar a fila. Mitigação: debounce 2 min via subquery + filtros estritos por colunas relevantes.
+- Backfill de ~278 deals: será processado pelo cron em lotes de 50/min (~6 min). Sem bloqueio de deploy.
+
+### Próximos passos após aprovação
+
+1. Migration (schema + triggers + backfill).
+2. Refactor edge `calculate-nrhs` e novo `process-nrhs-queue`.
+3. Cron via insert tool.
+4. Refactor service/hook + UI + realtime.
+5. QA: validar aba populada, recálculo manual, badge na pipeline, histórico em `score_history`.

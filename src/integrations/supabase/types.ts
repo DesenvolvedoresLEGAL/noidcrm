@@ -15159,6 +15159,84 @@ export type Database = {
           },
         ]
       }
+      nrhs_learning_signals: {
+        Row: {
+          account_id: string | null
+          created_at: string
+          event_type: string
+          event_value: Json
+          id: string
+          nrhs_score_at_event: number | null
+          opportunity_id: string
+          organization_id: string
+          outcome: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          created_at?: string
+          event_type: string
+          event_value?: Json
+          id?: string
+          nrhs_score_at_event?: number | null
+          opportunity_id: string
+          organization_id: string
+          outcome?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          created_at?: string
+          event_type?: string
+          event_value?: Json
+          id?: string
+          nrhs_score_at_event?: number | null
+          opportunity_id?: string
+          organization_id?: string
+          outcome?: string | null
+        }
+        Relationships: []
+      }
+      nrhs_recalc_queue: {
+        Row: {
+          account_id: string | null
+          created_at: string
+          error_message: string | null
+          id: string
+          metadata: Json
+          opportunity_id: string
+          organization_id: string
+          processed_at: string | null
+          status: string
+          trigger_action: string
+          trigger_source: string
+        }
+        Insert: {
+          account_id?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          metadata?: Json
+          opportunity_id: string
+          organization_id: string
+          processed_at?: string | null
+          status?: string
+          trigger_action: string
+          trigger_source: string
+        }
+        Update: {
+          account_id?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          metadata?: Json
+          opportunity_id?: string
+          organization_id?: string
+          processed_at?: string | null
+          status?: string
+          trigger_action?: string
+          trigger_source?: string
+        }
+        Relationships: []
+      }
       oauth_nonces: {
         Row: {
           created_at: string
@@ -15247,6 +15325,7 @@ export type Database = {
           engagement_score: number | null
           engagement_updated_at: string | null
           fonte: string | null
+          forecast_hygiene_eligible: boolean | null
           id: string
           indicators_updated_at: string | null
           is_recoverable: string | null
@@ -15260,10 +15339,21 @@ export type Database = {
           next_followup_date: string | null
           nrhs_blockers: Json | null
           nrhs_breakdown: Json | null
+          nrhs_cadence_score: number | null
+          nrhs_data_integrity_score: number | null
+          nrhs_evidence_score: number | null
+          nrhs_gaps: Json
           nrhs_issues_count: number | null
           nrhs_last_calculated_at: string | null
+          nrhs_metadata: Json
+          nrhs_process_adherence_score: number | null
+          nrhs_recommendations: Json
           nrhs_score: number | null
+          nrhs_stakeholders_score: number | null
+          nrhs_status: string | null
           nrhs_tier: string | null
+          nrhs_updated_at: string | null
+          nrhs_win_loss_score: number | null
           opportunity_grade: string | null
           opportunity_health: string | null
           opportunity_score: number | null
@@ -15271,6 +15361,7 @@ export type Database = {
           opportunity_type: string | null
           organization_id: string
           origem: string | null
+          ote_hygiene_eligible: boolean | null
           owner_user_id: string | null
           pipeline_id: string | null
           playbook_run_id: string | null
@@ -15340,6 +15431,7 @@ export type Database = {
           engagement_score?: number | null
           engagement_updated_at?: string | null
           fonte?: string | null
+          forecast_hygiene_eligible?: boolean | null
           id?: string
           indicators_updated_at?: string | null
           is_recoverable?: string | null
@@ -15353,10 +15445,21 @@ export type Database = {
           next_followup_date?: string | null
           nrhs_blockers?: Json | null
           nrhs_breakdown?: Json | null
+          nrhs_cadence_score?: number | null
+          nrhs_data_integrity_score?: number | null
+          nrhs_evidence_score?: number | null
+          nrhs_gaps?: Json
           nrhs_issues_count?: number | null
           nrhs_last_calculated_at?: string | null
+          nrhs_metadata?: Json
+          nrhs_process_adherence_score?: number | null
+          nrhs_recommendations?: Json
           nrhs_score?: number | null
+          nrhs_stakeholders_score?: number | null
+          nrhs_status?: string | null
           nrhs_tier?: string | null
+          nrhs_updated_at?: string | null
+          nrhs_win_loss_score?: number | null
           opportunity_grade?: string | null
           opportunity_health?: string | null
           opportunity_score?: number | null
@@ -15364,6 +15467,7 @@ export type Database = {
           opportunity_type?: string | null
           organization_id: string
           origem?: string | null
+          ote_hygiene_eligible?: boolean | null
           owner_user_id?: string | null
           pipeline_id?: string | null
           playbook_run_id?: string | null
@@ -15433,6 +15537,7 @@ export type Database = {
           engagement_score?: number | null
           engagement_updated_at?: string | null
           fonte?: string | null
+          forecast_hygiene_eligible?: boolean | null
           id?: string
           indicators_updated_at?: string | null
           is_recoverable?: string | null
@@ -15446,10 +15551,21 @@ export type Database = {
           next_followup_date?: string | null
           nrhs_blockers?: Json | null
           nrhs_breakdown?: Json | null
+          nrhs_cadence_score?: number | null
+          nrhs_data_integrity_score?: number | null
+          nrhs_evidence_score?: number | null
+          nrhs_gaps?: Json
           nrhs_issues_count?: number | null
           nrhs_last_calculated_at?: string | null
+          nrhs_metadata?: Json
+          nrhs_process_adherence_score?: number | null
+          nrhs_recommendations?: Json
           nrhs_score?: number | null
+          nrhs_stakeholders_score?: number | null
+          nrhs_status?: string | null
           nrhs_tier?: string | null
+          nrhs_updated_at?: string | null
+          nrhs_win_loss_score?: number | null
           opportunity_grade?: string | null
           opportunity_health?: string | null
           opportunity_score?: number | null
@@ -15457,6 +15573,7 @@ export type Database = {
           opportunity_type?: string | null
           organization_id?: string
           origem?: string | null
+          ote_hygiene_eligible?: boolean | null
           owner_user_id?: string | null
           pipeline_id?: string | null
           playbook_run_id?: string | null
