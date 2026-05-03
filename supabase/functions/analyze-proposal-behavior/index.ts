@@ -275,11 +275,10 @@ Gere insights acionáveis baseados nos padrões observados.`;
         reasoning_effort: 'low',
         feature: 'proposal_analytics_ai_insights',
         organization_id: proposal.organization_id,
-        metadata: { proposal_id, reason: refreshReason, entity_type: 'proposal', entity_id: proposal_id },
       });
       content = aiResult.content;
       usage = aiResult.usage;
-      modelUsed = (aiResult as any).model || modelUsed;
+      modelUsed = aiResult.model_used || modelUsed;
     } catch (aiErr) {
       console.error('[analyze-proposal-behavior] AI error', aiErr);
       if (cacheRow) {
