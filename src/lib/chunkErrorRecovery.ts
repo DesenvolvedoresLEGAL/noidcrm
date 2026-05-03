@@ -88,40 +88,30 @@ export function clearRecoveryAttempts(): void {
 }
 
 /**
- * Attempt automatic recovery from chunk load error
- * Returns true if recovery was attempted (page will reload)
+ * AUTH.1.2: NÃO recarrega a página automaticamente. Apenas registra a
+ * tentativa, emite um evento global `noid:chunk-error` e devolve `false`.
+ * A UI (ErrorBoundary, banners) decide se/quando oferecer reload manual.
  */
 export async function attemptChunkRecovery(): Promise<boolean> {
   const attempts = incrementRecoveryAttempts();
-  
-  console.log(`[ChunkRecovery] Attempt ${attempts}/${RECOVERY_MAX_ATTEMPTS}`);
-  
-  if (attempts === 1) {
-    // First attempt: soft recovery - skip waiting and reload
-    console.log('[ChunkRecovery] Trying soft recovery (skipWaitingAndReload)');
-    await skipWaitingAndReload();
-    return true;
-  } else if (attempts === 2) {
-    // Second attempt: clear caches and reload
-    console.log('[ChunkRecovery] Trying cache clear recovery');
-    await clearAllCaches();
-    await new Promise(resolve => setTimeout(resolve, 200));
-    window.location.reload();
-    return true;
-  } else if (attempts <= RECOVERY_MAX_ATTEMPTS) {
-    // Third attempt: hard recovery - unregister SW and clear all
-    console.log('[ChunkRecovery] Trying hard recovery (forceUpdate)');
-    await forceUpdate();
-    return true;
+
+  console.warn(`[ChunkRecovery] Detected (attempt ${attempts}/${RECOVERY_MAX_ATTEMPTS}) — no auto reload`);
+
+  try {
+    window.dispatchEvent(
+      new CustomEvent('noid:chunk-error', {
+        detail: { attempts, max: RECOVERY_MAX_ATTEMPTS, reason: 'chunk_load_failed' },
+      }),
+    );
+  } catch {
+    // ignore
   }
-  
-  // Max attempts reached - don't auto-recover, let user see the error
-  console.log('[ChunkRecovery] Max attempts reached, showing error to user');
+
   return false;
 }
 
 /**
- * Force a hard reset - clear everything and reload
+ * Force a hard reset - clear everything and reload (manual user action only)
  */
 export async function forceHardReset(): Promise<void> {
   console.log('[ChunkRecovery] User requested hard reset');
@@ -132,28 +122,40 @@ export async function forceHardReset(): Promise<void> {
 
 /**
  * Setup global error handlers for catching chunk load errors
- * outside of React error boundaries
+ * outside of React error boundaries.
+ *
+ * AUTH.1.2: NUNCA chama reload automático. Apenas loga e dispara evento.
  */
 export function setupGlobalChunkErrorHandlers(): void {
-  // Handle unhandled promise rejections (dynamic imports fail as rejections)
   window.addEventListener('unhandledrejection', (event) => {
     const error = event.reason;
     if (error instanceof Error && isChunkLoadError(error)) {
-      console.error('[ChunkRecovery] Caught unhandled chunk load rejection:', error.message);
+      console.warn('[ChunkRecovery] unhandled chunk rejection (no auto reload):', error.message);
       event.preventDefault();
-      attemptChunkRecovery();
+      try {
+        window.dispatchEvent(
+          new CustomEvent('noid:chunk-error', { detail: { reason: 'unhandledrejection' } }),
+        );
+      } catch {
+        // ignore
+      }
     }
   });
 
-  // Handle regular errors (backup)
   window.addEventListener('error', (event) => {
     const error = event.error;
     if (error instanceof Error && isChunkLoadError(error)) {
-      console.error('[ChunkRecovery] Caught global chunk load error:', error.message);
+      console.warn('[ChunkRecovery] global chunk error (no auto reload):', error.message);
       event.preventDefault();
-      attemptChunkRecovery();
+      try {
+        window.dispatchEvent(
+          new CustomEvent('noid:chunk-error', { detail: { reason: 'window_error' } }),
+        );
+      } catch {
+        // ignore
+      }
     }
   });
 
-  console.log('[ChunkRecovery] Global handlers installed');
+  console.log('[ChunkRecovery] Global handlers installed (no auto reload)');
 }
