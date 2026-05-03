@@ -96,7 +96,7 @@ export function useCurrentOrganization() {
     };
 
     fetchOrganization();
-  }, [user]);
+  }, [user, authLoading]);
 
   // Unificado: usar org_role (campo correto da tabela organization_members)
   const isOwner = membership?.org_role === 'owner';
