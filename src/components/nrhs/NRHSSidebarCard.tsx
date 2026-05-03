@@ -56,8 +56,8 @@ export function NRHSSidebarCard({
   }
 
   const hasIssues = issuesCount > 0;
-  const hasBlockers = blockers.length > 0;
-  const topIssues = breakdown?.required_actions?.slice(0, 2) || [];
+  const hasBlockers = (blockersDetailed?.length ?? 0) > 0;
+  const topIssues = [...(blockersDetailed || []), ...(gaps || [])].slice(0, 2);
 
   return (
     <>
