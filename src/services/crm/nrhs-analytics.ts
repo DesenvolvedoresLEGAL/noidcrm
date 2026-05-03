@@ -48,9 +48,13 @@ export interface NRHSDeal {
   accountName: string;
   ownerName: string;
   ownerUserId: string;
+  isInactiveOwner: boolean;
   value: number;
   stageName: string;
   stageId: string;
+  pipelineId: string | null;
+  pipelineName: string | null;
+  pipelineType: string | null;
   opportunityScore: number | null;
   nrhsScore: number | null;
   nrhsTier: NRHSTier | null;
@@ -67,6 +71,15 @@ export interface NRHSDeal {
   };
   lastReviewedAt: string | null;
   createdAt: string;
+}
+
+export interface NRHSFilterOptions {
+  pipelineOptions: { id: string; name: string; pipelineType: string | null }[];
+  ownerOptions: { userId: string; fullName: string; isInactive: boolean }[];
+  stageOptions: { id: string; name: string; pipelineId: string | null }[];
+  appliedScope: string;
+  includedPipelineTypes: string[];
+  excludedPipelineTypes: string[];
 }
 
 export interface NRHSInsight {
