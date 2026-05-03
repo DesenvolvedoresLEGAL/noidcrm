@@ -383,30 +383,20 @@ export function calculateOwnerStats(deals: NRHSDeal[]): NRHSOwnerStats[] {
 
 export function generateNRHSInsights(deals: NRHSDeal[]): NRHSInsight[] {
   const insights: NRHSInsight[] = [];
-  
-  // Count issues by type
-  const issueCount: Record<string, number> = {};
-  const issueDealCount: Record<string, number> = {};
-  
-  for (const deal of deals) {
-    for (const blockerId of deal.nrhsBlockers || []) {
-      issueCount[blockerId] = (issueCount[blockerId] || 0) + 1;
-      issueDealCount[blockerId] = (issueDealCount[blockerId] || 0) + 1;
-    }
-  }
+  const codeOf = (b: any): string => (typeof b === 'string' ? b : b?.code ?? '');
+  const dealHas = (d: NRHSDeal, code: string) =>
+    (d.nrhsBlockers || []).some(b => codeOf(b) === code);
 
-  // Calculate percentages and generate insights
   const totalDeals = deals.length;
-  const criticalDeals = deals.filter(d => (d.nrhsScore ?? 0) < 60);
-  
-  // Insight: Missing next step in critical deals
-  const criticalWithNoStep = criticalDeals.filter(d => d.nrhsBlockers?.includes('missing_next_step'));
-  if (criticalWithNoStep.length > 0 && totalDeals > 0) {
+  const criticalDeals = deals.filter(d => (d.nrhsScore ?? 0) < 50);
+
+  const criticalWithNoStep = criticalDeals.filter(d => dealHas(d, 'missing_next_step') || dealHas(d, 'no_next_step'));
+  if (criticalWithNoStep.length > 0 && criticalDeals.length > 0) {
     const percent = Math.round((criticalWithNoStep.length / criticalDeals.length) * 100);
     if (percent >= 30) {
       insights.push({
         id: 'critical_no_step',
-        text: `${percent}% dos deals críticos falham por ausência de próximo passo`,
+        text: `${percent}% dos deals em risco/críticos sem próximo passo agendado`,
         pillar: 'Cadência',
         dealCount: criticalWithNoStep.length,
         severity: 'high',
@@ -414,56 +404,52 @@ export function generateNRHSInsights(deals: NRHSDeal[]): NRHSInsight[] {
     }
   }
 
-  // Insight: Missing decision maker
-  const noDecisionMaker = deals.filter(d => d.nrhsBlockers?.includes('missing_decision_maker'));
+  const noDecisionMaker = deals.filter(d => dealHas(d, 'missing_decision_maker') || dealHas(d, 'no_decisor'));
   if (noDecisionMaker.length >= 3) {
     const avgNRHS = Math.round(noDecisionMaker.reduce((s, d) => s + (d.nrhsScore ?? 0), 0) / noDecisionMaker.length);
     insights.push({
       id: 'no_decision_maker',
-      text: `Deals sem decisor têm NRHS médio ${avgNRHS} e precisam de atenção`,
+      text: `${noDecisionMaker.length} deals sem decisor mapeado (NRHS médio ${avgNRHS})`,
       pillar: 'Stakeholders',
       dealCount: noDecisionMaker.length,
       severity: avgNRHS < 50 ? 'high' : 'medium',
     });
   }
 
-  // Insight: No recent activity
-  const noActivity = deals.filter(d => d.nrhsBlockers?.includes('no_recent_activity'));
+  const noActivity = deals.filter(d => dealHas(d, 'no_recent_activity') || dealHas(d, 'stale_in_stage'));
   if (noActivity.length >= 3) {
     insights.push({
       id: 'stale_deals',
-      text: `${noActivity.length} deals estão sem atividade recente e podem estar abandonados`,
+      text: `${noActivity.length} deals sem atividade recente — possível abandono`,
       pillar: 'Cadência',
       dealCount: noActivity.length,
       severity: 'medium',
     });
   }
 
-  // Insight: Missing value
-  const noValue = deals.filter(d => d.nrhsBlockers?.includes('missing_value'));
+  const noValue = deals.filter(d => dealHas(d, 'missing_value'));
   if (noValue.length >= 2) {
     insights.push({
       id: 'missing_value',
-      text: `${noValue.length} deals não possuem valor definido, prejudicando o forecast`,
+      text: `${noValue.length} deals sem valor definido — quebra forecast`,
       pillar: 'Integridade',
       dealCount: noValue.length,
       severity: 'high',
     });
   }
 
-  // Insight: Past close date
-  const pastDate = deals.filter(d => d.nrhsBlockers?.includes('close_date_past'));
+  const pastDate = deals.filter(d => dealHas(d, 'close_date_past') || dealHas(d, 'stale_close_date'));
   if (pastDate.length >= 2) {
     insights.push({
       id: 'past_close_date',
-      text: `${pastDate.length} deals têm data de fechamento vencida e precisam de atualização`,
+      text: `${pastDate.length} deals com data de fechamento vencida`,
       pillar: 'Integridade',
       dealCount: pastDate.length,
       severity: 'medium',
     });
   }
 
-  return insights.slice(0, 5); // Return top 5 insights
+  return insights.slice(0, 5);
 }
 
 export function generateNRHSCorrelations(deals: NRHSDeal[]): NRHSCorrelation[] {
