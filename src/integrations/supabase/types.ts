@@ -19981,6 +19981,78 @@ export type Database = {
           },
         ]
       }
+      proposal_ai_insights_cache: {
+        Row: {
+          analytics_signature: string
+          close_probability: number | null
+          created_at: string
+          engagement_level: string | null
+          engagement_score: number | null
+          expires_at: string | null
+          generated_at: string
+          generated_summary: string | null
+          id: string
+          insights_payload: Json
+          model_used: string | null
+          opportunity_id: string
+          organization_id: string
+          proposal_id: string
+          recommended_actions: Json
+          risk_level: string | null
+          smart_alerts: Json
+          tokens_input: number | null
+          tokens_output: number | null
+          total_tokens: number | null
+          updated_at: string
+        }
+        Insert: {
+          analytics_signature: string
+          close_probability?: number | null
+          created_at?: string
+          engagement_level?: string | null
+          engagement_score?: number | null
+          expires_at?: string | null
+          generated_at?: string
+          generated_summary?: string | null
+          id?: string
+          insights_payload?: Json
+          model_used?: string | null
+          opportunity_id: string
+          organization_id: string
+          proposal_id: string
+          recommended_actions?: Json
+          risk_level?: string | null
+          smart_alerts?: Json
+          tokens_input?: number | null
+          tokens_output?: number | null
+          total_tokens?: number | null
+          updated_at?: string
+        }
+        Update: {
+          analytics_signature?: string
+          close_probability?: number | null
+          created_at?: string
+          engagement_level?: string | null
+          engagement_score?: number | null
+          expires_at?: string | null
+          generated_at?: string
+          generated_summary?: string | null
+          id?: string
+          insights_payload?: Json
+          model_used?: string | null
+          opportunity_id?: string
+          organization_id?: string
+          proposal_id?: string
+          recommended_actions?: Json
+          risk_level?: string | null
+          smart_alerts?: Json
+          tokens_input?: number | null
+          tokens_output?: number | null
+          total_tokens?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       proposal_alerts: {
         Row: {
           alert_type: string
@@ -31019,6 +31091,14 @@ export type Database = {
         Args: { _user_id?: string }
         Returns: Database["public"]["Enums"]["platform_admin_role"]
       }
+      get_proposal_ai_insights_cache: {
+        Args: { p_proposal_id: string }
+        Returns: Json
+      }
+      get_proposal_analytics_signature: {
+        Args: { p_proposal_id: string }
+        Returns: string
+      }
       get_proposal_by_public_token: { Args: { p_token: string }; Returns: Json }
       get_relevant_memories: {
         Args: {
@@ -31423,6 +31503,27 @@ export type Database = {
       unblock_trial: {
         Args: { by_user_id: string; org_id: string; reason?: string }
         Returns: boolean
+      }
+      upsert_proposal_ai_insights_cache: {
+        Args: {
+          p_analytics_signature: string
+          p_close_probability?: number
+          p_engagement_level?: string
+          p_engagement_score?: number
+          p_generated_summary?: string
+          p_insights_payload: Json
+          p_model_used?: string
+          p_opportunity_id: string
+          p_organization_id: string
+          p_proposal_id: string
+          p_recommended_actions?: Json
+          p_risk_level?: string
+          p_smart_alerts?: Json
+          p_tokens_input?: number
+          p_tokens_output?: number
+          p_total_tokens?: number
+        }
+        Returns: string
       }
       user_belongs_to_tenant: { Args: { _tenant_id: string }; Returns: boolean }
       user_can_access_proposal: {
