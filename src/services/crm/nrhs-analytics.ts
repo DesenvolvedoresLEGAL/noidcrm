@@ -152,6 +152,13 @@ export async function fetchNRHSDeals(
       opportunity_score,
       nrhs_score,
       nrhs_tier,
+      nrhs_status,
+      nrhs_data_integrity_score,
+      nrhs_cadence_score,
+      nrhs_stakeholders_score,
+      nrhs_win_loss_score,
+      nrhs_process_adherence_score,
+      nrhs_evidence_score,
       nrhs_issues_count,
       nrhs_blockers,
       nrhs_last_calculated_at,
@@ -164,12 +171,9 @@ export async function fetchNRHSDeals(
     .is('deleted_at', null)
     .not('status', 'in', '("won","lost","disqualified")');
 
-  // Apply permission filter
   if (!isAdmin && userId) {
     query = query.eq('owner_user_id', userId);
   }
-
-  // Apply filters
   if (filters?.tier) {
     query = query.eq('nrhs_tier', filters.tier);
   }
@@ -179,21 +183,13 @@ export async function fetchNRHSDeals(
   if (filters?.stageId) {
     query = query.eq('stage_id', filters.stageId);
   }
-  if (filters?.hasBlocker !== undefined) {
-    if (filters.hasBlocker) {
-      query = query.not('nrhs_blockers', 'eq', '{}');
-    } else {
-      query = query.or('nrhs_blockers.eq.{},nrhs_blockers.is.null');
-    }
-  }
   if (filters?.search) {
     query = query.or(`title.ilike.%${filters.search}%,accounts.razao_social.ilike.%${filters.search}%`);
   }
 
-  // Order by NRHS ascending (worst first)
   query = query.order('nrhs_score', { ascending: true, nullsFirst: true });
 
-  const { data, error } = await query.limit(200);
+  const { data, error } = await query.limit(500);
 
   if (error) {
     console.error('Error fetching NRHS deals:', error);
@@ -212,8 +208,17 @@ export async function fetchNRHSDeals(
     opportunityScore: opp.opportunity_score,
     nrhsScore: opp.nrhs_score,
     nrhsTier: opp.nrhs_tier as NRHSTier | null,
+    nrhsStatus: opp.nrhs_status ?? null,
     nrhsIssuesCount: opp.nrhs_issues_count || 0,
-    nrhsBlockers: (opp.nrhs_blockers as string[]) || [],
+    nrhsBlockers: Array.isArray(opp.nrhs_blockers) ? opp.nrhs_blockers : [],
+    pillars: {
+      integrity: opp.nrhs_data_integrity_score,
+      cadence: opp.nrhs_cadence_score,
+      stakeholders: opp.nrhs_stakeholders_score,
+      winloss: opp.nrhs_win_loss_score,
+      adherence: opp.nrhs_process_adherence_score,
+      evidence: opp.nrhs_evidence_score,
+    },
     lastReviewedAt: opp.nrhs_last_calculated_at,
     createdAt: opp.created_at,
   }));
