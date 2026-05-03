@@ -22,6 +22,9 @@ import { NRHSGovernanceBox } from './NRHSGovernanceBox';
 
 export function RevenueHygieneDashboard() {
   const { organization } = useCurrentOrganization();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [isRecalcing, setIsRecalcing] = useState(false);
   const {
     deals,
     kpis,
@@ -37,9 +40,10 @@ export function RevenueHygieneDashboard() {
     filteredDeals,
   } = useNRHSAnalytics();
 
+  useNRHSAnalyticsRealtime(organization?.id);
+
   const handleFilterTier = (tier: NRHSTier | 'at_risk_or_below') => {
     if (tier === 'at_risk_or_below') {
-      // Filter deals with NRHS < 60 (critical + insalubrious)
       setFilters({ ...filters, tier: 'critical' });
     } else {
       setFilters({ ...filters, tier });
@@ -51,8 +55,39 @@ export function RevenueHygieneDashboard() {
   };
 
   const handleViewInsightDeals = (insightId: string, pillar: string) => {
-    // Could filter by blocker type in the future
     setFilters({ ...filters, hasBlocker: true });
+  };
+
+  const handleRecalcAll = async () => {
+    if (!organization?.id || isRecalcing || deals.length === 0) return;
+    setIsRecalcing(true);
+    try {
+      const rows = deals.map(d => ({
+        organization_id: organization.id,
+        opportunity_id: d.id,
+        trigger_source: 'manual_dashboard',
+        trigger_action: 'recalculate',
+      }));
+      const { error } = await supabase.from('nrhs_recalc_queue').insert(rows);
+      if (error) throw error;
+      toast({
+        title: 'Atualização enfileirada',
+        description: `${rows.length} deals serão recalculados em background.`,
+      });
+      // Trigger immediate processing (best-effort, non-blocking)
+      supabase.functions.invoke('process-nrhs-queue', {
+        body: { organization_id: organization.id },
+      }).catch(() => undefined);
+      queryClient.invalidateQueries({ queryKey: ['nrhs-analytics'] });
+    } catch (e: any) {
+      toast({
+        title: 'Falha ao enfileirar',
+        description: e?.message || 'Tente novamente em instantes.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsRecalcing(false);
+    }
   };
 
   return (
@@ -83,15 +118,16 @@ export function RevenueHygieneDashboard() {
               <TooltipTrigger asChild>
                 <Button 
                   variant="outline" 
-                  disabled={isLoading}
+                  disabled={isLoading || isRecalcing || deals.length === 0}
+                  onClick={handleRecalcAll}
                   className="bg-background/50 backdrop-blur-sm"
                 >
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Atualizar NRHS
+                  <RefreshCw className={`h-4 w-4 mr-2 ${isRecalcing ? 'animate-spin' : ''}`} />
+                  {isRecalcing ? 'Enfileirando...' : 'Atualizar NRHS'}
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                <p>Atualiza o cálculo de NRHS de todos os deals</p>
+                <p>Recalcula NRHS para os {deals.length} deals visíveis</p>
               </TooltipContent>
             </Tooltip>
           </div>
