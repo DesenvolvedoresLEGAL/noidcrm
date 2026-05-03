@@ -40,6 +40,7 @@ export default function Login() {
   const { signIn } = useSupabaseAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
