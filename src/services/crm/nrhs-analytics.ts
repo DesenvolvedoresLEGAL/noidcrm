@@ -40,6 +40,7 @@ export interface NRHSOwnerStats {
   insalubriousPercent: number;
   valueAtRisk: number;
   evolution7d: number | null;
+  isInactive?: boolean;
 }
 
 export interface NRHSDeal {
@@ -48,9 +49,13 @@ export interface NRHSDeal {
   accountName: string;
   ownerName: string;
   ownerUserId: string;
+  isInactiveOwner: boolean;
   value: number;
   stageName: string;
   stageId: string;
+  pipelineId: string | null;
+  pipelineName: string | null;
+  pipelineType: string | null;
   opportunityScore: number | null;
   nrhsScore: number | null;
   nrhsTier: NRHSTier | null;
@@ -67,6 +72,15 @@ export interface NRHSDeal {
   };
   lastReviewedAt: string | null;
   createdAt: string;
+}
+
+export interface NRHSFilterOptions {
+  pipelineOptions: { id: string; name: string; pipelineType: string | null }[];
+  ownerOptions: { userId: string; fullName: string; isInactive: boolean }[];
+  stageOptions: { id: string; name: string; pipelineId: string | null }[];
+  appliedScope: string;
+  includedPipelineTypes: string[];
+  excludedPipelineTypes: string[];
 }
 
 export interface NRHSInsight {
@@ -136,18 +150,23 @@ export interface NRHSAnalyticsPayload {
   distribution: NRHSTierDistribution[] | null;
   pillars: Record<string, number> | null;
   owners: NRHSOwnerStats[] | null;
+  filterOptions: NRHSFilterOptions | null;
 }
 
 function mapRpcDeal(d: any): NRHSDeal {
   return {
     id: d.id,
     title: d.title,
-    accountName: d.account_name || 'Sem empresa',
+    accountName: d.account_name || 'Conta sem nome',
     ownerName: d.owner_name || 'Sem responsável',
     ownerUserId: d.owner_user_id,
+    isInactiveOwner: !!d.is_inactive_owner,
     value: Number(d.value) || 0,
-    stageName: d.stage_name || 'Sem estágio',
+    stageName: d.stage_name || 'Estágio não informado',
     stageId: d.stage_id,
+    pipelineId: d.pipeline_id ?? null,
+    pipelineName: d.pipeline_name ?? null,
+    pipelineType: d.pipeline_type ?? null,
     opportunityScore: d.opportunity_score,
     nrhsScore: d.nrhs_score,
     nrhsTier: d.nrhs_tier as NRHSTier | null,
@@ -164,6 +183,24 @@ function mapRpcDeal(d: any): NRHSDeal {
     },
     lastReviewedAt: d.last_reviewed_at,
     createdAt: d.created_at,
+  };
+}
+
+function mapFilterOptions(raw: any): NRHSFilterOptions | null {
+  if (!raw) return null;
+  return {
+    pipelineOptions: Array.isArray(raw.pipeline_options)
+      ? raw.pipeline_options.map((p: any) => ({ id: p.id, name: p.name, pipelineType: p.pipeline_type ?? null }))
+      : [],
+    ownerOptions: Array.isArray(raw.owner_options)
+      ? raw.owner_options.map((o: any) => ({ userId: o.user_id, fullName: o.full_name, isInactive: !!o.is_inactive }))
+      : [],
+    stageOptions: Array.isArray(raw.stage_options)
+      ? raw.stage_options.map((s: any) => ({ id: s.id, name: s.name, pipelineId: s.pipeline_id ?? null }))
+      : [],
+    appliedScope: raw.applied_scope || 'commercial',
+    includedPipelineTypes: Array.isArray(raw.included_pipeline_types) ? raw.included_pipeline_types : [],
+    excludedPipelineTypes: Array.isArray(raw.excluded_pipeline_types) ? raw.excluded_pipeline_types : [],
   };
 }
 
@@ -231,6 +268,7 @@ export async function fetchNRHSAnalytics(
     insalubriousPercent: o.insalubrious_percent ?? 0,
     valueAtRisk: Number(o.value_at_risk) || 0,
     evolution7d: o.evolution_7d ?? null,
+    isInactive: !!o.is_inactive,
   }));
 
   return {
@@ -239,6 +277,7 @@ export async function fetchNRHSAnalytics(
     distribution,
     pillars: payload.pillars || null,
     owners,
+    filterOptions: mapFilterOptions(payload.filters),
   };
 }
 

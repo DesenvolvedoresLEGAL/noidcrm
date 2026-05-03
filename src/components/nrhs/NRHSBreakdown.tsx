@@ -150,6 +150,9 @@ function PillarSection({ pillarKey, pillar, onFixIssue }: PillarSectionProps) {
 
 export function NRHSBreakdown({ breakdown, onFixIssue }: NRHSBreakdownProps) {
   const pillarOrder = ['integrity', 'cadence', 'stakeholders', 'winloss', 'adherence'];
+  const pillars = (breakdown as any)?.pillars ?? {};
+  const safePillar = (key: string) =>
+    pillars?.[key] ?? { score: 0, issues: [], passed: [] };
 
   return (
     <div className="border rounded-lg divide-y">
@@ -157,7 +160,7 @@ export function NRHSBreakdown({ breakdown, onFixIssue }: NRHSBreakdownProps) {
         <PillarSection
           key={pillarKey}
           pillarKey={pillarKey}
-          pillar={breakdown.pillars[pillarKey as keyof typeof breakdown.pillars]}
+          pillar={safePillar(pillarKey)}
           onFixIssue={onFixIssue}
         />
       ))}

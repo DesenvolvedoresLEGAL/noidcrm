@@ -57,7 +57,7 @@ export function NRHSByOwner({ ownerStats, isLoading, onFilterOwner }: NRHSByOwne
       <Card>
         <CardHeader>
           <CardTitle className="text-base font-medium">
-            Higiene Operacional por Owner
+            Higiene Comercial por Responsável
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -74,7 +74,7 @@ export function NRHSByOwner({ ownerStats, isLoading, onFilterOwner }: NRHSByOwne
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base font-medium flex items-center gap-2">
-            Higiene Operacional por Owner
+            Higiene Comercial por Responsável
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger>

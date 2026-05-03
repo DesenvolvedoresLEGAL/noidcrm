@@ -22,13 +22,16 @@ import {
   NRHSOwnerStats,
   NRHSInsight,
   NRHSCorrelation,
+  NRHSFilterOptions,
 } from '@/services/crm/nrhs-analytics';
 
 export interface NRHSFilters {
   tier?: NRHSTier;
   ownerId?: string;
   stageId?: string;
+  pipelineId?: string;
   hasBlocker?: boolean;
+  showInactive?: boolean;
   search?: string;
 }
 
@@ -40,6 +43,7 @@ export interface NRHSAnalyticsData {
   ownerStats: NRHSOwnerStats[];
   insights: NRHSInsight[];
   correlations: NRHSCorrelation[];
+  filterOptions: NRHSFilterOptions | null;
   isLoading: boolean;
   error: Error | null;
   filters: NRHSFilters;
@@ -91,6 +95,12 @@ export function useNRHSAnalytics(): NRHSAnalyticsData {
     }
     if (filters.stageId) {
       result = result.filter(d => d.stageId === filters.stageId);
+    }
+    if (filters.pipelineId) {
+      result = result.filter(d => d.pipelineId === filters.pipelineId);
+    }
+    if (!filters.showInactive) {
+      result = result.filter(d => !d.isInactiveOwner);
     }
     if (filters.hasBlocker !== undefined) {
       if (filters.hasBlocker) {
@@ -151,6 +161,7 @@ export function useNRHSAnalytics(): NRHSAnalyticsData {
     ownerStats,
     insights,
     correlations,
+    filterOptions: data?.filterOptions ?? null,
     isLoading,
     error: error as Error | null,
     filters,
