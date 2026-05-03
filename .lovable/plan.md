@@ -81,3 +81,26 @@ Registrar entrega da sprint AUTH.1.4 com lista classificada de `window.location.
 ## Próximos passos pós-sprint
 
 Rodar manualmente os 8 testes de `docs/auth-session-test-plan.md` e marcar status. Se algum falhar, abrir AUTH.1.5 escopada no cenário específico.
+
+---
+
+## Sprint AUTH.1.4 — ENTREGUE
+
+**Criados:**
+- `src/components/system/AuthDebugPanel.tsx` — painel DEV-only (fixed bottom-right) com authLoading, sessionChecked, hasSession, hasUser, userId(8), organizationId(8), pathname, lastAuthEvent, lastAuthEventAt. Sem PII.
+- `docs/auth-session-test-plan.md` — checklist oficial dos 8 testes de regressão + tabela de classificação `window.location.*`.
+
+**Editados:**
+- `src/hooks/useSupabaseAuth.ts` — (sem alteração final; lastAuthEvent foi colocado em useCurrentUser que já é fonte de verdade compartilhada).
+- `src/hooks/useCurrentUser.ts` — registra `lastAuthEvent`/`lastAuthEventAt` no `onAuthStateChange`. Log DEV `[AUTH_EVENT]` (event, hasSession, userId.slice(0,8)). Expõe ambos no retorno.
+- `src/hooks/usePrivateQueryEnabled.ts` — log DEV `[PRIVATE_QUERY_BLOCKED]` quando `extra=true && !enabled`, com `useRef` anti-spam.
+- `src/App.tsx` — monta `<AuthDebugPanel />` dentro do `<BrowserRouter>` (fora de ProtectedRoute).
+- `src/components/ote/GoalSystemModeSelector.tsx` — removido único `DANGEROUS_AUTO_RELOAD` da varredura; agora usa `queryClient.invalidateQueries` para 'current-organization', 'current-user', 'ote' e 'organization'.
+
+**Auditoria final `window.location.*`:** 10 ocorrências classificadas, 0 `DANGEROUS_AUTO_RELOAD` no fluxo crítico de auth (ver tabela em `docs/auth-session-test-plan.md`).
+
+**Isolamento `/login`:** confirmado via `App.tsx` — rotas públicas (`/login`, `/signup`, `/forgot-password`, `/reset-password`, `/`, `/p/:token`, `/f/:token`, `/docs/*`) ficam fora de `ProtectedRoute`. A árvore global só monta providers neutros (Theme, Tooltip, Toaster, PostHog, QueryClient). Nenhum `MainLayout`/`Sidebar`/Dashboard/NRHS/Forecast provider é montado nessas rotas.
+
+**Riscos residuais:** nenhum bloqueante. Painel DEV é tree-shaken no build de produção (`import.meta.env.DEV` constante). Logs `[AUTH_EVENT]`/`[PRIVATE_QUERY_BLOCKED]` só em DEV.
+
+**Próximo:** rodar os 8 testes manuais de `docs/auth-session-test-plan.md` e marcar status. Abrir AUTH.1.5 escopada apenas se algum cenário falhar.
