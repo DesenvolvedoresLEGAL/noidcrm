@@ -176,5 +176,11 @@ export function useNRHSKPIs() {
     },
     enabled,
     staleTime: 30000,
+    refetchOnWindowFocus: false,
+    retry: (failureCount, err: any) => {
+      const code = err?.status ?? err?.code;
+      if (code === 400 || code === '400' || code === '0A000' || code === '42501') return false;
+      return failureCount < 1;
+    },
   });
 }
