@@ -124,6 +124,8 @@ export function AppSidebar() {
           variant: 'destructive',
         });
       } else {
+        // AUTH.1.2: limpar cache do React Query antes de navegar (sem reload).
+        queryClient.clear();
         toast({ title: 'Logout realizado com sucesso' });
         navigate('/login', { replace: true });
       }
