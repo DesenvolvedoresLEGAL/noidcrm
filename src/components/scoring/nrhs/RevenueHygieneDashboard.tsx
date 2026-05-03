@@ -19,6 +19,7 @@ import { NRHSByOwner } from './NRHSByOwner';
 import { NRHSCorrelations } from './NRHSCorrelations';
 import { NRHSInsightsPanel } from './NRHSInsightsPanel';
 import { NRHSGovernanceBox } from './NRHSGovernanceBox';
+import { NRHSFilterBar } from './NRHSFilterBar';
 
 export function RevenueHygieneDashboard() {
   const { organization, loading: orgLoading } = useCurrentOrganization();
