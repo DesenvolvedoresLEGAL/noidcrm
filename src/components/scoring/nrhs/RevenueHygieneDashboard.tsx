@@ -1,12 +1,17 @@
 // Revenue Hygiene Dashboard - Página principal NRHS
 
 import { Shield, RefreshCw, Sparkles } from 'lucide-react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useNRHSAnalytics } from '@/hooks/useNRHSAnalytics';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
+import { useNRHSAnalyticsRealtime } from '@/hooks/scoring/useNRHSAnalyticsRealtime';
 import { NRHSTier } from '@/services/crm/nrhs-calculator';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import { useQueryClient } from '@tanstack/react-query';
 import { NRHSOverviewKPIs } from './NRHSOverviewKPIs';
 import { NRHSDistributionCharts } from './NRHSDistributionCharts';
 import { NRHSDealsTable } from './NRHSDealsTable';
