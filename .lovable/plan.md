@@ -1,85 +1,102 @@
 
-# Sprint F2.9.2 — Forecast V2: Metas Globais, Período Dinâmico e Estabilização Final
+# Sprint A — Proposal Analytics AI Insights Cache
 
-## Diagnóstico (causa raiz, confirmada no banco)
+## Problem
+The Analytics tab inside an opportunity (`OpportunityAnalyticsTab` → `AIProposalInsightCard`) calls the `analyze-proposal-behavior` edge function on every mount via `autoLoad` + `useEffect`. The result is never persisted, so every tab open burns tokens even when nothing changed.
 
-1. **`get_seller_monthly_goal_v2` quebrada**: o fallback referencia `ol.target_revenue`, coluna que **não existe** em `ote_levels` (a correta é `monthly_goal`). Isso quebra:
-   - Aba **Vendedor V2** → erro `column ol.target_revenue does not exist`
-   - Aba **AI** → como `get_forecast_intelligence_v2` chama essa função dentro de um `BEGIN/EXCEPTION`, ela retorna NULL e mostra "Sem meta configurada" mesmo com metas em `sales_config`.
+## Goal
+Persist AI Insights in the database keyed by a deterministic signature of the proposal + analytics state. Only call the LLM when the signature changes (new view, forwarding, status/value/due date/payment/items change) or when the user explicitly forces a refresh.
 
-2. **`get_seller_monthly_goal_v2` ignora metas globais da organização**: quando `p_seller_id` é NULL (filtro "Todos os vendedores"), retorna NULL na linha 12-14. Não consulta `sales_config.monthly_revenue_target` / `quarterly_goal` / `yearly_goal`. Resultado: AI Hub e fallbacks ficam "no_goal_configured" mesmo com metas configuradas em `/app/settings/sales`.
+## Discovered context (real schema, will be used as-is)
+- Frontend entry: `src/components/opportunity/OpportunityAnalyticsTab.tsx` → `src/components/proposals/AIProposalInsightCard.tsx` (uses `autoLoad` and a manual `RefreshCw` button — both call the edge fn directly).
+- Edge function: `supabase/functions/analyze-proposal-behavior/index.ts` (uses service role, queries `proposals`, `proposal_views` filtered by `viewer_type='external'`, `proposal_view_events`).
+- Tables: `proposals (id, organization_id, opportunity_id, status, total_amount, updated_at)` — no `due_date`/`payment_method` columns (will use what exists, plus `valor_liquido` etc. via dynamic select). `proposal_views (proposal_id, viewed_at, viewer_ip, duration_seconds, sections_viewed, scroll_depth_percent, is_forwarded, viewer_type, viewer_user_id)`. `proposal_view_events`, `proposal_items`.
+- AI usage log already exists: `ai_usage_logs (organization_id, user_id, feature, action, entity_type, entity_id, model_used, tokens_input, tokens_output, tokens_total, success, request_metadata, response_metadata, created_at)` — reuse, do not duplicate.
+- RLS helpers: `get_user_organization_id()`, `user_is_org_member(uuid)`, `user_is_org_admin(uuid)`. No `user_belongs_to_organization` — the spec's example will be adapted to `user_is_org_member`.
+- `update_updated_at_column()` already exists — reuse for trigger.
 
-3. **Frontend `useForecastData` não muda meta por período**: `orgGoalQuery` sempre lê `monthly_revenue_target`. Quando o usuário troca o filtro para Trimestral/Anual, os KPIs continuam mostrando R$ 150.000,00 (a meta mensal). Deveria ler `quarterly_goal` no trimestral e `yearly_goal` no anual.
+## Plan
 
-4. **Loop "Inicializar Forecast V2"**: o painel exige `latest_run_at && latest_snapshot_at` para o **período exato** (`period_start = X AND period_end = Y`). Quando o usuário navega para outra página e volta, ou troca de período, não existe run para esse `period_start/end` específico → o card de bootstrap reaparece. Faltam runs por período além do mensal corrente, e o critério precisa ser mais tolerante (a engine ativa + qualquer run recente já basta para não mostrar bootstrap).
+### 1. Migration: cache table
+Create `public.proposal_ai_insights_cache` with the schema from the brief, but:
+- FKs: `organization_id → organizations(id)`, `opportunity_id → opportunities(id) ON DELETE CASCADE`, `proposal_id → proposals(id) ON DELETE CASCADE`.
+- `UNIQUE (proposal_id)` (proposal already implies opportunity/org; keeps upsert simple).
+- Indexes on `organization_id`, `opportunity_id`, `proposal_id`, `analytics_signature`.
+- Trigger `update_updated_at_column` on `BEFORE UPDATE`.
 
-5. **Risk Center "Não foi possível carregar"**: o RPC retorna `v_empty` quando não existe run. O hook trata o objeto vazio mas o UI legado abaixo mostra erro. Após corrigir item 4 (gerar runs por período), some.
+### 2. RLS
+Enable RLS and add three policies using existing helpers:
+- SELECT: `user_is_org_member(organization_id)`.
+- INSERT: `WITH CHECK (user_is_org_member(organization_id))`.
+- UPDATE: `USING + WITH CHECK (user_is_org_member(organization_id))`.
+Service role (edge fn) bypasses RLS, so upsert from the edge function works safely.
 
-## Mudanças
+### 3. RPC `get_proposal_analytics_signature(p_proposal_id uuid)`
+`SECURITY DEFINER`, fixed `search_path = public`. Returns md5 hash combining:
+- `proposals`: id, opportunity_id, organization_id, status, total_amount, updated_at (and `valor_liquido`, `due_date` only if those columns exist — use dynamic SQL `to_jsonb(p)` slice to be schema-tolerant).
+- Aggregates over `proposal_views` (external only): count, distinct viewer_ip, distinct viewer_user_id, sum/avg duration_seconds, max viewed_at, max scroll_depth_percent, bool_or(is_forwarded), array_agg(distinct sections_viewed) hashed.
+- Aggregates over `proposal_view_events`: count, max(timestamp).
+- Aggregates over `proposal_items`: count, max(updated_at).
+Single `SELECT md5(string_agg(...))` query with LEFT JOINs grouped by proposal id.
 
-### A. Database migration (RPCs)
+### 4. RPC `get_proposal_ai_insights_cache(p_proposal_id uuid)`
+Returns JSON `{ has_cache, is_valid, current_signature, cached_signature, generated_at, insights_payload, engagement_score, engagement_level, close_probability, risk_level, recommended_actions, smart_alerts, generated_summary, model_used }`. Reads cache row scoped by RLS, computes current signature via the function above, sets `is_valid = (cached_signature = current_signature)`.
 
-**A1. Corrigir `get_seller_monthly_goal_v2`** (mantém ordem: vendedor específico → org global):
-- Remover referência inexistente `ol.target_revenue`; trocar fallback OTE para `ol.monthly_goal`.
-- Quando `p_seller_id IS NULL`, **buscar meta global da org** em `sales_config`, escolhendo a coluna por janela do período:
-  - duração ≤ 31 dias → `monthly_revenue_target`
-  - 32–95 dias → `quarterly_goal`
-  - 96–200 dias → `semester_goal`
-  - > 200 dias → `yearly_goal`
-- Adicionar fallback final: somar metas mensais ativas dos vendedores (`ote_seller_config.custom_goal_override` ou `ote_levels.monthly_goal`) e multiplicar pelo nº de meses do período quando for trimestral/anual.
+### 5. RPC `upsert_proposal_ai_insights_cache(...)`
+`INSERT ... ON CONFLICT (proposal_id) DO UPDATE` overwriting all fields per spec, refreshing `generated_at` and `updated_at`. Validates the caller is org member (or service role).
 
-**A2. Tornar `calculate_forecast_audit_v2` resiliente**: já não usa `target_revenue`, mas verificar; nenhum efeito colateral.
+### 6. Edge function: cache-aware
+Refactor `analyze-proposal-behavior/index.ts`:
+1. Accept `{ proposal_id, force_refresh?: boolean }`.
+2. Compute signature via `get_proposal_analytics_signature`.
+3. SELECT existing cache row.
+4. If `total_views === 0` and no cache → return `{ status: 'insufficient_data' }` without calling AI.
+5. If cache valid and not `force_refresh` → return cached payload with `from_cache: true`.
+6. Otherwise call existing `callAI(...)` flow; on success, upsert via `upsert_proposal_ai_insights_cache`, log to `ai_usage_logs` (`feature='proposal_analytics_ai_insights'`, `action=reason` ∈ `cache_miss|signature_changed|manual_refresh`, `entity_type='proposal'`, tokens, success).
+7. On AI failure, return existing cache with `stale: true, error: '...'` so UI can show fallback; do not delete cache.
+8. Never log `ai_usage_logs` for cache hits.
 
-**A3. `get_forecast_v2_health_check`**: relaxar condição de `bootstrap_required`. Hoje exige run/snapshot para o período exato; passar a considerar:
-- `bootstrap_required = (engine_active AND total_runs_org = 0)` (qualquer run recente da org no último 30 dias).
-- Adicionar campo `latest_run_in_period` (run para o `period_start/end` atual) sem ditar bootstrap.
+### 7. Frontend hook + service
+Create `src/services/supabase/proposal-ai-insights.ts`:
+- `getProposalAIInsights(proposalId)` → calls edge function with `force_refresh=false`.
+- `refreshProposalAIInsights(proposalId, { force })` → calls with `force_refresh=true`.
 
-### B. Frontend `src/hooks/useForecastData.ts`
+Create `src/hooks/useProposalAIInsights.ts` using React Query:
+- `queryKey: ['proposal-ai-insights', proposalId]`.
+- `queryFn`: invokes edge function (cache-aware path).
+- Returns `{ data, isLoading, isRefreshing, isFromCache, generatedAt, status, error, refresh }`.
+- `staleTime: Infinity` (server is the source of truth — invalidation happens via signature).
 
-- Substituir `orgGoalQuery` para selecionar a coluna correta de `sales_config` baseada em `filters.periodType`:
-  ```ts
-  const col = periodType === 'yearly' ? 'yearly_goal'
-            : periodType === 'quarterly' ? 'quarterly_goal'
-            : 'monthly_revenue_target';
-  ```
-- Incluir `periodType` na `queryKey` (`salesGoalKeys.orgGoal(periodType)`).
-- Ajustar `sellerGoalsQuery` para multiplicar a soma por 3 (trim) ou 12 (anual) quando aplicável, usado apenas como fallback.
+### 8. Refactor `AIProposalInsightCard`
+- Remove `useEffect` auto-call and local `useState` AI call.
+- Consume `useProposalAIInsights({ proposalId, opportunityId })`.
+- Render existing cards with payload; map server payload (`engagement_score/level`, `recommended_actions`, `smart_alerts`, `summary`, `close_probability`, `insights`) — keep current visual layout untouched.
+- Add states:
+  - `insufficient_data` → "Ainda não há visualizações suficientes…".
+  - `from_cache` valid → small footer `Insights atualizados em DD/MM/YYYY HH:mm`.
+  - `refreshing` → "Novas interações detectadas. Atualizando análise inteligente…".
+  - `error_with_cache` → keep showing payload + warning banner.
+  - `error_no_cache` → "Não foi possível gerar os insights agora. Tente novamente mais tarde."
+- "Atualizar análise" button (existing `RefreshCw`):
+  - If signature unchanged (response had `from_cache=true`), open AlertDialog "Nenhuma nova interação foi detectada. Deseja gerar uma nova análise mesmo assim?" — only on confirm call `refresh({ force: true })`.
+  - Else call `refresh({ force: true })` directly.
+  - Visible only when `user_is_org_admin_or_manager` (reuse existing `usePermissions`).
 
-### C. Frontend `src/components/forecast/health/ForecastV2HealthPanel.tsx`
+### 9. Tests / manual QA matrix
+Run all 7 manual tests from the brief. Optionally add a vitest unit for the signature computation parity (skip if too costly).
 
-- Trocar a condição do banner de bootstrap por `health.bootstrap_required === true` (vem do RPC), em vez de checar `!latest_run_at && !latest_snapshot_at` no cliente.
-- Persistir o último resultado bem sucedido por organização em `sessionStorage` (chave `forecast_v2_bootstrapped:{orgId}`), para que o banner não pisque em remontagens enquanto o `useQuery` está revalidando.
+## Files to change
+- New: `supabase/migrations/<ts>_proposal_ai_insights_cache.sql`
+- Edit: `supabase/functions/analyze-proposal-behavior/index.ts`
+- New: `src/services/supabase/proposal-ai-insights.ts`
+- New: `src/hooks/useProposalAIInsights.ts`
+- Edit: `src/components/proposals/AIProposalInsightCard.tsx`
 
-### D. Frontend (filtros mostram a meta correta)
+## Risks
+- Signature must be deterministic — avoid floating averages drift; cast to `numeric(12,2)` before hashing.
+- RLS: edge fn uses service role → bypasses RLS; ensure upsert function still scopes by `organization_id` from the proposal record (don't trust client).
+- Backwards compat: existing callers of `analyze-proposal-behavior` (only `AIProposalInsightCard`) — no other usage in repo.
+- `due_date`/`payment_method` not present on `proposals` — use `valor_liquido` if present; signature uses only existing columns to avoid migration errors.
 
-- `ForecastKPICards` já lê `kpis.goal`; após (B), o valor passa a refletir trim/anual.
-- `ForecastScenariosCard`: percentuais usam `goal` recebido por prop — automaticamente correto.
-
-### E. Forecast Risk Center fallback
-
-- `useForecastRiskCenter`: tratar `riskCenter?.summary?.total_risk_deals === 0 && !runId` como "sem dados ainda" (estado vazio amigável), não como erro. Remove o card vermelho "Não foi possível carregar" quando o RPC respondeu com `v_empty` válido.
-
-## Arquivos afetados
-
-```text
-supabase/migrations/<novo>.sql
-  - CREATE OR REPLACE get_seller_monthly_goal_v2
-  - CREATE OR REPLACE get_forecast_v2_health_check
-src/hooks/useForecastData.ts
-src/components/forecast/health/ForecastV2HealthPanel.tsx
-src/components/forecast/risk-center/ForecastRiskCenterPanel.tsx
-src/types/forecast-health.ts (novos campos opcionais)
-src/lib/query-keys.ts (queryKey de orgGoal aceitando periodType)
-```
-
-## O que NÃO será alterado
-- Lógica de cenários/Engine V2 e fórmula NRHS — preservada.
-- RLS, segurança e enums (sem novos roles).
-- AI / Risk Center / Acurácia — apenas correções de fallback/leitura.
-
-## Resultado esperado
-- **AI tab**: mostra meta global (mensal/trim/anual) e sai do estado "Sem meta configurada".
-- **Aba Geral/KPIs**: "Meta do Mês" passa a "Meta do Período" e troca o valor ao trocar Mensal/Trim/Anual conforme `sales_config`.
-- **Aba Vendedor V2**: deixa de mostrar `column ol.target_revenue does not exist`.
-- **Aba Saúde V2**: o card "Inicializar Forecast V2 agora" só aparece quando realmente não há nenhum run; ao voltar de outra página, mantém estado.
-- **Aba Riscos**: estado vazio amigável quando ainda não há run para o período, sem o banner vermelho de erro.
+## Out of scope
+- Layout redesign, Sprint B value sync, deleting old cache rows (signature naturally invalidates).
