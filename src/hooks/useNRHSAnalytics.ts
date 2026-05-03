@@ -7,13 +7,14 @@ import { usePrivateQueryEnabled } from '@/hooks/usePrivateQueryEnabled';
 import { NRHSTier } from '@/services/crm/nrhs-calculator';
 import { nrhsAnalyticsKeys } from '@/lib/query-keys';
 import {
-  fetchNRHSDeals,
+  fetchNRHSAnalytics,
   calculateNRHSKPIs,
   calculateTierDistribution,
   calculatePillarAverages,
   calculateOwnerStats,
   generateNRHSInsights,
   generateNRHSCorrelations,
+  NRHS_PILLARS,
   NRHSDeal,
   NRHSKPIs,
   NRHSTierDistribution,
