@@ -134,6 +134,26 @@ export function RevenueHygieneDashboard() {
           </div>
         </div>
 
+      {error ? (
+        <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-4 flex items-start gap-3">
+          <AlertTriangle className="h-5 w-5 text-destructive mt-0.5" />
+          <div className="flex-1">
+            <p className="font-medium text-foreground">Não foi possível carregar os dados de Revenue Hygiene agora.</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              {error.message || 'Erro inesperado ao consultar oportunidades.'}
+            </p>
+            <Button
+              size="sm"
+              variant="outline"
+              className="mt-3"
+              onClick={() => queryClient.invalidateQueries({ queryKey: ['nrhs-analytics'] })}
+            >
+              <RefreshCw className="h-3 w-3 mr-2" /> Tentar novamente
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
       {/* Seção 1: KPIs Overview */}
       <NRHSOverviewKPIs 
         kpis={kpis} 
