@@ -34,6 +34,7 @@ export function RevenueHygieneDashboard() {
     insights,
     correlations,
     isLoading,
+    error,
     filters,
     setFilters,
     clearFilters,
