@@ -130,103 +130,126 @@ export function getTierLabel(tier: NRHSTier): string {
   return labels[tier];
 }
 
-export async function fetchNRHSDeals(
+export interface NRHSAnalyticsPayload {
+  deals: NRHSDeal[];
+  summary: NRHSKPIs | null;
+  distribution: NRHSTierDistribution[] | null;
+  pillars: Record<string, number> | null;
+  owners: NRHSOwnerStats[] | null;
+}
+
+function mapRpcDeal(d: any): NRHSDeal {
+  return {
+    id: d.id,
+    title: d.title,
+    accountName: d.account_name || 'Sem empresa',
+    ownerName: d.owner_name || 'Sem responsável',
+    ownerUserId: d.owner_user_id,
+    value: Number(d.value) || 0,
+    stageName: d.stage_name || 'Sem estágio',
+    stageId: d.stage_id,
+    opportunityScore: d.opportunity_score,
+    nrhsScore: d.nrhs_score,
+    nrhsTier: d.nrhs_tier as NRHSTier | null,
+    nrhsStatus: d.nrhs_status ?? null,
+    nrhsIssuesCount: d.nrhs_issues_count || 0,
+    nrhsBlockers: Array.isArray(d.nrhs_blockers) ? d.nrhs_blockers : [],
+    pillars: {
+      integrity: d.pillars?.integrity ?? null,
+      cadence: d.pillars?.cadence ?? null,
+      stakeholders: d.pillars?.stakeholders ?? null,
+      winloss: d.pillars?.winloss ?? null,
+      adherence: d.pillars?.adherence ?? null,
+      evidence: d.pillars?.evidence ?? null,
+    },
+    lastReviewedAt: d.last_reviewed_at,
+    createdAt: d.created_at,
+  };
+}
+
+export async function fetchNRHSAnalytics(
   organizationId: string,
   userId: string | null,
-  isAdmin: boolean,
-  filters?: {
-    tier?: NRHSTier;
-    ownerId?: string;
-    stageId?: string;
-    hasBlocker?: boolean;
-    search?: string;
-  }
-): Promise<NRHSDeal[]> {
-  // AUTH.1.3: falha cedo se chamado sem organizationId (não pode "vazar" sem org).
+  isAdmin: boolean
+): Promise<NRHSAnalyticsPayload> {
+  // AUTH.1.3: falha cedo se chamado sem organizationId.
   if (!organizationId) {
     throw new Error('NRHS: organizationId is required');
   }
-  let query = (supabase as any)
-    .from('opportunities')
-    .select(`
-      id,
-      title,
-      value,
-      stage_id,
-      owner_user_id,
-      opportunity_score,
-      nrhs_score,
-      nrhs_tier,
-      nrhs_status,
-      nrhs_data_integrity_score,
-      nrhs_cadence_score,
-      nrhs_stakeholders_score,
-      nrhs_win_loss_score,
-      nrhs_process_adherence_score,
-      nrhs_evidence_score,
-      nrhs_issues_count,
-      nrhs_blockers,
-      nrhs_last_calculated_at,
-      created_at,
-      accounts(razao_social, nome_fantasia),
-      stage:stages(name),
-      profiles!opportunities_owner_user_id_fkey(full_name)
-    `)
-    .eq('organization_id', organizationId)
-    .is('deleted_at', null)
-    .not('status', 'in', '("won","lost","disqualified")');
 
-  if (!isAdmin && userId) {
-    query = query.eq('owner_user_id', userId);
-  }
-  if (filters?.tier) {
-    query = query.eq('nrhs_tier', filters.tier);
-  }
-  if (filters?.ownerId) {
-    query = query.eq('owner_user_id', filters.ownerId);
-  }
-  if (filters?.stageId) {
-    query = query.eq('stage_id', filters.stageId);
-  }
-  if (filters?.search) {
-    query = query.or(`title.ilike.%${filters.search}%,accounts.razao_social.ilike.%${filters.search}%`);
-  }
-
-  query = query.order('nrhs_score', { ascending: true, nullsFirst: true });
-
-  const { data, error } = await query.limit(500);
+  // HOTFIX 1.4.2: leitura via RPC explícita — sem nested selects no PostgREST.
+  const { data, error } = await (supabase as any).rpc('get_nrhs_analytics', {
+    p_org_id: organizationId,
+    p_owner_id: isAdmin ? null : userId,
+    p_only_privileged: !!isAdmin,
+    p_caller_user_id: userId,
+  });
 
   if (error) {
-    console.error('[NRHS] fetchNRHSDeals failed:', error);
+    console.error('[NRHS] get_nrhs_analytics failed:', error);
     throw error;
   }
 
-  return (data || []).map((opp: any) => ({
-    id: opp.id,
-    title: opp.title,
-    accountName: opp.accounts?.nome_fantasia || opp.accounts?.razao_social || 'Sem empresa',
-    ownerName: opp.profiles?.full_name || 'Sem responsável',
-    ownerUserId: opp.owner_user_id,
-    value: opp.value || 0,
-    stageName: opp.stage?.name || 'Sem estágio',
-    stageId: opp.stage_id,
-    opportunityScore: opp.opportunity_score,
-    nrhsScore: opp.nrhs_score,
-    nrhsTier: opp.nrhs_tier as NRHSTier | null,
-    nrhsStatus: opp.nrhs_status ?? null,
-    nrhsIssuesCount: opp.nrhs_issues_count || 0,
-    nrhsBlockers: Array.isArray(opp.nrhs_blockers) ? opp.nrhs_blockers : [],
-    pillars: {
-      integrity: opp.nrhs_data_integrity_score,
-      cadence: opp.nrhs_cadence_score,
-      stakeholders: opp.nrhs_stakeholders_score,
-      winloss: opp.nrhs_win_loss_score,
-      adherence: opp.nrhs_process_adherence_score,
-      evidence: opp.nrhs_evidence_score,
-    },
-    lastReviewedAt: opp.nrhs_last_calculated_at,
-    createdAt: opp.created_at,
+  const payload = data || {};
+  const deals: NRHSDeal[] = Array.isArray(payload.deals) ? payload.deals.map(mapRpcDeal) : [];
+
+  const summaryRaw = payload.summary || null;
+  const summary: NRHSKPIs | null = summaryRaw ? {
+    averageScore: summaryRaw.nrhs_avg ?? 0,
+    totalDeals: summaryRaw.total ?? 0,
+    eliteCount: summaryRaw.elite_count ?? 0,
+    healthyCount: summaryRaw.healthy_count ?? 0,
+    riskCount: summaryRaw.risk_count ?? 0,
+    criticalCount: summaryRaw.critical_count ?? 0,
+    insalubriousCount: summaryRaw.insalubrious_count ?? 0,
+    valueAtRisk: Number(summaryRaw.value_at_risk) || 0,
+    totalPipelineValue: Number(summaryRaw.total_value) || 0,
+  } : null;
+
+  const totalDeals = summary?.totalDeals ?? deals.length;
+  const distRaw = Array.isArray(payload.distribution) ? payload.distribution : [];
+  const distMap: Record<string, { count: number; value: number }> = {};
+  for (const d of distRaw) {
+    distMap[d.tier] = { count: d.count ?? 0, value: Number(d.value) || 0 };
+  }
+  const tiersOrder: NRHSTier[] = ['elite', 'healthy', 'risk', 'critical', 'insalubrious'];
+  const distribution: NRHSTierDistribution[] = tiersOrder.map(tier => ({
+    tier,
+    count: distMap[tier]?.count ?? 0,
+    value: distMap[tier]?.value ?? 0,
+    percentage: totalDeals > 0 ? Math.round(((distMap[tier]?.count ?? 0) / totalDeals) * 100) : 0,
   }));
+
+  const ownersRaw = Array.isArray(payload.owners) ? payload.owners : [];
+  const owners: NRHSOwnerStats[] = ownersRaw.map((o: any) => ({
+    userId: o.user_id,
+    userName: o.user_name || 'Sem responsável',
+    avatarUrl: o.avatar_url ?? null,
+    dealCount: o.deal_count ?? 0,
+    averageNRHS: o.average_nrhs ?? 0,
+    healthyPercent: o.healthy_percent ?? 0,
+    insalubriousPercent: o.insalubrious_percent ?? 0,
+    valueAtRisk: Number(o.value_at_risk) || 0,
+    evolution7d: o.evolution_7d ?? null,
+  }));
+
+  return {
+    deals,
+    summary,
+    distribution,
+    pillars: payload.pillars || null,
+    owners,
+  };
+}
+
+// Backwards-compatible thin wrapper (keeps signature for any other caller).
+export async function fetchNRHSDeals(
+  organizationId: string,
+  userId: string | null,
+  isAdmin: boolean
+): Promise<NRHSDeal[]> {
+  const payload = await fetchNRHSAnalytics(organizationId, userId, isAdmin);
+  return payload.deals;
 }
 
 export function calculateNRHSKPIs(deals: NRHSDeal[]): NRHSKPIs {
