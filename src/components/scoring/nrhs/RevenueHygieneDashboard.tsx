@@ -171,6 +171,14 @@ export function RevenueHygieneDashboard() {
         </div>
       ) : null}
 
+      {/* Filter Bar */}
+      <NRHSFilterBar
+        filters={filters}
+        options={filterOptions}
+        onChange={setFilters}
+        onClear={clearFilters}
+      />
+
       {/* Seção 1: KPIs Overview */}
       <NRHSOverviewKPIs 
         kpis={kpis} 
