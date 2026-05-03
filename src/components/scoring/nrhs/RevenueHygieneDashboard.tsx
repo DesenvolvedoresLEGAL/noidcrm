@@ -75,20 +75,20 @@ export function RevenueHygieneDashboard() {
   };
 
   const handleRecalcAll = async () => {
-    if (!organization?.id || isRecalcing || deals.length === 0) return;
+    if (!organization?.id || isRecalcing) return;
     setIsRecalcing(true);
     try {
-      const rows = deals.map(d => ({
-        organization_id: organization.id,
-        opportunity_id: d.id,
-        trigger_source: 'manual_dashboard',
-        trigger_action: 'recalculate',
-      }));
-      const { error } = await supabase.from('nrhs_recalc_queue').insert(rows);
+      // HOTFIX 1.4.2: usa RPC dedicada com os mesmos filtros da tela.
+      const { data, error } = await (supabase as any).rpc('enqueue_nrhs_recalc_for_filters', {
+        p_org_id: organization.id,
+        p_owner_id: filters.ownerId ?? null,
+      });
       if (error) throw error;
+      const enqueued = data?.enqueued ?? 0;
+      const skipped = data?.skipped ?? 0;
       toast({
         title: 'Atualização enfileirada',
-        description: `${rows.length} deals serão recalculados em background.`,
+        description: `${enqueued} deals serão recalculados${skipped > 0 ? ` (${skipped} já estavam na fila)` : ''}.`,
       });
       // Trigger immediate processing (best-effort, non-blocking)
       supabase.functions.invoke('process-nrhs-queue', {
