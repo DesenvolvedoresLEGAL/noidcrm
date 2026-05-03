@@ -1,13 +1,16 @@
 // Sprint Scoring 1.4 — realtime invalidation for the Revenue Hygiene dashboard.
+// AUTH.1.3 — gate por sessão para evitar inscrição sem JWT válido.
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 
 export function useNRHSAnalyticsRealtime(organizationId: string | undefined) {
   const queryClient = useQueryClient();
+  const { hasSession, sessionChecked } = useCurrentUser();
 
   useEffect(() => {
-    if (!organizationId) return;
+    if (!sessionChecked || !hasSession || !organizationId) return;
     const channel = supabase
       .channel(`nrhs-analytics-${organizationId}`)
       .on(
@@ -31,5 +34,5 @@ export function useNRHSAnalyticsRealtime(organizationId: string | undefined) {
       )
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [organizationId, queryClient]);
+  }, [organizationId, hasSession, sessionChecked, queryClient]);
 }

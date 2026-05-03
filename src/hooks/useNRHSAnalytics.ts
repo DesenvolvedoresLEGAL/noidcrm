@@ -2,11 +2,10 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { useState, useMemo } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
-import { usePermissions } from '@/hooks/usePermissions';
+import { usePrivateQueryEnabled } from '@/hooks/usePrivateQueryEnabled';
 import { NRHSTier } from '@/services/crm/nrhs-calculator';
-import { nrhsAnalyticsKeys, sessionKeys } from '@/lib/query-keys';
+import { nrhsAnalyticsKeys } from '@/lib/query-keys';
 import {
   fetchNRHSDeals,
   calculateNRHSKPIs,
@@ -49,18 +48,10 @@ export interface NRHSAnalyticsData {
 }
 
 export function useNRHSAnalytics(): NRHSAnalyticsData {
-  const { organization, isAdmin, isOwner } = useCurrentOrganization();
+  const { isAdmin, isOwner } = useCurrentOrganization();
+  // AUTH.1.3: gate único — só roda com sessão + user + organização.
+  const { enabled, organizationId, userId } = usePrivateQueryEnabled();
   const [filters, setFilters] = useState<NRHSFilters>({});
-
-  // Fetch current user
-  const { data: userData } = useQuery({
-    queryKey: sessionKeys.currentUser(),
-    queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      return user;
-    },
-    staleTime: 60000,
-  });
 
   const isPrivileged = isAdmin || isOwner;
 
@@ -70,17 +61,13 @@ export function useNRHSAnalytics(): NRHSAnalyticsData {
     isLoading,
     error,
   } = useQuery({
-    queryKey: nrhsAnalyticsKeys.byUser(organization?.id, userData?.id, isPrivileged),
+    queryKey: nrhsAnalyticsKeys.byUser(organizationId ?? undefined, userId ?? undefined, isPrivileged),
     queryFn: async () => {
-      if (!organization?.id) return [];
-      return fetchNRHSDeals(
-        organization.id,
-        userData?.id || null,
-        isPrivileged
-      );
+      if (!organizationId) return [];
+      return fetchNRHSDeals(organizationId, userId, isPrivileged);
     },
-    enabled: !!organization?.id,
-    staleTime: 30000, // 30 seconds cache
+    enabled,
+    staleTime: 30000,
   });
 
   // Apply client-side filters
@@ -105,7 +92,7 @@ export function useNRHSAnalytics(): NRHSAnalyticsData {
     }
     if (filters.search) {
       const searchLower = filters.search.toLowerCase();
-      result = result.filter(d => 
+      result = result.filter(d =>
         d.title.toLowerCase().includes(searchLower) ||
         d.accountName.toLowerCase().includes(searchLower)
       );
@@ -143,31 +130,19 @@ export function useNRHSAnalytics(): NRHSAnalyticsData {
 
 // Lightweight hook for just KPIs
 export function useNRHSKPIs() {
-  const { organization, isAdmin, isOwner } = useCurrentOrganization();
-
-  const { data: userData } = useQuery({
-    queryKey: sessionKeys.currentUser(),
-    queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      return user;
-    },
-    staleTime: 60000,
-  });
+  const { isAdmin, isOwner } = useCurrentOrganization();
+  const { enabled, organizationId, userId } = usePrivateQueryEnabled();
 
   const isPrivileged = isAdmin || isOwner;
 
   return useQuery({
-    queryKey: nrhsAnalyticsKeys.kpis(organization?.id, userData?.id, isPrivileged),
+    queryKey: nrhsAnalyticsKeys.kpis(organizationId ?? undefined, userId ?? undefined, isPrivileged),
     queryFn: async () => {
-      if (!organization?.id) return null;
-      const deals = await fetchNRHSDeals(
-        organization.id,
-        userData?.id || null,
-        isPrivileged
-      );
+      if (!organizationId) return null;
+      const deals = await fetchNRHSDeals(organizationId, userId, isPrivileged);
       return calculateNRHSKPIs(deals);
     },
-    enabled: !!organization?.id,
+    enabled,
     staleTime: 30000,
   });
 }

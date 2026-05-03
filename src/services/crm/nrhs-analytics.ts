@@ -142,6 +142,10 @@ export async function fetchNRHSDeals(
     search?: string;
   }
 ): Promise<NRHSDeal[]> {
+  // AUTH.1.3: falha cedo se chamado sem organizationId (não pode "vazar" sem org).
+  if (!organizationId) {
+    throw new Error('NRHS: organizationId is required');
+  }
   let query = (supabase as any)
     .from('opportunities')
     .select(`

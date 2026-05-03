@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
+import { useQueryClient } from '@tanstack/react-query';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -39,6 +40,7 @@ export default function Login() {
   const { signIn } = useSupabaseAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,8 +69,11 @@ export default function Login() {
       }
 
       if (data.user) {
+        // AUTH.1.3: limpa cache de qualquer sessão anterior antes de navegar.
+        // Garante que queries privadas com organizationId antigo não disparem.
+        queryClient.clear();
         await new Promise(resolve => setTimeout(resolve, 100));
-        
+
         toast({
           title: t('loginSuccess', { ns: 'auth' }),
           description: t('welcome', { ns: 'dashboard' }),

@@ -31,12 +31,19 @@ export interface OrganizationMember {
 }
 
 export function useCurrentOrganization() {
-  const { user } = useSupabaseAuth();
+  const { user, loading: authLoading } = useSupabaseAuth();
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [membership, setMembership] = useState<OrganizationMember | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // AUTH.1.3: enquanto o boot do Supabase Auth não termina, não decide nada.
+    // Evita falso "sem organização" durante restauração de sessão.
+    if (authLoading) {
+      setLoading(true);
+      return;
+    }
+
     if (!user) {
       setOrganization(null);
       setMembership(null);
@@ -89,7 +96,7 @@ export function useCurrentOrganization() {
     };
 
     fetchOrganization();
-  }, [user]);
+  }, [user, authLoading]);
 
   // Unificado: usar org_role (campo correto da tabela organization_members)
   const isOwner = membership?.org_role === 'owner';
