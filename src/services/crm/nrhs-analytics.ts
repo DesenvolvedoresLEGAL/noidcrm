@@ -164,8 +164,8 @@ export async function fetchNRHSDeals(
       nrhs_blockers,
       nrhs_last_calculated_at,
       created_at,
-      accounts!inner(razao_social, nome_fantasia),
-      pipeline_stages!inner(name),
+      accounts(razao_social, nome_fantasia),
+      stage:stages(name),
       profiles!opportunities_owner_user_id_fkey(full_name)
     `)
     .eq('organization_id', organizationId)
@@ -193,8 +193,8 @@ export async function fetchNRHSDeals(
   const { data, error } = await query.limit(500);
 
   if (error) {
-    console.error('Error fetching NRHS deals:', error);
-    return [];
+    console.error('[NRHS] fetchNRHSDeals failed:', error);
+    throw error;
   }
 
   return (data || []).map((opp: any) => ({
@@ -204,7 +204,7 @@ export async function fetchNRHSDeals(
     ownerName: opp.profiles?.full_name || 'Sem responsável',
     ownerUserId: opp.owner_user_id,
     value: opp.value || 0,
-    stageName: opp.pipeline_stages?.name || 'Sem estágio',
+    stageName: opp.stage?.name || 'Sem estágio',
     stageId: opp.stage_id,
     opportunityScore: opp.opportunity_score,
     nrhsScore: opp.nrhs_score,
