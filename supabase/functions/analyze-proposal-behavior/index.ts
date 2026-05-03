@@ -32,7 +32,9 @@ serve(async (req) => {
   }
 
   try {
-    const { proposal_id } = await req.json();
+    const body = await req.json();
+    const proposal_id: string | undefined = body?.proposal_id;
+    const force_refresh: boolean = !!body?.force_refresh;
 
     if (!proposal_id) {
       return new Response(
@@ -45,6 +47,33 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // ---- Signature + cache lookup ----
+    const { data: sigData, error: sigErr } = await supabase.rpc('get_proposal_analytics_signature', { p_proposal_id: proposal_id });
+    if (sigErr) console.error('[analyze-proposal-behavior] signature error', sigErr);
+    const currentSignature: string | null = (sigData as any) ?? null;
+
+    const { data: cacheRow } = await supabase
+      .from('proposal_ai_insights_cache')
+      .select('*')
+      .eq('proposal_id', proposal_id)
+      .maybeSingle();
+
+    const cacheValid = !!cacheRow && currentSignature && cacheRow.analytics_signature === currentSignature;
+
+    if (cacheValid && !force_refresh) {
+      const payload = (cacheRow!.insights_payload || {}) as any;
+      return new Response(JSON.stringify({
+        ...payload,
+        from_cache: true,
+        status: 'ok',
+        analyzed_at: cacheRow!.generated_at,
+        cached_signature: cacheRow!.analytics_signature,
+        current_signature: currentSignature,
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    const refreshReason = !cacheRow ? 'cache_miss' : (force_refresh ? 'manual_refresh' : 'signature_changed');
 
     // Fetch proposal data
     const { data: proposal, error: proposalError } = await supabase
