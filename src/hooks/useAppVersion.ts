@@ -93,13 +93,11 @@ export function useAppVersion() {
       checkForUpdate();
     }, 5 * 60 * 1000);
 
-    // Listen for service worker state changes
+    // AUTH.1.2: NÃO recarrega automaticamente quando o SW troca de controller.
+    // Apenas marca needsUpdate para o UpdateBanner avisar — usuário decide.
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.addEventListener('controllerchange', () => {
-        // New service worker took control - reload to get fresh content
-        if (!state.needsUpdate) {
-          window.location.reload();
-        }
+        setState(prev => ({ ...prev, needsUpdate: true, lastChecked: new Date() }));
       });
     }
 

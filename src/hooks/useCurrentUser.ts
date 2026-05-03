@@ -227,27 +227,44 @@ export function useCurrentUser() {
   // - Se já temos dados, refetch acontece silenciosamente em background
   const loading = !sessionChecked || (hasSession && queryLoading && !data);
 
+  // AUTH.1.2: a verdade da autenticação é a sessão Supabase (hasSession),
+  // NÃO o sucesso da edge function get-current-user. Se o profile fetch falhar
+  // (cold start, 5xx transitório), o usuário continua autenticado — só o perfil
+  // está em loading. Isso evita falso logout / kick para /login.
+  if (import.meta.env.DEV) {
+    // Log mínimo para diagnóstico — sem token, sem email, sem sessão completa
+    // eslint-disable-next-line no-console
+    console.info('[AUTH_DEBUG]', {
+      sessionChecked,
+      hasSession,
+      profileLoaded: !!data?.user,
+      loading,
+    });
+  }
+
   return {
     // Dados completos
     data: data || null,
-    
+
     // Dados individuais para compatibilidade
     user: data?.user || null,
     profile: data?.profile || null,
     organization: data?.organization || null,
     membership: data?.membership || null,
     roles: data?.roles || [],
-    
+
     // Flags booleanas
     isOwner: data?.isOwner || false,
     isOrgAdmin: data?.isOrgAdmin || false,
     hasAdminRole: data?.hasAdminRole || false,
-    isAuthenticated: !!data?.user,
-    
+    // Fonte da verdade: sessão Supabase (não a edge function de perfil).
+    isAuthenticated: hasSession,
+    hasProfile: !!data?.user,
+
     // Estado
     loading,
     error: error as Error | null,
-    
+
     // Helpers adicionais
     sessionChecked,
     hasSession,
