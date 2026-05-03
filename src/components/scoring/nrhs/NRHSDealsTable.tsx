@@ -67,8 +67,24 @@ export function NRHSDealsTable({
 
   const hasActiveFilters = filters.tier || filters.ownerId || filters.stageId || filters.hasBlocker !== undefined || filters.search;
 
-  const getBlockerIssues = (blockers: string[]) => {
-    return blockers.map(b => NRHS_ISSUES[b]).filter(Boolean);
+  const getBlockerIssues = (blockers: any[]) => {
+    return (blockers || [])
+      .map(b => {
+        const code = typeof b === 'string' ? b : b?.code;
+        const known = code ? NRHS_ISSUES[code] : null;
+        if (known) return known;
+        // Fallback: synthesize an issue object from v1 blocker shape
+        if (b && typeof b === 'object' && b.code) {
+          return {
+            id: b.code,
+            title: b.label || b.code,
+            blocker: b.severity === 'critical' || b.severity === 'high',
+            cta: { label: 'Ajustar' },
+          } as any;
+        }
+        return null;
+      })
+      .filter(Boolean);
   };
 
   if (isLoading) {

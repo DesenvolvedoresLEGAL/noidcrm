@@ -54,8 +54,17 @@ export interface NRHSDeal {
   opportunityScore: number | null;
   nrhsScore: number | null;
   nrhsTier: NRHSTier | null;
+  nrhsStatus: string | null;
   nrhsIssuesCount: number;
-  nrhsBlockers: string[];
+  nrhsBlockers: any[];
+  pillars: {
+    integrity: number | null;
+    cadence: number | null;
+    stakeholders: number | null;
+    winloss: number | null;
+    adherence: number | null;
+    evidence: number | null;
+  };
   lastReviewedAt: string | null;
   createdAt: string;
 }
@@ -76,13 +85,14 @@ export interface NRHSCorrelation {
   comparison: number;
 }
 
-// Pillar configuration
-export const NRHS_PILLARS = [
-  { id: 'integrity', label: 'Integridade', weight: 0.30 },
-  { id: 'cadence', label: 'Cadência', weight: 0.25 },
-  { id: 'stakeholders', label: 'Stakeholders', weight: 0.20 },
-  { id: 'winloss', label: 'Win/Loss', weight: 0.15 },
-  { id: 'adherence', label: 'Aderência', weight: 0.10 },
+// Pillar configuration (NRHS v1 — pontos absolutos)
+export const NRHS_PILLARS: { id: keyof NRHSDeal['pillars']; label: string; weight: number }[] = [
+  { id: 'integrity', label: 'Integridade', weight: 25 },
+  { id: 'cadence', label: 'Cadência', weight: 20 },
+  { id: 'stakeholders', label: 'Stakeholders', weight: 20 },
+  { id: 'winloss', label: 'Win/Loss', weight: 15 },
+  { id: 'adherence', label: 'Aderência', weight: 10 },
+  { id: 'evidence', label: 'Evidências', weight: 10 },
 ];
 
 // Map issues to pillars
@@ -143,6 +153,13 @@ export async function fetchNRHSDeals(
       opportunity_score,
       nrhs_score,
       nrhs_tier,
+      nrhs_status,
+      nrhs_data_integrity_score,
+      nrhs_cadence_score,
+      nrhs_stakeholders_score,
+      nrhs_win_loss_score,
+      nrhs_process_adherence_score,
+      nrhs_evidence_score,
       nrhs_issues_count,
       nrhs_blockers,
       nrhs_last_calculated_at,
@@ -155,12 +172,9 @@ export async function fetchNRHSDeals(
     .is('deleted_at', null)
     .not('status', 'in', '("won","lost","disqualified")');
 
-  // Apply permission filter
   if (!isAdmin && userId) {
     query = query.eq('owner_user_id', userId);
   }
-
-  // Apply filters
   if (filters?.tier) {
     query = query.eq('nrhs_tier', filters.tier);
   }
@@ -170,21 +184,13 @@ export async function fetchNRHSDeals(
   if (filters?.stageId) {
     query = query.eq('stage_id', filters.stageId);
   }
-  if (filters?.hasBlocker !== undefined) {
-    if (filters.hasBlocker) {
-      query = query.not('nrhs_blockers', 'eq', '{}');
-    } else {
-      query = query.or('nrhs_blockers.eq.{},nrhs_blockers.is.null');
-    }
-  }
   if (filters?.search) {
     query = query.or(`title.ilike.%${filters.search}%,accounts.razao_social.ilike.%${filters.search}%`);
   }
 
-  // Order by NRHS ascending (worst first)
   query = query.order('nrhs_score', { ascending: true, nullsFirst: true });
 
-  const { data, error } = await query.limit(200);
+  const { data, error } = await query.limit(500);
 
   if (error) {
     console.error('Error fetching NRHS deals:', error);
@@ -203,8 +209,17 @@ export async function fetchNRHSDeals(
     opportunityScore: opp.opportunity_score,
     nrhsScore: opp.nrhs_score,
     nrhsTier: opp.nrhs_tier as NRHSTier | null,
+    nrhsStatus: opp.nrhs_status ?? null,
     nrhsIssuesCount: opp.nrhs_issues_count || 0,
-    nrhsBlockers: (opp.nrhs_blockers as string[]) || [],
+    nrhsBlockers: Array.isArray(opp.nrhs_blockers) ? opp.nrhs_blockers : [],
+    pillars: {
+      integrity: opp.nrhs_data_integrity_score,
+      cadence: opp.nrhs_cadence_score,
+      stakeholders: opp.nrhs_stakeholders_score,
+      winloss: opp.nrhs_win_loss_score,
+      adherence: opp.nrhs_process_adherence_score,
+      evidence: opp.nrhs_evidence_score,
+    },
     lastReviewedAt: opp.nrhs_last_calculated_at,
     createdAt: opp.created_at,
   }));
@@ -296,48 +311,22 @@ export function calculateTierDistribution(deals: NRHSDeal[]): NRHSTierDistributi
 }
 
 export function calculatePillarAverages(deals: NRHSDeal[]): NRHSPillarAverage[] {
-  // Calculate average issues per pillar
-  const pillarIssues: Record<string, number[]> = {};
-  
-  for (const pillar of NRHS_PILLARS) {
-    pillarIssues[pillar.id] = [];
-  }
-
-  for (const deal of deals) {
-    const breakdown = deal.nrhsBlockers || [];
-    const pillarScores: Record<string, number> = {};
-    
-    // Initialize all pillars with 100
-    for (const pillar of NRHS_PILLARS) {
-      pillarScores[pillar.id] = 100;
-    }
-    
-    // Deduct for each blocker/issue
-    for (const blockerId of breakdown) {
-      const pillarId = ISSUE_TO_PILLAR[blockerId];
-      if (pillarId && pillarScores[pillarId] !== undefined) {
-        pillarScores[pillarId] -= 20; // Deduct 20 points per issue
-      }
-    }
-    
-    // Add to pillar arrays
-    for (const pillar of NRHS_PILLARS) {
-      pillarIssues[pillar.id].push(Math.max(0, pillarScores[pillar.id]));
-    }
-  }
-
   return NRHS_PILLARS.map(pillar => {
-    const scores = pillarIssues[pillar.id];
-    const average = scores.length > 0 
-      ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
-      : 100;
-    
+    const scores = deals
+      .map(d => d.pillars?.[pillar.id])
+      .filter((v): v is number => typeof v === 'number');
+    const max = pillar.weight; // pillar max = its weight in the v1 formula
+    const avgPoints = scores.length > 0
+      ? scores.reduce((a, b) => a + b, 0) / scores.length
+      : 0;
+    // Normalize to 0-100 percentage of pillar potential
+    const average = max > 0 ? Math.round((avgPoints / max) * 100) : 0;
     return {
       pillar: pillar.id,
       label: pillar.label,
       average,
       weight: pillar.weight,
-      hasAlert: average < 70,
+      hasAlert: average < 60,
     };
   });
 }
@@ -394,30 +383,20 @@ export function calculateOwnerStats(deals: NRHSDeal[]): NRHSOwnerStats[] {
 
 export function generateNRHSInsights(deals: NRHSDeal[]): NRHSInsight[] {
   const insights: NRHSInsight[] = [];
-  
-  // Count issues by type
-  const issueCount: Record<string, number> = {};
-  const issueDealCount: Record<string, number> = {};
-  
-  for (const deal of deals) {
-    for (const blockerId of deal.nrhsBlockers || []) {
-      issueCount[blockerId] = (issueCount[blockerId] || 0) + 1;
-      issueDealCount[blockerId] = (issueDealCount[blockerId] || 0) + 1;
-    }
-  }
+  const codeOf = (b: any): string => (typeof b === 'string' ? b : b?.code ?? '');
+  const dealHas = (d: NRHSDeal, code: string) =>
+    (d.nrhsBlockers || []).some(b => codeOf(b) === code);
 
-  // Calculate percentages and generate insights
   const totalDeals = deals.length;
-  const criticalDeals = deals.filter(d => (d.nrhsScore ?? 0) < 60);
-  
-  // Insight: Missing next step in critical deals
-  const criticalWithNoStep = criticalDeals.filter(d => d.nrhsBlockers?.includes('missing_next_step'));
-  if (criticalWithNoStep.length > 0 && totalDeals > 0) {
+  const criticalDeals = deals.filter(d => (d.nrhsScore ?? 0) < 50);
+
+  const criticalWithNoStep = criticalDeals.filter(d => dealHas(d, 'missing_next_step') || dealHas(d, 'no_next_step'));
+  if (criticalWithNoStep.length > 0 && criticalDeals.length > 0) {
     const percent = Math.round((criticalWithNoStep.length / criticalDeals.length) * 100);
     if (percent >= 30) {
       insights.push({
         id: 'critical_no_step',
-        text: `${percent}% dos deals críticos falham por ausência de próximo passo`,
+        text: `${percent}% dos deals em risco/críticos sem próximo passo agendado`,
         pillar: 'Cadência',
         dealCount: criticalWithNoStep.length,
         severity: 'high',
@@ -425,56 +404,52 @@ export function generateNRHSInsights(deals: NRHSDeal[]): NRHSInsight[] {
     }
   }
 
-  // Insight: Missing decision maker
-  const noDecisionMaker = deals.filter(d => d.nrhsBlockers?.includes('missing_decision_maker'));
+  const noDecisionMaker = deals.filter(d => dealHas(d, 'missing_decision_maker') || dealHas(d, 'no_decisor'));
   if (noDecisionMaker.length >= 3) {
     const avgNRHS = Math.round(noDecisionMaker.reduce((s, d) => s + (d.nrhsScore ?? 0), 0) / noDecisionMaker.length);
     insights.push({
       id: 'no_decision_maker',
-      text: `Deals sem decisor têm NRHS médio ${avgNRHS} e precisam de atenção`,
+      text: `${noDecisionMaker.length} deals sem decisor mapeado (NRHS médio ${avgNRHS})`,
       pillar: 'Stakeholders',
       dealCount: noDecisionMaker.length,
       severity: avgNRHS < 50 ? 'high' : 'medium',
     });
   }
 
-  // Insight: No recent activity
-  const noActivity = deals.filter(d => d.nrhsBlockers?.includes('no_recent_activity'));
+  const noActivity = deals.filter(d => dealHas(d, 'no_recent_activity') || dealHas(d, 'stale_in_stage'));
   if (noActivity.length >= 3) {
     insights.push({
       id: 'stale_deals',
-      text: `${noActivity.length} deals estão sem atividade recente e podem estar abandonados`,
+      text: `${noActivity.length} deals sem atividade recente — possível abandono`,
       pillar: 'Cadência',
       dealCount: noActivity.length,
       severity: 'medium',
     });
   }
 
-  // Insight: Missing value
-  const noValue = deals.filter(d => d.nrhsBlockers?.includes('missing_value'));
+  const noValue = deals.filter(d => dealHas(d, 'missing_value'));
   if (noValue.length >= 2) {
     insights.push({
       id: 'missing_value',
-      text: `${noValue.length} deals não possuem valor definido, prejudicando o forecast`,
+      text: `${noValue.length} deals sem valor definido — quebra forecast`,
       pillar: 'Integridade',
       dealCount: noValue.length,
       severity: 'high',
     });
   }
 
-  // Insight: Past close date
-  const pastDate = deals.filter(d => d.nrhsBlockers?.includes('close_date_past'));
+  const pastDate = deals.filter(d => dealHas(d, 'close_date_past') || dealHas(d, 'stale_close_date'));
   if (pastDate.length >= 2) {
     insights.push({
       id: 'past_close_date',
-      text: `${pastDate.length} deals têm data de fechamento vencida e precisam de atualização`,
+      text: `${pastDate.length} deals com data de fechamento vencida`,
       pillar: 'Integridade',
       dealCount: pastDate.length,
       severity: 'medium',
     });
   }
 
-  return insights.slice(0, 5); // Return top 5 insights
+  return insights.slice(0, 5);
 }
 
 export function generateNRHSCorrelations(deals: NRHSDeal[]): NRHSCorrelation[] {

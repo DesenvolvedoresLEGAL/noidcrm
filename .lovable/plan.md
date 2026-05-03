@@ -125,10 +125,11 @@ A spec pede que a fórmula seja v1 “oficial” (pontos absolutos), portanto va
 - Triggers de enqueue mal calibrados podem inflar a fila. Mitigação: debounce 2 min via subquery + filtros estritos por colunas relevantes.
 - Backfill de ~278 deals: será processado pelo cron em lotes de 50/min (~6 min). Sem bloqueio de deploy.
 
-### Próximos passos após aprovação
+### Status final
 
-1. Migration (schema + triggers + backfill).
-2. Refactor edge `calculate-nrhs` e novo `process-nrhs-queue`.
-3. Cron via insert tool.
-4. Refactor service/hook + UI + realtime.
-5. QA: validar aba populada, recálculo manual, badge na pipeline, histórico em `score_history`.
+- ✅ Migration (schema + colunas v1 + filas + triggers + signals)
+- ✅ Edge `calculate-nrhs` v1 + `process-nrhs-queue` deployados
+- ✅ Cron 1/min + backfill enfileirado (214 deals scorados)
+- ✅ Service/hook usando colunas reais por pilar; insights v1
+- ✅ Botão "Atualizar NRHS" enfileira deals visíveis e dispara processamento imediato
+- ✅ Realtime via `useNRHSAnalyticsRealtime` invalida queries quando `nrhs_score`/`nrhs_status` mudam
