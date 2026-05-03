@@ -165,8 +165,8 @@ export function useNRHSKPIs() {
     queryKey: nrhsAnalyticsKeys.kpis(organizationId ?? undefined, userId ?? undefined, isPrivileged),
     queryFn: async () => {
       if (!organizationId) return null;
-      const deals = await fetchNRHSDeals(organizationId, userId, isPrivileged);
-      return calculateNRHSKPIs(deals);
+      const payload = await fetchNRHSAnalytics(organizationId, userId, isPrivileged);
+      return payload.summary ?? calculateNRHSKPIs(payload.deals);
     },
     enabled,
     staleTime: 30000,
