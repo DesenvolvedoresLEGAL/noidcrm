@@ -204,7 +204,7 @@ export async function fetchNRHSDeals(
     ownerName: opp.profiles?.full_name || 'Sem responsável',
     ownerUserId: opp.owner_user_id,
     value: opp.value || 0,
-    stageName: opp.pipeline_stages?.name || 'Sem estágio',
+    stageName: opp.stage?.name || 'Sem estágio',
     stageId: opp.stage_id,
     opportunityScore: opp.opportunity_score,
     nrhsScore: opp.nrhs_score,
