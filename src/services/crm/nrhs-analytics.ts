@@ -193,8 +193,8 @@ export async function fetchNRHSDeals(
   const { data, error } = await query.limit(500);
 
   if (error) {
-    console.error('Error fetching NRHS deals:', error);
-    return [];
+    console.error('[NRHS] fetchNRHSDeals failed:', error);
+    throw error;
   }
 
   return (data || []).map((opp: any) => ({
