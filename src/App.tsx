@@ -201,13 +201,23 @@ const queryClient = new QueryClient({
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const location = useLocation();
+  const queryClient = useQueryClient();
   const [loadingTimeout, setLoadingTimeout] = React.useState(false);
-  const { user, membership, isOrgAdmin, isOwner, loading: userLoading, isAuthenticated, error: userError } = useCurrentUser();
+  const {
+    user,
+    membership,
+    isOrgAdmin,
+    isOwner,
+    loading: userLoading,
+    isAuthenticated,
+    hasSession,
+    sessionChecked,
+    error: userError,
+  } = useCurrentUser();
   const { onboardingCompleted, status, loading: onboardingLoading, hasActiveMembership } = useOnboardingStatus(user?.id);
 
   React.useEffect(() => {
     if (userLoading || onboardingLoading) {
-      // 25s para tolerar cold-start de edge functions + retries em backend congestionado
       const timer = setTimeout(() => setLoadingTimeout(true), 25000);
       return () => clearTimeout(timer);
     }
@@ -215,6 +225,28 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     setLoadingTimeout(false);
     return undefined;
   }, [userLoading, onboardingLoading]);
+
+  const retryProfile = React.useCallback(() => {
+    setLoadingTimeout(false);
+    queryClient.invalidateQueries({ queryKey: ['current-user'] });
+  }, [queryClient]);
+
+  // AUTH.1.2: nunca redirecionar para /login antes de o boot da sessão terminar.
+  if (!sessionChecked) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-muted-foreground">Restaurando sessão...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Boot pronto e SEM sessão Supabase → único caminho válido para /login.
+  if (!hasSession) {
+    return <Navigate to="/login" replace state={{ from: location }} />;
+  }
 
   if (loadingTimeout) {
     return (
@@ -226,7 +258,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
             O carregamento está demorando mais do que o esperado. Verifique sua conexão com a internet.
           </p>
           <button
-            onClick={() => window.location.reload()}
+            onClick={retryProfile}
             className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
           >
             Tentar novamente
@@ -236,6 +268,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     );
   }
 
+  // Erro carregando perfil mas sessão segue válida → oferecer retry, NÃO deslogar.
   if (userError && !userLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -244,10 +277,10 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
           <h2 className="text-xl font-semibold">Erro ao carregar dados</h2>
           <p className="text-muted-foreground">Ocorreu um erro ao carregar seus dados. Por favor, tente novamente.</p>
           <button
-            onClick={() => window.location.reload()}
+            onClick={retryProfile}
             className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
           >
-            Recarregar página
+            Tentar novamente
           </button>
         </div>
       </div>
@@ -269,7 +302,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   }
 
   if (!isAuthenticated || !user?.id) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
   // **LÓGICA DE ONBOARDING CORRIGIDA**
