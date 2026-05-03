@@ -363,11 +363,57 @@ Gere insights acionáveis baseados nos padrões observados.`;
       }
     }
 
+    // ---- Persist cache ----
+    const engagementMap: Record<string, number> = { low: 25, medium: 55, high: 80, very_high: 95 };
+    const insightsPayload = {
+      summary: analysis.summary,
+      engagement: { score: engagementMap[analysis.engagement_level] ?? null, level: analysis.engagement_level },
+      close_probability: { value: analysis.win_probability_delta, trend: 'neutral' },
+      insights: analysis.insights,
+      recommended_actions: analysis.recommended_actions,
+      smart_alerts: analysis.insights,
+      best_contact_time: analysis.best_contact_time,
+      concerns: analysis.concerns,
+      metrics: behaviorContext.metrics,
+    };
+
+    const tokensIn = usage?.prompt_tokens ?? 0;
+    const tokensOut = usage?.completion_tokens ?? 0;
+    const tokensTot = usage?.total_tokens ?? (tokensIn + tokensOut);
+
+    if (currentSignature) {
+      const { error: upsertErr } = await supabase.rpc('upsert_proposal_ai_insights_cache', {
+        p_organization_id: proposal.organization_id,
+        p_opportunity_id: proposal.opportunity_id,
+        p_proposal_id: proposal_id,
+        p_analytics_signature: currentSignature,
+        p_insights_payload: insightsPayload,
+        p_engagement_score: engagementMap[analysis.engagement_level] ?? null,
+        p_engagement_level: analysis.engagement_level,
+        p_close_probability: analysis.win_probability_delta,
+        p_risk_level: null,
+        p_recommended_actions: analysis.recommended_actions as any,
+        p_smart_alerts: analysis.insights as any,
+        p_generated_summary: analysis.summary,
+        p_model_used: modelUsed,
+        p_tokens_input: tokensIn,
+        p_tokens_output: tokensOut,
+        p_total_tokens: tokensTot,
+      });
+      if (upsertErr) console.error('[analyze-proposal-behavior] cache upsert error', upsertErr);
+    }
+
     return new Response(
       JSON.stringify({
         ...analysis,
+        ...insightsPayload,
+        status: 'ok',
+        from_cache: false,
+        reason: refreshReason,
+        current_signature: currentSignature,
+        cached_signature: currentSignature,
         metrics: behaviorContext.metrics,
-        analyzed_at: new Date().toISOString()
+        analyzed_at: new Date().toISOString(),
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
