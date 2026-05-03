@@ -30818,6 +30818,10 @@ export type Database = {
         Args: { payload: Json; queue_name: string }
         Returns: number
       }
+      enqueue_nrhs_recalc_for_filters: {
+        Args: { p_org_id: string; p_owner_id?: string }
+        Returns: Json
+      }
       enqueue_opportunity_indicators_recalc: {
         Args: {
           _account_id: string
@@ -31137,6 +31141,15 @@ export type Database = {
           read_rate_pct: number
           volume_sent: number
         }[]
+      }
+      get_nrhs_analytics: {
+        Args: {
+          p_caller_user_id?: string
+          p_only_privileged?: boolean
+          p_org_id: string
+          p_owner_id?: string
+        }
+        Returns: Json
       }
       get_opportunity_pending_approvals: {
         Args: { p_opportunity_id: string }
