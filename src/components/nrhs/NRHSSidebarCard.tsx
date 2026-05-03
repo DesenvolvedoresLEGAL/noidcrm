@@ -34,6 +34,8 @@ export function NRHSSidebarCard({
     breakdown,
     issuesCount,
     blockers,
+    blockersDetailed,
+    gaps,
     isLoading,
     recalculate,
     isRecalculating,
