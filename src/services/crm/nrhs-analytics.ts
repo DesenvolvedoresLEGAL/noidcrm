@@ -85,13 +85,14 @@ export interface NRHSCorrelation {
   comparison: number;
 }
 
-// Pillar configuration
-export const NRHS_PILLARS = [
-  { id: 'integrity', label: 'Integridade', weight: 0.30 },
-  { id: 'cadence', label: 'Cadência', weight: 0.25 },
-  { id: 'stakeholders', label: 'Stakeholders', weight: 0.20 },
-  { id: 'winloss', label: 'Win/Loss', weight: 0.15 },
-  { id: 'adherence', label: 'Aderência', weight: 0.10 },
+// Pillar configuration (NRHS v1 — pontos absolutos)
+export const NRHS_PILLARS: { id: keyof NRHSDeal['pillars']; label: string; weight: number }[] = [
+  { id: 'integrity', label: 'Integridade', weight: 25 },
+  { id: 'cadence', label: 'Cadência', weight: 20 },
+  { id: 'stakeholders', label: 'Stakeholders', weight: 20 },
+  { id: 'winloss', label: 'Win/Loss', weight: 15 },
+  { id: 'adherence', label: 'Aderência', weight: 10 },
+  { id: 'evidence', label: 'Evidências', weight: 10 },
 ];
 
 // Map issues to pillars
