@@ -150,9 +150,22 @@ function PillarSection({ pillarKey, pillar, onFixIssue }: PillarSectionProps) {
 
 export function NRHSBreakdown({ breakdown, onFixIssue }: NRHSBreakdownProps) {
   const pillarOrder = ['integrity', 'cadence', 'stakeholders', 'winloss', 'adherence'];
-  const pillars = (breakdown as any)?.pillars ?? {};
-  const safePillar = (key: string) =>
-    pillars?.[key] ?? { score: 0, issues: [], passed: [] };
+  const raw = (breakdown as any) ?? {};
+  const pillarsSrc = raw?.pillars ?? raw ?? {};
+  const safePillar = (key: string) => {
+    const fallbacks: Record<string, string> = {
+      integrity: 'data_integrity',
+      winloss: 'win_loss',
+      adherence: 'process_adherence',
+    };
+    const p = pillarsSrc?.[key] ?? pillarsSrc?.[fallbacks[key]] ?? null;
+    if (!p || typeof p !== 'object') return { score: 0, issues: [], passed: [] };
+    return {
+      score: Number(p.score ?? 0) || 0,
+      issues: Array.isArray(p.issues) ? p.issues : [],
+      passed: Array.isArray(p.passed) ? p.passed : [],
+    };
+  };
 
   return (
     <div className="border rounded-lg divide-y">

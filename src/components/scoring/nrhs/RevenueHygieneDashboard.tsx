@@ -19,6 +19,7 @@ import { NRHSByOwner } from './NRHSByOwner';
 import { NRHSCorrelations } from './NRHSCorrelations';
 import { NRHSInsightsPanel } from './NRHSInsightsPanel';
 import { NRHSGovernanceBox } from './NRHSGovernanceBox';
+import { NRHSFilterBar } from './NRHSFilterBar';
 
 export function RevenueHygieneDashboard() {
   const { organization, loading: orgLoading } = useCurrentOrganization();
@@ -40,6 +41,7 @@ export function RevenueHygieneDashboard() {
     setFilters,
     clearFilters,
     filteredDeals,
+    filterOptions,
   } = useNRHSAnalytics();
 
   useNRHSAnalyticsRealtime(organization?.id);
@@ -87,8 +89,8 @@ export function RevenueHygieneDashboard() {
       const enqueued = data?.enqueued ?? 0;
       const skipped = data?.skipped ?? 0;
       toast({
-        title: 'Atualização enfileirada',
-        description: `${enqueued} deals serão recalculados${skipped > 0 ? ` (${skipped} já estavam na fila)` : ''}.`,
+        title: 'NRHS em atualização',
+        description: `${enqueued} oportunidades comerciais abertas serão recalculadas${skipped > 0 ? ` (${skipped} já estavam na fila)` : ''}.`,
       });
       // Trigger immediate processing (best-effort, non-blocking)
       supabase.functions.invoke('process-nrhs-queue', {
@@ -168,6 +170,14 @@ export function RevenueHygieneDashboard() {
           </div>
         </div>
       ) : null}
+
+      {/* Filter Bar */}
+      <NRHSFilterBar
+        filters={filters}
+        options={filterOptions}
+        onChange={setFilters}
+        onClear={clearFilters}
+      />
 
       {/* Seção 1: KPIs Overview */}
       <NRHSOverviewKPIs 

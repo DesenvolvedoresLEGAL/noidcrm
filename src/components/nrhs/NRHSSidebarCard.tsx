@@ -8,7 +8,6 @@ import { Badge } from '@/components/ui/badge';
 import { InfoCard } from '@/components/opportunity/InfoCard';
 import { useNRHS } from '@/hooks/useNRHS';
 import { getNRHSTierConfig } from '@/services/crm/nrhs-calculator';
-import { NRHS_ISSUES } from '@/services/crm/nrhs-issues';
 import { NRHSBreakdown } from './NRHSBreakdown';
 import { FixHygieneWizardModal } from './FixHygieneWizardModal';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -34,6 +33,8 @@ export function NRHSSidebarCard({
     breakdown,
     issuesCount,
     blockers,
+    blockersDetailed,
+    gaps,
     isLoading,
     recalculate,
     isRecalculating,
@@ -54,8 +55,8 @@ export function NRHSSidebarCard({
   }
 
   const hasIssues = issuesCount > 0;
-  const hasBlockers = blockers.length > 0;
-  const topIssues = breakdown?.required_actions?.slice(0, 2) || [];
+  const hasBlockers = (blockersDetailed?.length ?? 0) > 0;
+  const topIssues = [...(blockersDetailed || []), ...(gaps || [])].slice(0, 2);
 
   return (
     <>
@@ -127,23 +128,27 @@ export function NRHSSidebarCard({
             </div>
           )}
 
-          {/* Top Issues */}
+          {/* Top Issues (blockers + gaps) */}
           {hasIssues && topIssues.length > 0 && (
             <div className="flex flex-wrap gap-1">
-              {topIssues.map(issue => (
-                <Badge
-                  key={issue.id}
-                  variant="outline"
-                  className={cn(
-                    "text-[10px]",
-                    issue.severity === 'high' && "border-red-500/50 text-red-600",
-                    issue.severity === 'med' && "border-yellow-500/50 text-yellow-600",
-                    issue.severity === 'low' && "border-muted-foreground/50"
-                  )}
-                >
-                  {NRHS_ISSUES[issue.id]?.title || issue.id}
-                </Badge>
-              ))}
+              {topIssues.map((issue: any, idx: number) => {
+                const sev = issue?.severity ?? 'low';
+                return (
+                  <Badge
+                    key={(issue?.code ?? 'issue') + idx}
+                    variant="outline"
+                    className={cn(
+                      "text-[10px]",
+                      sev === 'critical' && "border-red-500/50 text-red-600",
+                      sev === 'high' && "border-red-500/50 text-red-600",
+                      sev === 'medium' && "border-yellow-500/50 text-yellow-600",
+                      sev === 'low' && "border-muted-foreground/50",
+                    )}
+                  >
+                    {issue?.label ?? issue?.code ?? 'Issue'}
+                  </Badge>
+                );
+              })}
               {issuesCount > 2 && (
                 <Badge variant="secondary" className="text-[10px]">
                   +{issuesCount - 2}
