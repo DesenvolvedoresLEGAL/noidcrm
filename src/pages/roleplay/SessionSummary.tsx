@@ -223,12 +223,9 @@ export default function SessionSummary() {
     );
   }
 
-  // If session loaded but evaluation hasn't been computed yet, show processing state.
-  // The session query polls every 2s, so this updates automatically when ready.
-  const fallbackEval = fallbackEvaluation as any;
-  const mergedSession: any = session?.score_overall == null && fallbackEval
-    ? { ...(session as any), ...fallbackEval, passed: (fallbackEval.score_overall || 0) >= 8 }
-    : session;
+  // Session source of truth lives entirely in roleplay_sessions now.
+  const mergedSession: any = session;
+
 
   const normalizedPhase = mergedSession?.current_phase || mergedSession?.status;
   const hasScore = mergedSession?.score_overall != null;
