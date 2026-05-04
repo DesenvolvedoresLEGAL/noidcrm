@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Send, Sparkles, Loader2, FileText, AlertTriangle, Info, Thermometer } from 'lucide-react';
+import { Send, Sparkles, Loader2, FileText, AlertTriangle, Info, Thermometer, Paperclip, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { listEmailTemplates, renderEmailTemplate, type EmailTemplate } from '@/services/crm/email-templates';
