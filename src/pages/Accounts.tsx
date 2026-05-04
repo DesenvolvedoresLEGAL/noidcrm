@@ -656,6 +656,12 @@ export default function Accounts() {
             )}
           </CardContent>
         </Card>
+          </TabsContent>
+
+          <TabsContent value="rfm">
+            <AccountRFMIntelligencePage />
+          </TabsContent>
+        </Tabs>
       </div>
 
       <AccountModalTabs
