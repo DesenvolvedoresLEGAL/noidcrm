@@ -173,10 +173,24 @@ serve(async (req) => {
     }
 
     const body = await req.json();
-    const { to_emails, cc_emails, subject, html_body, opportunity_id, organization_id } = body;
+    const { to_emails, cc_emails, subject, html_body, opportunity_id, organization_id, attachments } = body;
 
     if (!to_emails?.length || !subject || !html_body) {
       return new Response(JSON.stringify({ error: 'to_emails, subject, and html_body are required' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Validate attachments size (max 10MB total)
+    const attachmentList: Array<{ filename: string; content_type: string; content_base64: string }> =
+      Array.isArray(attachments) ? attachments : [];
+    const totalAttachmentBytes = attachmentList.reduce(
+      (sum, a) => sum + Math.ceil((a.content_base64?.length || 0) * 3 / 4),
+      0
+    );
+    if (totalAttachmentBytes > 10 * 1024 * 1024) {
+      return new Response(JSON.stringify({ error: 'Tamanho total dos anexos excede 10MB' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -280,6 +294,15 @@ serve(async (req) => {
 
     if (customMessageId) {
       sendOptions.headers = new Map<string, string>([['Message-ID', customMessageId]]);
+    }
+
+    if (attachmentList.length > 0) {
+      sendOptions.attachments = attachmentList.map((a) => ({
+        filename: a.filename,
+        contentType: a.content_type || 'application/octet-stream',
+        encoding: 'base64',
+        content: a.content_base64,
+      }));
     }
 
     await client.send(sendOptions);

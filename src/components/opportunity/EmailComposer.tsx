@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Send, Sparkles, Loader2, FileText, AlertTriangle, Info, Thermometer } from 'lucide-react';
+import { Send, Sparkles, Loader2, FileText, AlertTriangle, Info, Thermometer, Paperclip, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { listEmailTemplates, renderEmailTemplate, type EmailTemplate } from '@/services/crm/email-templates';
@@ -82,6 +82,9 @@ export function EmailComposer({
   const [ccEmails, setCcEmails] = useState('');
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
+  const [attachments, setAttachments] = useState<File[]>([]);
+
+  const MAX_TOTAL_BYTES = 10 * 1024 * 1024; // 10MB
 
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<string>('');
@@ -102,8 +105,43 @@ export function EmailComposer({
       setEmailTypeLabel('');
       setEmailContext(null);
       setWarnings([]);
+      setAttachments([]);
     }
   }, [open]);
+
+  const handleAddFiles = (files: FileList | null) => {
+    if (!files) return;
+    const incoming = Array.from(files);
+    const currentTotal = attachments.reduce((s, f) => s + f.size, 0);
+    const incomingTotal = incoming.reduce((s, f) => s + f.size, 0);
+    if (currentTotal + incomingTotal > MAX_TOTAL_BYTES) {
+      toast.error('Tamanho total dos anexos excede 10MB');
+      return;
+    }
+    setAttachments((prev) => [...prev, ...incoming]);
+  };
+
+  const removeAttachment = (idx: number) => {
+    setAttachments((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const formatBytes = (b: number) => {
+    if (b < 1024) return `${b} B`;
+    if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`;
+    return `${(b / 1024 / 1024).toFixed(2)} MB`;
+  };
+
+  const fileToBase64 = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        const base64 = result.split(',')[1] || '';
+        resolve(base64);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
 
   const checkSmtpConfig = async () => {
     setLoadingSmtp(true);
@@ -214,6 +252,14 @@ export function EmailComposer({
       const toList = toEmails.split(',').map(e => e.trim()).filter(Boolean);
       const ccList = ccEmails ? ccEmails.split(',').map(e => e.trim()).filter(Boolean) : [];
 
+      const encodedAttachments = await Promise.all(
+        attachments.map(async (f) => ({
+          filename: f.name,
+          content_type: f.type || 'application/octet-stream',
+          content_base64: await fileToBase64(f),
+        }))
+      );
+
       const { data, error } = await supabase.functions.invoke('send-smtp-email', {
         body: {
           to_emails: toList,
@@ -221,6 +267,7 @@ export function EmailComposer({
           subject,
           html_body: body,
           opportunity_id: opportunityId,
+          attachments: encodedAttachments,
         },
       });
 
@@ -233,6 +280,7 @@ export function EmailComposer({
         setCcEmails('');
         setSelectedTemplate('');
         setWarnings([]);
+        setAttachments([]);
         onSent();
         onClose();
       } else {
@@ -409,6 +457,56 @@ export function EmailComposer({
                 rows={10}
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               />
+            </div>
+
+            {/* Attachments */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Anexos</Label>
+                <span className="text-xs text-muted-foreground">
+                  {formatBytes(attachments.reduce((s, f) => s + f.size, 0))} / 10 MB
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  id="email-attachments"
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => {
+                    handleAddFiles(e.target.files);
+                    e.target.value = '';
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => document.getElementById('email-attachments')?.click()}
+                >
+                  <Paperclip className="h-4 w-4 mr-2" />
+                  Anexar arquivos
+                </Button>
+                <span className="text-xs text-muted-foreground">Máx. 10MB no total</span>
+              </div>
+              {attachments.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {attachments.map((f, i) => (
+                    <Badge key={i} variant="secondary" className="gap-1 pr-1">
+                      <FileText className="h-3 w-3" />
+                      <span className="max-w-[200px] truncate">{f.name}</span>
+                      <span className="text-xs opacity-70">({formatBytes(f.size)})</span>
+                      <button
+                        type="button"
+                        onClick={() => removeAttachment(i)}
+                        className="ml-1 hover:bg-muted-foreground/20 rounded p-0.5"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Actions */}
