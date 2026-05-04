@@ -65,24 +65,22 @@ export default function SessionSummary() {
 
   const reprocessMutation = useMutation({
     mutationFn: async () => {
-      await supabase
-        .from('roleplay_sessions')
-        .update({ current_phase: 'evaluating', evaluation_error: null })
-        .eq('id', sessionId!);
       console.log('[RoleplaySummary] calling finalize-roleplay-session', { sessionId, source: 'manual-reprocess' });
       const { data, error } = await supabase.functions.invoke('finalize-roleplay-session', { body: { sessionId } });
       if (error) throw error;
       console.log('[RoleplaySummary] finalize returned', data);
       return data;
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       setEvaluationError(null);
       setTechnicalDetails(null);
       recoveryRequestedRef.current = false;
+      await refetchSession();
     },
     onError: (error) => {
-      console.error('[RoleplaySummary] failed', error);
+      console.error('[RoleplaySummary] reprocess failed', error);
       setEvaluationError(error instanceof Error ? error.message : 'Falha ao reprocessar avaliação');
+      setTechnicalDetails(error instanceof Error ? error.message : null);
     },
   });
 

@@ -486,6 +486,8 @@ Regras do JSON:
         score_overall: evaluation.overall_score,
         scores_json: evaluation,
         passed: evaluation.passed,
+        coach_notes: evaluation.summary ?? null,
+        current_phase: 'completed',
         finished_at: new Date().toISOString()
       })
       .eq('id', sessionId);
