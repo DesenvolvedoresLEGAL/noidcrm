@@ -234,6 +234,75 @@ export type Database = {
           },
         ]
       }
+      account_rfm_snapshots: {
+        Row: {
+          account_id: string
+          avg_ticket: number
+          calculated_at: string
+          created_at: string
+          f_score: number
+          id: string
+          last_won_date: string | null
+          m_score: number
+          organization_id: string
+          owner_id: string | null
+          period_end: string
+          period_start: string
+          r_score: number
+          recency_days: number | null
+          rfm_score: number
+          rfm_segment: string
+          suggested_action: string | null
+          total_revenue: number
+          updated_at: string
+          won_count: number
+        }
+        Insert: {
+          account_id: string
+          avg_ticket?: number
+          calculated_at?: string
+          created_at?: string
+          f_score?: number
+          id?: string
+          last_won_date?: string | null
+          m_score?: number
+          organization_id: string
+          owner_id?: string | null
+          period_end: string
+          period_start: string
+          r_score?: number
+          recency_days?: number | null
+          rfm_score?: number
+          rfm_segment?: string
+          suggested_action?: string | null
+          total_revenue?: number
+          updated_at?: string
+          won_count?: number
+        }
+        Update: {
+          account_id?: string
+          avg_ticket?: number
+          calculated_at?: string
+          created_at?: string
+          f_score?: number
+          id?: string
+          last_won_date?: string | null
+          m_score?: number
+          organization_id?: string
+          owner_id?: string | null
+          period_end?: string
+          period_start?: string
+          r_score?: number
+          recency_days?: number | null
+          rfm_score?: number
+          rfm_segment?: string
+          suggested_action?: string | null
+          total_revenue?: number
+          updated_at?: string
+          won_count?: number
+        }
+        Relationships: []
+      }
       account_tags: {
         Row: {
           account_id: string
@@ -30920,6 +30989,17 @@ export type Database = {
       generate_proposal_public_token: { Args: never; Returns: string }
       generate_public_form_token: { Args: never; Returns: string }
       generate_trace_id: { Args: never; Returns: string }
+      get_account_rfm_intelligence: {
+        Args: {
+          p_organization_id: string
+          p_owner_id?: string
+          p_period_end: string
+          p_period_start: string
+          p_search?: string
+          p_segment?: string
+        }
+        Returns: Json
+      }
       get_accounts_porte_summary: {
         Args: { _organization_id: string }
         Returns: {
@@ -31530,6 +31610,14 @@ export type Database = {
           msg_id: number
           read_ct: number
         }[]
+      }
+      recalculate_account_rfm: {
+        Args: {
+          p_organization_id: string
+          p_period_end: string
+          p_period_start: string
+        }
+        Returns: number
       }
       recalculate_email_kb_quality: {
         Args: { p_opportunity_id: string }
