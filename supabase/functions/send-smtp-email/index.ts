@@ -296,6 +296,15 @@ serve(async (req) => {
       sendOptions.headers = new Map<string, string>([['Message-ID', customMessageId]]);
     }
 
+    if (attachmentList.length > 0) {
+      sendOptions.attachments = attachmentList.map((a) => ({
+        filename: a.filename,
+        contentType: a.content_type || 'application/octet-stream',
+        encoding: 'base64',
+        content: a.content_base64,
+      }));
+    }
+
     await client.send(sendOptions);
     await client.close();
 
