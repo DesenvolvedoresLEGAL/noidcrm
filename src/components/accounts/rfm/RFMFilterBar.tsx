@@ -33,7 +33,7 @@ export function RFMFilterBar({ periodStart, periodEnd, ownerId, segment, search,
           <SelectContent>
             <SelectItem value="all">Todos</SelectItem>
             {users.map((u) => (
-              <SelectItem key={u.id} value={u.id}>{u.full_name || u.email}</SelectItem>
+              <SelectItem key={u.user_id} value={u.user_id}>{u.full_name || u.email}</SelectItem>
             ))}
           </SelectContent>
         </Select>
