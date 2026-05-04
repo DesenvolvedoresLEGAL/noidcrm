@@ -38,7 +38,7 @@ export default function SessionSummary() {
         const data = await getSession(sessionId!);
         console.log('[RoleplaySummary] session loaded', data?.id);
         console.log('[RoleplaySummary] status/current_phase/score_overall', {
-          status: data?.status,
+          status: (data as any)?.status,
           current_phase: data?.current_phase,
           score_overall: data?.score_overall,
         });
