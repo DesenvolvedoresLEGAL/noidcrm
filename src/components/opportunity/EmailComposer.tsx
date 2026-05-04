@@ -459,6 +459,56 @@ export function EmailComposer({
               />
             </div>
 
+            {/* Attachments */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Anexos</Label>
+                <span className="text-xs text-muted-foreground">
+                  {formatBytes(attachments.reduce((s, f) => s + f.size, 0))} / 10 MB
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  id="email-attachments"
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => {
+                    handleAddFiles(e.target.files);
+                    e.target.value = '';
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => document.getElementById('email-attachments')?.click()}
+                >
+                  <Paperclip className="h-4 w-4 mr-2" />
+                  Anexar arquivos
+                </Button>
+                <span className="text-xs text-muted-foreground">Máx. 10MB no total</span>
+              </div>
+              {attachments.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {attachments.map((f, i) => (
+                    <Badge key={i} variant="secondary" className="gap-1 pr-1">
+                      <FileText className="h-3 w-3" />
+                      <span className="max-w-[200px] truncate">{f.name}</span>
+                      <span className="text-xs opacity-70">({formatBytes(f.size)})</span>
+                      <button
+                        type="button"
+                        onClick={() => removeAttachment(i)}
+                        className="ml-1 hover:bg-muted-foreground/20 rounded p-0.5"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+
             {/* Actions */}
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={onClose}>
