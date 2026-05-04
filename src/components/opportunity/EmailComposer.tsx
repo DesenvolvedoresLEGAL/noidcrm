@@ -450,13 +450,11 @@ export function EmailComposer({
             {/* Body */}
             <div className="space-y-2">
               <Label htmlFor="body">Corpo do E-mail *</Label>
-              <textarea
-                id="body"
+              <RichTextEditor
                 value={body}
-                onChange={(e) => setBody(e.target.value)}
+                onChange={setBody}
                 placeholder="Escreva o conteúdo do e-mail aqui..."
-                rows={10}
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                minHeight="240px"
               />
             </div>
 
