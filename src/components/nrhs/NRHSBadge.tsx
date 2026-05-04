@@ -8,13 +8,42 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 interface NRHSBadgeProps {
   score: number | null;
-  tier: NRHSTier | null;
+  tier: unknown;
   issuesCount?: number;
-  blockers?: string[];
+  blockers?: unknown;
   size?: 'xs' | 'sm' | 'md';
   showLabel?: boolean;
   isLoading?: boolean;
   className?: string;
+}
+
+const CANONICAL_TIERS: NRHSTier[] = ['elite', 'healthy', 'risk', 'critical', 'insalubrious'];
+
+function normalizeNRHSBadgeValue(input: unknown): string {
+  if (typeof input === 'string') return input;
+  if (typeof input === 'number') return String(input);
+
+  if (Array.isArray(input)) {
+    const first = input.find(item => typeof item === 'string' || typeof item === 'number');
+    return first != null ? String(first) : '';
+  }
+
+  if (input && typeof input === 'object') {
+    const obj = input as Record<string, unknown>;
+    const candidate = obj.status ?? obj.tier ?? obj.label ?? obj.name ?? obj.code ?? obj.value;
+    return typeof candidate === 'string' || typeof candidate === 'number' ? String(candidate) : '';
+  }
+
+  return '';
+}
+
+function normalizeBlockers(blockers: unknown): string[] {
+  if (!Array.isArray(blockers)) return [];
+
+  return blockers
+    .map(normalizeNRHSBadgeValue)
+    .map(value => value.trim())
+    .filter(Boolean);
 }
 
 export function NRHSBadge({
@@ -27,6 +56,9 @@ export function NRHSBadge({
   isLoading = false,
   className
 }: NRHSBadgeProps) {
+  const safeTier = normalizeNRHSBadgeValue(tier).trim().toLowerCase();
+  const safeBlockers = normalizeBlockers(blockers);
+
   if (isLoading) {
     return (
       <Skeleton className={cn(
@@ -36,7 +68,7 @@ export function NRHSBadge({
     );
   }
 
-  if (score === null || tier === null) {
+  if (score === null || !safeTier) {
     return null;
   }
 
@@ -56,9 +88,9 @@ export function NRHSBadge({
     worst: 'insalubrious',
   };
   const canonicalTier: NRHSTier =
-    (['elite', 'healthy', 'risk', 'critical', 'insalubrious'] as NRHSTier[]).includes(tier as NRHSTier)
-      ? (tier as NRHSTier)
-      : (TIER_ALIASES[String(tier).toLowerCase()] ?? 'risk');
+    CANONICAL_TIERS.includes(safeTier as NRHSTier)
+      ? (safeTier as NRHSTier)
+      : (TIER_ALIASES[safeTier] ?? 'risk');
 
   const tierConfig = getNRHSTierConfig(canonicalTier) ?? {
     label: '—',
@@ -66,7 +98,7 @@ export function NRHSBadge({
     bgColor: 'bg-muted',
     borderColor: 'border-muted',
   };
-  const hasBlockers = blockers.length > 0;
+  const hasBlockers = safeBlockers.length > 0;
 
   const sizeClasses = size === 'xs'
     ? 'text-[8px] px-1 py-0.5 gap-0.5'
@@ -112,11 +144,11 @@ export function NRHSBadge({
               <div className="pt-1 border-t border-border/50">
                 <p className="text-red-400 font-medium">Blockers:</p>
                 <ul className="list-disc pl-4 text-red-400">
-                  {blockers.slice(0, 3).map(b => (
+                  {safeBlockers.slice(0, 3).map(b => (
                     <li key={b}>{b.replace(/_/g, ' ')}</li>
                   ))}
-                  {blockers.length > 3 && (
-                    <li>+{blockers.length - 3} mais...</li>
+                  {safeBlockers.length > 3 && (
+                    <li>+{safeBlockers.length - 3} mais...</li>
                   )}
                 </ul>
               </div>
