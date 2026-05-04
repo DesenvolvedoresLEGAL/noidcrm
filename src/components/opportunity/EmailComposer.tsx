@@ -252,6 +252,14 @@ export function EmailComposer({
       const toList = toEmails.split(',').map(e => e.trim()).filter(Boolean);
       const ccList = ccEmails ? ccEmails.split(',').map(e => e.trim()).filter(Boolean) : [];
 
+      const encodedAttachments = await Promise.all(
+        attachments.map(async (f) => ({
+          filename: f.name,
+          content_type: f.type || 'application/octet-stream',
+          content_base64: await fileToBase64(f),
+        }))
+      );
+
       const { data, error } = await supabase.functions.invoke('send-smtp-email', {
         body: {
           to_emails: toList,
@@ -259,6 +267,7 @@ export function EmailComposer({
           subject,
           html_body: body,
           opportunity_id: opportunityId,
+          attachments: encodedAttachments,
         },
       });
 
@@ -271,6 +280,7 @@ export function EmailComposer({
         setCcEmails('');
         setSelectedTemplate('');
         setWarnings([]);
+        setAttachments([]);
         onSent();
         onClose();
       } else {
