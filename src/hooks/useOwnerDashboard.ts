@@ -265,9 +265,12 @@ export function useOwnerDashboard() {
         return sum + (o.valor_previsto || 0);
       }, 0);
 
-      // Sprint 2.11 — preferir breakdown unificado (one_time = net_revenue − mrr*12).
-      // Fallback para cálculo legacy se RPC falhar.
-      const closedOneTimeThisMonth = unifiedOneTimeValue || (oneTimeFromProposals + oneTimeFallback);
+      // Receita avulsa = total fechado do mês − parcela MRR (1 mês) contida nesses deals.
+      // Garante que: Receita Avulsa + Novo MRR (1m) = Receita Fechada (BI/Forecast).
+      // (unifiedOneTimeValue assume 12 meses de MRR — não bate com o card que mostra MRR/mês.)
+      const closedOneTimeThisMonth = Math.max(0, closedRevenueThisMonth - closedMRRThisMonth);
+      // Mantém referências legadas para evitar warnings de variáveis não usadas
+      void unifiedOneTimeValue; void oneTimeFromProposals; void oneTimeFallback;
       
       // ARR is based on actual MRR, not assumed
       const arr = realMRR * 12;
