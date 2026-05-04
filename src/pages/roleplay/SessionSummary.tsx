@@ -4,7 +4,7 @@ import { Layout } from '@/components/Layout';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { getSession } from '@/services/roleplay/sessions';
 import { supabase } from '@/integrations/supabase/client';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
@@ -20,6 +20,7 @@ export default function SessionSummary() {
   const [unlockedBadge, setUnlockedBadge] = useState<BadgeType | null>(null);
   const [shownBadgeIds, setShownBadgeIds] = useState<Set<string>>(new Set());
   const recoveryRequestedRef = useRef(false);
+  const [evaluationError, setEvaluationError] = useState<string | null>(null);
 
   const { data: session, isLoading: loadingSession } = useQuery({
     queryKey: ['roleplay-session', sessionId],
@@ -41,6 +42,16 @@ export default function SessionSummary() {
     if (!session || evaluationReady || !sessionId || !sessionStartedAt) return false;
     return Date.now() - sessionStartedAt > 10000;
   }, [session, evaluationReady, sessionId, sessionStartedAt]);
+
+  const reprocessMutation = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke('finalize-roleplay-session', { body: { sessionId } });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => setEvaluationError(null),
+    onError: (error) => setEvaluationError(error instanceof Error ? error.message : 'Falha ao reprocessar avaliação'),
+  });
   
   const { 
     recentUnlocks, 
@@ -99,15 +110,26 @@ export default function SessionSummary() {
 
     recoveryRequestedRef.current = true;
 
+    const timeoutId = setTimeout(() => {
+      if (!evaluationReady) {
+        setEvaluationError('A avaliação demorou além do esperado.');
+      }
+    }, 20000);
+
     supabase.functions
       .invoke('finalize-roleplay-session', {
         body: { sessionId },
       })
+      .then(({ error }) => {
+        if (error) throw error;
+      })
       .catch((error) => {
         console.error('[SessionSummary] Recovery invoke failed:', error);
+        setEvaluationError(error instanceof Error ? error.message : 'Não foi possível avaliar agora.');
         recoveryRequestedRef.current = false;
-      });
-  }, [sessionId, shouldAttemptRecovery]);
+      })
+      .finally(() => clearTimeout(timeoutId));
+  }, [sessionId, shouldAttemptRecovery, evaluationReady]);
 
   // Get badges unlocked in this session
   const { data: sessionBadges } = useQuery({
@@ -167,12 +189,21 @@ export default function SessionSummary() {
     return (
       <Layout>
         <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4 p-8 text-center">
-          <LoadingSpinner />
+          {!evaluationError && <LoadingSpinner />}
           <h2 className="text-2xl font-bold">Avaliando seu treino...</h2>
           <p className="text-muted-foreground max-w-md">
             Nossa IA está analisando a conversa, calculando notas por dimensão e gerando feedback detalhado.
             {shouldAttemptRecovery ? ' Detectamos atraso e reiniciamos o processamento automaticamente.' : ' Isso pode levar até 30 segundos.'}
           </p>
+          {evaluationError && (
+            <Card className="p-4 max-w-md border-destructive/40 bg-destructive/5">
+              <p className="text-sm text-destructive mb-3">{evaluationError}</p>
+              <Button onClick={() => reprocessMutation.mutate()} disabled={reprocessMutation.isPending}>
+                {reprocessMutation.isPending ? 'Reprocessando...' : 'Reprocessar avaliação'}
+              </Button>
+            </Card>
+          )}
+
         </div>
       </Layout>
     );
