@@ -228,10 +228,11 @@ export function useOwnerDashboard() {
         });
       });
 
-      // Closed MRR this month = sum of monthly_value from opportunities won this month that have recurring terms
-      const closedMRRThisMonth = wonSalesThisMonth.reduce((sum, o) => {
+      // Closed MRR this month = fonte unificada quando disponível, fallback legado local.
+      const legacyClosedMRRThisMonth = wonSalesThisMonth.reduce((sum, o) => {
         return sum + (recurringMRRByOpportunity.get(o.id) || 0);
       }, 0);
+      const closedMRRThisMonth = unifiedMrrValue || legacyClosedMRRThisMonth;
 
       // =================== ONE-TIME REVENUE CALCULATION (FIXED) ===================
       // Usa proposals.total_amount (já com desconto de condição de pagamento aplicado)
@@ -290,7 +291,7 @@ export function useOwnerDashboard() {
       // =================== TICKET MÉDIO ===================
       // Average ticket do MÊS ATUAL (fonte de verdade para KPI principal)
       const avgTicketThisMonth = wonSalesThisMonth.length > 0 
-        ? wonSalesThisMonth.reduce((sum, o) => sum + (o.valor_previsto || 0), 0) / wonSalesThisMonth.length 
+        ? closedRevenueThisMonth / wonSalesThisMonth.length 
         : 0;
       
       // Average ticket HISTÓRICO (para referência, se necessário)
