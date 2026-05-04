@@ -343,6 +343,13 @@ export default function Accounts() {
           }
         />
 
+        <Tabs defaultValue="contas" className="space-y-6">
+          <TabsList>
+            <TabsTrigger value="contas">Contas</TabsTrigger>
+            <TabsTrigger value="rfm">RFM Intelligence</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="contas" className="space-y-6">
         {/* KPIs */}
         <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
           <Card>
