@@ -38,7 +38,7 @@ export default function SessionSummary() {
         const data = await getSession(sessionId!);
         console.log('[RoleplaySummary] session loaded', data?.id);
         console.log('[RoleplaySummary] status/current_phase/score_overall', {
-          status: data?.status,
+          status: (data as any)?.status,
           current_phase: data?.current_phase,
           score_overall: data?.score_overall,
         });
@@ -243,8 +243,9 @@ export default function SessionSummary() {
 
   // If session loaded but evaluation hasn't been computed yet, show processing state.
   // The session query polls every 2s, so this updates automatically when ready.
-  const mergedSession = session?.score_overall == null && fallbackEvaluation
-    ? { ...session, ...fallbackEvaluation, passed: (fallbackEvaluation.score_overall || 0) >= 8 }
+  const fallbackEval = fallbackEvaluation as any;
+  const mergedSession: any = session?.score_overall == null && fallbackEval
+    ? { ...(session as any), ...fallbackEval, passed: (fallbackEval.score_overall || 0) >= 8 }
     : session;
 
   const normalizedPhase = mergedSession?.current_phase || mergedSession?.status;
