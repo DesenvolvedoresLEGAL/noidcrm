@@ -14,6 +14,8 @@ import { BadgeUnlockModal } from '@/components/gamification/BadgeUnlockModal';
 import { Badge as BadgeType } from '@/services/gamification/badges';
 import { motion, AnimatePresence } from 'framer-motion';
 
+const SUMMARY_TIMEOUT_MS = 20000;
+
 export default function SessionSummary() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
@@ -21,10 +23,31 @@ export default function SessionSummary() {
   const [shownBadgeIds, setShownBadgeIds] = useState<Set<string>>(new Set());
   const recoveryRequestedRef = useRef(false);
   const [evaluationError, setEvaluationError] = useState<string | null>(null);
+  const [technicalDetails, setTechnicalDetails] = useState<string | null>(null);
+  const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
+
+  useEffect(() => {
+    console.log('[RoleplaySummary] mounted sessionId', sessionId);
+  }, [sessionId]);
 
   const { data: session, isLoading: loadingSession } = useQuery({
     queryKey: ['roleplay-session', sessionId],
-    queryFn: () => getSession(sessionId!),
+    queryFn: async () => {
+      console.log('[RoleplaySummary] fetching session', sessionId);
+      try {
+        const data = await getSession(sessionId!);
+        console.log('[RoleplaySummary] session loaded', data?.id);
+        console.log('[RoleplaySummary] status/current_phase/score_overall', {
+          status: data?.status,
+          current_phase: data?.current_phase,
+          score_overall: data?.score_overall,
+        });
+        return data;
+      } catch (error) {
+        console.error('[RoleplaySummary] error', error);
+        throw error;
+      }
+    },
     enabled: !!sessionId,
     // Poll every 2s while evaluation is still being processed (background work)
     refetchInterval: (query) => {
@@ -33,6 +56,7 @@ export default function SessionSummary() {
       // Stop polling once we have a score (evaluation completed)
       return data.score_overall == null ? 2000 : false;
     },
+    retry: false,
   });
 
   const sellerId = session?.seller_id;
@@ -45,12 +69,21 @@ export default function SessionSummary() {
 
   const reprocessMutation = useMutation({
     mutationFn: async () => {
+      await supabase
+        .from('roleplay_sessions')
+        .update({ current_phase: 'evaluating' })
+        .eq('id', sessionId!);
+      console.log('[RoleplaySummary] calling finalize function', { sessionId, source: 'manual-reprocess' });
       const { data, error } = await supabase.functions.invoke('finalize-roleplay-session', { body: { sessionId } });
       if (error) throw error;
+      console.log('[RoleplaySummary] finalize response', data);
       return data;
     },
     onSuccess: () => setEvaluationError(null),
-    onError: (error) => setEvaluationError(error instanceof Error ? error.message : 'Falha ao reprocessar avaliação'),
+    onError: (error) => {
+      console.error('[RoleplaySummary] error', error);
+      setEvaluationError(error instanceof Error ? error.message : 'Falha ao reprocessar avaliação');
+    },
   });
   
   const { 
@@ -112,24 +145,45 @@ export default function SessionSummary() {
 
     const timeoutId = setTimeout(() => {
       if (!evaluationReady) {
-        setEvaluationError('A avaliação demorou além do esperado.');
+        setEvaluationError('A avaliação demorou mais que o esperado');
+        setTechnicalDetails('Timeout absoluto de 20s atingido sem score_overall.');
       }
-    }, 20000);
+    }, SUMMARY_TIMEOUT_MS);
 
+    console.log('[RoleplaySummary] calling finalize function', { sessionId, source: 'auto-recovery' });
     supabase.functions
       .invoke('finalize-roleplay-session', {
         body: { sessionId },
       })
-      .then(({ error }) => {
+      .then(({ data, error }) => {
+        console.log('[RoleplaySummary] finalize response', data);
         if (error) throw error;
       })
       .catch((error) => {
-        console.error('[SessionSummary] Recovery invoke failed:', error);
+        console.error('[RoleplaySummary] error', error);
         setEvaluationError(error instanceof Error ? error.message : 'Não foi possível avaliar agora.');
+        setTechnicalDetails(error instanceof Error ? error.message : 'Erro desconhecido ao chamar finalize-roleplay-session.');
         recoveryRequestedRef.current = false;
       })
       .finally(() => clearTimeout(timeoutId));
   }, [sessionId, shouldAttemptRecovery, evaluationReady]);
+
+  const { data: fallbackEvaluation } = useQuery({
+    queryKey: ['roleplay-evaluation-fallback', sessionId],
+    enabled: !!sessionId && !evaluationReady,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('roleplay_evaluations' as any)
+        .select('score_overall,scores_json,feedback,insights,current_phase,finished_at')
+        .eq('session_id', sessionId!)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) return null;
+      return data;
+    },
+    retry: false,
+  });
 
   // Get badges unlocked in this session
   const { data: sessionBadges } = useQuery({
@@ -172,6 +226,10 @@ export default function SessionSummary() {
     setUnlockedBadge(null);
   };
 
+  if (!sessionId) {
+    return <Layout><div className="text-center py-12"><p>Erro técnico: sessionId ausente.</p></div></Layout>;
+  }
+
   if (loadingSession) {
     return (
       <Layout>
@@ -185,30 +243,12 @@ export default function SessionSummary() {
 
   // If session loaded but evaluation hasn't been computed yet, show processing state.
   // The session query polls every 2s, so this updates automatically when ready.
-  if (session && session.score_overall == null) {
-    return (
-      <Layout>
-        <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4 p-8 text-center">
-          {!evaluationError && <LoadingSpinner />}
-          <h2 className="text-2xl font-bold">Avaliando seu treino...</h2>
-          <p className="text-muted-foreground max-w-md">
-            Nossa IA está analisando a conversa, calculando notas por dimensão e gerando feedback detalhado.
-            {shouldAttemptRecovery ? ' Detectamos atraso e reiniciamos o processamento automaticamente.' : ' Isso pode levar até 30 segundos.'}
-          </p>
-          {evaluationError && (
-            <Card className="p-4 max-w-md border-destructive/40 bg-destructive/5">
-              <p className="text-sm text-destructive mb-3">{evaluationError}</p>
-              <Button onClick={() => reprocessMutation.mutate()} disabled={reprocessMutation.isPending}>
-                {reprocessMutation.isPending ? 'Reprocessando...' : 'Reprocessar avaliação'}
-              </Button>
-            </Card>
-          )}
+  const mergedSession = session?.score_overall == null && fallbackEvaluation
+    ? { ...session, ...fallbackEvaluation, passed: (fallbackEvaluation.score_overall || 0) >= 8 }
+    : session;
 
-        </div>
-      </Layout>
-    );
-  }
-
+  const normalizedPhase = mergedSession?.current_phase || mergedSession?.status;
+  const hasScore = mergedSession?.score_overall != null;
 
   if (!session) {
     return (
@@ -223,9 +263,67 @@ export default function SessionSummary() {
     );
   }
 
-  const scoreData = session.scores_json as any;
-  const passed = session.passed;
-  const overallScore = session.score_overall || 0;
+  if (!hasScore && ['pending', 'in_progress', 'finished'].includes(String(normalizedPhase))) {
+    console.log('[RoleplaySummary] calling finalize function', { sessionId, source: 'state-handler' });
+  }
+
+  if (!hasScore && ['evaluating', 'pending', 'in_progress', 'finished'].includes(String(normalizedPhase))) {
+    return (
+      <Layout>
+        <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4 p-8 text-center">
+          {!evaluationError && <LoadingSpinner />}
+          <h2 className="text-2xl font-bold">Avaliando seu treino...</h2>
+          <p className="text-muted-foreground max-w-md">
+            Nossa IA está analisando a conversa, calculando notas por dimensão e gerando feedback detalhado.
+            {shouldAttemptRecovery ? ' Detectamos atraso e reiniciamos o processamento automaticamente.' : ' Isso pode levar até 20 segundos.'}
+          </p>
+          {evaluationError && (
+            <Card className="p-4 max-w-md border-destructive/40 bg-destructive/5">
+              <p className="text-sm text-destructive mb-3">{evaluationError}</p>
+              <div className="flex flex-wrap gap-2 justify-center">
+                <Button onClick={() => reprocessMutation.mutate()} disabled={reprocessMutation.isPending}>
+                  {reprocessMutation.isPending ? 'Reprocessando...' : 'Reprocessar avaliação'}
+                </Button>
+                <Button variant="outline" onClick={() => navigate('/app/roleplay')}>
+                  Voltar para Roleplay
+                </Button>
+                <Button variant="ghost" onClick={() => setShowTechnicalDetails(prev => !prev)}>
+                  Ver logs técnicos
+                </Button>
+              </div>
+              {showTechnicalDetails && technicalDetails && (
+                <p className="text-xs mt-3 text-muted-foreground">{technicalDetails}</p>
+              )}
+            </Card>
+          )}
+
+        </div>
+      </Layout>
+    );
+  }
+
+
+  if (!hasScore && normalizedPhase === 'error') {
+    return (
+      <Layout>
+        <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4 p-8 text-center">
+          <h2 className="text-2xl font-bold">Erro na avaliação</h2>
+          <p className="text-muted-foreground max-w-md">Não foi possível concluir a avaliação desta sessão.</p>
+          <Button onClick={() => reprocessMutation.mutate()} disabled={reprocessMutation.isPending}>
+            {reprocessMutation.isPending ? 'Reprocessando...' : 'Reprocessar avaliação'}
+          </Button>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!hasScore) {
+    return <Layout><div className="text-center py-12"><p>Erro técnico: estado de sessão desconhecido.</p></div></Layout>;
+  }
+
+  const scoreData = mergedSession.scores_json as any;
+  const passed = mergedSession.passed;
+  const overallScore = mergedSession.score_overall || 0;
 
   // Helper to format insight items that can be strings or objects
   const formatInsightItem = (item: unknown): string => {
