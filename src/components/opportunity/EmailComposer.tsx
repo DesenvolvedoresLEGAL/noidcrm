@@ -105,8 +105,43 @@ export function EmailComposer({
       setEmailTypeLabel('');
       setEmailContext(null);
       setWarnings([]);
+      setAttachments([]);
     }
   }, [open]);
+
+  const handleAddFiles = (files: FileList | null) => {
+    if (!files) return;
+    const incoming = Array.from(files);
+    const currentTotal = attachments.reduce((s, f) => s + f.size, 0);
+    const incomingTotal = incoming.reduce((s, f) => s + f.size, 0);
+    if (currentTotal + incomingTotal > MAX_TOTAL_BYTES) {
+      toast.error('Tamanho total dos anexos excede 10MB');
+      return;
+    }
+    setAttachments((prev) => [...prev, ...incoming]);
+  };
+
+  const removeAttachment = (idx: number) => {
+    setAttachments((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const formatBytes = (b: number) => {
+    if (b < 1024) return `${b} B`;
+    if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`;
+    return `${(b / 1024 / 1024).toFixed(2)} MB`;
+  };
+
+  const fileToBase64 = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        const base64 = result.split(',')[1] || '';
+        resolve(base64);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
 
   const checkSmtpConfig = async () => {
     setLoadingSmtp(true);
