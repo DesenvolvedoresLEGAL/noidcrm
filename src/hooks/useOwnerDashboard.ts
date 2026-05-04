@@ -265,9 +265,12 @@ export function useOwnerDashboard() {
         return sum + (o.valor_previsto || 0);
       }, 0);
 
-      // Sprint 2.11 — preferir breakdown unificado (one_time = net_revenue − mrr*12).
-      // Fallback para cálculo legacy se RPC falhar.
-      const closedOneTimeThisMonth = unifiedOneTimeValue || (oneTimeFromProposals + oneTimeFallback);
+      // Receita avulsa = total fechado do mês − parcela MRR (1 mês) contida nesses deals.
+      // Garante que: Receita Avulsa + Novo MRR (1m) = Receita Fechada (BI/Forecast).
+      // (unifiedOneTimeValue assume 12 meses de MRR — não bate com o card que mostra MRR/mês.)
+      const closedOneTimeThisMonth = Math.max(0, closedRevenueThisMonth - closedMRRThisMonth);
+      // Mantém referências legadas para evitar warnings de variáveis não usadas
+      void unifiedOneTimeValue; void oneTimeFromProposals; void oneTimeFallback;
       
       // ARR is based on actual MRR, not assumed
       const arr = realMRR * 12;
@@ -407,6 +410,21 @@ export function useOwnerDashboard() {
           };
         })
         .filter(s => s.deals > 0 || s.winRate > 0) // Only show sellers with activity
+        .sort((a, b) => b.revenue - a.revenue);
+
+      // Top performer DO MÊS (usado no insight "lidera com X negócios fechados")
+      const sellerStatsThisMonth = profiles
+        .filter(p => salesUserIds.includes(p.user_id))
+        .map(p => {
+          const won = wonSalesThisMonth.filter(o => o.owner_user_id === p.user_id);
+          return {
+            name: p.full_name || 'Sem nome',
+            winRate: 0,
+            revenue: won.reduce((s, o) => s + (o.valor_previsto || 0), 0),
+            deals: won.length,
+          };
+        })
+        .filter(s => s.deals > 0)
         .sort((a, b) => b.revenue - a.revenue);
 
       // =================== CRM HEATMAP (SALES STAGES ONLY) ===================
@@ -583,6 +601,7 @@ export function useOwnerDashboard() {
       const humanoidInsights = generateHumanoidInsights({
         salesTrend,
         sellerStats,
+        sellerStatsThisMonth,
         yearlyGoal,
         runRate,
         salesOpportunities,
@@ -679,6 +698,7 @@ export function useOwnerDashboard() {
 function generateHumanoidInsights(data: {
   salesTrend: { month: string; value: number; count: number }[];
   sellerStats: { name: string; winRate: number; revenue: number; deals: number }[];
+  sellerStatsThisMonth: { name: string; winRate: number; revenue: number; deals: number }[];
   yearlyGoal: number;
   runRate: number;
   salesOpportunities: any[];
@@ -736,10 +756,10 @@ function generateHumanoidInsights(data: {
   }
 
   // Top performer insight
-  const topSeller = data.sellerStats[0];
+  const topSeller = data.sellerStatsThisMonth[0];
   if (topSeller && topSeller.deals >= 1) {
     insights.push({
-      insight: `${topSeller.name} lidera com ${topSeller.deals} negócio${topSeller.deals > 1 ? 's' : ''} fechado${topSeller.deals > 1 ? 's' : ''} (R$${topSeller.revenue.toLocaleString('pt-BR')}).`,
+      insight: `${topSeller.name} lidera o mês com ${topSeller.deals} negócio${topSeller.deals > 1 ? 's' : ''} fechado${topSeller.deals > 1 ? 's' : ''} (R$${topSeller.revenue.toLocaleString('pt-BR')}).`,
       impact: 'Médio',
       confidence: 95
     });
