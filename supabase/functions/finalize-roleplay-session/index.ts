@@ -18,6 +18,15 @@ type EvaluationPayload = {
   summary?: string;
 };
 
+class HttpError extends Error {
+  status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
+
 async function runRoleplayPipeline(sessionId: string, authHeader: string) {
   const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
   const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -34,6 +43,22 @@ async function runRoleplayPipeline(sessionId: string, authHeader: string) {
     .single();
 
   if (sessionError || !session) throw new Error('Session not found');
+
+  const { data: authData, error: authError } = await userClient.auth.getUser();
+  if (authError || !authData?.user) {
+    throw new HttpError(401, 'Unauthorized');
+  }
+
+  const { data: member, error: memberError } = await adminClient
+    .from('organization_members')
+    .select('id')
+    .eq('organization_id', session.organization_id)
+    .eq('user_id', authData.user.id)
+    .maybeSingle();
+
+  if (memberError) throw memberError;
+  if (!member) throw new HttpError(403, 'Forbidden');
+
   console.log('[RoleplayFinalize] session loaded', { sessionId, organizationId: session.organization_id, currentPhase: session.current_phase });
 
   if (session.score_overall != null && session.scores_json) {
@@ -56,16 +81,37 @@ async function runRoleplayPipeline(sessionId: string, authHeader: string) {
     throw new Error('Sessão não possui mensagens suficientes para avaliação.');
   }
 
-  await adminClient
+  const { data: lockSession, error: lockError } = await adminClient
     .from('roleplay_sessions')
     .update({ finished_at: session.finished_at || new Date().toISOString(), current_phase: 'evaluating' })
     .eq('id', sessionId)
-    .is('score_overall', null);
+    .is('score_overall', null)
+    .neq('current_phase', 'evaluating')
+    .select('id,current_phase,score_overall')
+    .maybeSingle();
 
-  const { data: refreshSession } = await adminClient.from('roleplay_sessions').select('*').eq('id', sessionId).single();
-  if (refreshSession?.score_overall != null && refreshSession?.scores_json) {
-    console.log('[RoleplayFinalize] existing evaluation found', { sessionId, score: refreshSession.score_overall });
-    return { evaluation: refreshSession.scores_json as EvaluationPayload, status: 'complete' };
+  if (lockError) throw lockError;
+
+  if (!lockSession) {
+    const { data: refreshSession, error: refreshError } = await adminClient
+      .from('roleplay_sessions')
+      .select('score_overall,scores_json,current_phase')
+      .eq('id', sessionId)
+      .maybeSingle();
+
+    if (refreshError || !refreshSession) throw refreshError || new Error('Session not found');
+
+    if (refreshSession.score_overall != null && refreshSession.scores_json) {
+      console.log('[RoleplayFinalize] existing evaluation found', { sessionId, score: refreshSession.score_overall });
+      return { evaluation: refreshSession.scores_json as EvaluationPayload, status: 'complete' };
+    }
+
+    if (refreshSession.current_phase === 'evaluating') {
+      console.log('[RoleplayFinalize] evaluation in progress', { sessionId });
+      return { status: 'evaluating' };
+    }
+
+    throw new Error('Unable to acquire evaluation lock');
   }
 
   console.log('[RoleplayFinalize] ai evaluation started', { sessionId });
@@ -133,6 +179,7 @@ serve(async (req) => {
     return new Response(JSON.stringify({ success: true, sessionId, evaluationStatus: result.status, evaluation: result.evaluation }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
   } catch (error) {
     console.error('[RoleplayFinalize] failed', error);
-    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    const status = error instanceof HttpError ? error.status : 500;
+    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 });
