@@ -61,36 +61,36 @@ export default function SessionSummary() {
 
   const sellerId = session?.seller_id;
   const evaluationReady = session?.score_overall != null;
-  const sessionStartedAt = session?.started_at ? new Date(session.started_at).getTime() : null;
-  const shouldAttemptRecovery = useMemo(() => {
-    if (!session || evaluationReady || !sessionId || !sessionStartedAt) return false;
-    return Date.now() - sessionStartedAt > 10000;
-  }, [session, evaluationReady, sessionId, sessionStartedAt]);
+  const shouldAttemptRecovery = !!session && !evaluationReady && !!sessionId;
 
   const reprocessMutation = useMutation({
     mutationFn: async () => {
       await supabase
         .from('roleplay_sessions')
-        .update({ current_phase: 'evaluating' })
+        .update({ current_phase: 'evaluating', evaluation_error: null })
         .eq('id', sessionId!);
-      console.log('[RoleplaySummary] calling finalize function', { sessionId, source: 'manual-reprocess' });
+      console.log('[RoleplaySummary] calling finalize-roleplay-session', { sessionId, source: 'manual-reprocess' });
       const { data, error } = await supabase.functions.invoke('finalize-roleplay-session', { body: { sessionId } });
       if (error) throw error;
-      console.log('[RoleplaySummary] finalize response', data);
+      console.log('[RoleplaySummary] finalize returned', data);
       return data;
     },
-    onSuccess: () => setEvaluationError(null),
+    onSuccess: () => {
+      setEvaluationError(null);
+      setTechnicalDetails(null);
+      recoveryRequestedRef.current = false;
+    },
     onError: (error) => {
-      console.error('[RoleplaySummary] error', error);
+      console.error('[RoleplaySummary] failed', error);
       setEvaluationError(error instanceof Error ? error.message : 'Falha ao reprocessar avaliação');
     },
   });
-  
-  const { 
-    recentUnlocks, 
-    level, 
+
+  const {
+    recentUnlocks,
+    level,
     checkForNewBadges,
-    isCheckingBadges 
+    isCheckingBadges
   } = useGamification(sellerId);
 
   // Check for new badges only AFTER evaluation is ready
@@ -103,7 +103,6 @@ export default function SessionSummary() {
   const { data: insights, isLoading: loadingInsights } = useQuery({
     queryKey: ['session-insights', sessionId],
     queryFn: async () => {
-      // Use order+limit instead of maybeSingle to be resilient against legacy duplicates
       const { data, error } = await supabase
         .from('performance_insights')
         .select('*')
@@ -116,7 +115,6 @@ export default function SessionSummary() {
       return data;
     },
     enabled: !!sessionId,
-    // Poll for insights (generated in background after evaluation)
     refetchInterval: (query) => (query.state.data ? false : 3000),
   });
 
@@ -138,6 +136,7 @@ export default function SessionSummary() {
     refetchInterval: (query) => (query.state.data ? false : 3000),
   });
 
+  // Trigger finalize immediately on mount when session loaded and no score yet
   useEffect(() => {
     if (!shouldAttemptRecovery || recoveryRequestedRef.current) return;
 
@@ -150,17 +149,17 @@ export default function SessionSummary() {
       }
     }, SUMMARY_TIMEOUT_MS);
 
-    console.log('[RoleplaySummary] calling finalize function', { sessionId, source: 'auto-recovery' });
+    console.log('[RoleplaySummary] calling finalize-roleplay-session', { sessionId, source: 'auto-recovery' });
     supabase.functions
       .invoke('finalize-roleplay-session', {
         body: { sessionId },
       })
       .then(({ data, error }) => {
-        console.log('[RoleplaySummary] finalize response', data);
+        console.log('[RoleplaySummary] finalize returned', data);
         if (error) throw error;
       })
       .catch((error) => {
-        console.error('[RoleplaySummary] error', error);
+        console.error('[RoleplaySummary] failed', error);
         setEvaluationError(error instanceof Error ? error.message : 'Não foi possível avaliar agora.');
         setTechnicalDetails(error instanceof Error ? error.message : 'Erro desconhecido ao chamar finalize-roleplay-session.');
         recoveryRequestedRef.current = false;
