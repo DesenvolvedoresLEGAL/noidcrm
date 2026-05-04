@@ -756,10 +756,10 @@ function generateHumanoidInsights(data: {
   }
 
   // Top performer insight
-  const topSeller = data.sellerStats[0];
+  const topSeller = data.sellerStatsThisMonth[0];
   if (topSeller && topSeller.deals >= 1) {
     insights.push({
-      insight: `${topSeller.name} lidera com ${topSeller.deals} negócio${topSeller.deals > 1 ? 's' : ''} fechado${topSeller.deals > 1 ? 's' : ''} (R$${topSeller.revenue.toLocaleString('pt-BR')}).`,
+      insight: `${topSeller.name} lidera o mês com ${topSeller.deals} negócio${topSeller.deals > 1 ? 's' : ''} fechado${topSeller.deals > 1 ? 's' : ''} (R$${topSeller.revenue.toLocaleString('pt-BR')}).`,
       impact: 'Médio',
       confidence: 95
     });
