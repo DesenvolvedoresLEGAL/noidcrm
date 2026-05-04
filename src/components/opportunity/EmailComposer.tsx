@@ -82,6 +82,9 @@ export function EmailComposer({
   const [ccEmails, setCcEmails] = useState('');
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
+  const [attachments, setAttachments] = useState<File[]>([]);
+
+  const MAX_TOTAL_BYTES = 10 * 1024 * 1024; // 10MB
 
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<string>('');
