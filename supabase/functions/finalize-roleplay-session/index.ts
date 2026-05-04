@@ -152,30 +152,31 @@ async function runRoleplayPipeline(sessionId: string, authHeader: string) {
   if (persistError) throw persistError;
   console.log('[RoleplayFinalize] evaluation persisted', { sessionId, score: evaluation.overall_score });
 
-  const backgroundTasks: Promise<any>[] = [];
-  backgroundTasks.push(
-    userClient.functions.invoke('ai-recommend-videos', { body: { sessionId, sellerId: session.seller_id, scoresJson: evaluation } })
-      .catch((e) => console.error('[RoleplayFinalize] recommend-videos failed', e))
-  );
-  backgroundTasks.push(
-    userClient.functions.invoke('ai-generate-insights', { body: { sessionId, sellerId: session.seller_id, scoresJson: evaluation, messages: messagesRaw, organizationId: session.organization_id } })
-      .catch((e) => console.error('[RoleplayFinalize] generate-insights failed', e))
-  );
-  backgroundTasks.push(
-    userClient.functions.invoke('gamification-engine', { body: { sellerId: session.seller_id, sessionId } })
-      .catch((e) => console.error('[RoleplayFinalize] gamification failed', e))
-  );
-  backgroundTasks.push(
-    userClient.functions.invoke('missions-engine', { body: { sellerId: session.seller_id, action: 'roleplay_complete', metadata: { sessionId } } })
-      .catch((e) => console.error('[RoleplayFinalize] mission complete failed', e))
-  );
-  if (evaluation.passed) {
-    backgroundTasks.push(
-      userClient.functions.invoke('missions-engine', { body: { sellerId: session.seller_id, action: 'roleplay_pass', metadata: { sessionId, score: evaluation.overall_score } } })
-        .catch((e) => console.error('[RoleplayFinalize] mission pass failed', e))
-    );
+  // Background tasks: don't block the response — fire-and-forget via EdgeRuntime.waitUntil
+  const backgroundTasks = (async () => {
+    const tasks: Promise<any>[] = [
+      userClient.functions.invoke('ai-recommend-videos', { body: { sessionId, sellerId: session.seller_id, scoresJson: evaluation } })
+        .catch((e) => console.error('[RoleplayFinalize] recommend-videos failed', e)),
+      userClient.functions.invoke('ai-generate-insights', { body: { sessionId, sellerId: session.seller_id, scoresJson: evaluation, messages: messagesRaw, organizationId: session.organization_id } })
+        .catch((e) => console.error('[RoleplayFinalize] generate-insights failed', e)),
+      userClient.functions.invoke('gamification-engine', { body: { sellerId: session.seller_id, sessionId } })
+        .catch((e) => console.error('[RoleplayFinalize] gamification failed', e)),
+      userClient.functions.invoke('missions-engine', { body: { sellerId: session.seller_id, action: 'roleplay_complete', metadata: { sessionId } } })
+        .catch((e) => console.error('[RoleplayFinalize] mission complete failed', e)),
+    ];
+    if (evaluation.passed) {
+      tasks.push(
+        userClient.functions.invoke('missions-engine', { body: { sellerId: session.seller_id, action: 'roleplay_pass', metadata: { sessionId, score: evaluation.overall_score } } })
+          .catch((e) => console.error('[RoleplayFinalize] mission pass failed', e))
+      );
+    }
+    await Promise.allSettled(tasks);
+  })();
+  // @ts-ignore - EdgeRuntime is available in Supabase Edge runtime
+  if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime?.waitUntil) {
+    // @ts-ignore
+    EdgeRuntime.waitUntil(backgroundTasks);
   }
-  await Promise.allSettled(backgroundTasks);
 
   return { evaluation, status: 'complete' };
 }
