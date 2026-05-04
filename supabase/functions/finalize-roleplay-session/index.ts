@@ -20,11 +20,18 @@ type EvaluationPayload = {
 
 class HttpError extends Error {
   status: number;
-
   constructor(status: number, message: string) {
     super(message);
     this.status = status;
   }
+}
+
+function hasValidEvaluation(session: any): boolean {
+  if (session?.score_overall == null) return false;
+  const sj = session?.scores_json;
+  if (!sj || typeof sj !== 'object') return false;
+  const score = (sj as any).overall_score;
+  return typeof score === 'number' && !Number.isNaN(score);
 }
 
 async function runRoleplayPipeline(sessionId: string, authHeader: string) {
@@ -42,8 +49,9 @@ async function runRoleplayPipeline(sessionId: string, authHeader: string) {
     .eq('id', sessionId)
     .single();
 
-  if (sessionError || !session) throw new Error('Session not found');
+  if (sessionError || !session) throw new HttpError(404, 'Session not found');
 
+  // Auth check (always required)
   const { data: authData, error: authError } = await userClient.auth.getUser();
   if (authError || !authData?.user) {
     throw new HttpError(401, 'Unauthorized');
@@ -59,13 +67,20 @@ async function runRoleplayPipeline(sessionId: string, authHeader: string) {
   if (memberError) throw memberError;
   if (!member) throw new HttpError(403, 'Forbidden');
 
-  console.log('[RoleplayFinalize] session loaded', { sessionId, organizationId: session.organization_id, currentPhase: session.current_phase });
+  console.log('[RoleplayFinalize] session loaded', {
+    sessionId,
+    organizationId: session.organization_id,
+    currentPhase: session.current_phase,
+    hasScore: session.score_overall != null,
+  });
 
-  if (session.score_overall != null && session.scores_json) {
-    console.log('[RoleplayFinalize] existing evaluation found', { sessionId, score: session.score_overall });
-    return { evaluation: session.scores_json as EvaluationPayload, status: 'complete' };
+  // Idempotency: if a valid evaluation already exists, return it.
+  if (hasValidEvaluation(session)) {
+    console.log('[RoleplayFinalize] existing valid evaluation found', { sessionId, score: session.score_overall });
+    return { evaluation: session.scores_json as EvaluationPayload, status: 'already_complete' as const };
   }
 
+  // Load messages
   const { data: messagesRaw, error: messagesError } = await adminClient
     .from('roleplay_messages')
     .select('sender,content,timestamp')
@@ -74,85 +89,80 @@ async function runRoleplayPipeline(sessionId: string, authHeader: string) {
 
   if (messagesError) throw messagesError;
   const messages = (messagesRaw || []).map((m: any) => ({ sender: m.sender, text: m.content }));
-  console.log('[RoleplayFinalize] messages loaded: N', messages.length);
+  // Cap at 100 (matches ai-evaluate-session validation). Take the last 100 to keep the most recent context.
+  const cappedMessages = messages.length > 100 ? messages.slice(-100) : messages;
+  console.log('[RoleplayFinalize] messages loaded', { total: messages.length, used: cappedMessages.length });
 
-  if (messages.length < MIN_MESSAGES_FOR_EVALUATION) {
-    await adminClient.from('roleplay_sessions').update({ finished_at: session.finished_at || new Date().toISOString(), current_phase: 'evaluation_error' }).eq('id', sessionId);
-    throw new Error('Sessão não possui mensagens suficientes para avaliação.');
-  }
-
-  const { data: lockSession, error: lockError } = await adminClient
-    .from('roleplay_sessions')
-    .update({ finished_at: session.finished_at || new Date().toISOString(), current_phase: 'evaluating' })
-    .eq('id', sessionId)
-    .is('score_overall', null)
-    .neq('current_phase', 'evaluating')
-    .select('id,current_phase,score_overall')
-    .maybeSingle();
-
-  if (lockError) throw lockError;
-
-  if (!lockSession) {
-    const { data: refreshSession, error: refreshError } = await adminClient
-      .from('roleplay_sessions')
-      .select('score_overall,scores_json,current_phase')
-      .eq('id', sessionId)
-      .maybeSingle();
-
-    if (refreshError || !refreshSession) throw refreshError || new Error('Session not found');
-
-    if (refreshSession.score_overall != null && refreshSession.scores_json) {
-      console.log('[RoleplayFinalize] existing evaluation found', { sessionId, score: refreshSession.score_overall });
-      return { evaluation: refreshSession.scores_json as EvaluationPayload, status: 'complete' };
-    }
-
-    if (refreshSession.current_phase === 'evaluating') {
-      console.log('[RoleplayFinalize] evaluation in progress', { sessionId });
-      return { status: 'evaluating' };
-    }
-
-    throw new Error('Unable to acquire evaluation lock');
-  }
-
-  console.log('[RoleplayFinalize] ai evaluation started', { sessionId });
-  let data: any;
-  try {
-    const evalResponse = await userClient.functions.invoke('ai-evaluate-session', {
-      body: { sessionId, rubricId: session.rubric_id, messages },
-    });
-    if (evalResponse.error) throw evalResponse.error;
-    data = evalResponse.data;
-  } catch (err) {
-    const evaluationErrorMessage = err instanceof Error ? err.message : String(err);
+  if (cappedMessages.length < MIN_MESSAGES_FOR_EVALUATION) {
     await adminClient
       .from('roleplay_sessions')
       .update({
-        current_phase: 'error',
-        evaluation_error: evaluationErrorMessage,
         finished_at: session.finished_at || new Date().toISOString(),
+        current_phase: 'evaluation_error',
       })
       .eq('id', sessionId);
-    throw err;
+    throw new HttpError(422, 'Sessão não possui mensagens suficientes para avaliação.');
   }
 
-  const evaluation = (data?.evaluation ?? null) as EvaluationPayload | null;
+  // Mark as evaluating + ensure finished_at. We DO NOT use this as a blocking lock anymore —
+  // the previous lock-based approach left sessions permanently stuck in 'evaluating' on any failure.
+  await adminClient
+    .from('roleplay_sessions')
+    .update({
+      finished_at: session.finished_at || new Date().toISOString(),
+      current_phase: 'evaluating',
+    })
+    .eq('id', sessionId);
+
+  console.log('[RoleplayFinalize] invoking ai-evaluate-session', { sessionId });
+  let aiData: any;
+  try {
+    const evalResponse = await userClient.functions.invoke('ai-evaluate-session', {
+      body: { sessionId, rubricId: session.rubric_id, messages: cappedMessages },
+    });
+    if (evalResponse.error) throw evalResponse.error;
+    aiData = evalResponse.data;
+  } catch (err) {
+    const evaluationErrorMessage = err instanceof Error ? err.message : String(err);
+    console.error('[RoleplayFinalize] ai-evaluate-session failed', evaluationErrorMessage);
+    // Reset phase so frontend can retry without thinking it's still evaluating.
+    await adminClient
+      .from('roleplay_sessions')
+      .update({ current_phase: 'evaluation_error' })
+      .eq('id', sessionId);
+    throw new HttpError(502, `Falha na avaliação por IA: ${evaluationErrorMessage}`);
+  }
+
+  const evaluation = (aiData?.evaluation ?? null) as EvaluationPayload | null;
   if (!evaluation || typeof evaluation.overall_score !== 'number') {
-    await adminClient.from('roleplay_sessions').update({ current_phase: 'evaluation_error' }).eq('id', sessionId);
-    throw new Error('Avaliação não retornou nota válida.');
+    console.error('[RoleplayFinalize] invalid evaluation payload', { sessionId, aiData });
+    await adminClient
+      .from('roleplay_sessions')
+      .update({ current_phase: 'evaluation_error' })
+      .eq('id', sessionId);
+    throw new HttpError(502, 'Avaliação não retornou nota válida.');
   }
 
-  const { error: persistError } = await adminClient.from('roleplay_sessions').update({
-    score_overall: evaluation.overall_score,
-    passed: evaluation.passed ?? null,
-    scores_json: evaluation,
-    coach_notes: evaluation.summary ?? null,
-    current_phase: 'completed',
-    finished_at: session.finished_at || new Date().toISOString(),
-  }).eq('id', sessionId);
-  if (persistError) throw persistError;
+  // ai-evaluate-session already persisted score_overall/scores_json/passed/finished_at.
+  // We just guarantee current_phase = 'completed' here.
+  const { error: persistError } = await adminClient
+    .from('roleplay_sessions')
+    .update({
+      score_overall: evaluation.overall_score,
+      passed: evaluation.passed ?? null,
+      scores_json: evaluation,
+      coach_notes: evaluation.summary ?? null,
+      current_phase: 'completed',
+      finished_at: session.finished_at || new Date().toISOString(),
+    })
+    .eq('id', sessionId);
+  if (persistError) {
+    console.error('[RoleplayFinalize] persist error', persistError);
+    throw persistError;
+  }
   console.log('[RoleplayFinalize] evaluation persisted', { sessionId, score: evaluation.overall_score });
 
-  // Background tasks: don't block the response — fire-and-forget via EdgeRuntime.waitUntil
+  // Background tasks: don't block the response.
   const backgroundTasks = (async () => {
     const tasks: Promise<any>[] = [
       userClient.functions.invoke('ai-recommend-videos', { body: { sessionId, sellerId: session.seller_id, scoresJson: evaluation } })
@@ -178,7 +188,7 @@ async function runRoleplayPipeline(sessionId: string, authHeader: string) {
     EdgeRuntime.waitUntil(backgroundTasks);
   }
 
-  return { evaluation, status: 'complete' };
+  return { evaluation, status: 'complete' as const };
 }
 
 serve(async (req) => {
@@ -192,10 +202,18 @@ serve(async (req) => {
     }
 
     const result = await runRoleplayPipeline(sessionId, authHeader);
-    return new Response(JSON.stringify({ success: true, sessionId, evaluationStatus: result.status, evaluation: result.evaluation }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+    return new Response(JSON.stringify({
+      success: true,
+      sessionId,
+      evaluationStatus: result.status,
+      evaluation: result.evaluation,
+    }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
   } catch (error) {
     console.error('[RoleplayFinalize] failed', error);
     const status = error instanceof HttpError ? error.status : 500;
-    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    }), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 });

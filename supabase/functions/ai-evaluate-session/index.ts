@@ -335,8 +335,10 @@ Regras do JSON:
           { role: 'user', content: userPrompt }
         ],
         response_format: { type: 'json_object' },
-        max_completion_tokens: 1000,
-        timeoutMs: 20000,
+        // gpt-5-mini is a reasoning model; reasoning_tokens count against max_completion_tokens.
+        // Need a generous budget so the model has room to both reason AND emit the JSON answer.
+        max_completion_tokens: 8000,
+        timeoutMs: 45000,
         maxRetries: 2,
       });
     } catch (err) {
@@ -486,6 +488,8 @@ Regras do JSON:
         score_overall: evaluation.overall_score,
         scores_json: evaluation,
         passed: evaluation.passed,
+        coach_notes: evaluation.summary ?? null,
+        current_phase: 'completed',
         finished_at: new Date().toISOString()
       })
       .eq('id', sessionId);
