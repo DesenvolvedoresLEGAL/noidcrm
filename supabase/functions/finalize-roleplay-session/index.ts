@@ -115,10 +115,25 @@ async function runRoleplayPipeline(sessionId: string, authHeader: string) {
   }
 
   console.log('[RoleplayFinalize] ai evaluation started', { sessionId });
-  const { data, error } = await userClient.functions.invoke('ai-evaluate-session', {
-    body: { sessionId, rubricId: session.rubric_id, messages },
-  });
-  if (error) throw error;
+  let data: any;
+  try {
+    const evalResponse = await userClient.functions.invoke('ai-evaluate-session', {
+      body: { sessionId, rubricId: session.rubric_id, messages },
+    });
+    if (evalResponse.error) throw evalResponse.error;
+    data = evalResponse.data;
+  } catch (err) {
+    const evaluationErrorMessage = err instanceof Error ? err.message : String(err);
+    await adminClient
+      .from('roleplay_sessions')
+      .update({
+        current_phase: 'error',
+        evaluation_error: evaluationErrorMessage,
+        finished_at: session.finished_at || new Date().toISOString(),
+      })
+      .eq('id', sessionId);
+    throw err;
+  }
 
   const evaluation = (data?.evaluation ?? null) as EvaluationPayload | null;
   if (!evaluation || typeof evaluation.overall_score !== 'number') {
