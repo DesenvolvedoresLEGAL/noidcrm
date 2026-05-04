@@ -412,6 +412,21 @@ export function useOwnerDashboard() {
         .filter(s => s.deals > 0 || s.winRate > 0) // Only show sellers with activity
         .sort((a, b) => b.revenue - a.revenue);
 
+      // Top performer DO MÊS (usado no insight "lidera com X negócios fechados")
+      const sellerStatsThisMonth = profiles
+        .filter(p => salesUserIds.includes(p.user_id))
+        .map(p => {
+          const won = wonSalesThisMonth.filter(o => o.owner_user_id === p.user_id);
+          return {
+            name: p.full_name || 'Sem nome',
+            winRate: 0,
+            revenue: won.reduce((s, o) => s + (o.valor_previsto || 0), 0),
+            deals: won.length,
+          };
+        })
+        .filter(s => s.deals > 0)
+        .sort((a, b) => b.revenue - a.revenue);
+
       // =================== CRM HEATMAP (SALES STAGES ONLY) ===================
       const salesStageIds = stages.filter(s => 
         salesPipelineIds.includes(s.pipeline_id)
