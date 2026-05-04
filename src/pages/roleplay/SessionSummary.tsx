@@ -30,7 +30,7 @@ export default function SessionSummary() {
     console.log('[RoleplaySummary] mounted sessionId', sessionId);
   }, [sessionId]);
 
-  const { data: session, isLoading: loadingSession } = useQuery({
+  const { data: session, isLoading: loadingSession, refetch: refetchSession } = useQuery({
     queryKey: ['roleplay-session', sessionId],
     queryFn: async () => {
       console.log('[RoleplaySummary] fetching session', sessionId);
@@ -152,9 +152,11 @@ export default function SessionSummary() {
       .invoke('finalize-roleplay-session', {
         body: { sessionId },
       })
-      .then(({ data, error }) => {
+      .then(async ({ data, error }) => {
         console.log('[RoleplaySummary] finalize returned', data);
         if (error) throw error;
+        // Force a refetch immediately so we don't have to wait for the next poll tick.
+        await refetchSession();
       })
       .catch((error) => {
         console.error('[RoleplaySummary] failed', error);
@@ -163,24 +165,7 @@ export default function SessionSummary() {
         recoveryRequestedRef.current = false;
       })
       .finally(() => clearTimeout(timeoutId));
-  }, [sessionId, shouldAttemptRecovery, evaluationReady]);
-
-  const { data: fallbackEvaluation } = useQuery({
-    queryKey: ['roleplay-evaluation-fallback', sessionId],
-    enabled: !!sessionId && !evaluationReady,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('roleplay_evaluations' as any)
-        .select('score_overall,scores_json,feedback,insights,current_phase,finished_at')
-        .eq('session_id', sessionId!)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (error) return null;
-      return data;
-    },
-    retry: false,
-  });
+  }, [sessionId, shouldAttemptRecovery, evaluationReady, refetchSession]);
 
   // Get badges unlocked in this session
   const { data: sessionBadges } = useQuery({
