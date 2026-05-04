@@ -601,6 +601,7 @@ export function useOwnerDashboard() {
       const humanoidInsights = generateHumanoidInsights({
         salesTrend,
         sellerStats,
+        sellerStatsThisMonth,
         yearlyGoal,
         runRate,
         salesOpportunities,
