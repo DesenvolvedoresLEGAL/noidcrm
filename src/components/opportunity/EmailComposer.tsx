@@ -23,6 +23,7 @@ import { Send, Sparkles, Loader2, FileText, AlertTriangle, Info, Thermometer, Pa
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { listEmailTemplates, renderEmailTemplate, type EmailTemplate } from '@/services/crm/email-templates';
+import { RichTextEditor } from '@/components/ui/rich-text-editor';
 
 interface EmailContext {
   pipeline_name: string;
