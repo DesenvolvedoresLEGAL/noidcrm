@@ -698,6 +698,7 @@ export function useOwnerDashboard() {
 function generateHumanoidInsights(data: {
   salesTrend: { month: string; value: number; count: number }[];
   sellerStats: { name: string; winRate: number; revenue: number; deals: number }[];
+  sellerStatsThisMonth: { name: string; winRate: number; revenue: number; deals: number }[];
   yearlyGoal: number;
   runRate: number;
   salesOpportunities: any[];
