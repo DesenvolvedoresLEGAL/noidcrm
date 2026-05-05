@@ -1,5 +1,6 @@
 import { ProposalItem } from '@/services/crm/proposal-items';
 import { PaymentTerm } from '@/services/crm/proposal-payment-terms';
+import { extractEmail, extractPhone } from '@/lib/contactFormat';
 
 export interface ProposalPDFData {
   id: string;
@@ -12,6 +13,7 @@ export interface ProposalPDFData {
   client_state: string;
   client_zip: string;
   contact_name: string;
+  contact_cargo: string;
   contact_email: string;
   contact_phone: string;
   seller_name: string;
@@ -110,8 +112,9 @@ export function buildProposalPDFData(
     client_state: account?.uf || '',
     client_zip: account?.cep || '',
     contact_name: contact?.nome || '',
-    contact_email: (() => { const arr = contact?.emails; if (!Array.isArray(arr)) return ''; const p = arr.find((v: any) => v?.is_primary); return (p || arr[0])?.value || ''; })(),
-    contact_phone: (() => { const arr = contact?.telefones; if (!Array.isArray(arr)) return ''; const p = arr.find((v: any) => v?.is_primary); return (p || arr[0])?.value || ''; })(),
+    contact_cargo: contact?.cargo || '',
+    contact_email: extractEmail(contact?.emails) || '',
+    contact_phone: extractPhone(contact?.telefones) || '',
     seller_name: seller?.full_name || '',
     seller_email: seller?.email || '',
     seller_phone: seller?.phone || '',

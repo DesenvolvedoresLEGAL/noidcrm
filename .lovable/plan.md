@@ -1,71 +1,64 @@
-# Diagnóstico forense — por que ainda está lento
+## Diagnóstico
 
-Rodei agora mesmo o smoke test no banco de produção (`SELECT 1`) e a resposta foi:
+### Problema 1 — PDF "engole" um item (LEGAL™ Core sumiu)
+**Causa raiz em `src/lib/proposalPdfGenerator.ts` (renderItemsTable, linhas ~590‑650).**
 
-```
-SUPABASE_INTERNAL_ERROR — status 544
-"Failed to run sql query: Connection terminated due to connection timeout"
-```
+O fluxo atual faz:
+1. `didParseCell` zera o texto da célula (`data.cell.text = ['']`) para desenhar manualmente nome+descrição.
+2. `willDrawCell` recalcula `data.cell.height` **depois** que o autoTable já planejou o layout.
+3. `didDrawCell` desenha o conteúdo via `doc.text(...)`.
 
-Os logs `postgres_logs` retornaram **vazios** (Logflare não está conseguindo nem coletar). Isso significa que **o problema atual não é mais só código** — a instância do Lovable Cloud está saturada e qualquer query (incluindo as do detalhe da oportunidade) está enfileirada/derrubada por timeout. Foi por isso que a tela de oportunidade demorou >1min e estourou "Tempo esgotado".
+Com `rowPageBreak: 'avoid'` e a célula reportando altura ~0 na fase de planejamento, o autoTable acha que a linha cabe; quando `willDrawCell` infla a altura no draw, a linha estoura a página e o jsPDF **descarta o desenho** dessa linha (fica em branco / é "comida"). É exatamente o que aconteceu com o item Core (que tem a descrição mais longa). Os totais permanecem corretos porque são calculados a partir do array `items`, não do que foi efetivamente desenhado — daí a inconsistência (soma visível ≠ Total).
 
-A migração de RLS que apliquei ontem (`20260505180136`) está correta e continua valendo (restringiu a policy `Public access via proposal token` ao role `anon`, eliminando o EXISTS caro para usuários autenticados). Mas ela sozinha não resolve um pool de conexões esgotado.
+### Problema 2 — Cargo, telefone e e‑mail do contato sumindo no PDF
+**Causa raiz na ponte `buildProposalPDFData` → `generateProposalPDFClient`.**
 
----
+- `buildProposalPDFData` (`src/lib/proposalPdfBuilder.ts`) preenche os campos **flat** `contact_name`, `contact_email`, `contact_phone`, mas **não** popula `pdfData.opportunity.contact` nem inclui `cargo`.
+- Em `proposalPdfGenerator.ts` (linhas 393‑421) o card de Contato lê:
+  - `proposal.contact_name || proposal.opportunity?.contact?.nome` (ok)
+  - `proposal.opportunity.contact.cargo` (**sempre undefined** vindo do builder → cargo nunca aparece)
+  - `proposal.contact_email || extractEmail(proposal.opportunity?.contact?.emails)` (depende do flat)
+  - `proposal.contact_phone || extractPhone(proposal.opportunity?.contact?.telefones)` (depende do flat)
+- O builder extrai `value` do JSONB, mas o schema real grava `email`/`numero` em alguns casos (vide `extractEmail`/`extractPhone` em `src/lib/contactFormat.ts` que tratam `email|value|address` e `numero|phone|value|number`). Quando o objeto vem com `email`/`numero`, `contact_email`/`contact_phone` ficam vazios → e como o fallback `opportunity.contact` também está ausente, **não aparece nada**.
 
-# Plano de correção definitiva (3 frentes em paralelo)
-
-## Frente 1 — Infraestrutura (ação imediata, fora do código)
-A causa raiz do "carrega 1 minuto e dá erro" agora é capacidade do backend. Você precisa:
-
-1. Abrir **Cloud → Advanced settings → Upgrade instance** e subir o tamanho da instância (CPU + RAM + conexões).
-2. Após o upgrade (~poucos minutos), o pool de conexões para de derrubar queries e o detalhe da oportunidade volta ao tempo normal.
-
-Documentação: https://docs.lovable.dev/features/cloud#advanced-settings-upgrade-instance
-
-Sem esse passo, qualquer otimização de código vai ser engolida pela fila do banco.
-
-## Frente 2 — Reduzir carga da página de Oportunidade (código)
-O `OpportunityDetailPage` hoje dispara em paralelo **>15 queries** ao abrir (details, scoring, NRHS, gaps, vibe, emotional memory, AI suggestions, timeline, activities, notes, files, emails, proposals, participants, history, analytics) + 3 realtime channels. Isso multiplica a pressão no banco. Vou:
-
-1. **Lazy-load por aba**: hoje `OpportunityTabs` monta `defaultValue="timeline"` mas todos os `<TabsContent>` são instanciados. Mudar para render condicional (`mounted` set por aba clicada) — só Timeline carrega no abrir; Inteligência/Analytics/Histórico só quando o usuário troca de aba. Corta ~70% das queries iniciais.
-2. **Consolidar fetch do detalhe**: `useOpportunityDetails` hoje faz 1 query principal + 4 follow-ups sequenciais (`Promise.all` de owner/qualified_by/source_opp/stages). Criar uma RPC `get_opportunity_detail(id)` security definer que devolve tudo em 1 round-trip.
-3. **Aumentar `staleTime`** dos hooks satélites (scoring, NRHS, emotional memory) de default para 5 min — esses dados não mudam a cada navegação.
-4. **Suspender o auto-recalc de score** ao abrir (`useOpportunityScoring` hoje pode disparar recalculate). Manter só leitura; recálculo via botão.
-5. **Throttle do realtime**: `useRealtimeOpportunityDetail` invalida o cache inteiro a cada postgres_change. Trocar por debounce de 1s + invalidar somente as keys afetadas.
-
-## Frente 3 — Resiliência e telemetria
-1. **Timeout + retry exponencial** no `supabase` client wrapper: hoje uma query travada faz a UI ficar "Carregando…" eternamente. Aplicar `AbortController` com 15s + 1 retry, e disparar toast "Backend lento, tentando novamente" em vez de tela em branco.
-2. **Circuit breaker** no React Query: se 3 queries seguidas falharem por timeout, parar de disparar novas por 30s e mostrar banner "Sistema sobrecarregado — aguarde".
-3. **Métrica visível** no header (dev/admin): tempo médio das últimas 10 queries Supabase, para enxergarmos quando volta a degradar.
-4. **Migração adicional**: garantir índices que ainda faltam para o detalhe:
-   - `idx_opportunities_owner_user_id_active` (owner + deleted_at IS NULL)
-   - `idx_proposals_opportunity_id_status` (composto)
-   - `idx_opportunity_activities_opportunity_id_created` (paginação)
-   - `ANALYZE` nas 3 tabelas após criação.
+Mesmo problema atinge o link rápido quando o PDF é baixado pela `ProposalPublicView`.
 
 ---
 
-# Arquivos que vou tocar (Frentes 2+3)
+## Plano de Correção
 
-- `src/components/opportunity/OpportunityTabs.tsx` — lazy mount por aba
-- `src/hooks/useOpportunityDetails.ts` — usar nova RPC, staleTime 5min
-- `src/hooks/useRealtimeOpportunityDetail.ts` — debounce + invalidação granular
-- `src/hooks/useOpportunityScoring.ts` — remover auto-recalc on mount
-- `src/lib/supabaseTimeout.ts` (novo) — wrapper com AbortController + retry
-- `src/lib/queryCircuitBreaker.ts` (novo) — contador global de timeouts
-- `supabase/migrations/<novo>.sql` — RPC `get_opportunity_detail` + índices faltantes + ANALYZE
+### Frente A — Eliminar o "item engolido" no PDF
+Em `src/lib/proposalPdfGenerator.ts` (`renderItemsTable`):
+1. **Pré-calcular a altura de cada linha** (nome + descrição) ANTES do autoTable, e passá-la como `minCellHeight` no `body` row config (`{ content, styles: { minCellHeight } }`).
+2. Remover a mutação tardia de `data.cell.height` em `willDrawCell` (mantendo apenas o desenho em `didDrawCell`).
+3. Manter `rowPageBreak: 'avoid'` — agora seguro porque o autoTable já conhece a altura real e fará o page-break corretamente.
 
-# Riscos
+Resultado: nenhum item é descartado e a soma visível dos itens passa a bater com o Total.
 
-- A RPC nova precisa respeitar RLS via `SECURITY INVOKER` (não definer) para não vazar deals de outras orgs.
-- Lazy mount de abas pode quebrar deep-links tipo `?tab=propostas` — manter leitura do query string e pré-montar a aba alvo.
-- O upgrade de instância é responsabilidade sua no painel do Cloud — sem ele, frentes 2 e 3 melhoram mas não eliminam o problema atual.
+### Frente B — Garantir cargo / telefone / e‑mail do contato
+1. Em `src/lib/proposalPdfBuilder.ts`:
+   - Adicionar `cargo` ao tipo `ProposalPDFData` (campo flat `contact_cargo`).
+   - Trocar a extração inline de e‑mail/telefone pelos helpers `extractEmail` / `extractPhone` de `@/lib/contactFormat` (cobrem `value|email|numero|phone|address`).
+   - Popular `contact_cargo: contact?.cargo || ''`.
+2. Em `src/lib/proposalPdfGenerator.ts`:
+   - No card de Contato, ler `proposal.contact_cargo || proposal.opportunity?.contact?.cargo` (linha ~400) e usar os mesmos helpers para email/telefone caso `contact_email`/`contact_phone` venham vazios.
+   - Adicionar `contact_cargo?: string` à interface `ProposalData`.
 
-# Próximo passo
+### Frente C — Validação visual (sem alterar produto)
+- Após a edição, gerar localmente um PDF de teste com a mesma proposta (PROP-2026-00663) e verificar:
+  - Os 4 itens aparecem (Setup, Core, Implantação, Logística).
+  - Soma dos totais por linha = R$ 11.854,00.
+  - Card "Contato" mostra Nome, Cargo, Telefone e E‑mail.
 
-Aprove o plano para eu executar Frentes 2 e 3 no código + migração. **Em paralelo, faça o upgrade da instância no Cloud agora** — é o que destrava o gargalo imediato que você está sentindo.
+---
 
-<lov-actions>
-<lov-link url="https://docs.lovable.dev/features/cloud#advanced-settings-upgrade-instance">Como fazer upgrade da instância Cloud</lov-link>
-</lov-actions>
+## Arquivos a alterar
+- `src/lib/proposalPdfGenerator.ts` (render de itens + leitura de cargo/contato)
+- `src/lib/proposalPdfBuilder.ts` (campo `contact_cargo` + helpers de extração)
+
+## Riscos
+- Mudança de altura via `minCellHeight` pode reduzir levemente a densidade visual em propostas longas (aceitável — preferível a perder linhas).
+- Nenhum impacto em backend, RLS, edge functions ou link público (HTML do `generate-proposal-pdf` usa caminho próprio e já estava correto para contato; só o PDF client-side é afetado).
+
+## Próximos passos
+Aprovar para eu aplicar as duas frentes em sequência.
