@@ -445,12 +445,14 @@ export default function ProposalEditor() {
     // Evita propostas enviadas ao cliente sem o quadro de Pagamento Avulso/MRR.
     const effectiveStatus = (data as any)?.status || status;
     if (effectiveStatus !== 'draft' && (!paymentTerms || paymentTerms.length === 0)) {
-      toast.error(
-        'Defina pelo menos uma condição de pagamento (Avulso ou Recorrente) antes de salvar fora de rascunho.'
-      );
+      const msg = 'Defina pelo menos uma condição de pagamento (Avulso ou Recorrente) antes de salvar fora de rascunho.';
+      setPaymentTermsError(msg);
+      toast.error(msg);
       console.warn('[ProposalEditor] BLOCKED: save without paymentTerms on status', effectiveStatus);
+      setActiveTab('payment-terms');
       return;
     }
+    setPaymentTermsError(null);
 
     setIsSaving(true);
     try {
