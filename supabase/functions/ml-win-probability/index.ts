@@ -156,7 +156,7 @@ serve(async (req) => {
     // Get proposals for current opportunity
     const { data: proposals } = await supabase
       .from('proposals')
-      .select('status, value, view_count')
+      .select('status, value, views_count')
       .eq('opportunity_id', opportunityId);
 
     // Calculate days in pipeline
