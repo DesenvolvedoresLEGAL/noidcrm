@@ -70,7 +70,9 @@ export async function listOpportunities(params: {
     query = query.not('status', 'in', '("won","lost")');
   }
 
-  const { data, error, count } = await query.order('created_at', { ascending: false });
+  const { data, error, count } = await query
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1);
 
   if (error) {
     console.error('Error fetching opportunities:', error);
