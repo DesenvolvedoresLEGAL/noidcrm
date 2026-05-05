@@ -227,12 +227,19 @@ export function useCurrentUser() {
     // Retry 2x com backoff para tolerar timeouts transientes do backend
     // (cold-start de edge functions ou pico momentâneo no Postgres)
     retry: (failureCount, error: any) => {
-      // Não retry em auth errors (401)
+      // Não retry em auth errors (401) — evita cascata de POSTs 401 quando
+      // a sessão está realmente expirada.
       const msg = String(error?.message || '').toLowerCase();
-      if (msg.includes('401') || msg.includes('não autenticado') || msg.includes('unauthorized')) {
+      if (
+        msg.includes('401') ||
+        msg.includes('não autenticado') ||
+        msg.includes('unauthenticated') ||
+        msg.includes('unauthorized')
+      ) {
         return false;
       }
-      return failureCount < 2;
+      // Retry apenas 1x para erros 5xx/timeouts transitórios
+      return failureCount < 1;
     },
     retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 4000),
     enabled: sessionChecked && hasSession, // Só executa se verificou sessão e há sessão ativa
