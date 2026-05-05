@@ -509,7 +509,8 @@ Campos possíveis: temperature, prob, close_date_prevista, stage_id, valor_previ
           confidence_score: Math.min(1, Math.max(0, suggestion.confidence_score || 0.7)),
           reasoning: suggestion.reasoning,
           status: 'pending',
-          expires_at: expiresAt.toISOString()
+          expires_at: expiresAt.toISOString(),
+          context_signature: currentSignature,
         })
         .select()
         .single();
