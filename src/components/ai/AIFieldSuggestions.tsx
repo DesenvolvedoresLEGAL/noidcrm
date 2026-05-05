@@ -9,6 +9,7 @@ import { formatDateBR } from '@/lib/dateUtils';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { invalidateOpportunity } from '@/lib/cache-invalidation';
 import { aiSuggestionKeys } from '@/lib/query-keys';
+import { supabase } from '@/integrations/supabase/client';
 
 interface AIFieldSuggestionsProps {
   opportunityId: string;
@@ -17,27 +18,45 @@ interface AIFieldSuggestionsProps {
 
 export function AIFieldSuggestions({ opportunityId, onAccept }: AIFieldSuggestionsProps) {
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const queryClient = useQueryClient();
 
-  // Cache suggestions for 10 minutes — avoids regenerating on every tab change
+  // Load persisted suggestions from DB only — NEVER call the AI on mount.
+  // The AI is only invoked when the user clicks the refresh button.
   const { data, isLoading, refetch } = useQuery({
     queryKey: aiSuggestionKeys.fields(opportunityId),
     queryFn: async () => {
-      const result = await generateFieldSuggestions(opportunityId);
-      return result.suggestions;
+      const { data, error } = await supabase
+        .from('ai_suggestions')
+        .select('*')
+        .eq('opportunity_id', opportunityId)
+        .eq('suggestion_type', 'field_update')
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return (data || []) as unknown as AISuggestion[];
     },
     enabled: !!opportunityId,
-    staleTime: 10 * 60 * 1000, // 10 min
+    staleTime: Infinity,
     gcTime: 30 * 60 * 1000,
-    retry: 1,
     refetchOnWindowFocus: false,
   });
 
   const suggestions = data ?? [];
   const loading = isLoading;
 
-  const loadSuggestions = () => {
-    refetch();
+  const loadSuggestions = async () => {
+    setRefreshing(true);
+    try {
+      // Force AI regeneration; edge function persists with context signature.
+      const result = await generateFieldSuggestions(opportunityId, true);
+      queryClient.setQueryData(aiSuggestionKeys.fields(opportunityId), result.suggestions || []);
+    } catch (e: any) {
+      console.error('Error refreshing suggestions:', e);
+      toast.error('Erro ao gerar sugestões');
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const handleAccept = async (suggestion: AISuggestion) => {
