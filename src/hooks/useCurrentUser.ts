@@ -113,24 +113,25 @@ async function fetchCurrentUser(): Promise<CurrentUserData | null> {
       (functionError && errorMessage.includes('non-2xx'));
     
     if (isAuthError) {
-      // Auth error esperado - tentar refresh silenciosamente
+      // Auth error esperado - tentar refresh silenciosamente UMA vez.
+      // Se falhar de novo, NÃO tentamos novamente nesta chamada — propagamos
+      // erro para o React Query parar (o retry da query já está desabilitado
+      // para 401), evitando o loop de POSTs 401 visto em produção.
       const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
-      
+
       if (refreshError || !refreshData.session) {
         // Verificar se há uma sessão de roleplay ativa antes de fazer logout
         try {
           const { useRoleplaySessionStore } = await import('./useRoleplaySession');
           const isInActiveSession = useRoleplaySessionStore.getState().isInActiveSession;
-          
+
           if (isInActiveSession) {
-            // Sessão de roleplay ativa - não fazer logout
             throw new Error('Sessão expirada. Salve seu progresso e faça login novamente.');
           }
-        } catch (importError) {
+        } catch {
           // Ignorar erro de importação do roleplay store
         }
-        
-        // Refresh falhou - fazer logout silencioso
+
         try {
           await supabase.auth.signOut();
         } catch {
@@ -138,17 +139,19 @@ async function fetchCurrentUser(): Promise<CurrentUserData | null> {
         }
         return null;
       }
-      
-      // Token renovado - retry silencioso
+
+      // Token renovado - retry silencioso (única tentativa)
       const { data: retryData, error: retryError } = await supabase.functions.invoke('get-current-user');
-      
+
       if (retryError || retryData?.error) {
-        return null;
+        // Não retornar null aqui — lançar erro para o React Query marcar como
+        // "errored" e respeitar o `retry: false` para 401, parando a cascata.
+        throw new Error('unauthenticated');
       }
-      
+
       return retryData;
     }
-    
+
     // Para outros erros, apenas retornar null
     return null;
   }
@@ -224,12 +227,19 @@ export function useCurrentUser() {
     // Retry 2x com backoff para tolerar timeouts transientes do backend
     // (cold-start de edge functions ou pico momentâneo no Postgres)
     retry: (failureCount, error: any) => {
-      // Não retry em auth errors (401)
+      // Não retry em auth errors (401) — evita cascata de POSTs 401 quando
+      // a sessão está realmente expirada.
       const msg = String(error?.message || '').toLowerCase();
-      if (msg.includes('401') || msg.includes('não autenticado') || msg.includes('unauthorized')) {
+      if (
+        msg.includes('401') ||
+        msg.includes('não autenticado') ||
+        msg.includes('unauthenticated') ||
+        msg.includes('unauthorized')
+      ) {
         return false;
       }
-      return failureCount < 2;
+      // Retry apenas 1x para erros 5xx/timeouts transitórios
+      return failureCount < 1;
     },
     retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 4000),
     enabled: sessionChecked && hasSession, // Só executa se verificou sessão e há sessão ativa
