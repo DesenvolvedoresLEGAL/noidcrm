@@ -196,7 +196,7 @@ ${lostOpportunities?.slice(0, 30).map((o: any) => {
 - Dias desde último contato: ${opportunity.days_since_contact || 0}
 - Atividades realizadas: ${activitiesCount || 0}
 - Propostas: ${proposals?.length || 0} (${proposals?.filter(p => p.status === 'sent').length || 0} enviadas)
-- Visualizações de proposta: ${proposals?.reduce((sum, p) => sum + (p.view_count || 0), 0) || 0}
+- Visualizações de proposta: ${proposals?.reduce((sum, p) => sum + (p.views_count || 0), 0) || 0}
 
 ## SCORES DA CONTA:
 - FIT Score: ${opportunity.account?.fit_score || 0}/100
