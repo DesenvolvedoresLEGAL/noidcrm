@@ -1006,12 +1006,18 @@ export default function ProposalEditor() {
                 />
               </TabsContent>
 
-              <TabsContent value="payment-terms">
+              <TabsContent value="payment-terms" className="space-y-4">
+                {paymentTermsError && (
+                  <Alert variant="destructive">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription>{paymentTermsError}</AlertDescription>
+                  </Alert>
+                )}
                 <ProposalPaymentTerms 
                   proposalId={currentProposalId || ''} 
                   totalAmount={itemsTotal}
                   terms={paymentTerms} 
-                  onChange={setPaymentTerms}
+                  onChange={(terms) => { setPaymentTerms(terms); if (terms.length > 0) setPaymentTermsError(null); }}
                   items={items}
                   currency={watch('currency')}
                 />
