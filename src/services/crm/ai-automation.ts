@@ -81,9 +81,9 @@ export async function createAutoTasks(): Promise<{ success: boolean; tasks_creat
   return data;
 }
 
-export async function generateFieldSuggestions(opportunityId: string): Promise<{ suggestions: AISuggestion[] }> {
+export async function generateFieldSuggestions(opportunityId: string, forceRefresh = false): Promise<{ suggestions: AISuggestion[]; from_cache?: boolean }> {
   const { data, error } = await supabase.functions.invoke('ai-field-suggestions', {
-    body: { opportunityId }
+    body: { opportunityId, force_refresh: forceRefresh }
   });
 
   if (error) throw error;
