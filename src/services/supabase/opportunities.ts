@@ -29,14 +29,22 @@ export async function listOpportunities(params: {
   owner_user_id?: string;
   owner_user_ids?: string[]; // Suporte para múltiplos IDs (visibilidade por time)
   exclude_closed?: boolean;
+  limit?: number;
+  offset?: number;
 } = {}): Promise<{ data: Opportunity[]; total: number }> {
+  // Performance: avoid `count: 'exact'` (full second pass) and cap rows.
+  // The Kanban can render thousands of cards; with an unbounded query the
+  // PostgREST plan times out at the database statement_timeout.
+  const limit = Math.min(Math.max(params.limit ?? 500, 1), 1000);
+  const offset = Math.max(params.offset ?? 0, 0);
+
   let query = supabase
     .from('opportunities')
     .select(`
       *,
       account:accounts(razao_social, nome_fantasia, lead_score, lead_grade, fit_score, intent_score, cidade, uf, origem_principal, score_financeiro, risco_financeiro, score_fatores),
       contact:contacts(nome, cargo, emails, telefones)
-    `, { count: 'exact' })
+    `, { count: 'estimated' })
     .is('deleted_at', null); // Soft delete filter
 
   if (params.pipeline_id) {
