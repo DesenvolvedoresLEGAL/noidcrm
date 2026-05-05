@@ -439,7 +439,18 @@ export default function ProposalEditor() {
       console.error('[ProposalEditor] BLOCKED: Attempted to create proposal without opportunity_id');
       return;
     }
-    
+
+    // CRITICAL: Bloquear salvar sem condições de pagamento, exceto rascunho.
+    // Evita propostas enviadas ao cliente sem o quadro de Pagamento Avulso/MRR.
+    const effectiveStatus = (data as any)?.status || status;
+    if (effectiveStatus !== 'draft' && (!paymentTerms || paymentTerms.length === 0)) {
+      toast.error(
+        'Defina pelo menos uma condição de pagamento (Avulso ou Recorrente) antes de salvar fora de rascunho.'
+      );
+      console.warn('[ProposalEditor] BLOCKED: save without paymentTerms on status', effectiveStatus);
+      return;
+    }
+
     setIsSaving(true);
     try {
       let savedProposalId = currentProposalId;
