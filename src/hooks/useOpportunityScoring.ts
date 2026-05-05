@@ -33,6 +33,8 @@ export function useOpportunityScoring(opportunityId: string | undefined) {
       return data as OpportunityScoring;
     },
     enabled: !!opportunityId,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
   });
 
   const recalculateMutation = useMutation({
