@@ -1427,14 +1427,23 @@ export default function ProposalPublicView() {
         </div>
 
         {/* Payment Terms */}
-        {paymentTerms.length > 0 && (
-          <Card data-section="payment">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CreditCard className="h-5 w-5" />
-                Condições de Pagamento
-              </CardTitle>
-            </CardHeader>
+        <Card data-section="payment">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CreditCard className="h-5 w-5" />
+              Condições de Pagamento
+            </CardTitle>
+          </CardHeader>
+          {paymentTerms.length === 0 ? (
+            <CardContent>
+              <div className="rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800 p-4 text-sm">
+                <p className="font-semibold mb-1">Condições de pagamento ainda não definidas</p>
+                <p className="text-muted-foreground">
+                  Entre em contato com seu consultor comercial para confirmação dos valores e prazos antes do aceite.
+                </p>
+              </div>
+            </CardContent>
+          ) : (
             <CardContent className="space-y-6">
               {/* Avulso Payment */}
               {oneTimeTerm && (
@@ -1627,8 +1636,8 @@ export default function ProposalPublicView() {
                 </div>
               )}
             </CardContent>
-          </Card>
-        )}
+          )}
+        </Card>
 
         {/* Layout PDF Terms - Sprint D */}
         {layout?.terms_pdf_url && (
