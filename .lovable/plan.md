@@ -1,89 +1,71 @@
-## Diagnóstico (forense, baseado em logs reais)
+# Diagnóstico forense — por que ainda está lento
 
-Confirmado pelos logs do Postgres (últimos 5 min) e pelo console:
+Rodei agora mesmo o smoke test no banco de produção (`SELECT 1`) e a resposta foi:
 
-1. **Timeout em `GET /opportunities?select=...account...contact...`** (HTTP 400 / “canceling statement due to statement timeout”). É a query que carrega o Pipeline.
-2. **`get_unified_won_revenue_v2` cancelada** (mesmo motivo) → Dashboard cai pro fallback legacy.
-3. **`get-current-user` retornando 401 em loop** (8+ chamadas seguidas) → loop de refresh/retry no `useCurrentUser`.
-4. Erros colaterais reincidentes: `column sellers.team_id does not exist`, `column "completed_at" of relation "playbook_runs" does not exist`, `proposal_alerts_alert_type_check` violado.
+```
+SUPABASE_INTERNAL_ERROR — status 544
+"Failed to run sql query: Connection terminated due to connection timeout"
+```
 
-### Causa raiz #1 — RLS de “acesso público via proposal token” penalizando todo acesso autenticado
+Os logs `postgres_logs` retornaram **vazios** (Logflare não está conseguindo nem coletar). Isso significa que **o problema atual não é mais só código** — a instância do Lovable Cloud está saturada e qualquer query (incluindo as do detalhe da oportunidade) está enfileirada/derrubada por timeout. Foi por isso que a tela de oportunidade demorou >1min e estourou "Tempo esgotado".
 
-As tabelas `opportunities`, `accounts` e `contacts` têm **duas** policies SELECT empilhadas:
-
-- `opportunities_select_by_visibility` (authenticated)
-- `Public access to ... via proposal token` (anon) — faz `EXISTS (SELECT 1 FROM proposals p WHERE p.opportunity_id = opportunities.id AND p.public_token IS NOT NULL AND p.status IN (...))`
-
-Postgres aplica policies do mesmo comando com **OR**, então o `EXISTS` no `proposals` é avaliado pra **cada linha** mesmo em request autenticado. Em `accounts`/`contacts` é pior: o EXISTS faz JOIN `opportunities × proposals`. Quando a query é o pipeline (753 opps + lateral join em accounts/contacts), explode o tempo de planning/execução até bater o `statement_timeout`.
-
-### Causa raiz #2 — `listOpportunities` carrega tudo, sem paginação
-
-`src/services/supabase/opportunities.ts:25` faz:
-- `select('*, account:accounts(...), contact:contacts(...)', { count: 'exact' })`
-- `.is('deleted_at', null)`
-- **sem** filtro por `organization_id`, **sem** `range/limit`, **sem** índice usado pra ordenação (`created_at DESC` força top-N sort).
-
-Com `count: 'exact'` PostgREST roda também um `count(*)` no full set, dobrando o trabalho. Combine isso com a RLS acima e você tem o timeout reproduzível.
-
-### Causa raiz #3 — `get-current-user` em loop 401
-
-Em `useCurrentUser.fetchCurrentUser`, quando a edge devolve 401 a gente chama `auth.refreshSession()` e re-invoca a função. Se o refresh devolve session mas o JWT ainda não propagou para a edge (race), volta 401 → próximo render dispara a query de novo (5 min stale, mas sem dados retorna sempre). O `retry: 2` da query soma mais 2 chamadas. Resultado: cascata visível no console (8+ POSTs 401).
+A migração de RLS que apliquei ontem (`20260505180136`) está correta e continua valendo (restringiu a policy `Public access via proposal token` ao role `anon`, eliminando o EXISTS caro para usuários autenticados). Mas ela sozinha não resolve um pool de conexões esgotado.
 
 ---
 
-## Plano de correção
+# Plano de correção definitiva (3 frentes em paralelo)
 
-### 1) RLS — eliminar custo do acesso público em sessões autenticadas
+## Frente 1 — Infraestrutura (ação imediata, fora do código)
+A causa raiz do "carrega 1 minuto e dá erro" agora é capacidade do backend. Você precisa:
 
-Migração SQL:
+1. Abrir **Cloud → Advanced settings → Upgrade instance** e subir o tamanho da instância (CPU + RAM + conexões).
+2. Após o upgrade (~poucos minutos), o pool de conexões para de derrubar queries e o detalhe da oportunidade volta ao tempo normal.
 
-- Trocar as 3 policies `Public access to ... via proposal token` (em `opportunities`, `accounts`, `contacts`) para **só valer pro role `anon`** explicitamente: `TO anon` + `USING (auth.uid() IS NULL AND EXISTS(...))`. Hoje elas são `{anon}` mas o planner ainda OR-eia os USING entre policies do mesmo comando — adicionar o guard `auth.uid() IS NULL` faz o planner descartar o branch em sessões autenticadas (curto-circuito barato).
-- Garantir que as policies authenticated (`opportunities_select_by_visibility`, `Users view org accounts`, `Users can view org contacts` / `Users view contacts by role and account`) tenham `TO authenticated`.
+Documentação: https://docs.lovable.dev/features/cloud#advanced-settings-upgrade-instance
 
-Resultado esperado: planner remove o `EXISTS proposals` para qualquer chamada com JWT.
+Sem esse passo, qualquer otimização de código vai ser engolida pela fila do banco.
 
-### 2) `listOpportunities` — paginar e tirar `count: 'exact'`
+## Frente 2 — Reduzir carga da página de Oportunidade (código)
+O `OpportunityDetailPage` hoje dispara em paralelo **>15 queries** ao abrir (details, scoring, NRHS, gaps, vibe, emotional memory, AI suggestions, timeline, activities, notes, files, emails, proposals, participants, history, analytics) + 3 realtime channels. Isso multiplica a pressão no banco. Vou:
 
-Em `src/services/supabase/opportunities.ts`:
+1. **Lazy-load por aba**: hoje `OpportunityTabs` monta `defaultValue="timeline"` mas todos os `<TabsContent>` são instanciados. Mudar para render condicional (`mounted` set por aba clicada) — só Timeline carrega no abrir; Inteligência/Analytics/Histórico só quando o usuário troca de aba. Corta ~70% das queries iniciais.
+2. **Consolidar fetch do detalhe**: `useOpportunityDetails` hoje faz 1 query principal + 4 follow-ups sequenciais (`Promise.all` de owner/qualified_by/source_opp/stages). Criar uma RPC `get_opportunity_detail(id)` security definer que devolve tudo em 1 round-trip.
+3. **Aumentar `staleTime`** dos hooks satélites (scoring, NRHS, emotional memory) de default para 5 min — esses dados não mudam a cada navegação.
+4. **Suspender o auto-recalc de score** ao abrir (`useOpportunityScoring` hoje pode disparar recalculate). Manter só leitura; recálculo via botão.
+5. **Throttle do realtime**: `useRealtimeOpportunityDetail` invalida o cache inteiro a cada postgres_change. Trocar por debounce de 1s + invalidar somente as keys afetadas.
 
-- Adicionar parâmetros `limit` (default 200) e `offset` e aplicar `.range(offset, offset+limit-1)`.
-- Trocar `count: 'exact'` → `count: 'estimated'` (ou remover; a UI não precisa do total real para o Kanban).
-- Filtrar explicitamente por `organization_id` quando disponível (vindo do `useCurrentUser`) — RLS continua, mas o planner usa `idx_opportunities_org_deleted`.
-- Manter ordenação `created_at DESC` mas reduzir colunas embutidas: `accounts(razao_social, nome_fantasia)` e `contacts(nome)` no Kanban (lead_score/fit_score/etc só na tela de detalhe).
-
-Atualizar o(s) hook(s) consumidores (`useOpportunities`, kanban) para passar os novos parâmetros. Sem mudança visual.
-
-### 3) `get-current-user` — quebrar o loop 401
-
-- No `useCurrentUser`: se o `retry` silencioso após `refreshSession` ainda voltar 401, **não retornar `null` (que dispara nova query no próximo render)** — marcar a query com `throwOnError` controlado e desativar `enabled` por uma janela curta (ex. 30s) via state local. Já temos `staleTime: 5min`, mas como o resultado é `null`, a query não fica “successful with data”.
-- Reduzir `retry` global da query de 2 → 0 para erros não-rede (já evitamos 401, mas qualquer 500 também repete 3×).
-- Na edge `get-current-user`: cobrir o caso “Auth session missing” com `Cache-Control: no-store` em respostas 401 (hoje o 401 não tem header) e devolver corpo `{ error: 'unauthenticated' }` consistente para o cliente parar o loop.
-
-### 4) Limpezas colaterais (rápidas)
-
-- `sellers.team_id` não existe → identificar a edge function que faz esse SELECT (provavelmente `calculate-account-scores` ou correlata) e remover/ajustar para `team_members.team_id`.
-- `playbook_runs.completed_at` → trocar por `finished_at` no caller restante.
-- `proposal_alerts_alert_type_check` violado → conferir os valores aceitos pelo CHECK e ajustar o emissor (provavelmente edge `proposal-alerts-monitor`) para usar um dos enums válidos.
-
-Esses 3 não causam a lentidão, mas geram ruído nos logs e mascaram o sinal.
+## Frente 3 — Resiliência e telemetria
+1. **Timeout + retry exponencial** no `supabase` client wrapper: hoje uma query travada faz a UI ficar "Carregando…" eternamente. Aplicar `AbortController` com 15s + 1 retry, e disparar toast "Backend lento, tentando novamente" em vez de tela em branco.
+2. **Circuit breaker** no React Query: se 3 queries seguidas falharem por timeout, parar de disparar novas por 30s e mostrar banner "Sistema sobrecarregado — aguarde".
+3. **Métrica visível** no header (dev/admin): tempo médio das últimas 10 queries Supabase, para enxergarmos quando volta a degradar.
+4. **Migração adicional**: garantir índices que ainda faltam para o detalhe:
+   - `idx_opportunities_owner_user_id_active` (owner + deleted_at IS NULL)
+   - `idx_proposals_opportunity_id_status` (composto)
+   - `idx_opportunity_activities_opportunity_id_created` (paginação)
+   - `ANALYZE` nas 3 tabelas após criação.
 
 ---
 
-## Arquivos impactados
+# Arquivos que vou tocar (Frentes 2+3)
 
-- `supabase/migrations/<nova>.sql` (RLS hardening + `TO anon` guards).
-- `src/services/supabase/opportunities.ts` (paginação, colunas reduzidas, org filter).
-- `src/hooks/useOpportunities.ts` (passar `limit/offset`).
-- `src/hooks/useCurrentUser.ts` (retry/loop break).
-- `supabase/functions/get-current-user/index.ts` (headers/erros).
-- 3 edges com colunas inválidas (a localizar com `rg` antes do patch).
+- `src/components/opportunity/OpportunityTabs.tsx` — lazy mount por aba
+- `src/hooks/useOpportunityDetails.ts` — usar nova RPC, staleTime 5min
+- `src/hooks/useRealtimeOpportunityDetail.ts` — debounce + invalidação granular
+- `src/hooks/useOpportunityScoring.ts` — remover auto-recalc on mount
+- `src/lib/supabaseTimeout.ts` (novo) — wrapper com AbortController + retry
+- `src/lib/queryCircuitBreaker.ts` (novo) — contador global de timeouts
+- `supabase/migrations/<novo>.sql` — RPC `get_opportunity_detail` + índices faltantes + ANALYZE
 
-## Riscos
+# Riscos
 
-- Mudar RLS é sensível: vamos manter o comportamento funcional (anon com token continua lendo). O guard `auth.uid() IS NULL` só desliga o branch para quem JÁ é authenticated.
-- Paginar Kanban: precisa confirmar se algum lugar dependia do `count` exato. Verificar antes de alterar.
-- `useCurrentUser`: cobrir bem o caso “sessão recém-renovada” para não bloquear login legítimo.
+- A RPC nova precisa respeitar RLS via `SECURITY INVOKER` (não definer) para não vazar deals de outras orgs.
+- Lazy mount de abas pode quebrar deep-links tipo `?tab=propostas` — manter leitura do query string e pré-montar a aba alvo.
+- O upgrade de instância é responsabilidade sua no painel do Cloud — sem ele, frentes 2 e 3 melhoram mas não eliminam o problema atual.
 
-## Próximos passos
+# Próximo passo
 
-Aprove e eu aplico nessa ordem: (a) migração RLS, (b) paginação `listOpportunities`, (c) loop-break `get-current-user`, (d) limpezas de colunas. Cada passo é independente — se algo regressar, rollback é isolado.
+Aprove o plano para eu executar Frentes 2 e 3 no código + migração. **Em paralelo, faça o upgrade da instância no Cloud agora** — é o que destrava o gargalo imediato que você está sentindo.
+
+<lov-actions>
+<lov-link url="https://docs.lovable.dev/features/cloud#advanced-settings-upgrade-instance">Como fazer upgrade da instância Cloud</lov-link>
+</lov-actions>

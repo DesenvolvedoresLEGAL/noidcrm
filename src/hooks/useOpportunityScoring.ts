@@ -33,6 +33,8 @@ export function useOpportunityScoring(opportunityId: string | undefined) {
       return data as OpportunityScoring;
     },
     enabled: !!opportunityId,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
   });
 
   const recalculateMutation = useMutation({
@@ -60,21 +62,14 @@ export function useOpportunityScoring(opportunityId: string | undefined) {
     },
   });
 
-  // Auto-calculate scores if never calculated (score_updated_at is null)
+  // Auto-recalc on mount foi REMOVIDO em 2026-05-05 — disparava edge functions
+  // pesadas (calculate-opportunity-scores + ml-win-probability) toda vez que a
+  // tela de oportunidade abria, contribuindo para saturar o pool de conexões
+  // do banco. Recálculo agora é manual via botão (recalculate()).
+  void hasAutoCalculated;
   useEffect(() => {
-    if (
-      opportunityId &&
-      scoring &&
-      !isLoading &&
-      !hasAutoCalculated.current &&
-      !recalculateMutation.isPending &&
-      scoring.score_updated_at === null
-    ) {
-      hasAutoCalculated.current = true;
-      console.log('Auto-calculating scores for opportunity:', opportunityId);
-      recalculateMutation.mutate();
-    }
-  }, [opportunityId, scoring, isLoading, recalculateMutation]);
+    // no-op: kept for future opt-in auto-refresh logic
+  }, [opportunityId]);
 
   return {
     scoring,
