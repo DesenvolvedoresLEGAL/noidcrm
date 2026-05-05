@@ -525,33 +525,74 @@ export async function generateProposalPDFClient(
     doc.text(title, margin, yPos);
     yPos += 5;
 
-    const tableBody = tableItems.map(item => {
-      const itemDesc = stripHtmlPreserveBreaks(item.description || '');
-      const itemNameWithDesc = itemDesc 
-        ? `${item.name}\n${itemDesc}`
-        : item.name;
-      
+    // Pre-compute item name/desc lines + minimum row height per item.
+    // We do this BEFORE autoTable so the layout planner knows the real height
+    // and won't drop rows that overflow the page (which silently "ate" items).
+    const itemNameFontSize = 9;
+    const itemDescFontSize = 7.5;
+    const nameLineHeight = 4.2;
+    const descLineHeight = 3.5;
+    const cellPadding = 4;
+    const itemColCellWidth = 'auto'; // keep using autoTable's auto width
+    // Approximate available text width for the item column.
+    // Other columns sum to 18+30+18+32 = 98mm (cellWidth values below).
+    const otherColsWidth = 18 + 30 + 18 + 32;
+    const itemColAvailableWidth =
+      contentWidth - otherColsWidth - cellPadding * 2 /* left+right padding of item col */;
+
+    type PreparedItem = {
+      raw: ProposalItem;
+      name: string;
+      desc: string;
+      nameLines: string[];
+      descLines: string[];
+      minHeight: number;
+    };
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(itemNameFontSize);
+    const prepared: PreparedItem[] = tableItems.map((item) => {
+      const name = item.name || '';
+      const desc = stripHtmlPreserveBreaks(item.description || '');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(itemNameFontSize);
+      const nameLines = doc.splitTextToSize(name, itemColAvailableWidth);
+      let descLines: string[] = [];
+      if (desc) {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(itemDescFontSize);
+        descLines = doc.splitTextToSize(desc, itemColAvailableWidth);
+      }
+      // top padding (~6) + name + (gap + desc) + bottom padding (~3)
+      const minHeight =
+        6 +
+        nameLines.length * nameLineHeight +
+        (descLines.length > 0 ? 2 + descLines.length * descLineHeight : 0) +
+        3;
+      return { raw: item, name, desc, nameLines, descLines, minHeight };
+    });
+
+    const tableBody = prepared.map((p) => {
+      const item = p.raw;
       const unit = item.measurement_unit?.abbreviation || '';
       const qtyFormatted = formatQuantity(item.quantity);
       const qtyDisplay = unit ? `${qtyFormatted} ${unit}` : qtyFormatted;
-      const priceDisplay = isRecurring 
+      const priceDisplay = isRecurring
         ? `${formatCurrency(item.unit_price, currency)}/mês`
         : formatCurrency(item.unit_price, currency);
-      const totalDisplay = isRecurring 
+      const totalDisplay = isRecurring
         ? `${formatCurrency(item.total, currency)}/mês`
         : formatCurrency(item.total, currency);
-      
+
       return [
-        itemNameWithDesc,
+        // Item column: empty content but enforce minCellHeight; we draw manually below
+        { content: '', styles: { minCellHeight: p.minHeight } },
         qtyDisplay,
         priceDisplay,
         item.discount_percent ? `${item.discount_percent}%` : '-',
         totalDisplay,
-      ];
+      ] as any[];
     });
-
-    // Store item names for bold rendering
-    const itemNames = tableItems.map(item => item.name || '');
 
     autoTable(doc, {
       startY: yPos,
@@ -566,7 +607,7 @@ export async function generateProposalPDFClient(
       theme: 'plain',
       styles: {
         fontSize: 8,
-        cellPadding: 4,
+        cellPadding: cellPadding,
         lineColor: [borderColor.r, borderColor.g, borderColor.b],
         lineWidth: 0.1,
         overflow: 'linebreak',
@@ -581,7 +622,7 @@ export async function generateProposalPDFClient(
         fillColor: [bgLight.r, bgLight.g, bgLight.b],
       },
       columnStyles: {
-        0: { cellWidth: 'auto', valign: 'top', overflow: 'linebreak' },
+        0: { cellWidth: itemColCellWidth as any, valign: 'top', overflow: 'linebreak' },
         1: { cellWidth: 18, halign: 'center', valign: 'middle' },
         2: { cellWidth: 30, halign: 'right', valign: 'middle' },
         3: { cellWidth: 18, halign: 'center', valign: 'middle' },
@@ -589,64 +630,27 @@ export async function generateProposalPDFClient(
       },
       rowPageBreak: 'avoid',
       margin: { left: margin, right: margin },
-      didParseCell: (data: any) => {
-        // Make item name bold and larger, description normal and smaller
-        if (data.section === 'body' && data.column.index === 0) {
-          const rowIndex = data.row.index;
-          const name = itemNames[rowIndex] || '';
-          const fullText = String(data.cell.text?.join?.('\n') || data.cell.raw || '');
-          const descPart = fullText.startsWith(name) ? fullText.slice(name.length).replace(/^\n/, '') : '';
-          
-          // Store parsed parts for didDrawCell
-          data.cell._itemName = name;
-          data.cell._itemDesc = descPart;
-          // Hide default text rendering — we'll draw manually
-          data.cell.text = [''];
-        }
-      },
       didDrawCell: (data: any) => {
-        if (data.section === 'body' && data.column.index === 0 && data.cell._itemName) {
-          const cellX = data.cell.x + 4;
-          let cellY = data.cell.y + 5;
-          const cellMaxWidth = data.cell.width - 8;
-          
-          // Draw item name — bold, slightly larger
-          doc.setFont('helvetica', 'bold');
-          doc.setFontSize(9);
-          doc.setTextColor(textDark.r, textDark.g, textDark.b);
-          const nameLines = doc.splitTextToSize(data.cell._itemName, cellMaxWidth);
-          doc.text(nameLines, cellX, cellY);
-          cellY += nameLines.length * 4.2;
-          
-          // Draw description — normal, smaller
-          if (data.cell._itemDesc) {
-            doc.setFont('helvetica', 'normal');
-            doc.setFontSize(7.5);
-            doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
-            const descLines = doc.splitTextToSize(data.cell._itemDesc, cellMaxWidth);
-            doc.text(descLines, cellX, cellY + 1);
-          }
-        }
-      },
-      willDrawCell: (data: any) => {
-        // Calculate required height for custom-rendered cells
-        if (data.section === 'body' && data.column.index === 0 && data.cell._itemName) {
-          const cellMaxWidth = data.cell.width - 8;
-          
-          doc.setFontSize(9);
-          const nameLines = doc.splitTextToSize(data.cell._itemName, cellMaxWidth);
-          let neededH = nameLines.length * 4.2 + 6; // name + top padding
-          
-          if (data.cell._itemDesc) {
-            doc.setFontSize(7.5);
-            const descLines = doc.splitTextToSize(data.cell._itemDesc, cellMaxWidth);
-            neededH += descLines.length * 3.5 + 2;
-          }
-          
-          if (neededH > data.cell.height) {
-            data.cell.height = neededH;
-            data.row.height = Math.max(data.row.height, neededH);
-          }
+        if (data.section !== 'body' || data.column.index !== 0) return;
+        const p = prepared[data.row.index];
+        if (!p) return;
+
+        const cellX = data.cell.x + cellPadding;
+        let cellY = data.cell.y + 5;
+
+        // Draw item name — bold, slightly larger
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(itemNameFontSize);
+        doc.setTextColor(textDark.r, textDark.g, textDark.b);
+        doc.text(p.nameLines, cellX, cellY);
+        cellY += p.nameLines.length * nameLineHeight;
+
+        // Draw description — normal, smaller
+        if (p.descLines.length > 0) {
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(itemDescFontSize);
+          doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
+          doc.text(p.descLines, cellX, cellY + 1);
         }
       },
     });
