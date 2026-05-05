@@ -156,7 +156,29 @@ export function AIFieldSuggestions({ opportunityId, onAccept }: AIFieldSuggestio
   }
 
   if (suggestions.length === 0) {
-    return null;
+    return (
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-primary" />
+              <CardTitle>Sugestões Inteligentes</CardTitle>
+            </div>
+            <Button size="sm" onClick={loadSuggestions} disabled={refreshing}>
+              {refreshing ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Sparkles className="h-4 w-4 mr-2" />
+              )}
+              Gerar com IA
+            </Button>
+          </div>
+          <CardDescription>
+            Clique em "Gerar com IA" para analisar esta oportunidade. As sugestões persistem até serem aceitas, rejeitadas ou o contexto da oportunidade mudar.
+          </CardDescription>
+        </CardHeader>
+      </Card>
+    );
   }
 
   return (
@@ -171,9 +193,9 @@ export function AIFieldSuggestions({ opportunityId, onAccept }: AIFieldSuggestio
             variant="ghost"
             size="sm"
             onClick={loadSuggestions}
-            disabled={loading}
+            disabled={refreshing}
           >
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
           </Button>
         </div>
         <CardDescription>
