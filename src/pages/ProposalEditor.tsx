@@ -98,6 +98,7 @@ export default function ProposalEditor() {
   const [activeTab, setActiveTab] = useState('content');
   const [items, setItems] = useState<ProposalItem[]>([]);
   const [paymentTerms, setPaymentTerms] = useState<PaymentTerm[]>([]);
+  const [paymentTermsError, setPaymentTermsError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [generatingPDF, setGeneratingPDF] = useState(false);
   const [publicToken, setPublicToken] = useState<string | null>(null);
@@ -444,12 +445,14 @@ export default function ProposalEditor() {
     // Evita propostas enviadas ao cliente sem o quadro de Pagamento Avulso/MRR.
     const effectiveStatus = (data as any)?.status || status;
     if (effectiveStatus !== 'draft' && (!paymentTerms || paymentTerms.length === 0)) {
-      toast.error(
-        'Defina pelo menos uma condição de pagamento (Avulso ou Recorrente) antes de salvar fora de rascunho.'
-      );
+      const msg = 'Defina pelo menos uma condição de pagamento (Avulso ou Recorrente) antes de salvar fora de rascunho.';
+      setPaymentTermsError(msg);
+      toast.error(msg);
       console.warn('[ProposalEditor] BLOCKED: save without paymentTerms on status', effectiveStatus);
+      setActiveTab('payment-terms');
       return;
     }
+    setPaymentTermsError(null);
 
     setIsSaving(true);
     try {
@@ -1003,12 +1006,18 @@ export default function ProposalEditor() {
                 />
               </TabsContent>
 
-              <TabsContent value="payment-terms">
+              <TabsContent value="payment-terms" className="space-y-4">
+                {paymentTermsError && (
+                  <Alert variant="destructive">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription>{paymentTermsError}</AlertDescription>
+                  </Alert>
+                )}
                 <ProposalPaymentTerms 
                   proposalId={currentProposalId || ''} 
                   totalAmount={itemsTotal}
                   terms={paymentTerms} 
-                  onChange={setPaymentTerms}
+                  onChange={(terms) => { setPaymentTerms(terms); if (terms.length > 0) setPaymentTermsError(null); }}
                   items={items}
                   currency={watch('currency')}
                 />
