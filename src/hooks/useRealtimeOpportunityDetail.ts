@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { invalidateOpportunity } from '@/lib/cache-invalidation';
@@ -8,6 +8,10 @@ import { invalidateOpportunity } from '@/lib/cache-invalidation';
  * and its linked account/contact so the detail page refreshes
  * automatically when data is edited elsewhere (including backend
  * recalculations of score/NRHS).
+ *
+ * Performance: invalidations are debounced (1s) to avoid invalidating
+ * the entire opportunity cache tree multiple times in a row when a
+ * backend job updates several columns of the same row.
  */
 export function useRealtimeOpportunityDetail(
   opportunityId: string | undefined,
@@ -15,11 +19,17 @@ export function useRealtimeOpportunityDetail(
   contactId: string | null | undefined,
 ) {
   const queryClient = useQueryClient();
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!opportunityId) return;
 
-    const refreshAll = () => invalidateOpportunity(queryClient, opportunityId);
+    const refreshAll = () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => {
+        invalidateOpportunity(queryClient, opportunityId);
+      }, 1000);
+    };
 
     const channel = supabase
       .channel(`realtime-opp-detail-${opportunityId}`)
@@ -34,7 +44,6 @@ export function useRealtimeOpportunityDetail(
         refreshAll,
       );
 
-    // Listen to linked account changes
     if (accountId) {
       channel.on(
         'postgres_changes',
@@ -48,7 +57,6 @@ export function useRealtimeOpportunityDetail(
       );
     }
 
-    // Listen to linked contact changes
     if (contactId) {
       channel.on(
         'postgres_changes',
@@ -65,6 +73,7 @@ export function useRealtimeOpportunityDetail(
     channel.subscribe();
 
     return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
       supabase.removeChannel(channel);
     };
   }, [opportunityId, accountId, contactId, queryClient]);
