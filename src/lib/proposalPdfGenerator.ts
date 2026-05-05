@@ -398,11 +398,12 @@ export async function generateProposalPDFClient(
   doc.text(contactNameLines, contactCardX + 4, yPos + 14);
   let contactY = yPos + 14 + contactNameLines.length * 4.5;
 
-  if (proposal.opportunity?.contact?.cargo) {
+  const contactCargoValue = proposal.contact_cargo || proposal.opportunity?.contact?.cargo || '';
+  if (contactCargoValue) {
     doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
     doc.setFontSize(7);
     doc.setFont('helvetica', 'normal');
-    doc.text(proposal.opportunity.contact.cargo, contactCardX + 4, contactY);
+    doc.text(contactCargoValue, contactCardX + 4, contactY);
     contactY += 5;
   }
 
