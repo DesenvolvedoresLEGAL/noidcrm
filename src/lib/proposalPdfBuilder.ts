@@ -13,6 +13,7 @@ export interface ProposalPDFData {
   client_state: string;
   client_zip: string;
   contact_name: string;
+  contact_cargo: string;
   contact_email: string;
   contact_phone: string;
   seller_name: string;
