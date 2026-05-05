@@ -68,10 +68,7 @@ export async function computeOpportunitySignature(
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle(),
-    supabase
-      .from('opportunity_indicators')
-      .select('*', { count: 'exact', head: true })
-      .eq('opportunity_id', opportunityId),
+    Promise.resolve({ count: 0 }),
   ]);
 
   const snapshot = {
