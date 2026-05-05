@@ -440,7 +440,7 @@ async function calculateIntentScore(supabase: any, account: AccountData) {
   if (oppIds.length > 0) {
     const { data: proposalData } = await supabase
       .from('proposals')
-      .select('status, view_count, last_viewed_at')
+      .select('status, views_count, last_viewed_at')
       .in('opportunity_id', oppIds);
     proposals = proposalData || [];
   }
