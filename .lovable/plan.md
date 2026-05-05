@@ -1,96 +1,84 @@
-## Análise forense
 
-Encontrei a causa raiz do bug em produção:
+## Problema
 
-1. A sessão do print `94436dff-c621-4fb8-959a-5d14bccce76b` está no banco com:
-   - `current_phase = 'evaluating'`
-   - `score_overall = null`
-   - `scores_json = {}`
-   - `message_count = 21`
+Hoje, ao abrir uma oportunidade:
 
-2. Existem outras sessões recentes no mesmo estado travado (`evaluating`, com muitas mensagens, sem nota).
+1. **Aba Inteligência → "Sugestões Inteligentes"** (`AIFieldSuggestions`) — o `useQuery` chama `generateFieldSuggestions` como `queryFn`, ou seja, **toda vez que o cache do React Query expira (10min) ou em outra sessão/aba sem cache, dispara a edge function `ai-field-suggestions`**, que por sua vez chama `gpt-5-mini`. Pior: a própria edge function começa marcando todas as sugestões `pending` como `expired` antes de gerar — então nunca há reaproveitamento real do que já está no banco.
 
-3. O `finalize-roleplay-session` hoje cria um “lock” usando `current_phase = 'evaluating'`. Quando uma tentativa anterior falha ou fica interrompida, a sessão permanece em `evaluating` para sempre. Depois disso, qualquer nova chamada ao finalize apenas retorna `{ evaluationStatus: 'evaluating' }` e nunca reprocessa.
+2. **Aba Atividades → "Próximas Ações (AI)"** (`AINextActionCard` + `useAINextActions`) — as sugestões até são salvas em `ai_suggestions` com `status='pending'` e `expires_at = +7 dias`, mas: (a) o usuário relata que "somem ao trocar de aba" — provavelmente porque outras edge functions (ex: `ai-field-suggestions`) expiram **todas** as `pending` da opp no início, sem filtrar pelo `suggestion_type`; (b) não existe controle de "regenerar só se mudou algo".
 
-4. Há regressões adicionais no código atual:
-   - O frontend tenta atualizar a coluna `evaluation_error`, mas essa coluna não existe em `roleplay_sessions`.
-   - O frontend tenta ler uma tabela `roleplay_evaluations`, mas essa tabela não existe.
-   - O fallback de summary não ajuda porque a avaliação real fica somente em `roleplay_sessions`.
-   - O fluxo fica preso porque `scores_json = {}` é considerado existente no banco, mas não contém `overall_score`.
+## Solução: Assinatura de Contexto + Persistência
 
-## Correção definitiva proposta
+Introduzir uma **assinatura determinística** do estado relevante da oportunidade. Sugestões só são regeneradas via IA quando essa assinatura muda. Caso contrário, o que está em `ai_suggestions` é reaproveitado.
 
-Vou fazer uma correção pequena, direta e segura: `summary chama finalize, finalize avalia, salva, summary renderiza`.
+### Campos que compõem a assinatura
+- `stage_id`
+- `prob`
+- `temperature` (normalizada)
+- `valor_previsto`
+- `close_date_prevista`
+- `score` (overall do deal) e timestamp do último recálculo
+- contagem de indicadores NRHS / lacunas
+- `updated_at` da atividade mais recente
+- `updated_at` do último email / nota
+- existência e `expires_at` da proposta ativa
 
-### 1. Backend: corrigir `finalize-roleplay-session`
+Hash: `sha256(JSON.stringify(orderedFields))` → 16 chars. Salvo em `ai_suggestions.context_signature` (nova coluna `text`, indexada junto com `opportunity_id`, `suggestion_type`, `status`).
 
-Editar `supabase/functions/finalize-roleplay-session/index.ts` para:
+### Mudanças
 
-- Remover a armadilha do lock eterno em `current_phase = 'evaluating'`.
-- Permitir reprocessar sessões travadas em `evaluating` quando ainda não existe `score_overall`.
-- Considerar avaliação existente somente quando `score_overall` é número válido e `scores_json.overall_score` existe.
-- Não depender da coluna inexistente `evaluation_error`.
-- Retornar JSON claro em todos os casos:
-  - `complete` quando avaliou/salvou.
-  - `already_complete` quando já tinha avaliação válida.
-  - `failed` com erro claro quando não conseguiu avaliar.
-- Manter validação de autenticação e organização antes de processar.
-- Manter tarefas secundárias em background, sem bloquear a nota.
+**1. Migração SQL**
+- Adicionar coluna `context_signature text` em `ai_suggestions`.
+- Índice parcial `(opportunity_id, suggestion_type, status) WHERE status = 'pending'`.
 
-### 2. Backend: tornar avaliação mais resiliente
+**2. Helper compartilhado** `supabase/functions/_shared/opportunity-signature.ts`
+- `computeOpportunitySignature(supabase, opportunityId)` → retorna `{ signature, snapshot }`.
+- Usado pelas duas edge functions.
 
-Ajustar `ai-evaluate-session` apenas no necessário:
+**3. `supabase/functions/ai-field-suggestions/index.ts`**
+- Aceitar `force_refresh: boolean` no body (default `false`).
+- Antes de chamar a IA:
+  - Computar `signature` atual.
+  - Buscar `ai_suggestions` com `suggestion_type='field_update'`, `status='pending'`, `opportunity_id=…`.
+  - Se existirem **e** todas terem o mesmo `context_signature` da atual **e** `force_refresh=false` → retornar diretamente, **sem chamar `callAI`**.
+  - Caso contrário: marcar **apenas** as `field_update` antigas como `expired` (filtrando por `suggestion_type`, **não** todas), gerar novas via IA, gravar com `context_signature`.
+- Log de cache hit/miss.
 
-- Garantir que, ao salvar a avaliação, também marque `current_phase = 'completed'`.
-- Se a IA/API falhar, devolver erro claro sem deixar o registro num estado invisível.
-- Manter limite de até 100 mensagens, que atende sessões com 20, 50 ou mais mensagens dentro desse teto.
+**4. `supabase/functions/ai-next-action/index.ts`** (mesma lógica)
+- Buscar pendentes `suggestion_type='next_action'`.
+- Se assinatura bate e não é `force_refresh` → retornar cache.
+- Senão expirar **apenas** `suggestion_type='next_action'` e gerar.
 
-### 3. Frontend: corrigir `SessionSummary.tsx`
+**5. `src/hooks/useAINextActions.ts`**
+- `generate()` continua sendo gatilho manual (botão "Atualizar"), passando `force_refresh: true`.
+- Adicionar carregamento automático: quando o componente monta e não há pendentes, **não** chama IA — apenas mostra estado vazio. (Comportamento atual já é assim, OK.)
+- Atualizar `fetchSavedActions` para não depender de `current_value` para metadados; usar nova coluna `metadata` ou primeiro registro como hoje.
 
-Editar `src/pages/roleplay/SessionSummary.tsx` para:
+**6. `src/components/ai/AIFieldSuggestions.tsx`**
+- Trocar `queryFn` para primeiro consultar `ai_suggestions` direto via Supabase client (`status='pending'`, `suggestion_type='field_update'`).
+- Se vazio → **não** dispara edge function automaticamente; mostra CTA "Gerar sugestões com IA" (igual ao card de Próximas Ações).
+- Botão refresh (♻) chama edge function com `force_refresh: true`.
+- Remover `staleTime: 10min` automático que mascarava o problema; cache vira `Infinity` porque a invalidação passa a ser explícita (aceitar/rejeitar/forçar).
 
-- Parar de tentar atualizar `evaluation_error`, pois a coluna não existe.
-- Remover a busca na tabela inexistente `roleplay_evaluations`.
-- Ao receber avaliação da função, atualizar/refazer a query da sessão imediatamente, sem depender só de polling.
-- Se a função retornar erro, mostrar botão de reprocessar, mas o reprocessar deve chamar diretamente o finalize novamente.
-- Tratar `current_phase = 'error'` e `evaluation_error` sem quebrar por coluna inexistente.
+**7. Invalidação reativa (sem polling de IA)**
+- Em `invalidateOpportunity` (ou hook equivalente), quando o usuário muda manualmente `stage_id`, `prob`, `temperature`, `valor_previsto`, etc., **não** disparar IA — apenas marcar a query `aiSuggestionKeys.fields(opportunityId)` como stale. O próximo `refetch` ainda só consulta o banco; a IA só roda se o usuário clicar em "Gerar/Atualizar".
 
-### 4. Frontend: corrigir comportamento de reprocessamento
+### Resultado esperado
+- Abrir oportunidade 10x sem mudar nada → **0 chamadas** à OpenAI.
+- Sugestões de campos e próximas ações **persistem** entre abas/refresh enquanto não forem aceitas/rejeitadas e o contexto não mudar.
+- Regeração só acontece: (a) clique manual em "Atualizar", ou (b) primeira vez que o contexto da oportunidade muda significativamente após o usuário pedir nova geração.
 
-O botão “Reprocessar avaliação” vai:
+### Arquivos impactados
+- `supabase/migrations/<novo>.sql` (nova coluna + índice)
+- `supabase/functions/_shared/opportunity-signature.ts` (novo)
+- `supabase/functions/ai-field-suggestions/index.ts`
+- `supabase/functions/ai-next-action/index.ts`
+- `src/components/ai/AIFieldSuggestions.tsx`
+- `src/hooks/useAINextActions.ts`
+- `src/services/crm/ai-automation.ts` (passar `force_refresh`)
+- `src/services/crm/ai-sales.ts` (passar `force_refresh` em `getNextActions`)
 
-- Chamar `finalize-roleplay-session` diretamente.
-- Não tentar alterar colunas inexistentes pelo cliente.
-- Invalidar/refazer cache de sessão ao concluir.
-- Não duplicar avaliação em refresh: se a sessão já tiver `score_overall`, o backend retorna avaliação existente.
-
-### 5. Validação em produção
-
-Depois da alteração, vou validar com a sessão real do print:
-
-- Chamar `finalize-roleplay-session` para `94436dff-c621-4fb8-959a-5d14bccce76b`.
-- Conferir que `score_overall` foi preenchido.
-- Conferir que `scores_json` contém dimensões.
-- Conferir que `current_phase` saiu de `evaluating` para `completed`.
-- Conferir que chamadas repetidas não duplicam avaliação.
-
-## Arquivos impactados
-
-- `supabase/functions/finalize-roleplay-session/index.ts`
-- `supabase/functions/ai-evaluate-session/index.ts`
-- `src/pages/roleplay/SessionSummary.tsx`
-
-## Riscos
-
-- Baixo risco visual: não vou mexer no layout geral.
-- Baixo risco de RLS: a validação de usuário/organização será mantida no backend antes do service role processar.
-- Principal risco é a chamada da IA falhar; nesse caso a tela deixará de ficar infinita e exibirá erro claro com reprocessamento.
-
-## Resultado esperado
-
-- Sessões travadas em `evaluating` passam a ser reprocessáveis.
-- Summary não fica preso em loading infinito.
-- Nota, feedback, insights e scores por dimensão aparecem novamente.
-- Refresh não duplica avaliação.
-- Usuário não acessa sessão de outra organização.
-- Sessões com 20, 50+ mensagens continuam funcionando.
+### Riscos
+- Assinatura "muito sensível" → invalida cache demais. Mitigação: incluir só campos de alto sinal (lista acima), arredondar timestamps por hora.
+- Usuários que esperavam regeneração automática: o botão "Atualizar/Gerar" continua disponível e visível.
+- Sugestões antigas com `context_signature = NULL`: tratadas como cache miss na primeira leitura (regeneram uma vez).
