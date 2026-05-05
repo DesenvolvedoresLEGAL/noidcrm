@@ -366,7 +366,7 @@ serve(async (req) => {
         ? supabase.from('stages').select('id, name').eq('id', opportunity.stage_id).maybeSingle()
         : Promise.resolve({ data: null }),
       opportunity.account_id
-        ? supabase.from('accounts').select('id, segment, segmento, company_size, porte, nome_fantasia, razao_social').eq('id', opportunity.account_id).maybeSingle()
+        ? supabase.from('accounts').select('id, segmento, porte, nome_fantasia, razao_social').eq('id', opportunity.account_id).maybeSingle()
         : Promise.resolve({ data: null }),
       opportunity.account_id
         ? supabase.from('contacts').select('*').eq('account_id', opportunity.account_id).is('deleted_at', null)
