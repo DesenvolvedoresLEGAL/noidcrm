@@ -1434,7 +1434,7 @@ export default function ProposalPublicView() {
               Condições de Pagamento
             </CardTitle>
           </CardHeader>
-          {paymentTerms.length === 0 && (
+          {paymentTerms.length === 0 ? (
             <CardContent>
               <div className="rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800 p-4 text-sm">
                 <p className="font-semibold mb-1">Condições de pagamento ainda não definidas</p>
@@ -1443,19 +1443,7 @@ export default function ProposalPublicView() {
                 </p>
               </div>
             </CardContent>
-          )}
-          {paymentTerms.length > 0 && (
-            <CardContent className="space-y-6">{/* original payment terms content */}</CardContent>
-          )}
-        </Card>
-        {paymentTerms.length > 0 && false && (
-          <Card data-section="payment-legacy">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CreditCard className="h-5 w-5" />
-                Condições de Pagamento
-              </CardTitle>
-            </CardHeader>
+          ) : (
             <CardContent className="space-y-6">
               {/* Avulso Payment */}
               {oneTimeTerm && (
