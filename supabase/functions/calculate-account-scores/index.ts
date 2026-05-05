@@ -440,7 +440,7 @@ async function calculateIntentScore(supabase: any, account: AccountData) {
   if (oppIds.length > 0) {
     const { data: proposalData } = await supabase
       .from('proposals')
-      .select('status, view_count, last_viewed_at')
+      .select('status, views_count, last_viewed_at')
       .in('opportunity_id', oppIds);
     proposals = proposalData || [];
   }
@@ -490,8 +490,8 @@ async function calculateIntentScore(supabase: any, account: AccountData) {
           proposalPoints += 5;
           break;
       }
-      if (proposal.view_count > 0) {
-        proposalPoints += Math.min(30, proposal.view_count * 10);
+      if ((proposal.views_count ?? 0) > 0) {
+        proposalPoints += Math.min(30, (proposal.views_count ?? 0) * 10);
       }
       if (proposal.last_viewed_at) {
         const viewedDate = new Date(proposal.last_viewed_at);
