@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { OpportunityActivitiesTab } from './OpportunityActivitiesTab';
 import { OpportunityNotesTab } from './OpportunityNotesTab';
@@ -26,13 +27,34 @@ interface OpportunityTabsProps {
   opportunityId: string;
 }
 
+/**
+ * Lazy-mount tabs: each TabsContent only renders (and therefore fires its
+ * underlying queries) once the user has actually visited it. The Timeline
+ * is pre-visited so the initial paint is identical to before.
+ *
+ * This dramatically reduces the number of parallel Supabase queries fired
+ * when the opportunity detail page opens, which was a major contributor
+ * to slow loads under DB pressure.
+ */
 export function OpportunityTabs({ opportunityId }: OpportunityTabsProps) {
-  const { scoring, recalculate, isRecalculating } = useOpportunityScoring(opportunityId);
-  const { data: emotionalMemory } = useLeadEmotionalMemory(opportunityId);
+  const [visited, setVisited] = useState<Set<string>>(() => new Set(['timeline']));
+  const markVisited = (tab: string) =>
+    setVisited((prev) => (prev.has(tab) ? prev : new Set(prev).add(tab)));
+
+  const intelligenceMounted = visited.has('inteligencia');
+  const { scoring, recalculate, isRecalculating } = useOpportunityScoring(
+    intelligenceMounted ? opportunityId : undefined,
+  );
+  const { data: emotionalMemory } = useLeadEmotionalMemory(
+    intelligenceMounted ? opportunityId : '',
+  );
+  // Opportunity details are needed for the breadcrumbs/header area in the
+  // Inteligência tab — keep a single shared cache (already throttled with
+  // staleTime 5min) so it does not refire across tabs.
   const { data: opportunity } = useOpportunityDetails(opportunityId);
 
   return (
-    <Tabs defaultValue="timeline" className="flex-1">
+    <Tabs defaultValue="timeline" className="flex-1" onValueChange={markVisited}>
       <TabsList className="flex flex-wrap h-auto gap-1 mb-4">
         <TabsTrigger value="timeline">Timeline</TabsTrigger>
         <TabsTrigger value="analytics">Analytics</TabsTrigger>
@@ -47,99 +69,96 @@ export function OpportunityTabs({ opportunityId }: OpportunityTabsProps) {
       </TabsList>
 
       <TabsContent value="timeline">
-        <UnifiedTimeline opportunityId={opportunityId} />
+        {visited.has('timeline') && <UnifiedTimeline opportunityId={opportunityId} />}
       </TabsContent>
 
       <TabsContent value="analytics">
-        <OpportunityAnalyticsTab opportunityId={opportunityId} />
+        {visited.has('analytics') && <OpportunityAnalyticsTab opportunityId={opportunityId} />}
       </TabsContent>
 
       <TabsContent value="inteligencia">
-        <div className="space-y-6">
-          {/* AI Suggestions */}
-          <AIFieldSuggestions opportunityId={opportunityId} />
-          
-          {/* AI Cards - Score e Next Action */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <AIDealScoreCard opportunityId={opportunityId} />
-            <AINextActionCard opportunityId={opportunityId} />
-          </div>
+        {intelligenceMounted && (
+          <div className="space-y-6">
+            <AIFieldSuggestions opportunityId={opportunityId} />
 
-          {/* Scoring Detalhado */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="border rounded-lg p-4">
-              <h3 className="text-sm font-medium mb-3">Score do Deal</h3>
-              <OpportunityScoreCard
-                opportunityId={opportunityId}
-                opportunityName={opportunity?.title || ''}
-                opportunityScore={scoring?.opportunity_score}
-                engagementScore={scoring?.engagement_score}
-                velocityScore={scoring?.velocity_score}
-                riskScore={scoring?.risk_score}
-                winProbabilityAi={scoring?.win_probability_ai}
-                scoringFactors={scoring?.scoring_factors}
-                variant="compact"
-                onRecalculate={recalculate}
-                isRecalculating={isRecalculating}
-              />
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <AIDealScoreCard opportunityId={opportunityId} />
+              <AINextActionCard opportunityId={opportunityId} />
             </div>
 
-            {(opportunity as any)?.organization_id && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="border rounded-lg p-4">
-                <h3 className="text-sm font-medium mb-3">Revenue Hygiene (NRHS)</h3>
-                <NRHSSidebarCard
+                <h3 className="text-sm font-medium mb-3">Score do Deal</h3>
+                <OpportunityScoreCard
                   opportunityId={opportunityId}
-                  organizationId={(opportunity as any).organization_id}
+                  opportunityName={opportunity?.title || ''}
+                  opportunityScore={scoring?.opportunity_score}
+                  engagementScore={scoring?.engagement_score}
+                  velocityScore={scoring?.velocity_score}
+                  riskScore={scoring?.risk_score}
+                  winProbabilityAi={scoring?.win_probability_ai}
+                  scoringFactors={scoring?.scoring_factors}
+                  variant="compact"
+                  onRecalculate={recalculate}
+                  isRecalculating={isRecalculating}
                 />
               </div>
-            )}
 
-            <div className="border rounded-lg p-4">
-              <h3 className="text-sm font-medium mb-3">Lacunas do Deal</h3>
-              <DealGapsCard opportunityId={opportunityId} />
+              {(opportunity as any)?.organization_id && (
+                <div className="border rounded-lg p-4">
+                  <h3 className="text-sm font-medium mb-3">Revenue Hygiene (NRHS)</h3>
+                  <NRHSSidebarCard
+                    opportunityId={opportunityId}
+                    organizationId={(opportunity as any).organization_id}
+                  />
+                </div>
+              )}
+
+              <div className="border rounded-lg p-4">
+                <h3 className="text-sm font-medium mb-3">Lacunas do Deal</h3>
+                <DealGapsCard opportunityId={opportunityId} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <LeadEmotionalMemoryCard opportunityId={opportunityId} />
+              <VibeNarrativeCard vibeState={emotionalMemory?.last_emotional_state || undefined} />
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <VibeAlertsCard opportunityId={opportunityId} />
+              <VibeAdvisorChat opportunityId={opportunityId} opportunityTitle={opportunity?.title || ''} />
             </div>
           </div>
-
-          {/* Inteligência de Vibe */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <LeadEmotionalMemoryCard opportunityId={opportunityId} />
-            <VibeNarrativeCard vibeState={emotionalMemory?.last_emotional_state || undefined} />
-          </div>
-
-          {/* Alertas e Conselheiro */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <VibeAlertsCard opportunityId={opportunityId} />
-            <VibeAdvisorChat opportunityId={opportunityId} opportunityTitle={opportunity?.title || ''} />
-          </div>
-        </div>
+        )}
       </TabsContent>
 
       <TabsContent value="historico">
-        <OpportunityHistoryTab opportunityId={opportunityId} />
+        {visited.has('historico') && <OpportunityHistoryTab opportunityId={opportunityId} />}
       </TabsContent>
 
       <TabsContent value="notas">
-        <OpportunityNotesTab opportunityId={opportunityId} />
+        {visited.has('notas') && <OpportunityNotesTab opportunityId={opportunityId} />}
       </TabsContent>
 
       <TabsContent value="atividades">
-        <OpportunityActivitiesTab opportunityId={opportunityId} />
+        {visited.has('atividades') && <OpportunityActivitiesTab opportunityId={opportunityId} />}
       </TabsContent>
 
       <TabsContent value="arquivos">
-        <OpportunityFilesTab opportunityId={opportunityId} />
+        {visited.has('arquivos') && <OpportunityFilesTab opportunityId={opportunityId} />}
       </TabsContent>
 
       <TabsContent value="emails">
-        <OpportunityEmailsTab opportunityId={opportunityId} />
+        {visited.has('emails') && <OpportunityEmailsTab opportunityId={opportunityId} />}
       </TabsContent>
 
       <TabsContent value="propostas">
-        <OpportunityProposalsTab opportunityId={opportunityId} />
+        {visited.has('propostas') && <OpportunityProposalsTab opportunityId={opportunityId} />}
       </TabsContent>
 
       <TabsContent value="equipe">
-        <DealParticipantsManager opportunityId={opportunityId} />
+        {visited.has('equipe') && <DealParticipantsManager opportunityId={opportunityId} />}
       </TabsContent>
     </Tabs>
   );
