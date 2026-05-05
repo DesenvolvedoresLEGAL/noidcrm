@@ -1636,8 +1636,8 @@ export default function ProposalPublicView() {
                 </div>
               )}
             </CardContent>
-          </Card>
-        )}
+          )}
+        </Card>
 
         {/* Layout PDF Terms - Sprint D */}
         {layout?.terms_pdf_url && (
