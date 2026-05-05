@@ -98,6 +98,7 @@ export default function ProposalEditor() {
   const [activeTab, setActiveTab] = useState('content');
   const [items, setItems] = useState<ProposalItem[]>([]);
   const [paymentTerms, setPaymentTerms] = useState<PaymentTerm[]>([]);
+  const [paymentTermsError, setPaymentTermsError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [generatingPDF, setGeneratingPDF] = useState(false);
   const [publicToken, setPublicToken] = useState<string | null>(null);
