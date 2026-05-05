@@ -263,11 +263,39 @@ serve(async (req) => {
 
     const stageIds = pipelineStages?.map(s => s.id) || [];
 
-    // Expire any old pending suggestions
+    // Compute current context signature (cache key based on opportunity state)
+    const { signature: currentSignature } = await computeOpportunitySignature(supabase, opportunityId);
+
+    // Look up existing pending suggestions of THIS type
+    const { data: existingPending } = await supabase
+      .from('ai_suggestions')
+      .select('*')
+      .eq('opportunity_id', opportunityId)
+      .eq('suggestion_type', 'field_update')
+      .eq('status', 'pending');
+
+    const cacheValid =
+      !force_refresh &&
+      existingPending &&
+      existingPending.length > 0 &&
+      existingPending.every((s: any) => s.context_signature === currentSignature);
+
+    if (cacheValid) {
+      console.log(`[ai-field-suggestions] cache HIT for ${opportunityId} (sig=${currentSignature}, n=${existingPending.length})`);
+      return new Response(
+        JSON.stringify({ suggestions: existingPending, from_cache: true, signature: currentSignature }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
+    console.log(`[ai-field-suggestions] cache MISS for ${opportunityId} (sig=${currentSignature}, force=${force_refresh})`);
+
+    // Expire only stale field_update suggestions (don't touch next_action and others)
     await supabase
       .from('ai_suggestions')
       .update({ status: 'expired', action_taken_at: new Date().toISOString() })
       .eq('opportunity_id', opportunityId)
+      .eq('suggestion_type', 'field_update')
       .eq('status', 'pending');
 
     // Compute temporal anchors
