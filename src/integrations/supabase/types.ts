@@ -4801,6 +4801,7 @@ export type Database = {
         Row: {
           action_taken_at: string | null
           confidence_score: number | null
+          context_signature: string | null
           created_at: string
           current_value: Json | null
           entity_id: string | null
@@ -4820,6 +4821,7 @@ export type Database = {
         Insert: {
           action_taken_at?: string | null
           confidence_score?: number | null
+          context_signature?: string | null
           created_at?: string
           current_value?: Json | null
           entity_id?: string | null
@@ -4839,6 +4841,7 @@ export type Database = {
         Update: {
           action_taken_at?: string | null
           confidence_score?: number | null
+          context_signature?: string | null
           created_at?: string
           current_value?: Json | null
           entity_id?: string | null

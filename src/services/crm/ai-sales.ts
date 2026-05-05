@@ -113,9 +113,9 @@ export async function scoreDeal(opportunityId: string): Promise<DealScore> {
   return data as DealScore;
 }
 
-export async function getNextActions(opportunityId: string): Promise<NextActions> {
+export async function getNextActions(opportunityId: string, forceRefresh = false): Promise<NextActions> {
   const { data, error } = await supabase.functions.invoke('ai-next-action', {
-    body: { opportunityId }
+    body: { opportunityId, force_refresh: forceRefresh }
   });
 
   if (error) throw error;

@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { callAI, getTodayISO, dateContextPrompt } from "../_shared/ai-client.ts";
+import { computeOpportunitySignature } from "../_shared/opportunity-signature.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -188,8 +189,9 @@ serve(async (req) => {
   }
 
   try {
-    const { opportunityId } = await req.json();
-    
+    const body = await req.json();
+    const { opportunityId, force_refresh = false } = body || {};
+
     if (!opportunityId) {
       throw new Error('opportunityId is required');
     }
@@ -261,11 +263,39 @@ serve(async (req) => {
 
     const stageIds = pipelineStages?.map(s => s.id) || [];
 
-    // Expire any old pending suggestions
+    // Compute current context signature (cache key based on opportunity state)
+    const { signature: currentSignature } = await computeOpportunitySignature(supabase, opportunityId);
+
+    // Look up existing pending suggestions of THIS type
+    const { data: existingPending } = await supabase
+      .from('ai_suggestions')
+      .select('*')
+      .eq('opportunity_id', opportunityId)
+      .eq('suggestion_type', 'field_update')
+      .eq('status', 'pending');
+
+    const cacheValid =
+      !force_refresh &&
+      existingPending &&
+      existingPending.length > 0 &&
+      existingPending.every((s: any) => s.context_signature === currentSignature);
+
+    if (cacheValid) {
+      console.log(`[ai-field-suggestions] cache HIT for ${opportunityId} (sig=${currentSignature}, n=${existingPending.length})`);
+      return new Response(
+        JSON.stringify({ suggestions: existingPending, from_cache: true, signature: currentSignature }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
+    console.log(`[ai-field-suggestions] cache MISS for ${opportunityId} (sig=${currentSignature}, force=${force_refresh})`);
+
+    // Expire only stale field_update suggestions (don't touch next_action and others)
     await supabase
       .from('ai_suggestions')
       .update({ status: 'expired', action_taken_at: new Date().toISOString() })
       .eq('opportunity_id', opportunityId)
+      .eq('suggestion_type', 'field_update')
       .eq('status', 'pending');
 
     // Compute temporal anchors
@@ -479,7 +509,8 @@ Campos possíveis: temperature, prob, close_date_prevista, stage_id, valor_previ
           confidence_score: Math.min(1, Math.max(0, suggestion.confidence_score || 0.7)),
           reasoning: suggestion.reasoning,
           status: 'pending',
-          expires_at: expiresAt.toISOString()
+          expires_at: expiresAt.toISOString(),
+          context_signature: currentSignature,
         })
         .select()
         .single();
