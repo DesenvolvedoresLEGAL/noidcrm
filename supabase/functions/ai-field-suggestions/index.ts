@@ -189,8 +189,9 @@ serve(async (req) => {
   }
 
   try {
-    const { opportunityId } = await req.json();
-    
+    const body = await req.json();
+    const { opportunityId, force_refresh = false } = body || {};
+
     if (!opportunityId) {
       throw new Error('opportunityId is required');
     }
