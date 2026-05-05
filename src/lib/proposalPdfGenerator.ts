@@ -765,13 +765,27 @@ export async function generateProposalPDFClient(
 
   // ===== PAYMENT TERMS =====
   const hasPaymentTerms = installments.length > 0 || recurringPayment;
-  
+
+  doc.setTextColor(primaryRgb.r, primaryRgb.g, primaryRgb.b);
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'bold');
+  doc.text('CONDIÇÕES DE PAGAMENTO', margin, yPos);
+  yPos += 8;
+
+  if (!hasPaymentTerms) {
+    // Fallback explícito: nunca omitir o quadro silenciosamente.
+    // Evita propostas enviadas ao cliente sem condições visíveis.
+    console.warn('[proposalPdfGenerator] Proposta sem payment_terms — renderizando aviso de fallback');
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(9);
+    doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
+    const warn = 'Condições de pagamento ainda não definidas. Entre em contato com seu consultor comercial para confirmação dos valores e prazos antes do aceite.';
+    const wrapped = doc.splitTextToSize(warn, pageWidth - margin * 2);
+    doc.text(wrapped, margin, yPos);
+    yPos += wrapped.length * 5 + 6;
+  }
+
   if (hasPaymentTerms) {
-    doc.setTextColor(primaryRgb.r, primaryRgb.g, primaryRgb.b);
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'bold');
-    doc.text('CONDIÇÕES DE PAGAMENTO', margin, yPos);
-    yPos += 8;
 
     const currency = proposal.currency || 'BRL';
 
