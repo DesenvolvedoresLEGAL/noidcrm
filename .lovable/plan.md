@@ -1,64 +1,105 @@
 ## Diagnóstico
 
-### Problema 1 — PDF "engole" um item (LEGAL™ Core sumiu)
-**Causa raiz em `src/lib/proposalPdfGenerator.ts` (renderItemsTable, linhas ~590‑650).**
+Após inspeção do banco e do hook `useWinLossData`, identifiquei a causa raiz de cada problema:
 
-O fluxo atual faz:
-1. `didParseCell` zera o texto da célula (`data.cell.text = ['']`) para desenhar manualmente nome+descrição.
-2. `willDrawCell` recalcula `data.cell.height` **depois** que o autoTable já planejou o layout.
-3. `didDrawCell` desenha o conteúdo via `doc.text(...)`.
+### 1. "Top Motivos de Perda" mostra o diagnóstico (texto longo) em vez do motivo
+No hook (`useWinLossData.ts` L243-247), a agregação faz:
+```ts
+const reason = l.reason_seller || l.reason?.name || 'Não informado';
+```
+`reason_seller` está populado com o **texto livre do diagnóstico** ("Cliente não retorna os contatos…"), então ele vence. Por isso vemos o diagnóstico no card.
 
-Com `rowPageBreak: 'avoid'` e a célula reportando altura ~0 na fase de planejamento, o autoTable acha que a linha cabe; quando `willDrawCell` infla a altura no draw, a linha estoura a página e o jsPDF **descarta o desenho** dessa linha (fica em branco / é "comida"). É exatamente o que aconteceu com o item Core (que tem a descrição mais longa). Os totais permanecem corretos porque são calculados a partir do array `items`, não do que foi efetivamente desenhado — daí a inconsistência (soma visível ≠ Total).
+### 2. "Top Motivos de Ganho" sempre "Não informado"
+Há **60 records** com `win_reason_id` preenchido, mas o hook na linha 229 hardcoda `win_reason_name: undefined` ("win_reason join removed for stability"). Resultado: 100% cai em "Não informado".
 
-### Problema 2 — Cargo, telefone e e‑mail do contato sumindo no PDF
-**Causa raiz na ponte `buildProposalPDFData` → `generateProposalPDFClient`.**
+### 3. "Diferenciais Decisivos" vazio na UI
+Há **36 records** com `key_differentiator`. O hook agrega corretamente, mas armazena códigos crus (`price`, `service`, `relationship`). Provavelmente está renderizando, só que com labels feios — confirmar e aplicar `WIN_CATEGORY_LABELS`.
 
-- `buildProposalPDFData` (`src/lib/proposalPdfBuilder.ts`) preenche os campos **flat** `contact_name`, `contact_email`, `contact_phone`, mas **não** popula `pdfData.opportunity.contact` nem inclui `cargo`.
-- Em `proposalPdfGenerator.ts` (linhas 393‑421) o card de Contato lê:
-  - `proposal.contact_name || proposal.opportunity?.contact?.nome` (ok)
-  - `proposal.opportunity.contact.cargo` (**sempre undefined** vindo do builder → cargo nunca aparece)
-  - `proposal.contact_email || extractEmail(proposal.opportunity?.contact?.emails)` (depende do flat)
-  - `proposal.contact_phone || extractPhone(proposal.opportunity?.contact?.telefones)` (depende do flat)
-- O builder extrai `value` do JSONB, mas o schema real grava `email`/`numero` em alguns casos (vide `extractEmail`/`extractPhone` em `src/lib/contactFormat.ts` que tratam `email|value|address` e `numero|phone|value|number`). Quando o objeto vem com `email`/`numero`, `contact_email`/`contact_phone` ficam vazios → e como o fallback `opportunity.contact` também está ausente, **não aparece nada**.
+### 4. "Feedback dos Clientes" parece vazio
+Filtro exige `recorded_by_customer = true` E `customer_feedback != null`. No banco só **7 records** atendem. Funciona, só tem pouco volume — vou relaxar para mostrar feedback mesmo quando `recorded_by_customer` é null mas o texto existe.
 
-Mesmo problema atinge o link rápido quando o PDF é baixado pela `ProposalPublicView`.
+### 5. Sem rastreabilidade de aprovações/reprovações de propostas
+A tabela `proposals` já guarda tudo: `acceptor_name`, `acceptor_email`, `acceptor_position`, `accepted_at`, `declined_at`, `declined_reason`, `acceptor_ip`. Não existe view consolidando isso no Hub.
 
 ---
 
-## Plano de Correção
+## Plano (apenas frontend + 1 hook novo, sem alterar schema)
 
-### Frente A — Eliminar o "item engolido" no PDF
-Em `src/lib/proposalPdfGenerator.ts` (`renderItemsTable`):
-1. **Pré-calcular a altura de cada linha** (nome + descrição) ANTES do autoTable, e passá-la como `minCellHeight` no `body` row config (`{ content, styles: { minCellHeight } }`).
-2. Remover a mutação tardia de `data.cell.height` em `willDrawCell` (mantendo apenas o desenho em `didDrawCell`).
-3. Manter `rowPageBreak: 'avoid'` — agora seguro porque o autoTable já conhece a altura real e fará o page-break corretamente.
+### Passo 1 — Corrigir agregações em `src/hooks/useWinLossData.ts`
 
-Resultado: nenhum item é descartado e a soma visível dos itens passa a bater com o Total.
+**a) Top Motivos de Perda (macro + específico):**
+- Buscar o nome do motivo via join (`loss_reasons!reason_id(name, category)`) no select de `win_loss_records`.
+- Trocar a fonte da agregação para: `record.loss_reason.name` (específico) com fallback para `opportunity.loss_reason.name`. **Nunca usar `reason_seller`** (que é diagnóstico).
+- Adicionar nova série `lossReasonsByMacro: Array<{ category, label, count, specifics: Array<{ name, count }> }>` agrupando por `category` (Concorrência, Preço, Timing…) com expansão de motivos específicos.
 
-### Frente B — Garantir cargo / telefone / e‑mail do contato
-1. Em `src/lib/proposalPdfBuilder.ts`:
-   - Adicionar `cargo` ao tipo `ProposalPDFData` (campo flat `contact_cargo`).
-   - Trocar a extração inline de e‑mail/telefone pelos helpers `extractEmail` / `extractPhone` de `@/lib/contactFormat` (cobrem `value|email|numero|phone|address`).
-   - Popular `contact_cargo: contact?.cargo || ''`.
-2. Em `src/lib/proposalPdfGenerator.ts`:
-   - No card de Contato, ler `proposal.contact_cargo || proposal.opportunity?.contact?.cargo` (linha ~400) e usar os mesmos helpers para email/telefone caso `contact_email`/`contact_phone` venham vazios.
-   - Adicionar `contact_cargo?: string` à interface `ProposalData`.
+**b) Top Motivos de Ganho:**
+- Adicionar fetch de `win_reasons` (id, name) para os IDs presentes nos records.
+- Popular `win_reason_name` no merge (linha ~229), eliminando o `undefined` hardcoded.
 
-### Frente C — Validação visual (sem alterar produto)
-- Após a edição, gerar localmente um PDF de teste com a mesma proposta (PROP-2026-00663) e verificar:
-  - Os 4 itens aparecem (Setup, Core, Implantação, Logística).
-  - Soma dos totais por linha = R$ 11.854,00.
-  - Card "Contato" mostra Nome, Cargo, Telefone e E‑mail.
+**c) Diferenciais Decisivos:**
+- Manter agregação, mas expor o código bruto. A renderização aplicará `WIN_CATEGORY_LABELS`.
+
+**d) Feedback dos Clientes:**
+- Relaxar filtro: incluir feedbacks com `customer_feedback` não vazio mesmo se `recorded_by_customer` for null (com badge "via vendedor" vs "via cliente").
+
+### Passo 2 — Atualizar UI
+
+**`LossAnalysisSection.tsx`:**
+- Card "Top Motivos de Perda" passa a mostrar **macro motivo** como cabeçalho colapsável e **motivos específicos** como sub-itens (com contagem). Quando macro = "Concorrência", listar concorrentes daquele macro inline.
+
+**`WinAnalysisSection.tsx`:**
+- "Top Motivos de Ganho" agora exibirá os nomes reais (Indicação, Custo-benefício, Timing…).
+- "Diferenciais Decisivos" aplica `WIN_CATEGORY_LABELS` aos códigos.
+- "Feedback dos Clientes" mostra fonte (cliente/vendedor) e remove limite de 5 (scroll interno até 20).
+
+### Passo 3 — Nova aba **"Aprovações"** no `WinLossHub.tsx`
+
+Criar `src/components/intelligence/winloss/tabs/ProposalApprovalsTab.tsx`:
+
+- Hook novo `useProposalApprovalsHistory(orgId, dateRange, pipelineId)` que busca em `proposals`:
+  ```ts
+  status in ('accepted','declined','expired'), 
+  joins: opportunity (title, value, owner_name), 
+  win_loss_records (key_differentiator, customer_feedback, win_reason_name)
+  ```
+- UI tipo timeline/tabela com filtro **Aprovadas | Recusadas | Expiradas**:
+  - **Coluna 1 — Quem:** `acceptor_name` + `acceptor_position` + `acceptor_email` + IP.
+  - **Coluna 2 — Quando:** `accepted_at` / `declined_at` (data + hora).
+  - **Coluna 3 — Oportunidade:** título + valor + vendedor responsável.
+  - **Coluna 4 — Motivo + Diferenciais (ganho):** badges de `key_differentiator` traduzidos + `win_reason_name`.
+  - **Coluna 5 — Feedback / Motivo (perda):** texto do `customer_feedback` (ganho) ou `declined_reason` + categoria de perda (recusa).
+- Botão "Abrir oportunidade" (link para `/opportunity/:id`).
+- Export CSV opcional (botão).
+
+Adicionar tab `"Aprovações"` (ícone `FileCheck`) na lista de abas do `WinLossHub`.
+
+### Passo 4 — Verificação
+
+- Rodar a tela com o filtro "Mês" e validar:
+  - Card de Perda passa a mostrar "Concorrência (3) → Starlink, Expo Telecom, …" em vez do diagnóstico bruto.
+  - Card de Ganho passa a listar "Indicação (X)", "Custo-benefício (Y)" etc.
+  - Diferenciais mostram labels PT-BR.
+  - Aba Aprovações lista as propostas aceitas/recusadas com quem/quando/motivo.
 
 ---
 
-## Arquivos a alterar
-- `src/lib/proposalPdfGenerator.ts` (render de itens + leitura de cargo/contato)
-- `src/lib/proposalPdfBuilder.ts` (campo `contact_cargo` + helpers de extração)
+## Arquivos impactados
+
+| Arquivo | Ação |
+|---|---|
+| `src/hooks/useWinLossData.ts` | join com `win_reasons`+`loss_reasons`, nova série macro→específico, relaxar filtro de feedback |
+| `src/components/intelligence/winloss/tabs/LossAnalysisSection.tsx` | card macro+específico+concorrentes |
+| `src/components/intelligence/winloss/tabs/WinAnalysisSection.tsx` | usar nomes reais + labels PT-BR |
+| `src/hooks/useProposalApprovalsHistory.ts` | **novo** |
+| `src/components/intelligence/winloss/tabs/ProposalApprovalsTab.tsx` | **novo** |
+| `src/pages/intelligence/WinLossHub.tsx` | registrar nova tab "Aprovações" |
 
 ## Riscos
-- Mudança de altura via `minCellHeight` pode reduzir levemente a densidade visual em propostas longas (aceitável — preferível a perder linhas).
-- Nenhum impacto em backend, RLS, edge functions ou link público (HTML do `generate-proposal-pdf` usa caminho próprio e já estava correto para contato; só o PDF client-side é afetado).
+- Baixo. Sem alteração de schema, só leitura.
+- O join novo em `win_loss_records` adiciona ~1 query (`win_reasons` por IDs) — cacheada via React Query.
 
-## Próximos passos
-Aprovar para eu aplicar as duas frentes em sequência.
+## Não está no escopo
+- Mudar o modal "Marcar como Perdida" (já captura macro+específico corretamente).
+- Alterar como o `reason_seller` é gravado (mantém como diagnóstico textual).
+
+Posso seguir com a implementação?
