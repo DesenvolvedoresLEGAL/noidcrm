@@ -166,7 +166,8 @@ export function useWinLossData(organizationId: string | undefined, pipelineId: s
           id, organization_id, opportunity_id, outcome, reason_id, reason_seller, 
           competitor, final_value, original_value, sales_cycle_days, 
           win_reason_id, key_differentiator, customer_feedback, 
-          recorded_by_customer, acceptor_name, created_at
+          recorded_by_customer, acceptor_name, created_at,
+          loss_reason:loss_reasons!win_loss_records_reason_id_fkey(name, category)
         `)
         .eq('organization_id', organizationId)
         .gte('created_at', fromISO)
@@ -176,8 +177,19 @@ export function useWinLossData(organizationId: string | undefined, pipelineId: s
         console.error('[useWinLossData] Win/loss records fetch error:', recordsErr);
       }
 
-      // Records are now flat - filter by matching opportunity pipeline via directOpps later
       const recordsList = records || [];
+
+      // 2b. Fetch win_reasons for IDs present
+      const winReasonIds = [...new Set(recordsList.map(r => r.win_reason_id).filter(Boolean))] as string[];
+      const winReasonsMap = new Map<string, string>();
+      if (winReasonIds.length > 0) {
+        const { data: wr } = await supabase
+          .from('win_reasons')
+          .select('id, name')
+          .in('id', winReasonIds);
+        wr?.forEach(w => winReasonsMap.set(w.id, w.name));
+      }
+
 
       // 3. Fetch opportunities directly
       const { data: directOpps, error: oppsErr } = await supabase
