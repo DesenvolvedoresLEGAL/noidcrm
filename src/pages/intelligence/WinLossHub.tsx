@@ -289,6 +289,16 @@ export default function WinLossHub() {
             {organization?.id && <WinLossRevenueTab organizationId={organization.id} />}
           </TabsContent>
 
+          <TabsContent value="approvals">
+            {organization?.id && (
+              <ProposalApprovalsTab
+                organizationId={organization.id}
+                pipelineId={selectedPipelineId}
+                dateRange={dateRange}
+              />
+            )}
+          </TabsContent>
+
           <TabsContent value="recommendations">
             <WinLossRecommendationsTab data={winLossData} />
           </TabsContent>
