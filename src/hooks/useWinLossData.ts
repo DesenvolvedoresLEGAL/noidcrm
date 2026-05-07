@@ -62,6 +62,14 @@ export interface SellerStat {
   totalValue: number;
 }
 
+export interface LossMacroGroup {
+  category: string;
+  label: string;
+  count: number;
+  specifics: Array<{ name: string; count: number; competitors?: string[] }>;
+  competitors?: string[];
+}
+
 export interface WinLossDataResult {
   wins: WinLossDeal[];
   losses: WinLossDeal[];
@@ -74,6 +82,7 @@ export interface WinLossDataResult {
   avgTicketWon: number;
   avgTicketLost: number;
   lossReasons: Array<{ reason: string; count: number }>;
+  lossReasonsByMacro: LossMacroGroup[];
   winReasons: Array<{ reason: string; count: number }>;
   differentiators: Array<{ differentiator: string; count: number }>;
   customerFeedbacks: Array<{ feedback: string; acceptorName: string; winReason?: string; value: number }>;
@@ -157,7 +166,8 @@ export function useWinLossData(organizationId: string | undefined, pipelineId: s
           id, organization_id, opportunity_id, outcome, reason_id, reason_seller, 
           competitor, final_value, original_value, sales_cycle_days, 
           win_reason_id, key_differentiator, customer_feedback, 
-          recorded_by_customer, acceptor_name, created_at
+          recorded_by_customer, acceptor_name, created_at,
+          loss_reason:loss_reasons!win_loss_records_reason_id_fkey(name, category)
         `)
         .eq('organization_id', organizationId)
         .gte('created_at', fromISO)
@@ -167,8 +177,19 @@ export function useWinLossData(organizationId: string | undefined, pipelineId: s
         console.error('[useWinLossData] Win/loss records fetch error:', recordsErr);
       }
 
-      // Records are now flat - filter by matching opportunity pipeline via directOpps later
       const recordsList = records || [];
+
+      // 2b. Fetch win_reasons for IDs present
+      const winReasonIds = [...new Set(recordsList.map(r => r.win_reason_id).filter(Boolean))] as string[];
+      const winReasonsMap = new Map<string, string>();
+      if (winReasonIds.length > 0) {
+        const { data: wr } = await supabase
+          .from('win_reasons')
+          .select('id, name')
+          .in('id', winReasonIds);
+        wr?.forEach(w => winReasonsMap.set(w.id, w.name));
+      }
+
 
       // 3. Fetch opportunities directly
       const { data: directOpps, error: oppsErr } = await supabase
@@ -215,6 +236,9 @@ export function useWinLossData(organizationId: string | undefined, pipelineId: s
             salesCycleDays = Math.max(0, Math.floor((closedDate.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24)));
           }
           const profile = opp.owner_user_id ? profilesMap.get(opp.owner_user_id) : undefined;
+          // Prefer the dedicated record loss_reason; fallback to opportunity.loss_reason
+          const recordLossReason = (record as any)?.loss_reason || null;
+          const effectiveReason = recordLossReason || opp.loss_reason;
           return {
             id: record?.id || opp.id,
             opportunity_id: opp.id,
@@ -224,9 +248,9 @@ export function useWinLossData(organizationId: string | undefined, pipelineId: s
             reason_seller: record?.reason_seller || opp.loss_comment,
             competitor: record?.competitor,
             opportunity: opp,
-            reason: opp.loss_reason,
+            reason: effectiveReason,
             win_reason_id: record?.win_reason_id,
-            win_reason_name: undefined, // win_reason join removed for stability
+            win_reason_name: record?.win_reason_id ? winReasonsMap.get(record.win_reason_id) : undefined,
             key_differentiator: record?.key_differentiator,
             customer_feedback: record?.customer_feedback,
             recorded_by_customer: record?.recorded_by_customer,
@@ -240,10 +264,23 @@ export function useWinLossData(organizationId: string | undefined, pipelineId: s
       const losses = allDeals.filter(d => d.outcome === 'lost');
 
       // 6. Aggregations
+      // Use the actual loss_reason name (specific motive), NOT reason_seller (which is the diagnosis text)
       const lossReasonCounts: Record<string, number> = {};
       losses.forEach(l => {
-        const reason = l.reason_seller || (l.reason as any)?.name || 'Não informado';
+        const reason = (l.reason as any)?.name || 'Não informado';
         lossReasonCounts[reason] = (lossReasonCounts[reason] || 0) + 1;
+      });
+
+      // Group losses by macro category -> specific reasons (and competitors when applicable)
+      const macroMap = new Map<string, { count: number; specifics: Map<string, number>; competitors: Set<string> }>();
+      losses.forEach(l => {
+        const category = (l.reason as any)?.category || 'other';
+        const specific = (l.reason as any)?.name || 'Não informado';
+        const entry = macroMap.get(category) || { count: 0, specifics: new Map(), competitors: new Set() };
+        entry.count++;
+        entry.specifics.set(specific, (entry.specifics.get(specific) || 0) + 1);
+        if (l.competitor) entry.competitors.add(l.competitor);
+        macroMap.set(category, entry);
       });
 
       const winReasonCounts: Record<string, number> = {};
@@ -261,15 +298,16 @@ export function useWinLossData(organizationId: string | undefined, pipelineId: s
         }
       });
 
+      // Relaxed filter: include feedback even when not formally flagged as customer-recorded
       const customerFeedbacks = wins
-        .filter(w => w.customer_feedback && w.recorded_by_customer)
-        .map(w => ({ feedback: w.customer_feedback!, acceptorName: w.acceptor_name || 'Cliente', winReason: w.win_reason_name, value: w.final_value }))
-        .slice(0, 5);
+        .filter(w => w.customer_feedback && w.customer_feedback.trim().length > 0)
+        .map(w => ({ feedback: w.customer_feedback!, acceptorName: w.acceptor_name || (w.recorded_by_customer ? 'Cliente' : 'Vendedor'), winReason: w.win_reason_name, value: w.final_value }))
+        .slice(0, 20);
 
       const lossFeedbacks = losses
-        .filter(l => l.customer_feedback && l.recorded_by_customer)
+        .filter(l => l.customer_feedback && l.customer_feedback.trim().length > 0)
         .map(l => ({ feedback: l.customer_feedback!, lossReason: (l.reason as any)?.name || l.reason_seller, competitor: l.competitor, value: l.final_value }))
-        .slice(0, 5);
+        .slice(0, 20);
 
       const competitorCounts: Record<string, number> = {};
       losses.filter(l => l.competitor).forEach(l => {
@@ -386,6 +424,18 @@ export function useWinLossData(organizationId: string | undefined, pipelineId: s
         return { week: label, count: weekBuckets[label] || 0 };
       }).filter(b => b.count > 0 || true); // keep all weeks for histogram shape
 
+      const lossReasonsByMacro: LossMacroGroup[] = [...macroMap.entries()]
+        .map(([category, data]) => ({
+          category,
+          label: '', // resolved on UI via LOSS_CATEGORY_LABELS
+          count: data.count,
+          specifics: [...data.specifics.entries()]
+            .map(([name, count]) => ({ name, count }))
+            .sort((a, b) => b.count - a.count),
+          competitors: [...data.competitors],
+        }))
+        .sort((a, b) => b.count - a.count);
+
       return {
         wins, losses, allDeals,
         wonCount: wins.length, lostCount: losses.length,
@@ -394,6 +444,7 @@ export function useWinLossData(organizationId: string | undefined, pipelineId: s
         avgTicketWon: wins.length > 0 ? Math.round(wonValue / wins.length) : 0,
         avgTicketLost: losses.length > 0 ? Math.round(lostValue / losses.length) : 0,
         lossReasons: Object.entries(lossReasonCounts).map(([reason, count]) => ({ reason, count })).sort((a, b) => b.count - a.count).slice(0, 8),
+        lossReasonsByMacro,
         winReasons: Object.entries(winReasonCounts).map(([reason, count]) => ({ reason, count })).sort((a, b) => b.count - a.count).slice(0, 8),
         differentiators: Object.entries(differentiatorCounts).map(([differentiator, count]) => ({ differentiator, count })).sort((a, b) => b.count - a.count).slice(0, 6),
         customerFeedbacks, lossFeedbacks,
@@ -415,7 +466,7 @@ function emptyResult(): WinLossDataResult {
     wins: [], losses: [], allDeals: [],
     wonCount: 0, lostCount: 0, winRate: 0, wonValue: 0, lostValue: 0,
     avgTicketWon: 0, avgTicketLost: 0,
-    lossReasons: [], winReasons: [], differentiators: [],
+    lossReasons: [], lossReasonsByMacro: [], winReasons: [], differentiators: [],
     customerFeedbacks: [], lossFeedbacks: [],
     competitors: [], competitorStats: [], sellerStats: [],
     factors: {}, avgCycleWon: null, avgCycleLost: null,
