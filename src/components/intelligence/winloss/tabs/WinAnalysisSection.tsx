@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Trophy, Award, Quote } from 'lucide-react';
+import { WIN_CATEGORY_LABELS } from '@/utils/category-labels';
 import type { WinLossDataResult } from '@/hooks/useWinLossData';
 
 interface Props {
