@@ -62,6 +62,14 @@ export interface SellerStat {
   totalValue: number;
 }
 
+export interface LossMacroGroup {
+  category: string;
+  label: string;
+  count: number;
+  specifics: Array<{ name: string; count: number; competitors?: string[] }>;
+  competitors?: string[];
+}
+
 export interface WinLossDataResult {
   wins: WinLossDeal[];
   losses: WinLossDeal[];
@@ -74,6 +82,7 @@ export interface WinLossDataResult {
   avgTicketWon: number;
   avgTicketLost: number;
   lossReasons: Array<{ reason: string; count: number }>;
+  lossReasonsByMacro: LossMacroGroup[];
   winReasons: Array<{ reason: string; count: number }>;
   differentiators: Array<{ differentiator: string; count: number }>;
   customerFeedbacks: Array<{ feedback: string; acceptorName: string; winReason?: string; value: number }>;
