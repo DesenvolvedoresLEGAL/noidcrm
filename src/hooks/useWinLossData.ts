@@ -424,6 +424,18 @@ export function useWinLossData(organizationId: string | undefined, pipelineId: s
         return { week: label, count: weekBuckets[label] || 0 };
       }).filter(b => b.count > 0 || true); // keep all weeks for histogram shape
 
+      const lossReasonsByMacro: LossMacroGroup[] = [...macroMap.entries()]
+        .map(([category, data]) => ({
+          category,
+          label: '', // resolved on UI via LOSS_CATEGORY_LABELS
+          count: data.count,
+          specifics: [...data.specifics.entries()]
+            .map(([name, count]) => ({ name, count }))
+            .sort((a, b) => b.count - a.count),
+          competitors: [...data.competitors],
+        }))
+        .sort((a, b) => b.count - a.count);
+
       return {
         wins, losses, allDeals,
         wonCount: wins.length, lostCount: losses.length,
@@ -432,6 +444,7 @@ export function useWinLossData(organizationId: string | undefined, pipelineId: s
         avgTicketWon: wins.length > 0 ? Math.round(wonValue / wins.length) : 0,
         avgTicketLost: losses.length > 0 ? Math.round(lostValue / losses.length) : 0,
         lossReasons: Object.entries(lossReasonCounts).map(([reason, count]) => ({ reason, count })).sort((a, b) => b.count - a.count).slice(0, 8),
+        lossReasonsByMacro,
         winReasons: Object.entries(winReasonCounts).map(([reason, count]) => ({ reason, count })).sort((a, b) => b.count - a.count).slice(0, 8),
         differentiators: Object.entries(differentiatorCounts).map(([differentiator, count]) => ({ differentiator, count })).sort((a, b) => b.count - a.count).slice(0, 6),
         customerFeedbacks, lossFeedbacks,
