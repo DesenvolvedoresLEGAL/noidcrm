@@ -264,10 +264,23 @@ export function useWinLossData(organizationId: string | undefined, pipelineId: s
       const losses = allDeals.filter(d => d.outcome === 'lost');
 
       // 6. Aggregations
+      // Use the actual loss_reason name (specific motive), NOT reason_seller (which is the diagnosis text)
       const lossReasonCounts: Record<string, number> = {};
       losses.forEach(l => {
-        const reason = l.reason_seller || (l.reason as any)?.name || 'Não informado';
+        const reason = (l.reason as any)?.name || 'Não informado';
         lossReasonCounts[reason] = (lossReasonCounts[reason] || 0) + 1;
+      });
+
+      // Group losses by macro category -> specific reasons (and competitors when applicable)
+      const macroMap = new Map<string, { count: number; specifics: Map<string, number>; competitors: Set<string> }>();
+      losses.forEach(l => {
+        const category = (l.reason as any)?.category || 'other';
+        const specific = (l.reason as any)?.name || 'Não informado';
+        const entry = macroMap.get(category) || { count: 0, specifics: new Map(), competitors: new Set() };
+        entry.count++;
+        entry.specifics.set(specific, (entry.specifics.get(specific) || 0) + 1);
+        if (l.competitor) entry.competitors.add(l.competitor);
+        macroMap.set(category, entry);
       });
 
       const winReasonCounts: Record<string, number> = {};
@@ -285,15 +298,16 @@ export function useWinLossData(organizationId: string | undefined, pipelineId: s
         }
       });
 
+      // Relaxed filter: include feedback even when not formally flagged as customer-recorded
       const customerFeedbacks = wins
-        .filter(w => w.customer_feedback && w.recorded_by_customer)
-        .map(w => ({ feedback: w.customer_feedback!, acceptorName: w.acceptor_name || 'Cliente', winReason: w.win_reason_name, value: w.final_value }))
-        .slice(0, 5);
+        .filter(w => w.customer_feedback && w.customer_feedback.trim().length > 0)
+        .map(w => ({ feedback: w.customer_feedback!, acceptorName: w.acceptor_name || (w.recorded_by_customer ? 'Cliente' : 'Vendedor'), winReason: w.win_reason_name, value: w.final_value }))
+        .slice(0, 20);
 
       const lossFeedbacks = losses
-        .filter(l => l.customer_feedback && l.recorded_by_customer)
+        .filter(l => l.customer_feedback && l.customer_feedback.trim().length > 0)
         .map(l => ({ feedback: l.customer_feedback!, lossReason: (l.reason as any)?.name || l.reason_seller, competitor: l.competitor, value: l.final_value }))
-        .slice(0, 5);
+        .slice(0, 20);
 
       const competitorCounts: Record<string, number> = {};
       losses.filter(l => l.competitor).forEach(l => {
