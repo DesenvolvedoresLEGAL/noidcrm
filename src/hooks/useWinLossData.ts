@@ -236,6 +236,9 @@ export function useWinLossData(organizationId: string | undefined, pipelineId: s
             salesCycleDays = Math.max(0, Math.floor((closedDate.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24)));
           }
           const profile = opp.owner_user_id ? profilesMap.get(opp.owner_user_id) : undefined;
+          // Prefer the dedicated record loss_reason; fallback to opportunity.loss_reason
+          const recordLossReason = (record as any)?.loss_reason || null;
+          const effectiveReason = recordLossReason || opp.loss_reason;
           return {
             id: record?.id || opp.id,
             opportunity_id: opp.id,
@@ -245,9 +248,9 @@ export function useWinLossData(organizationId: string | undefined, pipelineId: s
             reason_seller: record?.reason_seller || opp.loss_comment,
             competitor: record?.competitor,
             opportunity: opp,
-            reason: opp.loss_reason,
+            reason: effectiveReason,
             win_reason_id: record?.win_reason_id,
-            win_reason_name: undefined, // win_reason join removed for stability
+            win_reason_name: record?.win_reason_id ? winReasonsMap.get(record.win_reason_id) : undefined,
             key_differentiator: record?.key_differentiator,
             customer_feedback: record?.customer_feedback,
             recorded_by_customer: record?.recorded_by_customer,
