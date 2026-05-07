@@ -22,7 +22,7 @@ export function LossAnalysisSection({ data, isLoading, lostLabel }: Props) {
         Análise de Perdas
       </h2>
       <div className="grid lg:grid-cols-3 gap-4">
-        {/* Top Loss Reasons */}
+        {/* Top Loss Reasons - Macro -> Specific */}
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-sm">
@@ -31,18 +31,38 @@ export function LossAnalysisSection({ data, isLoading, lostLabel }: Props) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {isLoading ? <LoadingSkeleton /> : data?.lossReasons && data.lossReasons.length > 0 ? (
-              <div className="space-y-2.5">
-                {data.lossReasons.map((item, i) => {
-                  const total = data.lossReasons.reduce((s, r) => s + r.count, 0);
-                  const pct = Math.round((item.count / total) * 100);
+            {isLoading ? <LoadingSkeleton /> : data?.lossReasonsByMacro && data.lossReasonsByMacro.length > 0 ? (
+              <div className="space-y-3">
+                {data.lossReasonsByMacro.map((macro, i) => {
+                  const total = data.lossReasonsByMacro.reduce((s, r) => s + r.count, 0);
+                  const pct = total > 0 ? Math.round((macro.count / total) * 100) : 0;
+                  const macroLabel = LOSS_CATEGORY_LABELS[macro.category] || macro.category;
                   return (
-                    <div key={i} className="space-y-1">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium truncate text-xs">{item.reason}</span>
-                        <span className="text-muted-foreground text-xs ml-2">{pct}% ({item.count})</span>
+                    <div key={i} className="space-y-1.5">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-semibold">{macroLabel}</span>
+                        <span className="text-muted-foreground">{pct}% ({macro.count})</span>
                       </div>
                       <Progress value={pct} className="h-1.5 [&>div]:bg-red-500" />
+                      {macro.specifics.length > 0 && (
+                        <div className="pl-2 mt-1 space-y-0.5">
+                          {macro.specifics.map((s, j) => (
+                            <div key={j} className="flex items-center justify-between text-[11px] text-muted-foreground">
+                              <span className="truncate">↳ {s.name}</span>
+                              <span className="ml-2">({s.count})</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {macro.competitors && macro.competitors.length > 0 && (
+                        <div className="flex flex-wrap gap-1 pl-2 pt-1">
+                          {macro.competitors.map((c, k) => (
+                            <Badge key={k} variant="outline" className="text-[10px] h-4 border-orange-500/30 text-orange-600">
+                              {c}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
