@@ -466,7 +466,7 @@ function emptyResult(): WinLossDataResult {
     wins: [], losses: [], allDeals: [],
     wonCount: 0, lostCount: 0, winRate: 0, wonValue: 0, lostValue: 0,
     avgTicketWon: 0, avgTicketLost: 0,
-    lossReasons: [], winReasons: [], differentiators: [],
+    lossReasons: [], lossReasonsByMacro: [], winReasons: [], differentiators: [],
     customerFeedbacks: [], lossFeedbacks: [],
     competitors: [], competitorStats: [], sellerStats: [],
     factors: {}, avgCycleWon: null, avgCycleLost: null,
