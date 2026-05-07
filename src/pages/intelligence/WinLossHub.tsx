@@ -13,7 +13,7 @@ import { PageHeader } from '@/components/ui/page-header';
 import {
   Sparkles, RefreshCw,
   Activity, Swords, Trophy, MessageSquare, DollarSign, Lightbulb,
-  AlertTriangle, Target, Zap, ArrowRight
+  AlertTriangle, Target, Zap, ArrowRight, FileCheck
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -26,6 +26,7 @@ import { WinLossSellerTab } from '@/components/intelligence/winloss/tabs/WinLoss
 import { WinLossInterviewsTab } from '@/components/intelligence/winloss/tabs/WinLossInterviewsTab';
 import { WinLossRevenueTab } from '@/components/intelligence/winloss/tabs/WinLossRevenueTab';
 import { WinLossRecommendationsTab } from '@/components/intelligence/winloss/tabs/WinLossRecommendationsTab';
+import { ProposalApprovalsTab } from '@/components/intelligence/winloss/tabs/ProposalApprovalsTab';
 
 export default function WinLossHub() {
   const { organization } = useCurrentUser();
