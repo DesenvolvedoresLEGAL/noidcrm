@@ -250,6 +250,9 @@ export default function WinLossHub() {
             <TabsTrigger value="revenue" className="text-xs flex items-center gap-1">
               <DollarSign className="h-3 w-3" /> Revenue Impact
             </TabsTrigger>
+            <TabsTrigger value="approvals" className="text-xs flex items-center gap-1">
+              <FileCheck className="h-3 w-3" /> Aprovações
+            </TabsTrigger>
             <TabsTrigger value="recommendations" className="text-xs flex items-center gap-1">
               <Lightbulb className="h-3 w-3" /> Recomendações
             </TabsTrigger>
