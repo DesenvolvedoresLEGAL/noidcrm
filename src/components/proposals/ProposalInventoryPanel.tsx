@@ -36,6 +36,7 @@ import {
   reservationStatusBadgeVariant,
 } from '@/lib/operations/inventoryReservations';
 import { GeneratePreReservationDialog } from './GeneratePreReservationDialog';
+import { ProposalCapacityImpactBlock } from './ProposalCapacityImpactBlock';
 
 function fmt(v?: string | null) {
   if (!v) return '—';
@@ -300,6 +301,17 @@ export function ProposalInventoryPanel({ proposalId, closeDatePrevista }: Props)
         proposalId={proposalId}
         defaultDate={closeDatePrevista ?? null}
       />
+
+      {active && items.length > 0 && (
+        <CardContent className="pt-0">
+          <ProposalCapacityImpactBlock
+            proposalId={proposalId}
+            operationalStartDate={active.operational_start_date}
+            operationalEndDate={active.operational_end_date}
+            items={items}
+          />
+        </CardContent>
+      )}
     </Card>
   );
 }

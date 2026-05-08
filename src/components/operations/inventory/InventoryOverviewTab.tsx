@@ -34,6 +34,7 @@ import { useInventoryOverview } from '@/hooks/operations/useInventoryOverview';
 import { useInventoryPreReservationsOverview } from '@/hooks/operations/useInventoryPreReservations';
 import type { OverviewItemRow } from '@/services/operations/inventoryOverview';
 import { InventoryOperationalCapacityBlock } from './InventoryOperationalCapacityBlock';
+import { InventoryPricingPressureBlock } from './InventoryPricingPressureBlock';
 
 interface Props {
   onNavigateToItems?: () => void;
@@ -195,6 +196,7 @@ export function InventoryOverviewTab({ onNavigateToItems }: Props = {}) {
       )}
 
       <InventoryOperationalCapacityBlock />
+      <InventoryPricingPressureBlock />
 
       {/* Bloco 1 — KPIs principais */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

@@ -1,108 +1,111 @@
-# Sprint INV 1.3 — Calendário de Ocupação e Capacidade Operacional
+# Sprint INV 1.4 — Ocupação como Fator de Preço
 
-Substituir o placeholder da sub-aba "Calendário de ocupação" por uma visão real, baseada em RPCs agregadas das tabelas existentes (sem nova tabela de calendário). Adiciona snapshot de capacidade reutilizável pela proposta e bloco de capacidade na Visão Geral.
+Cria o motor de fator comercial baseado em ocupação real do inventário no período operacional. Não toca ainda em "tabela dinâmica por data" — apenas no fator de ocupação, snapshot por item de proposta, sinalização de aprovação e visibilidade comercial.
 
 ## 1. Banco de dados (1 migration)
 
-Sem novas tabelas. Apenas 3 RPCs `SECURITY DEFINER` com `SET search_path = public`, escopadas por `organization_id` via `user_belongs_to_organization`.
+### Tabela `inventory_pricing_rules`
+Conforme proposto, com RLS por `organization_id`:
+- Policies: `SELECT` para qualquer membro da org (`organization_id = get_user_organization_id()`); `INSERT/UPDATE/DELETE` exigem `has_role(auth.uid(),'admin')` OR `has_role(auth.uid(),'owner')`.
+- Trigger `update_updated_at_column` em UPDATE.
+- Trigger `set_updated_by` (se existir helper, senão `auth.uid()` no INSERT/UPDATE).
+- Index `(organization_id, status, min_occupancy_rate)`.
 
-### RPC `get_inventory_occupancy_calendar`
-- Parâmetros: `p_start_date date`, `p_end_date date`, `p_category_id uuid default null`, `p_family_id uuid default null`, `p_status text default null`, `p_view_mode text default 'item'`.
-- Une (UNION ALL) ocupações de:
-  - `inventory_pre_reservations` + `_items` + `_allocations` com `status = 'active'` (source_type=`pre_reservation`, occupancy_type=`pre_reserved`).
-  - `inventory_reservations` + `_items` + `_allocations` com status em `('confirmed','in_preparation','dispatched','in_operation','returned')` (source_type=`reservation`, occupancy_type derivado de `operational_status` ou status do header).
-  - Status físico atual de `inventory_items` (quantity buckets) e `inventory_serialized_items` para `maintenance | damaged | lost` (source_type=`physical_status`, span = período inteiro do filtro).
-- Filtra por interseção de `[start_date, end_date]` com o intervalo solicitado e por categoria/família via join com `inventory_items`.
-- Retorna colunas: `occupancy_type`, `source_type`, `source_id`, `item_type` (serialized|quantity), `item_id`, `item_name`, `item_code`, `category_id/name`, `family_id/name`, `start_date`, `end_date`, `status`, `quantity numeric`, `client_name`, `proposal_id`, `reservation_code`, `risk_level`.
-- `closed`/`cancelled` só aparecem se `p_status` explicitamente os incluir (histórico).
+### Seed por organização
+Função `public.seed_inventory_pricing_rules(p_org uuid)` (SECURITY DEFINER, search_path public) que insere as 4 regras padrão (Baixa, Moderada, Alta, Crítica) se a org ainda não tiver nenhuma. Chamada:
+- Loop inicial em todas as `organizations` existentes para popular.
+- Trigger `AFTER INSERT ON organizations` para popular novas orgs.
 
-### RPC `get_inventory_capacity_by_period`
-- Parâmetros: `p_start_date`, `p_end_date`, `p_category_id`, `p_family_id`.
-- Para cada `(category_id, family_id)`:
-  - `total_units` = soma de `quantity_total` (quantity items) + count de serializados ativos.
-  - Buckets agregados a partir do calendário acima: `pre_reserved_units`, `reserved_units`, `in_preparation_units`, `dispatched_units`, `in_operation_units`, `returned_units`, `maintenance_units`, `damaged_units`, `lost_units`.
-  - `available_units = total - (pre_reserved + reserved + in_preparation + dispatched + in_operation + returned + maintenance + damaged + lost)`.
-  - `occupancy_rate numeric` = (pre_reserved+reserved+in_preparation+dispatched+in_operation+returned)/NULLIF(total,0).
-  - `risk_level`: `<0.5 baixo`, `<0.75 medio`, `<0.9 alto`, `>=0.9 critico`.
+### Snapshot em `proposal_items`
+```sql
+ALTER TABLE public.proposal_items
+  ADD COLUMN IF NOT EXISTS inventory_occupancy_rate numeric,
+  ADD COLUMN IF NOT EXISTS inventory_pricing_factor numeric,
+  ADD COLUMN IF NOT EXISTS inventory_adjustment_amount numeric,
+  ADD COLUMN IF NOT EXISTS inventory_adjusted_unit_price numeric,
+  ADD COLUMN IF NOT EXISTS inventory_risk_level text,
+  ADD COLUMN IF NOT EXISTS inventory_pricing_snapshot jsonb NOT NULL DEFAULT '{}'::jsonb;
+```
 
-### RPC `get_inventory_availability_snapshot`
-- Parâmetros: `p_start_date`, `p_end_date`, `p_category_id`, `p_family_id`, `p_requested_quantity numeric`.
-- Retorna `available_quantity`, `pre_reserved_quantity`, `reserved_quantity`, `operational_quantity` (in_preparation+dispatched+in_operation+returned), `maintenance_quantity`, `can_fulfill bool` (`available >= requested`), `risk_level`, `message text` (PT-BR).
+### RPC `calculate_inventory_pricing_factor`
+SECURITY DEFINER, `SET search_path = public`. Lógica:
+1. Lê snapshot via `get_inventory_availability_snapshot(start, end, category, family, requested)` (já existente da INV 1.3) → `available`, `pre_reserved`, `reserved`, `operational`, `risk_level`.
+2. Recalcula `occupancy_rate` agregando `get_inventory_capacity_by_period`.
+3. Busca regra ativa em `inventory_pricing_rules` da org, com match por `(category_id, family_id)` e faixa `min_occupancy_rate <= rate AND (max_occupancy_rate IS NULL OR rate <= max_occupancy_rate)`. Ordem de prioridade: regra com `category+family` > só `category` > só `family` > global. Fallback: zero adjustment.
+4. Calcula `adjustment_amount` (percent ou fixed) e `adjusted_amount`.
+5. Retorna estrutura completa (rule_id, fator, valores, max_discount_percent, requires_approval, message PT-BR).
 
-Validação Zod no front; sem CHECK constraints adicionais.
+GRANT EXECUTE TO authenticated.
 
-## 2. Camadas TS
+## 2. Backend TS
 
-### Service `src/services/operations/inventoryOccupancy.ts`
-- `getOccupancyCalendar(filters)`
-- `getCapacityByPeriod(filters)`
-- `getAvailabilitySnapshot(payload)`
-- Chama `supabase.rpc(...)` com tipos derivados de `Database['public']['Functions']`.
+### `src/services/operations/inventoryPricing.ts`
+- `calculatePricingFactor(payload)` → chama RPC.
+- `listPricingRules()`, `createPricingRule()`, `updatePricingRule(id, patch)`, `deactivatePricingRule(id)` (UPDATE status='inactive').
 
-### Lib `src/lib/operations/inventoryOccupancy.ts`
-- `inventoryOccupancyFiltersSchema` (zod): datas obrigatórias, `end_date >= start_date`, opcionais ids/status, `view_mode` enum `'item'|'category'|'reservation'`.
-- `inventoryAvailabilitySnapshotSchema`: datas obrigatórias, `requested_quantity > 0`.
-- Helpers: `OCCUPANCY_TYPE_LABELS`, `OCCUPANCY_TYPE_BADGE_VARIANT`, `RISK_LEVEL_LABELS/COLORS`, `computeRiskLevel(rate)`, `groupOccupancyByItem/Category/Reservation`.
+### `src/lib/operations/inventoryPricing.ts`
+Schemas Zod:
+- `inventoryPricingRuleSchema` (name, category_id?, family_id?, min/max_occupancy_rate, price_adjustment_type, price_adjustment_value, max_discount_percent?, requires_approval, risk_level, status).
+- `inventoryPricingFactorPayloadSchema` (start_date, end_date, category_id?, family_id?, requested_quantity > 0, base_amount >= 0).
+- Helpers: `RISK_TO_BADGE`, `formatPricingFactor`, `derivePricingSnapshot(unitPrice, qty, factorResult)`.
 
-### Hooks `src/hooks/operations/useInventoryOccupancy.ts`
-- `useInventoryOccupancyCalendar(filters)`
-- `useInventoryCapacityByPeriod(filters)`
-- `useInventoryAvailabilitySnapshot(payload, { enabled })`
-- React Query, keys `['inventory','occupancy', ...]`, stale 60s.
+### `src/hooks/operations/useInventoryPricing.ts`
+- `useInventoryPricingRules()`
+- `useCreateInventoryPricingRule()`, `useUpdateInventoryPricingRule()`, `useDeactivateInventoryPricingRule()` (invalida query key).
+- `useInventoryPricingFactor(payload, { enabled })` — query key `['inventory','pricing','factor', payload]`, `staleTime: 30s`.
 
 ## 3. Frontend
 
-### Página `InventoryOccupancyCalendarPage.tsx`
-Renderizada dentro da sub-aba `calendar` em `InventoryReservationsTab.tsx` (substitui placeholder). Composição:
+### Configurações de regras de preço
+Nova sub-aba "Regras de Preço por Ocupação" dentro da aba "Reservas" (junto ao Calendário) ou — se houver tela de configurações já — anexar lá. Componentes:
+- `InventoryPricingRulesTab.tsx` (lista/tabela + toggle status).
+- `InventoryPricingRuleFormDialog.tsx` (create/edit; validações Zod). Acesso restrito por `useUserRole`/`has_role` (admin/owner).
+Tabela: Nome, Faixa (`min%`–`max%`), Ajuste, Desconto máx., Aprovação, Risco, Status, ações (editar / desativar).
 
-1. `InventoryCalendarFilters` — período (date range), categoria, família, tipo operacional, criticidade, status, cliente, proposta, reserva, busca por item; modo `Semana | Mês | Lista`.
-2. `InventoryCapacitySummaryCards` — cards: capacidade total, livres, pré-reservadas, reservadas, em operação, retornos pendentes, taxa de ocupação, risco.
-3. `InventoryOccupancyTimeline` — grid temporal item × dias com badges discretas (variants já existentes do design system, sem cores cruas).
-4. `InventoryOccupancyTable` — tabela "por item" alternativa à timeline.
-5. `InventoryCapacityByCategoryTable` — visão agregada por categoria/família com `occupancy_rate` e badge de risco.
-6. `InventoryOccupancyByReservationTable` — visão por reserva (cliente, período, status, itens, risco).
-7. `InventoryOccupancyAlerts` — gera alertas a partir do retorno das RPCs (categorias > 75%, retornos pendentes, sobreposições críticas).
-8. `InventoryAvailabilitySnapshotCard` — usado tanto na página quanto reaproveitado pela proposta.
+### Editor de proposta — `ProposalItemsManager.tsx`
+Para cada item com `product_id` que tenha categoria/família de inventário:
+- Hook `useInventoryPricingFactor` disparado quando o item tem `quantity > 0` e a proposta tem datas operacionais (já hoje em `proposals` via `event_start_date`/`operational_start_date` — usar o que existir).
+- Bloco discreto sob o item: Capacidade `XX%`, Fator `+YY%`, Risco, Disponível X / Demandado Y, Preço base / Preço ajustado.
+- Botão "Aplicar fator de ocupação" (ou aplicação automática + badge "Fator aplicado") que persiste no item:
+  - `inventory_occupancy_rate`, `inventory_pricing_factor`, `inventory_adjustment_amount`, `inventory_adjusted_unit_price`, `inventory_risk_level`, `inventory_pricing_snapshot` (RPC raw + ts).
+- Sinalização: se `discount_percent` > `max_discount_percent` da regra → `Alert` destrutivo "Desconto acima do permitido… aprovação necessária". Não trava nesta sprint, apenas sinaliza.
 
-Badges via `Badge` shadcn com `variant` semântica (`secondary`, `outline`, `destructive`); cores via tokens já em `index.css`.
+### Painel da proposta — `ProposalInventoryPanel.tsx`
+Novo bloco "Impacto comercial da capacidade":
+- Agrega snapshots dos `proposal_items`: ocupação média (ponderada por valor), maior risco, soma `inventory_adjustment_amount`, `requires_approval` (qualquer item true).
+- Card com tabela Produto / Ocupação / Fator / Risco / Status (Aplicado | Sem ajuste).
 
-### Integração com proposta
-Editar `ProposalInventoryPanel.tsx`:
-- Botão "Ver capacidade no período" abre `Sheet`/`Dialog` com `InventoryAvailabilitySnapshotCard`, pré-preenchendo período da proposta + categoria/família do item selecionado.
-
-### Visão Geral
-Editar `InventoryOverviewTab.tsx`:
-- Bloco "Capacidade operacional" com cards (7d / 30d / categorias críticas / itens em operação / retornos pendentes / capacidade livre) usando `useInventoryCapacityByPeriod`.
-- Lista "Próximos períodos críticos" derivada das categorias com `risk_level >= alto`.
+### Visão Geral do Inventário — `InventoryOverviewTab.tsx`
+Novo bloco "Pressão comercial do estoque" (ao lado de Capacidade Operacional):
+- Cards: ocupação média 7d / 30d (já vem do `useInventoryCapacityByPeriod`), categorias com acréscimo ativo (categorias com risk_level >= medium), receita protegida (sum `inventory_adjustment_amount` últimos 30 dias via SELECT em `proposal_items`), propostas com desconto em cenário crítico (count proposals com algum item `inventory_risk_level='critical'` AND `discount_percent > 0`).
+- RPC opcional `get_inventory_pricing_pressure(p_days int)` para evitar N queries no client.
 
 ## 4. Arquivos
 
 **Novos**
-- `supabase/migrations/<ts>_inv_1_3_occupancy_rpcs.sql`
-- `src/services/operations/inventoryOccupancy.ts`
-- `src/lib/operations/inventoryOccupancy.ts`
-- `src/hooks/operations/useInventoryOccupancy.ts`
-- `src/components/operations/inventory/InventoryOccupancyCalendarPage.tsx`
-- `src/components/operations/inventory/calendar/InventoryCalendarFilters.tsx`
-- `src/components/operations/inventory/calendar/InventoryCapacitySummaryCards.tsx`
-- `src/components/operations/inventory/calendar/InventoryOccupancyTimeline.tsx`
-- `src/components/operations/inventory/calendar/InventoryOccupancyTable.tsx`
-- `src/components/operations/inventory/calendar/InventoryCapacityByCategoryTable.tsx`
-- `src/components/operations/inventory/calendar/InventoryOccupancyByReservationTable.tsx`
-- `src/components/operations/inventory/calendar/InventoryOccupancyAlerts.tsx`
-- `src/components/operations/inventory/calendar/InventoryAvailabilitySnapshotCard.tsx`
+- `supabase/migrations/<ts>_inv_1_4_pricing_rules.sql`
+- `src/services/operations/inventoryPricing.ts`
+- `src/lib/operations/inventoryPricing.ts`
+- `src/hooks/operations/useInventoryPricing.ts`
+- `src/components/operations/inventory/InventoryPricingRulesTab.tsx`
+- `src/components/operations/inventory/InventoryPricingRuleFormDialog.tsx`
+- `src/components/proposals/ProposalItemPricingFactorBlock.tsx` (bloco por item)
+- `src/components/proposals/ProposalCapacityImpactBlock.tsx`
+- `src/components/operations/inventory/InventoryPricingPressureBlock.tsx`
 
 **Editados**
-- `src/components/operations/inventory/InventoryReservationsTab.tsx` (remove placeholder, monta página)
-- `src/components/operations/inventory/InventoryOverviewTab.tsx` (bloco capacidade)
-- `src/components/proposals/ProposalInventoryPanel.tsx` (botão snapshot)
-- `src/integrations/supabase/types.ts` (auto após migration)
+- `src/components/operations/inventory/InventoryReservationsTab.tsx` (nova sub-aba "Regras de preço")
+- `src/components/proposals/ProposalItemsManager.tsx` (integra bloco por item + persistência do snapshot)
+- `src/components/proposals/ProposalInventoryPanel.tsx` (novo bloco de impacto)
+- `src/components/operations/inventory/InventoryOverviewTab.tsx` (bloco pressão comercial)
+- `src/integrations/supabase/types.ts` (auto)
 
 ## 5. Segurança e qualidade
-- RPCs validam `organization_id = get_user_organization_id()` em todos os joins; sem acesso cross-tenant.
-- `SECURITY DEFINER` + `SET search_path = public` (memory rule).
-- Tudo via tokens semânticos do design system; sem cores hardcoded.
-- Sem alterações em INV 1.1 / 1.2 (apenas leitura agregada).
+- RLS: leitura org-wide; mutações somente admin/owner via `has_role`.
+- RPC `SECURITY DEFINER` + `SET search_path = public` (memory rule).
+- Snapshot imutável: gravado no momento de aplicação, nunca recalculado retroativamente.
+- Tokens semânticos do design system; nenhum HSL hardcoded.
+- Sem mudanças na INV 1.3 (apenas leituras adicionais às RPCs já existentes).
 
 ## 6. Critérios de aceite
-Conforme descrito na sprint: sub-aba real, 3 visões funcionais, filtros, capacidade/ocupação/risco calculados, snapshot acessível pela proposta, bloco na Visão Geral, RLS preservado, typecheck/build verdes.
+Conforme listado: tabela + RLS + seed por org, CRUD admin de regras, RPC de cálculo, snapshot persistido em `proposal_items`, sinalização de desconto acima do permitido, blocos de impacto na proposta e pressão comercial na visão geral, typecheck/build verdes, nada da INV 1.3 quebra.
