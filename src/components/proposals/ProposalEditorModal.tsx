@@ -106,6 +106,7 @@ export function ProposalEditorModal({
   const [suggestionMessage, setSuggestionMessage] = useState('');
   const [proposalNumber, setProposalNumber] = useState<string>('');
   const [proposalVersion, setProposalVersion] = useState<number>(1);
+  const [appliedTemplate, setAppliedTemplate] = useState<ProposalTemplate | null>(null);
   
   const queryClient = useQueryClient();
   const { organization } = useCurrentOrganization();
