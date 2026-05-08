@@ -534,6 +534,16 @@ const App = () => (
                 }
               />
               <Route
+                path="/app/operations/inventory"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <Inventory />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="/app/forecast"
                 element={
                   <ProtectedRoute>
