@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
+import { InventoryAvailabilitySnapshotDialog } from '@/components/operations/inventory/InventoryAvailabilitySnapshotDialog';
 import {
   RISK_LABELS,
   STATUS_LABELS,
@@ -132,13 +133,19 @@ export function ProposalInventoryPanel({ proposalId, closeDatePrevista }: Props)
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="text-base flex items-center gap-2">
-          <PackageSearch className="h-4 w-4" /> Inventário da proposta
-        </CardTitle>
-        <CardDescription>
-          Pré reserva operacional (segurança comercial). Não altera o status físico dos itens.
-        </CardDescription>
+      <CardHeader className="flex flex-row items-start justify-between gap-2">
+        <div>
+          <CardTitle className="text-base flex items-center gap-2">
+            <PackageSearch className="h-4 w-4" /> Inventário da proposta
+          </CardTitle>
+          <CardDescription>
+            Pré reserva operacional (segurança comercial). Não altera o status físico dos itens.
+          </CardDescription>
+        </div>
+        <InventoryAvailabilitySnapshotDialog
+          defaultStart={active?.operational_start_date ?? undefined}
+          defaultEnd={active?.operational_end_date ?? undefined}
+        />
       </CardHeader>
       <CardContent className="space-y-3">
         {list.isLoading ? (

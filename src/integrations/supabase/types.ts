@@ -32513,6 +32513,52 @@ export type Database = {
           table_name: string
         }[]
       }
+      get_inventory_availability_snapshot: {
+        Args: {
+          p_category_id?: string
+          p_end_date: string
+          p_family_id?: string
+          p_requested_quantity?: number
+          p_start_date: string
+        }
+        Returns: {
+          available_quantity: number
+          can_fulfill: boolean
+          maintenance_quantity: number
+          message: string
+          operational_quantity: number
+          pre_reserved_quantity: number
+          reserved_quantity: number
+          risk_level: string
+        }[]
+      }
+      get_inventory_capacity_by_period: {
+        Args: {
+          p_category_id?: string
+          p_end_date: string
+          p_family_id?: string
+          p_start_date: string
+        }
+        Returns: {
+          available_units: number
+          category_id: string
+          category_name: string
+          damaged_units: number
+          dispatched_units: number
+          family_id: string
+          family_name: string
+          in_operation_units: number
+          in_preparation_units: number
+          lost_units: number
+          maintenance_units: number
+          occupancy_rate: number
+          pre_reserved_units: number
+          reserved_units: number
+          returned_units: number
+          risk_level: string
+          total_units: number
+        }[]
+      }
       get_inventory_category_overview: {
         Args: { p_org_id: string }
         Returns: {
@@ -32539,6 +32585,37 @@ export type Database = {
           active_pre_reservations: number
           next_reserved_until: string
           pre_reserved_quantity: number
+        }[]
+      }
+      get_inventory_occupancy_calendar: {
+        Args: {
+          p_category_id?: string
+          p_end_date: string
+          p_family_id?: string
+          p_start_date: string
+          p_status?: string
+          p_view_mode?: string
+        }
+        Returns: {
+          category_id: string
+          category_name: string
+          client_name: string
+          end_date: string
+          family_id: string
+          family_name: string
+          item_code: string
+          item_id: string
+          item_name: string
+          item_type: string
+          occupancy_type: string
+          proposal_id: string
+          quantity: number
+          reservation_code: string
+          risk_level: string
+          source_id: string
+          source_type: string
+          start_date: string
+          status: string
         }[]
       }
       get_inventory_pre_reservations_overview: {
