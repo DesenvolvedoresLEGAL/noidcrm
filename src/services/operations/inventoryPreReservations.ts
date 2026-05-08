@@ -46,6 +46,12 @@ export interface PreReservationItemRow {
   availability_status: PreReservationAvailability;
   conflict_reason: string | null;
   notes: string | null;
+  allocation_status: PreReservationAllocationStatus;
+  allocated_quantity: number;
+  demand_label: string | null;
+  demand_source: DemandSource;
+  product_id: string | null;
+  proposal_item_id: string | null;
   created_at: string;
   updated_at: string;
 }
