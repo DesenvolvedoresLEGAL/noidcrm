@@ -52,6 +52,11 @@ const schema = z
     name: z.string().trim().min(2, 'Mínimo 2 caracteres').max(120, 'Máximo 120 caracteres'),
     description: z.string().trim().max(500, 'Máximo 500 caracteres').optional().or(z.literal('')),
     category_id: z.string().uuid('Selecione uma categoria.'),
+    family_id: z.string().uuid().nullable().optional(),
+    operational_type: z.enum([
+      'equipment','accessory','part','consumable','logical_kit','infrastructure','tool','other',
+    ]),
+    criticality: z.enum(['low','medium','high','critical']),
     location_id: z.string().uuid('Selecione um local.'),
     status: z.enum(STATUSES),
     unit_of_measure: z.string().min(1, 'Obrigatório').max(20, 'Máximo 20 caracteres'),
