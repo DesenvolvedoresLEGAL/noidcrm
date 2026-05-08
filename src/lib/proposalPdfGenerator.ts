@@ -4,6 +4,7 @@
 import type jsPDFType from 'jspdf';
 import { formatDateBR } from './dateUtils';
 import { extractEmail, extractPhone } from './contactFormat';
+import { getDynamicPricingBreakdown } from './proposals/dynamicPricing';
 
 // Cache do módulo carregado para evitar import repetido
 let _pdfLibs: { jsPDF: typeof jsPDFType; autoTable: any } | null = null;
