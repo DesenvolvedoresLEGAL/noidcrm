@@ -123,7 +123,16 @@ function formatLocalDate(date: Date): string {
 export function calculateInstallments(
   term: PaymentTerm,
   totalAmount: number,
-  options?: { proposalExpiresAt?: string | null; approvedAmount?: number | null },
+  options?: {
+    proposalExpiresAt?: string | null;
+    approvedAmount?: number | null;
+    /**
+     * PRICE UX 1.0.3 — quando a tabela dinâmica está ativa, o vencimento do
+     * "à vista" é a data-limite da faixa vigente (current_ends_at), não a
+     * data manual "Início" do termo.
+     */
+    dynamicPricingCurrentEndsAt?: string | null;
+  },
 ): Installment[] {
   if (term.payment_type !== 'one_time') {
     return [];
