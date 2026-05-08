@@ -679,7 +679,7 @@ export default function ProposalEditor() {
       setLastSaved(null);
       hasRestoredFromStorageRef.current = false;
       if (savedProposalId) {
-        invalidateProposalCaches(queryClient, savedProposalId);
+        invalidateProposalCaches(queryClient, savedProposalId, opportunityId || proposalData?.opportunity_id);
       }
       console.log('[ProposalEditor] Save completed successfully');
     } catch (error) {
