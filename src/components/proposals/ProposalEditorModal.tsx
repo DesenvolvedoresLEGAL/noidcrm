@@ -32,6 +32,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
+import { invalidateProposalCaches } from '@/hooks/proposals/useProposalOrchestrator';
 import {
   createProposal,
   updateProposal,
