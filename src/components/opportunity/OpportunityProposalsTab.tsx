@@ -199,7 +199,11 @@ export function OpportunityProposalsTab({ opportunityId, pipelineType }: Opportu
   };
 
   const handleNewProposal = () => {
-    navigate(`/app/proposals/new?opportunity_id=${opportunityId}`);
+    setTemplatePickerOpen(true);
+  };
+
+  const handleTemplateConfirmed = (templateId: string) => {
+    navigate(`/app/proposals/new?opportunity_id=${opportunityId}&template_id=${templateId}`);
   };
 
   const handleEditProposal = (proposalId: string) => {
