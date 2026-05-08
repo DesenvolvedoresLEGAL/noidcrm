@@ -114,3 +114,21 @@ export function useDisableProposalDynamicPricing(proposalId: string) {
     },
   });
 }
+
+export function useGenerateEventAntecedencePricing(proposalId: string) {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: (force?: boolean) =>
+      generateEventAntecedencePricing(proposalId, !!force),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: KEY(proposalId) });
+      qc.invalidateQueries({ queryKey: SNAPSHOT_KEY(proposalId) });
+      qc.invalidateQueries({ queryKey: EVENTS_KEY(proposalId) });
+      qc.invalidateQueries({ queryKey: ['proposal', proposalId] });
+      toast({ title: 'Tabela dinâmica gerada por antecedência do evento' });
+    },
+    onError: (e: any) =>
+      toast({ title: 'Erro', description: e?.message, variant: 'destructive' }),
+  });
+}
