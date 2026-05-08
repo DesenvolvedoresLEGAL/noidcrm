@@ -1512,20 +1512,8 @@ export default function ProposalPublicView() {
         })()}
         </div>
 
-        {/* Dynamic Pricing Banner */}
-        {proposal?.dynamic_pricing_enabled && (
-          <>
-            <PublicProposalDynamicPricingBanner
-              snapshot={proposal.dynamic_pricing_snapshot as any}
-            />
-            {publicPaymentEnabled && (
-              <PublicProposalPaymentBlock
-                proposalId={proposal.id}
-                snapshot={proposal.dynamic_pricing_snapshot as any}
-              />
-            )}
-          </>
-        )}
+        {/* Bloco "Condição comercial vigente" / "Pagar valor vigente" removido —
+            essa cobrança é responsabilidade do ERP, não do link público da proposta. */}
 
         {/* Payment Terms */}
         <Card data-section="payment">
