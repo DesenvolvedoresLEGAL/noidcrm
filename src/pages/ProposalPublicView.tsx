@@ -1439,9 +1439,15 @@ export default function ProposalPublicView() {
 
         {/* Dynamic Pricing Banner */}
         {proposal?.dynamic_pricing_enabled && (
-          <PublicProposalDynamicPricingBanner
-            snapshot={proposal.dynamic_pricing_snapshot as any}
-          />
+          <>
+            <PublicProposalDynamicPricingBanner
+              snapshot={proposal.dynamic_pricing_snapshot as any}
+            />
+            <PublicProposalPaymentBlock
+              proposalId={proposal.id}
+              snapshot={proposal.dynamic_pricing_snapshot as any}
+            />
+          </>
         )}
 
         {/* Payment Terms */}
