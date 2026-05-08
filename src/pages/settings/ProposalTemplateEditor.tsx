@@ -101,6 +101,27 @@ export default function ProposalTemplateEditor() {
       return;
     }
 
+    // Valida regras comerciais
+    const rulesParsed = proposalTemplateCommercialRulesSchema.safeParse({
+      revenue_type: templateData.revenue_type ?? null,
+      dynamic_pricing_applicability: templateData.dynamic_pricing_applicability ?? 'none',
+      dynamic_pricing_mode: templateData.dynamic_pricing_mode ?? 'none',
+      validity_strategy: templateData.validity_strategy ?? 'fixed_days_from_creation',
+      default_validity_days: templateData.default_validity_days ?? null,
+      requires_valid_until: !!templateData.requires_valid_until,
+      allow_recurring: !!templateData.allow_recurring,
+      default_payment_mode: templateData.default_payment_mode ?? 'one_time',
+      show_dynamic_pricing_on_public_link: !!templateData.show_dynamic_pricing_on_public_link,
+      show_dynamic_pricing_on_pdf: !!templateData.show_dynamic_pricing_on_pdf,
+      allow_pix_payment: templateData.allow_pix_payment !== false,
+      allow_complementary_charge: templateData.allow_complementary_charge !== false,
+      template_commercial_rules: templateData.template_commercial_rules ?? {},
+    });
+    if (!rulesParsed.success) {
+      toast.error(rulesParsed.error.issues[0]?.message ?? 'Regras comerciais inválidas');
+      return;
+    }
+
     setIsSaving(true);
     try {
       if (isEditing) {
