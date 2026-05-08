@@ -49,8 +49,6 @@ import {
 import { getProposalByToken, declineProposal, trackView } from '@/services/crm/proposals';
 import { listProposalItems } from '@/services/crm/proposal-items';
 import { getPaymentTerms, calculateInstallments } from '@/services/crm/proposal-payment-terms';
-import { PublicProposalDynamicPricingBanner } from '@/components/proposals/PublicProposalDynamicPricingBanner';
-import { PublicProposalPaymentBlock } from '@/components/proposals/PublicProposalPaymentBlock';
 import { PublicProposalApprovedScreen } from '@/components/proposals/PublicProposalApprovedScreen';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -1512,20 +1510,8 @@ export default function ProposalPublicView() {
         })()}
         </div>
 
-        {/* Dynamic Pricing Banner */}
-        {proposal?.dynamic_pricing_enabled && (
-          <>
-            <PublicProposalDynamicPricingBanner
-              snapshot={proposal.dynamic_pricing_snapshot as any}
-            />
-            {publicPaymentEnabled && (
-              <PublicProposalPaymentBlock
-                proposalId={proposal.id}
-                snapshot={proposal.dynamic_pricing_snapshot as any}
-              />
-            )}
-          </>
-        )}
+        {/* Bloco "Condição comercial vigente" / "Pagar valor vigente" removido —
+            essa cobrança é responsabilidade do ERP, não do link público da proposta. */}
 
         {/* Payment Terms */}
         <Card data-section="payment">
@@ -1946,9 +1932,7 @@ export default function ProposalPublicView() {
               <div className="text-center space-y-4">
                 <h3 className="text-xl md:text-2xl font-bold">Pronto para avançar?</h3>
                 <p className="text-sm md:text-base text-muted-foreground max-w-md mx-auto">
-                  {proposal?.dynamic_pricing_enabled
-                    ? 'Clique em "Aprovar proposta com valor vigente" para aceitar formalmente esta proposta nas condições comerciais apresentadas.'
-                    : 'Clique em "Aprovar Proposta" para aceitar formalmente esta oferta ou "Recusar" para nos informar sua decisão.'}
+                  Clique em "Aprovar Proposta" para aceitar formalmente esta oferta ou "Recusar" para nos informar sua decisão.
                 </p>
                 <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 pt-4">
                   <Button
@@ -1957,9 +1941,7 @@ export default function ProposalPublicView() {
                     onClick={() => setShowAcceptModal(true)}
                   >
                     <CheckCircle2 className="h-5 w-5" />
-                    {proposal?.dynamic_pricing_enabled
-                      ? 'Aprovar proposta com valor vigente'
-                      : 'Aprovar Proposta'}
+                    Aprovar Proposta
                   </Button>
                   <Button
                     size="lg"

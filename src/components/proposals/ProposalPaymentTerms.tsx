@@ -416,26 +416,27 @@ export function ProposalPaymentTerms({
         )}
 
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
-          <TabsList className="grid w-full grid-cols-2 h-10">
-            <TabsTrigger value="one_time" className="text-sm flex items-center gap-2">
-              <Zap className="h-3.5 w-3.5" />
-              Avulso
-              {hasOneTimeItems && (
-                <Badge variant="secondary" className="ml-1 text-[10px] px-1.5">
-                  {formatCurrency(effectiveOneTimeTotal)}
-                </Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="recurring" className="text-sm flex items-center gap-2">
-              <Repeat className="h-3.5 w-3.5" />
-              Recorrente
-              {hasRecurringItems && (
+          {/* Só mostra abas quando houver MRR; caso contrário, é só Avulso */}
+          {hasRecurringItems && (
+            <TabsList className="grid w-full grid-cols-2 h-10">
+              <TabsTrigger value="one_time" className="text-sm flex items-center gap-2">
+                <Zap className="h-3.5 w-3.5" />
+                Avulso
+                {hasOneTimeItems && (
+                  <Badge variant="secondary" className="ml-1 text-[10px] px-1.5">
+                    {formatCurrency(effectiveOneTimeTotal)}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="recurring" className="text-sm flex items-center gap-2">
+                <Repeat className="h-3.5 w-3.5" />
+                Recorrente
                 <Badge className="ml-1 text-[10px] px-1.5 bg-emerald-500">
                   {formatCurrency(recurringMRR)}/mês
                 </Badge>
-              )}
-            </TabsTrigger>
-          </TabsList>
+              </TabsTrigger>
+            </TabsList>
+          )}
 
           {/* ===== AVULSO TAB ===== */}
           <TabsContent value="one_time" className="space-y-4 pt-3">
@@ -602,26 +603,28 @@ export function ProposalPaymentTerms({
                     </>
                   )}
 
-                  <div className="space-y-1">
-                    <Label className="text-xs flex items-center gap-1">
-                      <Calendar className="h-3 w-3" />
-                      Início
-                    </Label>
-                    <Input
-                      type="date"
-                      value={oneTimeTerm.first_installment_date || ''}
-                      onChange={(e) => {
-                        const newDate = e.target.value;
-                        // Sync entry_date with first_installment_date if entry_percent > 0 and entry_date not manually set
-                        const updates: Partial<typeof oneTimeTerm> = { first_installment_date: newDate };
-                        if ((oneTimeTerm.entry_percent || 0) > 0 && !oneTimeTerm.entry_date) {
-                          updates.entry_date = newDate;
-                        }
-                        updateOneTime(updates);
-                      }}
-                      className="h-8 text-sm"
-                    />
-                  </div>
+                  {/* "Início" só faz sentido fora do "À Vista" — no à vista o vencimento vem da validade/faixa vigente */}
+                  {selectedPreset !== 'a_vista' && (
+                    <div className="space-y-1">
+                      <Label className="text-xs flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        Início
+                      </Label>
+                      <Input
+                        type="date"
+                        value={oneTimeTerm.first_installment_date || ''}
+                        onChange={(e) => {
+                          const newDate = e.target.value;
+                          const updates: Partial<typeof oneTimeTerm> = { first_installment_date: newDate };
+                          if ((oneTimeTerm.entry_percent || 0) > 0 && !oneTimeTerm.entry_date) {
+                            updates.entry_date = newDate;
+                          }
+                          updateOneTime(updates);
+                        }}
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                  )}
 
                   <div className="space-y-1">
                     <Label className="text-xs">Desconto</Label>
