@@ -1,61 +1,102 @@
-## Sprint INV 0.7 — Especificações Técnicas (metadata.technical_specs)
+## Sprint INV 0.8 — Categorias, Famílias e Classificação Operacional
 
-Adicionar camada universal de atributos técnicos flexíveis em `inventory_items.metadata.technical_specs`. Sem nova tabela, sem RPC, sem edge function, sem alteração de schema.
+### Adaptações ao estado real do banco
 
-### Arquivos a criar
+A spec original assume duas tabelas (`inventory_serialized_items` / `inventory_quantity_items`) e helpers `user_belongs_to_organization` / `is_organization_admin_or_owner`. Hoje o módulo usa:
 
-1. **`src/lib/operations/inventoryTechnicalSpecs.ts`** — utilitários puros e schema:
-   - `normalizeSpecKey(label)` — minúsculo, sem acento, espaços → `_`, sem chars especiais, sem `_` duplicados/no início/fim.
-   - `getTechnicalSpecs(metadata)` — leitura segura: retorna `[]` se `metadata` nulo/malformado ou se `technical_specs` não for array.
-   - `mergeTechnicalSpecs(existingMetadata, specs)` — preserva todas as outras chaves do `metadata` e atualiza apenas `technical_specs`.
-   - `TECHNICAL_SPEC_TYPES` = `['text','number','date','boolean','url']`, label map pt-BR (Texto, Número, Data, Sim/Não, URL).
-   - `MAX_SPECS = 30`.
-   - `technicalSpecSchema` (Zod): `key` min 1 max 80, `label` min 2 max 80, `value` min 1 max 200, `type` enum default `text`, `notes` max 300 nullable optional.
-   - `technicalSpecsArraySchema`: `z.array(...).max(30, 'Limite de 30 especificações técnicas por item.').default([]).superRefine` — rejeita `key` ou `label` (lowercased+trim) duplicados com mensagem "Já existe uma especificação com este campo neste item."
+- Tabela única `inventory_items` (`item_kind` = `serialized` | `quantity`).
+- `inventory_categories` já existe com `name`, `description`, `item_kind`, `is_active`, `sort_order` (sem slug/color/icon).
+- RLS usa `user_can_access_inventory(organization_id)`.
+- Não há colunas `reserved_quantity` / `maintenance_quantity` em itens; reservado/manutenção só existem como `status`.
 
-2. **`src/components/operations/inventory/TechnicalSpecsSection.tsx`** — bloco reutilizável (controlado por react-hook-form via `useFieldArray`):
-   - Card com título "Especificações Técnicas" + texto auxiliar.
-   - Estado vazio: "Nenhuma especificação técnica adicionada." + botão "Adicionar especificação".
-   - Cada linha: inputs `label`, `value`, select `type`, input `notes`, botão remover.
-   - Auto-gera `key` no `onBlur`/`onChange` do `label` via `normalizeSpecKey`. Se `key` resultar vazia, mostra erro inline e bloqueia (a validação Zod já cobre `min 1`).
-   - Botão "Adicionar especificação" desabilitado quando atinge 30; tooltip/aviso.
-   - Layout responsivo (grid sm:grid-cols-12), reaproveita `Input`, `Select`, `Button`, `Label`.
+O plano abaixo respeita essa realidade, mantendo a intenção da sprint.
 
-### Arquivos a editar
+### 1) Migração
 
-3. **`src/services/operations/inventoryItems.ts`**:
-   - Adicionar `technical_specs?: TechnicalSpec[]` em `SerializedItemInput` e `QuantityItemInput`.
-   - Em `createSerializedItem`/`createQuantityItem`: `metadata: { technical_specs: input.technical_specs ?? [] }`.
-   - Em `updateSerializedItem`/`updateQuantityItem`: aceitar opcional `_currentMetadata` e, quando `technical_specs !== undefined`, setar `patch.metadata = { ...(currentMetadata ?? {}), technical_specs }` para preservar outras chaves.
+**`inventory_categories` (alter)**
+- Adicionar `slug text`, `color text`, `icon text`.
+- Backfill `slug = normalize_inventory_slug(name)`; depois `NOT NULL`.
+- Índice único `(organization_id, slug)`.
+- Manter `is_active` como fonte de verdade (UI mostra "Ativo/Inativo"); `item_kind` permanece, mas formulário passa a aceitar "Ambos" (default `serialized` para compatibilidade — sem alterar dados existentes).
 
-4. **`src/components/operations/inventory/InventoryItemFormDialog.tsx`** (serializado):
-   - Estender schema com `technical_specs: technicalSpecsArraySchema`.
-   - `useEffect`: carregar `getTechnicalSpecs(item?.metadata)` no reset.
-   - Renderizar `<TechnicalSpecsSection control={form.control} />` abaixo de Observações.
-   - Passar `technical_specs` e `_currentMetadata: item?.metadata` para o update.
+**`inventory_families` (nova)** — conforme spec, com FK em `inventory_categories`, RLS `user_can_access_inventory`, trigger de slug e `updated_at`.
 
-5. **`src/components/operations/inventory/InventoryQuantityItemFormDialog.tsx`** (por quantidade):
-   - Mesmas mudanças do serializado.
+**`inventory_items` (alter)**
+- `family_id uuid references inventory_families(id) on delete set null`
+- `operational_type text not null default 'equipment'` + check enum (8 valores).
+- `criticality text not null default 'medium'` + check enum (4 valores).
+- Índices em `(organization_id, family_id)` e `(organization_id, criticality)`.
+- Trigger `validate_inventory_item_family_category()` em INSERT/UPDATE OF (category_id, family_id).
 
-6. **`src/hooks/operations/useInventoryItems.ts`**:
-   - Tipos das mutations já são `Partial<...Input>`; nenhuma mudança estrutural — `technical_specs` flui automaticamente.
+**Funções/triggers**
+- `create extension if not exists unaccent`.
+- `normalize_inventory_slug(text)` (immutable).
+- `set_inventory_category_slug()` + `set_inventory_family_slug()` triggers BEFORE INSERT/UPDATE.
 
-7. **`src/components/operations/inventory/InventorySerializedItemsTab.tsx`** e **`InventoryQuantityItemsTab.tsx`**:
-   - Adicionar coluna discreta "Specs" exibindo `getTechnicalSpecs(item.metadata).length` (ou `0`). Sem popover/drawer nesta sprint (preferência do brief).
+**RPC `get_inventory_category_overview()`** — agregando a partir de `inventory_items` único:
+- `total_skus = count(*)`
+- `total_units = sum(quantity_total)`
+- `available_units = sum(quantity_available)` (e count para serializados disponíveis)
+- `reserved_units = count(*) filter (where status='reserved')` (placeholder até existirem reservas reais; sprint observa que reservas virão depois)
+- `maintenance_units = count(*) filter (where status='maintenance')`
+- `critical_items = count(*) filter (where criticality='critical')`
+- Filtra por `user_can_access_inventory`.
 
-### Regras técnicas
+**Seed** — categorias padrão (Conectividade, Energia, Credenciamento, Sensores, Cabos e Acessórios, Materiais de Consumo, Outros) só em organizações sem nenhuma categoria.
 
-- Salvamento sempre via merge: `{ ...(metadata ?? {}), technical_specs }` — chave `source` ou outras nunca apagadas.
-- Toasts reutilizam mensagens existentes ("Item criado/atualizado com sucesso.", versão "por quantidade" idem).
-- Erros de validação Zod (duplicado, limite, key vazia) aparecem inline no formulário; submit bloqueado.
-- RLS preservada — todas as gravações continuam pelo cliente Supabase autenticado, filtradas por `organization_id` (sem alterações nas regras).
+### 2) Services
+
+- `inventoryCategories.ts` — estender com `slug`, `color`, `icon`. Manter API atual.
+- `inventoryFamilies.ts` (novo) — `listFamilies(orgId, categoryId?)`, `createFamily`, `updateFamily`, `deactivateFamily`.
+- `inventoryItems.ts` — incluir `family_id`, `operational_type`, `criticality` em `SerializedItemInput` e `QuantityItemInput`; SELECT joinando `inventory_categories(id,name,slug,color,icon)` e `inventory_families(id,name,slug)`.
+- `inventoryOverview.ts` — adicionar `getCategoryOverview()` chamando o RPC; alertas adicionais (críticos indisponíveis, categorias com >75% reservado, famílias com manutenção, categorias sem disponíveis, itens sem categoria).
+
+### 3) Hooks
+
+- `useInventoryCategories` — manter; expor `useCreate/Update/DeactivateCategory`.
+- `useInventoryFamilies(categoryId?)`, `useCreate/Update/DeactivateFamily` (novo `useInventoryFamilies.ts`).
+- `useInventoryOverview` — adicionar query `categoryOverview` e novos alertas.
+
+### 4) Componentes UI
+
+- `InventoryCategoriesTab.tsx` — adicionar colunas Slug, Cor, Ícone, "# famílias", "# itens"; dialog atualizado com color/icon (usar tokens semânticos do design system).
+- `InventoryFamiliesTab.tsx` (novo) — filtro por categoria, CRUD, contagem de itens.
+- `InventoryFamilyFormDialog.tsx` (novo).
+- `Inventory.tsx` — sub-tab "Configurações" agrupando Categorias / Famílias / Locais (ou novas tabs irmãs, mantendo padrão atual).
+- `InventoryClassificationFields.tsx` (novo, reutilizável):
+  - Categoria (obrigatória), Família (carrega quando categoria selecionada; limpa ao trocar categoria), Tipo operacional (obrigatório, default `equipment`), Criticidade (default `medium`).
+- `InventoryItemFormDialog.tsx` e `InventoryQuantityItemFormDialog.tsx` — substituir o select de categoria atual por `InventoryClassificationFields`. Persistir os 4 campos.
+- `InventorySerializedItemsTab.tsx` e `InventoryQuantityItemsTab.tsx`:
+  - Filtros: Categoria, Família, Tipo, Criticidade, Status, Busca textual (nome, código, serial, categoria, família, `metadata.technical_specs`).
+  - Colunas: Categoria, Família, Tipo, Criticidade (badge sóbrio via tokens), Specs (já existe).
+  - "Sem categoria" exibido para itens legacy.
+- `InventoryOverviewTab.tsx`:
+  - Bloco "Inventário por Categoria" (cards/tabela do RPC).
+  - Bloco de alertas inteligentes adicionais.
+
+### 5) Labels
+
+`inventoryLabels.ts` — adicionar `OPERATIONAL_TYPE_LABELS`, `CRITICALITY_LABELS` (pt-BR) e helpers `criticalityBadgeVariant()`.
+
+### 6) Validação Zod
+
+`inventoryClassificationSchema`, `inventoryCategorySchema` (acrescentando color/icon), `inventoryFamilySchema` conforme spec.
+
+### 7) Permissões
+
+- Visualização: qualquer usuário com `user_can_access_inventory`.
+- Mutação de categoria/família: mesma RLS atual (não há helper `is_organization_admin_or_owner` separado; controle adicional fica na UI por role `owner|admin|operations`, replicando o gate da rota).
+
+### Critérios de aceite
+
+- Cadastro/edição/inativação de categorias e famílias funcional.
+- Itens (serializado e por quantidade) classificados pelos 4 campos.
+- Trigger impede família de outra categoria.
+- Listas com filtros e colunas pedidos; busca textual incluindo `metadata.technical_specs`.
+- Dashboard com bloco por categoria + alertas.
+- Itens legacy continuam visíveis como "Sem categoria"; nada em `metadata` é sobrescrito.
+- Typecheck e build passando.
 
 ### Fora de escopo
 
-Tabela nova, presets por categoria, templates por tipo, vínculo entre itens, kits, reservas, disponibilidade, proposta, popover/drawer de visualização rápida, KPI "itens com specs" na Visão Geral, edge functions, RPCs, alteração de schema.
-
-### Riscos
-
-- `metadata` pode vir como `null` em itens antigos — `getTechnicalSpecs` e `mergeTechnicalSpecs` tratam.
-- `useFieldArray` precisa de `id` estável por linha (React Hook Form gera automaticamente).
-- Coluna "Specs" nas duas tabs aumenta levemente largura — manter classe `text-center w-16` para não poluir.
+Reservas reais (apenas placeholder via status), kits, precificação dinâmica, ações em lote de reclassificação, edge functions.
