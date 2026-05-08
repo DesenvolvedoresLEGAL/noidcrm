@@ -558,17 +558,36 @@ export default function ProposalEditor() {
             await savePaymentTermsToDb(savedProposalId);
             console.log('[ProposalEditor] Payment terms saved for new proposal');
           }
+
+          // CRITICAL: Apply template to persist commercial rules (revenue_type,
+          // dynamic_pricing_applicability/mode, validity_strategy, payment_mode, template_name)
+          if (preselectedTemplateId) {
+            try {
+              await applyTemplate(savedProposalId, preselectedTemplateId);
+              console.log('[ProposalEditor] Template commercial rules applied');
+            } catch (e) {
+              console.warn('[ProposalEditor] applyTemplate failed (non-blocking):', e);
+            }
+          }
+
           // ALWAYS recalculate totals — even without items, payment term discount may have changed
           await updateProposalTotals(savedProposalId);
           await syncOpportunityValue(savedProposalId);
           console.log('[ProposalEditor] Totals recalculated and synced (with discount applied)');
-          
+
+          // Orchestrate: ensure dynamic pricing tiers, snapshot, payment defaults
+          try {
+            await orchestrateProposalFinancials(savedProposalId, 'create_with_template');
+          } catch (e) {
+            console.warn('[ProposalEditor] orchestrate failed (non-blocking):', e);
+          }
+
           // Clear draft and invalidate queries
           clearDraft();
           setLastSaved(null);
           hasRestoredFromStorageRef.current = false;
-          queryClient.invalidateQueries({ queryKey: proposalKeys.lists() });
-          
+          invalidateProposalCaches(queryClient, savedProposalId);
+
           // Update state and navigate AFTER saving everything
           setCurrentProposalId(newProposal.id);
           setProposalNumber(newProposal.proposal_number || '');
