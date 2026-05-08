@@ -22345,6 +22345,199 @@ export type Database = {
           },
         ]
       }
+      proposal_payment_events: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          difference_amount: number | null
+          event_type: string
+          expected_amount: number | null
+          id: string
+          message: string | null
+          metadata: Json
+          organization_id: string
+          paid_amount: number | null
+          payment_intent_id: string | null
+          proposal_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          difference_amount?: number | null
+          event_type: string
+          expected_amount?: number | null
+          id?: string
+          message?: string | null
+          metadata?: Json
+          organization_id: string
+          paid_amount?: number | null
+          payment_intent_id?: string | null
+          proposal_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          difference_amount?: number | null
+          event_type?: string
+          expected_amount?: number | null
+          id?: string
+          message?: string | null
+          metadata?: Json
+          organization_id?: string
+          paid_amount?: number | null
+          payment_intent_id?: string | null
+          proposal_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposal_payment_events_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_payment_events_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_report_legacy_retirement_readiness_v2"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "proposal_payment_events_payment_intent_id_fkey"
+            columns: ["payment_intent_id"]
+            isOneToOne: false
+            referencedRelation: "proposal_payment_intents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proposal_payment_intents: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          currency: string
+          difference_amount: number
+          dynamic_pricing_rule_id: string | null
+          dynamic_pricing_snapshot: Json
+          dynamic_pricing_tier_id: string | null
+          erp_charge_id: string | null
+          erp_invoice_id: string | null
+          expected_amount: number
+          expires_at: string | null
+          id: string
+          notes: string | null
+          organization_id: string
+          paid_amount: number
+          paid_at: string | null
+          parent_payment_intent_id: string | null
+          payment_gateway_snapshot: Json
+          payment_method: string
+          payment_reference: string | null
+          pix_copy_paste: string | null
+          pix_qr_code: string | null
+          proposal_id: string
+          source: string
+          status: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          difference_amount?: number
+          dynamic_pricing_rule_id?: string | null
+          dynamic_pricing_snapshot?: Json
+          dynamic_pricing_tier_id?: string | null
+          erp_charge_id?: string | null
+          erp_invoice_id?: string | null
+          expected_amount?: number
+          expires_at?: string | null
+          id?: string
+          notes?: string | null
+          organization_id: string
+          paid_amount?: number
+          paid_at?: string | null
+          parent_payment_intent_id?: string | null
+          payment_gateway_snapshot?: Json
+          payment_method?: string
+          payment_reference?: string | null
+          pix_copy_paste?: string | null
+          pix_qr_code?: string | null
+          proposal_id: string
+          source?: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          difference_amount?: number
+          dynamic_pricing_rule_id?: string | null
+          dynamic_pricing_snapshot?: Json
+          dynamic_pricing_tier_id?: string | null
+          erp_charge_id?: string | null
+          erp_invoice_id?: string | null
+          expected_amount?: number
+          expires_at?: string | null
+          id?: string
+          notes?: string | null
+          organization_id?: string
+          paid_amount?: number
+          paid_at?: string | null
+          parent_payment_intent_id?: string | null
+          payment_gateway_snapshot?: Json
+          payment_method?: string
+          payment_reference?: string | null
+          pix_copy_paste?: string | null
+          pix_qr_code?: string | null
+          proposal_id?: string
+          source?: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposal_payment_intents_dynamic_pricing_rule_id_fkey"
+            columns: ["dynamic_pricing_rule_id"]
+            isOneToOne: false
+            referencedRelation: "proposal_dynamic_pricing_rules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_payment_intents_dynamic_pricing_tier_id_fkey"
+            columns: ["dynamic_pricing_tier_id"]
+            isOneToOne: false
+            referencedRelation: "proposal_dynamic_pricing_tiers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_payment_intents_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_payment_intents_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_report_legacy_retirement_readiness_v2"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "proposal_payment_intents_parent_payment_intent_id_fkey"
+            columns: ["parent_payment_intent_id"]
+            isOneToOne: false
+            referencedRelation: "proposal_payment_intents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       proposal_payment_terms: {
         Row: {
           auto_renewal: boolean | null
@@ -22928,11 +23121,17 @@ export type Database = {
           introduction: string | null
           key_differentiator: string | null
           last_viewed_at: string | null
+          latest_payment_intent_id: string | null
           layout_id: string | null
           notes: string | null
           opportunity_id: string
           organization_id: string
           parent_proposal_id: string | null
+          payment_difference_amount: number | null
+          payment_expected_amount: number | null
+          payment_paid_amount: number | null
+          payment_snapshot: Json
+          payment_validation_status: string | null
           pdf_url: string | null
           proposal_number: string | null
           proposal_version: number | null
@@ -22985,11 +23184,17 @@ export type Database = {
           introduction?: string | null
           key_differentiator?: string | null
           last_viewed_at?: string | null
+          latest_payment_intent_id?: string | null
           layout_id?: string | null
           notes?: string | null
           opportunity_id: string
           organization_id: string
           parent_proposal_id?: string | null
+          payment_difference_amount?: number | null
+          payment_expected_amount?: number | null
+          payment_paid_amount?: number | null
+          payment_snapshot?: Json
+          payment_validation_status?: string | null
           pdf_url?: string | null
           proposal_number?: string | null
           proposal_version?: number | null
@@ -23042,11 +23247,17 @@ export type Database = {
           introduction?: string | null
           key_differentiator?: string | null
           last_viewed_at?: string | null
+          latest_payment_intent_id?: string | null
           layout_id?: string | null
           notes?: string | null
           opportunity_id?: string
           organization_id?: string
           parent_proposal_id?: string | null
+          payment_difference_amount?: number | null
+          payment_expected_amount?: number | null
+          payment_paid_amount?: number | null
+          payment_snapshot?: Json
+          payment_validation_status?: string | null
           pdf_url?: string | null
           proposal_number?: string | null
           proposal_version?: number | null
@@ -32497,6 +32708,10 @@ export type Database = {
           score_range: string
         }[]
       }
+      create_complementary_payment_intent: {
+        Args: { p_original_payment_intent_id: string }
+        Returns: Json
+      }
       create_forecast_daily_snapshot_v2: {
         Args: {
           p_organization_id: string
@@ -32511,6 +32726,10 @@ export type Database = {
       create_organization_backup: {
         Args: { p_backup_type?: string; p_organization_id: string }
         Returns: string
+      }
+      create_proposal_payment_intent: {
+        Args: { p_proposal_id: string; p_source?: string }
+        Returns: Json
       }
       create_proposal_version: {
         Args: { p_proposal_id: string }
@@ -32672,6 +32891,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      expire_old_payment_intents: { Args: never; Returns: number }
       find_inventory_allocation_candidates: {
         Args: { p_pre_reservation_item_id: string }
         Returns: {
@@ -33735,6 +33955,15 @@ export type Database = {
       }
       user_is_org_member: { Args: { _org_id: string }; Returns: boolean }
       validate_cpf: { Args: { cpf: string }; Returns: boolean }
+      validate_proposal_payment_amount: {
+        Args: {
+          p_paid_amount: number
+          p_paid_at?: string
+          p_payment_intent_id: string
+          p_payment_reference?: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       accelerator_tier_type: "NONE" | "BRONZE" | "SILVER" | "GOLD" | "DIAMOND"

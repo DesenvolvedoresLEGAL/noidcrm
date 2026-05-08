@@ -11,7 +11,7 @@ interface Props {
 }
 
 const CLAUSE =
-  'A condição comercial é vinculada à data efetiva de pagamento, não apenas à data de emissão da proposta. Pagamentos realizados após o vencimento da condição vigente poderão ser recalculados conforme o valor ativo na data do pagamento.';
+  'O pagamento da proposta deve ser realizado exclusivamente pelo valor vigente no momento da emissão da cobrança. Pagamentos realizados manualmente com valor inferior ao vigente serão considerados parciais e poderão gerar cobrança complementar.';
 
 /**
  * Renderização HTML para inclusão no preview/PDF da proposta.

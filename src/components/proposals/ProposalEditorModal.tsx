@@ -18,6 +18,7 @@ import { RichTextEditor } from './RichTextEditor';
 import { ProposalItemsManager } from './ProposalItemsManager';
 import { ProposalPaymentTerms } from './ProposalPaymentTerms';
 import { ProposalDynamicPricingPanel } from './ProposalDynamicPricingPanel';
+import { ProposalDynamicPaymentPanel } from './ProposalDynamicPaymentPanel';
 import {
   Save,
   FileDown,
@@ -514,10 +515,13 @@ export function ProposalEditorModal({
             </TabsContent>
             <TabsContent value="payment-terms" className="mt-4 space-y-4">
               {proposalId && (
-                <ProposalDynamicPricingPanel
-                  proposalId={proposalId}
-                  proposalTotal={watch('value') || 0}
-                />
+                <>
+                  <ProposalDynamicPricingPanel
+                    proposalId={proposalId}
+                    proposalTotal={watch('value') || 0}
+                  />
+                  <ProposalDynamicPaymentPanel proposalId={proposalId} />
+                </>
               )}
               <ProposalPaymentTerms 
                 proposalId={proposalId || ''} 

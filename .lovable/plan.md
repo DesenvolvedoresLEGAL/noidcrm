@@ -1,118 +1,143 @@
+# Sprint PRICE 1.1 — Pix Dinâmico, ERP e Cobrança Complementar
 
-# Sprint PRICE 1.0 — Tabela de Preço Dinâmica da Proposta
+## Objetivo
+Conectar a tabela de preço dinâmica (PRICE 1.0) ao ciclo financeiro: cliente só quita pelo valor vigente; pagamento manual abaixo do vigente vira pagamento parcial com cobrança complementar automática.
 
-Cria uma camada de condições comerciais válidas por período. Cada proposta passa a ter `valor base`, uma tabela de tiers por data, e um `valor vigente` calculado automaticamente — visível no editor, no link público e no PDF. Preparado para integrar pagamento e conciliação ERP em sprints futuras.
+---
 
-## 1. Banco de dados (1 migration)
+## 1. Banco de Dados (1 migração)
 
 ### Novas tabelas
-- **`proposal_dynamic_pricing_rules`** — 1 regra por (organization_id, proposal_id). Campos: `enabled`, `base_amount`, `currency`, `status` (`draft|active|expired|disabled|requires_requote`), `current_tier_id`, `current_amount`, `next_tier_id`, `next_amount`, `last_calculated_at`, `notes`, auditoria.
-- **`proposal_dynamic_pricing_tiers`** — N tiers por regra. Campos: `tier_order`, `label`, `starts_at`, `ends_at`, `adjustment_type` (`base_amount|fixed_price|percent_adjustment|fixed_adjustment`), `adjustment_value`, `final_amount`, `is_current`, `is_expired`. Constraint impede `ends_at < starts_at`.
-- **`proposal_dynamic_pricing_events`** — log: `event_type` (`created|updated|tier_activated|tier_expired|proposal_repriced|disabled|manual_override`), `previous_amount`, `new_amount`, `message`, `metadata jsonb`.
+- **`proposal_payment_intents`** — intenções de cobrança ligadas à proposta e ao tier dinâmico vigente
+  - Vincula `proposal_id`, `dynamic_pricing_rule_id`, `dynamic_pricing_tier_id`
+  - Campos financeiros: `expected_amount`, `paid_amount`, `difference_amount`, `currency`
+  - Status: `pending`, `paid_exact`, `paid_partial`, `paid_over`, `expired`, `cancelled`, `complementary_pending`, `complementary_paid`, `manual_review`
+  - Origem: `proposal_link`, `crm_manual`, `erp_manual`, `complementary_charge`, `agent`
+  - Método: `pix`, `bank_transfer`, `boleto`, `credit_card`, `manual`
+  - Snapshots JSONB: `dynamic_pricing_snapshot`, `payment_gateway_snapshot`
+  - Campos ERP/Pix: `erp_invoice_id`, `erp_charge_id`, `pix_qr_code`, `pix_copy_paste`, `expires_at`, `paid_at`
 
-### Alteração em `proposals`
-Adicionar (idempotente): `dynamic_pricing_enabled`, `dynamic_pricing_current_amount`, `dynamic_pricing_status`, `dynamic_pricing_snapshot jsonb`, `dynamic_pricing_last_calculated_at`.
+- **`proposal_payment_events`** — auditoria financeira
+  - Tipos: `payment_intent_created`, `pix_generated`, `payment_received`, `payment_validated`, `payment_partial`, `payment_overpaid`, `payment_exact`, `complementary_charge_created`, `payment_expired`, `manual_review_required`, `cancelled`
 
-### Índices
-- `(organization_id, proposal_id)` em todas as três tabelas.
-- `(pricing_rule_id, tier_order)` em tiers.
-- `(proposal_id, created_at desc)` em events.
+### Alterações em `proposals`
+Novos campos: `payment_validation_status`, `payment_expected_amount`, `payment_paid_amount`, `payment_difference_amount`, `latest_payment_intent_id`, `payment_snapshot` (JSONB).
 
-### RLS (helpers existentes do projeto)
-- **SELECT**: `user_belongs_to_organization(organization_id)` em todas.
-- **INSERT/UPDATE em rules e tiers**: organização + papel comercial autorizado (`admin|owner|sales_manager|closer`), via `has_role`.
-- **DELETE / disable / manual_override**: somente `admin|owner`.
-- **events**: INSERT pelo backend (RPCs `SECURITY DEFINER`); SELECT por organização.
+### RLS
+- `SELECT`: membros da organização (via `get_user_organization_id`).
+- `INSERT/UPDATE` cobrança: comercial autorizado.
+- Validação, cancelamento, ajuste e revisão manual: financeiro/admin/owner (via `has_role`).
+- Eventos: insert por sistema/RPC; select por organização.
 
-### Triggers
-- `set_updated_at` nas duas tabelas mutáveis.
-- `trg_dynamic_pricing_tier_overlap_guard` (BEFORE INSERT/UPDATE em tiers): rejeita sobreposição de intervalos de datas dentro da mesma `pricing_rule_id`.
-- `trg_dynamic_pricing_tier_compute_final_amount` (BEFORE INSERT/UPDATE): calcula `final_amount` a partir do `base_amount` da regra e do tipo/valor de ajuste.
+### RPCs (security definer, `search_path = public`)
+1. **`create_proposal_payment_intent(p_proposal_id, p_source)`** — chama `calculate_proposal_dynamic_price`, bloqueia se `requires_requote`/`expired`/`disabled`, cria intent com `expected_amount = current_amount`, salva snapshot, registra `payment_intent_created`.
+2. **`validate_proposal_payment_amount(p_payment_intent_id, p_paid_amount, p_paid_at, p_payment_reference)`** — recalcula valor devido na data efetiva, classifica em `paid_exact`/`paid_partial`/`paid_over`, atualiza intent + proposta, registra evento, marca `complementary_pending` se houver diferença positiva.
+3. **`create_complementary_payment_intent(p_original_payment_intent_id)`** — cria nova intent com `source = complementary_charge` e `expected_amount = difference_amount`, registra `complementary_charge_created`.
+4. **`expire_old_payment_intents()`** — marca intents pendentes vencidas como `expired`, registra `payment_expired`.
 
-### RPCs `SECURITY DEFINER` (`search_path = public`)
-1. **`calculate_proposal_dynamic_price(p_proposal_id uuid, p_reference_at timestamptz default now())`** — retorna struct com `current_*`, `previous_*`, `next_*`, `status`, `message`. Marca tiers expirados, atualiza `current_tier_id`, `current_amount`, `next_*`, `last_calculated_at`. Se passou do último tier → `status = requires_requote`. Registra evento `tier_activated` quando há virada.
-2. **`apply_dynamic_price_to_proposal(p_proposal_id uuid, p_reference_at timestamptz default now())`** — chama #1 → atualiza `proposals.dynamic_pricing_current_amount`, `dynamic_pricing_status`, `dynamic_pricing_snapshot` (jsonb completo) e `dynamic_pricing_last_calculated_at`. **Não** mexe em `total_amount` quando proposta tem itens (regra do projeto: net value vem dos itens). Registra evento `proposal_repriced`.
+---
 
-### Integração INV 1.4
-Helper `_resolve_dynamic_pricing_base(p_proposal_id)` que retorna o valor da proposta **após** ajuste por ocupação (lê `proposal_items.inventory_adjusted_unit_price` agregado se existirem snapshots; senão usa `total_amount`). Esse helper é chamado pelas RPCs ao recalcular `base_amount` quando o usuário pede "Sincronizar valor base".
+## 2. Backend TS
 
-## 2. Backend TypeScript
+### `src/lib/proposals/proposalPayments.ts`
+Schemas Zod, tipos, labels de status, helpers `formatBRL`, classificação de diferença, badge variants.
 
-### Tipos e schemas (`src/lib/proposals/dynamicPricing.ts`)
-- Enums (`status`, `adjustment_type`, `event_type`).
-- Zod schemas: `dynamicPricingRuleSchema`, `dynamicPricingTierSchema`, helpers `formatBRL`, `tiersOverlap`, `findCurrentTier`.
+### `src/services/proposals/proposalPaymentsService.ts`
+- `getPaymentIntents(proposalId)`, `getLatestIntent(proposalId)`
+- `createPaymentIntent(proposalId, source)` (RPC 1)
+- `validatePaymentManually(intentId, paidAmount, paidAt, reference, notes)` (RPC 2)
+- `createComplementaryIntent(originalIntentId)` (RPC 3)
+- `expireOldIntents()` (RPC 4)
+- `listPaymentEvents(proposalId)`
 
-### Serviço (`src/services/proposals/proposalDynamicPricing.ts`)
-- `getDynamicPricing(proposalId)` — retorna `{ rule, tiers, currentCalculation }`.
-- `saveDynamicPricingRule(payload)` — upsert rule + replace tiers (transação client-side com cleanup).
-- `calculateDynamicPrice(proposalId, referenceAt?)` — chama RPC #1.
-- `applyDynamicPrice(proposalId)` — chama RPC #2.
-- `listDynamicPricingEvents(proposalId)`.
-- `disableDynamicPricing(proposalId)` — rule.status='disabled', enabled=false, registra evento.
+### `src/services/proposals/erpBillingBridgeService.ts` (mock-ready)
+- `createPixChargeFromPaymentIntent(intentId)` — gera payload Pix; se sem gateway, salva snapshot e marca `pix_generated`
+- `getChargeStatus(erpChargeId)`
+- `syncPaymentStatus(intentId)`
+- `createComplementaryCharge(intentId)`
 
-### Hooks (`src/hooks/proposals/useProposalDynamicPricing.ts`)
-- `useProposalDynamicPricing(proposalId)`
-- `useSaveProposalDynamicPricingRule()`
-- `useCalculateProposalDynamicPrice()`
-- `useApplyProposalDynamicPrice()`
-- `useProposalDynamicPricingEvents(proposalId)`
-- `useDisableProposalDynamicPricing()`
-- Invalidam `['proposal', id]` e `['proposal-dynamic-pricing', id]`.
+### `src/hooks/proposals/useProposalPayments.ts`
+- `useProposalPaymentIntents`, `useLatestPaymentIntent`, `useProposalPaymentEvents`
+- Mutations: `useCreatePaymentIntent`, `useValidateManualPayment`, `useCreateComplementaryIntent`, `useGeneratePixCharge`, `useSyncErpStatus`
+- Invalida `['proposal', id]`, `['proposal-dynamic-pricing', id]`, novas keys de pagamento.
+
+---
 
 ## 3. Frontend
 
-### Editor interno
-- **`ProposalDynamicPricingPanel.tsx`** — novo bloco no `ProposalEditorModal`/`ProposalEditor`. Exibe: status badge, valor base (com botão "Sincronizar com fator INV"), valor vigente, próxima virada, última atualização, ações (Ativar/Desativar tabela, Recalcular agora, Aplicar valor vigente), histórico de eventos.
-- **`DynamicPricingTierEditor.tsx`** — tabela editável com validações em tempo real (nome obrigatório, fim ≥ início, sem sobreposição, valor final ≥ 0, alerta de "buraco entre faixas"). Recalcula `final_amount` no client conforme tipo de ajuste.
+### Editor da proposta
+**`ProposalDynamicPaymentPanel`** (em `ProposalEditor.tsx` e `ProposalEditorModal.tsx`, abaixo do `ProposalDynamicPricingPanel`):
+- Cards: valor vigente, última cobrança (data, valor, status), valor pago, diferença pendente, status financeiro
+- Ações: Gerar Pix vigente / Reemitir / Gerar cobrança complementar / Validar pagamento manual / Sincronizar ERP / Ver histórico
+- Lista de eventos financeiros (timeline)
 
-### Link público (`ProposalPublicView`)
-- **`PublicProposalDynamicPricingBanner.tsx`** — antes de "Condições de Pagamento". Estados:
-  - **Ativa**: "Valor vigente hoje: R$ X / Válido até DD/MM HH:mm / Próxima atualização: R$ Y em DD/MM" + cláusula fixa de pagamento fora do prazo + texto discreto do valor anterior expirado.
-  - **Expirada/`requires_requote`**: aviso destacado "Esta condição comercial expirou. Nova cotação necessária." (esconde botão de aprovação ou desabilita).
-- Botão de aprovação muda label para **"Aprovar proposta com valor vigente"** quando dynamic pricing está ativo. Payload de aprovação inclui `current_tier_id`, `current_amount`, `dynamic_pricing_snapshot`.
+**`ManualPaymentValidationDialog`** — campos: valor pago, data, referência, observação → chama `validate_proposal_payment_amount`, exibe resultado (correto / parcial com diferença / acima).
 
-### PDF (`ProposalPDFViewer` / generator)
-- **`PdfDynamicPricingSection.tsx`** — seção "Condição Comercial Dinâmica" antes de "Condições de Pagamento". Tabela de tiers + cláusula obrigatória sobre data efetiva de pagamento.
+### Link público (`ProposalPublicView.tsx`)
+- Botão: **"Pagar valor vigente"** (substitui botão atual quando `dynamic_pricing_enabled`)
+- Texto auxiliar: "O Pix será gerado com o valor vigente da condição comercial no momento da emissão da cobrança."
+- Se `requires_requote`/`expired`: bloqueia pagamento e mostra "Esta condição comercial expirou. Solicite uma nova cotação."
+- Ao clicar: chama `create_proposal_payment_intent` → mostra valor, validade, QR Code/copia-cola se houver, ou estado "Cobrança gerada. Aguardando integração financeira."
 
-### Pequenos ajustes
-- `ProposalPreview.tsx` e `ProposalVisualizarTab.tsx`: render do banner em modo de visualização interna.
-- `ProposalCapacityImpactBlock` (INV 1.4): adicionar link "Aplicar como base da tabela dinâmica" quando snapshot já existir.
+**`PublicProposalPaymentBlock`** — componente novo para o link público.
 
-## 4. Estrutura visual do painel
+### PDF (`PdfDynamicPricingSection.tsx`)
+Acrescentar cláusula:
+> "O pagamento da proposta deve ser realizado exclusivamente pelo valor vigente no momento da emissão da cobrança. Pagamentos realizados manualmente com valor inferior ao vigente serão considerados parciais e poderão gerar cobrança complementar."
 
-```text
-┌────────────────────────────────────────────────────────┐
-│ Tabela de Preço Dinâmica            [Ativa] [⋯ Ações] │
-├────────────────────────────────────────────────────────┤
-│ Valor base:  R$ 3.714,00   [Sincronizar com fator INV] │
-│ Vigente hoje: R$ 3.714,00  até 08/05 23:59             │
-│ Próxima virada: R$ 4.085,40 em 09/05 00:00             │
-├────────────────────────────────────────────────────────┤
-│ # │ Condição          │ Início │ Fim   │ Tipo │ Valor │
-│ 1 │ Antecipado        │ -      │ 06/05 │ %    │ -10%  │
-│ 2 │ Padrão            │ 07/05  │ 08/05 │ base │ R$ X  │
-│ 3 │ Fora do prazo     │ 09/05  │ 10/05 │ %    │ +10%  │
-│ + Adicionar condição                                   │
-├────────────────────────────────────────────────────────┤
-│ Eventos recentes (5 últimos)                           │
-└────────────────────────────────────────────────────────┘
-```
+---
 
-## 5. Critérios de aceite (resumido)
-- Tabelas + RLS criadas; trigger anti-sobreposição funciona.
-- Snapshot na proposta atualizado por `apply_dynamic_price_to_proposal`.
-- `requires_requote` quando passa do último tier.
-- Painel no editor, banner público e seção PDF renderizam estados correto/expirado/próxima virada.
-- Botão público usa "valor vigente" e payload contém snapshot.
-- Base respeita ajuste de ocupação (INV 1.4) quando existe.
-- Typecheck + build passam; INV 1.4 intacto.
+## 4. Integração com PRICE 1.0
+- `expected_amount` sempre derivado de `calculate_proposal_dynamic_price` (não fixo).
+- Snapshot do tier salvo no momento da intent (auditoria histórica).
+- Validação manual recalcula com `p_paid_at` para usar tier vigente na data efetiva.
+- Não altera comportamento existente do `ProposalDynamicPricingPanel`.
+
+---
+
+## 5. Detalhes técnicos
+- **Triggers**: `update_updated_at_column` em ambas as tabelas; trigger em `proposal_payment_intents` para sincronizar `latest_payment_intent_id` e campos snapshot na `proposals`.
+- **Índices**: `(proposal_id)`, `(organization_id, status)`, `(expires_at) WHERE status='pending'`.
+- **Tipos Supabase**: regenerados automaticamente após migração.
+- **Mock ERP**: `erpBillingBridgeService` retorna payload determinístico até integração real estar disponível; `payment_gateway_snapshot` armazena o payload bruto.
+
+---
+
+## 6. Critérios de aceite
+- Tabelas `proposal_payment_intents` e `proposal_payment_events` criadas com RLS.
+- Campos financeiros adicionados em `proposals`.
+- Link público gera intent pelo valor vigente; bloqueia se requer recotação.
+- Editor mostra painel financeiro com ações.
+- Validação manual classifica `exact/partial/over` e calcula diferença.
+- Cobrança complementar é gerada automaticamente para diferenças.
+- Eventos financeiros registrados em todas as transições.
+- Payload ERP/Pix preparado (mesmo via mock).
+- PDF e link público com a nova cláusula.
+- Typecheck e build passam; PRICE 1.0 intacto.
+
+---
 
 ## Arquivos
-**Migration**: 1 nova (tabelas, RLS, triggers, RPCs, alter `proposals`).
-**Novos**: `src/lib/proposals/dynamicPricing.ts`, `src/services/proposals/proposalDynamicPricing.ts`, `src/hooks/proposals/useProposalDynamicPricing.ts`, `ProposalDynamicPricingPanel.tsx`, `DynamicPricingTierEditor.tsx`, `PublicProposalDynamicPricingBanner.tsx`, `PdfDynamicPricingSection.tsx`.
-**Editados**: `ProposalEditorModal.tsx`, `ProposalEditor.tsx`, `ProposalPublicView.tsx`, `ProposalPDFViewer.tsx`, `ProposalPreview.tsx`, `ProposalCapacityImpactBlock.tsx`, `src/integrations/supabase/types.ts` (auto).
+**Criados**
+- `supabase/migrations/<ts>_proposal_payment_intents.sql`
+- `src/lib/proposals/proposalPayments.ts`
+- `src/services/proposals/proposalPaymentsService.ts`
+- `src/services/proposals/erpBillingBridgeService.ts`
+- `src/hooks/proposals/useProposalPayments.ts`
+- `src/components/proposals/ProposalDynamicPaymentPanel.tsx`
+- `src/components/proposals/ManualPaymentValidationDialog.tsx`
+- `src/components/proposals/PublicProposalPaymentBlock.tsx`
 
-## Riscos
-- Sobreposição de datas mal validada → mitigado por trigger DB + validação UI.
-- Conflito com cálculo de totais por itens → não tocamos em `total_amount` quando há itens; apenas snapshot.
-- Performance do recálculo em listagens → recálculo só on-demand e ao salvar tiers.
+**Editados**
+- `src/pages/ProposalEditor.tsx`
+- `src/components/proposals/ProposalEditorModal.tsx`
+- `src/pages/ProposalPublicView.tsx`
+- `src/components/proposals/PdfDynamicPricingSection.tsx`
+- `src/integrations/supabase/types.ts` (auto)
+
+---
+## Status: implementado
+- Migração `proposal_payment_intents` + `proposal_payment_events` + campos em `proposals` aplicada.
+- 4 RPCs criadas com `security definer` e `search_path = public`.
+- Service, bridge ERP (mock), hooks e componentes (`ProposalDynamicPaymentPanel`, `ManualPaymentValidationDialog`, `PublicProposalPaymentBlock`) integrados ao `ProposalEditor`, `ProposalEditorModal` e `ProposalPublicView`.
+- Cláusula PDF atualizada.
