@@ -134,3 +134,10 @@ Acrescentar cláusula:
 - `src/pages/ProposalPublicView.tsx`
 - `src/components/proposals/PdfDynamicPricingSection.tsx`
 - `src/integrations/supabase/types.ts` (auto)
+
+---
+## Status: implementado
+- Migração `proposal_payment_intents` + `proposal_payment_events` + campos em `proposals` aplicada.
+- 4 RPCs criadas com `security definer` e `search_path = public`.
+- Service, bridge ERP (mock), hooks e componentes (`ProposalDynamicPaymentPanel`, `ManualPaymentValidationDialog`, `PublicProposalPaymentBlock`) integrados ao `ProposalEditor`, `ProposalEditorModal` e `ProposalPublicView`.
+- Cláusula PDF atualizada.
