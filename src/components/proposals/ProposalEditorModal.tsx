@@ -18,7 +18,7 @@ import { RichTextEditor } from './RichTextEditor';
 import { ProposalItemsManager } from './ProposalItemsManager';
 import { ProposalPaymentTerms } from './ProposalPaymentTerms';
 import { ProposalDynamicPricingPanel } from './ProposalDynamicPricingPanel';
-import { ProposalDynamicPaymentPanel } from './ProposalDynamicPaymentPanel';
+
 import {
   Save,
   FileDown,
@@ -547,7 +547,6 @@ export function ProposalEditorModal({
                     dynamicPricingMode={appliedTemplate?.dynamic_pricing_mode ?? null}
                     revenueType={appliedTemplate?.revenue_type ?? null}
                   />
-                  <ProposalDynamicPaymentPanel proposalId={proposalId} />
                 </>
               )}
             </TabsContent>
