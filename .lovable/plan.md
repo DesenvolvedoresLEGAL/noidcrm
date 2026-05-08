@@ -1,88 +1,102 @@
-# PRICE UX 1.0.3 — Fluxo público e financeiro da proposta
 
-## Objetivo
-Esconder o pagamento público (Pix/ERP) enquanto a integração real não existir, manter só o aceite com valor vigente, criar tela pós-aprovação com resumo e snapshot, corrigir o cronograma à vista (sem "Parcela 1") e preparar 50% + 50% sem recálculo da segunda parcela pela tabela dinâmica.
+## Diagnóstico
 
-## Mudanças
+### 1. "Onde seleciono à vista / 50+50 / parcelado / Pix / Boleto?"
+Existe sim — está dentro do editor da proposta, na aba **Pagamento → Avulso**. Lá o componente `ProposalPaymentTerms` mostra:
 
-### 1. Feature flag `public_payment_enabled`
-- Migration: adicionar coluna `public_payment_enabled boolean default false` em `organizations` (mais simples que settings) **e** opcional override `public_payment_enabled boolean` em `proposals` (nullable).
-- Helper resolve: `proposals.public_payment_enabled ?? organization.public_payment_enabled ?? false`.
-- Expor flag dentro do `get_proposal_by_public_token` RPC para o link público ler sem login.
+- Linha de chips de **forma de pagamento**: Pix · Boleto · Cartão · Transferência
+- Linha de chips de **Condição**: À Vista · 50% + 50% · 30/60/90 · Parcelado
 
-### 2. Snapshot de aprovação
-Migration em `proposals`:
-- `approval_snapshot jsonb default '{}'::jsonb`
-- `approved_dynamic_pricing_tier_id uuid null`
-- `approved_amount numeric null`
-- `approved_payment_schedule jsonb default '{}'::jsonb`
-- (já existe `accepted_at`; reaproveitar)
+O problema é puramente de UX: hoje os chips aparecem só depois da tabela de itens, sem rótulo de seção forte ("Forma de pagamento", "Como o cliente vai pagar?"), por isso parecem invisíveis. Além disso, o orquestrador da PRICE 1.0.3 cria o `payment_term` default com `payment_method='pix'` e condição `upfront` automaticamente — então o link público mostra "PIX" mesmo sem o usuário ter clicado em nada.
 
-RPC nova `accept_proposal_with_snapshot(p_token, p_acceptor_name, p_acceptor_email, ...)` (security definer, search_path public) que:
-- valida token
-- monta snapshot a partir de `dynamic_pricing_snapshot`, `proposal_items`, `proposal_payment_terms`, totais e dados do consultor
-- congela `approved_amount = dynamic_pricing_current_amount` (ou total)
-- congela `approved_payment_schedule` calculado server-side
-- atualiza `status='accepted'`, `accepted_at=now()`, persiste snapshot
-- continua disparando `notify-deal-won` / `post-acceptance-effects` (chamados pelo frontend como hoje)
+### 2. Bug do vencimento "Pagamento à vista 08/05"
+Em `calculateInstallments` (`src/services/supabase/proposal-payment-terms.ts`, linha 154), a data do à vista é:
 
-### 3. Link público (`src/pages/ProposalPublicView.tsx`)
-- Manter `PublicProposalDynamicPricingBanner` (Condição Comercial Vigente).
-- Renderizar `PublicProposalPaymentBlock` somente se `public_payment_enabled === true`. Como ainda não existe ERP integrado, na prática some.
-- Bloco final de aceite passa a ter título **"Pronto para avançar?"** + texto + botão **"Aprovar proposta com valor vigente"** (já existe rótulo, ajustar copy do header).
-- Ao chamar accept, usar a nova RPC para gravar snapshot.
+```
+dueDate = term.first_installment_date || term.entry_date || hoje
+```
 
-### 4. Tela pós-aprovação
-Novo componente `PublicProposalApprovedScreen` exibido quando `proposal.status === 'accepted'` (substitui o banner verde atual minimal):
-- Título "Proposta aprovada com sucesso" + subtítulo.
-- Cards: número, cliente, valor aprovado, condição vigente aplicada (faixa, ajuste, validade), forma de pagamento, condição, cronograma aprovado, itens contratados, consultor.
-- Lê de `approval_snapshot`; fallback para dados ao vivo se snapshot vazio (compat com propostas antigas).
-- Ações: "Baixar PDF da proposta aprovada" (reusa `downloadProposalPDF`), "Falar com consultor" (link wpp/email), "Voltar para proposta".
-- Se `public_payment_enabled === false`: mostrar mensagem "A cobrança será enviada pela equipe LEGAL conforme a condição aprovada."
-- Se `true`: também renderiza `PublicProposalPaymentBlock`.
+`first_installment_date` é o campo manual "Início". Quando o orquestrador cria o term default, ele preenche `first_installment_date = hoje` (08/05) — por isso o PDF/Link mostra 08/05 em vez de 11/05/2026 (validade da faixa vigente da tabela dinâmica).
 
-### 5. Cronograma à vista — labels
-Em `calculateInstallments` (mantém shape) e em todos os consumidores (`ProposalPublicView`, `ProposalPreview`, `proposalPdfGenerator`):
-- Detectar à vista: `installments_count <= 1 && entry_percent === 0`.
-- Renderizar bloco único "Pagamento à vista" com forma de pagamento + vencimento + valor, em vez de "Parcela 1".
+Comportamento correto pedido pelo usuário: quando a tabela dinâmica automática está ativa **e** a condição é à vista, o vencimento deve ser **a data-limite da faixa vigente** (`dynamic_pricing_snapshot.current_ends_at`), não a data manual "Início".
 
-### 6. Suporte a `split_50_50`
-- Adicionar coluna opcional `payment_condition text` (`upfront | split_50_50 | installments | custom`) em `proposal_payment_terms` + `second_payment_due_strategy text` (`post_event | after_valid_until | manual_date`) + `second_payment_due_date date null`.
-- Helper `calculateInstallments` reconhece `payment_condition='split_50_50'` e gera Entrada (50%) + Saldo (50%) com `dueDate` = `second_payment_due_date` ou `proposal.expires_at` (após validade) — labels "Entrada" / "Saldo".
-- Quando proposta já aprovada: usar `approved_amount` como base do split (não recalcular pela tabela dinâmica).
-- Editor interno (`ProposalPaymentTerms`): adicionar select de `payment_condition` com opções À vista / 50% + 50%; expor campo de estratégia da segunda parcela.
+### 3. "Não selecionei Pix nem Boleto"
+O badge PIX no link aparece porque o orquestrador define silenciosamente. Precisa ficar visualmente claro que o método foi escolhido (e, idealmente, exigir confirmação explícita ou pelo menos rotular como "Padrão da organização" para não parecer um bug).
 
-### 7. Visualização rápida (`ProposalPreview.tsx`)
-- Aplicar mesma lógica de labels (à vista / Entrada+Saldo).
-- Não mostrar "Pagar valor vigente".
+---
 
-### 8. PDF (`proposalPdfGenerator.ts`)
-- Cronograma à vista: linha única "Pagamento à vista".
-- Split 50/50: linhas "Entrada" e "Saldo".
-- Usar `approved_amount` quando proposta aceita; caso contrário `dynamic_pricing_current_amount` / total.
+## Plano de execução
+
+### A. UX da seção Pagamento (`ProposalPaymentTerms.tsx`)
+
+Reescrever só o cabeçalho da aba Avulso para ficar óbvio:
+
+```text
+┌─ Como o cliente vai pagar? ──────────────────────────────┐
+│  Forma de pagamento  [Pix*] [Boleto] [Cartão] [Transf.]  │
+│  Condição comercial  [À Vista*] [50% + 50%] [30/60/90]   │
+│                      [Parcelado]                         │
+└──────────────────────────────────────────────────────────┘
+```
+
+- Trocar o `Label` "Condição" minúsculo por um título de seção destacado.
+- Adicionar pequeno texto de ajuda: "Selecione a forma e a condição. O cronograma é gerado automaticamente."
+- Marcar visualmente o chip ativo com checkmark ✓ e um sutil "Padrão" em cinza quando nenhum clique manual aconteceu ainda (`auto_selected = true`).
+- Manter exatamente os mesmos handlers (`updateOneTime`, `handlePresetSelect`) — sem mudança de lógica.
+
+### B. Vencimento do à vista atrelado à tabela dinâmica
+
+Em `calculateInstallments` (e na assinatura de `CalculateInstallmentsOptions`):
+
+1. Aceitar novo campo opcional `dynamicPricingCurrentEndsAt?: string | null`.
+2. No ramo `isUpfront`, quando `dynamicPricingCurrentEndsAt` existir, usar:
+   ```ts
+   dueDate = dynamicPricingCurrentEndsAt.slice(0, 10)
+   ```
+   em vez de `term.first_installment_date`. Continuar caindo para o fluxo atual quando a tabela dinâmica não estiver ativa.
+
+3. Atualizar os 3 chamadores que precisam passar a snapshot:
+   - `ProposalPreview.tsx` (preview interna) — já carrega `dynamic_pricing_snapshot`.
+   - `ProposalPublicView.tsx` (link público) — idem.
+   - `proposalPdfGenerator.ts` / `proposalPdfBuilder.ts` (PDF) — já recebem `dynamic_pricing_snapshot`.
+
+4. Para o caso `split_50_50` mantemos o que já existe (`after_valid_until` já usa `proposalExpiresAt`). Nenhuma mudança lá.
+
+### C. Rótulo claro do método de pagamento no link e PDF
+
+- No card "Condições de Pagamento" da preview/link/PDF, quando o termo veio do default do orquestrador (`payment_method='pix'` sem alteração manual), mostrar o badge como **PIX (padrão)**. Hoje só mostra "PIX", o que confunde.
+- Para detectar "alteração manual", basta um campo `payment_method_source: 'auto' | 'user'` em memória no editor — ao clicar em qualquer chip, vira `'user'` e o "(padrão)" some. Não precisa ir para o banco; serve só de hint visual no editor enquanto a proposta está em rascunho.
+
+### D. Sem mudanças em banco
+
+Tudo o que precisamos já existe:
+- `proposal_payment_terms.payment_method` ✓
+- `proposal_payment_terms.payment_condition` ✓
+- `proposals.dynamic_pricing_snapshot` (com `current_ends_at`) ✓
+
+Nenhuma migration nova.
+
+---
 
 ## Arquivos impactados
-- `supabase/migrations/<new>.sql` (flag, snapshot, RPC, payment_condition)
-- `src/services/supabase/proposals.ts` (nova `acceptProposalWithSnapshot`)
-- `src/services/supabase/proposal-payment-terms.ts` (`calculateInstallments` reconhece `payment_condition`)
-- `src/pages/ProposalPublicView.tsx` (gate do bloco de pagamento, copy do CTA, render da tela pós-aprovação, labels do cronograma)
-- `src/components/proposals/PublicProposalApprovedScreen.tsx` (novo)
-- `src/components/proposals/ProposalPreview.tsx` (labels)
-- `src/components/proposals/ProposalPaymentTerms.tsx` (select payment_condition)
-- `src/lib/proposalPdfGenerator.ts` + `proposalPdfBuilder.ts` (labels + approved_amount)
 
-## Critérios de aceite
-- Link público sem botão "Pagar valor vigente" enquanto `public_payment_enabled=false`.
-- Banner de Condição Comercial Vigente continua aparecendo.
-- CTA final = "Aprovar proposta com valor vigente".
-- Aceite grava `approval_snapshot` + `approved_amount` + `approved_payment_schedule`.
-- Tela pós-aprovação aparece com resumo, PDF, mensagem da equipe LEGAL.
-- Cronograma à vista mostra "Pagamento à vista" (sem "Parcela 1").
-- 50% + 50% mostra Entrada e Saldo dividindo `approved_amount`, sem recalcular pela tabela dinâmica.
-- Visualização rápida e PDF usam novos labels.
-- Typecheck e build passam; nada da PRICE 1.1 quebra.
+- `src/components/proposals/ProposalPaymentTerms.tsx` — reorganizar cabeçalho da aba Avulso (rótulos, hint, marca "padrão").
+- `src/services/supabase/proposal-payment-terms.ts` — `CalculateInstallmentsOptions.dynamicPricingCurrentEndsAt` + uso no ramo upfront.
+- `src/components/proposals/ProposalPreview.tsx` — passar `current_ends_at` para `calculateInstallments`.
+- `src/pages/ProposalPublicView.tsx` — idem.
+- `src/lib/proposalPdfBuilder.ts` / `src/lib/proposalPdfGenerator.ts` — idem.
+
+---
 
 ## Riscos
-- Mudança em RPC pública precisa manter `security definer` + `set search_path = public` (memória do projeto).
-- Snapshot legacy (propostas já aceitas sem snapshot) precisa fallback para dados ao vivo.
-- Adicionar coluna em `organizations` exige RLS já existente — só leitura para o owner; flag exposta via RPC para anon.
+
+- Mudar a `dueDate` do à vista pode alterar a data exibida em propostas já aprovadas. Mitigação: só sobrescrever quando `approval_snapshot` **não** existir ainda. Se já existe snapshot, manter o que foi congelado.
+- Nada toca `payment_intents` nem RLS nem fluxo de cobrança real.
+
+## Critério de aceite
+
+- Editor: a aba Pagamento → Avulso deixa óbvio onde escolher Pix/Boleto e À vista/50+50/Parcelado.
+- Link público e PDF: condição "Pagamento à vista" mostra **vencimento = 11/05/2026 20:59** (data-limite da faixa vigente), não 08/05.
+- Badge da forma de pagamento mostra "(padrão)" enquanto o usuário não clicou; some após clique.
+- Propostas já aprovadas continuam com a data congelada do `approval_snapshot`.
+- Typecheck e build passam.
