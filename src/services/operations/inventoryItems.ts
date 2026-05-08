@@ -4,6 +4,11 @@ import {
   getQuantityAvailableForStatus,
   type InventoryItemStatus,
 } from '@/lib/operations/inventoryLabels';
+import {
+  mergeTechnicalSpecs,
+  sanitizeTechnicalSpecs,
+  type TechnicalSpec,
+} from '@/lib/operations/inventoryTechnicalSpecs';
 
 export type InventoryItemRow = Database['public']['Tables']['inventory_items']['Row'];
 
@@ -23,6 +28,8 @@ export interface SerializedItemInput {
   brand?: string | null;
   model?: string | null;
   notes?: string | null;
+  technical_specs?: TechnicalSpec[];
+  _currentMetadata?: unknown;
 }
 
 const SELECT_WITH_REFS =
