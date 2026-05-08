@@ -705,26 +705,44 @@ export async function generateProposalPDFClient(
 
     // Summary box - adjust height based on content
     const hasDiscount = paymentDiscountPercent > 0 && oneTimeTotal > 0;
+    const hasDpFooterNote =
+      showDpBreakdown && (dpBreakdown.endsAt || dpBreakdown.nextAmount != null);
     let summaryBoxHeight = 28;
     if (recurringMRR > 0) summaryBoxHeight = 50;
     if (hasDiscount) summaryBoxHeight += 8;
-    
+    if (showDpBreakdown) summaryBoxHeight += 16; // ajuste + linha "Total Vigente"
+    if (hasDpFooterNote) summaryBoxHeight += 8;
+
     doc.setFillColor(bgLight.r, bgLight.g, bgLight.b);
     doc.setDrawColor(primaryRgb.r, primaryRgb.g, primaryRgb.b);
     doc.setLineWidth(0.5);
     doc.roundedRect(margin, yPos, contentWidth, summaryBoxHeight, 2, 2, 'FD');
-    
+
     let lineY = yPos + 10;
-    
+
     // One-time total (before discount)
     if (oneTimeTotal > 0) {
       doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
       doc.setFontSize(9);
       doc.setFont('helvetica', 'normal');
-      doc.text('Total Avulso:', margin + 8, lineY);
+      const oneTimeLabel = showDpBreakdown ? 'Subtotal dos Itens:' : 'Total Avulso:';
+      doc.text(oneTimeLabel, margin + 8, lineY);
       doc.setTextColor(textDark.r, textDark.g, textDark.b);
-      doc.setFont('helvetica', 'bold');
+      doc.setFont('helvetica', showDpBreakdown ? 'normal' : 'bold');
       doc.text(formatCurrency(oneTimeTotal, currency), margin + contentWidth - 8, lineY, { align: 'right' });
+      lineY += 8;
+    }
+
+    // Dynamic pricing adjustment line
+    if (showDpBreakdown) {
+      doc.setTextColor(217, 119, 6); // amber-600
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      const pctTxt = `${dpBreakdown.adjustmentPercent >= 0 ? '+' : ''}${dpBreakdown.adjustmentPercent.toFixed(1)}%`;
+      doc.text(`Ajuste por antecedência (${pctTxt}):`, margin + 8, lineY);
+      doc.setFont('helvetica', 'bold');
+      const sign = dpBreakdown.delta >= 0 ? '+ ' : '- ';
+      doc.text(`${sign}${formatCurrency(Math.abs(dpBreakdown.delta), currency)}`, margin + contentWidth - 8, lineY, { align: 'right' });
       lineY += 8;
     }
 
@@ -738,7 +756,7 @@ export async function generateProposalPDFClient(
       doc.text(`- ${formatCurrency(paymentDiscountAmount, currency)}`, margin + contentWidth - 8, lineY, { align: 'right' });
       lineY += 8;
     }
-    
+
     // MRR
     if (recurringMRR > 0 || (recurringPayment && recurringPayment.monthly_value > 0)) {
       const mrr = recurringPayment?.monthly_value || recurringMRR;
