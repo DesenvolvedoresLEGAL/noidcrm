@@ -1,66 +1,70 @@
-# Sprint INV 0.1 — Fundação do módulo Inventário
+## Sprint INV 0.2 — Schema base do Inventário
 
-## Escopo
-Apenas fundação: rota, item de menu, permissão e página base premium. Zero banco, zero CRUD, zero edge function.
+Cria a fundação de banco do módulo Inventário (5 tabelas + 4 enums + RLS + triggers). Sem CRUD, sem UI nova, sem reservas/kits/chips/tabela dinâmica.
 
-## Arquivos a criar
+### 1. Enums (criar)
 
-### 1. `src/pages/operations/Inventory.tsx`
-Página base do módulo, usando `PageContainer` + `PageHeader` (variant `teal` ou `indigo`) já existentes.
+- `inventory_item_kind`: `serialized`, `quantity`
+- `inventory_item_status`: `available`, `blocked`, `maintenance`, `damaged`, `retired`, `lost`
+- `inventory_location_type`: `internal`, `external`, `maintenance`, `event`, `technician`, `lost`, `retired`, `other`
+- `inventory_movement_type`: `initial_entry`, `manual_adjustment`, `location_change`, `status_change`, `maintenance_entry`, `maintenance_exit`, `damage_report`, `loss_report`, `retirement`, `release`
 
-Estrutura:
-- **Header**: ícone `Boxes`, título "Inventário", subtítulo "Controle operacional de equipamentos, chips, kits, reservas e disponibilidade.", badge "Módulo em implantação".
-- **Grid 4 cards conceituais** (`Card` + `CardHeader/Content`), cada um com ícone, título, descrição e badge "Em breve":
-  1. Equipamentos — `Package`
-  2. Chips e Conectividade — `Wifi`
-  3. Kits Operacionais — `Boxes`
-  4. Reservas e Disponibilidade — `CalendarCheck`
-- **Bloco "Como o Inventário vai funcionar"**: card com texto descritivo + lista numerada (8 fluxos futuros).
-- **Bloco "Regra oficial de demanda por ocupação"**: card destacado com tabela de 4 linhas (faixas de ocupação x fator) + observação.
-- **Estado vazio elegante**: usa `EmptyState` (ícone `Boxes`) com título "Inventário pronto para implantação", descrição da sprint e botão `disabled` "Configuração em breve".
+### 2. Tabelas (todas com `organization_id NOT NULL` + RLS)
 
-Tudo usando tokens semânticos (`text-muted-foreground`, `bg-card`, `border-border`, etc.), responsivo (`grid-cols-1 md:grid-cols-2 lg:grid-cols-4`), sem cores hardcoded.
+1. **`inventory_categories`** — name, description, item_kind (default `serialized`), is_active, sort_order, created_by/updated_by, timestamps. Unique `(organization_id, lower(name))`.
+2. **`inventory_locations`** — name, description, location_type (default `internal`), is_active, sort_order, created_by/updated_by, timestamps. Unique `(organization_id, lower(name))`.
+3. **`inventory_items`** — category_id, location_id, item_kind, status (default `available`), name, description, asset_code, serial_number, brand, model, unit_of_measure (default `'un'`), quantity_total/available/minimum, acquisition_date/cost, notes, metadata jsonb, created_by/updated_by, timestamps.
+   - **Check constraints:**
+     - `quantity_total >= 0 AND quantity_available >= 0 AND quantity_available <= quantity_total`
+     - `(item_kind='serialized' AND quantity_total=1 AND quantity_available IN (0,1)) OR (item_kind='quantity')`
+   - **Unique parciais por org:** `lower(asset_code)` quando preenchido; `lower(serial_number)` quando preenchido.
+4. **`inventory_movements`** — item_id (FK SET NULL), movement_type, quantity, from/to_location_id, from/to_status, reason, notes, related_entity_type/id, metadata jsonb, created_by, created_at. Sem updated_at.
+5. **`inventory_status_history`** — item_id (FK CASCADE), from_status, to_status, reason, metadata jsonb, created_by, created_at. Sem updated_at.
 
-## Arquivos a editar
+Índices conforme spec (org, category, location, status, kind, created_at desc, related_entity).
 
-### 2. `src/App.tsx`
-Adicionar lazy import e rota `/app/operations/inventory` dentro de `<ProtectedRoute>` + `<LazyRoute>`, no mesmo padrão de `/app/contracts`.
+### 3. RLS — usar helpers existentes
 
-### 3. `src/components/AppSidebar.tsx`
-- Importar ícone `Boxes`.
-- Adicionar nova seção `'operacoes'` ao `SECTION_LABELS` com label `'Operações'`.
-- Adicionar item ao `ALL_MENU_ITEMS`:
-  ```ts
-  { path: '/app/operations/inventory', label: 'Inventário', icon: Boxes, section: 'operacoes' }
-  ```
-- Adicionar `const operacoesItems = getItemsForSection('operacoes');` e renderizar a seção entre Gestão e Inteligência (ou após Gestão, conforme hierarquia operacional).
+Já existem: `get_user_organization_id()`, `user_is_org_admin(org_id)`, `user_is_org_member(org_id)`. Sem helpers novos.
 
-### 4. `src/hooks/usePermissions.ts`
-Adicionar `'/app/operations/inventory'` apenas em:
-- `VISIBLE_MENU_ITEMS.operations`
+Função nova mínima e segura para checar acesso ao módulo:
 
-Owner/admin já recebem `'*'` (acesso automático). Sales, cs, manager, finance, viewer **não** recebem o item — comercial fica fora por padrão.
-
-### 5. Bloqueio por URL direta
-A rota `/app/operations/inventory` será envolta em um guard inline na página: ler `usePermissions()` e renderizar `<AccessDenied requiredLevel="partial" />` se o usuário não for owner/admin/operations. Isso reaproveita componentes existentes sem criar sistema paralelo.
-
-```tsx
-const { isOwner, isAdmin, role } = usePermissions();
-if (!isOwner && !isAdmin && role !== 'operations') {
-  return <AccessDenied title="Acesso restrito" description="Módulo Inventário disponível apenas para perfis operacionais." />;
-}
+```sql
+CREATE FUNCTION public.user_can_access_inventory(p_org_id uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.organization_members
+    WHERE user_id = auth.uid()
+      AND organization_id = p_org_id
+      AND status = 'active'
+      AND deleted_at IS NULL
+      AND org_role IN ('owner','admin','operations')
+  );
+$$;
 ```
 
-## Critérios de aceite (resumo)
-- Item "Inventário" aparece em "Operações" para owner/admin/operations.
-- Sales/SDR/comercial/finance não veem o item nem acessam pela URL.
-- Página renderiza header, 4 cards, bloco explicativo, tabela de demanda, estado vazio.
-- Responsivo, dark-mode compatível, sem cores hardcoded.
-- Nenhuma migração SQL, nenhuma tabela nova, nenhuma edge function.
+**Policies em todas as 5 tabelas:**
+- `SELECT` / `INSERT` / `UPDATE`: `user_can_access_inventory(organization_id)`.
+- **Sem `DELETE` policy** (delete físico bloqueado nesta sprint; soft delete via `is_active=false` ou status `retired`/`lost`).
+- Comercial/SDR/finance/cs/manager/viewer ficam fora automaticamente.
 
-## Riscos
-- Baixo. Apenas adições; nada existente é alterado em comportamento.
-- Confirmar que `role` está exposto por `usePermissions` (caso contrário, usar `roles.includes('operations')` via `useUserRole`).
+### 4. Triggers
 
-## Próximos passos (Sprint INV 0.2)
-Tabelas `inventory_items`, `inventory_categories`, `inventory_locations`; CRUD de equipamentos; cadastro de chips.
+- `update_updated_at_column` (já existe) em `inventory_categories`, `inventory_locations`, `inventory_items`.
+- **`trg_inventory_items_status_history`** — `AFTER UPDATE OF status` em `inventory_items`: se `OLD.status IS DISTINCT FROM NEW.status`, insere em `inventory_status_history` (org, item, from/to status, `auth.uid()` como created_by).
+- **`trg_inventory_items_initial_entry`** — `AFTER INSERT` em `inventory_items`: insere `inventory_movements` com `movement_type='initial_entry'`, `quantity=quantity_total`, `to_location_id=location_id`, `to_status=status`, `reason='Cadastro inicial do item'`, `created_by=auth.uid()`. Lógica simples e idempotente por linha nova.
+
+### 5. Frontend
+
+Nenhuma alteração funcional. Opcional: pequeno texto discreto no rodapé do card de empty state em `src/pages/operations/Inventory.tsx`: "Schema base preparado para categorias, locais, itens, movimentações e histórico." — única edição de UI permitida pela sprint.
+
+### Entrega
+
+- 1 migration SQL única com enums + tabelas + índices + RLS + triggers.
+- 1 edição mínima em `Inventory.tsx` (texto técnico discreto).
+- Sem CRUD, sem types manuais (regen automático), sem edge functions, sem mexer em proposta/preço/reservas/chips/kits.
+
+### Riscos
+
+- Baixo. Tabelas novas, isoladas. RLS restritiva por padrão (só owner/admin/operations leem ou escrevem).
+- Trigger de `initial_entry` cria 1 row em `inventory_movements` por item — comportamento desejado.
