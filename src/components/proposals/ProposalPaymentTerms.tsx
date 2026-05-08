@@ -723,21 +723,28 @@ export function ProposalPaymentTerms({
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {installments.map((inst, idx) => (
-                              <TableRow key={idx}>
-                                <TableCell className="text-xs py-1.5">
-                                  <span className={inst.type === 'entry' ? 'text-green-600 font-medium' : ''}>
-                                    {inst.type === 'entry' ? 'Entrada' : `${inst.number}/${oneTimeTerm.installments}`}
-                                  </span>
-                                </TableCell>
-                                <TableCell className="text-xs py-1.5">
-                                  {formatDateBR(inst.dueDate)}
-                                </TableCell>
-                                <TableCell className="text-xs py-1.5 text-right font-medium">
-                                  {formatCurrency(inst.amount)}
-                                </TableCell>
-                              </TableRow>
-                            ))}
+                            {installments.map((inst, idx) => {
+                              const label = (inst as any).label
+                                ?? (inst.type === 'upfront' ? 'Pagamento à vista'
+                                  : inst.type === 'entry' ? 'Entrada'
+                                  : (inst.type as any) === 'balance' ? 'Saldo'
+                                  : `${inst.number}/${oneTimeTerm.installments}`);
+                              return (
+                                <TableRow key={idx}>
+                                  <TableCell className="text-xs py-1.5">
+                                    <span className={inst.type === 'entry' || inst.type === 'upfront' ? 'text-green-600 font-medium' : ''}>
+                                      {label}
+                                    </span>
+                                  </TableCell>
+                                  <TableCell className="text-xs py-1.5">
+                                    {formatDateBR(inst.dueDate)}
+                                  </TableCell>
+                                  <TableCell className="text-xs py-1.5 text-right font-medium">
+                                    {formatCurrency(inst.amount)}
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
                           </TableBody>
                         </Table>
                       </div>

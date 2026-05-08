@@ -51,6 +51,7 @@ import { listProposalItems } from '@/services/crm/proposal-items';
 import { getPaymentTerms, calculateInstallments } from '@/services/crm/proposal-payment-terms';
 import { PublicProposalDynamicPricingBanner } from '@/components/proposals/PublicProposalDynamicPricingBanner';
 import { PublicProposalPaymentBlock } from '@/components/proposals/PublicProposalPaymentBlock';
+import { PublicProposalApprovedScreen } from '@/components/proposals/PublicProposalApprovedScreen';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { formatDateBR } from '@/lib/dateUtils';
@@ -443,7 +444,47 @@ export default function ProposalPublicView() {
     
     try {
       const acceptedAt = new Date().toISOString();
-      
+
+      // PRICE UX 1.0.3 — montar snapshot da aprovação
+      const snap = (proposal?.dynamic_pricing_snapshot ?? {}) as any;
+      const oneTimeItemsLocal = items.filter((it: any) => (it.billing_type || 'one_time') !== 'recurring');
+      const oneTimeTotalLocal = oneTimeItemsLocal.reduce((s: number, it: any) => s + Number(it.total ?? 0), 0);
+      const approvedAmountLocal = Number(
+        snap?.current_amount ?? proposal?.dynamic_pricing_current_amount ?? oneTimeTotalLocal ?? proposal?.total_amount ?? 0
+      );
+      const oneTimeTermLocal = paymentTerms.find((t: any) => t.payment_type === 'one_time');
+      const recurringTermLocal = paymentTerms.find((t: any) => t.payment_type === 'recurring');
+      const approvedSchedule = oneTimeTermLocal
+        ? calculateInstallments(oneTimeTermLocal as any, approvedAmountLocal, {
+            proposalExpiresAt: proposal?.expires_at ?? null,
+            approvedAmount: approvedAmountLocal,
+          })
+        : [];
+
+      const approvalSnapshot = {
+        proposal_id: proposalId,
+        approved_at: acceptedAt,
+        approved_amount: approvedAmountLocal,
+        dynamic_pricing: {
+          enabled: !!proposal?.dynamic_pricing_enabled,
+          current_amount: snap?.current_amount ?? null,
+          current_tier_id: snap?.current_tier_id ?? null,
+          current_label: snap?.current_label ?? null,
+          current_adjustment: snap?.current_adjustment ?? null,
+          current_valid_until: snap?.current_ends_at ?? null,
+        },
+        proposal_valid_until: proposal?.expires_at ?? null,
+        payment_method: oneTimeTermLocal?.payment_method ?? recurringTermLocal?.payment_method ?? null,
+        payment_condition: oneTimeTermLocal?.payment_condition ?? 'upfront',
+        payment_schedule: approvedSchedule,
+        proposal_items: items,
+        consultant: {
+          name: (proposal as any)?.created_by_name ?? null,
+          email: (proposal as any)?.created_by_email ?? null,
+          phone: (proposal as any)?.created_by_phone ?? null,
+        },
+      };
+
       // Update proposal status
       const { error } = await supabase
         .from('proposals')
@@ -452,6 +493,10 @@ export default function ProposalPublicView() {
           accepted_at: acceptedAt,
           acceptor_name: acceptorName,
           acceptor_document: acceptorDocument,
+          approved_amount: approvedAmountLocal,
+          approval_snapshot: approvalSnapshot as any,
+          approved_payment_schedule: { schedule: approvedSchedule } as any,
+          approved_dynamic_pricing_tier_id: snap?.current_tier_id ?? null,
         })
         .eq('id', proposalId);
 
@@ -964,7 +1009,20 @@ export default function ProposalPublicView() {
   const totalAmount = oneTimeWithDiscount + recurringContractTotal;
   
   // CRITICAL: Use oneTimeTotal for installments, not totalAmount (which includes MRR items)
-  const installments = oneTimeTerm ? calculateInstallments(oneTimeTerm, oneTimeTotal) : [];
+  // PRICE UX 1.0.3 — usar approved_amount quando proposta já foi aprovada (congela o split)
+  const baseForSchedule =
+    proposal?.status === 'accepted' && proposal?.approved_amount != null
+      ? Number(proposal.approved_amount)
+      : oneTimeTotal;
+  const installments = oneTimeTerm
+    ? calculateInstallments(oneTimeTerm, baseForSchedule, {
+        proposalExpiresAt: proposal?.expires_at ?? null,
+        approvedAmount: proposal?.status === 'accepted' ? Number(proposal?.approved_amount ?? oneTimeTotal) : null,
+      })
+    : [];
+
+  // PRICE UX 1.0.3 — flag pública de pagamento (Pix/ERP)
+  const publicPaymentEnabled = proposal?.public_payment_enabled === true;
 
   const PAYMENT_METHODS: Record<string, { label: string; icon: any }> = {
     'pix': { label: 'PIX', icon: Wallet },
@@ -1085,38 +1143,33 @@ export default function ProposalPublicView() {
       </header>
 
       <main className="max-w-5xl mx-auto px-3 py-4 md:px-4 md:py-8 space-y-4 md:space-y-6">
-        {/* Status Banner */}
-        {(isAccepted || isDeclined) && (
-          <Card className={`border-2 ${isAccepted ? 'border-green-500 bg-green-50' : 'border-red-500 bg-red-50'}`}>
+        {/* Status Banner — PRICE UX 1.0.3: tela completa pós-aprovação quando aceita */}
+        {isAccepted && (
+          <PublicProposalApprovedScreen
+            proposal={proposal}
+            items={items}
+            installments={installments as any}
+            publicPaymentEnabled={publicPaymentEnabled}
+            onDownloadPDF={handleDownloadPDF}
+            downloadingPDF={downloadingPDF}
+            contactConsultantHref={null}
+          />
+        )}
+        {isDeclined && (
+          <Card className="border-2 border-red-500 bg-red-50">
             <CardContent className="py-4 md:py-6 flex items-center gap-3 md:gap-4">
-              {isAccepted ? (
-                <>
-                  <div className="w-10 h-10 md:w-14 md:h-14 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
-                    <CheckCircle2 className="h-6 w-6 md:h-8 md:w-8 text-green-600" />
-                  </div>
-                  <div className="min-w-0">
-                    <h3 className="text-lg md:text-xl font-bold text-green-900">Proposta Aceita!</h3>
-                    <p className="text-sm md:text-base text-green-700">
-                      Aceita em {formatDateBR(proposal.accepted_at)} por {proposal.acceptor_name}
-                    </p>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="w-10 h-10 md:w-14 md:h-14 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
-                    <XCircle className="h-6 w-6 md:h-8 md:w-8 text-red-600" />
-                  </div>
-                  <div className="min-w-0">
-                    <h3 className="text-lg md:text-xl font-bold text-red-900">Proposta Recusada</h3>
-                    <p className="text-sm md:text-base text-red-700">
-                      Recusada em {formatDateBR(proposal.declined_at)}
-                    </p>
-                    {proposal.declined_reason && (
-                      <p className="text-xs md:text-sm text-red-600 mt-1">Motivo: {proposal.declined_reason}</p>
-                    )}
-                  </div>
-                </>
-              )}
+              <div className="w-10 h-10 md:w-14 md:h-14 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <XCircle className="h-6 w-6 md:h-8 md:w-8 text-red-600" />
+              </div>
+              <div className="min-w-0">
+                <h3 className="text-lg md:text-xl font-bold text-red-900">Proposta Recusada</h3>
+                <p className="text-sm md:text-base text-red-700">
+                  Recusada em {formatDateBR(proposal.declined_at)}
+                </p>
+                {proposal.declined_reason && (
+                  <p className="text-xs md:text-sm text-red-600 mt-1">Motivo: {proposal.declined_reason}</p>
+                )}
+              </div>
             </CardContent>
           </Card>
         )}
@@ -1443,10 +1496,12 @@ export default function ProposalPublicView() {
             <PublicProposalDynamicPricingBanner
               snapshot={proposal.dynamic_pricing_snapshot as any}
             />
-            <PublicProposalPaymentBlock
-              proposalId={proposal.id}
-              snapshot={proposal.dynamic_pricing_snapshot as any}
-            />
+            {publicPaymentEnabled && (
+              <PublicProposalPaymentBlock
+                proposalId={proposal.id}
+                snapshot={proposal.dynamic_pricing_snapshot as any}
+              />
+            )}
           </>
         )}
 
@@ -1514,19 +1569,30 @@ export default function ProposalPublicView() {
                   
                   {installments.length > 0 && (
                     <div className="bg-muted/50 rounded-lg p-4">
-                      <p className="text-sm text-muted-foreground mb-3">Cronograma de pagamentos:</p>
+                      <p className="text-sm text-muted-foreground mb-3">
+                        {installments.length === 1 && installments[0].type === 'upfront'
+                          ? 'Forma e prazo do pagamento:'
+                          : 'Cronograma de pagamentos:'}
+                      </p>
                       <div className="space-y-2">
-                        {installments.map((inst, idx) => (
-                          <div key={idx} className="flex justify-between items-center py-2 border-b border-border/50 last:border-0">
-                            <div className="flex items-center gap-2">
-                              <Badge variant={inst.type === 'entry' ? 'default' : 'outline'} className="text-xs">
-                                {inst.type === 'entry' ? 'Entrada' : `Parcela ${inst.number}`}
-                              </Badge>
-                              <span className="text-sm">{formatDateBR(inst.dueDate)}</span>
+                        {installments.map((inst, idx) => {
+                          const label = inst.label
+                            ?? (inst.type === 'upfront' ? 'Pagamento à vista'
+                              : inst.type === 'entry' ? 'Entrada'
+                              : inst.type === 'balance' ? 'Saldo'
+                              : `Parcela ${inst.number}`);
+                          return (
+                            <div key={idx} className="flex justify-between items-center py-2 border-b border-border/50 last:border-0">
+                              <div className="flex items-center gap-2">
+                                <Badge variant={inst.type === 'upfront' || inst.type === 'entry' ? 'default' : 'outline'} className="text-xs">
+                                  {label}
+                                </Badge>
+                                <span className="text-sm">{formatDateBR(inst.dueDate)}</span>
+                              </div>
+                              <span className="font-semibold">{formatCurrency(inst.amount)}</span>
                             </div>
-                            <span className="font-semibold">{formatCurrency(inst.amount)}</span>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   )}
@@ -1858,7 +1924,9 @@ export default function ProposalPublicView() {
               <div className="text-center space-y-4">
                 <h3 className="text-xl md:text-2xl font-bold">Pronto para avançar?</h3>
                 <p className="text-sm md:text-base text-muted-foreground max-w-md mx-auto">
-                  Clique em "Aprovar Proposta" para aceitar formalmente esta oferta ou "Recusar" para nos informar sua decisão.
+                  {proposal?.dynamic_pricing_enabled
+                    ? 'Clique em "Aprovar proposta com valor vigente" para aceitar formalmente esta proposta nas condições comerciais apresentadas.'
+                    : 'Clique em "Aprovar Proposta" para aceitar formalmente esta oferta ou "Recusar" para nos informar sua decisão.'}
                 </p>
                 <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 pt-4">
                   <Button

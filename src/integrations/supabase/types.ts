@@ -18938,6 +18938,7 @@ export type Database = {
           proposal_prefix: string | null
           proposal_sequence: number | null
           proposal_validity_days: number | null
+          public_payment_enabled: boolean
           responsible_user_id: string | null
           settings: Json | null
           slack_channel_id: string | null
@@ -18988,6 +18989,7 @@ export type Database = {
           proposal_prefix?: string | null
           proposal_sequence?: number | null
           proposal_validity_days?: number | null
+          public_payment_enabled?: boolean
           responsible_user_id?: string | null
           settings?: Json | null
           slack_channel_id?: string | null
@@ -19038,6 +19040,7 @@ export type Database = {
           proposal_prefix?: string | null
           proposal_sequence?: number | null
           proposal_validity_days?: number | null
+          public_payment_enabled?: boolean
           responsible_user_id?: string | null
           settings?: Json | null
           slack_channel_id?: string | null
@@ -22645,10 +22648,13 @@ export type Database = {
           installments: number | null
           monthly_value: number | null
           organization_id: string
+          payment_condition: string
           payment_method: string | null
           payment_type: string
           proposal_id: string
           recurring_due_day: number | null
+          second_payment_due_date: string | null
+          second_payment_due_strategy: string | null
           updated_at: string | null
         }
         Insert: {
@@ -22670,10 +22676,13 @@ export type Database = {
           installments?: number | null
           monthly_value?: number | null
           organization_id: string
+          payment_condition?: string
           payment_method?: string | null
           payment_type?: string
           proposal_id: string
           recurring_due_day?: number | null
+          second_payment_due_date?: string | null
+          second_payment_due_strategy?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -22695,10 +22704,13 @@ export type Database = {
           installments?: number | null
           monthly_value?: number | null
           organization_id?: string
+          payment_condition?: string
           payment_method?: string | null
           payment_type?: string
           proposal_id?: string
           recurring_due_day?: number | null
+          second_payment_due_date?: string | null
+          second_payment_due_strategy?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -23227,6 +23239,10 @@ export type Database = {
           acceptor_phone: string | null
           acceptor_position: string | null
           acceptor_user_agent: string | null
+          approval_snapshot: Json
+          approved_amount: number | null
+          approved_dynamic_pricing_tier_id: string | null
+          approved_payment_schedule: Json
           client_email: string | null
           client_name: string | null
           content: Json | null
@@ -23265,6 +23281,7 @@ export type Database = {
           pdf_url: string | null
           proposal_number: string | null
           proposal_version: number | null
+          public_payment_enabled: boolean | null
           public_token: string | null
           revenue_type: string | null
           sent_at: string | null
@@ -23296,6 +23313,10 @@ export type Database = {
           acceptor_phone?: string | null
           acceptor_position?: string | null
           acceptor_user_agent?: string | null
+          approval_snapshot?: Json
+          approved_amount?: number | null
+          approved_dynamic_pricing_tier_id?: string | null
+          approved_payment_schedule?: Json
           client_email?: string | null
           client_name?: string | null
           content?: Json | null
@@ -23334,6 +23355,7 @@ export type Database = {
           pdf_url?: string | null
           proposal_number?: string | null
           proposal_version?: number | null
+          public_payment_enabled?: boolean | null
           public_token?: string | null
           revenue_type?: string | null
           sent_at?: string | null
@@ -23365,6 +23387,10 @@ export type Database = {
           acceptor_phone?: string | null
           acceptor_position?: string | null
           acceptor_user_agent?: string | null
+          approval_snapshot?: Json
+          approved_amount?: number | null
+          approved_dynamic_pricing_tier_id?: string | null
+          approved_payment_schedule?: Json
           client_email?: string | null
           client_name?: string | null
           content?: Json | null
@@ -23403,6 +23429,7 @@ export type Database = {
           pdf_url?: string | null
           proposal_number?: string | null
           proposal_version?: number | null
+          public_payment_enabled?: boolean | null
           public_token?: string | null
           revenue_type?: string | null
           sent_at?: string | null

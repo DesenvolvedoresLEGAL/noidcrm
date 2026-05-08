@@ -29,6 +29,12 @@ export interface PaymentTerm {
   auto_renewal?: boolean;
   
   comments?: string;
+
+  // PRICE UX 1.0.3 — payment condition
+  payment_condition?: 'upfront' | 'split_50_50' | 'split_30_70' | 'installments' | 'custom_schedule';
+  second_payment_due_strategy?: 'post_event' | 'after_valid_until' | 'manual_date' | null;
+  second_payment_due_date?: string | null;
+
   created_at?: string;
   updated_at?: string;
 }
@@ -37,7 +43,9 @@ export interface Installment {
   number: number;
   dueDate: string;
   amount: number;
-  type: 'entry' | 'installment';
+  /** 'upfront' = pagamento à vista (linha única); 'entry' = entrada de split; 'balance' = saldo de split; 'installment' = parcela tradicional */
+  type: 'upfront' | 'entry' | 'balance' | 'installment';
+  label?: string;
 }
 
 export async function getPaymentTerms(proposalId: string): Promise<PaymentTerm[]> {
@@ -112,21 +120,91 @@ function formatLocalDate(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-export function calculateInstallments(term: PaymentTerm, totalAmount: number): Installment[] {
+export function calculateInstallments(
+  term: PaymentTerm,
+  totalAmount: number,
+  options?: { proposalExpiresAt?: string | null; approvedAmount?: number | null },
+): Installment[] {
   if (term.payment_type !== 'one_time') {
     return [];
   }
 
-  const installments: Installment[] = [];
-  const entryPercent = term.entry_percent || 0;
-  const numInstallments = term.installments || 1;
   const discountPercent = term.discount_percent || 0;
+  const baseTotal = options?.approvedAmount != null ? options.approvedAmount : totalAmount;
+  const discountedTotal = options?.approvedAmount != null
+    ? baseTotal // approved amount is already final/frozen
+    : baseTotal * (1 - discountPercent / 100);
+
+  // Auto-derive condition from legacy fields se ainda não foi configurada explicitamente
+  let condition = term.payment_condition || 'upfront';
+  const numInstallments = term.installments || 1;
+  const entryPercent = term.entry_percent || 0;
+  if (!term.payment_condition) {
+    if (entryPercent === 50 && numInstallments === 1) condition = 'split_50_50';
+    else if (entryPercent === 30 && numInstallments === 1) condition = 'split_30_70';
+    else if (numInstallments > 1) condition = 'installments';
+  }
+
+  // ----- À vista -----
+  const isUpfront =
+    condition === 'upfront' ||
+    (numInstallments <= 1 && entryPercent === 0 && condition !== 'split_50_50' && condition !== 'split_30_70');
+
+  if (isUpfront) {
+    const dueDate = term.first_installment_date || term.entry_date || formatLocalDate(new Date());
+    return [
+      {
+        number: 1,
+        dueDate,
+        amount: Number(discountedTotal.toFixed(2)),
+        type: 'upfront',
+        label: 'Pagamento à vista',
+      },
+    ];
+  }
+
+  // ----- 50% + 50% / 30% + 70% -----
+  if (condition === 'split_50_50' || condition === 'split_30_70') {
+    const firstPct = condition === 'split_50_50' ? 50 : 30;
+    const secondPct = 100 - firstPct;
+    const entryDate = term.entry_date || term.first_installment_date || formatLocalDate(new Date());
+
+    let balanceDate = term.second_payment_due_date || null;
+    if (!balanceDate) {
+      const strategy = term.second_payment_due_strategy || 'after_valid_until';
+      if (strategy === 'after_valid_until' && options?.proposalExpiresAt) {
+        balanceDate = options.proposalExpiresAt.slice(0, 10);
+      } else if (strategy === 'post_event' && options?.proposalExpiresAt) {
+        balanceDate = options.proposalExpiresAt.slice(0, 10);
+      } else {
+        const d = parseLocalDate(entryDate);
+        d.setDate(d.getDate() + 30);
+        balanceDate = formatLocalDate(d);
+      }
+    }
+
+    return [
+      {
+        number: 1,
+        dueDate: entryDate,
+        amount: Number(((discountedTotal * firstPct) / 100).toFixed(2)),
+        type: 'entry',
+        label: `Entrada (${firstPct}%)`,
+      },
+      {
+        number: 2,
+        dueDate: balanceDate,
+        amount: Number(((discountedTotal * secondPct) / 100).toFixed(2)),
+        type: 'balance',
+        label: `Saldo (${secondPct}%)`,
+      },
+    ];
+  }
+
+  // ----- Parcelado tradicional (legado) -----
+  const installments: Installment[] = [];
   const intervalDays = term.installment_interval_days || 30;
 
-  // Apply discount to total
-  const discountedTotal = totalAmount * (1 - discountPercent / 100);
-
-  // Calculate entry amount
   if (entryPercent > 0 && term.entry_date) {
     const entryAmount = discountedTotal * (entryPercent / 100);
     installments.push({
@@ -137,45 +215,31 @@ export function calculateInstallments(term: PaymentTerm, totalAmount: number): I
     });
   }
 
-  // Calculate remaining amount for installments
   const remainingAmount = discountedTotal * (1 - entryPercent / 100);
   const installmentAmount = remainingAmount / numInstallments;
-
-  // Generate installments - use local date parsing to avoid timezone shift
   const firstDateStr = term.first_installment_date || formatLocalDate(new Date());
   const firstDate = parseLocalDate(firstDateStr);
-  
+
   for (let i = 0; i < numInstallments; i++) {
     let dueDate: Date;
-    
     if (i === 0) {
-      // First installment uses first_installment_date exactly as configured
       dueDate = new Date(firstDate);
     } else {
-      // Calculate target date by adding months (not raw days) for more predictable behavior
-      // Then adjust to the preferred due_day
       const targetMonth = firstDate.getMonth() + i;
       const targetYear = firstDate.getFullYear() + Math.floor(targetMonth / 12);
       const normalizedMonth = targetMonth % 12;
-      
-      // Determine the day to use
       let targetDay: number;
       if (term.due_day && term.due_day >= 1 && term.due_day <= 31) {
         targetDay = term.due_day;
       } else {
-        // If no due_day preference, use interval-based calculation
         const intervalDate = new Date(firstDate);
         intervalDate.setDate(firstDate.getDate() + (intervalDays * i));
         targetDay = intervalDate.getDate();
       }
-      
-      // Clamp to last day of target month
       const lastDayOfMonth = new Date(targetYear, normalizedMonth + 1, 0).getDate();
       const clampedDay = Math.min(targetDay, lastDayOfMonth);
-      
       dueDate = new Date(targetYear, normalizedMonth, clampedDay);
     }
-
     installments.push({
       number: i + 1,
       dueDate: formatLocalDate(dueDate),
