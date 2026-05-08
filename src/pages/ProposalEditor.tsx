@@ -418,7 +418,7 @@ export default function ProposalEditor() {
             await applyTemplate(p.id, tplByName.id);
           }
           await orchestrateProposalFinancials(p.id, 'editor_open_lazy');
-          invalidateProposalCaches(queryClient, p.id);
+          invalidateProposalCaches(queryClient, p.id, opportunityId || (p as any).opportunity_id);
           getPaymentTerms(p.id).then(setPaymentTerms);
         } catch (e) {
           console.warn('[ProposalEditor] lazy orchestrate failed:', e);
@@ -636,7 +636,7 @@ export default function ProposalEditor() {
           clearDraft();
           setLastSaved(null);
           hasRestoredFromStorageRef.current = false;
-          invalidateProposalCaches(queryClient, savedProposalId);
+          invalidateProposalCaches(queryClient, savedProposalId, opportunityId || proposalData?.opportunity_id);
 
           // Update state and navigate AFTER saving everything
           setCurrentProposalId(newProposal.id);
@@ -679,7 +679,7 @@ export default function ProposalEditor() {
       setLastSaved(null);
       hasRestoredFromStorageRef.current = false;
       if (savedProposalId) {
-        invalidateProposalCaches(queryClient, savedProposalId);
+        invalidateProposalCaches(queryClient, savedProposalId, opportunityId || proposalData?.opportunity_id);
       }
       console.log('[ProposalEditor] Save completed successfully');
     } catch (error) {

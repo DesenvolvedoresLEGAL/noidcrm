@@ -32,6 +32,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
+import { invalidateProposalCaches } from '@/hooks/proposals/useProposalOrchestrator';
 import {
   createProposal,
   updateProposal,
@@ -284,7 +285,11 @@ export function ProposalEditorModal({
         console.log('[ProposalEditorModal] Totals recalculated and opportunity synced');
       }
       
-      queryClient.invalidateQueries({ queryKey: proposalKeys.lists() });
+      if (savedId) {
+        invalidateProposalCaches(queryClient, savedId, opportunityId);
+      } else {
+        queryClient.invalidateQueries({ queryKey: proposalKeys.lists() });
+      }
       onSuccess?.();
     } catch (error) {
       console.error('[ProposalEditorModal] Error saving proposal:', error);
