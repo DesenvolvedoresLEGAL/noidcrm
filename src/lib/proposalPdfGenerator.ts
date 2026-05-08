@@ -945,15 +945,18 @@ export async function generateProposalPDFClient(
       autoTable(doc, {
         startY: yPos,
         head: [[
-          { content: 'Parcela', styles: { halign: 'left' } },
+          { content: 'Descrição', styles: { halign: 'left' } },
           { content: 'Vencimento', styles: { halign: 'center' } },
           { content: 'Valor', styles: { halign: 'right' } },
         ]],
-        body: installments.map(inst => [
-          inst.type === 'entry' ? 'Entrada' : `Parcela ${inst.number}`,
-          formatDateBR(inst.dueDate),
-          formatCurrency(inst.amount, currency),
-        ]),
+        body: installments.map(inst => {
+          const label = inst.label
+            ?? (inst.type === 'upfront' ? 'Pagamento à vista'
+              : inst.type === 'entry' ? 'Entrada'
+              : inst.type === 'balance' ? 'Saldo'
+              : `Parcela ${inst.number}`);
+          return [label, formatDateBR(inst.dueDate), formatCurrency(inst.amount, currency)];
+        }),
         theme: 'plain',
         styles: {
           fontSize: 9,
