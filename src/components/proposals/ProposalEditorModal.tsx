@@ -238,6 +238,14 @@ export function ProposalEditorModal({
   }, [proposalId]);
 
   const onSubmit = async (data: ProposalFormData) => {
+    // Template requer validade da proposta?
+    if (appliedTemplate?.requires_valid_until && !data.expires_at) {
+      toast.error(
+        'Este template exige validade da proposta para calcular a condição comercial.',
+      );
+      return;
+    }
+
     // Check session validity before saving
     const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
     if (sessionError || !sessionData?.session) {
