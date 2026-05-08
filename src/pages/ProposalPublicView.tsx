@@ -443,7 +443,47 @@ export default function ProposalPublicView() {
     
     try {
       const acceptedAt = new Date().toISOString();
-      
+
+      // PRICE UX 1.0.3 — montar snapshot da aprovação
+      const snap = (proposal?.dynamic_pricing_snapshot ?? {}) as any;
+      const oneTimeItemsLocal = items.filter((it: any) => (it.billing_type || 'one_time') !== 'recurring');
+      const oneTimeTotalLocal = oneTimeItemsLocal.reduce((s: number, it: any) => s + Number(it.total ?? 0), 0);
+      const approvedAmountLocal = Number(
+        snap?.current_amount ?? proposal?.dynamic_pricing_current_amount ?? oneTimeTotalLocal ?? proposal?.total_amount ?? 0
+      );
+      const oneTimeTermLocal = paymentTerms.find((t: any) => t.payment_type === 'one_time');
+      const recurringTermLocal = paymentTerms.find((t: any) => t.payment_type === 'recurring');
+      const approvedSchedule = oneTimeTermLocal
+        ? calculateInstallments(oneTimeTermLocal as any, approvedAmountLocal, {
+            proposalExpiresAt: proposal?.expires_at ?? null,
+            approvedAmount: approvedAmountLocal,
+          })
+        : [];
+
+      const approvalSnapshot = {
+        proposal_id: proposalId,
+        approved_at: acceptedAt,
+        approved_amount: approvedAmountLocal,
+        dynamic_pricing: {
+          enabled: !!proposal?.dynamic_pricing_enabled,
+          current_amount: snap?.current_amount ?? null,
+          current_tier_id: snap?.current_tier_id ?? null,
+          current_label: snap?.current_label ?? null,
+          current_adjustment: snap?.current_adjustment ?? null,
+          current_valid_until: snap?.current_ends_at ?? null,
+        },
+        proposal_valid_until: proposal?.expires_at ?? null,
+        payment_method: oneTimeTermLocal?.payment_method ?? recurringTermLocal?.payment_method ?? null,
+        payment_condition: oneTimeTermLocal?.payment_condition ?? 'upfront',
+        payment_schedule: approvedSchedule,
+        proposal_items: items,
+        consultant: {
+          name: (proposal as any)?.created_by_name ?? null,
+          email: (proposal as any)?.created_by_email ?? null,
+          phone: (proposal as any)?.created_by_phone ?? null,
+        },
+      };
+
       // Update proposal status
       const { error } = await supabase
         .from('proposals')
@@ -452,6 +492,10 @@ export default function ProposalPublicView() {
           accepted_at: acceptedAt,
           acceptor_name: acceptorName,
           acceptor_document: acceptorDocument,
+          approved_amount: approvedAmountLocal,
+          approval_snapshot: approvalSnapshot,
+          approved_payment_schedule: { schedule: approvedSchedule },
+          approved_dynamic_pricing_tier_id: snap?.current_tier_id ?? null,
         })
         .eq('id', proposalId);
 
