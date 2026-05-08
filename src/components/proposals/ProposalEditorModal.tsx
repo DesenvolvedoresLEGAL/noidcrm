@@ -532,11 +532,19 @@ export function ProposalEditorModal({
             <TabsContent value="payment-terms" className="mt-4 space-y-4">
               {proposalId && (
                 <>
-                  <ProposalDynamicPricingPanel
-                    proposalId={proposalId}
-                    proposalTotal={watch('value') || 0}
-                    eventStartDate={(watch as any)('event_start_date') ?? null}
-                  />
+                  {appliedTemplate?.dynamic_pricing_applicability === 'none' ? (
+                    <Alert>
+                      <AlertDescription>
+                        Tabela dinâmica não aplicável para este template.
+                      </AlertDescription>
+                    </Alert>
+                  ) : (
+                    <ProposalDynamicPricingPanel
+                      proposalId={proposalId}
+                      proposalTotal={watch('value') || 0}
+                      eventStartDate={(watch as any)('event_start_date') ?? null}
+                    />
+                  )}
                   <ProposalDynamicPaymentPanel proposalId={proposalId} />
                 </>
               )}
