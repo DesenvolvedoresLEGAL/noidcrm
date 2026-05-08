@@ -214,66 +214,52 @@ export function InventoryItemFormDialog({ open, onOpenChange, item }: Props) {
             )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Categoria</Label>
-              <Select
-                value={form.watch('category_id')}
-                onValueChange={(v) => form.setValue('category_id', v, { shouldValidate: true })}
-                disabled={noCategories}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione uma categoria" />
-                </SelectTrigger>
-                <SelectContent>
-                  {serializedCategories.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {noCategories && (
-                <p className="text-xs text-muted-foreground">
-                  Cadastre uma categoria serializada antes de criar itens.
-                </p>
-              )}
-              {form.formState.errors.category_id && (
-                <p className="text-sm text-destructive">
-                  {form.formState.errors.category_id.message}
-                </p>
-              )}
-            </div>
+          <InventoryClassificationFields
+            categoryId={form.watch('category_id')}
+            familyId={form.watch('family_id') ?? null}
+            operationalType={form.watch('operational_type') as OperationalType}
+            criticality={form.watch('criticality') as Criticality}
+            itemKindFilter="serialized"
+            onChange={(next) => {
+              form.setValue('category_id', next.category_id, { shouldValidate: true });
+              form.setValue('family_id', next.family_id);
+              form.setValue('operational_type', next.operational_type);
+              form.setValue('criticality', next.criticality);
+            }}
+            errors={{
+              category_id: form.formState.errors.category_id as any,
+              family_id: form.formState.errors.family_id as any,
+            }}
+          />
 
-            <div className="space-y-2">
-              <Label>Local atual</Label>
-              <Select
-                value={form.watch('location_id')}
-                onValueChange={(v) => form.setValue('location_id', v, { shouldValidate: true })}
-                disabled={noLocations}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o local atual" />
-                </SelectTrigger>
-                <SelectContent>
-                  {activeLocations.map((l) => (
-                    <SelectItem key={l.id} value={l.id}>
-                      {l.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {noLocations && (
-                <p className="text-xs text-muted-foreground">
-                  Cadastre um local antes de criar itens.
-                </p>
-              )}
-              {form.formState.errors.location_id && (
-                <p className="text-sm text-destructive">
-                  {form.formState.errors.location_id.message}
-                </p>
-              )}
-            </div>
+          <div className="space-y-2">
+            <Label>Local atual</Label>
+            <Select
+              value={form.watch('location_id')}
+              onValueChange={(v) => form.setValue('location_id', v, { shouldValidate: true })}
+              disabled={noLocations}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione o local atual" />
+              </SelectTrigger>
+              <SelectContent>
+                {activeLocations.map((l) => (
+                  <SelectItem key={l.id} value={l.id}>
+                    {l.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {noLocations && (
+              <p className="text-xs text-muted-foreground">
+                Cadastre um local antes de criar itens.
+              </p>
+            )}
+            {form.formState.errors.location_id && (
+              <p className="text-sm text-destructive">
+                {form.formState.errors.location_id.message}
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">
