@@ -32,7 +32,12 @@ import {
   technicalSpecsArraySchema,
   type TechnicalSpec,
 } from '@/lib/operations/inventoryTechnicalSpecs';
+import {
+  type Criticality,
+  type OperationalType,
+} from '@/lib/operations/inventoryClassification';
 import { TechnicalSpecsSection } from './TechnicalSpecsSection';
+import { InventoryClassificationFields } from './InventoryClassificationFields';
 import { useInventoryCategories } from '@/hooks/operations/useInventoryCategories';
 import { useInventoryLocations } from '@/hooks/operations/useInventoryLocations';
 import { useInventoryQuantityItemMutations } from '@/hooks/operations/useInventoryItems';
