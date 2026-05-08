@@ -77,6 +77,7 @@ const NotificationPreferences = lazy(() => import("./pages/settings/Notification
 // System Settings Pages - Individual routes
 const CelebracoesSettingsPage = lazy(() => import("./pages/settings/system/CelebracoesSettingsPage"));
 const ForecastSettingsPage = lazy(() => import("./pages/settings/system/ForecastSettingsPage"));
+const PricingFactorRulesPage = lazy(() => import("./pages/settings/system/PricingFactorRulesPage"));
 const DadosSettingsPage = lazy(() => import("./pages/settings/system/DadosSettingsPage"));
 const ExportacoesSettingsPage = lazy(() => import("./pages/settings/system/ExportacoesSettingsPage"));
 const OportunidadesCartoesSettingsPage = lazy(() => import("./pages/settings/system/OportunidadesCartoesSettingsPage"));
@@ -900,6 +901,16 @@ const App = () => (
                   <ProtectedRoute>
                     <LazyRoute>
                       <ForecastSettingsPage />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/settings/pricing-factor-rules"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <PricingFactorRulesPage />
                     </LazyRoute>
                   </ProtectedRoute>
                 }

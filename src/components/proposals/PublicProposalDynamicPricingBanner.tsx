@@ -42,7 +42,17 @@ export function PublicProposalDynamicPricingBanner({ snapshot, variant = 'public
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <div className="text-xs text-muted-foreground">Valor válido hoje</div>
+            <div className="text-xs text-muted-foreground">
+              {(() => {
+                const isAuto = (snapshot as any).pricing_mode === 'event_antecedence';
+                const base = (snapshot as any).base_amount;
+                const adjusted =
+                  isAuto && base != null && Number(snapshot.current_amount) !== Number(base);
+                return adjusted
+                  ? 'Valor vigente hoje, já com ajuste por antecedência'
+                  : 'Valor vigente hoje';
+              })()}
+            </div>
             <div className="text-2xl font-bold">{formatBRL(snapshot.current_amount)}</div>
             {snapshot.current_ends_at && (
               <div className="text-xs text-muted-foreground flex items-center gap-1 mt-1">

@@ -519,6 +519,7 @@ export function ProposalEditorModal({
                   <ProposalDynamicPricingPanel
                     proposalId={proposalId}
                     proposalTotal={watch('value') || 0}
+                    eventStartDate={(watch as any)('event_start_date') ?? null}
                   />
                   <ProposalDynamicPaymentPanel proposalId={proposalId} />
                 </>

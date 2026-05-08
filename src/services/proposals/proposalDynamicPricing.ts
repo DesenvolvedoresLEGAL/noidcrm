@@ -20,6 +20,11 @@ export interface DynamicPricingRule {
   next_amount: number | null;
   last_calculated_at: string | null;
   notes: string | null;
+  pricing_mode: 'manual' | 'event_antecedence';
+  event_start_date: string | null;
+  auto_generated: boolean;
+  show_expired_tiers: boolean;
+  post_event_policy: 'surcharge' | 'requires_requote' | 'block_payment';
   created_at: string;
   updated_at: string;
 }
@@ -235,3 +240,101 @@ export async function disableDynamicPricing(proposalId: string) {
 }
 
 export type { DynamicPricingTierInput };
+
+// ===== PRICE 1.0.1 =====
+
+export interface PricingFactorRule {
+  id: string;
+  organization_id: string;
+  name: string;
+  label: string;
+  min_days_before_event: number | null;
+  max_days_before_event: number | null;
+  adjustment_type: 'percent' | 'fixed';
+  adjustment_value: number;
+  sort_order: number;
+  status: 'active' | 'inactive';
+  created_at: string;
+  updated_at: string;
+}
+
+export async function generateEventAntecedencePricing(
+  proposalId: string,
+  forceRegenerate = false,
+): Promise<any> {
+  const { data, error } = await c.rpc('generate_event_antecedence_pricing_for_proposal', {
+    p_proposal_id: proposalId,
+    p_force_regenerate: forceRegenerate,
+  });
+  if (error) throw error;
+  if (data?.error) throw new Error(data.message ?? data.error);
+  return data;
+}
+
+export async function listFactorRules(): Promise<PricingFactorRule[]> {
+  const { data, error } = await c
+    .from('proposal_dynamic_pricing_factor_rules')
+    .select('*')
+    .order('sort_order', { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as PricingFactorRule[];
+}
+
+export async function upsertFactorRule(
+  payload: Partial<PricingFactorRule> & { id?: string },
+): Promise<PricingFactorRule> {
+  const org = await currentOrgId();
+  const { data: userRes } = await supabase.auth.getUser();
+  const userId = userRes.user?.id ?? null;
+
+  if (payload.id) {
+    const { data, error } = await c
+      .from('proposal_dynamic_pricing_factor_rules')
+      .update({
+        name: payload.name,
+        label: payload.label,
+        min_days_before_event: payload.min_days_before_event ?? null,
+        max_days_before_event: payload.max_days_before_event ?? null,
+        adjustment_type: payload.adjustment_type ?? 'percent',
+        adjustment_value: payload.adjustment_value ?? 0,
+        sort_order: payload.sort_order ?? 0,
+        status: payload.status ?? 'active',
+        updated_by: userId,
+      })
+      .eq('id', payload.id)
+      .select('*')
+      .single();
+    if (error) throw error;
+    return data as PricingFactorRule;
+  }
+  const { data, error } = await c
+    .from('proposal_dynamic_pricing_factor_rules')
+    .insert({
+      organization_id: org,
+      name: payload.name,
+      label: payload.label,
+      min_days_before_event: payload.min_days_before_event ?? null,
+      max_days_before_event: payload.max_days_before_event ?? null,
+      adjustment_type: payload.adjustment_type ?? 'percent',
+      adjustment_value: payload.adjustment_value ?? 0,
+      sort_order: payload.sort_order ?? 0,
+      status: payload.status ?? 'active',
+      created_by: userId,
+      updated_by: userId,
+    })
+    .select('*')
+    .single();
+  if (error) throw error;
+  return data as PricingFactorRule;
+}
+
+export async function setFactorRuleStatus(
+  id: string,
+  status: 'active' | 'inactive',
+): Promise<void> {
+  const { error } = await c
+    .from('proposal_dynamic_pricing_factor_rules')
+    .update({ status })
+    .eq('id', id);
+  if (error) throw error;
+}

@@ -75,6 +75,93 @@ export const dynamicPricingRuleSchema = z.object({
 
 export type DynamicPricingRuleInput = z.infer<typeof dynamicPricingRuleSchema>;
 
+// ===== PRICE 1.0.1: Antecedência por evento =====
+
+export const PRICING_MODES = ['manual', 'event_antecedence'] as const;
+export type PricingMode = (typeof PRICING_MODES)[number];
+
+export const POST_EVENT_POLICIES = ['surcharge', 'requires_requote', 'block_payment'] as const;
+export type PostEventPolicy = (typeof POST_EVENT_POLICIES)[number];
+
+export const POST_EVENT_POLICY_LABEL: Record<PostEventPolicy, string> = {
+  surcharge: 'Aplicar sobretaxa pós-evento',
+  requires_requote: 'Exigir nova cotação',
+  block_payment: 'Bloquear pagamento',
+};
+
+export const FACTOR_ADJUSTMENT_TYPES = ['percent', 'fixed'] as const;
+export type FactorAdjustmentType = (typeof FACTOR_ADJUSTMENT_TYPES)[number];
+
+export const FACTOR_STATUSES = ['active', 'inactive'] as const;
+export type FactorStatus = (typeof FACTOR_STATUSES)[number];
+
+export const proposalDynamicPricingFactorRuleSchema = z.object({
+  id: z.string().uuid().optional(),
+  name: z.string().min(2, 'Nome obrigatório'),
+  label: z.string().min(2, 'Descrição obrigatória'),
+  min_days_before_event: z.coerce.number().int().nullable().optional(),
+  max_days_before_event: z.coerce.number().int().nullable().optional(),
+  adjustment_type: z.enum(FACTOR_ADJUSTMENT_TYPES).default('percent'),
+  adjustment_value: z.coerce.number().default(0),
+  sort_order: z.coerce.number().int().min(0).default(0),
+  status: z.enum(FACTOR_STATUSES).default('active'),
+});
+export type ProposalDynamicPricingFactorRuleInput = z.infer<
+  typeof proposalDynamicPricingFactorRuleSchema
+>;
+
+export const eventAntecedencePricingGenerationSchema = z.object({
+  proposal_id: z.string().uuid(),
+  force_regenerate: z.boolean().default(false),
+});
+export type EventAntecedencePricingGenerationInput = z.infer<
+  typeof eventAntecedencePricingGenerationSchema
+>;
+
+export type TierStatus = 'expired' | 'current' | 'next' | 'future' | 'post_event';
+
+export const TIER_STATUS_LABEL: Record<TierStatus, string> = {
+  expired: 'Expirada',
+  current: 'Vigente',
+  next: 'Próxima',
+  future: 'Futuro',
+  post_event: 'Pós evento',
+};
+
+export function tierStatusFromDates(
+  starts_at: string | null,
+  ends_at: string | null,
+  eventStartDate: string | null,
+  now: Date = new Date(),
+): TierStatus {
+  const t = now.getTime();
+  const s = starts_at ? new Date(starts_at).getTime() : -Infinity;
+  const e = ends_at ? new Date(ends_at).getTime() : Infinity;
+  if (eventStartDate && starts_at) {
+    const ev = new Date(eventStartDate).getTime();
+    if (s > ev) {
+      // tier starts after event begins → pós evento
+      if (s <= t && t <= e) return 'post_event';
+      if (t < s) return 'next';
+    }
+  }
+  if (s <= t && t <= e) return 'current';
+  if (t < s) {
+    // closest next
+    return 'next';
+  }
+  return 'expired';
+}
+
+export function daysUntil(date: string | null | undefined): number | null {
+  if (!date) return null;
+  const target = new Date(date);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  target.setHours(0, 0, 0, 0);
+  return Math.round((target.getTime() - today.getTime()) / 86400000);
+}
+
 export interface DynamicPricingSnapshot {
   proposal_id: string;
   pricing_rule_id?: string | null;
