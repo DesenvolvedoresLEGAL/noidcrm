@@ -164,8 +164,9 @@ export async function applyTemplate(proposalId: string, templateId: string): Pro
 
   if (templateError) throw templateError;
 
-  // Resolve valid_until based on validity_strategy
   const t: any = template;
+
+  // Resolve valid_until based on validity_strategy
   let validUntil: string | undefined;
   const days = t.default_validity_days ?? t.validity_days ?? null;
   if (t.validity_strategy === 'fixed_days_from_creation' && days != null) {
@@ -188,6 +189,14 @@ export async function applyTemplate(proposalId: string, templateId: string): Pro
     payment_mode: t.default_payment_mode ?? null,
   };
   if (validUntil) updates.expires_at = `${validUntil}T12:00:00Z`;
+
+  // Para templates de Evento automático, garantir Pix como método padrão
+  const isAutomaticEvent =
+    t.dynamic_pricing_applicability === 'automatic' &&
+    (t.revenue_type === 'one_time_event' || t.revenue_type === 'one_time_non_event');
+  if (isAutomaticEvent) {
+    updates.payment_mode = 'one_time';
+  }
 
   const { error: updateError } = await supabase
     .from('proposals')
