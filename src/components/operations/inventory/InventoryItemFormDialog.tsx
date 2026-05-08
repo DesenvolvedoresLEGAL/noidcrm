@@ -1,0 +1,344 @@
+import { useEffect, useMemo } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { toast } from 'sonner';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  ITEM_STATUS_OPTIONS,
+  mapDuplicateError,
+  type InventoryItemStatus,
+} from '@/lib/operations/inventoryLabels';
+import { useInventoryCategories } from '@/hooks/operations/useInventoryCategories';
+import { useInventoryLocations } from '@/hooks/operations/useInventoryLocations';
+import { useInventoryItemMutations } from '@/hooks/operations/useInventoryItems';
+import type { InventoryItemWithRefs } from '@/services/operations/inventoryItems';
+
+const STATUSES = [
+  'available',
+  'blocked',
+  'maintenance',
+  'damaged',
+  'retired',
+  'lost',
+] as const;
+
+const schema = z.object({
+  name: z.string().trim().min(2, 'Mínimo 2 caracteres').max(120, 'Máximo 120 caracteres'),
+  description: z.string().trim().max(500, 'Máximo 500 caracteres').optional().or(z.literal('')),
+  category_id: z.string().uuid('Selecione uma categoria.'),
+  location_id: z.string().uuid('Selecione um local.'),
+  status: z.enum(STATUSES),
+  asset_code: z.string().trim().max(80, 'Máximo 80 caracteres').optional().or(z.literal('')),
+  serial_number: z
+    .string()
+    .trim()
+    .max(120, 'Máximo 120 caracteres')
+    .optional()
+    .or(z.literal('')),
+  brand: z.string().trim().max(80, 'Máximo 80 caracteres').optional().or(z.literal('')),
+  model: z.string().trim().max(120, 'Máximo 120 caracteres').optional().or(z.literal('')),
+  notes: z.string().trim().max(1000, 'Máximo 1000 caracteres').optional().or(z.literal('')),
+});
+
+type FormData = z.infer<typeof schema>;
+
+interface Props {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  item?: InventoryItemWithRefs | null;
+}
+
+export function InventoryItemFormDialog({ open, onOpenChange, item }: Props) {
+  const isEdit = !!item;
+  const { create, update } = useInventoryItemMutations();
+  const { data: categories } = useInventoryCategories();
+  const { data: locations } = useInventoryLocations();
+
+  const serializedCategories = useMemo(
+    () =>
+      (categories ?? []).filter((c) => c.is_active && c.item_kind === 'serialized'),
+    [categories],
+  );
+  const activeLocations = useMemo(
+    () => (locations ?? []).filter((l) => l.is_active),
+    [locations],
+  );
+
+  const form = useForm<FormData>({
+    resolver: zodResolver(schema),
+    defaultValues: {
+      name: '',
+      description: '',
+      category_id: '',
+      location_id: '',
+      status: 'available',
+      asset_code: '',
+      serial_number: '',
+      brand: '',
+      model: '',
+      notes: '',
+    },
+  });
+
+  useEffect(() => {
+    if (open) {
+      form.reset({
+        name: item?.name ?? '',
+        description: item?.description ?? '',
+        category_id: item?.category_id ?? '',
+        location_id: item?.location_id ?? '',
+        status: ((item?.status as InventoryItemStatus) ?? 'available'),
+        asset_code: item?.asset_code ?? '',
+        serial_number: item?.serial_number ?? '',
+        brand: item?.brand ?? '',
+        model: item?.model ?? '',
+        notes: item?.notes ?? '',
+      });
+    }
+  }, [open, item, form]);
+
+  const onSubmit = async (data: FormData) => {
+    const payload = {
+      name: data.name,
+      description: data.description || null,
+      category_id: data.category_id,
+      location_id: data.location_id,
+      status: data.status,
+      asset_code: data.asset_code || null,
+      serial_number: data.serial_number || null,
+      brand: data.brand || null,
+      model: data.model || null,
+      notes: data.notes || null,
+    };
+    try {
+      if (isEdit && item) {
+        await update.mutateAsync({ id: item.id, input: payload });
+        toast.success('Item atualizado com sucesso.');
+      } else {
+        await create.mutateAsync(payload);
+        toast.success('Item criado com sucesso.');
+      }
+      onOpenChange(false);
+    } catch (err: any) {
+      const dup = mapDuplicateError(err);
+      toast.error(dup ?? err?.message ?? 'Não foi possível concluir a ação. Tente novamente.');
+    }
+  };
+
+  const pending = create.isPending || update.isPending;
+  const noCategories = serializedCategories.length === 0;
+  const noLocations = activeLocations.length === 0;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{isEdit ? 'Editar item' : 'Novo item'}</DialogTitle>
+          <DialogDescription>
+            Cadastre ativos físicos únicos do inventário, como roteadores, switches e tablets.
+          </DialogDescription>
+        </DialogHeader>
+
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="name">Nome do item</Label>
+            <Input id="name" placeholder="Ex: Router BLUE 001" {...form.register('name')} />
+            {form.formState.errors.name && (
+              <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="description">Descrição</Label>
+            <Textarea
+              id="description"
+              rows={2}
+              placeholder="Ex: Roteador principal utilizado em eventos corporativos."
+              {...form.register('description')}
+            />
+            {form.formState.errors.description && (
+              <p className="text-sm text-destructive">
+                {form.formState.errors.description.message}
+              </p>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Categoria</Label>
+              <Select
+                value={form.watch('category_id')}
+                onValueChange={(v) => form.setValue('category_id', v, { shouldValidate: true })}
+                disabled={noCategories}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione uma categoria" />
+                </SelectTrigger>
+                <SelectContent>
+                  {serializedCategories.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {noCategories && (
+                <p className="text-xs text-muted-foreground">
+                  Cadastre uma categoria serializada antes de criar itens.
+                </p>
+              )}
+              {form.formState.errors.category_id && (
+                <p className="text-sm text-destructive">
+                  {form.formState.errors.category_id.message}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label>Local atual</Label>
+              <Select
+                value={form.watch('location_id')}
+                onValueChange={(v) => form.setValue('location_id', v, { shouldValidate: true })}
+                disabled={noLocations}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o local atual" />
+                </SelectTrigger>
+                <SelectContent>
+                  {activeLocations.map((l) => (
+                    <SelectItem key={l.id} value={l.id}>
+                      {l.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {noLocations && (
+                <p className="text-xs text-muted-foreground">
+                  Cadastre um local antes de criar itens.
+                </p>
+              )}
+              {form.formState.errors.location_id && (
+                <p className="text-sm text-destructive">
+                  {form.formState.errors.location_id.message}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Status</Label>
+            <Select
+              value={form.watch('status')}
+              onValueChange={(v) => form.setValue('status', v as InventoryItemStatus)}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {ITEM_STATUS_OPTIONS.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="asset_code">Código patrimonial</Label>
+              <Input
+                id="asset_code"
+                placeholder="Ex: RT-BLUE-001"
+                {...form.register('asset_code')}
+              />
+              {form.formState.errors.asset_code && (
+                <p className="text-sm text-destructive">
+                  {form.formState.errors.asset_code.message}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="serial_number">Número de série</Label>
+              <Input
+                id="serial_number"
+                placeholder="Ex: SN123456789"
+                {...form.register('serial_number')}
+              />
+              {form.formState.errors.serial_number && (
+                <p className="text-sm text-destructive">
+                  {form.formState.errors.serial_number.message}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="brand">Marca</Label>
+              <Input id="brand" placeholder="Ex: Intelbras" {...form.register('brand')} />
+              {form.formState.errors.brand && (
+                <p className="text-sm text-destructive">
+                  {form.formState.errors.brand.message}
+                </p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="model">Modelo</Label>
+              <Input id="model" placeholder="Ex: GX 3000" {...form.register('model')} />
+              {form.formState.errors.model && (
+                <p className="text-sm text-destructive">
+                  {form.formState.errors.model.message}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="notes">Observações</Label>
+            <Textarea
+              id="notes"
+              rows={3}
+              placeholder="Ex: Equipamento revisado e pronto para uso."
+              {...form.register('notes')}
+            />
+            {form.formState.errors.notes && (
+              <p className="text-sm text-destructive">
+                {form.formState.errors.notes.message}
+              </p>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={pending || noCategories || noLocations}>
+              {pending ? 'Salvando...' : isEdit ? 'Atualizar' : 'Criar'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
