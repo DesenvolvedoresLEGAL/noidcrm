@@ -1,124 +1,91 @@
-# Sprint INV 0.4 — Itens Serializados
 
-## Objetivo
-Adicionar a aba **Itens** em `/app/operations/inventory` para CRUD de itens serializados (`item_kind='serialized'`), reutilizando a tabela `inventory_items` da Sprint INV 0.2.
+# Sprint INV 0.5 — Itens por Quantidade
 
-## Pré-requisito de schema (migration mínima)
-A tabela `inventory_items` **não tem** índices únicos para `asset_code` e `serial_number`. Sem eles, o tratamento de erro `23505` exigido pela sprint não dispara. Adicionar dois índices únicos parciais (apenas valores não-nulos, escopados por organização):
+Adicionar segundo tipo de item ao Inventário (`item_kind = 'quantity'`) reaproveitando estrutura da Sprint 0.4, sem novas tabelas, sem alterações de schema, sem novas RPCs.
 
-```sql
-CREATE UNIQUE INDEX IF NOT EXISTS uq_inventory_items_asset_code
-  ON public.inventory_items (organization_id, asset_code)
-  WHERE asset_code IS NOT NULL;
+## Estrutura de Navegação
 
-CREATE UNIQUE INDEX IF NOT EXISTS uq_inventory_items_serial_number
-  ON public.inventory_items (organization_id, serial_number)
-  WHERE serial_number IS NOT NULL;
+A aba **Itens** vira um container com subtabs internas:
+
+```text
+Operações > Inventário
+├── Visão Geral
+├── Itens
+│   ├── Serializados      ← comportamento da Sprint 0.4 preservado
+│   └── Por quantidade    ← novo nesta sprint
+├── Categorias
+└── Locais
 ```
 
-Sem alterar tabelas, RLS, enums ou triggers existentes.
+## Arquivos a Criar
 
-## Estrutura de arquivos
+1. **`src/services/operations/inventoryItems.ts`** — estender (mesmo arquivo):
+   - `listQuantityItems(orgId)` — filtra `item_kind='quantity'`
+   - `createQuantityItem(orgId, userId, input)`
+   - `updateQuantityItem(id, userId, input)`
+   - `updateQuantityItemStatus(id, status, userId, quantityAvailable?)`
+   - Helper `getQuantityAvailableForQuantityStatus(status, requested)`: retorna `requested` se `available`, senão `0`.
 
-**Novos:**
-- `src/services/operations/inventoryItems.ts` — list (com joins de category/location), create, update, updateStatus
-- `src/hooks/operations/useInventoryItems.ts` — `useInventoryItems` (query) + `useInventoryItemMutations` (create/update/updateStatus). Invalida `['inventory-items', orgId]` e `['inventory-status-history']`.
-- `src/components/operations/inventory/InventoryItemsTab.tsx` — header, busca + filtros (status/categoria/local), tabela, empty state, abre dialogs
-- `src/components/operations/inventory/InventoryItemFormDialog.tsx` — modal create/edit com Zod
-- `src/components/operations/inventory/InventoryItemStatusDialog.tsx` — modal de mudança de status com motivo + AlertDialog de confirmação para `retired/lost/damaged`
+2. **`src/hooks/operations/useInventoryItems.ts`** — estender:
+   - `useInventoryQuantityItems()`
+   - `useInventoryQuantityItemMutations()` (create/update/updateStatus)
+   - Invalidar queries: `['inventory-items']`, `['inventory-quantity-items']`, `['inventory-status-history']`.
 
-**Editados:**
-- `src/lib/operations/inventoryLabels.ts` — adicionar `ITEM_STATUS_LABEL` + `ITEM_STATUS_OPTIONS` + helpers `getQuantityAvailableForStatus(status)` (1 se `available`, senão 0) e `getStatusBadgeVariant`
-- `src/pages/operations/Inventory.tsx` — adicionar tab `Itens` na ordem **Visão Geral | Itens | Categorias | Locais**
+3. **`src/components/operations/inventory/InventoryQuantityItemsTab.tsx`**:
+   - 4 cards de KPI no topo (Total, Disponíveis, Abaixo do mínimo, Zerados).
+   - Tabela com colunas: Item, Categoria, Local, Status, Unidade, Qtd Total, Qtd Disponível, Estoque Mínimo, Alerta, Atualizado em, Ações.
+   - Busca (name/description/brand/model) + filtros: status, categoria (filtrada por `item_kind='quantity'`), local.
+   - Empty state com CTA "Novo item por quantidade".
+   - Badge de alerta com prioridade: Zerado > Abaixo do mínimo > No mínimo > OK > Sem mínimo.
 
-## Tipos e mapas
+4. **`src/components/operations/inventory/InventoryQuantityItemFormDialog.tsx`**:
+   - 12 campos conforme spec, validação Zod com `refine` para `quantity_available <= quantity_total`.
+   - Quando status ≠ `available`, força e desabilita `quantity_available = 0` com aviso.
+   - Select de categoria filtrado por `item_kind='quantity'` (com mensagem se vazio).
 
-```ts
-ITEM_STATUS_LABEL = {
-  available:'Disponível', blocked:'Bloqueado', maintenance:'Em manutenção',
-  damaged:'Danificado', retired:'Baixado', lost:'Perdido'
-}
-```
-Badge: `available` → default; `maintenance/blocked` → secondary; `damaged/lost/retired` → destructive.
+5. **`src/components/operations/inventory/InventoryQuantityItemStatusDialog.tsx`**:
+   - Status atual + novo status + motivo opcional.
+   - Se novo status = `available` e atual ≠ `available`, exibe input "Quantidade disponível" obrigatório (≤ `quantity_total`).
+   - AlertDialog de confirmação para `retired`/`lost`/`damaged` (textos da spec).
 
-## Camada de dados
+6. **`src/components/operations/inventory/InventoryItemsTab.tsx`** — refatorar:
+   - Renomear o conteúdo atual para `InventorySerializedItemsTab.tsx` (mover lógica) **ou** manter componente atual e wrapper.
+   - Decisão: criar wrapper `InventoryItemsTab.tsx` com subtabs Radix `<Tabs>` internas, e mover conteúdo atual para novo `InventorySerializedItemsTab.tsx` (rename limpo).
 
-**list (apenas serializados):**
-```ts
-supabase.from('inventory_items')
-  .select('*, category:inventory_categories(id,name,item_kind), location:inventory_locations(id,name,location_type)')
-  .eq('organization_id', orgId)
-  .eq('item_kind', 'serialized')
-  .order('updated_at', { ascending: false })
-```
+## Arquivos a Editar
 
-**create:** força `item_kind='serialized'`, `quantity_total=1`, `unit_of_measure='un'`, `metadata={}`, `quantity_available = getQuantityAvailableForStatus(status)`, `created_by/updated_by = auth.uid()`. Strings vazias salvam como `null`.
+- **`src/lib/operations/inventoryLabels.ts`**:
+  - Adicionar `UNIT_OF_MEASURE_OPTIONS` (un, m, cx, pct, rolo, kit, par, kg, l).
+  - Adicionar helper `getStockAlert({ available, minimum })` retornando `'zeroed' | 'below' | 'at_min' | 'ok' | 'no_min'` + labels e variants.
 
-**update:** mantém `item_kind` e `quantity_total=1`; recomputa `quantity_available` se `status` mudou; seta `updated_by`.
+- **`src/pages/operations/Inventory.tsx`**: nenhum mudança estrutural — `InventoryItemsTab` já está plugado e passa a renderizar subtabs internamente.
 
-**updateStatus(id, status, reason?):** update com `status` + `quantity_available` recomputado + `updated_by`. A trigger `trg_inventory_items_status_history` já registra histórico. **Não** criar movement manual nesta sprint (decisão: manter simples; histórico já cobre via trigger).
+## Regras de Negócio Críticas
 
-**Selects auxiliares:**
-- `useSerializedCategories()` — `inventory_categories` ativas com `item_kind='serialized'`
-- `useActiveLocations()` — `inventory_locations` ativos
-Reutilizam queryKeys das sprints 0.3 quando possível, ou criam queries dedicadas com `select` reduzido.
-
-## Validação Zod
-
-```ts
-inventorySerializedItemSchema = z.object({
-  name: z.string().trim().min(2).max(120),
-  description: z.string().trim().max(500).optional().or(z.literal('')),
-  category_id: z.string().uuid('Selecione uma categoria.'),
-  location_id: z.string().uuid('Selecione um local.'),
-  status: z.enum(['available','blocked','maintenance','damaged','retired','lost']),
-  asset_code: z.string().trim().max(80).optional().or(z.literal('')),
-  serial_number: z.string().trim().max(120).optional().or(z.literal('')),
-  brand: z.string().trim().max(80).optional().or(z.literal('')),
-  model: z.string().trim().max(120).optional().or(z.literal('')),
-  notes: z.string().trim().max(1000).optional().or(z.literal('')),
-})
-
-inventoryItemStatusSchema = z.object({
-  status: z.enum([...]),
-  reason: z.string().trim().max(300).optional().or(z.literal('')),
-})
-```
-
-## Tratamento de erro 23505
-No `catch` das mutations:
-- `err.message` contém `uq_inventory_items_asset_code` → "Já existe um item com este código patrimonial."
-- contém `uq_inventory_items_serial_number` → "Já existe um item com este número de série."
-- fallback `23505` → "Já existe um item com este código patrimonial ou número de série."
-
-## UI da aba Itens
-
-- Header: título "Itens" + descrição + botão **Novo item** (desabilitado com tooltip se não houver categoria serializada OU local ativo; mensagens "Cadastre uma categoria serializada antes de criar itens." / "Cadastre um local antes de criar itens.")
-- Toolbar: input de busca (filtra client-side em `name | asset_code | serial_number | brand | model`) + 3 selects (status, categoria, local) com opção "Todos"
-- Tabela: Item (name + description truncado), Categoria, Local, Status (Badge), Código patrimonial, Nº série, Marca/Modelo, Atualizado em, Ações (Editar | Alterar status)
-- Empty state com ícone `Package`, título e CTA conforme spec
-- Skeleton durante loading (padrão Sprint 0.3)
-
-## Confirmações
-`AlertDialog` antes de aplicar mudanças destrutivas (textos exatos da sprint):
-- `retired` → "Deseja baixar este item?..."
-- `lost` → "Deseja marcar este item como perdido?..."
-- `damaged` → "Deseja marcar este item como danificado?..."
-
-Outros status: salvam direto sem confirmação extra.
-
-## Toasts
-Sucesso: "Item criado com sucesso." / "Item atualizado com sucesso." / "Status alterado com sucesso." Erros conforme seção 23505 + fallback "Não foi possível concluir a ação. Tente novamente."
+- `item_kind` sempre `'quantity'` em create; nunca alterado em update.
+- `organization_id` da org atual; `created_by`/`updated_by` = `user.id`.
+- Em qualquer mutação de status para algo ≠ `available`: forçar `quantity_available = 0`.
+- Em mutação para `available`: usar valor informado pelo usuário (validado ≤ `quantity_total`).
+- `quantity_minimum` opcional (`null` permitido).
+- Não exibir nem enviar `asset_code`/`serial_number` para itens quantity.
+- Trigger DB existente cuida de `inventory_status_history`.
 
 ## Permissões
-Já garantidas pela página (Sprint 0.1) e pelas RLS policies via `user_can_access_inventory()` (Sprint 0.2). Nenhuma mudança.
 
-## Fora de escopo
-Itens por quantidade, chips/kits/reservas, movements manuais, integração com proposta/tabela dinâmica, histórico em UI, cards de KPI na Visão Geral, QR code, upload, delete físico.
+Reutilizar guard de `Inventory.tsx` (já restrito a owner/admin/operations/operacional). RLS no banco já bloqueia escrita indevida.
+
+## Toasts
+
+- Sucesso: "Item por quantidade criado/atualizado com sucesso.", "Status alterado com sucesso."
+- Erro Zod: mensagem do schema (incl. "A quantidade disponível não pode ser maior que a quantidade total.")
+- Erro genérico: "Não foi possível concluir a ação. Tente novamente."
+
+## Fora de Escopo (não implementar)
+
+Reservas, kits, chips, movimentações avançadas, transferências, integração com proposta/tabela dinâmica, edge functions, RPCs novas, delete físico, filtro de alerta (deixar para sprint futura — só busca + status + categoria + local nesta).
 
 ## Riscos
-- Índices únicos parciais aplicados em base com dados existentes podem falhar se já houver duplicatas. Como a tabela está vazia (sprints 0.2/0.3 só criaram schema/CRUD de cat/loc), risco é zero.
-- Constraint check `inventory_items_serialized_quantity_valid` exige `quantity_total=1` e `quantity_available ∈ {0,1}` para serializados — já coberto pelo `getQuantityAvailableForStatus`.
 
-## Próximos passos (INV 0.5)
-Cadastro de itens por quantidade e KPIs na Visão Geral.
+- Renomear o atual `InventoryItemsTab` pode quebrar imports — verificar e atualizar `Inventory.tsx`.
+- `quantity_available` é `numeric` no banco — usar `z.coerce.number()` e enviar como número.
+- Garantir que select de categorias só liste `item_kind='quantity'` para evitar inconsistência.
