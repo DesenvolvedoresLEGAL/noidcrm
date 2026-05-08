@@ -151,10 +151,39 @@ export function ProposalDynamicPricingPanel({
     });
   };
 
-  const eventDays = daysUntil(eventStartDate ?? data?.rule?.event_start_date);
+  const validityDays = daysUntil(referenceDate ?? data?.rule?.event_start_date);
+
+  // Estado: template não aplicável (recorrente, assinatura, etc.)
+  if (isNotApplicable) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            Tabela de Preço Dinâmica
+            <Badge variant="outline">Não aplicável</Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <p className="text-sm">Tabela dinâmica não aplicável para este template.</p>
+          <p className="text-xs text-muted-foreground">
+            Esta proposta usa um modelo recorrente, de assinatura ou de serviço. A precificação por
+            antecedência da validade não será aplicada.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   // Modo automático
   if (showAutoMode) {
+    const ref = referenceDate ?? data?.rule?.event_start_date ?? null;
+    const refLabel = isAutomaticByValidity ? 'Validade da proposta' : 'Evento começa em';
+    const daysLabel = isAutomaticByValidity ? 'Dias até a validade' : 'Dias até o evento';
+    const titleClause = isAutomaticByValidity
+      ? 'Tabela e valor vigente são gerados automaticamente a partir da diferença entre a data de pagamento e a validade da proposta.'
+      : 'Tabela e valor vigente são gerados automaticamente a partir da diferença entre a data de pagamento e o primeiro dia do evento.';
+    const generating = generate.isPending && (data?.tiers ?? []).length === 0;
+
     return (
       <Card>
         <CardHeader className="flex flex-row items-start justify-between gap-2">
@@ -165,11 +194,11 @@ export function ProposalDynamicPricingPanel({
               <Badge variant={statusBadgeVariant(status)}>
                 {STATUS_LABEL[status as keyof typeof STATUS_LABEL] ?? status}
               </Badge>
-              <Badge variant="outline">Modo automático por antecedência do evento</Badge>
+              <Badge variant="outline">
+                {isAutomaticByValidity ? 'Automática por validade' : 'Automática por antecedência'}
+              </Badge>
             </CardTitle>
-            <p className="text-xs text-muted-foreground">
-              Tabela e valor vigente são gerados automaticamente a partir da diferença entre a data de pagamento e o primeiro dia do evento.
-            </p>
+            <p className="text-xs text-muted-foreground">{titleClause}</p>
           </div>
           {isAdmin && (
             <Button
@@ -184,19 +213,23 @@ export function ProposalDynamicPricingPanel({
         </CardHeader>
 
         <CardContent className="space-y-4">
-          {!eventStartDate && !data?.rule?.event_start_date && (
+          {!ref && (
             <div className="rounded-md border border-destructive/50 bg-destructive/5 p-3 text-sm">
-              Defina a data de início do evento na proposta ou na oportunidade para gerar a tabela automaticamente.
+              {isAutomaticByValidity
+                ? 'Defina a validade da proposta para gerar a tabela automaticamente.'
+                : 'Defina a data de início do evento na proposta ou na oportunidade para gerar a tabela automaticamente.'}
+            </div>
+          )}
+
+          {generating && (
+            <div className="rounded-md border bg-muted/40 p-3 text-sm text-muted-foreground">
+              Gerando tabela automática...
             </div>
           )}
 
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-            <Metric label="Evento começa em" value={
-              (eventStartDate ?? data?.rule?.event_start_date)
-                ? new Date(eventStartDate ?? data!.rule!.event_start_date!).toLocaleDateString('pt-BR')
-                : '—'
-            } />
-            <Metric label="Dias até o evento" value={eventDays != null ? String(eventDays) : '—'} />
+            <Metric label={refLabel} value={ref ? new Date(ref).toLocaleDateString('pt-BR') : '—'} />
+            <Metric label={daysLabel} value={validityDays != null ? String(validityDays) : '—'} />
             <Metric label="Valor base" value={formatBRL(data?.rule?.base_amount ?? baseAmount)} />
             <Metric label="Valor vigente" value={formatBRL(snapshot?.current_amount)} highlight />
             <Metric label="Próxima virada" value={formatBRL(snapshot?.next_amount)} subtitle={
@@ -210,7 +243,7 @@ export function ProposalDynamicPricingPanel({
 
           <ReadOnlyTierTable
             tiers={data?.tiers ?? []}
-            eventStartDate={eventStartDate ?? data?.rule?.event_start_date ?? null}
+            eventStartDate={ref}
             currentTierId={snapshot?.current_tier_id ?? data?.rule?.current_tier_id ?? null}
           />
 
