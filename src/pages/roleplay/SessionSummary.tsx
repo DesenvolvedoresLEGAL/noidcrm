@@ -14,7 +14,7 @@ import { BadgeUnlockModal } from '@/components/gamification/BadgeUnlockModal';
 import { Badge as BadgeType } from '@/services/gamification/badges';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const SUMMARY_TIMEOUT_MS = 20000;
+const SUMMARY_TIMEOUT_MS = 150000;
 
 export default function SessionSummary() {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -142,8 +142,8 @@ export default function SessionSummary() {
 
     const timeoutId = setTimeout(() => {
       if (!evaluationReady) {
-        setEvaluationError('A avaliação demorou mais que o esperado');
-        setTechnicalDetails('Timeout absoluto de 20s atingido sem score_overall.');
+        setEvaluationError('A avaliação demorou mais que o esperado, mas sua conversa está salva.');
+        setTechnicalDetails('Timeout de acompanhamento atingido sem score_overall após 150s.');
       }
     }, SUMMARY_TIMEOUT_MS);
 
