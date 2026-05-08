@@ -25,8 +25,58 @@ export const PRE_RESERVATION_ITEM_TYPES = [
   'quantity',
   'sku',
   'service_no_stock',
+  'category_family_demand',
 ] as const;
 export type PreReservationItemType = (typeof PRE_RESERVATION_ITEM_TYPES)[number];
+
+export const PRE_RESERVATION_ALLOCATION_STATUSES = [
+  'unallocated',
+  'partially_allocated',
+  'allocated',
+  'over_allocated',
+  'not_required',
+] as const;
+export type PreReservationAllocationStatus =
+  (typeof PRE_RESERVATION_ALLOCATION_STATUSES)[number];
+
+export const ALLOCATION_ITEM_TYPES = ['serialized', 'quantity'] as const;
+export type AllocationItemType = (typeof ALLOCATION_ITEM_TYPES)[number];
+
+export const ALLOCATION_STATUSES = ['active', 'cancelled', 'replaced'] as const;
+export type AllocationStatus = (typeof ALLOCATION_STATUSES)[number];
+
+export const DEMAND_SOURCES = [
+  'proposal_item',
+  'product_rule',
+  'manual',
+  'agent',
+] as const;
+export type DemandSource = (typeof DEMAND_SOURCES)[number];
+
+export const ALLOCATION_STATUS_LABELS: Record<PreReservationAllocationStatus, string> = {
+  unallocated: 'Não alocado',
+  partially_allocated: 'Parcial',
+  allocated: 'Alocado',
+  over_allocated: 'Excedente',
+  not_required: 'Sem controle',
+};
+
+export function allocationStatusBadgeVariant(
+  s: PreReservationAllocationStatus,
+): 'default' | 'secondary' | 'destructive' | 'outline' {
+  switch (s) {
+    case 'allocated':
+      return 'default';
+    case 'partially_allocated':
+      return 'secondary';
+    case 'over_allocated':
+      return 'destructive';
+    case 'not_required':
+      return 'outline';
+    default:
+      return 'outline';
+  }
+}
 
 export const PRE_RESERVATION_AVAILABILITIES = [
   'pending',
