@@ -91,7 +91,7 @@ export function InventoryItemFormDialog({ open, onOpenChange, item }: Props) {
   );
 
   const form = useForm<FormData>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(schema) as any,
     defaultValues: {
       name: '',
       description: '',
@@ -103,6 +103,7 @@ export function InventoryItemFormDialog({ open, onOpenChange, item }: Props) {
       brand: '',
       model: '',
       notes: '',
+      technical_specs: [],
     },
   });
 
@@ -119,6 +120,7 @@ export function InventoryItemFormDialog({ open, onOpenChange, item }: Props) {
         brand: item?.brand ?? '',
         model: item?.model ?? '',
         notes: item?.notes ?? '',
+        technical_specs: getTechnicalSpecs(item?.metadata) as TechnicalSpec[],
       });
     }
   }, [open, item, form]);
@@ -135,10 +137,14 @@ export function InventoryItemFormDialog({ open, onOpenChange, item }: Props) {
       brand: data.brand || null,
       model: data.model || null,
       notes: data.notes || null,
+      technical_specs: (data.technical_specs ?? []) as TechnicalSpec[],
     };
     try {
       if (isEdit && item) {
-        await update.mutateAsync({ id: item.id, input: payload });
+        await update.mutateAsync({
+          id: item.id,
+          input: { ...payload, _currentMetadata: item.metadata } as any,
+        });
         toast.success('Item atualizado com sucesso.');
       } else {
         await create.mutateAsync(payload);
