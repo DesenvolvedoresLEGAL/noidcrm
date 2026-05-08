@@ -418,7 +418,7 @@ export default function ProposalEditor() {
             await applyTemplate(p.id, tplByName.id);
           }
           await orchestrateProposalFinancials(p.id, 'editor_open_lazy');
-          invalidateProposalCaches(queryClient, p.id);
+          invalidateProposalCaches(queryClient, p.id, opportunityId || (p as any).opportunity_id);
           getPaymentTerms(p.id).then(setPaymentTerms);
         } catch (e) {
           console.warn('[ProposalEditor] lazy orchestrate failed:', e);
