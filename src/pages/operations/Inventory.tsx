@@ -10,6 +10,7 @@ import { InventoryItemsTab } from '@/components/operations/inventory/InventoryIt
 import { InventoryCategoriesTab } from '@/components/operations/inventory/InventoryCategoriesTab';
 import { InventoryFamiliesTab } from '@/components/operations/inventory/InventoryFamiliesTab';
 import { InventoryLocationsTab } from '@/components/operations/inventory/InventoryLocationsTab';
+import { InventoryReservationsTab } from '@/components/operations/inventory/InventoryReservationsTab';
 
 export default function Inventory() {
   const { isOwner, isAdmin, orgRole, loading } = usePermissions();
@@ -43,6 +44,7 @@ export default function Inventory() {
         <TabsList>
           <TabsTrigger value="overview">Visão Geral</TabsTrigger>
           <TabsTrigger value="items">Itens</TabsTrigger>
+          <TabsTrigger value="reservations">Reservas</TabsTrigger>
           <TabsTrigger value="categories">Categorias</TabsTrigger>
           <TabsTrigger value="families">Famílias</TabsTrigger>
           <TabsTrigger value="locations">Locais</TabsTrigger>
@@ -53,6 +55,9 @@ export default function Inventory() {
         </TabsContent>
         <TabsContent value="items">
           <InventoryItemsTab />
+        </TabsContent>
+        <TabsContent value="reservations">
+          <InventoryReservationsTab />
         </TabsContent>
         <TabsContent value="categories">
           <InventoryCategoriesTab />

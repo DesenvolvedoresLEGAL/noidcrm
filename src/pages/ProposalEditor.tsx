@@ -14,6 +14,7 @@ import { ProposalEditorHeader } from '@/components/proposals/ProposalEditorHeade
 import { ProposalContextCards } from '@/components/proposals/ProposalContextCards';
 import { ProposalVisualizarTab } from '@/components/proposals/ProposalVisualizarTab';
 import { ProposalParticipantsManager } from '@/components/proposals/ProposalParticipantsManager';
+import { ProposalInventoryPanel } from '@/components/proposals/ProposalInventoryPanel';
 // Analytics moved to OpportunityAnalyticsTab
 import { AIInlineButton } from '@/components/proposals/AIInlineButton';
 import { ViewingNowIndicator } from '@/components/proposals/ViewingNowIndicator';
@@ -998,12 +999,13 @@ export default function ProposalEditor() {
                 </div>
               </TabsContent>
 
-              <TabsContent value="items">
+              <TabsContent value="items" className="space-y-4">
                 <ProposalItemsManager 
                   items={items} 
                   onChange={setItems} 
                   paymentDiscountPercent={paymentDiscountPercent}
                 />
+                <ProposalInventoryPanel proposalId={currentProposalId} />
               </TabsContent>
 
               <TabsContent value="payment-terms" className="space-y-4">

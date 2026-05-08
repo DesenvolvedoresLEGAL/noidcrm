@@ -13482,6 +13482,194 @@ export type Database = {
           },
         ]
       }
+      inventory_pre_reservation_items: {
+        Row: {
+          availability_status: string
+          category_id: string | null
+          conflict_reason: string | null
+          created_at: string
+          family_id: string | null
+          id: string
+          inventory_item_type: string
+          notes: string | null
+          organization_id: string
+          pre_reservation_id: string
+          pre_reserved_quantity: number
+          quantity_item_id: string | null
+          requested_quantity: number
+          serialized_item_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          availability_status?: string
+          category_id?: string | null
+          conflict_reason?: string | null
+          created_at?: string
+          family_id?: string | null
+          id?: string
+          inventory_item_type: string
+          notes?: string | null
+          organization_id: string
+          pre_reservation_id: string
+          pre_reserved_quantity?: number
+          quantity_item_id?: string | null
+          requested_quantity?: number
+          serialized_item_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          availability_status?: string
+          category_id?: string | null
+          conflict_reason?: string | null
+          created_at?: string
+          family_id?: string | null
+          id?: string
+          inventory_item_type?: string
+          notes?: string | null
+          organization_id?: string
+          pre_reservation_id?: string
+          pre_reserved_quantity?: number
+          quantity_item_id?: string | null
+          requested_quantity?: number
+          serialized_item_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_pre_reservation_items_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_pre_reservation_items_family_id_fkey"
+            columns: ["family_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_families"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_pre_reservation_items_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_pre_reservation_items_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_report_legacy_retirement_readiness_v2"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "inventory_pre_reservation_items_pre_reservation_id_fkey"
+            columns: ["pre_reservation_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_pre_reservations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_pre_reservation_items_quantity_item_id_fkey"
+            columns: ["quantity_item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_pre_reservation_items_serialized_item_id_fkey"
+            columns: ["serialized_item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_pre_reservations: {
+        Row: {
+          account_id: string | null
+          contact_id: string | null
+          created_at: string
+          created_by: string | null
+          event_end_date: string | null
+          event_start_date: string | null
+          id: string
+          notes: string | null
+          operational_end_date: string
+          operational_start_date: string
+          opportunity_id: string | null
+          organization_id: string
+          proposal_id: string | null
+          reservation_code: string
+          risk_level: string
+          source: string
+          status: string
+          title: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          event_end_date?: string | null
+          event_start_date?: string | null
+          id?: string
+          notes?: string | null
+          operational_end_date: string
+          operational_start_date: string
+          opportunity_id?: string | null
+          organization_id: string
+          proposal_id?: string | null
+          reservation_code: string
+          risk_level?: string
+          source?: string
+          status?: string
+          title: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          event_end_date?: string | null
+          event_start_date?: string | null
+          id?: string
+          notes?: string | null
+          operational_end_date?: string
+          operational_start_date?: string
+          opportunity_id?: string | null
+          organization_id?: string
+          proposal_id?: string | null
+          reservation_code?: string
+          risk_level?: string
+          source?: string
+          status?: string
+          title?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_pre_reservations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_pre_reservations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_report_legacy_retirement_readiness_v2"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
       inventory_status_history: {
         Row: {
           created_at: string
@@ -20398,12 +20586,19 @@ export type Database = {
           cost: number | null
           counts_for_commission: boolean
           created_at: string | null
+          default_inventory_category_id: string | null
+          default_inventory_family_id: string | null
+          default_inventory_item_type: string | null
+          default_quantity_item_id: string | null
+          default_serialized_item_id: string | null
           deleted_at: string | null
           description: string | null
           external_id: string | null
           external_source: string | null
           id: string
           image_url: string | null
+          inventory_control_mode: string
+          inventory_quantity_multiplier: number
           ipi_percent: number
           last_synced_at: string | null
           minimum_contract_months: number | null
@@ -20425,12 +20620,19 @@ export type Database = {
           cost?: number | null
           counts_for_commission?: boolean
           created_at?: string | null
+          default_inventory_category_id?: string | null
+          default_inventory_family_id?: string | null
+          default_inventory_item_type?: string | null
+          default_quantity_item_id?: string | null
+          default_serialized_item_id?: string | null
           deleted_at?: string | null
           description?: string | null
           external_id?: string | null
           external_source?: string | null
           id?: string
           image_url?: string | null
+          inventory_control_mode?: string
+          inventory_quantity_multiplier?: number
           ipi_percent?: number
           last_synced_at?: string | null
           minimum_contract_months?: number | null
@@ -20452,12 +20654,19 @@ export type Database = {
           cost?: number | null
           counts_for_commission?: boolean
           created_at?: string | null
+          default_inventory_category_id?: string | null
+          default_inventory_family_id?: string | null
+          default_inventory_item_type?: string | null
+          default_quantity_item_id?: string | null
+          default_serialized_item_id?: string | null
           deleted_at?: string | null
           description?: string | null
           external_id?: string | null
           external_source?: string | null
           id?: string
           image_url?: string | null
+          inventory_control_mode?: string
+          inventory_quantity_multiplier?: number
           ipi_percent?: number
           last_synced_at?: string | null
           minimum_contract_months?: number | null
@@ -31101,6 +31310,25 @@ export type Database = {
           table_name: string
         }[]
       }
+      check_inventory_availability_for_period: {
+        Args: {
+          p_end_date: string
+          p_ignore_pre_reservation_id?: string
+          p_inventory_item_type: string
+          p_organization_id: string
+          p_quantity_item_id: string
+          p_requested_quantity: number
+          p_serialized_item_id: string
+          p_start_date: string
+        }
+        Returns: {
+          already_pre_reserved_quantity: number
+          availability_status: string
+          available_quantity: number
+          conflict_count: number
+          message: string
+        }[]
+      }
       check_mcp_permission: {
         Args: {
           p_action: string
@@ -31412,6 +31640,10 @@ export type Database = {
         Args: { p_build_id?: string; p_organization_id: string }
         Returns: number
       }
+      generate_inventory_pre_reservation_code: {
+        Args: { org_id: string }
+        Returns: string
+      }
       generate_proposal_number: {
         Args: { p_org_id: string; p_prefix?: string }
         Returns: string
@@ -31656,6 +31888,28 @@ export type Database = {
           reserved_units: number
           total_skus: number
           total_units: number
+        }[]
+      }
+      get_inventory_item_pre_reservation_summary: {
+        Args: {
+          p_inventory_item_type: string
+          p_quantity_item_id?: string
+          p_serialized_item_id?: string
+        }
+        Returns: {
+          active_pre_reservations: number
+          next_reserved_until: string
+          pre_reserved_quantity: number
+        }[]
+      }
+      get_inventory_pre_reservations_overview: {
+        Args: never
+        Returns: {
+          active_pre_reservations: number
+          availability_conflicts: number
+          critical_risk_reservations: number
+          next_operational_start: string
+          pre_reserved_items: number
         }[]
       }
       get_notification_admin_metrics: {
@@ -32069,6 +32323,10 @@ export type Database = {
       recalculate_email_kb_quality: {
         Args: { p_opportunity_id: string }
         Returns: undefined
+      }
+      recalculate_inventory_pre_reservation_status: {
+        Args: { p_pre_reservation_id: string }
+        Returns: Json
       }
       recalculate_org_mrr: { Args: { org_id: string }; Returns: Json }
       record_memory_read: {

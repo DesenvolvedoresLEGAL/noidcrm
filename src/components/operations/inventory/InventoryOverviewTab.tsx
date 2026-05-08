@@ -31,6 +31,7 @@ import {
   type InventoryItemStatus,
 } from '@/lib/operations/inventoryLabels';
 import { useInventoryOverview } from '@/hooks/operations/useInventoryOverview';
+import { useInventoryPreReservationsOverview } from '@/hooks/operations/useInventoryPreReservations';
 import type { OverviewItemRow } from '@/services/operations/inventoryOverview';
 
 interface Props {
@@ -156,6 +157,7 @@ function balance(it: OverviewItemRow) {
 
 export function InventoryOverviewTab({ onNavigateToItems }: Props = {}) {
   const ov = useInventoryOverview();
+  const preRes = useInventoryPreReservationsOverview();
   const noItems = !ov.isLoading && ov.aggregates.totalItems === 0;
   const { totals, health, alerts } = ov.aggregates;
   const noAlerts =
@@ -306,6 +308,65 @@ export function InventoryOverviewTab({ onNavigateToItems }: Props = {}) {
               </Table>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Bloco — Pré reservas operacionais */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Pré reservas operacionais</CardTitle>
+          <CardDescription>
+            Reservas comerciais por período. Não alteram o status físico dos itens.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            <MiniKpi
+              title="Ativas"
+              value={Number(preRes.data?.active_pre_reservations ?? 0)}
+              loading={preRes.isLoading}
+              icon={PackageSearch}
+            />
+            <MiniKpi
+              title="Itens"
+              value={Number(preRes.data?.pre_reserved_items ?? 0)}
+              loading={preRes.isLoading}
+              icon={PackageOpen}
+            />
+            <MiniKpi
+              title="Conflitos"
+              value={Number(preRes.data?.availability_conflicts ?? 0)}
+              loading={preRes.isLoading}
+              icon={AlertTriangle}
+            />
+            <MiniKpi
+              title="Críticas"
+              value={Number(preRes.data?.critical_risk_reservations ?? 0)}
+              loading={preRes.isLoading}
+              icon={PackageMinus}
+            />
+            <Card>
+              <CardContent className="pt-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs uppercase text-muted-foreground">Próxima op.</p>
+                    <p className="text-lg font-semibold">
+                      {preRes.isLoading
+                        ? '...'
+                        : preRes.data?.next_operational_start
+                          ? format(
+                              new Date(preRes.data.next_operational_start + 'T00:00:00'),
+                              'dd/MM',
+                              { locale: ptBR },
+                            )
+                          : '—'}
+                    </p>
+                  </div>
+                  <Boxes className="h-4 w-4 text-muted-foreground" />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </CardContent>
       </Card>
 
