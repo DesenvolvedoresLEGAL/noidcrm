@@ -108,9 +108,25 @@ export function InventoryPreReservationDetailDialog({ id, open, onOpenChange }: 
       toast({ title: 'Erro', description: e.message, variant: 'destructive' });
     }
   };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+  const handleConvert = async () => {
+    if (!id) return;
+    if (!window.confirm('Converter em reserva definitiva?')) return;
+    try {
+      const res = await convert.mutateAsync({ pre_reservation_id: id, confirmation_trigger: 'manual' });
+      if (!res.success) {
+        toast({
+          title: 'Não foi possível converter',
+          description: res.message || res.reason || 'Verifique conflitos e demandas pendentes.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      toast({ title: 'Reserva definitiva criada', description: 'Pré reserva convertida com sucesso.' });
+      onOpenChange(false);
+    } catch (e: any) {
+      toast({ title: 'Erro', description: e.message, variant: 'destructive' });
+    }
+  };
       <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
