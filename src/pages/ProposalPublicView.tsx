@@ -1884,7 +1884,9 @@ export default function ProposalPublicView() {
               <div className="text-center space-y-4">
                 <h3 className="text-xl md:text-2xl font-bold">Pronto para avançar?</h3>
                 <p className="text-sm md:text-base text-muted-foreground max-w-md mx-auto">
-                  Clique em "Aprovar Proposta" para aceitar formalmente esta oferta ou "Recusar" para nos informar sua decisão.
+                  {proposal?.dynamic_pricing_enabled
+                    ? 'Clique em "Aprovar proposta com valor vigente" para aceitar formalmente esta proposta nas condições comerciais apresentadas.'
+                    : 'Clique em "Aprovar Proposta" para aceitar formalmente esta oferta ou "Recusar" para nos informar sua decisão.'}
                 </p>
                 <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 pt-4">
                   <Button
