@@ -398,18 +398,51 @@ export function ProposalPreview({
                     )}
                   </div>
                   {term.payment_type === 'one_time' ? (
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
-                      {term.entry_percent > 0 && (
-                        <div><span className="text-muted-foreground">Entrada:</span> {term.entry_percent}%</div>
-                      )}
-                      <div><span className="text-muted-foreground">Parcelas:</span> {term.installments || 1}x</div>
-                      {term.discount_percent > 0 && (
-                        <div><span className="text-muted-foreground">Desconto:</span> {term.discount_percent}%</div>
-                      )}
-                      {term.first_installment_date && (
-                        <div><span className="text-muted-foreground">Início:</span> {format(new Date(term.first_installment_date + 'T12:00:00'), 'dd/MM/yyyy', { locale: ptBR })}</div>
-                      )}
-                    </div>
+                    (() => {
+                      const dpSnap: any = (dynamicPricing as any)?.dynamic_pricing_snapshot ?? null;
+                      const dpEnabled = !!(dynamicPricing as any)?.dynamic_pricing_enabled;
+                      const schedule = calculateInstallments(term, oneTimeTotal, {
+                        dynamicPricingCurrentEndsAt:
+                          dpEnabled && dpSnap?.current_ends_at ? dpSnap.current_ends_at : null,
+                      });
+                      return (
+                        <div className="space-y-2">
+                          {term.payment_method && (
+                            <div className="text-xs">
+                              <span className="text-muted-foreground">Forma de pagamento: </span>
+                              <Badge variant="secondary" className="uppercase">{term.payment_method}</Badge>
+                            </div>
+                          )}
+                          <div className="rounded-md border bg-background">
+                            {schedule.map((inst, i) => (
+                              <div
+                                key={i}
+                                className="flex items-center justify-between px-3 py-2 text-sm border-b last:border-b-0"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="outline" className="text-[10px]">
+                                    {inst.label
+                                      ?? (inst.type === 'upfront' ? 'Pagamento à vista'
+                                        : inst.type === 'entry' ? 'Entrada'
+                                        : inst.type === 'balance' ? 'Saldo'
+                                        : `Parcela ${inst.number}`)}
+                                  </Badge>
+                                  <span className="text-muted-foreground">
+                                    {format(new Date(inst.dueDate + 'T12:00:00'), 'dd/MM/yyyy', { locale: ptBR })}
+                                  </span>
+                                </div>
+                                <span className="font-medium">{formatCurrency(inst.amount)}</span>
+                              </div>
+                            ))}
+                          </div>
+                          {term.discount_percent > 0 && (
+                            <div className="text-xs text-muted-foreground">
+                              Desconto aplicado: {term.discount_percent}%
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()
                   ) : (
                     <div className="space-y-3">
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
