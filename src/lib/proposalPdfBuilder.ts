@@ -83,16 +83,23 @@ export function buildProposalPDFData(
   const oneTimeTotal = oneTimeItems.reduce((sum, item) => sum + (item.total || 0), 0);
   const recurringMRR = recurringItems.reduce((sum, item) => sum + (item.total || 0), 0);
 
+  const dpSnap: any = (proposal as any)?.dynamic_pricing_snapshot ?? null;
+  const dynamicOneTimeAmount =
+    (proposal as any)?.dynamic_pricing_enabled && dpSnap?.current_amount != null
+      ? Number(dpSnap.current_amount)
+      : null;
+
   // Apply payment discount to one-time total
   const paymentDiscountAmount = oneTimeTotal * (paymentDiscountPercent / 100);
   const oneTimeWithDiscount = oneTimeTotal - paymentDiscountAmount;
+  const effectiveOneTimeAmount = dynamicOneTimeAmount ?? oneTimeWithDiscount;
 
   // Calculate contract total for recurring
   const contractMonths = (recurringTerm as any)?.contract_months || recurringTerm?.contract_duration_months || 12;
   const recurringContractTotal = recurringMRR * contractMonths;
 
   // Grand total with discount applied
-  const calculatedTotal = oneTimeWithDiscount + recurringContractTotal;
+  const calculatedTotal = effectiveOneTimeAmount + recurringContractTotal;
 
   // Calculate totals from items if not set on proposal (legacy fallback)
   const calculatedSubtotal = items.reduce((sum, item) => 
@@ -157,11 +164,10 @@ export function buildProposalPDFData(
   // e vencimento do à vista atrelado à tabela dinâmica vigente.
   const installments: PaymentInstallment[] = [];
   if (oneTimeTerm) {
-    const dpSnap: any = (proposal as any)?.dynamic_pricing_snapshot ?? null;
     const isAccepted = proposal?.status === 'accepted';
-    const calc = calculateInstallments(oneTimeTerm, oneTimeWithDiscount, {
+    const calc = calculateInstallments(oneTimeTerm, effectiveOneTimeAmount, {
       proposalExpiresAt: proposal?.expires_at ?? null,
-      approvedAmount: isAccepted ? Number(proposal?.approved_amount ?? oneTimeWithDiscount) : null,
+      approvedAmount: isAccepted ? Number(proposal?.approved_amount ?? effectiveOneTimeAmount) : null,
       dynamicPricingCurrentEndsAt:
         (proposal as any)?.dynamic_pricing_enabled && dpSnap?.current_ends_at
           ? dpSnap.current_ends_at
