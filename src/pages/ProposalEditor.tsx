@@ -615,14 +615,22 @@ export default function ProposalEditor() {
         await updateProposalTotals(savedProposalId);
         await syncOpportunityValue(savedProposalId);
         console.log('[ProposalEditor] Synced proposal totals and opportunity value (with discount applied)');
+
+        // Orchestrate after save: regen tiers, snapshot, payment defaults
+        try {
+          await orchestrateProposalFinancials(savedProposalId, 'editor_save');
+        } catch (e) {
+          console.warn('[ProposalEditor] orchestrate failed (non-blocking):', e);
+        }
       }
 
       // Clear draft after successful save (only matters for new proposals)
       clearDraft();
       setLastSaved(null);
       hasRestoredFromStorageRef.current = false;
-      queryClient.invalidateQueries({ queryKey: proposalKeys.lists() });
-      queryClient.invalidateQueries({ queryKey: proposalKeys.detail(currentProposalId) });
+      if (savedProposalId) {
+        invalidateProposalCaches(queryClient, savedProposalId);
+      }
       console.log('[ProposalEditor] Save completed successfully');
     } catch (error) {
       console.error('[ProposalEditor] Error saving proposal:', error);
