@@ -309,7 +309,7 @@ export async function listPreReservationsByProposal(
 ) {
   const { data, error } = await supabase
     .from(TABLE as never)
-    .select('*, items:inventory_pre_reservation_items(id,availability_status)')
+    .select('*, items:inventory_pre_reservation_items(id,availability_status,allocation_status,allocated_quantity,requested_quantity)')
     .eq('organization_id', organizationId)
     .eq('proposal_id', proposalId)
     .order('created_at', { ascending: false });

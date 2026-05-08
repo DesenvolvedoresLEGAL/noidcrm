@@ -154,7 +154,22 @@ export function ProposalInventoryPanel({ proposalId, closeDatePrevista }: Props)
                 <Badge variant={riskBadgeVariant(active.risk_level)}>
                   {RISK_LABELS[active.risk_level]}
                 </Badge>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 text-xs">
+              <div className="rounded-md border p-2 text-center">
+                <p className="text-muted-foreground">Alocadas</p>
+                <p className="font-semibold text-base">{allocatedCount}</p>
               </div>
+              <div className="rounded-md border p-2 text-center">
+                <p className="text-muted-foreground">Parciais</p>
+                <p className="font-semibold text-base">{partialCount}</p>
+              </div>
+              <div className="rounded-md border p-2 text-center">
+                <p className="text-muted-foreground">Pendentes</p>
+                <p className="font-semibold text-base">{pendingCount}</p>
+              </div>
+            </div>
             </div>
 
             <div className="flex flex-wrap gap-2 pt-2">
