@@ -1022,6 +1022,7 @@ export default function ProposalEditor() {
                     <ProposalDynamicPricingPanel
                       proposalId={currentProposalId}
                       proposalTotal={itemsTotal}
+                      eventStartDate={(watch as any)('event_start_date') ?? null}
                     />
                     <ProposalDynamicPaymentPanel proposalId={currentProposalId} />
                   </>
