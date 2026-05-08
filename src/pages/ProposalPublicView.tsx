@@ -471,6 +471,10 @@ export default function ProposalPublicView() {
         ? calculateInstallments(oneTimeTermLocal as any, approvedAmountLocal, {
             proposalExpiresAt: proposal?.expires_at ?? null,
             approvedAmount: approvedAmountLocal,
+            dynamicPricingCurrentEndsAt:
+              proposal?.dynamic_pricing_enabled && snap?.current_ends_at
+                ? snap.current_ends_at
+                : null,
           })
         : [];
 
