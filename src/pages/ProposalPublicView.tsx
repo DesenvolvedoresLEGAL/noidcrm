@@ -1529,19 +1529,30 @@ export default function ProposalPublicView() {
                   
                   {installments.length > 0 && (
                     <div className="bg-muted/50 rounded-lg p-4">
-                      <p className="text-sm text-muted-foreground mb-3">Cronograma de pagamentos:</p>
+                      <p className="text-sm text-muted-foreground mb-3">
+                        {installments.length === 1 && installments[0].type === 'upfront'
+                          ? 'Forma e prazo do pagamento:'
+                          : 'Cronograma de pagamentos:'}
+                      </p>
                       <div className="space-y-2">
-                        {installments.map((inst, idx) => (
-                          <div key={idx} className="flex justify-between items-center py-2 border-b border-border/50 last:border-0">
-                            <div className="flex items-center gap-2">
-                              <Badge variant={inst.type === 'entry' ? 'default' : 'outline'} className="text-xs">
-                                {inst.type === 'entry' ? 'Entrada' : `Parcela ${inst.number}`}
-                              </Badge>
-                              <span className="text-sm">{formatDateBR(inst.dueDate)}</span>
+                        {installments.map((inst, idx) => {
+                          const label = inst.label
+                            ?? (inst.type === 'upfront' ? 'Pagamento à vista'
+                              : inst.type === 'entry' ? 'Entrada'
+                              : inst.type === 'balance' ? 'Saldo'
+                              : `Parcela ${inst.number}`);
+                          return (
+                            <div key={idx} className="flex justify-between items-center py-2 border-b border-border/50 last:border-0">
+                              <div className="flex items-center gap-2">
+                                <Badge variant={inst.type === 'upfront' || inst.type === 'entry' ? 'default' : 'outline'} className="text-xs">
+                                  {label}
+                                </Badge>
+                                <span className="text-sm">{formatDateBR(inst.dueDate)}</span>
+                              </div>
+                              <span className="font-semibold">{formatCurrency(inst.amount)}</span>
                             </div>
-                            <span className="font-semibold">{formatCurrency(inst.amount)}</span>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   )}
