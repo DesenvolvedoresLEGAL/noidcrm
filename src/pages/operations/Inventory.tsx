@@ -8,6 +8,7 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { InventoryOverviewTab } from '@/components/operations/inventory/InventoryOverviewTab';
 import { InventoryItemsTab } from '@/components/operations/inventory/InventoryItemsTab';
 import { InventoryCategoriesTab } from '@/components/operations/inventory/InventoryCategoriesTab';
+import { InventoryFamiliesTab } from '@/components/operations/inventory/InventoryFamiliesTab';
 import { InventoryLocationsTab } from '@/components/operations/inventory/InventoryLocationsTab';
 
 export default function Inventory() {
@@ -43,6 +44,7 @@ export default function Inventory() {
           <TabsTrigger value="overview">Visão Geral</TabsTrigger>
           <TabsTrigger value="items">Itens</TabsTrigger>
           <TabsTrigger value="categories">Categorias</TabsTrigger>
+          <TabsTrigger value="families">Famílias</TabsTrigger>
           <TabsTrigger value="locations">Locais</TabsTrigger>
         </TabsList>
 
@@ -54,6 +56,9 @@ export default function Inventory() {
         </TabsContent>
         <TabsContent value="categories">
           <InventoryCategoriesTab />
+        </TabsContent>
+        <TabsContent value="families">
+          <InventoryFamiliesTab />
         </TabsContent>
         <TabsContent value="locations">
           <InventoryLocationsTab />
