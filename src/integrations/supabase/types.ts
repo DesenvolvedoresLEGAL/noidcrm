@@ -13249,11 +13249,17 @@ export type Database = {
           created_at: string
           created_by: string | null
           criticality: string
+          damaged_quantity: number
           description: string | null
+          dispatched_quantity: number
           family_id: string | null
           id: string
+          in_operation_quantity: number
+          in_preparation_quantity: number
           item_kind: Database["public"]["Enums"]["inventory_item_kind"]
           location_id: string | null
+          lost_quantity: number
+          maintenance_quantity: number
           metadata: Json
           model: string | null
           name: string
@@ -13263,6 +13269,8 @@ export type Database = {
           quantity_available: number
           quantity_minimum: number | null
           quantity_total: number
+          reserved_quantity: number
+          returned_quantity: number
           serial_number: string | null
           status: Database["public"]["Enums"]["inventory_item_status"]
           unit_of_measure: string | null
@@ -13278,11 +13286,17 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           criticality?: string
+          damaged_quantity?: number
           description?: string | null
+          dispatched_quantity?: number
           family_id?: string | null
           id?: string
+          in_operation_quantity?: number
+          in_preparation_quantity?: number
           item_kind: Database["public"]["Enums"]["inventory_item_kind"]
           location_id?: string | null
+          lost_quantity?: number
+          maintenance_quantity?: number
           metadata?: Json
           model?: string | null
           name: string
@@ -13292,6 +13306,8 @@ export type Database = {
           quantity_available?: number
           quantity_minimum?: number | null
           quantity_total?: number
+          reserved_quantity?: number
+          returned_quantity?: number
           serial_number?: string | null
           status?: Database["public"]["Enums"]["inventory_item_status"]
           unit_of_measure?: string | null
@@ -13307,11 +13323,17 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           criticality?: string
+          damaged_quantity?: number
           description?: string | null
+          dispatched_quantity?: number
           family_id?: string | null
           id?: string
+          in_operation_quantity?: number
+          in_preparation_quantity?: number
           item_kind?: Database["public"]["Enums"]["inventory_item_kind"]
           location_id?: string | null
+          lost_quantity?: number
+          maintenance_quantity?: number
           metadata?: Json
           model?: string | null
           name?: string
@@ -13321,6 +13343,8 @@ export type Database = {
           quantity_available?: number
           quantity_minimum?: number | null
           quantity_total?: number
+          reserved_quantity?: number
+          returned_quantity?: number
           serial_number?: string | null
           status?: Database["public"]["Enums"]["inventory_item_status"]
           unit_of_measure?: string | null
@@ -13478,6 +13502,99 @@ export type Database = {
             columns: ["to_location_id"]
             isOneToOne: false
             referencedRelation: "inventory_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_operation_events: {
+        Row: {
+          allocation_item_type: string | null
+          created_at: string
+          created_by: string | null
+          event_type: string
+          from_status: string | null
+          id: string
+          metadata: Json
+          notes: string | null
+          organization_id: string
+          quantity: number
+          quantity_item_id: string | null
+          reservation_allocation_id: string | null
+          reservation_id: string | null
+          reservation_item_id: string | null
+          serialized_item_id: string | null
+          to_status: string | null
+        }
+        Insert: {
+          allocation_item_type?: string | null
+          created_at?: string
+          created_by?: string | null
+          event_type: string
+          from_status?: string | null
+          id?: string
+          metadata?: Json
+          notes?: string | null
+          organization_id: string
+          quantity?: number
+          quantity_item_id?: string | null
+          reservation_allocation_id?: string | null
+          reservation_id?: string | null
+          reservation_item_id?: string | null
+          serialized_item_id?: string | null
+          to_status?: string | null
+        }
+        Update: {
+          allocation_item_type?: string | null
+          created_at?: string
+          created_by?: string | null
+          event_type?: string
+          from_status?: string | null
+          id?: string
+          metadata?: Json
+          notes?: string | null
+          organization_id?: string
+          quantity?: number
+          quantity_item_id?: string | null
+          reservation_allocation_id?: string | null
+          reservation_id?: string | null
+          reservation_item_id?: string | null
+          serialized_item_id?: string | null
+          to_status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_operation_events_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_operation_events_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_report_legacy_retirement_readiness_v2"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "inventory_operation_events_reservation_allocation_id_fkey"
+            columns: ["reservation_allocation_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_reservation_allocations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_operation_events_reservation_id_fkey"
+            columns: ["reservation_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_reservations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_operation_events_reservation_item_id_fkey"
+            columns: ["reservation_item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_reservation_items"
             referencedColumns: ["id"]
           },
         ]
@@ -13789,12 +13906,24 @@ export type Database = {
           allocation_status: string
           created_at: string
           created_by: string | null
+          dispatched_at: string | null
+          dispatched_by: string | null
           id: string
+          in_operation_at: string | null
           notes: string | null
+          operational_status: string
           organization_id: string
+          prepared_at: string | null
+          prepared_by: string | null
           quantity_item_id: string | null
+          released_at: string | null
+          released_by: string | null
           reservation_id: string
           reservation_item_id: string
+          return_condition: string | null
+          return_notes: string | null
+          returned_at: string | null
+          returned_by: string | null
           serialized_item_id: string | null
           source_pre_reservation_allocation_id: string | null
           updated_at: string
@@ -13806,12 +13935,24 @@ export type Database = {
           allocation_status?: string
           created_at?: string
           created_by?: string | null
+          dispatched_at?: string | null
+          dispatched_by?: string | null
           id?: string
+          in_operation_at?: string | null
           notes?: string | null
+          operational_status?: string
           organization_id: string
+          prepared_at?: string | null
+          prepared_by?: string | null
           quantity_item_id?: string | null
+          released_at?: string | null
+          released_by?: string | null
           reservation_id: string
           reservation_item_id: string
+          return_condition?: string | null
+          return_notes?: string | null
+          returned_at?: string | null
+          returned_by?: string | null
           serialized_item_id?: string | null
           source_pre_reservation_allocation_id?: string | null
           updated_at?: string
@@ -13823,12 +13964,24 @@ export type Database = {
           allocation_status?: string
           created_at?: string
           created_by?: string | null
+          dispatched_at?: string | null
+          dispatched_by?: string | null
           id?: string
+          in_operation_at?: string | null
           notes?: string | null
+          operational_status?: string
           organization_id?: string
+          prepared_at?: string | null
+          prepared_by?: string | null
           quantity_item_id?: string | null
+          released_at?: string | null
+          released_by?: string | null
           reservation_id?: string
           reservation_item_id?: string
+          return_condition?: string | null
+          return_notes?: string | null
+          returned_at?: string | null
+          returned_by?: string | null
           serialized_item_id?: string | null
           source_pre_reservation_allocation_id?: string | null
           updated_at?: string
@@ -32918,6 +33071,14 @@ export type Database = {
         Args: { _org_id: string }
         Returns: undefined
       }
+      set_inventory_return_condition: {
+        Args: {
+          p_reservation_allocation_id: string
+          p_return_condition: string
+          p_return_notes?: string
+        }
+        Returns: Json
+      }
       set_optimization_auto_mode: {
         Args: { _enabled: boolean; _org_id: string }
         Returns: boolean
@@ -32943,6 +33104,14 @@ export type Database = {
       unblock_trial: {
         Args: { by_user_id: string; org_id: string; reason?: string }
         Returns: boolean
+      }
+      update_inventory_reservation_operational_status: {
+        Args: {
+          p_new_status: string
+          p_notes?: string
+          p_reservation_id: string
+        }
+        Returns: Json
       }
       upsert_proposal_ai_insights_cache: {
         Args: {
