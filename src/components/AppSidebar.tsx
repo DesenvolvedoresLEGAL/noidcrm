@@ -101,6 +101,7 @@ const ALL_MENU_ITEMS: MenuItem[] = [
 const SECTION_LABELS: Record<string, string> = {
   principal: '',
   gestao: 'Gestão',
+  operacoes: 'Operações',
   inteligencia: 'Inteligência',
   gtm: 'GTM',
   objetivos: 'Objetivos',
