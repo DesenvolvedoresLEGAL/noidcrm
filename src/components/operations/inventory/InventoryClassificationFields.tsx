@@ -21,6 +21,7 @@ interface Props {
   familyId: string | null;
   operationalType: OperationalType;
   criticality: Criticality;
+  itemKindFilter?: 'serialized' | 'quantity';
   onChange: (next: {
     category_id: string;
     family_id: string | null;
@@ -38,6 +39,7 @@ export function InventoryClassificationFields({
   familyId,
   operationalType,
   criticality,
+  itemKindFilter,
   onChange,
   errors,
 }: Props) {
@@ -45,8 +47,11 @@ export function InventoryClassificationFields({
   const { data: families } = useInventoryFamilies(categoryId || undefined);
 
   const activeCategories = useMemo(
-    () => (categories ?? []).filter((c) => c.is_active),
-    [categories],
+    () =>
+      (categories ?? []).filter(
+        (c) => c.is_active && (!itemKindFilter || c.item_kind === itemKindFilter),
+      ),
+    [categories, itemKindFilter],
   );
   const activeFamilies = useMemo(
     () => (families ?? []).filter((f) => f.is_active),
