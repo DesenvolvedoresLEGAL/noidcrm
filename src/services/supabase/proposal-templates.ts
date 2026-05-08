@@ -183,10 +183,11 @@ export async function applyTemplate(proposalId: string, templateId: string): Pro
     currency: template.currency,
     revenue_type: t.revenue_type ?? null,
     dynamic_pricing_applicability: t.dynamic_pricing_applicability ?? 'none',
+    dynamic_pricing_mode: t.dynamic_pricing_mode ?? 'none',
     validity_strategy: t.validity_strategy ?? null,
     payment_mode: t.default_payment_mode ?? null,
   };
-  if (validUntil) updates.valid_until = validUntil;
+  if (validUntil) updates.expires_at = `${validUntil}T12:00:00Z`;
 
   const { error: updateError } = await supabase
     .from('proposals')

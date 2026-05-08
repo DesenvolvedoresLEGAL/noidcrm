@@ -1,85 +1,113 @@
-# Sprint TEMPLATE 1.0 — Regras Comerciais nos Templates de Proposta
+## Plano — PRICE AUTO ENGINE FIX
 
-## Resumo
+### Arquivos impactados
+- `supabase/migrations/*_price_auto_engine_fix.sql` — correções de RPCs/funções e automação no banco.
+- `src/services/proposals/proposalDynamicPricing.ts` — helper frontend para elegibilidade/geração automática.
+- `src/services/supabase/proposal-templates.ts` — aplicar `dynamic_pricing_mode` e disparar geração quando template elegível já tiver validade.
+- `src/services/supabase/proposals.ts` — salvar campos comerciais do template e disparar geração após criação/edição quando elegível.
+- `src/pages/ProposalEditor.tsx` e `src/components/proposals/ProposalEditorModal.tsx` — seleção de template, validade, save e refetch do motor automático.
+- `src/components/proposals/ProposalDynamicPricingPanel.tsx` — UI automática/read-only correta e estado “não aplicável”.
+- `src/components/proposals/ProposalPaymentTerms.tsx` — cronograma e resumo usando valor vigente quando tabela dinâmica ativa.
+- `src/pages/ProposalPublicView.tsx` e `src/components/proposals/PublicProposalDynamicPricingBanner.tsx` — link público com valor vigente, próxima virada e CTA correto.
+- `src/lib/proposalPdfBuilder.ts` e `src/lib/proposalPdfGenerator.ts` — PDF com seção “Condição Comercial por Antecedência” e parcelas pelo valor vigente.
+- `src/services/proposals/proposalPaymentsService.ts` / RPC de payment intent — cobrança sempre pelo valor vigente automático.
 
-Evoluir `proposal_templates` para definir o comportamento comercial das propostas geradas a partir dele (tipo de receita, tabela dinâmica automática, validade, recorrência, exibição pública/PDF). Atualizar UI de edição, badges no card e o fluxo de criação de proposta.
+### 1. Banco: unificar elegibilidade e nomenclatura
+- Criar `public.can_auto_generate_dynamic_pricing(p_proposal_id uuid)` com `SECURITY DEFINER` e `search_path = public`.
+- Regra de `true`:
+  - `dynamic_pricing_applicability = 'automatic'`
+  - `dynamic_pricing_mode = 'automatic_by_valid_until'`
+  - `valid_until`/`expires_at` preenchido
+  - `revenue_type IN ('one_time_event','one_time_non_event')`
+- Regra de `false`:
+  - `applicability = none`, `mode = none`
+  - recorrente/assinatura/assinatura com fidelidade.
+- Manter o armazenamento interno de `proposal_dynamic_pricing_rules.pricing_mode = 'event_antecedence'`, mas aceitar `automatic_by_valid_until` como modo de template/proposta.
 
-## Banco (1 migração)
+### 2. Banco: corrigir `generate_event_antecedence_pricing_for_proposal`
+- Usar `proposal.valid_until`/`expires_at` como data principal da condição comercial.
+- Não exigir `event_start_date` da oportunidade.
+- Validar organização/tenant e elegibilidade.
+- Retornar `status = not_applicable` sem erro quando não aplicável.
+- Retornar erro controlado quando o template exige validade e a validade está ausente.
+- Calcular `base_amount` pelo valor base real da proposta (`total_amount`, `value` ou fallback), sem usar `dynamic_pricing_current_amount`.
+- Criar/atualizar a regra com:
+  - `enabled = true`
+  - `pricing_mode = 'event_antecedence'`
+  - `auto_generated = true`
+  - `event_start_date = valid_until`
+  - `status = active`
+  - `base_amount = base_amount`
+- Remover/recriar apenas tiers `auto_generated` e gerar as 6 faixas oficiais.
+- Chamar `calculate_proposal_dynamic_price`.
+- Atualizar `proposals.dynamic_pricing_enabled`, `dynamic_pricing_current_amount`, `dynamic_pricing_status`, `dynamic_pricing_snapshot`, `dynamic_pricing_last_calculated_at`.
+- Registrar evento financeiro/auditável de geração/regeneração.
 
-### `proposal_templates` — novas colunas
-- `revenue_type text` — CHECK em (`one_time_event`, `one_time_non_event`, `recurring`, `short_subscription`, `subscription_with_commitment`, `service`)
-- `dynamic_pricing_applicability text NOT NULL DEFAULT 'none'` — CHECK em (`automatic`, `optional`, `none`)
-- `dynamic_pricing_mode text NOT NULL DEFAULT 'none'` — CHECK em (`none`, `automatic_by_valid_until`, `manual`)
-- `validity_strategy text NOT NULL DEFAULT 'fixed_days_from_creation'` — CHECK em (`fixed_days_from_creation`, `proposal_valid_until`, `manual`, `event_start_date`)
-- `default_validity_days integer`
-- `requires_valid_until boolean NOT NULL DEFAULT false`
-- `allow_recurring boolean NOT NULL DEFAULT false`
-- `default_payment_mode text NOT NULL DEFAULT 'one_time'` — CHECK em (`one_time`, `recurring`, `installment`, `mixed`)
-- `show_dynamic_pricing_on_public_link boolean NOT NULL DEFAULT false`
-- `show_dynamic_pricing_on_pdf boolean NOT NULL DEFAULT false`
-- `allow_pix_payment boolean NOT NULL DEFAULT true`
-- `allow_complementary_charge boolean NOT NULL DEFAULT true`
-- `template_commercial_rules jsonb NOT NULL DEFAULT '{}'::jsonb`
+### 3. Banco: automação pós-save e payment intent
+- Criar trigger seguro pós-save em `proposals` para regenerar quando mudarem:
+  - template/regras comerciais
+  - validade
+  - total/base amount
+  - campos de precificação dinâmica
+- Evitar loop: trigger só chama geração quando elegível e quando os campos de origem mudam.
+- Atualizar `create_proposal_payment_intent` para:
+  - se elegível e sem `dynamic_pricing_current_amount`, gerar a tabela antes.
+  - usar `dynamic_pricing_current_amount`/snapshot vigente como `expected_amount`.
+  - nunca cair para valor base quando tabela automática estiver ativa.
 
-### `proposals` — novas colunas (espelho aplicado a partir do template)
-- `revenue_type text`
-- `dynamic_pricing_applicability text DEFAULT 'none'`
-- `validity_strategy text`
-- `payment_mode text`
+### 4. Template e save da proposta
+- Corrigir `applyTemplate` para copiar também `dynamic_pricing_mode`, `show_dynamic_pricing_on_public_link`, `show_dynamic_pricing_on_pdf`, `allow_pix_payment`, `allow_complementary_charge` e validade comercial.
+- No editor, ao selecionar `ALUGUE Evento`, atualizar o estado/form com as regras comerciais do template.
+- Após salvar proposta e totais/itens, chamar geração automática quando elegível e invalidar/refazer queries da proposta, snapshot e tabela.
+- Ao alterar validade, garantir que o save regenere obrigatoriamente; opcionalmente exibir “Recalcular tabela”.
 
-(`dynamic_pricing_mode` já existe via `proposal_dynamic_pricing_rules.pricing_mode`; mantemos ali, sem duplicar.)
+### 5. Painel de tabela dinâmica
+- Receber `proposal`/regras comerciais ou carregar dados suficientes para decidir pelo template, não apenas pela existência de uma regra manual.
+- Se `dynamic_pricing_applicability = none`:
+  - mostrar “Tabela dinâmica não aplicável para este template.”
+  - subtexto de recorrente/assinatura.
+  - esconder ativar/adicionar condição/editor manual.
+- Se `dynamic_pricing_applicability = automatic`:
+  - mostrar badges “Ativa” e “Automática por validade”.
+  - se não houver tiers, mostrar “Gerando tabela automática...” e disparar geração.
+  - esconder “Modo manual”, “Ativar” e “Adicionar condição” para vendedor.
+  - renderizar cards: valor base, valor vigente hoje, faixa vigente, próxima virada, validade, dias até validade.
+  - renderizar tabela read-only das 6 faixas.
+  - ações: “Recalcular tabela”, “Aplicar valor vigente”, “Ver configurações”.
+- Se `dynamic_pricing_mode = manual`, manter editor manual apenas para admin/owner.
 
-### Backfill
-- UPDATE no template `1ª ALUGUE` (todas as orgs com esse nome) para a configuração de evento dinâmico.
-- Função `seed_recommended_proposal_templates(org_id)` que insere `ALUGUE Evento`, `ASSINATURA Recorrente`, `ASSINATURA Curta Sem Fidelidade` se não existirem (idempotente por nome+org).
-- Loop de backfill que chama a função para cada organização existente.
-- Trigger `AFTER INSERT ON organizations` chamando a mesma função para futuras orgs.
+### 6. Condições financeiras, link público e PDF
+- `ProposalPaymentTerms` passa a aceitar snapshot dinâmico ativo e calcular parcelas pelo valor vigente.
+- Adicionar bloco “Condição Comercial Vigente” antes do cronograma com valor vigente, faixa, ajuste, validade e próxima virada.
+- Link público:
+  - usar `dynamic_pricing_current_amount` no card/header quando ativo.
+  - mostrar “Valor vigente hoje”.
+  - mostrar condição vigente e tabela de antecedência antes das condições financeiras.
+  - botão de aceite: “Aprovar proposta com valor vigente”.
+  - botão de Pix: “Pagar valor vigente”.
+- PDF:
+  - incluir seção “Condição Comercial por Antecedência” quando `show_dynamic_pricing_on_pdf = true` e tabela ativa.
+  - texto obrigatório com “validade da proposta”.
+  - tabela: Antecedência, Período, Ajuste, Valor, Status.
+  - parcelas pelo valor vigente.
 
-## Backend TS
+### 7. Validação do caso informado
+- Confirmar pela lógica da tabela:
+  - Validade: `01/06/2026`
+  - Base: `R$ 1.994,00`
+  - Referência: `08/05/2026`
+  - 24 dias até validade
+  - faixa vigente `21 a 29 dias`, ajuste `0%`, valor `R$ 1.994,00`
+  - próxima virada em `12/05/2026`, valor `R$ 2.193,40`
+  - 6 faixas geradas.
 
-### `src/lib/proposals/proposalTemplateRules.ts` (novo)
-- Constantes: `REVENUE_TYPES`, `DYNAMIC_PRICING_APPLICABILITIES`, `DYNAMIC_PRICING_MODES`, `VALIDITY_STRATEGIES`, `PAYMENT_MODES` + `LABELS`.
-- `proposalTemplateCommercialRulesSchema` (Zod) com refinement: `requires_valid_until=true` ⇒ `validity_strategy ∈ {proposal_valid_until, event_start_date}`.
-- Helper `templateBadges(template)` retornando `{label, variant}[]` para os 4 badges (Avulso Evento, Tabela dinâmica automática, Recorrente, Sem tabela dinâmica).
+### Riscos
+- O trigger pós-save precisa evitar recursão ao atualizar os próprios campos `dynamic_pricing_*`.
+- Se `total_amount` ainda não tiver sido recalculado no momento da geração, o frontend deve chamar geração depois de `updateProposalTotals`.
+- O campo real de validade no banco parece ser `expires_at`; vou mapear como referência principal para a regra, mantendo compatibilidade com `valid_until` se existir.
 
-### `src/services/supabase/proposal-templates.ts`
-- Estender interface `ProposalTemplate` com os campos novos.
-- `applyTemplate`: ao popular a proposta, copiar `revenue_type`, `dynamic_pricing_applicability`, `validity_strategy`, `payment_mode`, e definir `valid_until` conforme `validity_strategy` + `default_validity_days`. Se `dynamic_pricing_applicability='automatic'` e `valid_until` presente, disparar `generate_event_antecedence_pricing_for_proposal`.
-
-## Frontend
-
-### `src/pages/settings/ProposalTemplateEditor.tsx`
-- Nova seção **"Regras Comerciais do Template"** com os 12 campos do escopo (selects + switches + input numérico).
-- Validação com `proposalTemplateCommercialRulesSchema`.
-- Auto-coerência: ao trocar `revenue_type` para `recurring/short_subscription`, sugerir `dynamic_pricing_applicability='none'` e `allow_recurring=true`.
-
-### `src/components/proposals/ProposalTemplatesManager.tsx`
-- Card mostra badges discretos via `templateBadges()`.
-
-### `src/components/proposals/ProposalEditorModal.tsx` (e/ou `ProposalEditor.tsx`)
-- Ao aplicar template: copiar regras para a proposta (mostrar resumo).
-- Se `requires_valid_until=true` e `proposal.valid_until` vazio: bloquear save com mensagem *"Este template exige validade da proposta para calcular a condição comercial."*
-- Se `dynamic_pricing_applicability='none'`: ocultar `ProposalDynamicPricingPanel` e exibir aviso *"Tabela dinâmica não aplicável para este template."*
-- Se `dynamic_pricing_applicability='automatic'`: chamar `useGenerateEventAntecedencePricing` automaticamente após save da proposta com `valid_until` presente.
-
-## Arquivos impactados
-
-- `supabase/migrations/<ts>_template_commercial_rules.sql` (novo)
-- `src/lib/proposals/proposalTemplateRules.ts` (novo)
-- `src/services/supabase/proposal-templates.ts` (editar interface + applyTemplate)
-- `src/services/crm/proposal-templates.ts` (re-export dos novos tipos)
-- `src/pages/settings/ProposalTemplateEditor.tsx` (nova seção)
-- `src/components/proposals/ProposalTemplatesManager.tsx` (badges)
-- `src/components/proposals/ProposalEditorModal.tsx` (aplicar regras + validação)
-- `src/integrations/supabase/types.ts` (auto, pós-migração)
-
-## Critérios de aceite cobertos
-
-1–10 ✅ via migração + UI + applyTemplate. 11–12 ✅ via tipagem coerente (CHECKs + Zod + types.ts regenerado).
-
-## Riscos
-
-- Templates pré-existentes com `revenue_type IS NULL` ⇒ tratado como "sem regra"; UI mostra placeholder e não bloqueia.
-- Trigger em `organizations` já tem outros seeds — adicionar com nome único pra não conflitar.
-- `proposals.payment_mode` poderia colidir com lógica MRR existente — usar campo novo e não tocar nos atuais.
-- Geração automática de tabela dinâmica só dispara se `valid_until` está definido após save (evita race com `event_start_date` ausente).
+### Resultado esperado
+- `ALUGUE Evento` gera e aplica a tabela automática sem clique em “Ativar”.
+- Templates recorrentes/assinatura não exibem painel manual.
+- Pagamento, link público, PDF e payment intent usam o valor vigente.
+- Typecheck e build ficam preservados pelo fluxo já validado pelo harness.

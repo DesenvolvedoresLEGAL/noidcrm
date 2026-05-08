@@ -23241,6 +23241,7 @@ export type Database = {
           dynamic_pricing_current_amount: number | null
           dynamic_pricing_enabled: boolean
           dynamic_pricing_last_calculated_at: string | null
+          dynamic_pricing_mode: string | null
           dynamic_pricing_snapshot: Json
           dynamic_pricing_status: string | null
           event_start_date: string | null
@@ -23309,6 +23310,7 @@ export type Database = {
           dynamic_pricing_current_amount?: number | null
           dynamic_pricing_enabled?: boolean
           dynamic_pricing_last_calculated_at?: string | null
+          dynamic_pricing_mode?: string | null
           dynamic_pricing_snapshot?: Json
           dynamic_pricing_status?: string | null
           event_start_date?: string | null
@@ -23377,6 +23379,7 @@ export type Database = {
           dynamic_pricing_current_amount?: number | null
           dynamic_pricing_enabled?: boolean
           dynamic_pricing_last_calculated_at?: string | null
+          dynamic_pricing_mode?: string | null
           dynamic_pricing_snapshot?: Json
           dynamic_pricing_status?: string | null
           event_start_date?: string | null
@@ -32719,6 +32722,10 @@ export type Database = {
           }
       can_access_org_record: {
         Args: { record_org_id: string }
+        Returns: boolean
+      }
+      can_auto_generate_dynamic_pricing: {
+        Args: { p_proposal_id: string }
         Returns: boolean
       }
       can_read_delivery_log: { Args: { _log_id: string }; Returns: boolean }
