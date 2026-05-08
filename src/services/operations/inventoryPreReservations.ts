@@ -148,6 +148,10 @@ export interface CreatePreReservationPayload {
     family_id?: string | null;
     requested_quantity: number;
     notes?: string | null;
+    demand_label?: string | null;
+    demand_source?: DemandSource;
+    product_id?: string | null;
+    proposal_item_id?: string | null;
   }>;
 }
 
