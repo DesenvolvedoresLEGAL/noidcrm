@@ -91,6 +91,7 @@ export default function ProposalEditor() {
   const { id: proposalId } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
   const opportunityId = searchParams.get('opportunity_id') || undefined;
+  const preselectedTemplateId = searchParams.get('template_id') || undefined;
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { organization } = useCurrentOrganization();
@@ -212,6 +213,35 @@ export default function ProposalEditor() {
       }
     }
   }, [watchedLayoutId, templates, isNewProposal, setValue, watch]);
+
+  // Apply preselected template (from "Criar Proposta" template picker)
+  const appliedPreselectedRef = useRef(false);
+  useEffect(() => {
+    if (!isNewProposal || !preselectedTemplateId || templates.length === 0) return;
+    if (appliedPreselectedRef.current) return;
+    const template: any = templates.find((t: any) => t.id === preselectedTemplateId);
+    if (!template) return;
+    appliedPreselectedRef.current = true;
+
+    if (template.layout_id) setValue('layout_id', template.layout_id);
+    if (template.currency) setValue('currency', template.currency as 'BRL' | 'USD' | 'EUR');
+    if (template.name) (setValue as any)('template_name', template.name);
+    const days = template.default_validity_days ?? template.validity_days;
+    if (days) {
+      const d = new Date();
+      d.setDate(d.getDate() + Number(days));
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      setValue('expires_at', `${y}-${m}-${dd}`);
+    }
+    if (template.introduction) setValue('introduction', template.introduction);
+    if (template.terms) setValue('terms', template.terms);
+    if (template.notes || template.observations) {
+      setValue('notes', template.notes || template.observations);
+    }
+    toast.success(`📄 Template "${template.name}" aplicado!`);
+  }, [preselectedTemplateId, templates, isNewProposal, setValue]);
 
   // Load proposal data if editing
   const { data: proposalData, isLoading: isProposalLoading } = useQuery({

@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ProposalEmailComposer } from '@/components/proposals/ProposalEmailComposer';
+import { ProposalTemplatePickerDialog } from '@/components/proposals/ProposalTemplatePickerDialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -104,6 +105,7 @@ export function OpportunityProposalsTab({ opportunityId, pipelineType }: Opportu
   const [loadingLink, setLoadingLink] = useState<string | null>(null);
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const [emailProposalId, setEmailProposalId] = useState<string | null>(null);
+  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
 
   // Fetch proposals
   const { data, isLoading } = useQuery({
@@ -197,7 +199,11 @@ export function OpportunityProposalsTab({ opportunityId, pipelineType }: Opportu
   };
 
   const handleNewProposal = () => {
-    navigate(`/app/proposals/new?opportunity_id=${opportunityId}`);
+    setTemplatePickerOpen(true);
+  };
+
+  const handleTemplateConfirmed = (templateId: string) => {
+    navigate(`/app/proposals/new?opportunity_id=${opportunityId}&template_id=${templateId}`);
   };
 
   const handleEditProposal = (proposalId: string) => {
@@ -590,6 +596,12 @@ export function OpportunityProposalsTab({ opportunityId, pipelineType }: Opportu
           opportunityId={opportunityId}
         />
       )}
+
+      <ProposalTemplatePickerDialog
+        open={templatePickerOpen}
+        onOpenChange={setTemplatePickerOpen}
+        onConfirm={handleTemplateConfirmed}
+      />
     </div>
   );
 }
