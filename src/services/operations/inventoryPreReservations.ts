@@ -318,3 +318,11 @@ export async function listPreReservationsByProposal(
     items: { id: string; availability_status: PreReservationAvailability }[];
   })[];
 }
+
+export async function deletePreReservationItem(itemId: string): Promise<void> {
+  const { error } = await supabase
+    .from(ITEMS_TABLE as never)
+    .delete()
+    .eq('id', itemId);
+  if (error) throw error;
+}
