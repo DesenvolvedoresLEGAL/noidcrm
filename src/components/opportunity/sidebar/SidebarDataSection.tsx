@@ -94,7 +94,7 @@ export function SidebarDataSection({ opportunity, onUpdateField, isClosed }: Sid
               </div>
               <div className="space-y-2">
                 <EditableField
-                  label="Valor Avulso"
+                  label="Valor Total"
                   value={opportunity.valor_previsto || 0}
                   onSave={(val) => onUpdateField('valor_previsto', parseFloat(val))}
                   type="currency"
