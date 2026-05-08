@@ -1354,7 +1354,11 @@ export default function ProposalPublicView() {
           const recurringSubtotal = recurringItems.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
           const recurringItemDiscount = recurringSubtotal - recurringMRR;
           const hasRecurringItemDiscounts = recurringItems.some(item => item.discount_percent > 0);
-          
+          const dpSnapItems: any = (proposal as any)?.dynamic_pricing_snapshot ?? null;
+          const dpBreakdown = getDynamicPricingBreakdown(dpSnapItems, oneTimeTotal);
+          const showDpBreakdown = dpBreakdown.active && dpBreakdown.hasAdjustment;
+          const colSpanLabel = hasItemDiscounts ? 4 : 3;
+
           return (
             <>
               {/* One-time Items */}
