@@ -146,8 +146,20 @@ export function ProposalPaymentTerms({
     return { oneTimeItems, recurringItems, oneTimeTotal, recurringMRR, minContractFromItems };
   }, [items]);
 
-  // Use calculated total or provided totalAmount
-  const effectiveOneTimeTotal = oneTimeTotal > 0 ? oneTimeTotal : totalAmount;
+  const { data: dpSnapshot } = useProposalDynamicPricingSnapshot(proposalId);
+  const dynamicCurrentAmount =
+    (dpSnapshot as any)?.enabled &&
+    (dpSnapshot as any)?.status === 'active' &&
+    (dpSnapshot as any)?.current_amount != null
+      ? Number((dpSnapshot as any).current_amount)
+      : null;
+  const dynamicCurrentEndsAt = (dpSnapshot as any)?.enabled && (dpSnapshot as any)?.current_ends_at
+    ? (dpSnapshot as any).current_ends_at
+    : null;
+
+  // Use valor vigente da tabela dinâmica quando ativa; itens ficam como valor base.
+  const baseOneTimeTotal = oneTimeTotal > 0 ? oneTimeTotal : totalAmount;
+  const effectiveOneTimeTotal = dynamicCurrentAmount ?? baseOneTimeTotal;
 
   // Calculate discount
   const discountPercent = oneTimeTerm.discount_percent || 0;
@@ -348,10 +360,6 @@ export function ProposalPaymentTerms({
     return today.toISOString().split('T')[0];
   };
 
-  const { data: dpSnapshot } = useProposalDynamicPricingSnapshot(proposalId);
-  const dynamicCurrentEndsAt = (dpSnapshot as any)?.enabled && (dpSnapshot as any)?.current_ends_at
-    ? (dpSnapshot as any).current_ends_at
-    : null;
   const installments = calculateInstallments(oneTimeTerm as PaymentTerm, effectiveOneTimeTotal, {
     dynamicPricingCurrentEndsAt: dynamicCurrentEndsAt,
   });
@@ -398,7 +406,7 @@ export function ProposalPaymentTerms({
                     <Zap className="h-3.5 w-3.5 text-amber-500" />
                     Avulso:
                   </span>
-                  <span className="font-semibold">{formatCurrency(oneTimeTotal)}</span>
+                    <span className="font-semibold">{formatCurrency(effectiveOneTimeTotal)}</span>
                 </div>
               )}
               
@@ -417,6 +425,12 @@ export function ProposalPaymentTerms({
               <div className="flex justify-between text-sm text-red-600 pt-1 border-t">
                 <span>Desconto ({discountPercent}%):</span>
                 <span>- {formatCurrency(discountValue)}</span>
+              </div>
+            )}
+            {dynamicCurrentAmount != null && dynamicCurrentAmount !== baseOneTimeTotal && (
+              <div className="flex justify-between text-xs text-muted-foreground pt-1 border-t">
+                <span>Valor base dos itens:</span>
+                <span>{formatCurrency(baseOneTimeTotal)}</span>
               </div>
             )}
           </div>
