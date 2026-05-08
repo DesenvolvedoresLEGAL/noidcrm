@@ -24,6 +24,7 @@ import {
   Trophy,
   Sparkles,
   Compass,
+  Boxes,
 } from 'lucide-react';
 import {
   Sidebar,
