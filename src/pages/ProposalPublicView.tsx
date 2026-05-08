@@ -1435,6 +1435,13 @@ export default function ProposalPublicView() {
         })()}
         </div>
 
+        {/* Dynamic Pricing Banner */}
+        {proposal?.dynamic_pricing_enabled && (
+          <PublicProposalDynamicPricingBanner
+            snapshot={proposal.dynamic_pricing_snapshot as any}
+          />
+        )}
+
         {/* Payment Terms */}
         <Card data-section="payment">
           <CardHeader>
