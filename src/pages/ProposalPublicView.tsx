@@ -964,7 +964,20 @@ export default function ProposalPublicView() {
   const totalAmount = oneTimeWithDiscount + recurringContractTotal;
   
   // CRITICAL: Use oneTimeTotal for installments, not totalAmount (which includes MRR items)
-  const installments = oneTimeTerm ? calculateInstallments(oneTimeTerm, oneTimeTotal) : [];
+  // PRICE UX 1.0.3 — usar approved_amount quando proposta já foi aprovada (congela o split)
+  const baseForSchedule =
+    proposal?.status === 'accepted' && proposal?.approved_amount != null
+      ? Number(proposal.approved_amount)
+      : oneTimeTotal;
+  const installments = oneTimeTerm
+    ? calculateInstallments(oneTimeTerm, baseForSchedule, {
+        proposalExpiresAt: proposal?.expires_at ?? null,
+        approvedAmount: proposal?.status === 'accepted' ? Number(proposal?.approved_amount ?? oneTimeTotal) : null,
+      })
+    : [];
+
+  // PRICE UX 1.0.3 — flag pública de pagamento (Pix/ERP)
+  const publicPaymentEnabled = proposal?.public_payment_enabled === true;
 
   const PAYMENT_METHODS: Record<string, { label: string; icon: any }> = {
     'pix': { label: 'PIX', icon: Wallet },
