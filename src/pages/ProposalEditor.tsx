@@ -16,6 +16,7 @@ import { ProposalVisualizarTab } from '@/components/proposals/ProposalVisualizar
 import { ProposalParticipantsManager } from '@/components/proposals/ProposalParticipantsManager';
 import { ProposalInventoryPanel } from '@/components/proposals/ProposalInventoryPanel';
 import { ProposalDynamicPricingPanel } from '@/components/proposals/ProposalDynamicPricingPanel';
+import { DynamicPricingMismatchAlert } from '@/components/proposals/DynamicPricingMismatchAlert';
 
 // Analytics moved to OpportunityAnalyticsTab
 import { AIInlineButton } from '@/components/proposals/AIInlineButton';
@@ -945,6 +946,11 @@ export default function ProposalEditor() {
 
         {/* Main Content */}
         <div className="flex-1 px-6 overflow-y-auto">
+          {currentProposalId && (
+            <div className="mb-4">
+              <DynamicPricingMismatchAlert proposalId={currentProposalId} />
+            </div>
+          )}
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="mb-4 flex-wrap">
               <TabsTrigger value="content">Conteúdo</TabsTrigger>

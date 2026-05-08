@@ -40,6 +40,7 @@ import { formatDateBR } from '@/lib/dateUtils';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { useProposalDynamicPricingSnapshot } from '@/hooks/proposals/useProposalDynamicPricing';
+import { DynamicPricingMismatchAlert } from './DynamicPricingMismatchAlert';
 
 const PAYMENT_METHODS = [
   { value: 'pix', label: 'PIX', icon: Wallet },
@@ -381,6 +382,7 @@ export function ProposalPaymentTerms({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        <DynamicPricingMismatchAlert proposalId={proposalId} />
         {/* Alert when no value */}
         {items.length === 0 && totalAmount === 0 && (
           <Alert className="border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800">
