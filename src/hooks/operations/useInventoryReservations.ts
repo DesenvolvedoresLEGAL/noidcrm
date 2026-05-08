@@ -5,14 +5,17 @@ import {
   cancelReservation,
   checkReservationConflict,
   convertPreReservationToReservation,
+  getOperationEvents,
   getReservation,
   getReservationsOverview,
   listReservations,
   listReservationsByProposal,
+  setReturnCondition,
+  updateReservationOperationalStatus,
   updateReservationStatus,
   type ReservationFilters,
 } from '@/services/operations/inventoryReservations';
-import type { ReservationStatus } from '@/lib/operations/inventoryReservations';
+import type { ReservationStatus, ReturnCondition } from '@/lib/operations/inventoryReservations';
 
 const baseKey = ['inventory', 'reservations'] as const;
 
