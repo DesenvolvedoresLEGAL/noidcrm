@@ -4,20 +4,34 @@ import {
   getQuantityAvailableForStatus,
   type InventoryItemStatus,
 } from '@/lib/operations/inventoryLabels';
+import type { Criticality, OperationalType } from '@/lib/operations/inventoryClassification';
 import {
   mergeTechnicalSpecs,
   sanitizeTechnicalSpecs,
   type TechnicalSpec,
 } from '@/lib/operations/inventoryTechnicalSpecs';
 
-export type InventoryItemRow = Database['public']['Tables']['inventory_items']['Row'];
+export type InventoryItemRow = Database['public']['Tables']['inventory_items']['Row'] & {
+  family_id?: string | null;
+  operational_type?: OperationalType;
+  criticality?: Criticality;
+};
 
 export interface InventoryItemWithRefs extends InventoryItemRow {
-  category: { id: string; name: string; item_kind: string } | null;
+  category:
+    | { id: string; name: string; item_kind: string; slug?: string | null; color?: string | null; icon?: string | null }
+    | null;
+  family: { id: string; name: string; slug?: string | null } | null;
   location: { id: string; name: string; location_type: string } | null;
 }
 
-export interface SerializedItemInput {
+export interface ClassificationFields {
+  family_id?: string | null;
+  operational_type?: OperationalType;
+  criticality?: Criticality;
+}
+
+export interface SerializedItemInput extends ClassificationFields {
   name: string;
   description?: string | null;
   category_id: string;
@@ -33,7 +47,7 @@ export interface SerializedItemInput {
 }
 
 const SELECT_WITH_REFS =
-  '*, category:inventory_categories(id,name,item_kind), location:inventory_locations(id,name,location_type)';
+  '*, category:inventory_categories(id,name,item_kind,slug,color,icon), family:inventory_families(id,name,slug), location:inventory_locations(id,name,location_type)';
 
 const emptyToNull = (v?: string | null) => {
   if (v === undefined || v === null) return null;
@@ -70,6 +84,9 @@ export async function createSerializedItem(
       description: emptyToNull(input.description),
       category_id: input.category_id,
       location_id: input.location_id,
+      family_id: input.family_id ?? null,
+      operational_type: input.operational_type ?? 'equipment',
+      criticality: input.criticality ?? 'medium',
       status: input.status,
       asset_code: emptyToNull(input.asset_code),
       serial_number: emptyToNull(input.serial_number),
@@ -78,7 +95,7 @@ export async function createSerializedItem(
       notes: emptyToNull(input.notes),
       created_by: userId ?? null,
       updated_by: userId ?? null,
-    })
+    } as any)
     .select(SELECT_WITH_REFS)
     .single();
   if (error) throw error;
@@ -99,6 +116,9 @@ export async function updateSerializedItem(
   if (input.description !== undefined) patch.description = emptyToNull(input.description);
   if (input.category_id !== undefined) patch.category_id = input.category_id;
   if (input.location_id !== undefined) patch.location_id = input.location_id;
+  if (input.family_id !== undefined) patch.family_id = input.family_id ?? null;
+  if (input.operational_type !== undefined) patch.operational_type = input.operational_type;
+  if (input.criticality !== undefined) patch.criticality = input.criticality;
   if (input.asset_code !== undefined) patch.asset_code = emptyToNull(input.asset_code);
   if (input.serial_number !== undefined)
     patch.serial_number = emptyToNull(input.serial_number);
@@ -136,7 +156,7 @@ export async function updateSerializedItemStatus(
 
 // ---------- Quantity items ----------
 
-export interface QuantityItemInput {
+export interface QuantityItemInput extends ClassificationFields {
   name: string;
   description?: string | null;
   category_id: string;
@@ -190,6 +210,9 @@ export async function createQuantityItem(
       description: emptyToNull(input.description),
       category_id: input.category_id,
       location_id: input.location_id,
+      family_id: input.family_id ?? null,
+      operational_type: input.operational_type ?? 'equipment',
+      criticality: input.criticality ?? 'medium',
       status: input.status,
       unit_of_measure: input.unit_of_measure,
       quantity_total: total,
@@ -204,7 +227,7 @@ export async function createQuantityItem(
       metadata: { technical_specs: sanitizeTechnicalSpecs(input.technical_specs ?? []) } as any,
       created_by: userId ?? null,
       updated_by: userId ?? null,
-    })
+    } as any)
     .select(SELECT_WITH_REFS)
     .single();
   if (error) throw error;
@@ -224,6 +247,9 @@ export async function updateQuantityItem(
   if (input.description !== undefined) patch.description = emptyToNull(input.description);
   if (input.category_id !== undefined) patch.category_id = input.category_id;
   if (input.location_id !== undefined) patch.location_id = input.location_id;
+  if (input.family_id !== undefined) patch.family_id = input.family_id ?? null;
+  if (input.operational_type !== undefined) patch.operational_type = input.operational_type;
+  if (input.criticality !== undefined) patch.criticality = input.criticality;
   if (input.unit_of_measure !== undefined) patch.unit_of_measure = input.unit_of_measure;
   if (input.brand !== undefined) patch.brand = emptyToNull(input.brand);
   if (input.model !== undefined) patch.model = emptyToNull(input.model);

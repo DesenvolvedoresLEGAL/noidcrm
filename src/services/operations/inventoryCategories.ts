@@ -1,13 +1,17 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
+import { normalizeSlug } from '@/lib/operations/inventoryClassification';
 
 export type InventoryCategory = Database['public']['Tables']['inventory_categories']['Row'];
 export type InventoryItemKind = Database['public']['Enums']['inventory_item_kind'];
 
 export interface InventoryCategoryInput {
   name: string;
+  slug?: string | null;
   description?: string | null;
   item_kind: InventoryItemKind;
+  color?: string | null;
+  icon?: string | null;
   sort_order?: number;
   is_active?: boolean;
 }
@@ -28,18 +32,24 @@ export async function createInventoryCategory(
   userId: string | undefined,
   input: InventoryCategoryInput,
 ) {
+  const slug = (input.slug && input.slug.trim().length > 0
+    ? normalizeSlug(input.slug)
+    : normalizeSlug(input.name));
   const { data, error } = await supabase
     .from('inventory_categories')
     .insert({
       organization_id: organizationId,
       name: input.name,
+      slug,
       description: input.description ?? null,
       item_kind: input.item_kind,
+      color: input.color ?? null,
+      icon: input.icon ?? null,
       sort_order: input.sort_order ?? 0,
       is_active: input.is_active ?? true,
       created_by: userId ?? null,
       updated_by: userId ?? null,
-    })
+    } as any)
     .select('*')
     .single();
   if (error) throw error;
@@ -51,12 +61,13 @@ export async function updateInventoryCategory(
   userId: string | undefined,
   input: Partial<InventoryCategoryInput>,
 ) {
+  const patch: Record<string, unknown> = { ...input, updated_by: userId ?? null };
+  if (input.slug !== undefined && input.slug !== null) {
+    patch.slug = normalizeSlug(input.slug);
+  }
   const { data, error } = await supabase
     .from('inventory_categories')
-    .update({
-      ...input,
-      updated_by: userId ?? null,
-    })
+    .update(patch)
     .eq('id', id)
     .select('*')
     .single();
