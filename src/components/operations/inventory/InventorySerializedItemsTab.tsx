@@ -60,7 +60,14 @@ export function InventorySerializedItemsTab() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | InventoryItemStatus>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [familyFilter, setFamilyFilter] = useState<string>('all');
+  const [opTypeFilter, setOpTypeFilter] = useState<'all' | OperationalType>('all');
+  const [critFilter, setCritFilter] = useState<'all' | Criticality>('all');
   const [locationFilter, setLocationFilter] = useState<string>('all');
+
+  const { data: families } = useInventoryFamilies(
+    categoryFilter !== 'all' ? categoryFilter : undefined,
+  );
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<InventoryItemWithRefs | null>(null);
@@ -75,11 +82,19 @@ export function InventorySerializedItemsTab() {
     () => (locations ?? []).filter((l) => l.is_active),
     [locations],
   );
+  const activeFamilies = useMemo(
+    () => (families ?? []).filter((f) => f.is_active),
+    [families],
+  );
 
   const filtered = useMemo(() => {
     let list = items ?? [];
     if (statusFilter !== 'all') list = list.filter((i) => i.status === statusFilter);
     if (categoryFilter !== 'all') list = list.filter((i) => i.category_id === categoryFilter);
+    if (familyFilter !== 'all') list = list.filter((i) => (i as any).family_id === familyFilter);
+    if (opTypeFilter !== 'all')
+      list = list.filter((i) => (i as any).operational_type === opTypeFilter);
+    if (critFilter !== 'all') list = list.filter((i) => (i as any).criticality === critFilter);
     if (locationFilter !== 'all') list = list.filter((i) => i.location_id === locationFilter);
     if (search.trim()) {
       const q = search.trim().toLowerCase();
@@ -90,7 +105,7 @@ export function InventorySerializedItemsTab() {
       );
     }
     return list;
-  }, [items, search, statusFilter, categoryFilter, locationFilter]);
+  }, [items, search, statusFilter, categoryFilter, familyFilter, opTypeFilter, critFilter, locationFilter]);
 
   const isEmpty = !isLoading && (items?.length ?? 0) === 0;
   const noCategories = serializedCategories.length === 0;
