@@ -210,6 +210,9 @@ export async function createQuantityItem(
       description: emptyToNull(input.description),
       category_id: input.category_id,
       location_id: input.location_id,
+      family_id: input.family_id ?? null,
+      operational_type: input.operational_type ?? 'equipment',
+      criticality: input.criticality ?? 'medium',
       status: input.status,
       unit_of_measure: input.unit_of_measure,
       quantity_total: total,
@@ -224,7 +227,7 @@ export async function createQuantityItem(
       metadata: { technical_specs: sanitizeTechnicalSpecs(input.technical_specs ?? []) } as any,
       created_by: userId ?? null,
       updated_by: userId ?? null,
-    })
+    } as any)
     .select(SELECT_WITH_REFS)
     .single();
   if (error) throw error;
