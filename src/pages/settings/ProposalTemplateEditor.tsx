@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Save, FileText, Package, CreditCard, Eye, Star, Loader2 } from 'lucide-react';
+import { ArrowLeft, Save, FileText, Package, CreditCard, Eye, Star, Loader2, Settings2 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { 
@@ -17,9 +17,11 @@ import {
 import { TemplateContentTab } from '@/components/templates/TemplateContentTab';
 import { TemplateItemsTab } from '@/components/templates/TemplateItemsTab';
 import { TemplatePaymentTab } from '@/components/templates/TemplatePaymentTab';
+import { TemplateCommercialRulesTab } from '@/components/templates/TemplateCommercialRulesTab';
 
 import { TemplatePreviewTab } from '@/components/templates/TemplatePreviewTab';
 import { TemplateConfigSidebar } from '@/components/templates/TemplateConfigSidebar';
+import { proposalTemplateCommercialRulesSchema } from '@/lib/proposals/proposalTemplateRules';
 
 export default function ProposalTemplateEditor() {
   const { id } = useParams();
