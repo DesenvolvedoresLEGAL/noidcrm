@@ -119,6 +119,7 @@ async function runRoleplayPipeline(sessionId: string, authHeader: string) {
     .update({
       finished_at: session.finished_at || new Date().toISOString(),
       current_phase: 'evaluating',
+      updated_at: new Date().toISOString(),
     })
     .eq('id', sessionId);
 
