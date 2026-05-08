@@ -382,6 +382,10 @@ export function ProposalPaymentTerms({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        <DynamicPricingMismatchAlert
+          proposalId={proposalId}
+          displayedAmount={effectiveOneTimeTotal}
+        />
         {/* Alert when no value */}
         {items.length === 0 && totalAmount === 0 && (
           <Alert className="border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800">
