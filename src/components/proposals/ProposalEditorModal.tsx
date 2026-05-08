@@ -18,6 +18,7 @@ import { RichTextEditor } from './RichTextEditor';
 import { ProposalItemsManager } from './ProposalItemsManager';
 import { ProposalPaymentTerms } from './ProposalPaymentTerms';
 import { ProposalDynamicPricingPanel } from './ProposalDynamicPricingPanel';
+import { ProposalDynamicPaymentPanel } from './ProposalDynamicPaymentPanel';
 import {
   Save,
   FileDown,
