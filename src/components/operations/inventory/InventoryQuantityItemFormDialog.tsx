@@ -32,7 +32,12 @@ import {
   technicalSpecsArraySchema,
   type TechnicalSpec,
 } from '@/lib/operations/inventoryTechnicalSpecs';
+import {
+  type Criticality,
+  type OperationalType,
+} from '@/lib/operations/inventoryClassification';
 import { TechnicalSpecsSection } from './TechnicalSpecsSection';
+import { InventoryClassificationFields } from './InventoryClassificationFields';
 import { useInventoryCategories } from '@/hooks/operations/useInventoryCategories';
 import { useInventoryLocations } from '@/hooks/operations/useInventoryLocations';
 import { useInventoryQuantityItemMutations } from '@/hooks/operations/useInventoryItems';
@@ -52,6 +57,11 @@ const schema = z
     name: z.string().trim().min(2, 'Mínimo 2 caracteres').max(120, 'Máximo 120 caracteres'),
     description: z.string().trim().max(500, 'Máximo 500 caracteres').optional().or(z.literal('')),
     category_id: z.string().uuid('Selecione uma categoria.'),
+    family_id: z.string().uuid().nullable().optional(),
+    operational_type: z.enum([
+      'equipment','accessory','part','consumable','logical_kit','infrastructure','tool','other',
+    ]),
+    criticality: z.enum(['low','medium','high','critical']),
     location_id: z.string().uuid('Selecione um local.'),
     status: z.enum(STATUSES),
     unit_of_measure: z.string().min(1, 'Obrigatório').max(20, 'Máximo 20 caracteres'),
@@ -100,6 +110,9 @@ export function InventoryQuantityItemFormDialog({ open, onOpenChange, item }: Pr
       name: '',
       description: '',
       category_id: '',
+      family_id: null,
+      operational_type: 'equipment',
+      criticality: 'medium',
       location_id: '',
       status: 'available',
       unit_of_measure: 'un',
@@ -119,6 +132,9 @@ export function InventoryQuantityItemFormDialog({ open, onOpenChange, item }: Pr
         name: item?.name ?? '',
         description: item?.description ?? '',
         category_id: item?.category_id ?? '',
+        family_id: (item as any)?.family_id ?? null,
+        operational_type: ((item as any)?.operational_type as OperationalType) ?? 'equipment',
+        criticality: ((item as any)?.criticality as Criticality) ?? 'medium',
         location_id: item?.location_id ?? '',
         status: ((item?.status as InventoryItemStatus) ?? 'available'),
         unit_of_measure: item?.unit_of_measure ?? 'un',
@@ -144,6 +160,9 @@ export function InventoryQuantityItemFormDialog({ open, onOpenChange, item }: Pr
       name: data.name,
       description: data.description || null,
       category_id: data.category_id,
+      family_id: data.family_id ?? null,
+      operational_type: data.operational_type,
+      criticality: data.criticality,
       location_id: data.location_id,
       status: data.status,
       unit_of_measure: data.unit_of_measure,
@@ -211,62 +230,50 @@ export function InventoryQuantityItemFormDialog({ open, onOpenChange, item }: Pr
             )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Categoria</Label>
-              <Select
-                value={form.watch('category_id')}
-                onValueChange={(v) => form.setValue('category_id', v, { shouldValidate: true })}
-                disabled={noCategories}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione uma categoria" />
-                </SelectTrigger>
-                <SelectContent>
-                  {quantityCategories.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {noCategories && (
-                <p className="text-xs text-muted-foreground">
-                  Cadastre uma categoria por quantidade antes de criar itens deste tipo.
-                </p>
-              )}
-              {form.formState.errors.category_id && (
-                <p className="text-sm text-destructive">{form.formState.errors.category_id.message}</p>
-              )}
-            </div>
+          <InventoryClassificationFields
+            categoryId={form.watch('category_id')}
+            familyId={form.watch('family_id') ?? null}
+            operationalType={form.watch('operational_type') as OperationalType}
+            criticality={form.watch('criticality') as Criticality}
+            itemKindFilter="quantity"
+            onChange={(next) => {
+              form.setValue('category_id', next.category_id, { shouldValidate: true });
+              form.setValue('family_id', next.family_id);
+              form.setValue('operational_type', next.operational_type);
+              form.setValue('criticality', next.criticality);
+            }}
+            errors={{
+              category_id: form.formState.errors.category_id as any,
+              family_id: form.formState.errors.family_id as any,
+            }}
+          />
 
-            <div className="space-y-2">
-              <Label>Local atual</Label>
-              <Select
-                value={form.watch('location_id')}
-                onValueChange={(v) => form.setValue('location_id', v, { shouldValidate: true })}
-                disabled={noLocations}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o local atual" />
-                </SelectTrigger>
-                <SelectContent>
-                  {activeLocations.map((l) => (
-                    <SelectItem key={l.id} value={l.id}>
-                      {l.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {noLocations && (
-                <p className="text-xs text-muted-foreground">
-                  Cadastre um local antes de criar itens.
-                </p>
-              )}
-              {form.formState.errors.location_id && (
-                <p className="text-sm text-destructive">{form.formState.errors.location_id.message}</p>
-              )}
-            </div>
+          <div className="space-y-2">
+            <Label>Local atual</Label>
+            <Select
+              value={form.watch('location_id')}
+              onValueChange={(v) => form.setValue('location_id', v, { shouldValidate: true })}
+              disabled={noLocations}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione o local atual" />
+              </SelectTrigger>
+              <SelectContent>
+                {activeLocations.map((l) => (
+                  <SelectItem key={l.id} value={l.id}>
+                    {l.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {noLocations && (
+              <p className="text-xs text-muted-foreground">
+                Cadastre um local antes de criar itens.
+              </p>
+            )}
+            {form.formState.errors.location_id && (
+              <p className="text-sm text-destructive">{form.formState.errors.location_id.message}</p>
+            )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

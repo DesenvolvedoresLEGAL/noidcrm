@@ -37,8 +37,18 @@ import {
   getStockAlertVariant,
   type InventoryItemStatus,
 } from '@/lib/operations/inventoryLabels';
+import {
+  CRITICALITY_LABELS,
+  CRITICALITY_OPTIONS,
+  OPERATIONAL_TYPE_LABELS,
+  OPERATIONAL_TYPE_OPTIONS,
+  criticalityBadgeVariant,
+  type Criticality,
+  type OperationalType,
+} from '@/lib/operations/inventoryClassification';
 import { useInventoryQuantityItems } from '@/hooks/operations/useInventoryItems';
 import { useInventoryCategories } from '@/hooks/operations/useInventoryCategories';
+import { useInventoryFamilies } from '@/hooks/operations/useInventoryFamilies';
 import { useInventoryLocations } from '@/hooks/operations/useInventoryLocations';
 import type { InventoryItemWithRefs } from '@/services/operations/inventoryItems';
 import { InventoryQuantityItemFormDialog } from './InventoryQuantityItemFormDialog';
@@ -60,7 +70,14 @@ export function InventoryQuantityItemsTab() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | InventoryItemStatus>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [familyFilter, setFamilyFilter] = useState<string>('all');
+  const [opTypeFilter, setOpTypeFilter] = useState<'all' | OperationalType>('all');
+  const [critFilter, setCritFilter] = useState<'all' | Criticality>('all');
   const [locationFilter, setLocationFilter] = useState<string>('all');
+
+  const { data: families } = useInventoryFamilies(
+    categoryFilter !== 'all' ? categoryFilter : undefined,
+  );
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<InventoryItemWithRefs | null>(null);
@@ -75,11 +92,18 @@ export function InventoryQuantityItemsTab() {
     () => (locations ?? []).filter((l) => l.is_active),
     [locations],
   );
+  const activeFamilies = useMemo(
+    () => (families ?? []).filter((f) => f.is_active),
+    [families],
+  );
 
   const filtered = useMemo(() => {
     let list = items ?? [];
     if (statusFilter !== 'all') list = list.filter((i) => i.status === statusFilter);
     if (categoryFilter !== 'all') list = list.filter((i) => i.category_id === categoryFilter);
+    if (familyFilter !== 'all') list = list.filter((i) => (i as any).family_id === familyFilter);
+    if (opTypeFilter !== 'all') list = list.filter((i) => (i as any).operational_type === opTypeFilter);
+    if (critFilter !== 'all') list = list.filter((i) => (i as any).criticality === critFilter);
     if (locationFilter !== 'all') list = list.filter((i) => i.location_id === locationFilter);
     if (search.trim()) {
       const q = search.trim().toLowerCase();
@@ -90,7 +114,7 @@ export function InventoryQuantityItemsTab() {
       );
     }
     return list;
-  }, [items, search, statusFilter, categoryFilter, locationFilter]);
+  }, [items, search, statusFilter, categoryFilter, familyFilter, opTypeFilter, critFilter, locationFilter]);
 
   const cards = useMemo(() => {
     const list = items ?? [];
@@ -198,8 +222,8 @@ export function InventoryQuantityItemsTab() {
       ) : (
         <Card>
           <CardContent className="p-4 space-y-4">
-            <div className="flex flex-col lg:flex-row gap-2">
-              <div className="relative flex-1">
+            <div className="flex flex-col lg:flex-row flex-wrap gap-2">
+              <div className="relative flex-1 min-w-[200px]">
                 <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   placeholder="Buscar por nome, descrição, marca ou modelo..."
@@ -209,41 +233,66 @@ export function InventoryQuantityItemsTab() {
                 />
               </div>
               <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
-                <SelectTrigger className="w-full lg:w-44">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
+                <SelectTrigger className="w-full lg:w-40"><SelectValue placeholder="Status" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos os status</SelectItem>
                   {ITEM_STATUS_OPTIONS.map((o) => (
-                    <SelectItem key={o.value} value={o.value}>
-                      {o.label}
-                    </SelectItem>
+                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                <SelectTrigger className="w-full lg:w-48">
-                  <SelectValue placeholder="Categoria" />
-                </SelectTrigger>
+              <Select
+                value={categoryFilter}
+                onValueChange={(v) => {
+                  setCategoryFilter(v);
+                  setFamilyFilter('all');
+                }}
+              >
+                <SelectTrigger className="w-full lg:w-44"><SelectValue placeholder="Categoria" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todas as categorias</SelectItem>
                   {quantityCategories.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name}
-                    </SelectItem>
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select
+                value={familyFilter}
+                onValueChange={setFamilyFilter}
+                disabled={categoryFilter === 'all' || activeFamilies.length === 0}
+              >
+                <SelectTrigger className="w-full lg:w-40"><SelectValue placeholder="Família" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas as famílias</SelectItem>
+                  {activeFamilies.map((f) => (
+                    <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={opTypeFilter} onValueChange={(v) => setOpTypeFilter(v as any)}>
+                <SelectTrigger className="w-full lg:w-40"><SelectValue placeholder="Tipo" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os tipos</SelectItem>
+                  {OPERATIONAL_TYPE_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={critFilter} onValueChange={(v) => setCritFilter(v as any)}>
+                <SelectTrigger className="w-full lg:w-36"><SelectValue placeholder="Criticidade" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas</SelectItem>
+                  {CRITICALITY_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               <Select value={locationFilter} onValueChange={setLocationFilter}>
-                <SelectTrigger className="w-full lg:w-48">
-                  <SelectValue placeholder="Local" />
-                </SelectTrigger>
+                <SelectTrigger className="w-full lg:w-44"><SelectValue placeholder="Local" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos os locais</SelectItem>
                   {activeLocations.map((l) => (
-                    <SelectItem key={l.id} value={l.id}>
-                      {l.name}
-                    </SelectItem>
+                    <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -255,6 +304,9 @@ export function InventoryQuantityItemsTab() {
                   <TableRow>
                     <TableHead>Item</TableHead>
                     <TableHead>Categoria</TableHead>
+                    <TableHead>Família</TableHead>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead>Criticidade</TableHead>
                     <TableHead>Local</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Unidade</TableHead>
@@ -271,20 +323,22 @@ export function InventoryQuantityItemsTab() {
                   {isLoading ? (
                     Array.from({ length: 3 }).map((_, i) => (
                       <TableRow key={i}>
-                        <TableCell colSpan={12}>
+                        <TableCell colSpan={15}>
                           <Skeleton className="h-6 w-full" />
                         </TableCell>
                       </TableRow>
                     ))
                   ) : filtered.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={12} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={15} className="text-center text-muted-foreground py-8">
                         Nenhum item encontrado com esses filtros.
                       </TableCell>
                     </TableRow>
                   ) : (
                     filtered.map((it) => {
                       const status = it.status as InventoryItemStatus;
+                      const opType = ((it as any).operational_type as OperationalType) ?? 'equipment';
+                      const crit = ((it as any).criticality as Criticality) ?? 'medium';
                       const alert = getStockAlert({
                         available: Number(it.quantity_available),
                         minimum:
@@ -303,6 +357,17 @@ export function InventoryQuantityItemsTab() {
                             )}
                           </TableCell>
                           <TableCell>{it.category?.name ?? 'Sem categoria'}</TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {(it as any).family?.name ?? '—'}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {OPERATIONAL_TYPE_LABELS[opType] ?? opType}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={criticalityBadgeVariant(crit)}>
+                              {CRITICALITY_LABELS[crit] ?? crit}
+                            </Badge>
+                          </TableCell>
                           <TableCell>{it.location?.name ?? 'Sem local'}</TableCell>
                           <TableCell>
                             <Badge variant={getStatusBadgeVariant(status)}>
@@ -326,20 +391,10 @@ export function InventoryQuantityItemsTab() {
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => openEdit(it)}
-                                className="gap-1"
-                              >
+                              <Button variant="ghost" size="sm" onClick={() => openEdit(it)} className="gap-1">
                                 <Pencil className="h-3.5 w-3.5" /> Editar
                               </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => openStatus(it)}
-                                className="gap-1"
-                              >
+                              <Button variant="outline" size="sm" onClick={() => openStatus(it)} className="gap-1">
                                 <RefreshCw className="h-3.5 w-3.5" /> Status
                               </Button>
                             </div>

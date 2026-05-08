@@ -156,3 +156,37 @@ export async function listRecentStatusHistory(orgId: string): Promise<StatusHist
   if (error) throw error;
   return (data ?? []) as unknown as StatusHistoryRow[];
 }
+
+export interface CategoryOverviewRow {
+  category_id: string;
+  category_name: string;
+  category_slug: string | null;
+  category_color: string | null;
+  category_icon: string | null;
+  total_skus: number;
+  total_units: number;
+  available_units: number;
+  reserved_units: number;
+  maintenance_units: number;
+  critical_items: number;
+}
+
+export async function getCategoryOverview(orgId: string): Promise<CategoryOverviewRow[]> {
+  const { data, error } = await (supabase as any).rpc('get_inventory_category_overview', {
+    p_org_id: orgId,
+  });
+  if (error) throw error;
+  return ((data ?? []) as any[]).map((r) => ({
+    category_id: r.category_id,
+    category_name: r.category_name,
+    category_slug: r.category_slug,
+    category_color: r.category_color,
+    category_icon: r.category_icon,
+    total_skus: Number(r.total_skus ?? 0),
+    total_units: Number(r.total_units ?? 0),
+    available_units: Number(r.available_units ?? 0),
+    reserved_units: Number(r.reserved_units ?? 0),
+    maintenance_units: Number(r.maintenance_units ?? 0),
+    critical_items: Number(r.critical_items ?? 0),
+  }));
+}
