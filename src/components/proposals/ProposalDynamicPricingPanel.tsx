@@ -200,7 +200,7 @@ export function ProposalDynamicPricingPanel({
             </Button>
             {isAdmin && (
               <Button variant="ghost" asChild>
-                <Link to="/settings/system/pricing-factor-rules">
+                <Link to="/app/settings/pricing-factor-rules">
                   <Settings className="h-4 w-4 mr-2" />
                   Ver configurações da regra
                 </Link>
