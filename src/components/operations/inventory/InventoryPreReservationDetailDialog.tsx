@@ -277,10 +277,25 @@ export function InventoryPreReservationDetailDialog({ id, open, onOpenChange }: 
           </div>
         )}
 
-        <DialogFooter className="gap-2">
+        <DialogFooter className="gap-2 flex-wrap">
           <Button variant="outline" onClick={handleRecalc} disabled={!id || recalc.isPending}>
             <RefreshCw className="h-4 w-4 mr-2" /> Recalcular
           </Button>
+          {r?.status === 'active' && (
+            <Button
+              onClick={handleConvert}
+              disabled={!canConvert || convert.isPending}
+              title={
+                !canConvert
+                  ? pendingDemands > 0
+                    ? `${pendingDemands} demanda(s) pendentes de alocação`
+                    : 'Pré reserva precisa estar ativa'
+                  : 'Converter em reserva definitiva'
+              }
+            >
+              <CheckCircle2 className="h-4 w-4 mr-2" /> Converter em reserva definitiva
+            </Button>
+          )}
           {r?.status === 'active' && (
             <Button variant="destructive" onClick={handleCancel} disabled={cancel.isPending}>
               <XCircle className="h-4 w-4 mr-2" /> Cancelar pré reserva
