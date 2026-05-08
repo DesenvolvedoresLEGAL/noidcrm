@@ -130,18 +130,21 @@ export function ProposalEditorModal({
     const template = templates.find(t => t.id === templateId);
     if (template) {
       // Calculate expiration based on template validity_days
-      const validityDays = template.validity_days || 30;
+      const validityDays = template.default_validity_days ?? template.validity_days ?? 30;
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + validityDays);
       
       // Apply all template configurations
       setValue('layout_id', template.layout_id || '');
       setValue('currency', (template.currency as 'BRL' | 'USD' | 'EUR') || 'BRL');
-      setValue('expires_at', expiresAt.toISOString().split('T')[0]);
+      if (template.validity_strategy === 'fixed_days_from_creation' || !template.validity_strategy) {
+        setValue('expires_at', expiresAt.toISOString().split('T')[0]);
+      }
       setValue('introduction', template.introduction || '');
       setValue('terms', template.terms || '');
       setValue('notes', template.notes || '');
-      
+
+      setAppliedTemplate(template);
       toast.success(`Template "${template.name}" aplicado!`);
     }
   };
