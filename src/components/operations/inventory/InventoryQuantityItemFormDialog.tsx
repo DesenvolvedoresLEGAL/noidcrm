@@ -399,6 +399,12 @@ export function InventoryQuantityItemFormDialog({ open, onOpenChange, item }: Pr
             )}
           </div>
 
+          <TechnicalSpecsSection
+            control={form.control}
+            setValue={form.setValue}
+            errors={(form.formState.errors as any)?.technical_specs}
+          />
+
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
