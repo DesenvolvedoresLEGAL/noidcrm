@@ -191,6 +191,55 @@ function extractEvaluationFallback(content: string, rubric: any): any | null {
   };
 }
 
+function buildContingencyEvaluation(messages: any[], rubric: any, reason: unknown): any {
+  const sellerMessages = messages.filter((msg: any) => msg.sender === 'seller');
+  const clientMessages = messages.filter((msg: any) => msg.sender !== 'seller');
+  const sellerText = sellerMessages.map((msg: any) => String(msg.text || '')).join(' ').toLowerCase();
+  const avgSellerLength = sellerMessages.length
+    ? sellerMessages.reduce((sum: number, msg: any) => sum + String(msg.text || '').length, 0) / sellerMessages.length
+    : 0;
+
+  const evidenceSignals = [
+    /\?/.test(sellerText),
+    /(dor|problema|desafio|necessidade|objetivo|impacto|prioridade)/i.test(sellerText),
+    /(valor|resultado|benefício|solução|proposta|próximo passo|agenda|reunião)/i.test(sellerText),
+    sellerMessages.length >= 6,
+    clientMessages.length >= 4,
+    avgSellerLength >= 60,
+  ].filter(Boolean).length;
+
+  const baseScore = Math.max(4.5, Math.min(8.2, 5.2 + evidenceSignals * 0.45));
+  const dims = Array.isArray(rubric.dimensions) && rubric.dimensions.length > 0
+    ? rubric.dimensions
+    : [{ name: 'Execução comercial', weight: 100 }];
+
+  const dimensions = dims.map((d: any, index: number) => {
+    const variation = ((index % 3) - 1) * 0.2;
+    const score = Math.round(Math.max(0, Math.min(10, baseScore + variation)) * 10) / 10;
+    return {
+      key: d.name || d.key || `Dimensão ${index + 1}`,
+      score,
+      feedback: 'Avaliação de contingência gerada porque a IA principal não respondeu dentro do tempo. Revise a conversa para feedback qualitativo mais profundo.',
+      weight: d.weight || (1 / dims.length),
+    };
+  });
+
+  const totalWeight = dimensions.reduce((sum: number, d: any) => sum + (Number(d.weight) || 0), 0);
+  const weighted = totalWeight > 0
+    ? dimensions.reduce((sum: number, d: any) => sum + d.score * (Number(d.weight) || 0), 0) / totalWeight
+    : baseScore;
+  const overallScore = Math.round(Math.max(0, Math.min(10, weighted)) * 10) / 10;
+  const reasonMessage = reason instanceof Error ? reason.message : String(reason ?? 'timeout');
+
+  return {
+    dimensions,
+    overall_score: overallScore,
+    passed: overallScore >= rubric.passing_score,
+    summary: `Avaliação concluída em modo de contingência por instabilidade/timeout da IA principal. Nota calculada por sinais objetivos da conversa. Motivo técnico: ${sanitizeUsageErrorMessage(reasonMessage)}`,
+    _contingencyFallback: true,
+  };
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
