@@ -1456,10 +1456,12 @@ export default function ProposalPublicView() {
             <PublicProposalDynamicPricingBanner
               snapshot={proposal.dynamic_pricing_snapshot as any}
             />
-            <PublicProposalPaymentBlock
-              proposalId={proposal.id}
-              snapshot={proposal.dynamic_pricing_snapshot as any}
-            />
+            {publicPaymentEnabled && (
+              <PublicProposalPaymentBlock
+                proposalId={proposal.id}
+                snapshot={proposal.dynamic_pricing_snapshot as any}
+              />
+            )}
           </>
         )}
 
