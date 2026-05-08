@@ -109,6 +109,7 @@ export function InventoryQuantityItemFormDialog({ open, onOpenChange, item }: Pr
       brand: '',
       model: '',
       notes: '',
+      technical_specs: [],
     },
   });
 
@@ -130,6 +131,7 @@ export function InventoryQuantityItemFormDialog({ open, onOpenChange, item }: Pr
         brand: item?.brand ?? '',
         model: item?.model ?? '',
         notes: item?.notes ?? '',
+        technical_specs: getTechnicalSpecs(item?.metadata) as TechnicalSpec[],
       });
     }
   }, [open, item, form]);
@@ -154,10 +156,14 @@ export function InventoryQuantityItemFormDialog({ open, onOpenChange, item }: Pr
       brand: data.brand || null,
       model: data.model || null,
       notes: data.notes || null,
+      technical_specs: ((data as any).technical_specs ?? []) as TechnicalSpec[],
     };
     try {
       if (isEdit && item) {
-        await update.mutateAsync({ id: item.id, input: payload });
+        await update.mutateAsync({
+          id: item.id,
+          input: { ...payload, _currentMetadata: item.metadata } as any,
+        });
         toast.success('Item por quantidade atualizado com sucesso.');
       } else {
         await create.mutateAsync(payload);
