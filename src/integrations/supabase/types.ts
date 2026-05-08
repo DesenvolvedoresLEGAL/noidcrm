@@ -33092,6 +33092,12 @@ export type Database = {
         | "damaged"
         | "retired"
         | "lost"
+        | "reserved"
+        | "in_preparation"
+        | "dispatched"
+        | "in_operation"
+        | "returned"
+        | "inactive"
       inventory_location_type:
         | "internal"
         | "external"
@@ -33409,6 +33415,12 @@ export const Constants = {
         "damaged",
         "retired",
         "lost",
+        "reserved",
+        "in_preparation",
+        "dispatched",
+        "in_operation",
+        "returned",
+        "inactive",
       ],
       inventory_location_type: [
         "internal",
