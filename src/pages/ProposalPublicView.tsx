@@ -1429,14 +1429,52 @@ export default function ProposalPublicView() {
                               </tr>
                             </>
                           )}
-                          <tr className="bg-amber-50 dark:bg-amber-950/30">
-                            <td colSpan={2} className="text-right py-3 px-2 md:py-4 md:px-4 font-bold text-sm md:text-base sm:hidden">Subtotal Avulso</td>
-                            <td colSpan={hasItemDiscounts ? 4 : 3} className="text-right py-3 px-2 md:py-4 md:px-4 font-bold text-sm md:text-base hidden sm:table-cell">Subtotal Avulso</td>
-                            <td className="text-right py-3 px-2 md:py-4 md:px-4 font-bold text-base md:text-lg">{formatCurrency(oneTimeTotal)}</td>
-                          </tr>
+                          {showDpBreakdown ? (
+                            <>
+                              <tr className="bg-muted/30">
+                                <td colSpan={2} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm text-muted-foreground sm:hidden">Subtotal dos Itens</td>
+                                <td colSpan={colSpanLabel} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm text-muted-foreground hidden sm:table-cell">Subtotal dos Itens</td>
+                                <td className="text-right py-2 px-2 md:py-3 md:px-4 text-sm">{formatCurrency(oneTimeTotal)}</td>
+                              </tr>
+                              <tr className="bg-amber-50/60 dark:bg-amber-950/20">
+                                <td colSpan={2} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm font-medium text-amber-700 dark:text-amber-300 sm:hidden">
+                                  Ajuste por antecedência ({dpBreakdown.adjustmentPercent >= 0 ? '+' : ''}{dpBreakdown.adjustmentPercent.toFixed(1)}%)
+                                </td>
+                                <td colSpan={colSpanLabel} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm font-medium text-amber-700 dark:text-amber-300 hidden sm:table-cell">
+                                  Ajuste por antecedência ({dpBreakdown.adjustmentPercent >= 0 ? '+' : ''}{dpBreakdown.adjustmentPercent.toFixed(1)}%)
+                                </td>
+                                <td className="text-right py-2 px-2 md:py-3 md:px-4 text-sm font-medium text-amber-700 dark:text-amber-300">
+                                  {dpBreakdown.delta >= 0 ? '+ ' : '- '}{formatCurrency(Math.abs(dpBreakdown.delta))}
+                                </td>
+                              </tr>
+                              <tr className="bg-amber-50 dark:bg-amber-950/30 border-t-2 border-amber-300 dark:border-amber-700">
+                                <td colSpan={2} className="text-right py-3 px-2 md:py-4 md:px-4 font-bold text-sm md:text-base sm:hidden">Total Vigente Hoje</td>
+                                <td colSpan={colSpanLabel} className="text-right py-3 px-2 md:py-4 md:px-4 font-bold text-sm md:text-base hidden sm:table-cell">Total Vigente Hoje</td>
+                                <td className="text-right py-3 px-2 md:py-4 md:px-4 font-bold text-base md:text-lg text-amber-700 dark:text-amber-300">
+                                  {formatCurrency(dpBreakdown.current)}
+                                </td>
+                              </tr>
+                            </>
+                          ) : (
+                            <tr className="bg-amber-50 dark:bg-amber-950/30">
+                              <td colSpan={2} className="text-right py-3 px-2 md:py-4 md:px-4 font-bold text-sm md:text-base sm:hidden">Subtotal Avulso</td>
+                              <td colSpan={colSpanLabel} className="text-right py-3 px-2 md:py-4 md:px-4 font-bold text-sm md:text-base hidden sm:table-cell">Subtotal Avulso</td>
+                              <td className="text-right py-3 px-2 md:py-4 md:px-4 font-bold text-base md:text-lg">{formatCurrency(oneTimeTotal)}</td>
+                            </tr>
+                          )}
                         </tfoot>
                       </table>
                     </div>
+                    {showDpBreakdown && (dpBreakdown.endsAt || dpBreakdown.nextAmount != null) && (
+                      <p className="mt-3 text-xs text-muted-foreground leading-relaxed">
+                        {dpBreakdown.endsAt && (
+                          <>Condição vigente até <span className="font-medium text-foreground">{formatDpDateTime(dpBreakdown.endsAt)}</span>. </>
+                        )}
+                        {dpBreakdown.nextAmount != null && dpBreakdown.nextStartsAt && (
+                          <>A partir de <span className="font-medium text-foreground">{formatDpDateTime(dpBreakdown.nextStartsAt)}</span>, novo valor: <span className="font-semibold text-amber-700 dark:text-amber-300">{formatCurrency(dpBreakdown.nextAmount)}</span>.</>
+                        )}
+                      </p>
+                    )}
                   </CardContent>
                 </Card>
               )}
