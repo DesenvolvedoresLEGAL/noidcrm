@@ -105,9 +105,10 @@ export function ProposalPaymentTerms({
   const [showComments, setShowComments] = useState(false);
   const [showMrrComments, setShowMrrComments] = useState(false);
   
-  const [oneTimeTerm, setOneTimeTerm] = useState<Partial<PaymentTerm> & { payment_method?: string }>({
+  const [oneTimeTerm, setOneTimeTerm] = useState<Partial<PaymentTerm> & { payment_method?: string; payment_condition?: string }>({
     payment_type: 'one_time',
     payment_method: 'boleto',
+    payment_condition: 'upfront',
     entry_percent: 0,
     discount_percent: 0,
     installments: 1,
@@ -254,9 +255,17 @@ export function ProposalPaymentTerms({
     
     if (preset?.config) {
       const baseDate = oneTimeTerm.first_installment_date || getTodayDate();
+      const paymentCondition = presetId === 'a_vista'
+        ? 'upfront'
+        : presetId === '50_50'
+          ? 'split_50_50'
+          : presetId === '30_60_90'
+            ? 'installments'
+            : 'custom_schedule';
       const newTerm = { 
         ...oneTimeTerm, 
         ...preset.config,
+        payment_condition: paymentCondition,
         first_installment_date: baseDate,
         // Sync entry_date with first_installment_date when entry_percent > 0
         entry_date: preset.config.entry_percent > 0 ? baseDate : undefined,
@@ -265,6 +274,7 @@ export function ProposalPaymentTerms({
       setShowAdvanced(false);
       autoSave('one_time', newTerm);
     } else {
+      updateOneTime({ payment_condition: 'installments', installments: oneTimeTerm.installments || 2 });
       // Parcelado - show advanced options
       setShowAdvanced(true);
     }
