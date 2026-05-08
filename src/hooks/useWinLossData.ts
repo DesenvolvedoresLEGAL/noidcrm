@@ -285,7 +285,10 @@ export function useWinLossData(organizationId: string | undefined, pipelineId: s
 
       const winReasonCounts: Record<string, number> = {};
       wins.forEach(w => {
-        const reason = w.win_reason_name || 'Não informado';
+        // Distinguish: legacy/backfilled wins (no record info) vs new wins where the customer
+        // simply hasn't filled the reason yet vs proper named reason.
+        const reason = w.win_reason_name
+          || (w.acceptor_name && !w.win_reason_id ? 'Sem motivo selecionado' : 'Não informado');
         winReasonCounts[reason] = (winReasonCounts[reason] || 0) + 1;
       });
 
