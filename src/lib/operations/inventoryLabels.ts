@@ -79,6 +79,51 @@ export function getStatusBadgeVariant(
   return 'destructive';
 }
 
+export const UNIT_OF_MEASURE_OPTIONS = [
+  { value: 'un', label: 'un' },
+  { value: 'm', label: 'm' },
+  { value: 'cx', label: 'cx' },
+  { value: 'pct', label: 'pct' },
+  { value: 'rolo', label: 'rolo' },
+  { value: 'kit', label: 'kit' },
+  { value: 'par', label: 'par' },
+  { value: 'kg', label: 'kg' },
+  { value: 'l', label: 'l' },
+] as const;
+
+export type StockAlert = 'zeroed' | 'below' | 'at_min' | 'ok' | 'no_min';
+
+export const STOCK_ALERT_LABEL: Record<StockAlert, string> = {
+  zeroed: 'Zerado',
+  below: 'Abaixo do mínimo',
+  at_min: 'No mínimo',
+  ok: 'OK',
+  no_min: 'Sem mínimo',
+};
+
+export function getStockAlert(params: {
+  available: number | null | undefined;
+  minimum: number | null | undefined;
+}): StockAlert {
+  const a = Number(params.available ?? 0);
+  const m = params.minimum;
+  if (a === 0) return 'zeroed';
+  if (m === null || m === undefined) return 'no_min';
+  const min = Number(m);
+  if (a < min) return 'below';
+  if (a === min) return 'at_min';
+  return 'ok';
+}
+
+export function getStockAlertVariant(
+  alert: StockAlert,
+): 'default' | 'secondary' | 'destructive' | 'outline' {
+  if (alert === 'zeroed' || alert === 'below') return 'destructive';
+  if (alert === 'at_min') return 'secondary';
+  if (alert === 'ok') return 'default';
+  return 'outline';
+}
+
 export function mapDuplicateError(err: any): string | null {
   const msg = String(err?.message ?? '');
   const code = err?.code;
