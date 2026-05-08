@@ -49,8 +49,7 @@ import {
 import { getProposalByToken, declineProposal, trackView } from '@/services/crm/proposals';
 import { listProposalItems } from '@/services/crm/proposal-items';
 import { getPaymentTerms, calculateInstallments } from '@/services/crm/proposal-payment-terms';
-import { PublicProposalDynamicPricingBanner } from '@/components/proposals/PublicProposalDynamicPricingBanner';
-import { PublicProposalPaymentBlock } from '@/components/proposals/PublicProposalPaymentBlock';
+import { PublicProposalApprovedScreen } from '@/components/proposals/PublicProposalApprovedScreen';
 import { PublicProposalApprovedScreen } from '@/components/proposals/PublicProposalApprovedScreen';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
