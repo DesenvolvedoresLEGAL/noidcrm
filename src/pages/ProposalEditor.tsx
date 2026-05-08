@@ -1124,29 +1124,44 @@ export default function ProposalEditor() {
                     <AlertDescription>{paymentTermsError}</AlertDescription>
                   </Alert>
                 )}
-                {currentProposalId && (
-                  <>
-                    <ProposalDynamicPricingPanel
-                      proposalId={currentProposalId}
-                      proposalTotal={itemsTotal}
-                      eventStartDate={(watch as any)('event_start_date') ?? null}
-                      validUntil={watch('expires_at') ?? null}
-                      dynamicPricingApplicability={appliedTemplate?.dynamic_pricing_applicability ?? null}
-                      dynamicPricingMode={appliedTemplate?.dynamic_pricing_mode ?? null}
-                      revenueType={appliedTemplate?.revenue_type ?? null}
-                    />
-                    <ProposalDynamicPaymentPanel proposalId={currentProposalId} />
-                  </>
-                )}
-                <ProposalPaymentTerms 
-                  proposalId={currentProposalId || ''} 
-                  totalAmount={itemsTotal}
-                  terms={paymentTerms} 
-                  onChange={(terms) => { setPaymentTerms(terms); if (terms.length > 0) setPaymentTermsError(null); }}
-                  items={items}
-                  currency={watch('currency')}
-                />
-              </TabsContent>
+                {currentProposalId && (() => {
+                  const p: any = proposalData ?? {};
+                  // Use proposal DB fields as primary source of truth, fall back to template
+                  const applicability =
+                    p.dynamic_pricing_applicability ?? appliedTemplate?.dynamic_pricing_applicability ?? null;
+                  const mode =
+                    p.dynamic_pricing_mode ?? appliedTemplate?.dynamic_pricing_mode ?? null;
+                  const revenue =
+                    p.revenue_type ?? appliedTemplate?.revenue_type ?? null;
+                  const isAutoEvent =
+                    applicability === 'automatic' &&
+                    mode === 'automatic_by_valid_until' &&
+                    ['one_time_event', 'one_time_non_event'].includes(revenue ?? '');
+                  return (
+                    <>
+                      <ProposalDynamicPricingPanel
+                        proposalId={currentProposalId}
+                        proposalTotal={itemsTotal}
+                        eventStartDate={(watch as any)('event_start_date') ?? null}
+                        validUntil={watch('expires_at') ?? null}
+                        dynamicPricingApplicability={applicability}
+                        dynamicPricingMode={mode}
+                        revenueType={revenue}
+                      />
+                      <ProposalDynamicPaymentPanel proposalId={currentProposalId} />
+                      {!isAutoEvent && (
+                        <ProposalPaymentTerms
+                          proposalId={currentProposalId}
+                          totalAmount={itemsTotal}
+                          terms={paymentTerms}
+                          onChange={(terms) => { setPaymentTerms(terms); if (terms.length > 0) setPaymentTermsError(null); }}
+                          items={items}
+                          currency={watch('currency')}
+                        />
+                      )}
+                    </>
+                  );
+                })()}
 
               <TabsContent value="team">
                 <ProposalParticipantsManager 
