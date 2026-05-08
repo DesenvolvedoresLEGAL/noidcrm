@@ -1168,9 +1168,7 @@ export default function ProposalPublicView() {
                 {proposal.declined_reason && (
                   <p className="text-xs md:text-sm text-red-600 mt-1">Motivo: {proposal.declined_reason}</p>
                 )}
-                  </div>
-                </>
-              )}
+              </div>
             </CardContent>
           </Card>
         )}
