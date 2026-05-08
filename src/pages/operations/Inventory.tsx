@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AccessDenied } from '@/components/AccessDenied';
 import { usePermissions } from '@/hooks/usePermissions';
 import { InventoryOverviewTab } from '@/components/operations/inventory/InventoryOverviewTab';
+import { InventoryItemsTab } from '@/components/operations/inventory/InventoryItemsTab';
 import { InventoryCategoriesTab } from '@/components/operations/inventory/InventoryCategoriesTab';
 import { InventoryLocationsTab } from '@/components/operations/inventory/InventoryLocationsTab';
 
@@ -38,12 +39,16 @@ export default function Inventory() {
       <Tabs defaultValue="overview" className="space-y-6">
         <TabsList>
           <TabsTrigger value="overview">Visão Geral</TabsTrigger>
+          <TabsTrigger value="items">Itens</TabsTrigger>
           <TabsTrigger value="categories">Categorias</TabsTrigger>
           <TabsTrigger value="locations">Locais</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview">
           <InventoryOverviewTab />
+        </TabsContent>
+        <TabsContent value="items">
+          <InventoryItemsTab />
         </TabsContent>
         <TabsContent value="categories">
           <InventoryCategoriesTab />
