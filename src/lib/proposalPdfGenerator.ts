@@ -129,6 +129,8 @@ interface ProposalData {
     }>;
     [key: string]: any;
   };
+  dynamic_pricing_enabled?: boolean;
+  dynamic_pricing_snapshot?: any;
 }
 
 // Helper to strip HTML tags and decode entities
@@ -767,6 +769,130 @@ export async function generateProposalPDFClient(
   if (yPos > pageHeight - 80 && installments.length > 0) {
     doc.addPage();
     yPos = margin;
+  }
+
+  // ===== CONDIÇÃO COMERCIAL VIGENTE (Dynamic Pricing) =====
+  const dpSnap: any = proposal.dynamic_pricing_snapshot;
+  const dpEnabled = !!proposal.dynamic_pricing_enabled && dpSnap && dpSnap.status !== 'disabled';
+  if (dpEnabled) {
+    if (yPos > pageHeight - 60) {
+      doc.addPage();
+      yPos = margin;
+    }
+
+    const isExpired = dpSnap.status === 'requires_requote' || dpSnap.status === 'expired';
+    const fmtBRL = (v: any) => {
+      if (v == null || isNaN(Number(v))) return '—';
+      return formatCurrency(Number(v), currency);
+    };
+    const fmtDT = (v: any) => {
+      if (!v) return '—';
+      try {
+        return new Date(v).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+      } catch { return '—'; }
+    };
+
+    doc.setTextColor(primaryRgb.r, primaryRgb.g, primaryRgb.b);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('CONDIÇÃO COMERCIAL VIGENTE', margin, yPos);
+    yPos += 6;
+
+    if (isExpired) {
+      const boxH = 18;
+      doc.setFillColor(254, 242, 242);
+      doc.setDrawColor(220, 38, 38);
+      doc.setLineWidth(0.5);
+      doc.roundedRect(margin, yPos, contentWidth, boxH, 2, 2, 'FD');
+      doc.setTextColor(185, 28, 28);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Condição comercial expirada', margin + 5, yPos + 7);
+      doc.setFont('helvetica', 'normal');
+      doc.text('Esta condição comercial expirou. Nova cotação necessária.', margin + 5, yPos + 13);
+      yPos += boxH + 8;
+    } else if (dpSnap.current_amount != null) {
+      const isAuto = dpSnap.pricing_mode === 'event_antecedence';
+      const base = dpSnap.base_amount;
+      const adjusted = isAuto && base != null && Number(dpSnap.current_amount) !== Number(base);
+      const currentLabel = adjusted
+        ? 'Valor vigente hoje (com ajuste por antecedência)'
+        : 'Valor vigente hoje';
+
+      const boxH = 38;
+      doc.setFillColor(bgLight.r, bgLight.g, bgLight.b);
+      doc.setDrawColor(primaryRgb.r, primaryRgb.g, primaryRgb.b);
+      doc.setLineWidth(0.5);
+      doc.roundedRect(margin, yPos, contentWidth, boxH, 2, 2, 'FD');
+
+      const colW = contentWidth / 3;
+
+      // Col 1: current
+      doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
+      doc.setFontSize(7.5);
+      doc.setFont('helvetica', 'normal');
+      doc.text(currentLabel, margin + 5, yPos + 7);
+      doc.setTextColor(textDark.r, textDark.g, textDark.b);
+      doc.setFontSize(13);
+      doc.setFont('helvetica', 'bold');
+      doc.text(fmtBRL(dpSnap.current_amount), margin + 5, yPos + 16);
+      if (dpSnap.current_ends_at) {
+        doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
+        doc.setFontSize(7);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Válido até ${fmtDT(dpSnap.current_ends_at)}`, margin + 5, yPos + 22);
+      }
+
+      // Col 2: next
+      if (dpSnap.next_amount != null && dpSnap.next_starts_at) {
+        const x = margin + colW + 5;
+        doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
+        doc.setFontSize(7.5);
+        doc.setFont('helvetica', 'normal');
+        doc.text('Próxima atualização', x, yPos + 7);
+        doc.setTextColor(textDark.r, textDark.g, textDark.b);
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'bold');
+        doc.text(fmtBRL(dpSnap.next_amount), x, yPos + 15);
+        doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
+        doc.setFontSize(7);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`em ${fmtDT(dpSnap.next_starts_at)}`, x, yPos + 21);
+      }
+
+      // Col 3: previous
+      if (dpSnap.previous_amount != null) {
+        const x = margin + colW * 2 + 5;
+        doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
+        doc.setFontSize(7.5);
+        doc.setFont('helvetica', 'normal');
+        doc.text('Valor anterior expirado', x, yPos + 7);
+        doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.text(fmtBRL(dpSnap.previous_amount), x, yPos + 15);
+        if (dpSnap.previous_label) {
+          doc.setFontSize(7);
+          doc.setFont('helvetica', 'normal');
+          const prevTxt = dpSnap.current_starts_at
+            ? `${dpSnap.previous_label} — até ${fmtDT(dpSnap.current_starts_at)}`
+            : dpSnap.previous_label;
+          const prevLines = doc.splitTextToSize(String(prevTxt), colW - 8);
+          doc.text(prevLines, x, yPos + 21);
+        }
+      }
+
+      yPos += boxH + 4;
+
+      // Clause
+      doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
+      doc.setFontSize(7);
+      doc.setFont('helvetica', 'italic');
+      const clause = 'Pagamentos realizados após o vencimento da condição comercial serão considerados conforme o valor vigente na data efetiva do pagamento. Diferenças poderão gerar cobrança complementar.';
+      const clauseLines = doc.splitTextToSize(clause, contentWidth);
+      doc.text(clauseLines, margin, yPos);
+      yPos += clauseLines.length * 3 + 6;
+    }
   }
 
   // ===== PAYMENT TERMS =====

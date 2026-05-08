@@ -33,6 +33,8 @@ export interface ProposalPDFData {
   organization: any;
   layout: any;
   payment_method: string;
+  dynamic_pricing_enabled?: boolean;
+  dynamic_pricing_snapshot?: any;
 }
 
 // Match the PaymentInstallment interface from proposalPdfGenerator.ts
@@ -132,6 +134,8 @@ export function buildProposalPDFData(
     organization: org || null,
     layout: proposal.layout || null,
     payment_method: oneTimeTerm?.payment_method || recurringTerm?.payment_method || '',
+    dynamic_pricing_enabled: !!proposal.dynamic_pricing_enabled,
+    dynamic_pricing_snapshot: proposal.dynamic_pricing_snapshot ?? null,
   };
 
   // Build items for PDF with billing_type for separation
