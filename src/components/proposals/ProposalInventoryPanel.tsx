@@ -26,6 +26,14 @@ import {
   useProposalPreReservations,
   useRecalculateInventoryPreReservation,
 } from '@/hooks/operations/useInventoryPreReservations';
+import {
+  useConvertPreReservationToReservation,
+  useProposalReservations,
+} from '@/hooks/operations/useInventoryReservations';
+import {
+  RESERVATION_STATUS_LABELS,
+  reservationStatusBadgeVariant,
+} from '@/lib/operations/inventoryReservations';
 import { GeneratePreReservationDialog } from './GeneratePreReservationDialog';
 
 function fmt(v?: string | null) {
@@ -46,8 +54,10 @@ export function ProposalInventoryPanel({ proposalId, closeDatePrevista }: Props)
   const { toast } = useToast();
   const [genOpen, setGenOpen] = useState(false);
   const list = useProposalPreReservations(proposalId);
+  const reservationsList = useProposalReservations(proposalId);
   const recalc = useRecalculateInventoryPreReservation();
   const cancel = useCancelInventoryPreReservation();
+  const convert = useConvertPreReservationToReservation();
 
   if (!proposalId) {
     return (
@@ -61,6 +71,9 @@ export function ProposalInventoryPanel({ proposalId, closeDatePrevista }: Props)
 
   const reservations = list.data ?? [];
   const active = reservations.find((r) => r.status === 'active');
+  const definitive = (reservationsList.data ?? []).find(
+    (r: any) => r.status !== 'cancelled',
+  );
 
   const items = (active as any)?.items ?? [];
   const conflicts = items.filter((i: any) =>
@@ -69,6 +82,33 @@ export function ProposalInventoryPanel({ proposalId, closeDatePrevista }: Props)
   const allocatedCount = items.filter((i: any) => i.allocation_status === 'allocated').length;
   const partialCount = items.filter((i: any) => i.allocation_status === 'partially_allocated').length;
   const pendingCount = items.filter((i: any) => i.allocation_status === 'unallocated').length;
+  const pendingDemands = items.filter(
+    (i: any) =>
+      i.inventory_item_type !== 'service_no_stock' &&
+      Number(i.allocated_quantity ?? 0) < Number(i.requested_quantity ?? 0),
+  ).length;
+  const canConvert = !!active && pendingDemands === 0 && !definitive;
+
+  const handleConvert = async () => {
+    if (!active) return;
+    try {
+      const res = await convert.mutateAsync({
+        pre_reservation_id: active.id,
+        confirmation_trigger: 'manual',
+      });
+      if (!res.success) {
+        toast({
+          title: 'Não foi possível converter',
+          description: res.message ?? res.reason,
+          variant: 'destructive',
+        });
+        return;
+      }
+      toast({ title: 'Reserva definitiva criada' });
+    } catch (e: any) {
+      toast({ title: 'Erro', description: e.message, variant: 'destructive' });
+    }
+  };
 
   const handleRecalc = async () => {
     if (!active) return;
@@ -176,6 +216,22 @@ export function ProposalInventoryPanel({ proposalId, closeDatePrevista }: Props)
               <Button variant="outline" size="sm" onClick={handleRecalc} disabled={recalc.isPending}>
                 <RefreshCw className="h-4 w-4 mr-2" /> Recalcular
               </Button>
+              {!definitive && (
+                <Button
+                  size="sm"
+                  onClick={handleConvert}
+                  disabled={!canConvert || convert.isPending}
+                  title={
+                    !canConvert
+                      ? pendingDemands > 0
+                        ? `${pendingDemands} demanda(s) pendentes`
+                        : 'Indisponível'
+                      : undefined
+                  }
+                >
+                  <CheckCircle2 className="h-4 w-4 mr-2" /> Converter em reserva definitiva
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="sm"
@@ -192,6 +248,21 @@ export function ProposalInventoryPanel({ proposalId, closeDatePrevista }: Props)
                 <XCircle className="h-4 w-4 mr-2" /> Cancelar
               </Button>
             </div>
+
+            {definitive && (
+              <div className="rounded-md border p-3 bg-muted/30 mt-2 space-y-1">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-muted-foreground">Reserva definitiva</p>
+                  <Badge variant={reservationStatusBadgeVariant(definitive.status as any)}>
+                    {RESERVATION_STATUS_LABELS[definitive.status as keyof typeof RESERVATION_STATUS_LABELS]}
+                  </Badge>
+                </div>
+                <p className="font-mono text-sm">{definitive.reservation_code}</p>
+                <p className="text-xs text-muted-foreground">
+                  Período: {fmt(definitive.operational_start_date)} → {fmt(definitive.operational_end_date)}
+                </p>
+              </div>
+            )}
           </>
         )}
       </CardContent>

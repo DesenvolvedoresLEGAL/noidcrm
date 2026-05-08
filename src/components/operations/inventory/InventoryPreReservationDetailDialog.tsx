@@ -39,6 +39,8 @@ import {
 } from '@/hooks/operations/useInventoryPreReservations';
 import { InventoryAllocationDialog } from './InventoryAllocationDialog';
 import { InventoryAllocatedItemsList } from './InventoryAllocatedItemsList';
+import { useConvertPreReservationToReservation } from '@/hooks/operations/useInventoryReservations';
+import { CheckCircle2 } from 'lucide-react';
 
 function fmt(v?: string | null) {
   if (!v) return '—';
@@ -61,7 +63,15 @@ export function InventoryPreReservationDetailDialog({ id, open, onOpenChange }: 
   const recalc = useRecalculateInventoryPreReservation();
   const cancel = useCancelInventoryPreReservation();
   const del = useDeletePreReservationItem();
+  const convert = useConvertPreReservationToReservation();
   const r = q.data;
+
+  const pendingDemands = (r?.items ?? []).filter(
+    (i: any) =>
+      i.inventory_item_type !== 'service_no_stock' &&
+      Number(i.allocated_quantity ?? 0) < Number(i.requested_quantity ?? 0),
+  ).length;
+  const canConvert = r?.status === 'active' && pendingDemands === 0;
 
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [allocItemId, setAllocItemId] = useState<string | null>(null);
@@ -94,6 +104,25 @@ export function InventoryPreReservationDetailDialog({ id, open, onOpenChange }: 
     try {
       await del.mutateAsync(itemId);
       toast({ title: 'Demanda removida' });
+    } catch (e: any) {
+      toast({ title: 'Erro', description: e.message, variant: 'destructive' });
+    }
+  };
+  const handleConvert = async () => {
+    if (!id) return;
+    if (!window.confirm('Converter em reserva definitiva?')) return;
+    try {
+      const res = await convert.mutateAsync({ pre_reservation_id: id, confirmation_trigger: 'manual' });
+      if (!res.success) {
+        toast({
+          title: 'Não foi possível converter',
+          description: res.message || res.reason || 'Verifique conflitos e demandas pendentes.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      toast({ title: 'Reserva definitiva criada', description: 'Pré reserva convertida com sucesso.' });
+      onOpenChange(false);
     } catch (e: any) {
       toast({ title: 'Erro', description: e.message, variant: 'destructive' });
     }
@@ -248,10 +277,25 @@ export function InventoryPreReservationDetailDialog({ id, open, onOpenChange }: 
           </div>
         )}
 
-        <DialogFooter className="gap-2">
+        <DialogFooter className="gap-2 flex-wrap">
           <Button variant="outline" onClick={handleRecalc} disabled={!id || recalc.isPending}>
             <RefreshCw className="h-4 w-4 mr-2" /> Recalcular
           </Button>
+          {r?.status === 'active' && (
+            <Button
+              onClick={handleConvert}
+              disabled={!canConvert || convert.isPending}
+              title={
+                !canConvert
+                  ? pendingDemands > 0
+                    ? `${pendingDemands} demanda(s) pendentes de alocação`
+                    : 'Pré reserva precisa estar ativa'
+                  : 'Converter em reserva definitiva'
+              }
+            >
+              <CheckCircle2 className="h-4 w-4 mr-2" /> Converter em reserva definitiva
+            </Button>
+          )}
           {r?.status === 'active' && (
             <Button variant="destructive" onClick={handleCancel} disabled={cancel.isPending}>
               <XCircle className="h-4 w-4 mr-2" /> Cancelar pré reserva
