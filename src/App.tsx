@@ -906,6 +906,16 @@ const App = () => (
                 }
               />
               <Route
+                path="/app/settings/pricing-factor-rules"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <PricingFactorRulesPage />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="/app/settings/dados"
                 element={
                   <ProtectedRoute>
