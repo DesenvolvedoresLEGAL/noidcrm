@@ -363,6 +363,14 @@ export function ProposalPreview({
         </Card>
       )}
 
+      {/* Condição comercial vigente */}
+      {dynamicPricing?.dynamic_pricing_enabled && (
+        <PublicProposalDynamicPricingBanner
+          snapshot={dynamicPricing.dynamic_pricing_snapshot as any}
+          variant="preview"
+        />
+      )}
+
       {/* Payment Terms */}
       {displayPaymentTerms.length > 0 && (
         <Card>
