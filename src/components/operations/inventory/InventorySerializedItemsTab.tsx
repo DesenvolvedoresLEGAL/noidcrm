@@ -40,6 +40,7 @@ import { useInventoryLocations } from '@/hooks/operations/useInventoryLocations'
 import type { InventoryItemWithRefs } from '@/services/operations/inventoryItems';
 import { InventoryItemFormDialog } from './InventoryItemFormDialog';
 import { InventoryItemStatusDialog } from './InventoryItemStatusDialog';
+import { getTechnicalSpecs } from '@/lib/operations/inventoryTechnicalSpecs';
 
 export function InventorySerializedItemsTab() {
   const { data: items, isLoading } = useInventoryItems();
@@ -216,6 +217,7 @@ export function InventorySerializedItemsTab() {
                     <TableHead>Cód. patrimonial</TableHead>
                     <TableHead>Nº série</TableHead>
                     <TableHead>Marca / Modelo</TableHead>
+                    <TableHead className="text-center w-16">Specs</TableHead>
                     <TableHead>Atualizado em</TableHead>
                     <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
@@ -224,14 +226,14 @@ export function InventorySerializedItemsTab() {
                   {isLoading ? (
                     Array.from({ length: 3 }).map((_, i) => (
                       <TableRow key={i}>
-                        <TableCell colSpan={9}>
+                        <TableCell colSpan={10}>
                           <Skeleton className="h-6 w-full" />
                         </TableCell>
                       </TableRow>
                     ))
                   ) : filtered.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
                         Nenhum item encontrado com esses filtros.
                       </TableCell>
                     </TableRow>
@@ -259,6 +261,9 @@ export function InventorySerializedItemsTab() {
                           <TableCell className="text-sm">{it.asset_code || '—'}</TableCell>
                           <TableCell className="text-sm">{it.serial_number || '—'}</TableCell>
                           <TableCell className="text-sm">{brandModel}</TableCell>
+                          <TableCell className="text-center text-sm text-muted-foreground">
+                            {getTechnicalSpecs(it.metadata).length}
+                          </TableCell>
                           <TableCell className="text-muted-foreground text-sm">
                             {format(new Date(it.updated_at), 'dd/MM/yyyy HH:mm')}
                           </TableCell>
