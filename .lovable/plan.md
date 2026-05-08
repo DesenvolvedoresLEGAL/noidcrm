@@ -1,91 +1,64 @@
+## Sprint INV 0.6 — Visão Geral Real do Inventário
 
-# Sprint INV 0.5 — Itens por Quantidade
+Transformar `InventoryOverviewTab` num dashboard operacional real com dados das tabelas existentes (`inventory_items`, `inventory_categories`, `inventory_locations`, `inventory_status_history`). Sem novas tabelas, sem RPCs, sem edge functions, sem alterar schema.
 
-Adicionar segundo tipo de item ao Inventário (`item_kind = 'quantity'`) reaproveitando estrutura da Sprint 0.4, sem novas tabelas, sem alterações de schema, sem novas RPCs.
+### Arquivos a criar
 
-## Estrutura de Navegação
+1. **`src/services/operations/inventoryOverview.ts`** — funções puras de leitura:
+   - `listOverviewItems(orgId)` — `SELECT id, item_kind, status, quantity_total, quantity_available, quantity_minimum, updated_at FROM inventory_items WHERE organization_id`.
+   - `countCategories(orgId)` / `countLocations(orgId)` via `count: 'exact', head: true`.
+   - `listCriticalItems(orgId)` — busca itens com `status in (maintenance, damaged, lost)` OU (`item_kind='quantity'` e (`quantity_available=0` ou `quantity_available < quantity_minimum`)), join categoria/local, ordenação no frontend (zerado > abaixo > manutenção > danificado > perdido), limit 10.
+   - `listRecentItems(orgId)` — top 8 por `updated_at desc` com category/location.
+   - `listRecentStatusHistory(orgId)` — top 8 de `inventory_status_history` com `item:inventory_items(name,item_kind)`.
 
-A aba **Itens** vira um container com subtabs internas:
+2. **`src/hooks/operations/useInventoryOverview.ts`** — hooks TanStack Query:
+   - `useInventoryOverviewData()` → executa as 5 queries em paralelo via `useQueries` ou hooks separados; expõe os agregados calculados (`totals`, `health`, `alerts`, `categoriesCount`, `locationsCount`).
+   - Cálculo derivado no client a partir de `listOverviewItems`: serializados, por quantidade, disponíveis, indisponíveis (blocked/maintenance/damaged/retired/lost), bloqueados, manutenção, danificados, perdidos, baixados, zerados, abaixo do mínimo.
 
-```text
-Operações > Inventário
-├── Visão Geral
-├── Itens
-│   ├── Serializados      ← comportamento da Sprint 0.4 preservado
-│   └── Por quantidade    ← novo nesta sprint
-├── Categorias
-└── Locais
-```
+3. **`src/components/operations/inventory/overview/`** (novos componentes pequenos):
+   - `OverviewKpiCards.tsx` — 4 cards principais (Serializados, Por quantidade, Disponíveis, Indisponíveis).
+   - `OverviewHealthCards.tsx` — 7 cards compactos (Bloqueados, Manutenção, Danificados, Perdidos, Baixados, Categorias, Locais).
+   - `OverviewAlertsBlock.tsx` — 4 cards de alerta + estado vazio "Nenhum alerta operacional no momento".
+   - `OverviewCriticalItemsTable.tsx` — tabela "Itens que exigem atenção" (Item, Tipo, Categoria, Local, Status/Alerta, Saldo, Atualizado em).
+   - `OverviewRecentItemsTable.tsx` — "Últimos itens atualizados".
+   - `OverviewRecentStatusTable.tsx` — "Últimas mudanças de status" usando `ITEM_STATUS_LABEL`.
+   - `OverviewEmptyState.tsx` — estado quando não há nenhum item, com CTA "Cadastrar item" que muda a tab ativa para `items`.
 
-## Arquivos a Criar
+### Arquivos a editar
 
-1. **`src/services/operations/inventoryItems.ts`** — estender (mesmo arquivo):
-   - `listQuantityItems(orgId)` — filtra `item_kind='quantity'`
-   - `createQuantityItem(orgId, userId, input)`
-   - `updateQuantityItem(id, userId, input)`
-   - `updateQuantityItemStatus(id, status, userId, quantityAvailable?)`
-   - Helper `getQuantityAvailableForQuantityStatus(status, requested)`: retorna `requested` se `available`, senão `0`.
+- **`src/components/operations/inventory/InventoryOverviewTab.tsx`** — reescrito para orquestrar:
+  1. Frase curta no topo
+  2. KPIs principais
+  3. Saúde operacional
+  4. Alertas
+  5. Itens críticos
+  6. Últimos itens atualizados
+  7. Últimas mudanças de status
+  8. Regra de demanda (versão enxuta da existente)
+  9. Próximas capacidades (lista compacta substituindo `conceptCards`/`futureFlows` longos)
+  10. Empty state global se zero itens
+  - Aceita prop opcional `onNavigateToItems?: () => void` para o CTA do empty state.
 
-2. **`src/hooks/operations/useInventoryItems.ts`** — estender:
-   - `useInventoryQuantityItems()`
-   - `useInventoryQuantityItemMutations()` (create/update/updateStatus)
-   - Invalidar queries: `['inventory-items']`, `['inventory-quantity-items']`, `['inventory-status-history']`.
+- **`src/pages/operations/Inventory.tsx`** — controlar `Tabs` por estado (`useState`) em vez de `defaultValue`, passar `onNavigateToItems={() => setTab('items')}` ao `InventoryOverviewTab`.
 
-3. **`src/components/operations/inventory/InventoryQuantityItemsTab.tsx`**:
-   - 4 cards de KPI no topo (Total, Disponíveis, Abaixo do mínimo, Zerados).
-   - Tabela com colunas: Item, Categoria, Local, Status, Unidade, Qtd Total, Qtd Disponível, Estoque Mínimo, Alerta, Atualizado em, Ações.
-   - Busca (name/description/brand/model) + filtros: status, categoria (filtrada por `item_kind='quantity'`), local.
-   - Empty state com CTA "Novo item por quantidade".
-   - Badge de alerta com prioridade: Zerado > Abaixo do mínimo > No mínimo > OK > Sem mínimo.
+- **`src/lib/operations/inventoryLabels.ts`** — adicionar helper `getCriticalSortRank(item)` opcional para ordenação consistente.
 
-4. **`src/components/operations/inventory/InventoryQuantityItemFormDialog.tsx`**:
-   - 12 campos conforme spec, validação Zod com `refine` para `quantity_available <= quantity_total`.
-   - Quando status ≠ `available`, força e desabilita `quantity_available = 0` com aviso.
-   - Select de categoria filtrado por `item_kind='quantity'` (com mensagem se vazio).
+### Regras técnicas
 
-5. **`src/components/operations/inventory/InventoryQuantityItemStatusDialog.tsx`**:
-   - Status atual + novo status + motivo opcional.
-   - Se novo status = `available` e atual ≠ `available`, exibe input "Quantidade disponível" obrigatório (≤ `quantity_total`).
-   - AlertDialog de confirmação para `retired`/`lost`/`damaged` (textos da spec).
+- Todas as queries filtram por `organization_id` da org corrente (`useCurrentOrganization`). RLS já cobre, mas filtramos explicitamente.
+- Sem service role, sem RPC nova, sem alterar schema.
+- Loading: usar `Skeleton` (componente já existe no projeto) nos cards e linhas das tabelas.
+- Empty states elegantes em cada bloco.
+- Badges reutilizam `getStatusBadgeVariant` e `getStockAlertVariant` já presentes em `inventoryLabels.ts`.
+- Saldo: serializado → `—`; quantidade → `quantity_available / quantity_total`.
+- Datas formatadas com util já usado no projeto (`date-fns` pt-BR — verificar `src/lib/dateUtils.ts`).
 
-6. **`src/components/operations/inventory/InventoryItemsTab.tsx`** — refatorar:
-   - Renomear o conteúdo atual para `InventorySerializedItemsTab.tsx` (mover lógica) **ou** manter componente atual e wrapper.
-   - Decisão: criar wrapper `InventoryItemsTab.tsx` com subtabs Radix `<Tabs>` internas, e mover conteúdo atual para novo `InventorySerializedItemsTab.tsx` (rename limpo).
+### Fora de escopo
 
-## Arquivos a Editar
+Chips, kits, reservas, ocupação, transferências, integração proposta/tabela dinâmica, edge functions, RPCs, delete físico, alteração de schema.
 
-- **`src/lib/operations/inventoryLabels.ts`**:
-  - Adicionar `UNIT_OF_MEASURE_OPTIONS` (un, m, cx, pct, rolo, kit, par, kg, l).
-  - Adicionar helper `getStockAlert({ available, minimum })` retornando `'zeroed' | 'below' | 'at_min' | 'ok' | 'no_min'` + labels e variants.
+### Riscos
 
-- **`src/pages/operations/Inventory.tsx`**: nenhum mudança estrutural — `InventoryItemsTab` já está plugado e passa a renderizar subtabs internamente.
-
-## Regras de Negócio Críticas
-
-- `item_kind` sempre `'quantity'` em create; nunca alterado em update.
-- `organization_id` da org atual; `created_by`/`updated_by` = `user.id`.
-- Em qualquer mutação de status para algo ≠ `available`: forçar `quantity_available = 0`.
-- Em mutação para `available`: usar valor informado pelo usuário (validado ≤ `quantity_total`).
-- `quantity_minimum` opcional (`null` permitido).
-- Não exibir nem enviar `asset_code`/`serial_number` para itens quantity.
-- Trigger DB existente cuida de `inventory_status_history`.
-
-## Permissões
-
-Reutilizar guard de `Inventory.tsx` (já restrito a owner/admin/operations/operacional). RLS no banco já bloqueia escrita indevida.
-
-## Toasts
-
-- Sucesso: "Item por quantidade criado/atualizado com sucesso.", "Status alterado com sucesso."
-- Erro Zod: mensagem do schema (incl. "A quantidade disponível não pode ser maior que a quantidade total.")
-- Erro genérico: "Não foi possível concluir a ação. Tente novamente."
-
-## Fora de Escopo (não implementar)
-
-Reservas, kits, chips, movimentações avançadas, transferências, integração com proposta/tabela dinâmica, edge functions, RPCs novas, delete físico, filtro de alerta (deixar para sprint futura — só busca + status + categoria + local nesta).
-
-## Riscos
-
-- Renomear o atual `InventoryItemsTab` pode quebrar imports — verificar e atualizar `Inventory.tsx`.
-- `quantity_available` é `numeric` no banco — usar `z.coerce.number()` e enviar como número.
-- Garantir que select de categorias só liste `item_kind='quantity'` para evitar inconsistência.
+- `inventory_status_history` pode não ter `organization_id` direto — se não tiver, filtrar via join `item:inventory_items!inner(organization_id)` com `.eq('item.organization_id', orgId)`. Verificar no momento da implementação.
+- `useQueries` precisa que cada query tenha `enabled: !!orgId` para evitar disparos prematuros.
+- Lista de "itens críticos" ordenada no client porque PostgREST não suporta `CASE WHEN` em order.
