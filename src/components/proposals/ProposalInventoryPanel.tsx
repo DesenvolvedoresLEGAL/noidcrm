@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
+import { InventoryAvailabilitySnapshotDialog } from '@/components/operations/inventory/InventoryAvailabilitySnapshotDialog';
 import {
   RISK_LABELS,
   STATUS_LABELS,
