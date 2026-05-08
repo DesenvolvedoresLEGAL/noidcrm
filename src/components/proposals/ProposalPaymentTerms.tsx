@@ -348,7 +348,13 @@ export function ProposalPaymentTerms({
     return today.toISOString().split('T')[0];
   };
 
-  const installments = calculateInstallments(oneTimeTerm as PaymentTerm, effectiveOneTimeTotal);
+  const { data: dpSnapshot } = useProposalDynamicPricingSnapshot(proposalId);
+  const dynamicCurrentEndsAt = (dpSnapshot as any)?.enabled && (dpSnapshot as any)?.current_ends_at
+    ? (dpSnapshot as any).current_ends_at
+    : null;
+  const installments = calculateInstallments(oneTimeTerm as PaymentTerm, effectiveOneTimeTotal, {
+    dynamicPricingCurrentEndsAt: dynamicCurrentEndsAt,
+  });
 
   const formatCurrency = (value: number) => {
     const symbol = currency === 'USD' ? '$' : currency === 'EUR' ? '€' : 'R$';
