@@ -4,6 +4,7 @@ import {
   applyDynamicPrice,
   calculateDynamicPrice,
   disableDynamicPricing,
+  generateEventAntecedencePricing,
   getDynamicPricing,
   listDynamicPricingEvents,
   saveDynamicPricingRule,
