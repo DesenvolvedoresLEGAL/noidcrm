@@ -20,6 +20,11 @@ export interface DynamicPricingRule {
   next_amount: number | null;
   last_calculated_at: string | null;
   notes: string | null;
+  pricing_mode: 'manual' | 'event_antecedence';
+  event_start_date: string | null;
+  auto_generated: boolean;
+  show_expired_tiers: boolean;
+  post_event_policy: 'surcharge' | 'requires_requote' | 'block_payment';
   created_at: string;
   updated_at: string;
 }
