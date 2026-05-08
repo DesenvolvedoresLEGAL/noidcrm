@@ -84,6 +84,9 @@ export async function createSerializedItem(
       description: emptyToNull(input.description),
       category_id: input.category_id,
       location_id: input.location_id,
+      family_id: input.family_id ?? null,
+      operational_type: input.operational_type ?? 'equipment',
+      criticality: input.criticality ?? 'medium',
       status: input.status,
       asset_code: emptyToNull(input.asset_code),
       serial_number: emptyToNull(input.serial_number),
@@ -92,7 +95,7 @@ export async function createSerializedItem(
       notes: emptyToNull(input.notes),
       created_by: userId ?? null,
       updated_by: userId ?? null,
-    })
+    } as any)
     .select(SELECT_WITH_REFS)
     .single();
   if (error) throw error;
