@@ -1860,7 +1860,9 @@ export default function ProposalPublicView() {
                     onClick={() => setShowAcceptModal(true)}
                   >
                     <CheckCircle2 className="h-5 w-5" />
-                    Aprovar Proposta
+                    {proposal?.dynamic_pricing_enabled
+                      ? 'Aprovar proposta com valor vigente'
+                      : 'Aprovar Proposta'}
                   </Button>
                   <Button
                     size="lg"
