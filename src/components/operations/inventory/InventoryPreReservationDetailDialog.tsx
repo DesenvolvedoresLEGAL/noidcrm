@@ -1,6 +1,7 @@
+import { useState } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Calendar, RefreshCw, XCircle } from 'lucide-react';
+import { Calendar, ChevronDown, ChevronRight, PackagePlus, RefreshCw, Trash2, XCircle } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -22,19 +23,22 @@ import {
 } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import {
-  AVAILABILITY_LABELS,
+  ALLOCATION_STATUS_LABELS,
   ITEM_TYPE_LABELS,
   RISK_LABELS,
   STATUS_LABELS,
-  availabilityBadgeVariant,
+  allocationStatusBadgeVariant,
   riskBadgeVariant,
   statusBadgeVariant,
 } from '@/lib/operations/inventoryPreReservations';
 import {
   useCancelInventoryPreReservation,
+  useDeletePreReservationItem,
   useInventoryPreReservation,
   useRecalculateInventoryPreReservation,
 } from '@/hooks/operations/useInventoryPreReservations';
+import { InventoryAllocationDialog } from './InventoryAllocationDialog';
+import { InventoryAllocatedItemsList } from './InventoryAllocatedItemsList';
 
 function fmt(v?: string | null) {
   if (!v) return '—';
@@ -56,7 +60,14 @@ export function InventoryPreReservationDetailDialog({ id, open, onOpenChange }: 
   const q = useInventoryPreReservation(id);
   const recalc = useRecalculateInventoryPreReservation();
   const cancel = useCancelInventoryPreReservation();
+  const del = useDeletePreReservationItem();
   const r = q.data;
+
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [allocItemId, setAllocItemId] = useState<string | null>(null);
+
+  const toggle = (itemId: string) =>
+    setExpanded((p) => ({ ...p, [itemId]: !p[itemId] }));
 
   const handleRecalc = async () => {
     if (!id) return;
@@ -78,10 +89,19 @@ export function InventoryPreReservationDetailDialog({ id, open, onOpenChange }: 
       toast({ title: 'Erro', description: e.message, variant: 'destructive' });
     }
   };
+  const handleRemove = async (itemId: string) => {
+    if (!window.confirm('Remover esta demanda?')) return;
+    try {
+      await del.mutateAsync(itemId);
+      toast({ title: 'Demanda removida' });
+    } catch (e: any) {
+      toast({ title: 'Erro', description: e.message, variant: 'destructive' });
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Calendar className="h-5 w-5" />
@@ -130,52 +150,95 @@ export function InventoryPreReservationDetailDialog({ id, open, onOpenChange }: 
             )}
 
             <div>
-              <h4 className="text-sm font-semibold mb-2">Itens</h4>
+              <h4 className="text-sm font-semibold mb-2">Demandas e alocação</h4>
               <div className="overflow-x-auto rounded-md border">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Item</TableHead>
+                      <TableHead className="w-8"></TableHead>
+                      <TableHead>Demanda</TableHead>
+                      <TableHead>Categoria</TableHead>
+                      <TableHead>Família</TableHead>
                       <TableHead>Tipo</TableHead>
                       <TableHead className="text-right">Solicitado</TableHead>
-                      <TableHead className="text-right">Pré reservado</TableHead>
+                      <TableHead className="text-right">Alocado</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Motivo</TableHead>
+                      <TableHead className="text-right">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {r.items.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center text-sm text-muted-foreground">
-                          Nenhum item.
+                        <TableCell colSpan={9} className="text-center text-sm text-muted-foreground">
+                          Nenhuma demanda.
                         </TableCell>
                       </TableRow>
                     ) : (
-                      r.items.map((it) => (
-                        <TableRow key={it.id}>
-                          <TableCell className="font-medium">
-                            {it.serialized_item?.name ||
-                              it.quantity_item?.name ||
-                              it.notes ||
-                              it.category?.name ||
-                              '—'}
-                          </TableCell>
-                          <TableCell className="text-sm">
-                            {ITEM_TYPE_LABELS[it.inventory_item_type]}
-                          </TableCell>
-                          <TableCell className="text-right">{Number(it.requested_quantity)}</TableCell>
-                          <TableCell className="text-right">
-                            {Number(it.pre_reserved_quantity)}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={availabilityBadgeVariant(it.availability_status)}>
-                              {AVAILABILITY_LABELS[it.availability_status]}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-xs text-muted-foreground">
-                            {it.conflict_reason ?? '—'}
-                          </TableCell>
-                        </TableRow>
+                      r.items.map((it: any) => (
+                        <>
+                          <TableRow key={it.id}>
+                            <TableCell>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6"
+                                onClick={() => toggle(it.id)}
+                              >
+                                {expanded[it.id] ? (
+                                  <ChevronDown className="h-4 w-4" />
+                                ) : (
+                                  <ChevronRight className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </TableCell>
+                            <TableCell className="font-medium">
+                              {it.demand_label ||
+                                it.serialized_item?.name ||
+                                it.quantity_item?.name ||
+                                it.notes ||
+                                '—'}
+                            </TableCell>
+                            <TableCell className="text-xs">{it.category?.name ?? '—'}</TableCell>
+                            <TableCell className="text-xs">{it.family?.name ?? '—'}</TableCell>
+                            <TableCell className="text-xs">
+                              {ITEM_TYPE_LABELS[it.inventory_item_type as keyof typeof ITEM_TYPE_LABELS]}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {Number(it.requested_quantity)}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {Number(it.allocated_quantity ?? 0)}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={allocationStatusBadgeVariant(it.allocation_status)}>
+                                {ALLOCATION_STATUS_LABELS[it.allocation_status as keyof typeof ALLOCATION_STATUS_LABELS]}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right space-x-1">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setAllocItemId(it.id)}
+                              >
+                                <PackagePlus className="h-3.5 w-3.5 mr-1" /> Alocar
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleRemove(it.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                          {expanded[it.id] && (
+                            <TableRow>
+                              <TableCell colSpan={9} className="bg-muted/30">
+                                <InventoryAllocatedItemsList preReservationItemId={it.id} />
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </>
                       ))
                     )}
                   </TableBody>
@@ -195,6 +258,13 @@ export function InventoryPreReservationDetailDialog({ id, open, onOpenChange }: 
             </Button>
           )}
         </DialogFooter>
+
+        <InventoryAllocationDialog
+          open={!!allocItemId}
+          onOpenChange={(o) => !o && setAllocItemId(null)}
+          preReservationId={id}
+          preReservationItemId={allocItemId}
+        />
       </DialogContent>
     </Dialog>
   );
