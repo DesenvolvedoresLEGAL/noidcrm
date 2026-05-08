@@ -16,6 +16,7 @@ import { ProposalVisualizarTab } from '@/components/proposals/ProposalVisualizar
 import { ProposalParticipantsManager } from '@/components/proposals/ProposalParticipantsManager';
 import { ProposalInventoryPanel } from '@/components/proposals/ProposalInventoryPanel';
 import { ProposalDynamicPricingPanel } from '@/components/proposals/ProposalDynamicPricingPanel';
+import { DynamicPricingMismatchAlert } from '@/components/proposals/DynamicPricingMismatchAlert';
 
 // Analytics moved to OpportunityAnalyticsTab
 import { AIInlineButton } from '@/components/proposals/AIInlineButton';
