@@ -243,6 +243,12 @@ export async function updateQuantityItem(
     const requested = Number(input.quantity_available ?? 0);
     patch.quantity_available = quantityAvailableForStatus(status, requested, total ?? requested);
   }
+  if (input.technical_specs !== undefined) {
+    patch.metadata = mergeTechnicalSpecs(
+      input._currentMetadata,
+      sanitizeTechnicalSpecs(input.technical_specs),
+    );
+  }
 
   const { data, error } = await supabase
     .from('inventory_items')
