@@ -49,6 +49,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
+import { templateBadges } from '@/lib/proposals/proposalTemplateRules';
 
 export default function ProposalLayouts() {
   const navigate = useNavigate();
