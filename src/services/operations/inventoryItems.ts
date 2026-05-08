@@ -65,7 +65,7 @@ export async function createSerializedItem(
       quantity_total: 1,
       quantity_available: getQuantityAvailableForStatus(input.status),
       unit_of_measure: 'un',
-      metadata: {},
+      metadata: { technical_specs: sanitizeTechnicalSpecs(input.technical_specs ?? []) },
       name: input.name.trim(),
       description: emptyToNull(input.description),
       category_id: input.category_id,
@@ -109,6 +109,12 @@ export async function updateSerializedItem(
     patch.status = input.status;
     patch.quantity_available = getQuantityAvailableForStatus(input.status);
   }
+  if (input.technical_specs !== undefined) {
+    patch.metadata = mergeTechnicalSpecs(
+      input._currentMetadata,
+      sanitizeTechnicalSpecs(input.technical_specs),
+    );
+  }
 
   const { data, error } = await supabase
     .from('inventory_items')
@@ -143,6 +149,8 @@ export interface QuantityItemInput {
   brand?: string | null;
   model?: string | null;
   notes?: string | null;
+  technical_specs?: TechnicalSpec[];
+  _currentMetadata?: unknown;
 }
 
 function quantityAvailableForStatus(
