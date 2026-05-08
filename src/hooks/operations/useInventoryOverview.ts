@@ -4,6 +4,7 @@ import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import {
   countCategories,
   countLocations,
+  getCategoryOverview,
   listCriticalItems,
   listOverviewItems,
   listRecentItems,
