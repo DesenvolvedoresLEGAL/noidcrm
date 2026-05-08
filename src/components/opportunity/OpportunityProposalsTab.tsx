@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ProposalEmailComposer } from '@/components/proposals/ProposalEmailComposer';
+import { ProposalTemplatePickerDialog } from '@/components/proposals/ProposalTemplatePickerDialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
