@@ -373,22 +373,21 @@ Regras do JSON:
 - overall_score deve ser um número decimal (ex: 7.5)
 - passed deve ser true ou false (sem aspas)`;
 
-    // Call Lovable AI
+    // Call AI
     console.log('[ai-evaluate-session] Calling AI for evaluation...');
     let aiResult;
+    let evaluation: EvaluationResult | null = null;
     try {
       aiResult = await callOpenAIWithGuardrails({
-        model: 'gpt-5-mini',
+        model: 'gpt-5-nano',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
         response_format: { type: 'json_object' },
-        // gpt-5-mini is a reasoning model; reasoning_tokens count against max_completion_tokens.
-        // Need a generous budget so the model has room to both reason AND emit the JSON answer.
-        max_completion_tokens: 8000,
-        timeoutMs: 45000,
-        maxRetries: 2,
+        max_completion_tokens: 2500,
+        timeoutMs: 18000,
+        maxRetries: 1,
       });
     } catch (err) {
       await logAIUsage(supabase, {
@@ -398,29 +397,31 @@ Regras do JSON:
         action: 'evaluate_session',
         entity_type: 'roleplay_session',
         entity_id: sessionId,
-        model_used: 'gpt-5-mini',
+        model_used: 'gpt-5-nano',
         success: false,
         error_message: sanitizeUsageErrorMessage(err),
         request_metadata: {
           function_name: 'ai-evaluate-session',
-          max_completion_tokens: 1000,
-          retry_count: 2,
-          attempts: 3,
+          max_completion_tokens: 2500,
+          retry_count: 1,
+          attempts: 2,
           timed_out: false,
           response_format: 'json_object',
+          contingency_fallback: true,
         },
         response_metadata: { provider: 'openai' },
       });
-      throw err;
+      console.error('[ai-evaluate-session] AI failed, using contingency evaluation:', err);
+      evaluation = buildContingencyEvaluation(messages, rubric, err) as EvaluationResult;
     }
 
-    const aiContent = aiResult.content;
+    const aiContent = aiResult?.content ?? '';
 
     console.log('[ai-evaluate-session] AI transport metadata:', {
-      model: aiResult.metadata.model,
-      retryCount: aiResult.metadata.retryCount,
-      timedOut: aiResult.metadata.timedOut,
-      usage: aiResult.usage ?? null,
+      model: aiResult?.metadata.model,
+      retryCount: aiResult?.metadata.retryCount,
+      timedOut: aiResult?.metadata.timedOut,
+      usage: aiResult?.usage ?? null,
       responseLength: aiContent.length,
       responseHash: simpleHash(aiContent),
     });
