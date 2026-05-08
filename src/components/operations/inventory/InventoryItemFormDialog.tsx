@@ -32,7 +32,12 @@ import {
   technicalSpecsArraySchema,
   type TechnicalSpec,
 } from '@/lib/operations/inventoryTechnicalSpecs';
+import {
+  type Criticality,
+  type OperationalType,
+} from '@/lib/operations/inventoryClassification';
 import { TechnicalSpecsSection } from './TechnicalSpecsSection';
+import { InventoryClassificationFields } from './InventoryClassificationFields';
 import { useInventoryCategories } from '@/hooks/operations/useInventoryCategories';
 import { useInventoryLocations } from '@/hooks/operations/useInventoryLocations';
 import { useInventoryItemMutations } from '@/hooks/operations/useInventoryItems';
@@ -51,6 +56,11 @@ const schema = z.object({
   name: z.string().trim().min(2, 'Mínimo 2 caracteres').max(120, 'Máximo 120 caracteres'),
   description: z.string().trim().max(500, 'Máximo 500 caracteres').optional().or(z.literal('')),
   category_id: z.string().uuid('Selecione uma categoria.'),
+  family_id: z.string().uuid().nullable().optional(),
+  operational_type: z.enum([
+    'equipment','accessory','part','consumable','logical_kit','infrastructure','tool','other',
+  ]),
+  criticality: z.enum(['low','medium','high','critical']),
   location_id: z.string().uuid('Selecione um local.'),
   status: z.enum(STATUSES),
   asset_code: z.string().trim().max(80, 'Máximo 80 caracteres').optional().or(z.literal('')),
