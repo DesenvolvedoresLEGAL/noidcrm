@@ -34,7 +34,8 @@ interface PaymentInstallment {
   number: number;
   dueDate: string;
   amount: number;
-  type: 'entry' | 'installment' | 'mrr';
+  type: 'upfront' | 'entry' | 'balance' | 'installment' | 'mrr';
+  label?: string;
 }
 
 interface RecurringPaymentData {
