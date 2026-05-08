@@ -289,7 +289,20 @@ export default function ProposalPublicView() {
       // Calculate only one-time items total for installments (exclude MRR)
       const oneTimeItems = items.filter(item => (item.billing_type || 'one_time') !== 'recurring');
       const oneTimeTotal = oneTimeItems.reduce((sum, item) => sum + item.total, 0);
-      const pdfInstallments = oneTimeTerm ? calculateInstallments(oneTimeTerm, oneTimeTotal) : [];
+      const dpSnapForPdf: any = (proposal as any)?.dynamic_pricing_snapshot ?? null;
+      const pdfInstallments = oneTimeTerm
+        ? calculateInstallments(oneTimeTerm, oneTimeTotal, {
+            proposalExpiresAt: (proposal as any)?.expires_at ?? null,
+            approvedAmount:
+              (proposal as any)?.status === 'accepted'
+                ? Number((proposal as any)?.approved_amount ?? oneTimeTotal)
+                : null,
+            dynamicPricingCurrentEndsAt:
+              (proposal as any)?.dynamic_pricing_enabled && dpSnapForPdf?.current_ends_at
+                ? dpSnapForPdf.current_ends_at
+                : null,
+          })
+        : [];
       
       // Build recurring payment data for PDF
       const recurringPaymentData = recurringTerm ? {
@@ -458,6 +471,10 @@ export default function ProposalPublicView() {
         ? calculateInstallments(oneTimeTermLocal as any, approvedAmountLocal, {
             proposalExpiresAt: proposal?.expires_at ?? null,
             approvedAmount: approvedAmountLocal,
+            dynamicPricingCurrentEndsAt:
+              proposal?.dynamic_pricing_enabled && snap?.current_ends_at
+                ? snap.current_ends_at
+                : null,
           })
         : [];
 
@@ -1014,10 +1031,15 @@ export default function ProposalPublicView() {
     proposal?.status === 'accepted' && proposal?.approved_amount != null
       ? Number(proposal.approved_amount)
       : oneTimeTotal;
+  const dpSnapPublic: any = (proposal as any)?.dynamic_pricing_snapshot ?? null;
   const installments = oneTimeTerm
     ? calculateInstallments(oneTimeTerm, baseForSchedule, {
         proposalExpiresAt: proposal?.expires_at ?? null,
         approvedAmount: proposal?.status === 'accepted' ? Number(proposal?.approved_amount ?? oneTimeTotal) : null,
+        dynamicPricingCurrentEndsAt:
+          (proposal as any)?.dynamic_pricing_enabled && dpSnapPublic?.current_ends_at
+            ? dpSnapPublic.current_ends_at
+            : null,
       })
     : [];
 

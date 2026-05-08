@@ -1,5 +1,5 @@
 import { ProposalItem } from '@/services/crm/proposal-items';
-import { PaymentTerm } from '@/services/crm/proposal-payment-terms';
+import { PaymentTerm, calculateInstallments } from '@/services/crm/proposal-payment-terms';
 import { extractEmail, extractPhone } from '@/lib/contactFormat';
 
 export interface ProposalPDFData {
@@ -42,7 +42,8 @@ export interface PaymentInstallment {
   number: number;
   dueDate: string;
   amount: number;
-  type: 'entry' | 'installment';
+  type: 'upfront' | 'entry' | 'balance' | 'installment';
+  label?: string;
 }
 
 export interface RecurringPaymentData {
@@ -151,42 +152,28 @@ export function buildProposalPDFData(
     billing_type: (item as any).billing_type || 'one_time',
   }));
 
-  // Calculate installments from payment term
-  // NOTE: pdfData.total_amount already includes the discount (calculated in lines 82-90)
-  // DO NOT apply discount again here!
+  // Calculate installments via central calculator (PRICE UX 1.0.3)
+  // Garante: rótulos corretos (À vista / Entrada / Saldo / Parcela N)
+  // e vencimento do à vista atrelado à tabela dinâmica vigente.
   const installments: PaymentInstallment[] = [];
   if (oneTimeTerm) {
-    const totalForInstallments = oneTimeWithDiscount; // Already discounted one-time total
-    const numInstallments = oneTimeTerm.installments || 1;
-    const entryPercent = oneTimeTerm.entry_percent || 0;
-    const entryAmount = totalForInstallments * (entryPercent / 100);
-    const remainingAmount = totalForInstallments - entryAmount;
-    const installmentAmount = numInstallments > 0 ? remainingAmount / numInstallments : 0;
-
-    // Add entry installment if exists
-    if (entryPercent > 0 && oneTimeTerm.entry_date) {
+    const dpSnap: any = (proposal as any)?.dynamic_pricing_snapshot ?? null;
+    const isAccepted = proposal?.status === 'accepted';
+    const calc = calculateInstallments(oneTimeTerm, oneTimeWithDiscount, {
+      proposalExpiresAt: proposal?.expires_at ?? null,
+      approvedAmount: isAccepted ? Number(proposal?.approved_amount ?? oneTimeWithDiscount) : null,
+      dynamicPricingCurrentEndsAt:
+        (proposal as any)?.dynamic_pricing_enabled && dpSnap?.current_ends_at
+          ? dpSnap.current_ends_at
+          : null,
+    });
+    for (const inst of calc) {
       installments.push({
-        number: 0,
-        dueDate: oneTimeTerm.entry_date,
-        amount: entryAmount,
-        type: 'entry',
-      });
-    }
-
-    // Add regular installments
-    const firstInstallmentDate = oneTimeTerm.first_installment_date 
-      ? new Date(oneTimeTerm.first_installment_date) 
-      : new Date();
-    
-    for (let i = 0; i < numInstallments; i++) {
-      const dueDate = new Date(firstInstallmentDate);
-      dueDate.setMonth(dueDate.getMonth() + i);
-      
-      installments.push({
-        number: i + 1,
-        dueDate: dueDate.toISOString(),
-        amount: installmentAmount,
-        type: 'installment',
+        number: inst.number,
+        dueDate: inst.dueDate,
+        amount: inst.amount,
+        type: inst.type,
+        label: inst.label,
       });
     }
   }

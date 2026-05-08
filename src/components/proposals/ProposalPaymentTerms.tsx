@@ -437,52 +437,67 @@ export function ProposalPaymentTerms({
               </Alert>
             ) : (
               <>
-                {/* Payment Method Chips */}
-                <div className="flex flex-wrap gap-2">
-                  {PAYMENT_METHODS.map((method) => {
-                    const Icon = method.icon;
-                    const isSelected = oneTimeTerm.payment_method === method.value;
-                    return (
-                      <button
-                        key={method.value}
-                        type="button"
-                        onClick={() => updateOneTime({ payment_method: method.value as PaymentTerm['payment_method'] })}
-                        className={cn(
-                          "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors border",
-                          isSelected 
-                            ? "bg-primary text-primary-foreground border-primary" 
-                            : "bg-background hover:bg-muted border-border"
-                        )}
-                      >
-                        <Icon className="h-3.5 w-3.5" />
-                        {method.label}
-                      </button>
-                    );
-                  })}
-                </div>
+                {/* PRICE UX 1.0.3 — Bloco "Como o cliente vai pagar?" */}
+                <div className="rounded-lg border bg-muted/30 p-4 space-y-4">
+                  <div>
+                    <h4 className="text-sm font-semibold">Como o cliente vai pagar?</h4>
+                    <p className="text-xs text-muted-foreground">
+                      Selecione a forma e a condição. O cronograma é gerado automaticamente.
+                    </p>
+                  </div>
 
-                {/* Quick Presets */}
-                <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Zap className="h-3 w-3" />
-                    Condição
-                  </Label>
-                  <div className="flex flex-wrap gap-2">
-                    {PAYMENT_PRESETS.map((preset) => (
-                      <button
-                        key={preset.id}
-                        type="button"
-                        onClick={() => handlePresetSelect(preset.id)}
-                        className={cn(
-                          "px-3 py-1.5 rounded-md text-sm font-medium transition-colors border",
-                          selectedPreset === preset.id
-                            ? "bg-secondary text-secondary-foreground border-secondary"
-                            : "bg-background hover:bg-muted border-border"
-                        )}
-                      >
-                        {preset.label}
-                      </button>
-                    ))}
+                  {/* Forma de pagamento */}
+                  <div className="space-y-2">
+                    <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Forma de pagamento
+                    </Label>
+                    <div className="flex flex-wrap gap-2">
+                      {PAYMENT_METHODS.map((method) => {
+                        const Icon = method.icon;
+                        const isSelected = oneTimeTerm.payment_method === method.value;
+                        return (
+                          <button
+                            key={method.value}
+                            type="button"
+                            onClick={() => updateOneTime({ payment_method: method.value as PaymentTerm['payment_method'] })}
+                            className={cn(
+                              "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors border",
+                              isSelected
+                                ? "bg-primary text-primary-foreground border-primary"
+                                : "bg-background hover:bg-muted border-border"
+                            )}
+                          >
+                            <Icon className="h-3.5 w-3.5" />
+                            {method.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Condição comercial */}
+                  <div className="space-y-2">
+                    <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground flex items-center gap-1">
+                      <Zap className="h-3 w-3" />
+                      Condição comercial
+                    </Label>
+                    <div className="flex flex-wrap gap-2">
+                      {PAYMENT_PRESETS.map((preset) => (
+                        <button
+                          key={preset.id}
+                          type="button"
+                          onClick={() => handlePresetSelect(preset.id)}
+                          className={cn(
+                            "px-3 py-1.5 rounded-md text-sm font-medium transition-colors border",
+                            selectedPreset === preset.id
+                              ? "bg-primary text-primary-foreground border-primary"
+                              : "bg-background hover:bg-muted border-border"
+                          )}
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
