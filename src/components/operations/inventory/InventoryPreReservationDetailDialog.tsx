@@ -39,6 +39,8 @@ import {
 } from '@/hooks/operations/useInventoryPreReservations';
 import { InventoryAllocationDialog } from './InventoryAllocationDialog';
 import { InventoryAllocatedItemsList } from './InventoryAllocatedItemsList';
+import { useConvertPreReservationToReservation } from '@/hooks/operations/useInventoryReservations';
+import { CheckCircle2 } from 'lucide-react';
 
 function fmt(v?: string | null) {
   if (!v) return '—';
