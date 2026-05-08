@@ -381,11 +381,15 @@ export function OpportunityProposalsTab({ opportunityId, pipelineType }: Opportu
         <div className="space-y-4">
           {proposals.map((proposal: any) => {
             const details = proposalDetails?.[proposal.id];
-            const displayValue = proposal.total_amount || details?.calculatedTotal || 0;
+            const displayValue =
+              proposal.dynamic_pricing_current_amount ??
+              proposal.payment_expected_amount ??
+              proposal.total_amount ??
+              details?.calculatedTotal ??
+              0;
             const itemCount = details?.items?.length || 0;
             const paymentTerm = details?.paymentTerms?.[0];
             const paymentMethod = paymentTerm?.payment_method;
-            const firstInstallmentDate = paymentTerm?.first_installment_date || paymentTerm?.first_payment_date;
             const statusInfo = statusConfig[proposal.status] || statusConfig.draft;
             const isLoadingPDF = loadingPDF === proposal.id;
             const isLoadingLink = loadingLink === proposal.id;
