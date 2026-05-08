@@ -1,5 +1,5 @@
 import { ProposalItem } from '@/services/crm/proposal-items';
-import { PaymentTerm } from '@/services/crm/proposal-payment-terms';
+import { PaymentTerm, calculateInstallments } from '@/services/crm/proposal-payment-terms';
 import { extractEmail, extractPhone } from '@/lib/contactFormat';
 
 export interface ProposalPDFData {
