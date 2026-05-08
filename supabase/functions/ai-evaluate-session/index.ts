@@ -191,6 +191,55 @@ function extractEvaluationFallback(content: string, rubric: any): any | null {
   };
 }
 
+function buildContingencyEvaluation(messages: any[], rubric: any, reason: unknown): any {
+  const sellerMessages = messages.filter((msg: any) => msg.sender === 'seller');
+  const clientMessages = messages.filter((msg: any) => msg.sender !== 'seller');
+  const sellerText = sellerMessages.map((msg: any) => String(msg.text || '')).join(' ').toLowerCase();
+  const avgSellerLength = sellerMessages.length
+    ? sellerMessages.reduce((sum: number, msg: any) => sum + String(msg.text || '').length, 0) / sellerMessages.length
+    : 0;
+
+  const evidenceSignals = [
+    /\?/.test(sellerText),
+    /(dor|problema|desafio|necessidade|objetivo|impacto|prioridade)/i.test(sellerText),
+    /(valor|resultado|benefício|solução|proposta|próximo passo|agenda|reunião)/i.test(sellerText),
+    sellerMessages.length >= 6,
+    clientMessages.length >= 4,
+    avgSellerLength >= 60,
+  ].filter(Boolean).length;
+
+  const baseScore = Math.max(4.5, Math.min(8.2, 5.2 + evidenceSignals * 0.45));
+  const dims = Array.isArray(rubric.dimensions) && rubric.dimensions.length > 0
+    ? rubric.dimensions
+    : [{ name: 'Execução comercial', weight: 100 }];
+
+  const dimensions = dims.map((d: any, index: number) => {
+    const variation = ((index % 3) - 1) * 0.2;
+    const score = Math.round(Math.max(0, Math.min(10, baseScore + variation)) * 10) / 10;
+    return {
+      key: d.name || d.key || `Dimensão ${index + 1}`,
+      score,
+      feedback: 'Avaliação de contingência gerada porque a IA principal não respondeu dentro do tempo. Revise a conversa para feedback qualitativo mais profundo.',
+      weight: d.weight || (1 / dims.length),
+    };
+  });
+
+  const totalWeight = dimensions.reduce((sum: number, d: any) => sum + (Number(d.weight) || 0), 0);
+  const weighted = totalWeight > 0
+    ? dimensions.reduce((sum: number, d: any) => sum + d.score * (Number(d.weight) || 0), 0) / totalWeight
+    : baseScore;
+  const overallScore = Math.round(Math.max(0, Math.min(10, weighted)) * 10) / 10;
+  const reasonMessage = reason instanceof Error ? reason.message : String(reason ?? 'timeout');
+
+  return {
+    dimensions,
+    overall_score: overallScore,
+    passed: overallScore >= rubric.passing_score,
+    summary: `Avaliação concluída em modo de contingência por instabilidade/timeout da IA principal. Nota calculada por sinais objetivos da conversa. Motivo técnico: ${sanitizeUsageErrorMessage(reasonMessage)}`,
+    _contingencyFallback: true,
+  };
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -324,22 +373,29 @@ Regras do JSON:
 - overall_score deve ser um número decimal (ex: 7.5)
 - passed deve ser true ou false (sem aspas)`;
 
-    // Call Lovable AI
+    // Call AI
     console.log('[ai-evaluate-session] Calling AI for evaluation...');
     let aiResult;
+    interface EvaluationResult {
+      dimensions: Array<{ key: string; score: number; feedback: string; weight: number }>;
+      overall_score: number;
+      passed: boolean;
+      summary: string;
+      _extractedViaFallback?: boolean;
+      _contingencyFallback?: boolean;
+    }
+    let evaluation: EvaluationResult | null = null;
     try {
       aiResult = await callOpenAIWithGuardrails({
-        model: 'gpt-5-mini',
+        model: 'gpt-5-nano',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
         response_format: { type: 'json_object' },
-        // gpt-5-mini is a reasoning model; reasoning_tokens count against max_completion_tokens.
-        // Need a generous budget so the model has room to both reason AND emit the JSON answer.
-        max_completion_tokens: 8000,
-        timeoutMs: 45000,
-        maxRetries: 2,
+        max_completion_tokens: 2500,
+        timeoutMs: 18000,
+        maxRetries: 1,
       });
     } catch (err) {
       await logAIUsage(supabase, {
@@ -349,71 +405,66 @@ Regras do JSON:
         action: 'evaluate_session',
         entity_type: 'roleplay_session',
         entity_id: sessionId,
-        model_used: 'gpt-5-mini',
+        model_used: 'gpt-5-nano',
         success: false,
         error_message: sanitizeUsageErrorMessage(err),
         request_metadata: {
           function_name: 'ai-evaluate-session',
-          max_completion_tokens: 1000,
-          retry_count: 2,
-          attempts: 3,
+          max_completion_tokens: 2500,
+          retry_count: 1,
+          attempts: 2,
           timed_out: false,
           response_format: 'json_object',
+          contingency_fallback: true,
         },
         response_metadata: { provider: 'openai' },
       });
-      throw err;
+      console.error('[ai-evaluate-session] AI failed, using contingency evaluation:', err);
+      evaluation = buildContingencyEvaluation(messages, rubric, err) as EvaluationResult;
     }
 
-    const aiContent = aiResult.content;
+    const aiContent = aiResult?.content ?? '';
 
     console.log('[ai-evaluate-session] AI transport metadata:', {
-      model: aiResult.metadata.model,
-      retryCount: aiResult.metadata.retryCount,
-      timedOut: aiResult.metadata.timedOut,
-      usage: aiResult.usage ?? null,
+      model: aiResult?.metadata.model,
+      retryCount: aiResult?.metadata.retryCount,
+      timedOut: aiResult?.metadata.timedOut,
+      usage: aiResult?.usage ?? null,
       responseLength: aiContent.length,
       responseHash: simpleHash(aiContent),
     });
-    await logAIUsage(supabase, {
-      organization_id: rubric.organization_id ?? null,
-      user_id: user?.id ?? null,
-      feature: 'ai_evaluate_session',
-      action: 'evaluate_session',
-      entity_type: 'roleplay_session',
-      entity_id: sessionId,
-      model_used: aiResult.metadata.model ?? 'gpt-5-mini',
-      tokens_input: aiResult.usage?.prompt_tokens ?? null,
-      tokens_output: aiResult.usage?.completion_tokens ?? null,
-      tokens_total: aiResult.usage?.total_tokens ?? null,
-      success: true,
-      latency_ms: aiResult.metadata.durationMs ?? null,
-      request_metadata: {
-        function_name: 'ai-evaluate-session',
-        max_completion_tokens: 1000,
-        retry_count: aiResult.metadata.retryCount,
-        attempts: (aiResult.metadata.retryCount ?? 0) + 1,
-        timed_out: aiResult.metadata.timedOut ?? false,
-        response_format: 'json_object',
-      },
-      response_metadata: {
-        provider: 'openai',
-        finish_reason: aiResult.metadata.finishReason ?? null,
-        response_length: aiContent.length,
-        response_hash: simpleHash(aiContent),
-      },
-    });
+    if (aiResult) {
+      await logAIUsage(supabase, {
+        organization_id: rubric.organization_id ?? null,
+        user_id: user?.id ?? null,
+        feature: 'ai_evaluate_session',
+        action: 'evaluate_session',
+        entity_type: 'roleplay_session',
+        entity_id: sessionId,
+        model_used: aiResult.metadata.model ?? 'gpt-5-nano',
+        tokens_input: aiResult.usage?.prompt_tokens ?? null,
+        tokens_output: aiResult.usage?.completion_tokens ?? null,
+        tokens_total: aiResult.usage?.total_tokens ?? null,
+        success: true,
+        latency_ms: aiResult.metadata.durationMs ?? null,
+        request_metadata: {
+          function_name: 'ai-evaluate-session',
+          max_completion_tokens: 2500,
+          retry_count: aiResult.metadata.retryCount,
+          attempts: (aiResult.metadata.retryCount ?? 0) + 1,
+          timed_out: aiResult.metadata.timedOut ?? false,
+          response_format: 'json_object',
+        },
+        response_metadata: {
+          provider: 'openai',
+          finish_reason: (aiResult.metadata as any).finishReason ?? null,
+          response_length: aiContent.length,
+          response_hash: simpleHash(aiContent),
+        },
+      });
+    }
 
     // Parse evaluation with robust error handling
-    interface EvaluationResult {
-      dimensions: Array<{ key: string; score: number; feedback: string; weight: number }>;
-      overall_score: number;
-      passed: boolean;
-      summary: string;
-      _extractedViaFallback?: boolean;
-    }
-    
-    let evaluation: EvaluationResult | null = null;
     let parseAttempts = 0;
     const maxAttempts = 3;
     
