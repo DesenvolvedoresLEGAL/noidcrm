@@ -41,7 +41,7 @@ import type { InventoryItemWithRefs } from '@/services/operations/inventoryItems
 import { InventoryItemFormDialog } from './InventoryItemFormDialog';
 import { InventoryItemStatusDialog } from './InventoryItemStatusDialog';
 
-export function InventoryItemsTab() {
+export function InventorySerializedItemsTab() {
   const { data: items, isLoading } = useInventoryItems();
   const { data: categories } = useInventoryCategories();
   const { data: locations } = useInventoryLocations();
