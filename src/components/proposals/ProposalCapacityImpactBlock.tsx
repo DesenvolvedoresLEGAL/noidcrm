@@ -173,7 +173,7 @@ export function ProposalCapacityImpactBlock({
     },
     onSuccess: () => {
       toast({ title: 'Fator de ocupação aplicado em todos os itens.' });
-      proposalItemsQuery.forEach((q) => qc.invalidateQueries({ queryKey: q.queryKey as any }));
+      qc.invalidateQueries({ queryKey: ['proposal-item'] });
       qc.invalidateQueries({ queryKey: ['proposal-items'] });
     },
     onError: (e: any) =>
