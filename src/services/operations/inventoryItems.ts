@@ -156,7 +156,7 @@ export async function updateSerializedItemStatus(
 
 // ---------- Quantity items ----------
 
-export interface QuantityItemInput {
+export interface QuantityItemInput extends ClassificationFields {
   name: string;
   description?: string | null;
   category_id: string;
