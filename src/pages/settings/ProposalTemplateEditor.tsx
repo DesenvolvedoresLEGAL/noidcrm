@@ -250,6 +250,13 @@ export default function ProposalTemplateEditor() {
                 />
               </TabsContent>
 
+              <TabsContent value="rules">
+                <TemplateCommercialRulesTab
+                  data={templateData}
+                  onChange={(field, value) => updateField(field, value)}
+                />
+              </TabsContent>
+
               <TabsContent value="preview">
                 <TemplatePreviewTab templateData={templateData} />
               </TabsContent>
