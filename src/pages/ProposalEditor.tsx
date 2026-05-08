@@ -379,30 +379,53 @@ export default function ProposalEditor() {
 
   // Lazy orchestration: when an existing proposal is eligible (Evento automático)
   // but has no current snapshot/tiers, run orchestrator once to materialize it.
+  // Also: if proposal has template_name but no commercial rules persisted,
+  // re-apply the template first to backfill rules.
   const lazyOrchestratedRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!proposalData || isNewProposal) return;
+    if (!proposalData || isNewProposal || templates.length === 0) return;
     const p: any = proposalData;
     if (lazyOrchestratedRef.current === p.id) return;
 
-    const isEventAuto =
-      p.dynamic_pricing_applicability === 'automatic' &&
-      p.dynamic_pricing_mode === 'automatic_by_valid_until' &&
-      ['one_time_event', 'one_time_non_event'].includes(p.revenue_type ?? '');
+    const hasRules =
+      p.revenue_type ||
+      (p.dynamic_pricing_applicability && p.dynamic_pricing_applicability !== 'none');
+
+    const tplByName = p.template_name
+      ? (templates as any[]).find((t) => t.name === p.template_name)
+      : null;
+
+    const tplApplicability = tplByName?.dynamic_pricing_applicability;
+    const tplRevenue = tplByName?.revenue_type;
+    const tplIsAutoEvent =
+      tplApplicability === 'automatic' &&
+      ['one_time_event', 'one_time_non_event'].includes(tplRevenue ?? '');
+
+    const isAutoEvent =
+      (p.dynamic_pricing_applicability === 'automatic' &&
+        p.dynamic_pricing_mode === 'automatic_by_valid_until' &&
+        ['one_time_event', 'one_time_non_event'].includes(p.revenue_type ?? '')) ||
+      tplIsAutoEvent;
 
     const missingSnapshot =
       !p.dynamic_pricing_current_amount || Number(p.dynamic_pricing_current_amount) <= 0;
 
-    if (isEventAuto && p.expires_at && missingSnapshot) {
+    if (isAutoEvent && p.expires_at && missingSnapshot) {
       lazyOrchestratedRef.current = p.id;
-      orchestrateProposalFinancials(p.id, 'editor_open_lazy')
-        .then(() => {
+      (async () => {
+        try {
+          if (!hasRules && tplByName?.id) {
+            await applyTemplate(p.id, tplByName.id);
+          }
+          await orchestrateProposalFinancials(p.id, 'editor_open_lazy');
           invalidateProposalCaches(queryClient, p.id);
           getPaymentTerms(p.id).then(setPaymentTerms);
-        })
-        .catch((e) => console.warn('[ProposalEditor] lazy orchestrate failed:', e));
+        } catch (e) {
+          console.warn('[ProposalEditor] lazy orchestrate failed:', e);
+        }
+      })();
     }
-  }, [proposalData, isNewProposal, queryClient]);
+  }, [proposalData, isNewProposal, templates, queryClient]);
 
   // Load context data (account, contact, owner)
   useEffect(() => {
