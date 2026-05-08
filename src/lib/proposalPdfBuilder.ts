@@ -134,6 +134,8 @@ export function buildProposalPDFData(
     organization: org || null,
     layout: proposal.layout || null,
     payment_method: oneTimeTerm?.payment_method || recurringTerm?.payment_method || '',
+    dynamic_pricing_enabled: !!proposal.dynamic_pricing_enabled,
+    dynamic_pricing_snapshot: proposal.dynamic_pricing_snapshot ?? null,
   };
 
   // Build items for PDF with billing_type for separation
