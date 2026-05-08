@@ -105,7 +105,7 @@ export function ProposalPaymentTerms({
   const [showComments, setShowComments] = useState(false);
   const [showMrrComments, setShowMrrComments] = useState(false);
   
-  const [oneTimeTerm, setOneTimeTerm] = useState<Partial<PaymentTerm> & { payment_method?: string; payment_condition?: string }>({
+  const [oneTimeTerm, setOneTimeTerm] = useState<Partial<PaymentTerm> & { payment_method?: string; payment_condition?: PaymentTerm['payment_condition'] }>({
     payment_type: 'one_time',
     payment_method: 'boleto',
     payment_condition: 'upfront',
@@ -255,7 +255,7 @@ export function ProposalPaymentTerms({
     
     if (preset?.config) {
       const baseDate = oneTimeTerm.first_installment_date || getTodayDate();
-      const paymentCondition = presetId === 'a_vista'
+      const paymentCondition: PaymentTerm['payment_condition'] = presetId === 'a_vista'
         ? 'upfront'
         : presetId === '50_50'
           ? 'split_50_50'
