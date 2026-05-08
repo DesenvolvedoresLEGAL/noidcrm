@@ -39,6 +39,7 @@ import { ProposalItem } from '@/services/crm/proposal-items';
 import { formatDateBR } from '@/lib/dateUtils';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import { useProposalDynamicPricingSnapshot } from '@/hooks/proposals/useProposalDynamicPricing';
 
 const PAYMENT_METHODS = [
   { value: 'pix', label: 'PIX', icon: Wallet },
@@ -347,7 +348,13 @@ export function ProposalPaymentTerms({
     return today.toISOString().split('T')[0];
   };
 
-  const installments = calculateInstallments(oneTimeTerm as PaymentTerm, effectiveOneTimeTotal);
+  const { data: dpSnapshot } = useProposalDynamicPricingSnapshot(proposalId);
+  const dynamicCurrentEndsAt = (dpSnapshot as any)?.enabled && (dpSnapshot as any)?.current_ends_at
+    ? (dpSnapshot as any).current_ends_at
+    : null;
+  const installments = calculateInstallments(oneTimeTerm as PaymentTerm, effectiveOneTimeTotal, {
+    dynamicPricingCurrentEndsAt: dynamicCurrentEndsAt,
+  });
 
   const formatCurrency = (value: number) => {
     const symbol = currency === 'USD' ? '$' : currency === 'EUR' ? '€' : 'R$';

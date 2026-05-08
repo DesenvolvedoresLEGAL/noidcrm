@@ -58,6 +58,7 @@ import { sanitizeHtml } from '@/lib/sanitizeHtml';
 import confetti from 'canvas-confetti';
 import { extractEmail, extractPhone } from '@/lib/contactFormat';
 import { useProposalEngagementTracker } from '@/hooks/useProposalEngagementTracker';
+import { PublicProposalDynamicPricingBanner } from '@/components/proposals/PublicProposalDynamicPricingBanner';
 
 // Fallback decline reasons (used if organization has none configured)
 const FALLBACK_DECLINE_REASONS = [
@@ -1510,8 +1511,11 @@ export default function ProposalPublicView() {
         })()}
         </div>
 
-        {/* Bloco "Condição comercial vigente" / "Pagar valor vigente" removido —
-            essa cobrança é responsabilidade do ERP, não do link público da proposta. */}
+        {/* Tabela de Preço Dinâmica — informa ao cliente o valor vigente,
+            condições anteriores expiradas e próxima virada de faixa. */}
+        {(proposal as any)?.dynamic_pricing_enabled && dpSnapPublic && (
+          <PublicProposalDynamicPricingBanner snapshot={dpSnapPublic} variant="public" />
+        )}
 
         {/* Payment Terms */}
         <Card data-section="payment">

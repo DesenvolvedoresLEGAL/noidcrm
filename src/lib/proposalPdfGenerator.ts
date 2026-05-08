@@ -772,7 +772,97 @@ export async function generateProposalPDFClient(
     yPos = margin;
   }
 
-  // (Bloco "Condição comercial vigente" removido — somente condições de pagamento abaixo)
+  // ===== TABELA DE PREÇO DINÂMICA / CONDIÇÃO COMERCIAL VIGENTE =====
+  const dpSnap: any = (proposal as any)?.dynamic_pricing_snapshot;
+  if ((proposal as any)?.dynamic_pricing_enabled && dpSnap && dpSnap.status !== 'disabled' && dpSnap.current_amount != null) {
+    if (yPos > pageHeight - 80) {
+      doc.addPage();
+      yPos = margin;
+    }
+    const fmtDt = (iso?: string | null) => {
+      if (!iso) return '—';
+      try {
+        return new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+      } catch {
+        return '—';
+      }
+    };
+
+    doc.setTextColor(primaryRgb.r, primaryRgb.g, primaryRgb.b);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('CONDIÇÃO COMERCIAL VIGENTE', margin, yPos);
+    yPos += 7;
+
+    const boxX = margin;
+    const boxW = pageWidth - margin * 2;
+    const boxH = 32;
+    doc.setDrawColor(primaryRgb.r, primaryRgb.g, primaryRgb.b);
+    doc.setFillColor(248, 250, 252);
+    doc.roundedRect(boxX, yPos, boxW, boxH, 2, 2, 'FD');
+
+    const colW = boxW / 3;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
+    doc.text('Valor vigente hoje', boxX + 4, yPos + 6);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(20, 20, 20);
+    doc.text(formatCurrency(Number(dpSnap.current_amount), currency), boxX + 4, yPos + 14);
+    if (dpSnap.current_ends_at) {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
+      doc.text(`Válido até ${fmtDt(dpSnap.current_ends_at)}`, boxX + 4, yPos + 22);
+    }
+
+    if (dpSnap.next_amount != null && dpSnap.next_starts_at) {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
+      doc.text('Próxima atualização', boxX + colW + 4, yPos + 6);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.setTextColor(20, 20, 20);
+      doc.text(formatCurrency(Number(dpSnap.next_amount), currency), boxX + colW + 4, yPos + 14);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
+      doc.text(`em ${fmtDt(dpSnap.next_starts_at)}`, boxX + colW + 4, yPos + 22);
+    }
+
+    if (dpSnap.previous_amount != null) {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
+      doc.text('Valor anterior expirado', boxX + colW * 2 + 4, yPos + 6);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(120, 120, 120);
+      const prevTxt = formatCurrency(Number(dpSnap.previous_amount), currency);
+      doc.text(prevTxt, boxX + colW * 2 + 4, yPos + 14);
+      // strike-through line
+      const tw = doc.getTextWidth(prevTxt);
+      doc.setDrawColor(120, 120, 120);
+      doc.line(boxX + colW * 2 + 4, yPos + 13, boxX + colW * 2 + 4 + tw, yPos + 13);
+      if (dpSnap.previous_label) {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7);
+        doc.text(String(dpSnap.previous_label), boxX + colW * 2 + 4, yPos + 22);
+      }
+    }
+
+    yPos += boxH + 4;
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(7);
+    doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
+    const clause = 'Pagamentos realizados após o vencimento da condição comercial serão considerados conforme o valor vigente na data efetiva do pagamento. Diferenças poderão gerar cobrança complementar.';
+    const wrappedClause = doc.splitTextToSize(clause, pageWidth - margin * 2);
+    doc.text(wrappedClause, margin, yPos);
+    yPos += wrappedClause.length * 3.5 + 6;
+  }
+
 
   // ===== PAYMENT TERMS =====
   const hasPaymentTerms = installments.length > 0 || recurringPayment;
