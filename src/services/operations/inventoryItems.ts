@@ -65,7 +65,7 @@ export async function createSerializedItem(
       quantity_total: 1,
       quantity_available: getQuantityAvailableForStatus(input.status),
       unit_of_measure: 'un',
-      metadata: { technical_specs: sanitizeTechnicalSpecs(input.technical_specs ?? []) },
+      metadata: { technical_specs: sanitizeTechnicalSpecs(input.technical_specs ?? []) } as any,
       name: input.name.trim(),
       description: emptyToNull(input.description),
       category_id: input.category_id,
@@ -201,7 +201,7 @@ export async function createQuantityItem(
       brand: emptyToNull(input.brand),
       model: emptyToNull(input.model),
       notes: emptyToNull(input.notes),
-      metadata: {},
+      metadata: { technical_specs: sanitizeTechnicalSpecs(input.technical_specs ?? []) } as any,
       created_by: userId ?? null,
       updated_by: userId ?? null,
     })
