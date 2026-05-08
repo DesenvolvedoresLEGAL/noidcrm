@@ -1156,12 +1156,16 @@ export default function ProposalEditor() {
                     p.dynamic_pricing_mode ?? appliedTemplate?.dynamic_pricing_mode ?? null;
                   const revenue =
                     p.revenue_type ?? appliedTemplate?.revenue_type ?? null;
-                  const isAutoEvent =
-                    applicability === 'automatic' &&
-                    mode === 'automatic_by_valid_until' &&
-                    ['one_time_event', 'one_time_non_event'].includes(revenue ?? '');
                   return (
                     <>
+                      <ProposalPaymentTerms
+                        proposalId={currentProposalId}
+                        totalAmount={itemsTotal}
+                        terms={paymentTerms}
+                        onChange={(terms) => { setPaymentTerms(terms); if (terms.length > 0) setPaymentTermsError(null); }}
+                        items={items}
+                        currency={watch('currency')}
+                      />
                       <ProposalDynamicPricingPanel
                         proposalId={currentProposalId}
                         proposalTotal={itemsTotal}
@@ -1172,16 +1176,6 @@ export default function ProposalEditor() {
                         revenueType={revenue}
                       />
                       <ProposalDynamicPaymentPanel proposalId={currentProposalId} />
-                      {!isAutoEvent && (
-                        <ProposalPaymentTerms
-                          proposalId={currentProposalId}
-                          totalAmount={itemsTotal}
-                          terms={paymentTerms}
-                          onChange={(terms) => { setPaymentTerms(terms); if (terms.length > 0) setPaymentTermsError(null); }}
-                          items={items}
-                          currency={watch('currency')}
-                        />
-                      )}
                     </>
                   );
                 })()}

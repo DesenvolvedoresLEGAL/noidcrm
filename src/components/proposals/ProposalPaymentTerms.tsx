@@ -105,9 +105,10 @@ export function ProposalPaymentTerms({
   const [showComments, setShowComments] = useState(false);
   const [showMrrComments, setShowMrrComments] = useState(false);
   
-  const [oneTimeTerm, setOneTimeTerm] = useState<Partial<PaymentTerm> & { payment_method?: string }>({
+  const [oneTimeTerm, setOneTimeTerm] = useState<Partial<PaymentTerm> & { payment_method?: string; payment_condition?: PaymentTerm['payment_condition'] }>({
     payment_type: 'one_time',
     payment_method: 'boleto',
+    payment_condition: 'upfront',
     entry_percent: 0,
     discount_percent: 0,
     installments: 1,
@@ -254,9 +255,17 @@ export function ProposalPaymentTerms({
     
     if (preset?.config) {
       const baseDate = oneTimeTerm.first_installment_date || getTodayDate();
+      const paymentCondition: PaymentTerm['payment_condition'] = presetId === 'a_vista'
+        ? 'upfront'
+        : presetId === '50_50'
+          ? 'split_50_50'
+          : presetId === '30_60_90'
+            ? 'installments'
+            : 'custom_schedule';
       const newTerm = { 
         ...oneTimeTerm, 
         ...preset.config,
+        payment_condition: paymentCondition,
         first_installment_date: baseDate,
         // Sync entry_date with first_installment_date when entry_percent > 0
         entry_date: preset.config.entry_percent > 0 ? baseDate : undefined,
@@ -265,6 +274,7 @@ export function ProposalPaymentTerms({
       setShowAdvanced(false);
       autoSave('one_time', newTerm);
     } else {
+      updateOneTime({ payment_condition: 'installments', installments: oneTimeTerm.installments || 2 });
       // Parcelado - show advanced options
       setShowAdvanced(true);
     }
@@ -348,11 +358,11 @@ export function ProposalPaymentTerms({
   const hasRecurringItems = recurringItems.length > 0 || recurringMRR > 0;
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
+    <Card className="border-primary/40 shadow-sm">
+      <CardHeader className="pb-3 bg-primary/5">
         <CardTitle className="flex items-center gap-2 text-base">
           <CreditCard className="h-4 w-4" />
-          Condições de Pagamento
+          Configurar formas de pagamento
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -438,11 +448,11 @@ export function ProposalPaymentTerms({
             ) : (
               <>
                 {/* PRICE UX 1.0.3 — Bloco "Como o cliente vai pagar?" */}
-                <div className="rounded-lg border bg-muted/30 p-4 space-y-4">
+                <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-4">
                   <div>
-                    <h4 className="text-sm font-semibold">Como o cliente vai pagar?</h4>
+                    <h4 className="text-sm font-semibold">Forma e prazo de pagamento avulso</h4>
                     <p className="text-xs text-muted-foreground">
-                      Selecione a forma e a condição. O cronograma é gerado automaticamente.
+                      Escolha PIX, boleto, cartão ou transferência e defina se será à vista, 50% + 50%, 30/60/90 ou parcelado.
                     </p>
                   </div>
 
