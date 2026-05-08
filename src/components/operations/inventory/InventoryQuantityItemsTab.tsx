@@ -37,8 +37,18 @@ import {
   getStockAlertVariant,
   type InventoryItemStatus,
 } from '@/lib/operations/inventoryLabels';
+import {
+  CRITICALITY_LABELS,
+  CRITICALITY_OPTIONS,
+  OPERATIONAL_TYPE_LABELS,
+  OPERATIONAL_TYPE_OPTIONS,
+  criticalityBadgeVariant,
+  type Criticality,
+  type OperationalType,
+} from '@/lib/operations/inventoryClassification';
 import { useInventoryQuantityItems } from '@/hooks/operations/useInventoryItems';
 import { useInventoryCategories } from '@/hooks/operations/useInventoryCategories';
+import { useInventoryFamilies } from '@/hooks/operations/useInventoryFamilies';
 import { useInventoryLocations } from '@/hooks/operations/useInventoryLocations';
 import type { InventoryItemWithRefs } from '@/services/operations/inventoryItems';
 import { InventoryQuantityItemFormDialog } from './InventoryQuantityItemFormDialog';
