@@ -26,6 +26,14 @@ import {
   useProposalPreReservations,
   useRecalculateInventoryPreReservation,
 } from '@/hooks/operations/useInventoryPreReservations';
+import {
+  useConvertPreReservationToReservation,
+  useProposalReservations,
+} from '@/hooks/operations/useInventoryReservations';
+import {
+  RESERVATION_STATUS_LABELS,
+  reservationStatusBadgeVariant,
+} from '@/lib/operations/inventoryReservations';
 import { GeneratePreReservationDialog } from './GeneratePreReservationDialog';
 
 function fmt(v?: string | null) {
