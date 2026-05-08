@@ -1015,6 +1015,12 @@ export default function ProposalEditor() {
                     <AlertDescription>{paymentTermsError}</AlertDescription>
                   </Alert>
                 )}
+                {currentProposalId && (
+                  <ProposalDynamicPricingPanel
+                    proposalId={currentProposalId}
+                    proposalTotal={itemsTotal}
+                  />
+                )}
                 <ProposalPaymentTerms 
                   proposalId={currentProposalId || ''} 
                   totalAmount={itemsTotal}
