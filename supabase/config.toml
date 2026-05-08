@@ -387,3 +387,6 @@ verify_jwt = false
 
 [functions.apollo-phone-webhook]
 verify_jwt = false
+
+[functions.check-proposal-pricing-tier-transition]
+verify_jwt = false
