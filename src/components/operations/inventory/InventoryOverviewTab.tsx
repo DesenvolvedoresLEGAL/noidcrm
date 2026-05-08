@@ -345,18 +345,27 @@ export function InventoryOverviewTab({ onNavigateToItems }: Props = {}) {
               loading={preRes.isLoading}
               icon={PackageMinus}
             />
-            <MiniKpi
-              title="Próxima op."
-              value={
-                preRes.data?.next_operational_start
-                  ? format(new Date(preRes.data.next_operational_start + 'T00:00:00'), 'dd/MM', {
-                      locale: ptBR,
-                    })
-                  : '—'
-              }
-              loading={preRes.isLoading}
-              icon={Boxes}
-            />
+            <Card>
+              <CardContent className="pt-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs uppercase text-muted-foreground">Próxima op.</p>
+                    <p className="text-lg font-semibold">
+                      {preRes.isLoading
+                        ? '...'
+                        : preRes.data?.next_operational_start
+                          ? format(
+                              new Date(preRes.data.next_operational_start + 'T00:00:00'),
+                              'dd/MM',
+                              { locale: ptBR },
+                            )
+                          : '—'}
+                    </p>
+                  </div>
+                  <Boxes className="h-4 w-4 text-muted-foreground" />
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </CardContent>
       </Card>
