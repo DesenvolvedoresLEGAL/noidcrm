@@ -459,6 +459,12 @@ export default function ProposalEditor() {
       return;
     }
 
+    // Sprint TEMPLATE 1.0: template pode exigir validade
+    if (appliedTemplate?.requires_valid_until && !data.expires_at) {
+      toast.error('Este template exige validade da proposta para calcular a condição comercial.');
+      return;
+    }
+
     // CRITICAL: Bloquear salvar sem condições de pagamento, exceto rascunho.
     // Evita propostas enviadas ao cliente sem o quadro de Pagamento Avulso/MRR.
     const effectiveStatus = (data as any)?.status || status;
