@@ -1162,6 +1162,7 @@ export default function ProposalEditor() {
                     </>
                   );
                 })()}
+              </TabsContent>
 
               <TabsContent value="team">
                 <ProposalParticipantsManager 
