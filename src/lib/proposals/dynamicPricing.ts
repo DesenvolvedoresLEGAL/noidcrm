@@ -241,3 +241,67 @@ export function computeFinalAmount(
       return 0;
   }
 }
+
+export interface DynamicPricingBreakdown {
+  active: boolean;
+  base: number;
+  current: number;
+  delta: number;
+  adjustmentPercent: number;
+  hasAdjustment: boolean;
+  endsAt: string | null;
+  nextAmount: number | null;
+  nextStartsAt: string | null;
+  currentLabel: string | null;
+}
+
+/**
+ * Unified breakdown for the "Itens Avulsos" section across public view and PDF.
+ * Returns base subtotal vs current vigent value plus next-tier transition info.
+ */
+export function getDynamicPricingBreakdown(
+  snapshot: Partial<DynamicPricingSnapshot> | null | undefined,
+  baseOneTimeTotal: number,
+): DynamicPricingBreakdown {
+  const enabled = !!snapshot?.enabled;
+  const status = snapshot?.status;
+  const current =
+    snapshot?.current_amount != null ? Number(snapshot.current_amount) : null;
+
+  const active = enabled && status !== 'disabled' && current != null;
+
+  if (!active || current == null) {
+    return {
+      active: false,
+      base: baseOneTimeTotal,
+      current: baseOneTimeTotal,
+      delta: 0,
+      adjustmentPercent: 0,
+      hasAdjustment: false,
+      endsAt: null,
+      nextAmount: null,
+      nextStartsAt: null,
+      currentLabel: null,
+    };
+  }
+
+  const base =
+    snapshot?.base_amount != null && Number(snapshot.base_amount) > 0
+      ? Number(snapshot.base_amount)
+      : baseOneTimeTotal;
+  const delta = current - base;
+  const adjustmentPercent = base > 0 ? (delta / base) * 100 : 0;
+
+  return {
+    active: true,
+    base,
+    current,
+    delta,
+    adjustmentPercent,
+    hasAdjustment: Math.abs(delta) > 0.01,
+    endsAt: snapshot?.current_ends_at ?? null,
+    nextAmount: snapshot?.next_amount != null ? Number(snapshot.next_amount) : null,
+    nextStartsAt: snapshot?.next_starts_at ?? null,
+    currentLabel: snapshot?.current_label ?? null,
+  };
+}
