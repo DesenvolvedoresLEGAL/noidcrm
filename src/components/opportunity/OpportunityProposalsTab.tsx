@@ -105,6 +105,7 @@ export function OpportunityProposalsTab({ opportunityId, pipelineType }: Opportu
   const [loadingLink, setLoadingLink] = useState<string | null>(null);
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const [emailProposalId, setEmailProposalId] = useState<string | null>(null);
+  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
 
   // Fetch proposals
   const { data, isLoading } = useQuery({
