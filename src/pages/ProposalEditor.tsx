@@ -160,6 +160,21 @@ export default function ProposalEditor() {
     queryFn: listTemplates,
   });
 
+  // Derive applied template by template_name on the proposal or by linked layout
+  const watchedLayoutIdForTemplate = watch('layout_id');
+  const watchedTemplateName = (watch as any)('template_name') as string | undefined;
+  const appliedTemplate: any = (() => {
+    if (!templates.length) return null;
+    if (watchedTemplateName) {
+      const byName = templates.find((t: any) => t.name === watchedTemplateName);
+      if (byName) return byName;
+    }
+    if (watchedLayoutIdForTemplate) {
+      return templates.find((t: any) => t.layout_id === watchedLayoutIdForTemplate) || null;
+    }
+    return null;
+  })();
+
   // Watch layout_id to auto-fill from template when layout changes
   const watchedLayoutId = watch('layout_id');
   
