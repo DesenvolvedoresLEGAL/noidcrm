@@ -785,14 +785,46 @@ export async function generateProposalPDFClient(
     doc.setDrawColor(borderColor.r, borderColor.g, borderColor.b);
     doc.setLineWidth(0.3);
     doc.line(margin + 8, lineY - 2, margin + contentWidth - 8, lineY - 2);
-    
+
+    // "Total Vigente Hoje" line (when dynamic pricing active) — sits above grand total
+    if (showDpBreakdown) {
+      doc.setTextColor(217, 119, 6); // amber-600
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Total Vigente Hoje:', margin + 8, lineY + 6);
+      doc.text(formatCurrency(dpBreakdown.current, currency), margin + contentWidth - 8, lineY + 6, { align: 'right' });
+      lineY += 8;
+    }
+
     // Grand total
     doc.setTextColor(primaryRgb.r, primaryRgb.g, primaryRgb.b);
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
     doc.text('VALOR TOTAL DA PROPOSTA:', margin + 8, lineY + 6);
     doc.text(formatCurrency(grandTotal, currency), margin + contentWidth - 8, lineY + 6, { align: 'right' });
-    
+    lineY += 8;
+
+    // Footer note inside the box (validade + próximo valor)
+    if (hasDpFooterNote) {
+      const fmtDtShort = (iso?: string | null) => {
+        if (!iso) return '';
+        try {
+          return new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+        } catch {
+          return '';
+        }
+      };
+      doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(7.5);
+      const parts: string[] = [];
+      if (dpBreakdown.endsAt) parts.push(`Vigente até ${fmtDtShort(dpBreakdown.endsAt)}`);
+      if (dpBreakdown.nextAmount != null && dpBreakdown.nextStartsAt) {
+        parts.push(`próximo valor ${formatCurrency(dpBreakdown.nextAmount, currency)} em ${fmtDtShort(dpBreakdown.nextStartsAt)}`);
+      }
+      doc.text(parts.join(' · '), margin + 8, lineY + 8);
+    }
+
     yPos += summaryBoxHeight + 12;
   }
 
