@@ -63,7 +63,9 @@ import { PaymentTerm } from '@/services/crm/proposal-payment-terms';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { useProposalRealtime } from '@/hooks/useProposalRealtime';
 import { listLayouts } from '@/services/crm/proposal-layouts';
-import { listTemplates } from '@/services/crm/proposal-templates';
+import { listTemplates, applyTemplate } from '@/services/crm/proposal-templates';
+import { orchestrateProposalFinancials } from '@/services/proposals/proposalOrchestrator';
+import { invalidateProposalCaches } from '@/hooks/proposals/useProposalOrchestrator';
 import { useFormPersistence } from '@/hooks/useFormPersistence';
 import { useDebounce } from '@/hooks/useDebounce';
 import { supabase } from '@/integrations/supabase/client';
@@ -375,6 +377,56 @@ export default function ProposalEditor() {
     }
   }, [currentProposalId, isNewProposal]);
 
+  // Lazy orchestration: when an existing proposal is eligible (Evento automático)
+  // but has no current snapshot/tiers, run orchestrator once to materialize it.
+  // Also: if proposal has template_name but no commercial rules persisted,
+  // re-apply the template first to backfill rules.
+  const lazyOrchestratedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!proposalData || isNewProposal || templates.length === 0) return;
+    const p: any = proposalData;
+    if (lazyOrchestratedRef.current === p.id) return;
+
+    const hasRules =
+      p.revenue_type ||
+      (p.dynamic_pricing_applicability && p.dynamic_pricing_applicability !== 'none');
+
+    const tplByName = p.template_name
+      ? (templates as any[]).find((t) => t.name === p.template_name)
+      : null;
+
+    const tplApplicability = tplByName?.dynamic_pricing_applicability;
+    const tplRevenue = tplByName?.revenue_type;
+    const tplIsAutoEvent =
+      tplApplicability === 'automatic' &&
+      ['one_time_event', 'one_time_non_event'].includes(tplRevenue ?? '');
+
+    const isAutoEvent =
+      (p.dynamic_pricing_applicability === 'automatic' &&
+        p.dynamic_pricing_mode === 'automatic_by_valid_until' &&
+        ['one_time_event', 'one_time_non_event'].includes(p.revenue_type ?? '')) ||
+      tplIsAutoEvent;
+
+    const missingSnapshot =
+      !p.dynamic_pricing_current_amount || Number(p.dynamic_pricing_current_amount) <= 0;
+
+    if (isAutoEvent && p.expires_at && missingSnapshot) {
+      lazyOrchestratedRef.current = p.id;
+      (async () => {
+        try {
+          if (!hasRules && tplByName?.id) {
+            await applyTemplate(p.id, tplByName.id);
+          }
+          await orchestrateProposalFinancials(p.id, 'editor_open_lazy');
+          invalidateProposalCaches(queryClient, p.id);
+          getPaymentTerms(p.id).then(setPaymentTerms);
+        } catch (e) {
+          console.warn('[ProposalEditor] lazy orchestrate failed:', e);
+        }
+      })();
+    }
+  }, [proposalData, isNewProposal, templates, queryClient]);
+
   // Load context data (account, contact, owner)
   useEffect(() => {
     const loadContextData = async () => {
@@ -556,17 +608,36 @@ export default function ProposalEditor() {
             await savePaymentTermsToDb(savedProposalId);
             console.log('[ProposalEditor] Payment terms saved for new proposal');
           }
+
+          // CRITICAL: Apply template to persist commercial rules (revenue_type,
+          // dynamic_pricing_applicability/mode, validity_strategy, payment_mode, template_name)
+          if (preselectedTemplateId) {
+            try {
+              await applyTemplate(savedProposalId, preselectedTemplateId);
+              console.log('[ProposalEditor] Template commercial rules applied');
+            } catch (e) {
+              console.warn('[ProposalEditor] applyTemplate failed (non-blocking):', e);
+            }
+          }
+
           // ALWAYS recalculate totals — even without items, payment term discount may have changed
           await updateProposalTotals(savedProposalId);
           await syncOpportunityValue(savedProposalId);
           console.log('[ProposalEditor] Totals recalculated and synced (with discount applied)');
-          
+
+          // Orchestrate: ensure dynamic pricing tiers, snapshot, payment defaults
+          try {
+            await orchestrateProposalFinancials(savedProposalId, 'create_with_template');
+          } catch (e) {
+            console.warn('[ProposalEditor] orchestrate failed (non-blocking):', e);
+          }
+
           // Clear draft and invalidate queries
           clearDraft();
           setLastSaved(null);
           hasRestoredFromStorageRef.current = false;
-          queryClient.invalidateQueries({ queryKey: proposalKeys.lists() });
-          
+          invalidateProposalCaches(queryClient, savedProposalId);
+
           // Update state and navigate AFTER saving everything
           setCurrentProposalId(newProposal.id);
           setProposalNumber(newProposal.proposal_number || '');
@@ -594,14 +665,22 @@ export default function ProposalEditor() {
         await updateProposalTotals(savedProposalId);
         await syncOpportunityValue(savedProposalId);
         console.log('[ProposalEditor] Synced proposal totals and opportunity value (with discount applied)');
+
+        // Orchestrate after save: regen tiers, snapshot, payment defaults
+        try {
+          await orchestrateProposalFinancials(savedProposalId, 'editor_save');
+        } catch (e) {
+          console.warn('[ProposalEditor] orchestrate failed (non-blocking):', e);
+        }
       }
 
       // Clear draft after successful save (only matters for new proposals)
       clearDraft();
       setLastSaved(null);
       hasRestoredFromStorageRef.current = false;
-      queryClient.invalidateQueries({ queryKey: proposalKeys.lists() });
-      queryClient.invalidateQueries({ queryKey: proposalKeys.detail(currentProposalId) });
+      if (savedProposalId) {
+        invalidateProposalCaches(queryClient, savedProposalId);
+      }
       console.log('[ProposalEditor] Save completed successfully');
     } catch (error) {
       console.error('[ProposalEditor] Error saving proposal:', error);
@@ -1068,28 +1147,44 @@ export default function ProposalEditor() {
                     <AlertDescription>{paymentTermsError}</AlertDescription>
                   </Alert>
                 )}
-                {currentProposalId && (
-                  <>
-                    <ProposalDynamicPricingPanel
-                      proposalId={currentProposalId}
-                      proposalTotal={itemsTotal}
-                      eventStartDate={(watch as any)('event_start_date') ?? null}
-                      validUntil={watch('expires_at') ?? null}
-                      dynamicPricingApplicability={appliedTemplate?.dynamic_pricing_applicability ?? null}
-                      dynamicPricingMode={appliedTemplate?.dynamic_pricing_mode ?? null}
-                      revenueType={appliedTemplate?.revenue_type ?? null}
-                    />
-                    <ProposalDynamicPaymentPanel proposalId={currentProposalId} />
-                  </>
-                )}
-                <ProposalPaymentTerms 
-                  proposalId={currentProposalId || ''} 
-                  totalAmount={itemsTotal}
-                  terms={paymentTerms} 
-                  onChange={(terms) => { setPaymentTerms(terms); if (terms.length > 0) setPaymentTermsError(null); }}
-                  items={items}
-                  currency={watch('currency')}
-                />
+                {currentProposalId && (() => {
+                  const p: any = proposalData ?? {};
+                  // Use proposal DB fields as primary source of truth, fall back to template
+                  const applicability =
+                    p.dynamic_pricing_applicability ?? appliedTemplate?.dynamic_pricing_applicability ?? null;
+                  const mode =
+                    p.dynamic_pricing_mode ?? appliedTemplate?.dynamic_pricing_mode ?? null;
+                  const revenue =
+                    p.revenue_type ?? appliedTemplate?.revenue_type ?? null;
+                  const isAutoEvent =
+                    applicability === 'automatic' &&
+                    mode === 'automatic_by_valid_until' &&
+                    ['one_time_event', 'one_time_non_event'].includes(revenue ?? '');
+                  return (
+                    <>
+                      <ProposalDynamicPricingPanel
+                        proposalId={currentProposalId}
+                        proposalTotal={itemsTotal}
+                        eventStartDate={(watch as any)('event_start_date') ?? null}
+                        validUntil={watch('expires_at') ?? null}
+                        dynamicPricingApplicability={applicability}
+                        dynamicPricingMode={mode}
+                        revenueType={revenue}
+                      />
+                      <ProposalDynamicPaymentPanel proposalId={currentProposalId} />
+                      {!isAutoEvent && (
+                        <ProposalPaymentTerms
+                          proposalId={currentProposalId}
+                          totalAmount={itemsTotal}
+                          terms={paymentTerms}
+                          onChange={(terms) => { setPaymentTerms(terms); if (terms.length > 0) setPaymentTermsError(null); }}
+                          items={items}
+                          currency={watch('currency')}
+                        />
+                      )}
+                    </>
+                  );
+                })()}
               </TabsContent>
 
               <TabsContent value="team">
