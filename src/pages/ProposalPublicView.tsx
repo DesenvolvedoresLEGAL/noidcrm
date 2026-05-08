@@ -493,8 +493,8 @@ export default function ProposalPublicView() {
           acceptor_name: acceptorName,
           acceptor_document: acceptorDocument,
           approved_amount: approvedAmountLocal,
-          approval_snapshot: approvalSnapshot,
-          approved_payment_schedule: { schedule: approvedSchedule },
+          approval_snapshot: approvalSnapshot as any,
+          approved_payment_schedule: { schedule: approvedSchedule } as any,
           approved_dynamic_pricing_tier_id: snap?.current_tier_id ?? null,
         })
         .eq('id', proposalId);
