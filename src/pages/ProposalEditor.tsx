@@ -1040,19 +1040,15 @@ export default function ProposalEditor() {
                 )}
                 {currentProposalId && (
                   <>
-                    {appliedTemplate?.dynamic_pricing_applicability === 'none' ? (
-                      <Alert>
-                        <AlertDescription>
-                          Tabela dinâmica não aplicável para este template.
-                        </AlertDescription>
-                      </Alert>
-                    ) : (
-                      <ProposalDynamicPricingPanel
-                        proposalId={currentProposalId}
-                        proposalTotal={itemsTotal}
-                        eventStartDate={(watch as any)('event_start_date') ?? null}
-                      />
-                    )}
+                    <ProposalDynamicPricingPanel
+                      proposalId={currentProposalId}
+                      proposalTotal={itemsTotal}
+                      eventStartDate={(watch as any)('event_start_date') ?? null}
+                      validUntil={watch('expires_at') ?? null}
+                      dynamicPricingApplicability={appliedTemplate?.dynamic_pricing_applicability ?? null}
+                      dynamicPricingMode={appliedTemplate?.dynamic_pricing_mode ?? null}
+                      revenueType={appliedTemplate?.revenue_type ?? null}
+                    />
                     <ProposalDynamicPaymentPanel proposalId={currentProposalId} />
                   </>
                 )}
