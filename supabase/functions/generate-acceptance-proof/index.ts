@@ -194,7 +194,7 @@ serve(async (req: Request) => {
           organization_id: proposal.organization_id,
           opportunity_id: opportunity.id,
           outcome: 'won',
-          win_reason_id: winReasonId || null,
+          win_reason_id: safeWinReasonId,
           key_differentiator: keyDifferentiator || null,
           customer_feedback: customerFeedback || null,
           final_value: proposal.total_amount || proposal.value || opportunity.valor_previsto,
@@ -220,7 +220,7 @@ serve(async (req: Request) => {
             acceptor_document: acceptorDocument,
             acceptor_position: acceptorPosition,
           };
-          if (winReasonId) updateData.win_reason_id = winReasonId;
+          if (safeWinReasonId) updateData.win_reason_id = safeWinReasonId;
           if (keyDifferentiator) updateData.key_differentiator = keyDifferentiator;
           if (customerFeedback) updateData.customer_feedback = customerFeedback;
 
