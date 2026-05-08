@@ -80,6 +80,14 @@ async function runRoleplayPipeline(sessionId: string, authHeader: string) {
     return { evaluation: session.scores_json as EvaluationPayload, status: 'already_complete' as const };
   }
 
+  if (session.current_phase === 'evaluating' && session.updated_at) {
+    const evaluatingForMs = Date.now() - new Date(session.updated_at).getTime();
+    if (evaluatingForMs >= 0 && evaluatingForMs < 120_000) {
+      console.log('[RoleplayFinalize] evaluation already running, skipping duplicate invoke', { sessionId, evaluatingForMs });
+      return { evaluation: null, status: 'processing' as const };
+    }
+  }
+
   // Load messages
   const { data: messagesRaw, error: messagesError } = await adminClient
     .from('roleplay_messages')
@@ -120,8 +128,21 @@ async function runRoleplayPipeline(sessionId: string, authHeader: string) {
     const evalResponse = await userClient.functions.invoke('ai-evaluate-session', {
       body: { sessionId, rubricId: session.rubric_id, messages: cappedMessages },
     });
-    if (evalResponse.error) throw evalResponse.error;
-    aiData = evalResponse.data;
+    if (evalResponse.error) {
+      const { data: maybeCompleted } = await adminClient
+        .from('roleplay_sessions')
+        .select('score_overall,scores_json')
+        .eq('id', sessionId)
+        .maybeSingle();
+      if (hasValidEvaluation(maybeCompleted)) {
+        console.log('[RoleplayFinalize] evaluation persisted despite invoke error', { sessionId });
+        aiData = { evaluation: maybeCompleted?.scores_json };
+      } else {
+        throw evalResponse.error;
+      }
+    } else {
+      aiData = evalResponse.data;
+    }
   } catch (err) {
     const evaluationErrorMessage = err instanceof Error ? err.message : String(err);
     console.error('[RoleplayFinalize] ai-evaluate-session failed', evaluationErrorMessage);
