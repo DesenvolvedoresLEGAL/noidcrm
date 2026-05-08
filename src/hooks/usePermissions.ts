@@ -43,6 +43,7 @@ const VISIBLE_MENU_ITEMS: Record<string, string[]> = {
   operations: [
     '/app/dashboard', '/app/opportunities',
     '/app/activities', '/app/accounts', '/app/contracts', '/app/reports',
+    '/app/operations/inventory',
     '/app/insights', '/app/intelligence/kairos', '/app/scoring',
     '/app/intelligence/vibe', '/app/intelligence/winloss',
     '/app/roleplay',

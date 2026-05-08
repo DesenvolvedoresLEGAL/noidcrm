@@ -24,6 +24,7 @@ import {
   Trophy,
   Sparkles,
   Compass,
+  Boxes,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -69,6 +70,9 @@ const ALL_MENU_ITEMS: MenuItem[] = [
   { path: '/app/contracts', label: 'Contratos', icon: FileCheck, section: 'gestao' },
   { path: '/app/forecast', label: 'Forecast', icon: TrendingUp, section: 'gestao' },
   { path: '/app/reports', label: 'Relatórios', icon: BarChart3, section: 'gestao' },
+
+  // OPERAÇÕES
+  { path: '/app/operations/inventory', label: 'Inventário', icon: Boxes, section: 'operacoes' },
   
   // INTELIGÊNCIA
   { path: '/app/insights', label: 'Insights', icon: Lightbulb, section: 'inteligencia' },
@@ -97,6 +101,7 @@ const ALL_MENU_ITEMS: MenuItem[] = [
 const SECTION_LABELS: Record<string, string> = {
   principal: '',
   gestao: 'Gestão',
+  operacoes: 'Operações',
   inteligencia: 'Inteligência',
   gtm: 'GTM',
   objetivos: 'Objetivos',
@@ -163,6 +168,7 @@ export function AppSidebar() {
 
   const principalItems = getItemsForSection('principal');
   const gestaoItems = getItemsForSection('gestao');
+  const operacoesItems = getItemsForSection('operacoes');
   const inteligenciaItems = getItemsForSection('inteligencia');
   const objetivosItems = getItemsForSection('objetivos');
   const gtmItems = getItemsForSection('gtm');
@@ -240,6 +246,7 @@ export function AppSidebar() {
         <SidebarContent className="px-2 py-2">
           {renderSection(principalItems, SECTION_LABELS.principal, 'principal')}
           {renderSection(gestaoItems, SECTION_LABELS.gestao, 'gestao')}
+          {renderSection(operacoesItems, SECTION_LABELS.operacoes, 'operacoes')}
           {renderSection(inteligenciaItems, SECTION_LABELS.inteligencia, 'inteligencia')}
           {renderSection(objetivosItems, SECTION_LABELS.objetivos, 'objetivos')}
           {renderSection(gtmItems, SECTION_LABELS.gtm, 'gtm')}

@@ -59,6 +59,7 @@ const AccountEditor = lazy(() => import("./pages/AccountEditor"));
 const OpportunityDetail = lazy(() => import("./pages/OpportunityDetail"));
 const Contacts = lazy(() => import("./pages/Contacts"));
 const Contracts = lazy(() => import("./pages/Contracts"));
+const Inventory = lazy(() => import("./pages/operations/Inventory"));
 const Sequences = lazy(() => import("./pages/Sequences"));
 const Reports = lazy(() => import("./pages/Reports"));
 const Settings = lazy(() => import("./pages/Settings"));
@@ -528,6 +529,16 @@ const App = () => (
                   <ProtectedRoute>
                     <LazyRoute>
                       <Contracts />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/operations/inventory"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <Inventory />
                     </LazyRoute>
                   </ProtectedRoute>
                 }
