@@ -13121,6 +13121,325 @@ export type Database = {
           },
         ]
       }
+      inventory_categories: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          item_kind: Database["public"]["Enums"]["inventory_item_kind"]
+          name: string
+          organization_id: string
+          sort_order: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          item_kind?: Database["public"]["Enums"]["inventory_item_kind"]
+          name: string
+          organization_id: string
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          item_kind?: Database["public"]["Enums"]["inventory_item_kind"]
+          name?: string
+          organization_id?: string
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      inventory_items: {
+        Row: {
+          acquisition_cost: number | null
+          acquisition_date: string | null
+          asset_code: string | null
+          brand: string | null
+          category_id: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          item_kind: Database["public"]["Enums"]["inventory_item_kind"]
+          location_id: string | null
+          metadata: Json
+          model: string | null
+          name: string
+          notes: string | null
+          organization_id: string
+          quantity_available: number
+          quantity_minimum: number | null
+          quantity_total: number
+          serial_number: string | null
+          status: Database["public"]["Enums"]["inventory_item_status"]
+          unit_of_measure: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          acquisition_cost?: number | null
+          acquisition_date?: string | null
+          asset_code?: string | null
+          brand?: string | null
+          category_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          item_kind: Database["public"]["Enums"]["inventory_item_kind"]
+          location_id?: string | null
+          metadata?: Json
+          model?: string | null
+          name: string
+          notes?: string | null
+          organization_id: string
+          quantity_available?: number
+          quantity_minimum?: number | null
+          quantity_total?: number
+          serial_number?: string | null
+          status?: Database["public"]["Enums"]["inventory_item_status"]
+          unit_of_measure?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          acquisition_cost?: number | null
+          acquisition_date?: string | null
+          asset_code?: string | null
+          brand?: string | null
+          category_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          item_kind?: Database["public"]["Enums"]["inventory_item_kind"]
+          location_id?: string | null
+          metadata?: Json
+          model?: string | null
+          name?: string
+          notes?: string | null
+          organization_id?: string
+          quantity_available?: number
+          quantity_minimum?: number | null
+          quantity_total?: number
+          serial_number?: string | null
+          status?: Database["public"]["Enums"]["inventory_item_status"]
+          unit_of_measure?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_items_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_items_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_locations: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          location_type: Database["public"]["Enums"]["inventory_location_type"]
+          name: string
+          organization_id: string
+          sort_order: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          location_type?: Database["public"]["Enums"]["inventory_location_type"]
+          name: string
+          organization_id: string
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          location_type?: Database["public"]["Enums"]["inventory_location_type"]
+          name?: string
+          organization_id?: string
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      inventory_movements: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          from_location_id: string | null
+          from_status:
+            | Database["public"]["Enums"]["inventory_item_status"]
+            | null
+          id: string
+          item_id: string | null
+          metadata: Json
+          movement_type: Database["public"]["Enums"]["inventory_movement_type"]
+          notes: string | null
+          organization_id: string
+          quantity: number
+          reason: string | null
+          related_entity_id: string | null
+          related_entity_type: string | null
+          to_location_id: string | null
+          to_status: Database["public"]["Enums"]["inventory_item_status"] | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          from_location_id?: string | null
+          from_status?:
+            | Database["public"]["Enums"]["inventory_item_status"]
+            | null
+          id?: string
+          item_id?: string | null
+          metadata?: Json
+          movement_type: Database["public"]["Enums"]["inventory_movement_type"]
+          notes?: string | null
+          organization_id: string
+          quantity?: number
+          reason?: string | null
+          related_entity_id?: string | null
+          related_entity_type?: string | null
+          to_location_id?: string | null
+          to_status?:
+            | Database["public"]["Enums"]["inventory_item_status"]
+            | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          from_location_id?: string | null
+          from_status?:
+            | Database["public"]["Enums"]["inventory_item_status"]
+            | null
+          id?: string
+          item_id?: string | null
+          metadata?: Json
+          movement_type?: Database["public"]["Enums"]["inventory_movement_type"]
+          notes?: string | null
+          organization_id?: string
+          quantity?: number
+          reason?: string | null
+          related_entity_id?: string | null
+          related_entity_type?: string | null
+          to_location_id?: string | null
+          to_status?:
+            | Database["public"]["Enums"]["inventory_item_status"]
+            | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_movements_from_location_id_fkey"
+            columns: ["from_location_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_movements_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_movements_to_location_id_fkey"
+            columns: ["to_location_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_status_history: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          from_status:
+            | Database["public"]["Enums"]["inventory_item_status"]
+            | null
+          id: string
+          item_id: string
+          metadata: Json
+          organization_id: string
+          reason: string | null
+          to_status: Database["public"]["Enums"]["inventory_item_status"]
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          from_status?:
+            | Database["public"]["Enums"]["inventory_item_status"]
+            | null
+          id?: string
+          item_id: string
+          metadata?: Json
+          organization_id: string
+          reason?: string | null
+          to_status: Database["public"]["Enums"]["inventory_item_status"]
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          from_status?:
+            | Database["public"]["Enums"]["inventory_item_status"]
+            | null
+          id?: string
+          item_id?: string
+          metadata?: Json
+          organization_id?: string
+          reason?: string | null
+          to_status?: Database["public"]["Enums"]["inventory_item_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_status_history_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ip_trial_attempts: {
         Row: {
           attempted_at: string
@@ -31763,6 +32082,10 @@ export type Database = {
         Returns: string
       }
       user_belongs_to_tenant: { Args: { _tenant_id: string }; Returns: boolean }
+      user_can_access_inventory: {
+        Args: { p_org_id: string }
+        Returns: boolean
+      }
       user_can_access_proposal: {
         Args: { _opportunity_id: string; _organization_id: string }
         Returns: boolean
@@ -31877,6 +32200,34 @@ export type Database = {
         | "note_added"
         | "task_completed"
         | "other"
+      inventory_item_kind: "serialized" | "quantity"
+      inventory_item_status:
+        | "available"
+        | "blocked"
+        | "maintenance"
+        | "damaged"
+        | "retired"
+        | "lost"
+      inventory_location_type:
+        | "internal"
+        | "external"
+        | "maintenance"
+        | "event"
+        | "technician"
+        | "lost"
+        | "retired"
+        | "other"
+      inventory_movement_type:
+        | "initial_entry"
+        | "manual_adjustment"
+        | "location_change"
+        | "status_change"
+        | "maintenance_entry"
+        | "maintenance_exit"
+        | "damage_report"
+        | "loss_report"
+        | "retirement"
+        | "release"
       memory_type:
         | "objection"
         | "win_pattern"
@@ -32165,6 +32516,37 @@ export const Constants = {
         "note_added",
         "task_completed",
         "other",
+      ],
+      inventory_item_kind: ["serialized", "quantity"],
+      inventory_item_status: [
+        "available",
+        "blocked",
+        "maintenance",
+        "damaged",
+        "retired",
+        "lost",
+      ],
+      inventory_location_type: [
+        "internal",
+        "external",
+        "maintenance",
+        "event",
+        "technician",
+        "lost",
+        "retired",
+        "other",
+      ],
+      inventory_movement_type: [
+        "initial_entry",
+        "manual_adjustment",
+        "location_change",
+        "status_change",
+        "maintenance_entry",
+        "maintenance_exit",
+        "damage_report",
+        "loss_report",
+        "retirement",
+        "release",
       ],
       memory_type: [
         "objection",
