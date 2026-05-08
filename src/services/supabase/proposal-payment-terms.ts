@@ -29,6 +29,12 @@ export interface PaymentTerm {
   auto_renewal?: boolean;
   
   comments?: string;
+
+  // PRICE UX 1.0.3 — payment condition
+  payment_condition?: 'upfront' | 'split_50_50' | 'split_30_70' | 'installments' | 'custom_schedule';
+  second_payment_due_strategy?: 'post_event' | 'after_valid_until' | 'manual_date' | null;
+  second_payment_due_date?: string | null;
+
   created_at?: string;
   updated_at?: string;
 }
@@ -37,7 +43,9 @@ export interface Installment {
   number: number;
   dueDate: string;
   amount: number;
-  type: 'entry' | 'installment';
+  /** 'upfront' = pagamento à vista (linha única); 'entry' = entrada de split; 'balance' = saldo de split; 'installment' = parcela tradicional */
+  type: 'upfront' | 'entry' | 'balance' | 'installment';
+  label?: string;
 }
 
 export async function getPaymentTerms(proposalId: string): Promise<PaymentTerm[]> {
