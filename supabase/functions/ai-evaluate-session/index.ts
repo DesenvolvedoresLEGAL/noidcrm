@@ -376,6 +376,14 @@ Regras do JSON:
     // Call AI
     console.log('[ai-evaluate-session] Calling AI for evaluation...');
     let aiResult;
+    interface EvaluationResult {
+      dimensions: Array<{ key: string; score: number; feedback: string; weight: number }>;
+      overall_score: number;
+      passed: boolean;
+      summary: string;
+      _extractedViaFallback?: boolean;
+      _contingencyFallback?: boolean;
+    }
     let evaluation: EvaluationResult | null = null;
     try {
       aiResult = await callOpenAIWithGuardrails({
@@ -425,45 +433,38 @@ Regras do JSON:
       responseLength: aiContent.length,
       responseHash: simpleHash(aiContent),
     });
-    await logAIUsage(supabase, {
-      organization_id: rubric.organization_id ?? null,
-      user_id: user?.id ?? null,
-      feature: 'ai_evaluate_session',
-      action: 'evaluate_session',
-      entity_type: 'roleplay_session',
-      entity_id: sessionId,
-      model_used: aiResult.metadata.model ?? 'gpt-5-mini',
-      tokens_input: aiResult.usage?.prompt_tokens ?? null,
-      tokens_output: aiResult.usage?.completion_tokens ?? null,
-      tokens_total: aiResult.usage?.total_tokens ?? null,
-      success: true,
-      latency_ms: aiResult.metadata.durationMs ?? null,
-      request_metadata: {
-        function_name: 'ai-evaluate-session',
-        max_completion_tokens: 1000,
-        retry_count: aiResult.metadata.retryCount,
-        attempts: (aiResult.metadata.retryCount ?? 0) + 1,
-        timed_out: aiResult.metadata.timedOut ?? false,
-        response_format: 'json_object',
-      },
-      response_metadata: {
-        provider: 'openai',
-        finish_reason: aiResult.metadata.finishReason ?? null,
-        response_length: aiContent.length,
-        response_hash: simpleHash(aiContent),
-      },
-    });
+    if (aiResult) {
+      await logAIUsage(supabase, {
+        organization_id: rubric.organization_id ?? null,
+        user_id: user?.id ?? null,
+        feature: 'ai_evaluate_session',
+        action: 'evaluate_session',
+        entity_type: 'roleplay_session',
+        entity_id: sessionId,
+        model_used: aiResult.metadata.model ?? 'gpt-5-nano',
+        tokens_input: aiResult.usage?.prompt_tokens ?? null,
+        tokens_output: aiResult.usage?.completion_tokens ?? null,
+        tokens_total: aiResult.usage?.total_tokens ?? null,
+        success: true,
+        latency_ms: aiResult.metadata.durationMs ?? null,
+        request_metadata: {
+          function_name: 'ai-evaluate-session',
+          max_completion_tokens: 2500,
+          retry_count: aiResult.metadata.retryCount,
+          attempts: (aiResult.metadata.retryCount ?? 0) + 1,
+          timed_out: aiResult.metadata.timedOut ?? false,
+          response_format: 'json_object',
+        },
+        response_metadata: {
+          provider: 'openai',
+          finish_reason: (aiResult.metadata as any).finishReason ?? null,
+          response_length: aiContent.length,
+          response_hash: simpleHash(aiContent),
+        },
+      });
+    }
 
     // Parse evaluation with robust error handling
-    interface EvaluationResult {
-      dimensions: Array<{ key: string; score: number; feedback: string; weight: number }>;
-      overall_score: number;
-      passed: boolean;
-      summary: string;
-      _extractedViaFallback?: boolean;
-    }
-    
-    let evaluation: EvaluationResult | null = null;
     let parseAttempts = 0;
     const maxAttempts = 3;
     
