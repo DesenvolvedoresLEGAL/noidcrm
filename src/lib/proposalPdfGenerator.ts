@@ -514,10 +514,22 @@ export async function generateProposalPDFClient(
   const paymentDiscountPercent = proposal.discount_percent || 0;
   const paymentDiscountAmount = oneTimeTotal * (paymentDiscountPercent / 100);
   const oneTimeWithDiscount = oneTimeTotal - paymentDiscountAmount;
-  
+
+  // Dynamic pricing breakdown — when active, vigent value supersedes the items subtotal
+  const dpSnapshot: any = (proposal as any)?.dynamic_pricing_snapshot ?? null;
+  const dpEnabled = !!(proposal as any)?.dynamic_pricing_enabled;
+  const dpBreakdown = getDynamicPricingBreakdown(
+    dpEnabled ? dpSnapshot : null,
+    oneTimeTotal,
+  );
+  const showDpBreakdown = dpBreakdown.active && dpBreakdown.hasAdjustment;
+  const effectiveOneTimeForTotal = dpBreakdown.active
+    ? dpBreakdown.current
+    : oneTimeWithDiscount;
+
   // Calculate grand total with discount applied
   const recurringContractTotal = recurringPayment?.contract_total || recurringMRR * (recurringPayment?.contract_months || 12);
-  const grandTotal = oneTimeWithDiscount + recurringContractTotal;
+  const grandTotal = effectiveOneTimeForTotal + recurringContractTotal;
 
   // Helper function to render items table
   const renderItemsTable = (tableItems: ProposalItem[], title: string, isRecurring: boolean) => {
