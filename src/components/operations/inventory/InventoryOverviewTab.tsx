@@ -33,6 +33,7 @@ import {
 import { useInventoryOverview } from '@/hooks/operations/useInventoryOverview';
 import { useInventoryPreReservationsOverview } from '@/hooks/operations/useInventoryPreReservations';
 import type { OverviewItemRow } from '@/services/operations/inventoryOverview';
+import { InventoryOperationalCapacityBlock } from './InventoryOperationalCapacityBlock';
 
 interface Props {
   onNavigateToItems?: () => void;
