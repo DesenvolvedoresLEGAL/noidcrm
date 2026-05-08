@@ -112,3 +112,35 @@ export function useCheckInventoryReservationConflict() {
       checkReservationConflict(input),
   });
 }
+
+export function useUpdateInventoryReservationOperationalStatus() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: (input: {
+      reservation_id: string;
+      new_status: ReservationStatus;
+      notes?: string | null;
+    }) => updateReservationOperationalStatus(input),
+    onSuccess: invalidate,
+  });
+}
+
+export function useSetInventoryReturnCondition() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: (input: {
+      reservation_allocation_id: string;
+      return_condition: ReturnCondition;
+      return_notes?: string | null;
+    }) => setReturnCondition(input),
+    onSuccess: invalidate,
+  });
+}
+
+export function useInventoryOperationEvents(reservationId?: string | null) {
+  return useQuery({
+    queryKey: [...baseKey, 'events', reservationId],
+    queryFn: () => getOperationEvents(reservationId as string),
+    enabled: !!reservationId,
+  });
+}
