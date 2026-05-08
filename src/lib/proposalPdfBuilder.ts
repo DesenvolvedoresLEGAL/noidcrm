@@ -33,6 +33,8 @@ export interface ProposalPDFData {
   organization: any;
   layout: any;
   payment_method: string;
+  dynamic_pricing_enabled?: boolean;
+  dynamic_pricing_snapshot?: any;
 }
 
 // Match the PaymentInstallment interface from proposalPdfGenerator.ts
