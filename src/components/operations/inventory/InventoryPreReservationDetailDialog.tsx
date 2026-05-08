@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Calendar, ChevronDown, ChevronRight, PackagePlus, RefreshCw, Trash2, XCircle } from 'lucide-react';
@@ -175,7 +175,7 @@ export function InventoryPreReservationDetailDialog({ id, open, onOpenChange }: 
                       </TableRow>
                     ) : (
                       r.items.map((it: any) => (
-                        <>
+                        <Fragment key={it.id}>
                           <TableRow key={it.id}>
                             <TableCell>
                               <Button
@@ -238,7 +238,7 @@ export function InventoryPreReservationDetailDialog({ id, open, onOpenChange }: 
                               </TableCell>
                             </TableRow>
                           )}
-                        </>
+                        </Fragment>
                       ))
                     )}
                   </TableBody>
