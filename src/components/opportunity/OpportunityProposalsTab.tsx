@@ -441,12 +441,12 @@ export function OpportunityProposalsTab({ opportunityId, pipelineType }: Opportu
                       <Calendar className="h-4 w-4 text-orange-600" />
                       <div>
                       <p className="text-sm font-semibold">
-                          {firstInstallmentDate 
-                            ? formatDateBR(firstInstallmentDate)
+                          {proposal.expires_at
+                            ? formatDateBR(proposal.expires_at)
                             : '-'
                           }
                         </p>
-                        <p className="text-xs text-muted-foreground">Vencimento</p>
+                        <p className="text-xs text-muted-foreground">Validade</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
