@@ -241,6 +241,74 @@ export function InventoryOverviewTab({ onNavigateToItems }: Props = {}) {
         </div>
       </div>
 
+      {/* Bloco — Inventário por categoria */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Inventário por categoria</CardTitle>
+          <CardDescription>
+            Visão consolidada de SKUs, unidades e itens críticos agrupados por categoria.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {ov.categoryOverviewLoading ? (
+            <div className="space-y-2">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Skeleton key={i} className="h-9 w-full" />
+              ))}
+            </div>
+          ) : ov.categoryOverview.length === 0 ? (
+            <EmptyState
+              icon={FolderTree}
+              title="Sem categorias com itens"
+              description="Cadastre categorias e classifique itens para acompanhar o inventário por categoria."
+            />
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Categoria</TableHead>
+                    <TableHead className="text-right">SKUs</TableHead>
+                    <TableHead className="text-right">Unidades</TableHead>
+                    <TableHead className="text-right">Disponíveis</TableHead>
+                    <TableHead className="text-right">Em manutenção</TableHead>
+                    <TableHead className="text-right">Itens críticos</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {ov.categoryOverview.map((c) => (
+                    <TableRow key={c.category_id}>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          {c.category_color && (
+                            <span
+                              className="h-2.5 w-2.5 rounded-full border border-border/40"
+                              style={{ backgroundColor: c.category_color }}
+                            />
+                          )}
+                          {c.category_name}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right text-sm">{c.total_skus}</TableCell>
+                      <TableCell className="text-right text-sm">{c.total_units}</TableCell>
+                      <TableCell className="text-right text-sm text-emerald-600 dark:text-emerald-400">
+                        {c.available_units}
+                      </TableCell>
+                      <TableCell className="text-right text-sm">{c.maintenance_units}</TableCell>
+                      <TableCell className="text-right">
+                        <Badge variant={c.critical_items > 0 ? 'destructive' : 'outline'}>
+                          {c.critical_items}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Bloco 3 — Alertas operacionais */}
       <Card>
         <CardHeader>
