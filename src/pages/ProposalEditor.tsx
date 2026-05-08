@@ -377,6 +377,33 @@ export default function ProposalEditor() {
     }
   }, [currentProposalId, isNewProposal]);
 
+  // Lazy orchestration: when an existing proposal is eligible (Evento automático)
+  // but has no current snapshot/tiers, run orchestrator once to materialize it.
+  const lazyOrchestratedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!proposalData || isNewProposal) return;
+    const p: any = proposalData;
+    if (lazyOrchestratedRef.current === p.id) return;
+
+    const isEventAuto =
+      p.dynamic_pricing_applicability === 'automatic' &&
+      p.dynamic_pricing_mode === 'automatic_by_valid_until' &&
+      ['one_time_event', 'one_time_non_event'].includes(p.revenue_type ?? '');
+
+    const missingSnapshot =
+      !p.dynamic_pricing_current_amount || Number(p.dynamic_pricing_current_amount) <= 0;
+
+    if (isEventAuto && p.expires_at && missingSnapshot) {
+      lazyOrchestratedRef.current = p.id;
+      orchestrateProposalFinancials(p.id, 'editor_open_lazy')
+        .then(() => {
+          invalidateProposalCaches(queryClient, p.id);
+          getPaymentTerms(p.id).then(setPaymentTerms);
+        })
+        .catch((e) => console.warn('[ProposalEditor] lazy orchestrate failed:', e));
+    }
+  }, [proposalData, isNewProposal, queryClient]);
+
   // Load context data (account, contact, owner)
   useEffect(() => {
     const loadContextData = async () => {
