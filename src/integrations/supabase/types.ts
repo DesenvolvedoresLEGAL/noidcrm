@@ -13123,45 +13123,121 @@ export type Database = {
       }
       inventory_categories: {
         Row: {
+          color: string | null
           created_at: string
           created_by: string | null
           description: string | null
+          icon: string | null
           id: string
           is_active: boolean
           item_kind: Database["public"]["Enums"]["inventory_item_kind"]
           name: string
           organization_id: string
+          slug: string
           sort_order: number
           updated_at: string
           updated_by: string | null
         }
         Insert: {
+          color?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
+          icon?: string | null
           id?: string
           is_active?: boolean
           item_kind?: Database["public"]["Enums"]["inventory_item_kind"]
           name: string
           organization_id: string
+          slug: string
           sort_order?: number
           updated_at?: string
           updated_by?: string | null
         }
         Update: {
+          color?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
+          icon?: string | null
           id?: string
           is_active?: boolean
           item_kind?: Database["public"]["Enums"]["inventory_item_kind"]
           name?: string
           organization_id?: string
+          slug?: string
           sort_order?: number
           updated_at?: string
           updated_by?: string | null
         }
         Relationships: []
+      }
+      inventory_families: {
+        Row: {
+          category_id: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          organization_id: string
+          slug: string
+          sort_order: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          category_id: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          organization_id: string
+          slug: string
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          category_id?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          organization_id?: string
+          slug?: string
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_families_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_families_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_families_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_report_legacy_retirement_readiness_v2"
+            referencedColumns: ["organization_id"]
+          },
+        ]
       }
       inventory_items: {
         Row: {
@@ -13172,7 +13248,9 @@ export type Database = {
           category_id: string | null
           created_at: string
           created_by: string | null
+          criticality: string
           description: string | null
+          family_id: string | null
           id: string
           item_kind: Database["public"]["Enums"]["inventory_item_kind"]
           location_id: string | null
@@ -13180,6 +13258,7 @@ export type Database = {
           model: string | null
           name: string
           notes: string | null
+          operational_type: string
           organization_id: string
           quantity_available: number
           quantity_minimum: number | null
@@ -13198,7 +13277,9 @@ export type Database = {
           category_id?: string | null
           created_at?: string
           created_by?: string | null
+          criticality?: string
           description?: string | null
+          family_id?: string | null
           id?: string
           item_kind: Database["public"]["Enums"]["inventory_item_kind"]
           location_id?: string | null
@@ -13206,6 +13287,7 @@ export type Database = {
           model?: string | null
           name: string
           notes?: string | null
+          operational_type?: string
           organization_id: string
           quantity_available?: number
           quantity_minimum?: number | null
@@ -13224,7 +13306,9 @@ export type Database = {
           category_id?: string | null
           created_at?: string
           created_by?: string | null
+          criticality?: string
           description?: string | null
+          family_id?: string | null
           id?: string
           item_kind?: Database["public"]["Enums"]["inventory_item_kind"]
           location_id?: string | null
@@ -13232,6 +13316,7 @@ export type Database = {
           model?: string | null
           name?: string
           notes?: string | null
+          operational_type?: string
           organization_id?: string
           quantity_available?: number
           quantity_minimum?: number | null
@@ -13248,6 +13333,13 @@ export type Database = {
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "inventory_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_items_family_id_fkey"
+            columns: ["family_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_families"
             referencedColumns: ["id"]
           },
           {
@@ -31550,6 +31642,22 @@ export type Database = {
           table_name: string
         }[]
       }
+      get_inventory_category_overview: {
+        Args: { p_org_id: string }
+        Returns: {
+          available_units: number
+          category_color: string
+          category_icon: string
+          category_id: string
+          category_name: string
+          category_slug: string
+          critical_items: number
+          maintenance_units: number
+          reserved_units: number
+          total_skus: number
+          total_units: number
+        }[]
+      }
       get_notification_admin_metrics: {
         Args: { p_from: string; p_organization_id: string; p_to: string }
         Returns: {
@@ -31937,6 +32045,7 @@ export type Database = {
         }
         Returns: number
       }
+      normalize_inventory_slug: { Args: { input: string }; Returns: string }
       preview_next_proposal_number: {
         Args: { p_org_id: string; p_prefix?: string }
         Returns: string
@@ -32056,6 +32165,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      unaccent: { Args: { "": string }; Returns: string }
       unblock_trial: {
         Args: { by_user_id: string; org_id: string; reason?: string }
         Returns: boolean
