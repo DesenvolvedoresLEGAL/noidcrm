@@ -212,8 +212,12 @@ export function ProposalEditorModal({
       setPublicToken(proposalData.public_token);
       setProposalNumber(proposalData.proposal_number || '');
       setProposalVersion(proposalData.proposal_version || 1);
+      if (proposalData.template_name && templates.length) {
+        const t = templates.find((x) => x.name === proposalData.template_name);
+        if (t) setAppliedTemplate(t);
+      }
     }
-  }, [proposalData, reset]);
+  }, [proposalData, reset, templates]);
 
   // Load proposal items
   useEffect(() => {
