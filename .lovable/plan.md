@@ -1,105 +1,67 @@
 ## Diagnóstico
 
-Após inspeção do banco e do hook `useWinLossData`, identifiquei a causa raiz de cada problema:
+Investiguei e encontrei a causa-raiz pela qual **Top Motivos de Ganho** aparece "Não informado 100% (17)" e **Diferenciais Decisivos** aparece zerado, apesar de o modal de aceite exigir essas respostas.
 
-### 1. "Top Motivos de Perda" mostra o diagnóstico (texto longo) em vez do motivo
-No hook (`useWinLossData.ts` L243-247), a agregação faz:
-```ts
-const reason = l.reason_seller || l.reason?.name || 'Não informado';
+### Evidências
+
+**1. Não existe NENHUM `win_loss_records` com `outcome='won'` nos últimos 90 dias.**
 ```
-`reason_seller` está populado com o **texto livre do diagnóstico** ("Cliente não retorna os contatos…"), então ele vence. Por isso vemos o diagnóstico no card.
+outcome | total | with_reason | with_diff | with_feedback
+lost    |  101  |      0      |     0     |       0
+(zero linhas para outcome='won')
+```
 
-### 2. "Top Motivos de Ganho" sempre "Não informado"
-Há **60 records** com `win_reason_id` preenchido, mas o hook na linha 229 hardcoda `win_reason_name: undefined` ("win_reason join removed for stability"). Resultado: 100% cai em "Não informado".
+**2. Mesmo as 17 oportunidades ganhas com proposta aceita (CARDAPIO WEB, COMPASS, RZD, FALAE, HC, MAIS MU, etc.) NÃO têm registro em `win_loss_records`.**
 
-### 3. "Diferenciais Decisivos" vazio na UI
-Há **36 records** com `key_differentiator`. O hook agrega corretamente, mas armazena códigos crus (`price`, `service`, `relationship`). Provavelmente está renderizando, só que com labels feios — confirmar e aplicar `WIN_CATEGORY_LABELS`.
+### Causa-raiz (dois bugs encadeados em `src/pages/ProposalPublicView.tsx`)
 
-### 4. "Feedback dos Clientes" parece vazio
-Filtro exige `recorded_by_customer = true` E `customer_feedback != null`. No banco só **7 records** atendem. Funciona, só tem pouco volume — vou relaxar para mostrar feedback mesmo quando `recorded_by_customer` é null mas o texto existe.
+**Bug A — `loadWinReasons()` é definida mas NUNCA é chamada.**
+O estado `winReasons` fica sempre `[]`, então o `<Select>` cai no **fallback hardcoded**:
+```
+best_proposal, price, quality, trust, relationship, deadline, other
+```
 
-### 5. Sem rastreabilidade de aprovações/reprovações de propostas
-A tabela `proposals` já guarda tudo: `acceptor_name`, `acceptor_email`, `acceptor_position`, `accepted_at`, `declined_at`, `declined_reason`, `acceptor_ip`. Não existe view consolidando isso no Hub.
+**Bug B — Esses ids do fallback NÃO são UUIDs.**
+São strings literais. O `handleAccept` envia `winReasonId="best_proposal"` para a edge function `generate-acceptance-proof`, que tenta inserir em `win_loss_records.win_reason_id` (UUID FK → `win_reasons.id`). A inserção quebra por **FK violation** e é engolida pelo `try/catch` (linha 226-229 da edge function), sem lançar erro pro usuário. Resultado: **nenhum win_loss_record é criado, levando junto o `key_differentiator` e o `customer_feedback`**.
 
----
-
-## Plano (apenas frontend + 1 hook novo, sem alterar schema)
-
-### Passo 1 — Corrigir agregações em `src/hooks/useWinLossData.ts`
-
-**a) Top Motivos de Perda (macro + específico):**
-- Buscar o nome do motivo via join (`loss_reasons!reason_id(name, category)`) no select de `win_loss_records`.
-- Trocar a fonte da agregação para: `record.loss_reason.name` (específico) com fallback para `opportunity.loss_reason.name`. **Nunca usar `reason_seller`** (que é diagnóstico).
-- Adicionar nova série `lossReasonsByMacro: Array<{ category, label, count, specifics: Array<{ name, count }> }>` agrupando por `category` (Concorrência, Preço, Timing…) com expansão de motivos específicos.
-
-**b) Top Motivos de Ganho:**
-- Adicionar fetch de `win_reasons` (id, name) para os IDs presentes nos records.
-- Popular `win_reason_name` no merge (linha ~229), eliminando o `undefined` hardcoded.
-
-**c) Diferenciais Decisivos:**
-- Manter agregação, mas expor o código bruto. A renderização aplicará `WIN_CATEGORY_LABELS`.
-
-**d) Feedback dos Clientes:**
-- Relaxar filtro: incluir feedbacks com `customer_feedback` não vazio mesmo se `recorded_by_customer` for null (com badge "via vendedor" vs "via cliente").
-
-### Passo 2 — Atualizar UI
-
-**`LossAnalysisSection.tsx`:**
-- Card "Top Motivos de Perda" passa a mostrar **macro motivo** como cabeçalho colapsável e **motivos específicos** como sub-itens (com contagem). Quando macro = "Concorrência", listar concorrentes daquele macro inline.
-
-**`WinAnalysisSection.tsx`:**
-- "Top Motivos de Ganho" agora exibirá os nomes reais (Indicação, Custo-benefício, Timing…).
-- "Diferenciais Decisivos" aplica `WIN_CATEGORY_LABELS` aos códigos.
-- "Feedback dos Clientes" mostra fonte (cliente/vendedor) e remove limite de 5 (scroll interno até 20).
-
-### Passo 3 — Nova aba **"Aprovações"** no `WinLossHub.tsx`
-
-Criar `src/components/intelligence/winloss/tabs/ProposalApprovalsTab.tsx`:
-
-- Hook novo `useProposalApprovalsHistory(orgId, dateRange, pipelineId)` que busca em `proposals`:
-  ```ts
-  status in ('accepted','declined','expired'), 
-  joins: opportunity (title, value, owner_name), 
-  win_loss_records (key_differentiator, customer_feedback, win_reason_name)
-  ```
-- UI tipo timeline/tabela com filtro **Aprovadas | Recusadas | Expiradas**:
-  - **Coluna 1 — Quem:** `acceptor_name` + `acceptor_position` + `acceptor_email` + IP.
-  - **Coluna 2 — Quando:** `accepted_at` / `declined_at` (data + hora).
-  - **Coluna 3 — Oportunidade:** título + valor + vendedor responsável.
-  - **Coluna 4 — Motivo + Diferenciais (ganho):** badges de `key_differentiator` traduzidos + `win_reason_name`.
-  - **Coluna 5 — Feedback / Motivo (perda):** texto do `customer_feedback` (ganho) ou `declined_reason` + categoria de perda (recusa).
-- Botão "Abrir oportunidade" (link para `/opportunity/:id`).
-- Export CSV opcional (botão).
-
-Adicionar tab `"Aprovações"` (ícone `FileCheck`) na lista de abas do `WinLossHub`.
-
-### Passo 4 — Verificação
-
-- Rodar a tela com o filtro "Mês" e validar:
-  - Card de Perda passa a mostrar "Concorrência (3) → Starlink, Expo Telecom, …" em vez do diagnóstico bruto.
-  - Card de Ganho passa a listar "Indicação (X)", "Custo-benefício (Y)" etc.
-  - Diferenciais mostram labels PT-BR.
-  - Aba Aprovações lista as propostas aceitas/recusadas com quem/quando/motivo.
+O hook `useWinLossData` então monta os ganhos a partir de `opportunities.status='won'` sem nenhum win_loss_record correspondente → cai em `'Não informado'` para todos os 17 deals e zera diferenciais/feedback.
 
 ---
 
-## Arquivos impactados
+## Plano de correção
 
-| Arquivo | Ação |
-|---|---|
-| `src/hooks/useWinLossData.ts` | join com `win_reasons`+`loss_reasons`, nova série macro→específico, relaxar filtro de feedback |
-| `src/components/intelligence/winloss/tabs/LossAnalysisSection.tsx` | card macro+específico+concorrentes |
-| `src/components/intelligence/winloss/tabs/WinAnalysisSection.tsx` | usar nomes reais + labels PT-BR |
-| `src/hooks/useProposalApprovalsHistory.ts` | **novo** |
-| `src/components/intelligence/winloss/tabs/ProposalApprovalsTab.tsx` | **novo** |
-| `src/pages/intelligence/WinLossHub.tsx` | registrar nova tab "Aprovações" |
+### 1. Frontend — `src/pages/ProposalPublicView.tsx`
+- Chamar `loadWinReasons()` quando a proposta carrega (mesmo gatilho do `loadLossReasons`).
+- Remover o **fallback hardcoded** de motivos de ganho. Enquanto carrega, mostrar "Carregando…"; se vier vazio, exibir um item único "Outro" com `id=null` e exigir comentário.
+- Aplicar o mesmo princípio aos **Diferenciais Decisivos**: persistir os labels reais (não só os codes) no payload, para o Win/Loss Hub poder mostrá-los direto.
+
+### 2. Edge function — `supabase/functions/generate-acceptance-proof/index.ts`
+- Validar `winReasonId` como UUID antes do insert; se inválido, salvar `win_reason_id = null` e logar warning, **garantindo que o registro seja criado** com `key_differentiator` e `customer_feedback`.
+- Trocar o `console.error` silencioso por log estruturado e devolver flag `winLossSaved: boolean` na resposta para o cliente poder agir/avisar.
+
+### 3. Schema — adicionar colunas-espelho em `proposals`
+Para nunca mais perder a resposta do cliente, mesmo que `win_loss_records` falhe:
+- `proposals.win_reason_id uuid` (FK opcional)
+- `proposals.key_differentiator text`
+- `proposals.customer_feedback text`
+- Trigger `on update of status to 'accepted'` espelha esses campos para `win_loss_records` (criando se não existir).
+
+### 4. Backfill dos 17 ganhos órfãos
+Migração SQL: para toda `opportunity` com `status='won'` que tem `proposal.status='accepted'` mas não tem `win_loss_records`, inserir um registro base (`outcome='won'`, `acceptor_name`, `acceptor_position`, `final_value`, `recorded_by_customer=true`, `closed_by_proposal_id`). **Os motivos/diferenciais perdidos não podem ser recuperados** (nunca chegaram no banco), mas o Hub passa a refletir corretamente quem aceitou e a partir de agora todos os novos aceites trarão as respostas completas.
+
+### 5. Win/Loss Hub — `src/hooks/useWinLossData.ts` e `WinAnalysisSection.tsx`
+- Já lê `win_reason_name`, `key_differentiator`, `customer_feedback` corretamente — nenhuma mudança de lógica necessária após (1)–(4).
+- Adicionar pequeno ajuste: quando o win_reason vier `null` mas o registro existir com `customer_feedback` ou `key_differentiator`, **rotular como "Sem motivo selecionado"** (em vez de "Não informado"), para distinguir lacuna histórica vs. novos aceites incompletos.
+
+---
+
+## Resultado esperado
+- A partir do próximo aceite via link público: motivo, diferenciais e feedback do cliente aparecem corretamente em **Top Motivos de Ganho**, **Diferenciais Decisivos** e **Feedback dos Clientes**.
+- Os 17 ganhos passados aparecem com nome do aceitante/cargo no Hub (sem motivos, pois nunca foram salvos).
+- Bug semelhante não pode mais acontecer em silêncio (validação + log + flag de retorno + colunas-espelho na própria proposta).
 
 ## Riscos
-- Baixo. Sem alteração de schema, só leitura.
-- O join novo em `win_loss_records` adiciona ~1 query (`win_reasons` por IDs) — cacheada via React Query.
-
-## Não está no escopo
-- Mudar o modal "Marcar como Perdida" (já captura macro+específico corretamente).
-- Alterar como o `reason_seller` é gravado (mantém como diagnóstico textual).
+- Pequena migração de schema em `proposals` + trigger.
+- Backfill atualiza dados históricos (idempotente, só insere onde não existe).
 
 Posso seguir com a implementação?

@@ -21237,6 +21237,7 @@ export type Database = {
           content: Json | null
           created_at: string | null
           currency: string | null
+          customer_feedback: string | null
           declined_at: string | null
           declined_reason: string | null
           deleted_at: string | null
@@ -21244,6 +21245,7 @@ export type Database = {
           expires_at: string | null
           id: string
           introduction: string | null
+          key_differentiator: string | null
           last_viewed_at: string | null
           layout_id: string | null
           notes: string | null
@@ -21268,6 +21270,7 @@ export type Database = {
           version: number | null
           viewed_at: string | null
           views_count: number | null
+          win_reason_id: string | null
         }
         Insert: {
           acceptance_hash?: string | null
@@ -21286,6 +21289,7 @@ export type Database = {
           content?: Json | null
           created_at?: string | null
           currency?: string | null
+          customer_feedback?: string | null
           declined_at?: string | null
           declined_reason?: string | null
           deleted_at?: string | null
@@ -21293,6 +21297,7 @@ export type Database = {
           expires_at?: string | null
           id?: string
           introduction?: string | null
+          key_differentiator?: string | null
           last_viewed_at?: string | null
           layout_id?: string | null
           notes?: string | null
@@ -21317,6 +21322,7 @@ export type Database = {
           version?: number | null
           viewed_at?: string | null
           views_count?: number | null
+          win_reason_id?: string | null
         }
         Update: {
           acceptance_hash?: string | null
@@ -21335,6 +21341,7 @@ export type Database = {
           content?: Json | null
           created_at?: string | null
           currency?: string | null
+          customer_feedback?: string | null
           declined_at?: string | null
           declined_reason?: string | null
           deleted_at?: string | null
@@ -21342,6 +21349,7 @@ export type Database = {
           expires_at?: string | null
           id?: string
           introduction?: string | null
+          key_differentiator?: string | null
           last_viewed_at?: string | null
           layout_id?: string | null
           notes?: string | null
@@ -21366,6 +21374,7 @@ export type Database = {
           version?: number | null
           viewed_at?: string | null
           views_count?: number | null
+          win_reason_id?: string | null
         }
         Relationships: [
           {
@@ -21499,6 +21508,13 @@ export type Database = {
             columns: ["parent_proposal_id"]
             isOneToOne: false
             referencedRelation: "v_proposals_normalized_v2"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposals_win_reason_id_fkey"
+            columns: ["win_reason_id"]
+            isOneToOne: false
+            referencedRelation: "win_reasons"
             referencedColumns: ["id"]
           },
         ]

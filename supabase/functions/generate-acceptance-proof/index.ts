@@ -112,7 +112,15 @@ serve(async (req: Request) => {
     const acceptanceHash = hashData;
     console.log("Generated acceptance hash:", acceptanceHash);
 
-    // Update proposal with acceptance data
+    // Validate winReasonId is a real UUID before passing it to FK columns;
+    // anything else (legacy hardcoded codes) is dropped to NULL so inserts don't fail.
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const safeWinReasonId = winReasonId && UUID_RE.test(winReasonId) ? winReasonId : null;
+    if (winReasonId && !safeWinReasonId) {
+      console.warn("[acceptance] Ignoring non-UUID winReasonId:", winReasonId);
+    }
+
+    // Update proposal with acceptance data + mirror feedback fields so we never lose them
     const { error: updateError } = await supabaseClient
       .from("proposals")
       .update({
@@ -126,6 +134,9 @@ serve(async (req: Request) => {
         acceptor_ip: acceptorIp,
         acceptor_user_agent: acceptorUserAgent,
         acceptance_hash: acceptanceHash,
+        win_reason_id: safeWinReasonId,
+        key_differentiator: keyDifferentiator || null,
+        customer_feedback: customerFeedback || null,
         updated_at: acceptedAt.toISOString(),
       })
       .eq("id", proposalId);
@@ -183,7 +194,7 @@ serve(async (req: Request) => {
           organization_id: proposal.organization_id,
           opportunity_id: opportunity.id,
           outcome: 'won',
-          win_reason_id: winReasonId || null,
+          win_reason_id: safeWinReasonId,
           key_differentiator: keyDifferentiator || null,
           customer_feedback: customerFeedback || null,
           final_value: proposal.total_amount || proposal.value || opportunity.valor_previsto,
@@ -209,7 +220,7 @@ serve(async (req: Request) => {
             acceptor_document: acceptorDocument,
             acceptor_position: acceptorPosition,
           };
-          if (winReasonId) updateData.win_reason_id = winReasonId;
+          if (safeWinReasonId) updateData.win_reason_id = safeWinReasonId;
           if (keyDifferentiator) updateData.key_differentiator = keyDifferentiator;
           if (customerFeedback) updateData.customer_feedback = customerFeedback;
 

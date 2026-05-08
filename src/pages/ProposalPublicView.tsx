@@ -120,6 +120,15 @@ export default function ProposalPublicView() {
     }
   }, [token]);
 
+  // Load win reasons as soon as the proposal (and its organization) are available,
+  // so the acceptance modal NEVER falls back to hardcoded non-UUID ids.
+  useEffect(() => {
+    if (proposal?.organization_id) {
+      loadWinReasons();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [proposal?.organization_id, proposal?.opportunity?.pipeline_id]);
+
   useEffect(() => {
     if (proposal?.opportunity?.title) {
       document.title = `${proposal.opportunity.title} | Proposta Comercial`;
@@ -1974,22 +1983,18 @@ export default function ProposalPublicView() {
                     <SelectValue placeholder="Selecione um motivo" />
                   </SelectTrigger>
                   <SelectContent className="z-[9999]">
-                    {winReasons.length > 0 ? (
+                    {loadingWinReasons && winReasons.length === 0 ? (
+                      <SelectItem value="__loading" disabled>Carregando motivos…</SelectItem>
+                    ) : winReasons.length > 0 ? (
                       winReasons.map(reason => (
                         <SelectItem key={reason.id} value={reason.id}>
                           {reason.label}
                         </SelectItem>
                       ))
                     ) : (
-                      <>
-                        <SelectItem value="best_proposal">Melhor proposta</SelectItem>
-                        <SelectItem value="price">Preço competitivo</SelectItem>
-                        <SelectItem value="quality">Qualidade do produto/serviço</SelectItem>
-                        <SelectItem value="trust">Confiança na empresa</SelectItem>
-                        <SelectItem value="relationship">Bom relacionamento</SelectItem>
-                        <SelectItem value="deadline">Melhor prazo</SelectItem>
-                        <SelectItem value="other">Outro motivo</SelectItem>
-                      </>
+                      <SelectItem value="__empty" disabled>
+                        Nenhum motivo configurado — peça ao time para cadastrar
+                      </SelectItem>
                     )}
                   </SelectContent>
                 </Select>
