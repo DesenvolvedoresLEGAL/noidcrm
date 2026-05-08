@@ -190,3 +190,100 @@ export const inventoryReservationSchema = z
 export const inventoryReservationStatusUpdateSchema = z.object({
   status: z.enum(RESERVATION_STATUSES),
 });
+
+// ---------- INV 1.2: Operational flow ----------
+
+export const ALLOCATION_OPERATIONAL_STATUSES = [
+  'pending',
+  'prepared',
+  'dispatched',
+  'in_operation',
+  'returned',
+  'released',
+  'damaged',
+  'lost',
+  'maintenance',
+  'cancelled',
+] as const;
+export type AllocationOperationalStatus =
+  (typeof ALLOCATION_OPERATIONAL_STATUSES)[number];
+
+export const ALLOCATION_OPERATIONAL_STATUS_LABELS: Record<
+  AllocationOperationalStatus,
+  string
+> = {
+  pending: 'Pendente',
+  prepared: 'Preparado',
+  dispatched: 'Despachado',
+  in_operation: 'Em operação',
+  returned: 'Retornado',
+  released: 'Liberado',
+  damaged: 'Avariado',
+  lost: 'Perdido',
+  maintenance: 'Manutenção',
+  cancelled: 'Cancelado',
+};
+
+export function allocationOperationalStatusBadgeVariant(
+  s: AllocationOperationalStatus,
+): 'default' | 'secondary' | 'destructive' | 'outline' {
+  switch (s) {
+    case 'released':
+      return 'default';
+    case 'prepared':
+    case 'dispatched':
+    case 'in_operation':
+      return 'secondary';
+    case 'damaged':
+    case 'lost':
+      return 'destructive';
+    default:
+      return 'outline';
+  }
+}
+
+export const RETURN_CONDITIONS = [
+  'ok',
+  'damaged',
+  'lost',
+  'maintenance_required',
+] as const;
+export type ReturnCondition = (typeof RETURN_CONDITIONS)[number];
+
+export const RETURN_CONDITION_LABELS: Record<ReturnCondition, string> = {
+  ok: 'OK',
+  damaged: 'Avariado',
+  lost: 'Perdido',
+  maintenance_required: 'Manutenção',
+};
+
+export const OPERATION_EVENT_LABELS: Record<string, string> = {
+  reservation_status_changed: 'Mudança de status da reserva',
+  item_prepared: 'Item preparado',
+  item_dispatched: 'Item despachado',
+  item_in_operation: 'Item em operação',
+  item_returned: 'Item retornado',
+  item_released: 'Item liberado',
+  item_damaged: 'Item marcado como avariado',
+  item_lost: 'Item marcado como perdido',
+  item_sent_to_maintenance: 'Item enviado para manutenção',
+  manual_adjustment: 'Ajuste manual',
+};
+
+export const inventoryReservationOperationalStatusSchema = z.object({
+  status: z.enum([
+    'in_preparation',
+    'dispatched',
+    'in_operation',
+    'returned',
+    'closed',
+    'cancelled',
+  ] as const),
+  notes: z.string().optional().nullable(),
+});
+
+export const inventoryReturnConditionSchema = z.object({
+  reservation_allocation_id: z.string().uuid(),
+  return_condition: z.enum(RETURN_CONDITIONS),
+  return_notes: z.string().optional().nullable(),
+});

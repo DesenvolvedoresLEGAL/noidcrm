@@ -5,14 +5,17 @@ import {
   cancelReservation,
   checkReservationConflict,
   convertPreReservationToReservation,
+  getOperationEvents,
   getReservation,
   getReservationsOverview,
   listReservations,
   listReservationsByProposal,
+  setReturnCondition,
+  updateReservationOperationalStatus,
   updateReservationStatus,
   type ReservationFilters,
 } from '@/services/operations/inventoryReservations';
-import type { ReservationStatus } from '@/lib/operations/inventoryReservations';
+import type { ReservationStatus, ReturnCondition } from '@/lib/operations/inventoryReservations';
 
 const baseKey = ['inventory', 'reservations'] as const;
 
@@ -107,5 +110,37 @@ export function useCheckInventoryReservationConflict() {
   return useMutation({
     mutationFn: (input: Parameters<typeof checkReservationConflict>[0]) =>
       checkReservationConflict(input),
+  });
+}
+
+export function useUpdateInventoryReservationOperationalStatus() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: (input: {
+      reservation_id: string;
+      new_status: ReservationStatus;
+      notes?: string | null;
+    }) => updateReservationOperationalStatus(input),
+    onSuccess: invalidate,
+  });
+}
+
+export function useSetInventoryReturnCondition() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: (input: {
+      reservation_allocation_id: string;
+      return_condition: ReturnCondition;
+      return_notes?: string | null;
+    }) => setReturnCondition(input),
+    onSuccess: invalidate,
+  });
+}
+
+export function useInventoryOperationEvents(reservationId?: string | null) {
+  return useQuery({
+    queryKey: [...baseKey, 'events', reservationId],
+    queryFn: () => getOperationEvents(reservationId as string),
+    enabled: !!reservationId,
   });
 }

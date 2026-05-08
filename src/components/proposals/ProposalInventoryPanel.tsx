@@ -250,7 +250,7 @@ export function ProposalInventoryPanel({ proposalId, closeDatePrevista }: Props)
             </div>
 
             {definitive && (
-              <div className="rounded-md border p-3 bg-muted/30 mt-2 space-y-1">
+              <div className="rounded-md border p-3 bg-muted/30 mt-2 space-y-2">
                 <div className="flex items-center justify-between">
                   <p className="text-xs text-muted-foreground">Reserva definitiva</p>
                   <Badge variant={reservationStatusBadgeVariant(definitive.status as any)}>
@@ -261,6 +261,26 @@ export function ProposalInventoryPanel({ proposalId, closeDatePrevista }: Props)
                 <p className="text-xs text-muted-foreground">
                   Período: {fmt(definitive.operational_start_date)} → {fmt(definitive.operational_end_date)}
                 </p>
+                <div className="grid grid-cols-3 gap-2 text-xs">
+                  <div className="rounded-md border p-2 text-center">
+                    <p className="text-muted-foreground">Itens</p>
+                    <p className="font-semibold">{(definitive as any).items?.length ?? 0}</p>
+                  </div>
+                  <div className="rounded-md border p-2 text-center">
+                    <p className="text-muted-foreground">Saída</p>
+                    <p className="font-semibold">
+                      {['dispatched', 'in_operation', 'returned', 'closed'].includes(definitive.status)
+                        ? 'OK'
+                        : 'pendente'}
+                    </p>
+                  </div>
+                  <div className="rounded-md border p-2 text-center">
+                    <p className="text-muted-foreground">Retorno</p>
+                    <p className="font-semibold">
+                      {['returned', 'closed'].includes(definitive.status) ? 'OK' : 'pendente'}
+                    </p>
+                  </div>
+                </div>
               </div>
             )}
           </>

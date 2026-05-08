@@ -1,110 +1,127 @@
-# Sprint INV 1.1 — Reserva Definitiva e Conversão de Pré Reserva
+# Sprint INV 1.2 — Preparação, Expedição, Retorno e Baixa Operacional
 
-## Objetivo
-Criar a camada de **reserva definitiva** que compromete oficialmente o estoque por período operacional, alimentada pela conversão de pré reservas (INV 0.9/1.0) com checagem de conflito e rastreabilidade ponta-a-ponta (proposta → pré reserva → reserva → alocações).
+Fecha o ciclo físico do inventário: a reserva definitiva passa a mover o status real dos itens (serializados) e os buckets operacionais (itens por quantidade), com timeline, checklists e histórico auditável.
 
-## Escopo
+## 1. Banco de Dados (migration única)
 
-### 1. Migração de banco
-Nova migração única contendo:
+### 1.1 Nova tabela `inventory_operation_events`
+- Campos conforme especificado: `reservation_id`, `reservation_item_id`, `reservation_allocation_id`, `event_type`, `from_status`, `to_status`, `allocation_item_type`, `serialized_item_id`, `quantity_item_id`, `quantity`, `notes`, `metadata`, `created_by`.
+- Constraints de `event_type` e `quantity > 0`.
+- Índices por `(org, reservation, created_at desc)`, `(org, serialized_item_id)`, `(org, quantity_item_id)`.
+- RLS: SELECT/INSERT via `user_belongs_to_organization(organization_id)` (helper já existente no projeto).
 
-**Tabelas**
-- `inventory_reservations` — header da reserva (proposta, oportunidade, conta, contato, código `RES-YYYY-NNNNN`, datas operacionais e do evento, status, risk_level, confirmation_trigger, confirmed_at/by, notes, audit).
-- `inventory_reservation_items` — demandas reservadas (referência opcional ao `inventory_pre_reservation_items` de origem, tipo, ids serializado/quantity, categoria/família, requested/reserved_quantity, demand_label, demand_source, reservation_status, conflict_reason).
-- `inventory_reservation_allocations` — alocações físicas comprometidas (referência opcional à alocação de pré reserva de origem, tipo, item serializado/quantity, allocated_quantity, allocation_status).
+### 1.2 Alterações em `inventory_reservation_allocations`
+- Novas colunas: `operational_status` (default `pending`), `prepared_at/by`, `dispatched_at/by`, `in_operation_at`, `returned_at/by`, `released_at/by`, `return_condition`, `return_notes`.
+- Constraints de domínio para `operational_status` e `return_condition`.
+- Índice em `(organization_id, operational_status)`.
 
-Constraints CHECK conforme spec (status, risk, source, trigger, datas, exclusividade serialized/quantity, quantidade > 0, unique `org_id + reservation_code`).
+### 1.3 Alterações em `inventory_quantity_items`
+- Novos buckets: `reserved_quantity`, `in_preparation_quantity`, `dispatched_quantity`, `in_operation_quantity`, `returned_quantity`, `maintenance_quantity`, `damaged_quantity`, `lost_quantity` (default 0, check `>= 0`).
+- Verifica que `available_quantity` continua sendo a base; transições subtraem/adicionam atomicamente.
 
-**Índices** conforme spec (org+status, pre_reservation, proposal, período, reservation, item, serialized, quantity).
+### 1.4 Status físico em `inventory_serialized_items`
+- Garantir que o enum/check aceite: `available`, `reserved`, `in_preparation`, `dispatched`, `in_operation`, `returned`, `maintenance`, `lost`, `damaged`, `inactive`. Adicionar valores faltantes preservando os existentes.
 
-**RLS** ativada nas três tabelas, usando helpers existentes do projeto (`user_belongs_to_organization`, `is_organization_admin_or_owner`).
+## 2. Funções RPC (SECURITY DEFINER, `search_path = public`)
 
-**Funções e triggers**
-- `generate_inventory_reservation_code(org_id)` — gera `RES-YYYY-NNNNN`.
-- `set_inventory_reservation_code()` — BEFORE INSERT.
-- `set_inventory_reservation_updated_at()` — BEFORE UPDATE nas 3 tabelas.
-- `validate_inventory_reservation_item_org()` — valida org/parent.
-- `validate_inventory_reservation_allocation_org()` — valida org + reservation_id consistente.
-- `validate_inventory_reservation_allocation_inventory_item()` — valida item físico/org.
-- `check_inventory_reservation_conflict(...)` — RPC SECURITY DEFINER (`set search_path = public`) retornando `conflict_status / available / reserved / count / message`. Bloqueia status `confirmed | in_preparation | dispatched | in_operation`.
-- `convert_pre_reservation_to_reservation(p_pre_reservation_id, p_confirmation_trigger)` — RPC principal:
-  - valida org, status `active`, ainda não convertida (sem reserva ativa filha).
-  - exige todas demandas obrigatórias alocadas (ignora `service_no_stock`).
-  - roda `check_inventory_reservation_conflict` para cada alocação ativa; se houver conflito, retorna `{success:false, reason:'reservation_conflict', conflicts:[...]}` sem criar nada.
-  - cria header, copia items e alocações com `source_*_id`, define `reservation_status` por completude.
-  - marca pré reserva como `converted`.
-- `get_inventory_reservations_overview()` — KPIs (ativas, itens reservados, em preparação/despachadas/em operação, próxima operação) escopadas por org via helper.
+### 2.1 `update_inventory_reservation_operational_status(p_reservation_id, p_new_status, p_notes)`
+- Valida transições permitidas:
+  - `confirmed → in_preparation → dispatched → in_operation → returned → closed`
+  - `confirmed | in_preparation → cancelled`
+- Para cada alocação ativa (`operational_status not in (cancelled, released, damaged, lost, maintenance)`), aplica efeitos físicos:
 
-**Atualizar `check_inventory_availability_for_period`** (criada na INV 0.9) para somar bloqueios de `inventory_reservation_allocations` cujas reservas estejam em `confirmed | in_preparation | dispatched | in_operation` e cujo período cruze com `daterange(...)`. Status `returned | closed | cancelled` não bloqueiam.
+```text
+confirmed → in_preparation : serializado=in_preparation; qty: reserved→in_preparation; alloc=prepared; evento item_prepared
+in_preparation → dispatched: serializado=dispatched; qty: in_preparation→dispatched; alloc=dispatched; evento item_dispatched
+dispatched → in_operation : serializado=in_operation; qty: dispatched→in_operation; alloc=in_operation; evento item_in_operation
+in_operation → returned   : serializado=returned; qty: in_operation→returned; alloc=returned; evento item_returned
+returned → closed         : exige return_condition em TODAS as alocações; aplica baixa por condição
+```
+- `closed` por condição:
+  - `ok` → serializado `available`, qty `returned→available`, alloc `released`, evento `item_released`
+  - `damaged` → serializado `damaged`, qty `returned→damaged`, alloc `damaged`, evento `item_damaged`
+  - `lost` → serializado `lost`, qty `returned→lost`, alloc `lost`, evento `item_lost`
+  - `maintenance_required` → serializado `maintenance`, qty `returned→maintenance`, alloc `maintenance`, evento `item_sent_to_maintenance`
+- Atualiza header `inventory_reservations.status` + cria evento `reservation_status_changed`.
+- Tudo dentro de transação atômica; valida tenant via `user_belongs_to_organization`.
 
-### 2. Camada de serviços (`src/services/operations/`)
-- Novo `inventoryReservations.ts`: `listReservations`, `getReservation`, `convertPreReservationToReservation`, `getReservationsOverview`, `updateReservationStatus`, `cancelReservation`, `checkReservationConflict`. Validação de transições de status (matriz da spec §20).
-- Atualizar `inventoryPreReservations.ts`: helper `convertToReservation(preReservationId, trigger)` chamando o serviço novo.
-- Schemas Zod: `inventoryReservationSchema` e `inventoryReservationStatusUpdateSchema` em `src/lib/operations/inventoryReservations.ts`.
+### 2.2 `set_inventory_return_condition(p_reservation_allocation_id, p_return_condition, p_return_notes)`
+- Exige reserva em `returned` e alocação em `returned`.
+- Atualiza `return_condition`, `return_notes`, `returned_by` (não muda status físico — isso só ocorre no fechamento).
 
-### 3. Hooks (`src/hooks/operations/`)
-Novo `useInventoryReservations.ts` com:
-`useInventoryReservations`, `useInventoryReservation`, `useConvertPreReservationToReservation`, `useInventoryReservationsOverview`, `useUpdateInventoryReservationStatus`, `useCancelInventoryReservation`, `useCheckInventoryReservationConflict`. Mantém o padrão React Query/invalidations já usado por pré reservas.
+### 2.3 Atualizar `convert_pre_reservation_to_reservation` (INV 1.1)
+- Após criar reserva e alocações com status inicial `confirmed`, comprometer estoque físico:
+  - Serializados alocados: `status = 'reserved'`.
+  - Quantidade: `available_quantity -= allocated; reserved_quantity += allocated` (com validação `available_quantity >= 0`, abortando a conversão em caso de inconsistência).
+- Em caso de falha de validação, rollback completo (já é uma única transação RPC).
+- Registrar evento `reservation_status_changed` (from null → confirmed).
 
-### 4. UI Inventário
-- `src/pages/operations/Inventory.tsx`: aba **Reservas** ganha sub-tabs internos: `Pré reservas | Reservas definitivas | Calendário`.
-- Novo `InventoryReservationsTab.tsx`:
-  - KPI cards (Ativas, Itens reservados, Em preparação, Despachadas, Em operação, Próxima operação).
-  - Tabela com colunas Código/Título/Cliente/Período/Status/Risco/Itens/Origem/Ações.
-  - Filtros: status, risco, período, origem, busca.
-  - Ações: Ver detalhes, Mudar status, Cancelar, Abrir proposta.
-- Novo `InventoryReservationDetailDialog.tsx`: header com proposta/oportunidade/cliente/pré reserva de origem/datas/trigger/confirmação; tabela de itens; tabela de alocações; ações de transição de status conforme matriz.
-- Atualizar `InventoryOverviewTab.tsx`: bloco "Reservas definitivas" com KPIs vindos da nova RPC.
-- Atualizar listas de itens (serializados e por quantidade): coluna **Ocupação** mostrando pré reserva + reserva (ex: `3 pré-reservados / 7 reservados` para quantity; `Reservado até 12/06` para serializado). Reaproveita summary existente extendido com dados de `inventory_reservation_allocations`.
+### 2.4 Ajustar `check_inventory_availability_for_period`
+- Continuar subtraindo as alocações definitivas ativas; agora `reserved_quantity` já representa o bloqueio físico, garantir que não haja dupla contagem entre buckets (`available` é a fonte). Revisar para usar `available_quantity` direto onde já refletido.
 
-### 5. UI Pré reserva
-- `InventoryPreReservationDetailDialog.tsx`: botão **Converter em reserva definitiva**, habilitado apenas se `status=active`, todas demandas alocadas e sem conflitos. Mostra motivo do bloqueio (pendências ou conflitos retornados pela RPC). Em sucesso, redireciona para o detalhe da reserva nova.
+## 3. Camada de Serviço & Hooks
 
-### 6. UI Proposta
-- `ProposalInventoryPanel.tsx`: três estados visuais
-  1. Sem pré reserva → CTA gerar (existente).
-  2. Pré reserva ativa → KPIs + botões `Ver pré reserva | Converter em reserva definitiva | Recalcular`.
-  3. Reserva definitiva criada → mostra código `RES-...`, status, período operacional, itens reservados; botões `Abrir reserva | Ver itens reservados`.
+### 3.1 `src/services/operations/inventoryReservations.ts` (expansão)
+- `updateReservationOperationalStatus(reservationId, status, notes?)`
+- `setReturnCondition(allocationId, condition, notes?)`
+- `getOperationEvents(reservationId)`
 
-### 7. Gatilho automático (preparado, não ativado)
-Helper exportado `tryAutoConvertOnProposalEvent({proposalId, trigger})` em `inventoryProposalBridge.ts`, pronto para ser invocado quando proposta vira `approved` ou pagamento `paid`. Não plugar no fluxo automático nesta sprint (apenas deixar testável e documentado).
+### 3.2 `src/hooks/operations/useInventoryReservations.ts` (expansão)
+- `useUpdateInventoryReservationOperationalStatus()`
+- `useSetInventoryReturnCondition()`
+- `useInventoryOperationEvents(reservationId)`
+- Invalidações: queries de reserva, alocações, overview, itens serializados/quantidade afetados.
 
-### 8. Itens físicos
-**Não alterar** `inventory_serialized_items.status` nem `inventory_quantity_items.available_quantity`. O bloqueio se dá exclusivamente via `check_inventory_availability_for_period` somando reservas definitivas. Mudança de status físico fica para sprint futura (preparação/expedição/retorno).
+### 3.3 `src/lib/operations/inventoryReservations.ts`
+- Adicionar Zod:
+  - `inventoryReservationOperationalStatusSchema`
+  - `inventoryReturnConditionSchema`
+- Tabela de transições `OPERATIONAL_STATUS_TRANSITIONS` reutilizada no client para habilitar/desabilitar ações.
 
-## Detalhes técnicos
+## 4. Frontend
 
-- Todas as funções `SECURITY DEFINER` usam `SET search_path = public` (regra de segurança do projeto).
-- RLS: SELECT/INSERT/UPDATE para membros da organização; DELETE somente admin/owner em `inventory_reservations`.
-- Conversão é atômica: função plpgsql roda em transação implícita; falha em qualquer item faz rollback completo.
-- React Query: invalidar `['inventory-reservations']`, `['inventory-pre-reservations']`, `['inventory-overview']`, `['inventory-availability']` após conversão/status/cancelamento.
-- Após migração, `src/integrations/supabase/types.ts` é regerado automaticamente; serviços passam a usar os novos tipos.
+### 4.1 `InventoryReservationDetailDialog`
+Nova seção **Operação Física** com 4 blocos:
+- **Timeline** horizontal: Confirmada → Em preparação → Despachada → Em operação → Retornada → Fechada (mostra data/hora/usuário/notas por etapa, derivado de `inventory_operation_events` filtrado por `reservation_status_changed`).
+- **Checklist de saída** (componente `ReservationDispatchChecklist`): visível em `confirmed`/`in_preparation`. Lista de alocações com tipo, quantidade, `operational_status`, ações rápidas (v1: derivado da transição em massa; placeholder para overrides individuais).
+- **Checklist de retorno** (`ReservationReturnChecklist`): visível em `returned`. Para cada alocação: select de condição (OK / Avariado / Perdido / Manutenção) + observações, salvo via `setReturnCondition`. Botão "Fechar reserva" só habilitado quando todas as condições preenchidas.
+- **Histórico operacional** (`ReservationOperationHistory`): tabela com data, evento, item, quantidade, usuário, observação.
 
-## Arquivos previstos
-**Criar (~7):**
-- `supabase/migrations/<ts>_inv_1_1_definitive_reservations.sql`
-- `src/services/operations/inventoryReservations.ts`
-- `src/lib/operations/inventoryReservations.ts`
-- `src/hooks/operations/useInventoryReservations.ts`
-- `src/components/operations/inventory/InventoryReservationsTab.tsx`
-- `src/components/operations/inventory/InventoryReservationDetailDialog.tsx`
-- `src/components/operations/inventory/InventoryReservationItemsList.tsx`
+Ações rápidas no header do dialog conforme status atual (Iniciar preparação / Despachar / Marcar em operação / Marcar retorno / Fechar reserva / Cancelar).
 
-**Editar (~8):**
-- `src/services/operations/inventoryPreReservations.ts`
-- `src/services/operations/inventoryProposalBridge.ts`
-- `src/hooks/operations/useInventoryPreReservations.ts`
-- `src/components/operations/inventory/InventoryPreReservationDetailDialog.tsx`
-- `src/components/operations/inventory/InventoryOverviewTab.tsx`
-- `src/components/operations/inventory/InventoryQuantityItemsTab.tsx`
-- `src/components/operations/inventory/InventorySerializedItemsTab.tsx`
-- `src/components/proposals/ProposalInventoryPanel.tsx`
-- `src/pages/operations/Inventory.tsx`
+### 4.2 `InventoryDefinitiveReservationsTab`
+- Coluna de status operacional + ações rápidas inline respeitando transições válidas.
+- Filtro por status operacional.
 
-## Riscos
-- Atualização de `check_inventory_availability_for_period` precisa preservar assinatura/retorno usados pela INV 0.9/1.0 — adicionar bloqueio sem quebrar consumidores.
-- Conversão pode falhar silenciosamente se status físico de um serializado mudou para `maintenance` entre alocação e conversão; tratado via `check_inventory_reservation_conflict` retornando `unavailable`.
-- Geração de código `RES-YYYY-NNNNN` por contagem pode colidir em alta concorrência; suficiente para escala atual (mesmo padrão usado em outros códigos do projeto).
+### 4.3 `ProposalInventoryPanel`
+- Quando reserva existir, mostrar status operacional, contagem de itens, e pendências de saída/retorno.
 
-## Critérios de aceite
-Conforme spec §26: tabelas/RLS/código automático/conversão completa com cópia de items+alocações, bloqueios de conflito e status de origem, painel de proposta atualizado, disponibilidade considera reserva definitiva, status físico inalterado, sem regressão em INV 0.9 e 1.0, typecheck e build verdes.
+### 4.4 `InventoryOverviewTab`
+- Novos KPIs: Reservas em preparação, Itens despachados, Itens em operação, Itens aguardando conferência, Itens em manutenção, Itens perdidos.
+- Banner de alertas: "X reservas retornadas aguardando conferência", "X itens marcados como perdidos", "X itens avariados aguardando ação".
+
+### 4.5 Listas de itens (serializado / quantidade)
+- Refletir os novos status/buckets nas badges e contadores existentes (sem quebrar layouts atuais).
+
+## 5. Riscos e Mitigações
+- **Conversão atual da INV 1.1**: passa a mexer em estoque físico → mitigar com validação atômica de `available_quantity >= 0` e cobertura via Sprint 1.1 não regredida (mantém RPC, só adiciona efeitos no final).
+- **Dupla contagem de bloqueio**: `check_inventory_availability_for_period` deve usar `available_quantity` como fonte; revisar para evitar subtrair alocações já refletidas em buckets.
+- **Status enums em `inventory_serialized_items`**: adicionar valores via `ALTER TYPE` somente se faltantes (verificar antes; se for check constraint, recriar).
+- **RLS multi-tenant**: novas tabelas/RPCs validam `organization_id` via helper existente; nenhuma rota bypassa RLS.
+- **Cache React Query**: invalidar reservas, alocações, itens serializados por SKU afetado, `inventory-overview`, `proposal-inventory`.
+- **Operações em massa**: a RPC processa todas as alocações da reserva atomicamente; em caso de erro, transação completa abortada.
+
+## 6. Critérios de Aceite
+Cobertos: tabela `inventory_operation_events` criada; `operational_status` em alocações; transições `confirmed → in_preparation → dispatched → in_operation → returned → closed` com efeitos físicos corretos em serializados e buckets de quantidade; bloqueio do fechamento sem `return_condition` em todas as alocações; baixa correta para `available/damaged/lost/maintenance`; histórico operacional persistido e visível; UI com timeline, checklists, ações rápidas e KPIs; painel da proposta atualizado; typecheck/build sem regressões da INV 1.1.
+
+## 7. Arquivos impactados (estimativa)
+- Migration nova: `supabase/migrations/<timestamp>_inv_1_2_operational_flow.sql`
+- `src/services/operations/inventoryReservations.ts` (edit)
+- `src/hooks/operations/useInventoryReservations.ts` (edit)
+- `src/lib/operations/inventoryReservations.ts` (edit)
+- `src/components/operations/inventory/InventoryReservationDetailDialog.tsx` (edit)
+- Novos: `ReservationOperationTimeline.tsx`, `ReservationDispatchChecklist.tsx`, `ReservationReturnChecklist.tsx`, `ReservationOperationHistory.tsx`
+- `src/components/operations/inventory/InventoryDefinitiveReservationsTab.tsx` (edit)
+- `src/components/operations/inventory/InventoryOverviewTab.tsx` (edit)
+- `src/components/proposals/ProposalInventoryPanel.tsx` (edit)
+- `src/integrations/supabase/types.ts` (auto)

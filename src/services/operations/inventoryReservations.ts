@@ -183,19 +183,28 @@ export async function updateReservationStatus(
   id: string,
   nextStatus: ReservationStatus,
   current?: ReservationStatus,
-  userId?: string | null,
+  _userId?: string | null,
+  notes?: string | null,
 ): Promise<void> {
-  if (current && nextStatus !== 'cancelled' && !canTransitionReservation(current, nextStatus)) {
+  if (current && !canTransitionReservation(current, nextStatus) && nextStatus !== 'cancelled') {
     throw new Error(`Transição inválida: ${current} → ${nextStatus}`);
   }
-  const { error } = await supabase
-    .from(TABLE as never)
-    .update({ status: nextStatus, updated_by: userId ?? null } as never)
-    .eq('id', id);
+  const { data, error } = await supabase.rpc(
+    'update_inventory_reservation_operational_status' as never,
+    {
+      p_reservation_id: id,
+      p_new_status: nextStatus,
+      p_notes: notes ?? null,
+    } as never,
+  );
   if (error) throw error;
+  const result = data as any;
+  if (result && result.success === false) {
+    throw new Error(result.message ?? 'Falha ao atualizar status.');
+  }
 }
 
-export async function cancelReservation(id: string, userId?: string | null) {
+export async function cancelReservation(id: string, _userId?: string | null) {
   const { data: current, error: fetchErr } = await supabase
     .from(TABLE as never)
     .select('status')
@@ -208,11 +217,80 @@ export async function cancelReservation(id: string, userId?: string | null) {
       'Apenas reservas em status Confirmada ou Em preparação podem ser canceladas.',
     );
   }
-  const { error } = await supabase
-    .from(TABLE as never)
-    .update({ status: 'cancelled', updated_by: userId ?? null } as never)
-    .eq('id', id);
+  const { error } = await supabase.rpc(
+    'update_inventory_reservation_operational_status' as never,
+    {
+      p_reservation_id: id,
+      p_new_status: 'cancelled',
+      p_notes: null,
+    } as never,
+  );
   if (error) throw error;
+}
+
+// ---------- INV 1.2: operational flow ----------
+
+export async function updateReservationOperationalStatus(input: {
+  reservation_id: string;
+  new_status: ReservationStatus;
+  notes?: string | null;
+}) {
+  const { data, error } = await supabase.rpc(
+    'update_inventory_reservation_operational_status' as never,
+    {
+      p_reservation_id: input.reservation_id,
+      p_new_status: input.new_status,
+      p_notes: input.notes ?? null,
+    } as never,
+  );
+  if (error) throw error;
+  return data as any;
+}
+
+export async function setReturnCondition(input: {
+  reservation_allocation_id: string;
+  return_condition: 'ok' | 'damaged' | 'lost' | 'maintenance_required';
+  return_notes?: string | null;
+}) {
+  const { data, error } = await supabase.rpc(
+    'set_inventory_return_condition' as never,
+    {
+      p_reservation_allocation_id: input.reservation_allocation_id,
+      p_return_condition: input.return_condition,
+      p_return_notes: input.return_notes ?? null,
+    } as never,
+  );
+  if (error) throw error;
+  return data as any;
+}
+
+export interface OperationEventRow {
+  id: string;
+  organization_id: string;
+  reservation_id: string | null;
+  reservation_item_id: string | null;
+  reservation_allocation_id: string | null;
+  event_type: string;
+  from_status: string | null;
+  to_status: string | null;
+  allocation_item_type: string | null;
+  serialized_item_id: string | null;
+  quantity_item_id: string | null;
+  quantity: number;
+  notes: string | null;
+  metadata: Record<string, unknown>;
+  created_by: string | null;
+  created_at: string;
+}
+
+export async function getOperationEvents(reservationId: string): Promise<OperationEventRow[]> {
+  const { data, error } = await supabase
+    .from('inventory_operation_events' as never)
+    .select('*')
+    .eq('reservation_id', reservationId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as unknown as OperationEventRow[];
 }
 
 export async function checkReservationConflict(input: {
