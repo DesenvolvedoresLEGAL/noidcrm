@@ -49,6 +49,7 @@ import {
 import { getProposalByToken, declineProposal, trackView } from '@/services/crm/proposals';
 import { listProposalItems } from '@/services/crm/proposal-items';
 import { getPaymentTerms, calculateInstallments } from '@/services/crm/proposal-payment-terms';
+import { PublicProposalDynamicPricingBanner } from '@/components/proposals/PublicProposalDynamicPricingBanner';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { formatDateBR } from '@/lib/dateUtils';
@@ -1435,6 +1436,13 @@ export default function ProposalPublicView() {
         })()}
         </div>
 
+        {/* Dynamic Pricing Banner */}
+        {proposal?.dynamic_pricing_enabled && (
+          <PublicProposalDynamicPricingBanner
+            snapshot={proposal.dynamic_pricing_snapshot as any}
+          />
+        )}
+
         {/* Payment Terms */}
         <Card data-section="payment">
           <CardHeader>
@@ -1852,7 +1860,9 @@ export default function ProposalPublicView() {
                     onClick={() => setShowAcceptModal(true)}
                   >
                     <CheckCircle2 className="h-5 w-5" />
-                    Aprovar Proposta
+                    {proposal?.dynamic_pricing_enabled
+                      ? 'Aprovar proposta com valor vigente'
+                      : 'Aprovar Proposta'}
                   </Button>
                   <Button
                     size="lg"

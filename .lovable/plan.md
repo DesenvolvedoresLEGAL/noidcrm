@@ -1,111 +1,118 @@
-# Sprint INV 1.4 — Ocupação como Fator de Preço
 
-Cria o motor de fator comercial baseado em ocupação real do inventário no período operacional. Não toca ainda em "tabela dinâmica por data" — apenas no fator de ocupação, snapshot por item de proposta, sinalização de aprovação e visibilidade comercial.
+# Sprint PRICE 1.0 — Tabela de Preço Dinâmica da Proposta
+
+Cria uma camada de condições comerciais válidas por período. Cada proposta passa a ter `valor base`, uma tabela de tiers por data, e um `valor vigente` calculado automaticamente — visível no editor, no link público e no PDF. Preparado para integrar pagamento e conciliação ERP em sprints futuras.
 
 ## 1. Banco de dados (1 migration)
 
-### Tabela `inventory_pricing_rules`
-Conforme proposto, com RLS por `organization_id`:
-- Policies: `SELECT` para qualquer membro da org (`organization_id = get_user_organization_id()`); `INSERT/UPDATE/DELETE` exigem `has_role(auth.uid(),'admin')` OR `has_role(auth.uid(),'owner')`.
-- Trigger `update_updated_at_column` em UPDATE.
-- Trigger `set_updated_by` (se existir helper, senão `auth.uid()` no INSERT/UPDATE).
-- Index `(organization_id, status, min_occupancy_rate)`.
+### Novas tabelas
+- **`proposal_dynamic_pricing_rules`** — 1 regra por (organization_id, proposal_id). Campos: `enabled`, `base_amount`, `currency`, `status` (`draft|active|expired|disabled|requires_requote`), `current_tier_id`, `current_amount`, `next_tier_id`, `next_amount`, `last_calculated_at`, `notes`, auditoria.
+- **`proposal_dynamic_pricing_tiers`** — N tiers por regra. Campos: `tier_order`, `label`, `starts_at`, `ends_at`, `adjustment_type` (`base_amount|fixed_price|percent_adjustment|fixed_adjustment`), `adjustment_value`, `final_amount`, `is_current`, `is_expired`. Constraint impede `ends_at < starts_at`.
+- **`proposal_dynamic_pricing_events`** — log: `event_type` (`created|updated|tier_activated|tier_expired|proposal_repriced|disabled|manual_override`), `previous_amount`, `new_amount`, `message`, `metadata jsonb`.
 
-### Seed por organização
-Função `public.seed_inventory_pricing_rules(p_org uuid)` (SECURITY DEFINER, search_path public) que insere as 4 regras padrão (Baixa, Moderada, Alta, Crítica) se a org ainda não tiver nenhuma. Chamada:
-- Loop inicial em todas as `organizations` existentes para popular.
-- Trigger `AFTER INSERT ON organizations` para popular novas orgs.
+### Alteração em `proposals`
+Adicionar (idempotente): `dynamic_pricing_enabled`, `dynamic_pricing_current_amount`, `dynamic_pricing_status`, `dynamic_pricing_snapshot jsonb`, `dynamic_pricing_last_calculated_at`.
 
-### Snapshot em `proposal_items`
-```sql
-ALTER TABLE public.proposal_items
-  ADD COLUMN IF NOT EXISTS inventory_occupancy_rate numeric,
-  ADD COLUMN IF NOT EXISTS inventory_pricing_factor numeric,
-  ADD COLUMN IF NOT EXISTS inventory_adjustment_amount numeric,
-  ADD COLUMN IF NOT EXISTS inventory_adjusted_unit_price numeric,
-  ADD COLUMN IF NOT EXISTS inventory_risk_level text,
-  ADD COLUMN IF NOT EXISTS inventory_pricing_snapshot jsonb NOT NULL DEFAULT '{}'::jsonb;
-```
+### Índices
+- `(organization_id, proposal_id)` em todas as três tabelas.
+- `(pricing_rule_id, tier_order)` em tiers.
+- `(proposal_id, created_at desc)` em events.
 
-### RPC `calculate_inventory_pricing_factor`
-SECURITY DEFINER, `SET search_path = public`. Lógica:
-1. Lê snapshot via `get_inventory_availability_snapshot(start, end, category, family, requested)` (já existente da INV 1.3) → `available`, `pre_reserved`, `reserved`, `operational`, `risk_level`.
-2. Recalcula `occupancy_rate` agregando `get_inventory_capacity_by_period`.
-3. Busca regra ativa em `inventory_pricing_rules` da org, com match por `(category_id, family_id)` e faixa `min_occupancy_rate <= rate AND (max_occupancy_rate IS NULL OR rate <= max_occupancy_rate)`. Ordem de prioridade: regra com `category+family` > só `category` > só `family` > global. Fallback: zero adjustment.
-4. Calcula `adjustment_amount` (percent ou fixed) e `adjusted_amount`.
-5. Retorna estrutura completa (rule_id, fator, valores, max_discount_percent, requires_approval, message PT-BR).
+### RLS (helpers existentes do projeto)
+- **SELECT**: `user_belongs_to_organization(organization_id)` em todas.
+- **INSERT/UPDATE em rules e tiers**: organização + papel comercial autorizado (`admin|owner|sales_manager|closer`), via `has_role`.
+- **DELETE / disable / manual_override**: somente `admin|owner`.
+- **events**: INSERT pelo backend (RPCs `SECURITY DEFINER`); SELECT por organização.
 
-GRANT EXECUTE TO authenticated.
+### Triggers
+- `set_updated_at` nas duas tabelas mutáveis.
+- `trg_dynamic_pricing_tier_overlap_guard` (BEFORE INSERT/UPDATE em tiers): rejeita sobreposição de intervalos de datas dentro da mesma `pricing_rule_id`.
+- `trg_dynamic_pricing_tier_compute_final_amount` (BEFORE INSERT/UPDATE): calcula `final_amount` a partir do `base_amount` da regra e do tipo/valor de ajuste.
 
-## 2. Backend TS
+### RPCs `SECURITY DEFINER` (`search_path = public`)
+1. **`calculate_proposal_dynamic_price(p_proposal_id uuid, p_reference_at timestamptz default now())`** — retorna struct com `current_*`, `previous_*`, `next_*`, `status`, `message`. Marca tiers expirados, atualiza `current_tier_id`, `current_amount`, `next_*`, `last_calculated_at`. Se passou do último tier → `status = requires_requote`. Registra evento `tier_activated` quando há virada.
+2. **`apply_dynamic_price_to_proposal(p_proposal_id uuid, p_reference_at timestamptz default now())`** — chama #1 → atualiza `proposals.dynamic_pricing_current_amount`, `dynamic_pricing_status`, `dynamic_pricing_snapshot` (jsonb completo) e `dynamic_pricing_last_calculated_at`. **Não** mexe em `total_amount` quando proposta tem itens (regra do projeto: net value vem dos itens). Registra evento `proposal_repriced`.
 
-### `src/services/operations/inventoryPricing.ts`
-- `calculatePricingFactor(payload)` → chama RPC.
-- `listPricingRules()`, `createPricingRule()`, `updatePricingRule(id, patch)`, `deactivatePricingRule(id)` (UPDATE status='inactive').
+### Integração INV 1.4
+Helper `_resolve_dynamic_pricing_base(p_proposal_id)` que retorna o valor da proposta **após** ajuste por ocupação (lê `proposal_items.inventory_adjusted_unit_price` agregado se existirem snapshots; senão usa `total_amount`). Esse helper é chamado pelas RPCs ao recalcular `base_amount` quando o usuário pede "Sincronizar valor base".
 
-### `src/lib/operations/inventoryPricing.ts`
-Schemas Zod:
-- `inventoryPricingRuleSchema` (name, category_id?, family_id?, min/max_occupancy_rate, price_adjustment_type, price_adjustment_value, max_discount_percent?, requires_approval, risk_level, status).
-- `inventoryPricingFactorPayloadSchema` (start_date, end_date, category_id?, family_id?, requested_quantity > 0, base_amount >= 0).
-- Helpers: `RISK_TO_BADGE`, `formatPricingFactor`, `derivePricingSnapshot(unitPrice, qty, factorResult)`.
+## 2. Backend TypeScript
 
-### `src/hooks/operations/useInventoryPricing.ts`
-- `useInventoryPricingRules()`
-- `useCreateInventoryPricingRule()`, `useUpdateInventoryPricingRule()`, `useDeactivateInventoryPricingRule()` (invalida query key).
-- `useInventoryPricingFactor(payload, { enabled })` — query key `['inventory','pricing','factor', payload]`, `staleTime: 30s`.
+### Tipos e schemas (`src/lib/proposals/dynamicPricing.ts`)
+- Enums (`status`, `adjustment_type`, `event_type`).
+- Zod schemas: `dynamicPricingRuleSchema`, `dynamicPricingTierSchema`, helpers `formatBRL`, `tiersOverlap`, `findCurrentTier`.
+
+### Serviço (`src/services/proposals/proposalDynamicPricing.ts`)
+- `getDynamicPricing(proposalId)` — retorna `{ rule, tiers, currentCalculation }`.
+- `saveDynamicPricingRule(payload)` — upsert rule + replace tiers (transação client-side com cleanup).
+- `calculateDynamicPrice(proposalId, referenceAt?)` — chama RPC #1.
+- `applyDynamicPrice(proposalId)` — chama RPC #2.
+- `listDynamicPricingEvents(proposalId)`.
+- `disableDynamicPricing(proposalId)` — rule.status='disabled', enabled=false, registra evento.
+
+### Hooks (`src/hooks/proposals/useProposalDynamicPricing.ts`)
+- `useProposalDynamicPricing(proposalId)`
+- `useSaveProposalDynamicPricingRule()`
+- `useCalculateProposalDynamicPrice()`
+- `useApplyProposalDynamicPrice()`
+- `useProposalDynamicPricingEvents(proposalId)`
+- `useDisableProposalDynamicPricing()`
+- Invalidam `['proposal', id]` e `['proposal-dynamic-pricing', id]`.
 
 ## 3. Frontend
 
-### Configurações de regras de preço
-Nova sub-aba "Regras de Preço por Ocupação" dentro da aba "Reservas" (junto ao Calendário) ou — se houver tela de configurações já — anexar lá. Componentes:
-- `InventoryPricingRulesTab.tsx` (lista/tabela + toggle status).
-- `InventoryPricingRuleFormDialog.tsx` (create/edit; validações Zod). Acesso restrito por `useUserRole`/`has_role` (admin/owner).
-Tabela: Nome, Faixa (`min%`–`max%`), Ajuste, Desconto máx., Aprovação, Risco, Status, ações (editar / desativar).
+### Editor interno
+- **`ProposalDynamicPricingPanel.tsx`** — novo bloco no `ProposalEditorModal`/`ProposalEditor`. Exibe: status badge, valor base (com botão "Sincronizar com fator INV"), valor vigente, próxima virada, última atualização, ações (Ativar/Desativar tabela, Recalcular agora, Aplicar valor vigente), histórico de eventos.
+- **`DynamicPricingTierEditor.tsx`** — tabela editável com validações em tempo real (nome obrigatório, fim ≥ início, sem sobreposição, valor final ≥ 0, alerta de "buraco entre faixas"). Recalcula `final_amount` no client conforme tipo de ajuste.
 
-### Editor de proposta — `ProposalItemsManager.tsx`
-Para cada item com `product_id` que tenha categoria/família de inventário:
-- Hook `useInventoryPricingFactor` disparado quando o item tem `quantity > 0` e a proposta tem datas operacionais (já hoje em `proposals` via `event_start_date`/`operational_start_date` — usar o que existir).
-- Bloco discreto sob o item: Capacidade `XX%`, Fator `+YY%`, Risco, Disponível X / Demandado Y, Preço base / Preço ajustado.
-- Botão "Aplicar fator de ocupação" (ou aplicação automática + badge "Fator aplicado") que persiste no item:
-  - `inventory_occupancy_rate`, `inventory_pricing_factor`, `inventory_adjustment_amount`, `inventory_adjusted_unit_price`, `inventory_risk_level`, `inventory_pricing_snapshot` (RPC raw + ts).
-- Sinalização: se `discount_percent` > `max_discount_percent` da regra → `Alert` destrutivo "Desconto acima do permitido… aprovação necessária". Não trava nesta sprint, apenas sinaliza.
+### Link público (`ProposalPublicView`)
+- **`PublicProposalDynamicPricingBanner.tsx`** — antes de "Condições de Pagamento". Estados:
+  - **Ativa**: "Valor vigente hoje: R$ X / Válido até DD/MM HH:mm / Próxima atualização: R$ Y em DD/MM" + cláusula fixa de pagamento fora do prazo + texto discreto do valor anterior expirado.
+  - **Expirada/`requires_requote`**: aviso destacado "Esta condição comercial expirou. Nova cotação necessária." (esconde botão de aprovação ou desabilita).
+- Botão de aprovação muda label para **"Aprovar proposta com valor vigente"** quando dynamic pricing está ativo. Payload de aprovação inclui `current_tier_id`, `current_amount`, `dynamic_pricing_snapshot`.
 
-### Painel da proposta — `ProposalInventoryPanel.tsx`
-Novo bloco "Impacto comercial da capacidade":
-- Agrega snapshots dos `proposal_items`: ocupação média (ponderada por valor), maior risco, soma `inventory_adjustment_amount`, `requires_approval` (qualquer item true).
-- Card com tabela Produto / Ocupação / Fator / Risco / Status (Aplicado | Sem ajuste).
+### PDF (`ProposalPDFViewer` / generator)
+- **`PdfDynamicPricingSection.tsx`** — seção "Condição Comercial Dinâmica" antes de "Condições de Pagamento". Tabela de tiers + cláusula obrigatória sobre data efetiva de pagamento.
 
-### Visão Geral do Inventário — `InventoryOverviewTab.tsx`
-Novo bloco "Pressão comercial do estoque" (ao lado de Capacidade Operacional):
-- Cards: ocupação média 7d / 30d (já vem do `useInventoryCapacityByPeriod`), categorias com acréscimo ativo (categorias com risk_level >= medium), receita protegida (sum `inventory_adjustment_amount` últimos 30 dias via SELECT em `proposal_items`), propostas com desconto em cenário crítico (count proposals com algum item `inventory_risk_level='critical'` AND `discount_percent > 0`).
-- RPC opcional `get_inventory_pricing_pressure(p_days int)` para evitar N queries no client.
+### Pequenos ajustes
+- `ProposalPreview.tsx` e `ProposalVisualizarTab.tsx`: render do banner em modo de visualização interna.
+- `ProposalCapacityImpactBlock` (INV 1.4): adicionar link "Aplicar como base da tabela dinâmica" quando snapshot já existir.
 
-## 4. Arquivos
+## 4. Estrutura visual do painel
 
-**Novos**
-- `supabase/migrations/<ts>_inv_1_4_pricing_rules.sql`
-- `src/services/operations/inventoryPricing.ts`
-- `src/lib/operations/inventoryPricing.ts`
-- `src/hooks/operations/useInventoryPricing.ts`
-- `src/components/operations/inventory/InventoryPricingRulesTab.tsx`
-- `src/components/operations/inventory/InventoryPricingRuleFormDialog.tsx`
-- `src/components/proposals/ProposalItemPricingFactorBlock.tsx` (bloco por item)
-- `src/components/proposals/ProposalCapacityImpactBlock.tsx`
-- `src/components/operations/inventory/InventoryPricingPressureBlock.tsx`
+```text
+┌────────────────────────────────────────────────────────┐
+│ Tabela de Preço Dinâmica            [Ativa] [⋯ Ações] │
+├────────────────────────────────────────────────────────┤
+│ Valor base:  R$ 3.714,00   [Sincronizar com fator INV] │
+│ Vigente hoje: R$ 3.714,00  até 08/05 23:59             │
+│ Próxima virada: R$ 4.085,40 em 09/05 00:00             │
+├────────────────────────────────────────────────────────┤
+│ # │ Condição          │ Início │ Fim   │ Tipo │ Valor │
+│ 1 │ Antecipado        │ -      │ 06/05 │ %    │ -10%  │
+│ 2 │ Padrão            │ 07/05  │ 08/05 │ base │ R$ X  │
+│ 3 │ Fora do prazo     │ 09/05  │ 10/05 │ %    │ +10%  │
+│ + Adicionar condição                                   │
+├────────────────────────────────────────────────────────┤
+│ Eventos recentes (5 últimos)                           │
+└────────────────────────────────────────────────────────┘
+```
 
-**Editados**
-- `src/components/operations/inventory/InventoryReservationsTab.tsx` (nova sub-aba "Regras de preço")
-- `src/components/proposals/ProposalItemsManager.tsx` (integra bloco por item + persistência do snapshot)
-- `src/components/proposals/ProposalInventoryPanel.tsx` (novo bloco de impacto)
-- `src/components/operations/inventory/InventoryOverviewTab.tsx` (bloco pressão comercial)
-- `src/integrations/supabase/types.ts` (auto)
+## 5. Critérios de aceite (resumido)
+- Tabelas + RLS criadas; trigger anti-sobreposição funciona.
+- Snapshot na proposta atualizado por `apply_dynamic_price_to_proposal`.
+- `requires_requote` quando passa do último tier.
+- Painel no editor, banner público e seção PDF renderizam estados correto/expirado/próxima virada.
+- Botão público usa "valor vigente" e payload contém snapshot.
+- Base respeita ajuste de ocupação (INV 1.4) quando existe.
+- Typecheck + build passam; INV 1.4 intacto.
 
-## 5. Segurança e qualidade
-- RLS: leitura org-wide; mutações somente admin/owner via `has_role`.
-- RPC `SECURITY DEFINER` + `SET search_path = public` (memory rule).
-- Snapshot imutável: gravado no momento de aplicação, nunca recalculado retroativamente.
-- Tokens semânticos do design system; nenhum HSL hardcoded.
-- Sem mudanças na INV 1.3 (apenas leituras adicionais às RPCs já existentes).
+## Arquivos
+**Migration**: 1 nova (tabelas, RLS, triggers, RPCs, alter `proposals`).
+**Novos**: `src/lib/proposals/dynamicPricing.ts`, `src/services/proposals/proposalDynamicPricing.ts`, `src/hooks/proposals/useProposalDynamicPricing.ts`, `ProposalDynamicPricingPanel.tsx`, `DynamicPricingTierEditor.tsx`, `PublicProposalDynamicPricingBanner.tsx`, `PdfDynamicPricingSection.tsx`.
+**Editados**: `ProposalEditorModal.tsx`, `ProposalEditor.tsx`, `ProposalPublicView.tsx`, `ProposalPDFViewer.tsx`, `ProposalPreview.tsx`, `ProposalCapacityImpactBlock.tsx`, `src/integrations/supabase/types.ts` (auto).
 
-## 6. Critérios de aceite
-Conforme listado: tabela + RLS + seed por org, CRUD admin de regras, RPC de cálculo, snapshot persistido em `proposal_items`, sinalização de desconto acima do permitido, blocos de impacto na proposta e pressão comercial na visão geral, typecheck/build verdes, nada da INV 1.3 quebra.
+## Riscos
+- Sobreposição de datas mal validada → mitigado por trigger DB + validação UI.
+- Conflito com cálculo de totais por itens → não tocamos em `total_amount` quando há itens; apenas snapshot.
+- Performance do recálculo em listagens → recálculo só on-demand e ao salvar tiers.

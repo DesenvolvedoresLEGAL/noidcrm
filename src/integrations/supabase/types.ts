@@ -21645,6 +21645,357 @@ export type Database = {
           },
         ]
       }
+      proposal_dynamic_pricing_events: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          event_type: string
+          id: string
+          message: string | null
+          metadata: Json
+          new_amount: number | null
+          organization_id: string
+          previous_amount: number | null
+          pricing_rule_id: string | null
+          pricing_tier_id: string | null
+          proposal_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          event_type: string
+          id?: string
+          message?: string | null
+          metadata?: Json
+          new_amount?: number | null
+          organization_id: string
+          previous_amount?: number | null
+          pricing_rule_id?: string | null
+          pricing_tier_id?: string | null
+          proposal_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          event_type?: string
+          id?: string
+          message?: string | null
+          metadata?: Json
+          new_amount?: number | null
+          organization_id?: string
+          previous_amount?: number | null
+          pricing_rule_id?: string | null
+          pricing_tier_id?: string | null
+          proposal_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposal_dynamic_pricing_events_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_dynamic_pricing_events_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_report_legacy_retirement_readiness_v2"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "proposal_dynamic_pricing_events_pricing_rule_id_fkey"
+            columns: ["pricing_rule_id"]
+            isOneToOne: false
+            referencedRelation: "proposal_dynamic_pricing_rules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_dynamic_pricing_events_pricing_tier_id_fkey"
+            columns: ["pricing_tier_id"]
+            isOneToOne: false
+            referencedRelation: "proposal_dynamic_pricing_tiers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_dynamic_pricing_events_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "proposals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_dynamic_pricing_events_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_accepted_proposal_v2"
+            referencedColumns: ["proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_dynamic_pricing_events_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["accepted_proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_dynamic_pricing_events_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["latest_proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_dynamic_pricing_events_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_latest_commercial_proposal_v2"
+            referencedColumns: ["proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_dynamic_pricing_events_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_proposals_normalized_v2"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proposal_dynamic_pricing_rules: {
+        Row: {
+          base_amount: number
+          created_at: string
+          created_by: string | null
+          currency: string
+          current_amount: number | null
+          current_tier_id: string | null
+          enabled: boolean
+          id: string
+          last_calculated_at: string | null
+          next_amount: number | null
+          next_tier_id: string | null
+          notes: string | null
+          organization_id: string
+          proposal_id: string
+          status: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          base_amount?: number
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          current_amount?: number | null
+          current_tier_id?: string | null
+          enabled?: boolean
+          id?: string
+          last_calculated_at?: string | null
+          next_amount?: number | null
+          next_tier_id?: string | null
+          notes?: string | null
+          organization_id: string
+          proposal_id: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          base_amount?: number
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          current_amount?: number | null
+          current_tier_id?: string | null
+          enabled?: boolean
+          id?: string
+          last_calculated_at?: string | null
+          next_amount?: number | null
+          next_tier_id?: string | null
+          notes?: string | null
+          organization_id?: string
+          proposal_id?: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposal_dynamic_pricing_rules_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_dynamic_pricing_rules_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_report_legacy_retirement_readiness_v2"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "proposal_dynamic_pricing_rules_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "proposals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_dynamic_pricing_rules_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_accepted_proposal_v2"
+            referencedColumns: ["proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_dynamic_pricing_rules_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["accepted_proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_dynamic_pricing_rules_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["latest_proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_dynamic_pricing_rules_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_latest_commercial_proposal_v2"
+            referencedColumns: ["proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_dynamic_pricing_rules_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_proposals_normalized_v2"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proposal_dynamic_pricing_tiers: {
+        Row: {
+          adjustment_type: string
+          adjustment_value: number
+          created_at: string
+          ends_at: string | null
+          final_amount: number
+          id: string
+          is_current: boolean
+          is_expired: boolean
+          label: string
+          organization_id: string
+          pricing_rule_id: string
+          proposal_id: string
+          starts_at: string | null
+          tier_order: number
+          updated_at: string
+        }
+        Insert: {
+          adjustment_type?: string
+          adjustment_value?: number
+          created_at?: string
+          ends_at?: string | null
+          final_amount?: number
+          id?: string
+          is_current?: boolean
+          is_expired?: boolean
+          label: string
+          organization_id: string
+          pricing_rule_id: string
+          proposal_id: string
+          starts_at?: string | null
+          tier_order?: number
+          updated_at?: string
+        }
+        Update: {
+          adjustment_type?: string
+          adjustment_value?: number
+          created_at?: string
+          ends_at?: string | null
+          final_amount?: number
+          id?: string
+          is_current?: boolean
+          is_expired?: boolean
+          label?: string
+          organization_id?: string
+          pricing_rule_id?: string
+          proposal_id?: string
+          starts_at?: string | null
+          tier_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposal_dynamic_pricing_tiers_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_dynamic_pricing_tiers_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_report_legacy_retirement_readiness_v2"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "proposal_dynamic_pricing_tiers_pricing_rule_id_fkey"
+            columns: ["pricing_rule_id"]
+            isOneToOne: false
+            referencedRelation: "proposal_dynamic_pricing_rules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_dynamic_pricing_tiers_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "proposals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_dynamic_pricing_tiers_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_accepted_proposal_v2"
+            referencedColumns: ["proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_dynamic_pricing_tiers_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["accepted_proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_dynamic_pricing_tiers_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["latest_proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_dynamic_pricing_tiers_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_latest_commercial_proposal_v2"
+            referencedColumns: ["proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_dynamic_pricing_tiers_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_proposals_normalized_v2"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       proposal_items: {
         Row: {
           billing_type: string | null
@@ -22567,6 +22918,11 @@ export type Database = {
           declined_reason: string | null
           deleted_at: string | null
           discount_amount: number | null
+          dynamic_pricing_current_amount: number | null
+          dynamic_pricing_enabled: boolean
+          dynamic_pricing_last_calculated_at: string | null
+          dynamic_pricing_snapshot: Json
+          dynamic_pricing_status: string | null
           expires_at: string | null
           id: string
           introduction: string | null
@@ -22619,6 +22975,11 @@ export type Database = {
           declined_reason?: string | null
           deleted_at?: string | null
           discount_amount?: number | null
+          dynamic_pricing_current_amount?: number | null
+          dynamic_pricing_enabled?: boolean
+          dynamic_pricing_last_calculated_at?: string | null
+          dynamic_pricing_snapshot?: Json
+          dynamic_pricing_status?: string | null
           expires_at?: string | null
           id?: string
           introduction?: string | null
@@ -22671,6 +23032,11 @@ export type Database = {
           declined_reason?: string | null
           deleted_at?: string | null
           discount_amount?: number | null
+          dynamic_pricing_current_amount?: number | null
+          dynamic_pricing_enabled?: boolean
+          dynamic_pricing_last_calculated_at?: string | null
+          dynamic_pricing_snapshot?: Json
+          dynamic_pricing_status?: string | null
           expires_at?: string | null
           id?: string
           introduction?: string | null
@@ -31895,6 +32261,10 @@ export type Database = {
         Returns: Json
       }
       admin_delete_organization: { Args: { org_id: string }; Returns: boolean }
+      apply_dynamic_price_to_proposal: {
+        Args: { p_proposal_id: string; p_reference_at?: string }
+        Returns: Json
+      }
       approve_hypothesis: {
         Args: { _hypothesis_id: string }
         Returns: {
@@ -31978,6 +32348,10 @@ export type Database = {
         Returns: Json
       }
       calculate_lead_grade: { Args: { score: number }; Returns: string }
+      calculate_proposal_dynamic_price: {
+        Args: { p_proposal_id: string; p_reference_at?: string }
+        Returns: Json
+      }
       calculate_weighted_xp:
         | {
             Args: {
