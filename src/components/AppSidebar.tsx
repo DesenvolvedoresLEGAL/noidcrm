@@ -168,6 +168,7 @@ export function AppSidebar() {
 
   const principalItems = getItemsForSection('principal');
   const gestaoItems = getItemsForSection('gestao');
+  const operacoesItems = getItemsForSection('operacoes');
   const inteligenciaItems = getItemsForSection('inteligencia');
   const objetivosItems = getItemsForSection('objetivos');
   const gtmItems = getItemsForSection('gtm');
