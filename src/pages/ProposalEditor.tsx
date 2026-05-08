@@ -91,6 +91,7 @@ export default function ProposalEditor() {
   const { id: proposalId } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
   const opportunityId = searchParams.get('opportunity_id') || undefined;
+  const preselectedTemplateId = searchParams.get('template_id') || undefined;
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { organization } = useCurrentOrganization();
