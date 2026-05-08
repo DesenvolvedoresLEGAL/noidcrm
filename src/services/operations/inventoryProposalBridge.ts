@@ -67,7 +67,7 @@ export async function generatePreReservationFromProposal(
     const { data: products, error: prErr } = await supabase
       .from('products')
       .select(
-        'id, inventory_control_mode, default_inventory_item_type, default_serialized_item_id, default_quantity_item_id, default_inventory_category_id, default_inventory_family_id, inventory_quantity_multiplier',
+        'id, inventory_control_mode, default_inventory_item_type, default_serialized_item_id, default_quantity_item_id, default_inventory_category_id, default_inventory_family_id, inventory_quantity_multiplier, inventory_demand_rules',
       )
       .in('id', productIds);
     if (prErr) throw prErr;
@@ -82,7 +82,30 @@ export async function generatePreReservationFromProposal(
   for (const it of items ?? []) {
     const cfg = it.product_id ? productMap.get(it.product_id) : undefined;
     if (!cfg || cfg.inventory_control_mode === 'none') continue;
-    const qty = Number(it.quantity ?? 1) * Number(cfg.inventory_quantity_multiplier ?? 1);
+    const baseQty = Number(it.quantity ?? 1) * Number(cfg.inventory_quantity_multiplier ?? 1);
+
+    // 1) Regras de demanda compostas (kits lógicos) têm prioridade.
+    const rules = Array.isArray(cfg.inventory_demand_rules)
+      ? cfg.inventory_demand_rules
+      : [];
+    if (rules.length > 0) {
+      for (const rule of rules) {
+        const ruleQty = baseQty * Number(rule.quantity_multiplier ?? 1);
+        if (!ruleQty) continue;
+        reservationItems.push({
+          inventory_item_type: 'category_family_demand',
+          category_id: rule.category_id ?? cfg.default_inventory_category_id ?? null,
+          family_id: rule.family_id ?? cfg.default_inventory_family_id ?? null,
+          requested_quantity: ruleQty,
+          demand_label: rule.label ?? `${it.name}`,
+          demand_source: 'product_rule',
+          product_id: it.product_id ?? null,
+          proposal_item_id: it.id,
+          notes: it.name,
+        });
+      }
+      continue;
+    }
 
     if (cfg.inventory_control_mode === 'direct_serialized_item' && cfg.default_serialized_item_id) {
       reservationItems.push({
@@ -91,6 +114,9 @@ export async function generatePreReservationFromProposal(
         category_id: cfg.default_inventory_category_id,
         family_id: cfg.default_inventory_family_id,
         requested_quantity: 1,
+        demand_source: 'proposal_item',
+        product_id: it.product_id ?? null,
+        proposal_item_id: it.id,
         notes: it.name,
       });
     } else if (
@@ -102,16 +128,23 @@ export async function generatePreReservationFromProposal(
         quantity_item_id: cfg.default_quantity_item_id,
         category_id: cfg.default_inventory_category_id,
         family_id: cfg.default_inventory_family_id,
-        requested_quantity: qty,
+        requested_quantity: baseQty,
+        demand_source: 'proposal_item',
+        product_id: it.product_id ?? null,
+        proposal_item_id: it.id,
         notes: it.name,
       });
     } else if (cfg.inventory_control_mode === 'category_family_demand') {
       reservationItems.push({
-        inventory_item_type: 'sku',
+        inventory_item_type: 'category_family_demand',
         category_id: cfg.default_inventory_category_id,
         family_id: cfg.default_inventory_family_id,
-        requested_quantity: qty,
-        notes: `${it.name} (demanda não alocada)`,
+        requested_quantity: baseQty,
+        demand_label: it.name,
+        demand_source: 'proposal_item',
+        product_id: it.product_id ?? null,
+        proposal_item_id: it.id,
+        notes: it.name,
       });
     }
   }
