@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Boxes, Construction } from 'lucide-react';
 import { PageContainer } from '@/components/ui/page-container';
 import { PageHeader } from '@/components/ui/page-header';
@@ -11,6 +12,7 @@ import { InventoryLocationsTab } from '@/components/operations/inventory/Invento
 
 export default function Inventory() {
   const { isOwner, isAdmin, orgRole, loading } = usePermissions();
+  const [tab, setTab] = useState('overview');
 
   if (loading) return null;
 
@@ -36,7 +38,7 @@ export default function Inventory() {
         variant="teal"
       />
 
-      <Tabs defaultValue="overview" className="space-y-6">
+      <Tabs value={tab} onValueChange={setTab} className="space-y-6">
         <TabsList>
           <TabsTrigger value="overview">Visão Geral</TabsTrigger>
           <TabsTrigger value="items">Itens</TabsTrigger>
@@ -45,7 +47,7 @@ export default function Inventory() {
         </TabsList>
 
         <TabsContent value="overview">
-          <InventoryOverviewTab />
+          <InventoryOverviewTab onNavigateToItems={() => setTab('items')} />
         </TabsContent>
         <TabsContent value="items">
           <InventoryItemsTab />
