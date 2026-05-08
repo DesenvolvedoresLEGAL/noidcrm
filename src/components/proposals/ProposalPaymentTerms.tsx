@@ -358,11 +358,11 @@ export function ProposalPaymentTerms({
   const hasRecurringItems = recurringItems.length > 0 || recurringMRR > 0;
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
+    <Card className="border-primary/40 shadow-sm">
+      <CardHeader className="pb-3 bg-primary/5">
         <CardTitle className="flex items-center gap-2 text-base">
           <CreditCard className="h-4 w-4" />
-          Condições de Pagamento
+          Configurar formas de pagamento
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -448,11 +448,11 @@ export function ProposalPaymentTerms({
             ) : (
               <>
                 {/* PRICE UX 1.0.3 — Bloco "Como o cliente vai pagar?" */}
-                <div className="rounded-lg border bg-muted/30 p-4 space-y-4">
+                <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-4">
                   <div>
-                    <h4 className="text-sm font-semibold">Como o cliente vai pagar?</h4>
+                    <h4 className="text-sm font-semibold">Forma e prazo de pagamento avulso</h4>
                     <p className="text-xs text-muted-foreground">
-                      Selecione a forma e a condição. O cronograma é gerado automaticamente.
+                      Escolha PIX, boleto, cartão ou transferência e defina se será à vista, 50% + 50%, 30/60/90 ou parcelado.
                     </p>
                   </div>
 
