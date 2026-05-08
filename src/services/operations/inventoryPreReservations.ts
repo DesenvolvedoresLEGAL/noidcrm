@@ -5,6 +5,8 @@ import type {
   PreReservationItemType,
   PreReservationAvailability,
   PreReservationSource,
+  PreReservationAllocationStatus,
+  DemandSource,
 } from '@/lib/operations/inventoryPreReservations';
 
 export interface PreReservationRow {
