@@ -185,6 +185,10 @@ export async function createPreReservation(
         family_id: it.family_id ?? null,
         requested_quantity: it.requested_quantity,
         notes: it.notes ?? null,
+        demand_label: it.demand_label ?? null,
+        demand_source: it.demand_source ?? 'manual',
+        product_id: it.product_id ?? null,
+        proposal_item_id: it.proposal_item_id ?? null,
       })) as never,
     );
     if (itemsError) throw itemsError;
