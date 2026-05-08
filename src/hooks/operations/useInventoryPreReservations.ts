@@ -145,3 +145,69 @@ export function useProposalPreReservations(proposalId?: string | null) {
 }
 
 export { checkAvailabilityForPeriod };
+
+import {
+  cancelAllocation,
+  createAllocation,
+  findAllocationCandidates,
+  listAllocations,
+  recalculatePreReservationItemAllocation,
+  type CreateAllocationPayload,
+} from '@/services/operations/inventoryAllocations';
+import { deletePreReservationItem } from '@/services/operations/inventoryPreReservations';
+
+export function useInventoryAllocationCandidates(preReservationItemId?: string | null) {
+  return useQuery({
+    queryKey: [...baseKey, 'candidates', preReservationItemId],
+    queryFn: () => findAllocationCandidates(preReservationItemId as string),
+    enabled: !!preReservationItemId,
+  });
+}
+
+export function useInventoryPreReservationAllocations(preReservationItemId?: string | null) {
+  return useQuery({
+    queryKey: [...baseKey, 'allocations', preReservationItemId],
+    queryFn: () => listAllocations(preReservationItemId as string),
+    enabled: !!preReservationItemId,
+  });
+}
+
+export function useCreateInventoryAllocation() {
+  const { organization } = useCurrentOrganization();
+  const { user } = useSupabaseAuth();
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: (input: Omit<CreateAllocationPayload, 'organization_id' | 'user_id'>) =>
+      createAllocation({
+        ...input,
+        organization_id: organization?.id as string,
+        user_id: user?.id ?? null,
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useCancelInventoryAllocation() {
+  const { user } = useSupabaseAuth();
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: (id: string) => cancelAllocation(id, user?.id ?? null),
+    onSuccess: invalidate,
+  });
+}
+
+export function useRecalculatePreReservationItemAllocation() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: (itemId: string) => recalculatePreReservationItemAllocation(itemId),
+    onSuccess: invalidate,
+  });
+}
+
+export function useDeletePreReservationItem() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: (itemId: string) => deletePreReservationItem(itemId),
+    onSuccess: invalidate,
+  });
+}

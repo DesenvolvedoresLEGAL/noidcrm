@@ -13482,12 +13482,110 @@ export type Database = {
           },
         ]
       }
+      inventory_pre_reservation_allocations: {
+        Row: {
+          allocated_quantity: number
+          allocation_item_type: string
+          allocation_status: string
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          organization_id: string
+          pre_reservation_id: string
+          pre_reservation_item_id: string
+          quantity_item_id: string | null
+          serialized_item_id: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          allocated_quantity?: number
+          allocation_item_type: string
+          allocation_status?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          organization_id: string
+          pre_reservation_id: string
+          pre_reservation_item_id: string
+          quantity_item_id?: string | null
+          serialized_item_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          allocated_quantity?: number
+          allocation_item_type?: string
+          allocation_status?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          organization_id?: string
+          pre_reservation_id?: string
+          pre_reservation_item_id?: string
+          quantity_item_id?: string | null
+          serialized_item_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_pre_reservation_allocati_pre_reservation_item_id_fkey"
+            columns: ["pre_reservation_item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_pre_reservation_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_pre_reservation_allocations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_pre_reservation_allocations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_report_legacy_retirement_readiness_v2"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "inventory_pre_reservation_allocations_pre_reservation_id_fkey"
+            columns: ["pre_reservation_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_pre_reservations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_pre_reservation_allocations_quantity_item_id_fkey"
+            columns: ["quantity_item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_pre_reservation_allocations_serialized_item_id_fkey"
+            columns: ["serialized_item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inventory_pre_reservation_items: {
         Row: {
+          allocated_quantity: number
+          allocation_status: string
           availability_status: string
           category_id: string | null
           conflict_reason: string | null
           created_at: string
+          demand_label: string | null
+          demand_source: string
           family_id: string | null
           id: string
           inventory_item_type: string
@@ -13495,16 +13593,22 @@ export type Database = {
           organization_id: string
           pre_reservation_id: string
           pre_reserved_quantity: number
+          product_id: string | null
+          proposal_item_id: string | null
           quantity_item_id: string | null
           requested_quantity: number
           serialized_item_id: string | null
           updated_at: string
         }
         Insert: {
+          allocated_quantity?: number
+          allocation_status?: string
           availability_status?: string
           category_id?: string | null
           conflict_reason?: string | null
           created_at?: string
+          demand_label?: string | null
+          demand_source?: string
           family_id?: string | null
           id?: string
           inventory_item_type: string
@@ -13512,16 +13616,22 @@ export type Database = {
           organization_id: string
           pre_reservation_id: string
           pre_reserved_quantity?: number
+          product_id?: string | null
+          proposal_item_id?: string | null
           quantity_item_id?: string | null
           requested_quantity?: number
           serialized_item_id?: string | null
           updated_at?: string
         }
         Update: {
+          allocated_quantity?: number
+          allocation_status?: string
           availability_status?: string
           category_id?: string | null
           conflict_reason?: string | null
           created_at?: string
+          demand_label?: string | null
+          demand_source?: string
           family_id?: string | null
           id?: string
           inventory_item_type?: string
@@ -13529,6 +13639,8 @@ export type Database = {
           organization_id?: string
           pre_reservation_id?: string
           pre_reserved_quantity?: number
+          product_id?: string | null
+          proposal_item_id?: string | null
           quantity_item_id?: string | null
           requested_quantity?: number
           serialized_item_id?: string | null
@@ -20598,6 +20710,7 @@ export type Database = {
           id: string
           image_url: string | null
           inventory_control_mode: string
+          inventory_demand_rules: Json
           inventory_quantity_multiplier: number
           ipi_percent: number
           last_synced_at: string | null
@@ -20632,6 +20745,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           inventory_control_mode?: string
+          inventory_demand_rules?: Json
           inventory_quantity_multiplier?: number
           ipi_percent?: number
           last_synced_at?: string | null
@@ -20666,6 +20780,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           inventory_control_mode?: string
+          inventory_demand_rules?: Json
           inventory_quantity_multiplier?: number
           ipi_percent?: number
           last_synced_at?: string | null
@@ -31559,6 +31674,23 @@ export type Database = {
         }
         Returns: undefined
       }
+      find_inventory_allocation_candidates: {
+        Args: { p_pre_reservation_item_id: string }
+        Returns: {
+          already_pre_reserved_quantity: number
+          available_quantity: number
+          candidate_code: string
+          candidate_id: string
+          candidate_name: string
+          candidate_type: string
+          category_id: string
+          category_name: string
+          family_id: string
+          family_name: string
+          message: string
+          status: string
+        }[]
+      }
       find_similar_accounts:
         | {
             Args: {
@@ -32150,6 +32282,21 @@ export type Database = {
       }
       is_trial_expired: { Args: { org_id: string }; Returns: boolean }
       kairos_janitor_stale_runs: { Args: never; Returns: number }
+      list_pre_reservation_item_allocations: {
+        Args: { p_pre_reservation_item_id: string }
+        Returns: {
+          allocated_quantity: number
+          allocation_item_type: string
+          allocation_status: string
+          created_at: string
+          id: string
+          inventory_item_code: string
+          inventory_item_name: string
+          notes: string
+          quantity_item_id: string
+          serialized_item_id: string
+        }[]
+      }
       load_noid_performance_gates: {
         Args: { p_organization_id: string }
         Returns: undefined
@@ -32329,6 +32476,10 @@ export type Database = {
         Returns: Json
       }
       recalculate_org_mrr: { Args: { org_id: string }; Returns: Json }
+      recalculate_pre_reservation_item_allocation: {
+        Args: { p_pre_reservation_item_id: string }
+        Returns: Json
+      }
       record_memory_read: {
         Args: {
           p_ai_function?: string

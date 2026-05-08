@@ -25,8 +25,58 @@ export const PRE_RESERVATION_ITEM_TYPES = [
   'quantity',
   'sku',
   'service_no_stock',
+  'category_family_demand',
 ] as const;
 export type PreReservationItemType = (typeof PRE_RESERVATION_ITEM_TYPES)[number];
+
+export const PRE_RESERVATION_ALLOCATION_STATUSES = [
+  'unallocated',
+  'partially_allocated',
+  'allocated',
+  'over_allocated',
+  'not_required',
+] as const;
+export type PreReservationAllocationStatus =
+  (typeof PRE_RESERVATION_ALLOCATION_STATUSES)[number];
+
+export const ALLOCATION_ITEM_TYPES = ['serialized', 'quantity'] as const;
+export type AllocationItemType = (typeof ALLOCATION_ITEM_TYPES)[number];
+
+export const ALLOCATION_STATUSES = ['active', 'cancelled', 'replaced'] as const;
+export type AllocationStatus = (typeof ALLOCATION_STATUSES)[number];
+
+export const DEMAND_SOURCES = [
+  'proposal_item',
+  'product_rule',
+  'manual',
+  'agent',
+] as const;
+export type DemandSource = (typeof DEMAND_SOURCES)[number];
+
+export const ALLOCATION_STATUS_LABELS: Record<PreReservationAllocationStatus, string> = {
+  unallocated: 'Não alocado',
+  partially_allocated: 'Parcial',
+  allocated: 'Alocado',
+  over_allocated: 'Excedente',
+  not_required: 'Sem controle',
+};
+
+export function allocationStatusBadgeVariant(
+  s: PreReservationAllocationStatus,
+): 'default' | 'secondary' | 'destructive' | 'outline' {
+  switch (s) {
+    case 'allocated':
+      return 'default';
+    case 'partially_allocated':
+      return 'secondary';
+    case 'over_allocated':
+      return 'destructive';
+    case 'not_required':
+      return 'outline';
+    default:
+      return 'outline';
+  }
+}
 
 export const PRE_RESERVATION_AVAILABILITIES = [
   'pending',
@@ -65,6 +115,7 @@ export const ITEM_TYPE_LABELS: Record<PreReservationItemType, string> = {
   quantity: 'Por quantidade',
   sku: 'Demanda (SKU)',
   service_no_stock: 'Serviço sem estoque',
+  category_family_demand: 'Demanda por categoria/família',
 };
 
 export function statusBadgeVariant(
@@ -186,3 +237,41 @@ export function computeOperationalPeriod(
     operational_end_date: end.toISOString().slice(0, 10),
   };
 }
+
+export const inventoryPreReservationAllocationSchema = z
+  .object({
+    pre_reservation_id: z.string().uuid(),
+    pre_reservation_item_id: z.string().uuid(),
+    allocation_item_type: z.enum(ALLOCATION_ITEM_TYPES),
+    serialized_item_id: z.string().uuid().optional().nullable(),
+    quantity_item_id: z.string().uuid().optional().nullable(),
+    allocated_quantity: z.number().positive('Quantidade precisa ser maior que zero'),
+    notes: z.string().optional().nullable(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.allocation_item_type === 'serialized' && !data.serialized_item_id) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['serialized_item_id'],
+        message: 'Item serializado obrigatório.',
+      });
+    }
+    if (data.allocation_item_type === 'quantity' && !data.quantity_item_id) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['quantity_item_id'],
+        message: 'Item por quantidade obrigatório.',
+      });
+    }
+    if (data.allocation_item_type === 'serialized' && data.allocated_quantity !== 1) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['allocated_quantity'],
+        message: 'Item serializado deve ter quantidade 1.',
+      });
+    }
+  });
+
+export type InventoryPreReservationAllocationInput = z.infer<
+  typeof inventoryPreReservationAllocationSchema
+>;

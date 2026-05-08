@@ -5,6 +5,8 @@ import type {
   PreReservationItemType,
   PreReservationAvailability,
   PreReservationSource,
+  PreReservationAllocationStatus,
+  DemandSource,
 } from '@/lib/operations/inventoryPreReservations';
 
 export interface PreReservationRow {
@@ -44,6 +46,12 @@ export interface PreReservationItemRow {
   availability_status: PreReservationAvailability;
   conflict_reason: string | null;
   notes: string | null;
+  allocation_status: PreReservationAllocationStatus;
+  allocated_quantity: number;
+  demand_label: string | null;
+  demand_source: DemandSource;
+  product_id: string | null;
+  proposal_item_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -140,6 +148,10 @@ export interface CreatePreReservationPayload {
     family_id?: string | null;
     requested_quantity: number;
     notes?: string | null;
+    demand_label?: string | null;
+    demand_source?: DemandSource;
+    product_id?: string | null;
+    proposal_item_id?: string | null;
   }>;
 }
 
@@ -173,6 +185,10 @@ export async function createPreReservation(
         family_id: it.family_id ?? null,
         requested_quantity: it.requested_quantity,
         notes: it.notes ?? null,
+        demand_label: it.demand_label ?? null,
+        demand_source: it.demand_source ?? 'manual',
+        product_id: it.product_id ?? null,
+        proposal_item_id: it.proposal_item_id ?? null,
       })) as never,
     );
     if (itemsError) throw itemsError;
@@ -293,7 +309,7 @@ export async function listPreReservationsByProposal(
 ) {
   const { data, error } = await supabase
     .from(TABLE as never)
-    .select('*, items:inventory_pre_reservation_items(id,availability_status)')
+    .select('*, items:inventory_pre_reservation_items(id,availability_status,allocation_status,allocated_quantity,requested_quantity)')
     .eq('organization_id', organizationId)
     .eq('proposal_id', proposalId)
     .order('created_at', { ascending: false });
@@ -301,4 +317,12 @@ export async function listPreReservationsByProposal(
   return (data ?? []) as unknown as (PreReservationRow & {
     items: { id: string; availability_status: PreReservationAvailability }[];
   })[];
+}
+
+export async function deletePreReservationItem(itemId: string): Promise<void> {
+  const { error } = await supabase
+    .from(ITEMS_TABLE as never)
+    .delete()
+    .eq('id', itemId);
+  if (error) throw error;
 }

@@ -1,79 +1,119 @@
-## Sprint INV 0.9 — Pré Reserva Operacional por Período
+# Sprint INV 1.0 — Alocação Inteligente de Estoque
 
-Conecta propostas do CRM ao Inventário criando pré reservas por período operacional (montagem → desmontagem → conferência), sem alterar o status real dos itens.
+Evolui a pré reserva (INV 0.9) para suportar **demanda por categoria/família** e **alocação posterior** de itens físicos (serializados ou por quantidade), preservando o status físico real dos itens.
 
-### Realidade do projeto vs. spec
+## 1. Banco de dados (migration única)
 
-Diferenças encontradas no banco que ajustam a spec sem mudar o objetivo:
+### Nova tabela `inventory_pre_reservation_allocations`
+- Campos: `organization_id`, `pre_reservation_id`, `pre_reservation_item_id`, `allocation_item_type` (serialized|quantity), `serialized_item_id`, `quantity_item_id`, `allocated_quantity`, `allocation_status` (active|cancelled|replaced), `notes`, `created_by`, `updated_by`, timestamps.
+- Constraints: type check, status check, quantidade > 0, exclusividade serialized vs quantity.
+- Índices em `organization_id`, `pre_reservation_id`, `pre_reservation_item_id`, `serialized_item_id`, `quantity_item_id`.
+- RLS via `user_belongs_to_organization` (helper já existente no projeto).
 
-- **Não existem** `inventory_serialized_items` / `inventory_quantity_items`. Tudo vive em `public.inventory_items` com `item_kind in ('serialized','quantity')`. Toda a checagem de disponibilidade vai usar essa tabela única (item serializado = `item_kind='serialized' and status='available'`; por quantidade = `quantity_available`).
-- **Helpers existentes**: `user_can_access_inventory(p_org_id uuid)`, `user_is_org_admin(_org_id uuid)`, `is_tenant_admin_or_owner(_tenant_id uuid)`. Não existe `user_belongs_to_organization` nem `is_organization_admin_or_owner` da spec — vamos usar os reais (`user_can_access_inventory` para SELECT/INSERT/UPDATE, `user_is_org_admin` para DELETE), mantendo a coerência com o resto do módulo Inventário.
-- **`opportunities` não tem `event_start_date/event_end_date`**, só `close_date_prevista`. O fluxo "gerar pré reserva a partir da proposta" vai abrir um diálogo onde o usuário confirma `event_start_date` e `event_end_date` (default = `close_date_prevista`). Período operacional = evento − 1 dia / + 1 dia (configurável depois).
-- `proposal_items.product_id → products` já existe; adicionamos os campos `inventory_control_mode` etc. em `products` (spec ipsis litteris).
+### Extensões em `inventory_pre_reservation_items`
+- Novas colunas: `allocation_status` (default `unallocated`), `allocated_quantity` (default 0), `demand_label`, `demand_source` (default `manual`), `product_id`, `proposal_item_id`.
+- Constraints de check para `allocation_status` e `demand_source`.
+- Adicionar valor `category_family_demand` ao domínio de `inventory_item_type` (mantendo `sku` por compat).
+- Índice em `(organization_id, allocation_status)`.
 
-### Banco (uma migration)
+### Extensão em `products`
+- `inventory_demand_rules jsonb not null default '[]'` para kits lógicos simples.
 
-1. **`inventory_pre_reservations`** (campos da spec) com triggers `set_updated_at`, `set_inventory_pre_reservation_code` (gera `PRERES-YYYY-NNNNN`).
-2. **`inventory_pre_reservation_items`** (campos da spec) com check `inventory_item_type/availability_status/quantity/reference`, trigger `validate_pre_reservation_item_org` e `set_updated_at`. As FKs `serialized_item_id` e `quantity_item_id` apontam ambas para `public.inventory_items(id) on delete set null` (o `inventory_item_type` discrimina o uso); o check de referência permanece como na spec.
-3. **Índices** da spec.
-4. **RLS**:
-   - SELECT/INSERT/UPDATE → `user_can_access_inventory(organization_id)`
-   - DELETE → `user_is_org_admin(organization_id)`
-5. **RPCs** (todas `security definer`, `set search_path = public`):
-   - `check_inventory_availability_for_period(...)` — adaptada à tabela única `inventory_items` (filtros por `item_kind`), com overlap via `daterange(...,'[]') && daterange(...,'[]')`, ignorando opcionalmente uma reserva (para recálculo).
-   - `recalculate_inventory_pre_reservation_status(p_pre_reservation_id)` — atualiza `availability_status`, `pre_reserved_quantity`, `conflict_reason` de cada item e `risk_level` da reserva, retorna JSON com totais.
-   - `get_inventory_pre_reservations_overview()` — KPIs.
-   - `get_inventory_item_pre_reservation_summary(...)` — ocupação por item para colunas das listas.
-6. **Extensão de `products`** (spec literal): `inventory_control_mode` (`none|direct_quantity_item|direct_serialized_item|category_family_demand`), `default_inventory_item_type`, `default_serialized_item_id`, `default_quantity_item_id`, `default_inventory_category_id`, `default_inventory_family_id`, `inventory_quantity_multiplier numeric default 1`. Constraints + check `products_inventory_control_mode_check`.
-7. **Status real do item NÃO é alterado** nesta sprint.
+### Triggers e funções
+- `validate_pre_reservation_allocation_org` — garante que a alocação herda org/reservation do item pai.
+- `validate_pre_reservation_allocation_inventory_item` — valida que item serializado/quantidade pertence à mesma org.
+- `recalculate_pre_reservation_item_allocation(uuid)` — soma alocações ativas e atualiza `allocated_quantity`, `allocation_status`, `pre_reserved_quantity`, `availability_status`.
+- `recalculate_allocation_after_change` — trigger AFTER INSERT/UPDATE/DELETE em allocations chamando o recálculo.
+- `find_inventory_allocation_candidates(uuid)` — RPC que retorna candidatos serializados + por quantidade filtrados por categoria/família e disponibilidade no período (usa `check_inventory_availability_for_period` da INV 0.9).
+- Atualizar `recalculate_inventory_pre_reservation_status` para considerar alocação real (low/medium/high/critical conforme regra abaixo).
 
-### Serviços (`src/services/operations/`)
+### Regra de risco atualizada
+| Situação | Risco |
+|---|---|
+| Tudo alocado/disponível | low |
+| Demandas sem alocação mas com candidatos | medium |
+| Demandas parcialmente alocadas | high |
+| Demandas sem candidatos suficientes | critical |
 
-- `inventoryPreReservations.ts` — `listPreReservations(filters)`, `getPreReservation(id)`, `createPreReservation(payload, items)`, `updatePreReservation`, `cancelPreReservation`, `recalculatePreReservation` (chama RPC), `checkAvailabilityForPeriod`, `getPreReservationsOverview`, `getItemPreReservationSummary`.
-- `inventoryProposalBridge.ts` — `generatePreReservationFromProposal({ proposalId, eventStart, eventEnd })`: lê `proposals` + `proposal_items` + `products`, calcula período operacional (−1/+1 dia), monta itens conforme `inventory_control_mode` (none → ignora; direct_* → vincula item; `category_family_demand` → cria item com `inventory_item_type='sku'`, `category_id`/`family_id` setados, sem alocação real — placeholder para Sprint 1.0), insere reserva + itens, dispara `recalculatePreReservation`.
+## 2. Backend (services + hooks)
 
-### Hooks (`src/hooks/operations/`)
+### `src/lib/operations/inventoryPreReservations.ts`
+- Adicionar enums `ALLOCATION_STATUSES`, `ALLOCATION_ITEM_TYPES`, labels e badge variants.
+- Estender `inventoryPreReservationItemSchema` com `allocation_status`, `allocated_quantity`, `demand_label`, `demand_source`, `product_id`, `proposal_item_id` e suportar `category_family_demand`.
+- Novo `inventoryPreReservationAllocationSchema` (com superRefine: serializado obriga qty=1, refs corretas).
 
-- `useInventoryPreReservations.ts` expondo: `useInventoryPreReservations`, `useInventoryPreReservation`, `useCreate/Update/Cancel/RecalculateInventoryPreReservation`, `useInventoryPreReservationsOverview`, `useInventoryItemPreReservationSummary`. React Query, invalida `['inventory','pre-reservations']`, `['inventory','overview']` e a key do item afetado.
+### `src/services/operations/inventoryPreReservations.ts`
+- `findAllocationCandidates(itemId)`
+- `createAllocation(payload)`
+- `cancelAllocation(allocationId)` (soft via `allocation_status='cancelled'`)
+- `listAllocations(itemId)`
+- `recalculatePreReservationItemAllocation(itemId)`
 
-### Validações (`src/lib/operations/`)
+### `src/services/operations/inventoryProposalBridge.ts`
+- Quando `inventory_control_mode = category_family_demand`: gerar item com `inventory_item_type='category_family_demand'`, `category_id`, `family_id`, `requested_quantity = qty * multiplier`, `allocation_status='unallocated'`.
+- Suportar `inventory_demand_rules` (JSONB): expandir um proposal_item em N demandas conforme regras (resolver category/family por slug). Sem regras → comportamento atual.
+- Persistir `product_id` e `proposal_item_id` em cada demanda.
 
-- `inventoryPreReservations.ts` com `inventoryPreReservationSchema` e `inventoryPreReservationItemSchema` exatamente como na spec, e helper `computeOperationalPeriod(eventStart, eventEnd, { padDaysBefore=1, padDaysAfter=1 })`.
+### `src/hooks/operations/useInventoryPreReservations.ts`
+Novos hooks:
+- `useInventoryAllocationCandidates(itemId)`
+- `useInventoryPreReservationAllocations(itemId)`
+- `useCreateInventoryAllocation()`
+- `useCancelInventoryAllocation()`
+- `useRecalculatePreReservationItemAllocation()`
 
-### UI — Inventário
+Invalidações: chave base + detail do pre_reservation + overview.
 
-- `src/pages/operations/Inventory.tsx`: nova subtab **Reservas** com sub-abas internas:
-  - **Pré reservas** (completa) → `InventoryPreReservationsTab.tsx`
-  - **Calendário de ocupação** → placeholder elegante (`InventoryReservationsCalendarPlaceholder.tsx`) com mensagem "será implementado na próxima sprint".
-- `InventoryPreReservationsTab.tsx`: 5 KPI cards (Ativas / Itens / Conflitos / Críticas / Próxima operação), filtros (status, risco, período, busca), tabela com Código, Título, Cliente, Período, Status, Risco, #Itens, #Conflitos, Ações (Ver, Recalcular, Cancelar).
-- `InventoryPreReservationDetailDialog.tsx`: cabeçalho (código, proposta/oportunidade/cliente, período operacional, evento, status, risco, notas) + tabela de itens (Item, Tipo, Categoria, Família, Solicitado, Pré-reservado, Status, Motivo) + ações (Recalcular, Cancelar, Abrir proposta).
-- `InventoryPreReservationFormDialog.tsx`: criação/edição manual (sem proposta).
-- `InventoryOverviewTab.tsx`: novo bloco **Pré reservas operacionais** (mesmos 5 KPIs + lista "Próximas pré reservas") + alertas (conflitos, reservas com itens indisponíveis, alta ocupação por categoria — derivada client-side da resposta dos KPIs).
-- `InventorySerializedItemsTab.tsx` e `InventoryQuantityItemsTab.tsx`: nova coluna **Pré reservado** (consultando `getItemPreReservationSummary` em batch via hook) — formato "Sim/Não/Parcial · até dd/MM" para serializados; "X de Y pré reservados" para quantidade.
+## 3. Frontend
 
-### UI — Proposta (CRM)
+### Detalhe da pré reserva (`InventoryPreReservationDetailDialog`)
+- Tabela de itens com colunas: Demanda · Categoria · Família · Solicitado · Alocado · Status · Ações.
+- Badge de `allocation_status`. Ações: **Alocar**, **Ver alocações**, **Remover demanda**.
 
-- Novo componente `ProposalInventoryPanel.tsx` montado na tela de detalhe da proposta (admin/owner/comercial via guard de role já existente). Estados:
-  - **Sem pré reserva** → botão "Gerar pré reserva de inventário" → abre `GeneratePreReservationDialog` (campos: data início/fim do evento com default `close_date_prevista`, observações). Ao confirmar, chama `generatePreReservationFromProposal`.
-  - **Ativa** → mostra código, período, risco, conflitos + ações (Ver no Inventário, Recalcular, Cancelar).
-  - **Com conflito** → variante destrutiva, botões (Ver conflitos, Recalcular).
+### Novos componentes
+- `src/components/operations/inventory/InventoryAllocationDialog.tsx`
+  - Mostra resumo (solicitado / alocado / restante).
+  - Lista candidatos via `useInventoryAllocationCandidates`.
+  - Serializados: checkbox (qty=1).
+  - Quantidade: input numérico (≤ disponível).
+  - Validações de quantidade, indisponibilidade, alerta de alocação parcial.
+  - Submete N alocações em sequência; mostra toast e recalcula.
+- `src/components/operations/inventory/InventoryAllocatedItemsList.tsx`
+  - Lista alocações ativas com ações **Cancelar** e **Substituir** (cancela + reabre dialog).
 
-### Detalhes técnicos sensíveis
+### Painel da proposta (`ProposalInventoryPanel`)
+- Adicionar KPIs: Demandas · Alocadas · Parciais · Pendentes · Conflitos.
+- Botões: Ver demandas (abre detalhe), Alocar itens (abre dialog na 1ª demanda pendente), Recalcular, Abrir no Inventário.
 
-- Toda RLS usa helpers reais (`user_can_access_inventory` / `user_is_org_admin`).
-- RPCs usam `security definer` + `set search_path = public` (regra de segurança do projeto).
-- Status físico do item **não muda**; ocupação é puramente cálculo via `inventory_pre_reservation_items` × período.
-- `pre_reserved_quantity` é alimentado pelo RPC de recálculo, nunca pelo cliente diretamente.
-- Cancelamento = `update status='cancelled'` (sem delete) → libera disponibilidade no próximo recálculo.
-- `inventoryProposalBridge` é fire-and-recalculate: cria reserva + itens, depois `recalculatePreReservation` em transação client-side (chamadas sequenciais; se recalc falhar, reserva permanece com `risk_level='low'` default e UI permite recálculo manual).
-- `category_family_demand` nesta sprint → cria item com `inventory_item_type='sku'`, sem alocar item real; UI mostra "demanda não alocada" e `availability_status='no_stock_control'`.
-- Cache React Query: invalidações cruzadas entre `['inventory','pre-reservations']`, `['inventory','overview']` e `['inventory','items']`.
-- Multi-tenant: trigger `validate_pre_reservation_item_org` garante isolamento; toda criação no client passa `organization_id` do contexto atual (igual outros services do módulo).
+### Visão geral (`InventoryOverviewTab`)
+- Novo bloco "Alocação de demandas" com cards: Pendentes · Parciais · 100% alocadas · Risco operacional.
+- Alertas textuais para demandas pendentes em pré reservas ativas.
 
-### Critérios de aceite (cobertos)
+## 4. Comportamento físico
+**NÃO** alterar `inventory_serialized_items.status` nem `inventory_quantity_items.available_quantity`. Alocação é apenas intenção de uso no período; reserva definitiva fica para sprint futura.
 
-Banco, RLS, criação manual e via proposta, período operacional ±1, checagem por período, conflito serializado, parcial em quantidade, status físico intacto, KPIs na Visão Geral, aba Reservas, detalhe com itens/conflitos, painel na proposta, recalcular, cancelar, "sem controle de estoque" tratado, typecheck/build, sem regressão das sprints 0.5–0.8.
+## 5. Critérios de aceite
+Conforme lista do briefing — destaque: demanda category_family_demand criável, candidatos filtrados por período/categoria/família, alocação mista (serializado + quantidade), recálculo automático de status, prevenção de serializado com qty≠1 e quantidade > disponível, painel da proposta com KPIs, status físico inalterado, INV 0.9 sem regressões, typecheck/build verdes.
 
-### Fora de escopo (mantido)
+## Detalhes técnicos
 
-Calendário de ocupação real (placeholder), reserva definitiva, alocação real de `category_family_demand`, edge functions, automação de expiração por cron (deixar `expired` apenas via recálculo manual ou ação futura).
+**Arquivos criados (≈4):**
+- `supabase/migrations/<timestamp>_inv_1_0_allocations.sql`
+- `src/components/operations/inventory/InventoryAllocationDialog.tsx`
+- `src/components/operations/inventory/InventoryAllocatedItemsList.tsx`
+- (opcional) `src/services/operations/inventoryAllocations.ts` se preferir separar de `inventoryPreReservations.ts`
+
+**Arquivos editados (≈8):**
+- `src/lib/operations/inventoryPreReservations.ts`
+- `src/services/operations/inventoryPreReservations.ts`
+- `src/services/operations/inventoryProposalBridge.ts`
+- `src/hooks/operations/useInventoryPreReservations.ts`
+- `src/components/operations/inventory/InventoryPreReservationDetailDialog.tsx`
+- `src/components/operations/inventory/InventoryPreReservationsTab.tsx` (badges/colunas allocation_status)
+- `src/components/operations/inventory/InventoryOverviewTab.tsx`
+- `src/components/proposals/ProposalInventoryPanel.tsx`
+
+**Riscos:**
+- Nomes reais de colunas em `inventory_serialized_items`/`inventory_quantity_items` (name/code/serial_number) precisam ser verificados antes da RPC `find_inventory_allocation_candidates` — ajustar se divergir.
+- Assinatura de `check_inventory_availability_for_period` (INV 0.9) deve aceitar `exclude_pre_reservation_id` para não contar a própria reserva ao buscar candidatos; conferir e ajustar a chamada se necessário.
+- Trigger de recálculo dispara em cascata; manter `security definer` + `search_path=public`.
