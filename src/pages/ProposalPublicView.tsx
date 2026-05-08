@@ -289,12 +289,16 @@ export default function ProposalPublicView() {
       const oneTimeItems = items.filter(item => (item.billing_type || 'one_time') !== 'recurring');
       const oneTimeTotal = oneTimeItems.reduce((sum, item) => sum + item.total, 0);
       const dpSnapForPdf: any = (proposal as any)?.dynamic_pricing_snapshot ?? null;
+      const oneTimeAmountForPdf =
+        (proposal as any)?.dynamic_pricing_enabled && dpSnapForPdf?.current_amount != null
+          ? Number(dpSnapForPdf.current_amount)
+          : oneTimeTotal;
       const pdfInstallments = oneTimeTerm
-        ? calculateInstallments(oneTimeTerm, oneTimeTotal, {
+        ? calculateInstallments(oneTimeTerm, oneTimeAmountForPdf, {
             proposalExpiresAt: (proposal as any)?.expires_at ?? null,
             approvedAmount:
               (proposal as any)?.status === 'accepted'
-                ? Number((proposal as any)?.approved_amount ?? oneTimeTotal)
+                ? Number((proposal as any)?.approved_amount ?? oneTimeAmountForPdf)
                 : null,
             dynamicPricingCurrentEndsAt:
               (proposal as any)?.dynamic_pricing_enabled && dpSnapForPdf?.current_ends_at
@@ -1022,15 +1026,20 @@ export default function ProposalPublicView() {
   const paymentDiscountAmount = oneTimeTotal * (paymentDiscountPercent / 100);
   const oneTimeWithDiscount = oneTimeTotal - paymentDiscountAmount;
   const recurringContractTotal = recurringMRR * (recurringTerm?.contract_months || recurringTerm?.contract_duration_months || 12);
-  const totalAmount = oneTimeWithDiscount + recurringContractTotal;
+  const dpSnapPublic: any = (proposal as any)?.dynamic_pricing_snapshot ?? null;
+  const dynamicOneTimeAmount =
+    (proposal as any)?.dynamic_pricing_enabled && dpSnapPublic?.current_amount != null
+      ? Number(dpSnapPublic.current_amount)
+      : null;
+  const effectiveOneTimeAmount = dynamicOneTimeAmount ?? oneTimeWithDiscount;
+  const totalAmount = effectiveOneTimeAmount + recurringContractTotal;
   
   // CRITICAL: Use oneTimeTotal for installments, not totalAmount (which includes MRR items)
   // PRICE UX 1.0.3 — usar approved_amount quando proposta já foi aprovada (congela o split)
   const baseForSchedule =
     proposal?.status === 'accepted' && proposal?.approved_amount != null
       ? Number(proposal.approved_amount)
-      : oneTimeTotal;
-  const dpSnapPublic: any = (proposal as any)?.dynamic_pricing_snapshot ?? null;
+      : effectiveOneTimeAmount;
   const installments = oneTimeTerm
     ? calculateInstallments(oneTimeTerm, baseForSchedule, {
         proposalExpiresAt: proposal?.expires_at ?? null,
