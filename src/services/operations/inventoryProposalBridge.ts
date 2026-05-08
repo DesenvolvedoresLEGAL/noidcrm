@@ -37,7 +37,7 @@ export async function generatePreReservationFromProposal(
   const { data: proposal, error: pErr } = await supabase
     .from('proposals')
     .select(
-      'id, title, opportunity_id, client_name, organization_id, opportunities(id, account_id, primary_contact_id)',
+      'id, title, opportunity_id, client_name, organization_id, opportunities(id, account_id, contact_id)',
     )
     .eq('id', input.proposal_id)
     .single();
@@ -119,7 +119,7 @@ export async function generatePreReservationFromProposal(
     proposal_id: input.proposal_id,
     opportunity_id: (proposal as any).opportunity_id ?? null,
     account_id: opportunity?.account_id ?? null,
-    contact_id: opportunity?.primary_contact_id ?? null,
+    contact_id: opportunity?.contact_id ?? null,
     operational_start_date: period.operational_start_date,
     operational_end_date: period.operational_end_date,
     event_start_date: input.event_start_date,
