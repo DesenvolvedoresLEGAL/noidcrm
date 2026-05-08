@@ -129,6 +129,8 @@ interface ProposalData {
     }>;
     [key: string]: any;
   };
+  dynamic_pricing_enabled?: boolean;
+  dynamic_pricing_snapshot?: any;
 }
 
 // Helper to strip HTML tags and decode entities
