@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Save, FileText, Package, CreditCard, Eye, Star, Loader2 } from 'lucide-react';
+import { ArrowLeft, Save, FileText, Package, CreditCard, Eye, Star, Loader2, Settings2 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { 
@@ -17,9 +17,11 @@ import {
 import { TemplateContentTab } from '@/components/templates/TemplateContentTab';
 import { TemplateItemsTab } from '@/components/templates/TemplateItemsTab';
 import { TemplatePaymentTab } from '@/components/templates/TemplatePaymentTab';
+import { TemplateCommercialRulesTab } from '@/components/templates/TemplateCommercialRulesTab';
 
 import { TemplatePreviewTab } from '@/components/templates/TemplatePreviewTab';
 import { TemplateConfigSidebar } from '@/components/templates/TemplateConfigSidebar';
+import { proposalTemplateCommercialRulesSchema } from '@/lib/proposals/proposalTemplateRules';
 
 export default function ProposalTemplateEditor() {
   const { id } = useParams();
@@ -99,6 +101,27 @@ export default function ProposalTemplateEditor() {
       return;
     }
 
+    // Valida regras comerciais
+    const rulesParsed = proposalTemplateCommercialRulesSchema.safeParse({
+      revenue_type: templateData.revenue_type ?? null,
+      dynamic_pricing_applicability: templateData.dynamic_pricing_applicability ?? 'none',
+      dynamic_pricing_mode: templateData.dynamic_pricing_mode ?? 'none',
+      validity_strategy: templateData.validity_strategy ?? 'fixed_days_from_creation',
+      default_validity_days: templateData.default_validity_days ?? null,
+      requires_valid_until: !!templateData.requires_valid_until,
+      allow_recurring: !!templateData.allow_recurring,
+      default_payment_mode: templateData.default_payment_mode ?? 'one_time',
+      show_dynamic_pricing_on_public_link: !!templateData.show_dynamic_pricing_on_public_link,
+      show_dynamic_pricing_on_pdf: !!templateData.show_dynamic_pricing_on_pdf,
+      allow_pix_payment: templateData.allow_pix_payment !== false,
+      allow_complementary_charge: templateData.allow_complementary_charge !== false,
+      template_commercial_rules: templateData.template_commercial_rules ?? {},
+    });
+    if (!rulesParsed.success) {
+      toast.error(rulesParsed.error.issues[0]?.message ?? 'Regras comerciais inválidas');
+      return;
+    }
+
     setIsSaving(true);
     try {
       if (isEditing) {
@@ -166,7 +189,7 @@ export default function ProposalTemplateEditor() {
           {/* Main Area */}
           <div className="flex-1 overflow-y-auto p-6">
             <Tabs defaultValue="content" className="space-y-6">
-              <TabsList className="grid w-full grid-cols-4 max-w-xl">
+              <TabsList className="grid w-full grid-cols-5 max-w-2xl">
                 <TabsTrigger value="content" className="gap-2">
                   <FileText className="h-4 w-4" />
                   <span className="hidden sm:inline">Conteúdo</span>
@@ -178,6 +201,10 @@ export default function ProposalTemplateEditor() {
                 <TabsTrigger value="payment" className="gap-2">
                   <CreditCard className="h-4 w-4" />
                   <span className="hidden sm:inline">Pagamento</span>
+                </TabsTrigger>
+                <TabsTrigger value="rules" className="gap-2">
+                  <Settings2 className="h-4 w-4" />
+                  <span className="hidden sm:inline">Regras</span>
                 </TabsTrigger>
                 <TabsTrigger value="preview" className="gap-2">
                   <Eye className="h-4 w-4" />
@@ -220,6 +247,13 @@ export default function ProposalTemplateEditor() {
                     mrr_comment: templateData.mrr_comment,
                   }}
                   onChange={(field, value) => updateField(field as keyof ProposalTemplate, value)}
+                />
+              </TabsContent>
+
+              <TabsContent value="rules">
+                <TemplateCommercialRulesTab
+                  data={templateData}
+                  onChange={(field, value) => updateField(field, value)}
                 />
               </TabsContent>
 

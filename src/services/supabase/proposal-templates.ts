@@ -31,6 +31,20 @@ export interface ProposalTemplate {
   mrr_first_payment_days?: number;
   mrr_due_day?: number;
   mrr_comment?: string;
+  // Commercial rules (Sprint TEMPLATE 1.0)
+  revenue_type?: string | null;
+  dynamic_pricing_applicability?: 'automatic' | 'optional' | 'none';
+  dynamic_pricing_mode?: 'none' | 'automatic_by_valid_until' | 'manual';
+  validity_strategy?: 'fixed_days_from_creation' | 'proposal_valid_until' | 'manual' | 'event_start_date';
+  default_validity_days?: number | null;
+  requires_valid_until?: boolean;
+  allow_recurring?: boolean;
+  default_payment_mode?: 'one_time' | 'recurring' | 'installment' | 'mixed';
+  show_dynamic_pricing_on_public_link?: boolean;
+  show_dynamic_pricing_on_pdf?: boolean;
+  allow_pix_payment?: boolean;
+  allow_complementary_charge?: boolean;
+  template_commercial_rules?: Record<string, any>;
 }
 
 export async function listTemplates(): Promise<ProposalTemplate[]> {
@@ -150,16 +164,33 @@ export async function applyTemplate(proposalId: string, templateId: string): Pro
 
   if (templateError) throw templateError;
 
-  // Update proposal with template data
+  // Resolve valid_until based on validity_strategy
+  const t: any = template;
+  let validUntil: string | undefined;
+  const days = t.default_validity_days ?? t.validity_days ?? null;
+  if (t.validity_strategy === 'fixed_days_from_creation' && days != null) {
+    const d = new Date();
+    d.setDate(d.getDate() + Number(days));
+    validUntil = d.toISOString().slice(0, 10);
+  }
+
+  // Update proposal with template data + commercial rules
+  const updates: Record<string, any> = {
+    introduction: template.introduction,
+    terms: template.terms,
+    notes: template.notes,
+    template_name: template.name,
+    currency: template.currency,
+    revenue_type: t.revenue_type ?? null,
+    dynamic_pricing_applicability: t.dynamic_pricing_applicability ?? 'none',
+    validity_strategy: t.validity_strategy ?? null,
+    payment_mode: t.default_payment_mode ?? null,
+  };
+  if (validUntil) updates.valid_until = validUntil;
+
   const { error: updateError } = await supabase
     .from('proposals')
-    .update({
-      introduction: template.introduction,
-      terms: template.terms,
-      notes: template.notes,
-      template_name: template.name,
-      currency: template.currency,
-    })
+    .update(updates)
     .eq('id', proposalId);
 
   if (updateError) throw updateError;

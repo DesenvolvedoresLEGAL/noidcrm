@@ -49,6 +49,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
+import { templateBadges } from '@/lib/proposals/proposalTemplateRules';
 
 export default function ProposalLayouts() {
   const navigate = useNavigate();
@@ -290,6 +291,19 @@ export default function ProposalLayouts() {
                             {(template.default_items as any[])?.length || 0}
                           </span>
                         </div>
+                        {(() => {
+                          const badges = templateBadges(template as any);
+                          if (!badges.length) return null;
+                          return (
+                            <div className="flex flex-wrap gap-1 pt-2">
+                              {badges.map((b) => (
+                                <Badge key={b.label} variant={b.variant} className="text-[10px]">
+                                  {b.label}
+                                </Badge>
+                              ))}
+                            </div>
+                          );
+                        })()}
                       </div>
                     </CardContent>
                   </Card>

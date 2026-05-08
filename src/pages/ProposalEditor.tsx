@@ -160,6 +160,21 @@ export default function ProposalEditor() {
     queryFn: listTemplates,
   });
 
+  // Derive applied template by template_name on the proposal or by linked layout
+  const watchedLayoutIdForTemplate = watch('layout_id');
+  const watchedTemplateName = (watch as any)('template_name') as string | undefined;
+  const appliedTemplate: any = (() => {
+    if (!templates.length) return null;
+    if (watchedTemplateName) {
+      const byName = templates.find((t: any) => t.name === watchedTemplateName);
+      if (byName) return byName;
+    }
+    if (watchedLayoutIdForTemplate) {
+      return templates.find((t: any) => t.layout_id === watchedLayoutIdForTemplate) || null;
+    }
+    return null;
+  })();
+
   // Watch layout_id to auto-fill from template when layout changes
   const watchedLayoutId = watch('layout_id');
   
@@ -441,6 +456,12 @@ export default function ProposalEditor() {
     if (isNewProposal && !opportunityId) {
       toast.error('Erro: Oportunidade não identificada. Volte à oportunidade e crie a proposta novamente.');
       console.error('[ProposalEditor] BLOCKED: Attempted to create proposal without opportunity_id');
+      return;
+    }
+
+    // Sprint TEMPLATE 1.0: template pode exigir validade
+    if (appliedTemplate?.requires_valid_until && !data.expires_at) {
+      toast.error('Este template exige validade da proposta para calcular a condição comercial.');
       return;
     }
 
@@ -1019,11 +1040,19 @@ export default function ProposalEditor() {
                 )}
                 {currentProposalId && (
                   <>
-                    <ProposalDynamicPricingPanel
-                      proposalId={currentProposalId}
-                      proposalTotal={itemsTotal}
-                      eventStartDate={(watch as any)('event_start_date') ?? null}
-                    />
+                    {appliedTemplate?.dynamic_pricing_applicability === 'none' ? (
+                      <Alert>
+                        <AlertDescription>
+                          Tabela dinâmica não aplicável para este template.
+                        </AlertDescription>
+                      </Alert>
+                    ) : (
+                      <ProposalDynamicPricingPanel
+                        proposalId={currentProposalId}
+                        proposalTotal={itemsTotal}
+                        eventStartDate={(watch as any)('event_start_date') ?? null}
+                      />
+                    )}
                     <ProposalDynamicPaymentPanel proposalId={currentProposalId} />
                   </>
                 )}

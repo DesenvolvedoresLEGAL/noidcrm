@@ -106,6 +106,7 @@ export function ProposalEditorModal({
   const [suggestionMessage, setSuggestionMessage] = useState('');
   const [proposalNumber, setProposalNumber] = useState<string>('');
   const [proposalVersion, setProposalVersion] = useState<number>(1);
+  const [appliedTemplate, setAppliedTemplate] = useState<ProposalTemplate | null>(null);
   
   const queryClient = useQueryClient();
   const { organization } = useCurrentOrganization();
@@ -129,18 +130,21 @@ export function ProposalEditorModal({
     const template = templates.find(t => t.id === templateId);
     if (template) {
       // Calculate expiration based on template validity_days
-      const validityDays = template.validity_days || 30;
+      const validityDays = template.default_validity_days ?? template.validity_days ?? 30;
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + validityDays);
       
       // Apply all template configurations
       setValue('layout_id', template.layout_id || '');
       setValue('currency', (template.currency as 'BRL' | 'USD' | 'EUR') || 'BRL');
-      setValue('expires_at', expiresAt.toISOString().split('T')[0]);
+      if (template.validity_strategy === 'fixed_days_from_creation' || !template.validity_strategy) {
+        setValue('expires_at', expiresAt.toISOString().split('T')[0]);
+      }
       setValue('introduction', template.introduction || '');
       setValue('terms', template.terms || '');
       setValue('notes', template.notes || '');
-      
+
+      setAppliedTemplate(template);
       toast.success(`Template "${template.name}" aplicado!`);
     }
   };
@@ -208,8 +212,12 @@ export function ProposalEditorModal({
       setPublicToken(proposalData.public_token);
       setProposalNumber(proposalData.proposal_number || '');
       setProposalVersion(proposalData.proposal_version || 1);
+      if (proposalData.template_name && templates.length) {
+        const t = templates.find((x) => x.name === proposalData.template_name);
+        if (t) setAppliedTemplate(t);
+      }
     }
-  }, [proposalData, reset]);
+  }, [proposalData, reset, templates]);
 
   // Load proposal items
   useEffect(() => {
@@ -230,6 +238,14 @@ export function ProposalEditorModal({
   }, [proposalId]);
 
   const onSubmit = async (data: ProposalFormData) => {
+    // Template requer validade da proposta?
+    if (appliedTemplate?.requires_valid_until && !data.expires_at) {
+      toast.error(
+        'Este template exige validade da proposta para calcular a condição comercial.',
+      );
+      return;
+    }
+
     // Check session validity before saving
     const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
     if (sessionError || !sessionData?.session) {
@@ -516,11 +532,19 @@ export function ProposalEditorModal({
             <TabsContent value="payment-terms" className="mt-4 space-y-4">
               {proposalId && (
                 <>
-                  <ProposalDynamicPricingPanel
-                    proposalId={proposalId}
-                    proposalTotal={watch('value') || 0}
-                    eventStartDate={(watch as any)('event_start_date') ?? null}
-                  />
+                  {appliedTemplate?.dynamic_pricing_applicability === 'none' ? (
+                    <Alert>
+                      <AlertDescription>
+                        Tabela dinâmica não aplicável para este template.
+                      </AlertDescription>
+                    </Alert>
+                  ) : (
+                    <ProposalDynamicPricingPanel
+                      proposalId={proposalId}
+                      proposalTotal={watch('value') || 0}
+                      eventStartDate={(watch as any)('event_start_date') ?? null}
+                    />
+                  )}
                   <ProposalDynamicPaymentPanel proposalId={proposalId} />
                 </>
               )}

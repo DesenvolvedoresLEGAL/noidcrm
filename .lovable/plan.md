@@ -1,174 +1,85 @@
-# PRICE 1.0.1 — Automação da Tabela de Preço Dinâmica por Antecedência
+# Sprint TEMPLATE 1.0 — Regras Comerciais nos Templates de Proposta
 
-## Objetivo
-Substituir a configuração manual de tiers da Tabela Dinâmica (PRICE 1.0) por geração automática a partir da diferença entre a data de pagamento e o primeiro dia do evento. Modo manual fica como fallback admin/owner.
+## Resumo
 
-## Regra comercial oficial
-| Antecedência | Ajuste |
-|---|---|
-| 30+ dias | -10% |
-| 21–29 dias | 0% |
-| 10–20 dias | +10% |
-| 4–9 dias | +20% |
-| 0–3 dias | +30% |
-| Pós-evento | +50% (configurável: surcharge / requires_requote / block_payment) |
+Evoluir `proposal_templates` para definir o comportamento comercial das propostas geradas a partir dele (tipo de receita, tabela dinâmica automática, validade, recorrência, exibição pública/PDF). Atualizar UI de edição, badges no card e o fluxo de criação de proposta.
 
-A validade da proposta passa a ser sempre `event_start_date`.
+## Banco (1 migração)
 
----
+### `proposal_templates` — novas colunas
+- `revenue_type text` — CHECK em (`one_time_event`, `one_time_non_event`, `recurring`, `short_subscription`, `subscription_with_commitment`, `service`)
+- `dynamic_pricing_applicability text NOT NULL DEFAULT 'none'` — CHECK em (`automatic`, `optional`, `none`)
+- `dynamic_pricing_mode text NOT NULL DEFAULT 'none'` — CHECK em (`none`, `automatic_by_valid_until`, `manual`)
+- `validity_strategy text NOT NULL DEFAULT 'fixed_days_from_creation'` — CHECK em (`fixed_days_from_creation`, `proposal_valid_until`, `manual`, `event_start_date`)
+- `default_validity_days integer`
+- `requires_valid_until boolean NOT NULL DEFAULT false`
+- `allow_recurring boolean NOT NULL DEFAULT false`
+- `default_payment_mode text NOT NULL DEFAULT 'one_time'` — CHECK em (`one_time`, `recurring`, `installment`, `mixed`)
+- `show_dynamic_pricing_on_public_link boolean NOT NULL DEFAULT false`
+- `show_dynamic_pricing_on_pdf boolean NOT NULL DEFAULT false`
+- `allow_pix_payment boolean NOT NULL DEFAULT true`
+- `allow_complementary_charge boolean NOT NULL DEFAULT true`
+- `template_commercial_rules jsonb NOT NULL DEFAULT '{}'::jsonb`
 
-## 1. Banco de dados (1 migration)
+### `proposals` — novas colunas (espelho aplicado a partir do template)
+- `revenue_type text`
+- `dynamic_pricing_applicability text DEFAULT 'none'`
+- `validity_strategy text`
+- `payment_mode text`
 
-### 1.1 Alterar `proposal_dynamic_pricing_rules`
-Adicionar colunas:
-- `pricing_mode text default 'manual'` (`manual` | `event_antecedence`)
-- `event_start_date date`
-- `auto_generated boolean default false`
-- `show_expired_tiers boolean default true`
-- `post_event_policy text default 'surcharge'` (`surcharge` | `requires_requote` | `block_payment`)
+(`dynamic_pricing_mode` já existe via `proposal_dynamic_pricing_rules.pricing_mode`; mantemos ali, sem duplicar.)
 
-CHECK constraints para os enums textuais.
+### Backfill
+- UPDATE no template `1ª ALUGUE` (todas as orgs com esse nome) para a configuração de evento dinâmico.
+- Função `seed_recommended_proposal_templates(org_id)` que insere `ALUGUE Evento`, `ASSINATURA Recorrente`, `ASSINATURA Curta Sem Fidelidade` se não existirem (idempotente por nome+org).
+- Loop de backfill que chama a função para cada organização existente.
+- Trigger `AFTER INSERT ON organizations` chamando a mesma função para futuras orgs.
 
-### 1.2 Nova tabela `proposal_dynamic_pricing_factor_rules`
-Configuração por organização das faixas oficiais:
-- `id`, `organization_id`, `name`, `label`
-- `min_days_before_event int` (nullable = sem limite inferior)
-- `max_days_before_event int` (nullable = sem limite superior; `-1` = pós-evento)
-- `adjustment_type text default 'percent'` (`percent` | `fixed`)
-- `adjustment_value numeric default 0`
-- `sort_order int`, `status text default 'active'` (`active` | `inactive`)
-- `created_by`, `updated_by`, `created_at`, `updated_at`
+## Backend TS
 
-RLS:
-- SELECT: membros da organização (helper `get_user_organization_id`)
-- INSERT/UPDATE: `has_role(admin|owner)` + organização correta
-- Sem DELETE (apenas inativar via `status`)
+### `src/lib/proposals/proposalTemplateRules.ts` (novo)
+- Constantes: `REVENUE_TYPES`, `DYNAMIC_PRICING_APPLICABILITIES`, `DYNAMIC_PRICING_MODES`, `VALIDITY_STRATEGIES`, `PAYMENT_MODES` + `LABELS`.
+- `proposalTemplateCommercialRulesSchema` (Zod) com refinement: `requires_valid_until=true` ⇒ `validity_strategy ∈ {proposal_valid_until, event_start_date}`.
+- Helper `templateBadges(template)` retornando `{label, variant}[]` para os 4 badges (Avulso Evento, Tabela dinâmica automática, Recorrente, Sem tabela dinâmica).
 
-### 1.3 Seed automático
-Trigger em `organizations` (AFTER INSERT) + função `seed_default_pricing_factor_rules(p_org_id)` chamada também via backfill para orgs existentes, criando as 6 faixas oficiais.
+### `src/services/supabase/proposal-templates.ts`
+- Estender interface `ProposalTemplate` com os campos novos.
+- `applyTemplate`: ao popular a proposta, copiar `revenue_type`, `dynamic_pricing_applicability`, `validity_strategy`, `payment_mode`, e definir `valid_until` conforme `validity_strategy` + `default_validity_days`. Se `dynamic_pricing_applicability='automatic'` e `valid_until` presente, disparar `generate_event_antecedence_pricing_for_proposal`.
 
-### 1.4 RPCs
+## Frontend
 
-**`generate_event_antecedence_pricing_for_proposal(p_proposal_id uuid, p_force_regenerate boolean default false)`**
-- Valida tenant via `get_user_organization_id`
-- Resolve `event_start_date` da proposta ou da `opportunity` vinculada (campo `event_start_date` / `event_date`); se ausente → erro controlado `EVENT_DATE_MISSING`
-- Atualiza `proposals.valid_until = event_start_date`
-- Calcula `base_amount` usando `total_amount` atual da proposta (já inclui ajuste de ocupação INV 1.4 quando presente)
-- Upsert em `proposal_dynamic_pricing_rules` com `pricing_mode='event_antecedence'`, `auto_generated=true`, `enabled=true`, `status='active'`
-- Limpa tiers `auto_generated=true` quando `p_force_regenerate` ou se `base_amount`/`event_start_date` mudou
-- Gera 6 tiers a partir de `proposal_dynamic_pricing_factor_rules` ativos da org, com janelas:
-  - `30+`: `-infinito` até `event - 30d 23:59:59`
-  - `21–29`: `event - 29d 00:00` → `event - 21d 23:59:59`
-  - `10–20`: `event - 20d 00:00` → `event - 10d 23:59:59`
-  - `4–9`: `event - 9d 00:00` → `event - 4d 23:59:59`
-  - `0–3`: `event - 3d 00:00` → `event 23:59:59`
-  - `pós`: `event + 1d 00:00` → `null`
-- `final_amount` = `base + percent` ou `base + fixed`
-- Chama `calculate_proposal_dynamic_price`
-- Atualiza `proposals.dynamic_pricing_*` (snapshot, current_amount, status, last_calculated_at)
-- Registra eventos `created`/`updated` e `tier_activated`
-- Retorna JSON com `proposal_id`, `base_amount`, `event_start_date`, `current_days_before_event`, `current_amount`, `current_factor`, `current_label`, `next_amount`, `next_label`, `status`, `message`
+### `src/pages/settings/ProposalTemplateEditor.tsx`
+- Nova seção **"Regras Comerciais do Template"** com os 12 campos do escopo (selects + switches + input numérico).
+- Validação com `proposalTemplateCommercialRulesSchema`.
+- Auto-coerência: ao trocar `revenue_type` para `recurring/short_subscription`, sugerir `dynamic_pricing_applicability='none'` e `allow_recurring=true`.
 
-**`calculate_proposal_dynamic_price`** (atualizar)
-- Suporta `pricing_mode='event_antecedence'` além do `manual`
-- Quando pós-evento e `post_event_policy='requires_requote'` → status `requires_requote`
-- Identifica vigente, anterior expirado, próxima virada e pós-evento
+### `src/components/proposals/ProposalTemplatesManager.tsx`
+- Card mostra badges discretos via `templateBadges()`.
 
-**`apply_dynamic_price_to_proposal`** (atualizar)
-- Quando rule ativa, usa `dynamic_pricing_current_amount` como total efetivo
+### `src/components/proposals/ProposalEditorModal.tsx` (e/ou `ProposalEditor.tsx`)
+- Ao aplicar template: copiar regras para a proposta (mostrar resumo).
+- Se `requires_valid_until=true` e `proposal.valid_until` vazio: bloquear save com mensagem *"Este template exige validade da proposta para calcular a condição comercial."*
+- Se `dynamic_pricing_applicability='none'`: ocultar `ProposalDynamicPricingPanel` e exibir aviso *"Tabela dinâmica não aplicável para este template."*
+- Se `dynamic_pricing_applicability='automatic'`: chamar `useGenerateEventAntecedencePricing` automaticamente após save da proposta com `valid_until` presente.
 
-`SECURITY DEFINER` + `SET search_path=public` em todas as RPCs.
+## Arquivos impactados
 
----
+- `supabase/migrations/<ts>_template_commercial_rules.sql` (novo)
+- `src/lib/proposals/proposalTemplateRules.ts` (novo)
+- `src/services/supabase/proposal-templates.ts` (editar interface + applyTemplate)
+- `src/services/crm/proposal-templates.ts` (re-export dos novos tipos)
+- `src/pages/settings/ProposalTemplateEditor.tsx` (nova seção)
+- `src/components/proposals/ProposalTemplatesManager.tsx` (badges)
+- `src/components/proposals/ProposalEditorModal.tsx` (aplicar regras + validação)
+- `src/integrations/supabase/types.ts` (auto, pós-migração)
 
-## 2. Backend TS
+## Critérios de aceite cobertos
 
-- `src/lib/proposals/dynamicPricing.ts`: adicionar
-  - `proposalDynamicPricingFactorRuleSchema` (Zod)
-  - `eventAntecedencePricingGenerationSchema` (Zod)
-  - tipos `PricingMode`, `PostEventPolicy`, `TierStatus` (`expired|current|next|future|post_event`)
-  - helper `tierStatusFromDates(starts_at, ends_at, now)`
-- `src/services/proposals/proposalDynamicPricing.ts`: adicionar
-  - `generateEventAntecedencePricing(proposalId, forceRegenerate?)`
-  - `listFactorRules(orgId)` / `upsertFactorRule(payload)` / `setFactorRuleStatus(id, status)`
-- `src/hooks/proposals/useProposalDynamicPricing.ts`: novo `useGenerateEventAntecedencePricing` + invalidations
-- Novo `src/hooks/proposals/usePricingFactorRules.ts`
+1–10 ✅ via migração + UI + applyTemplate. 11–12 ✅ via tipagem coerente (CHECKs + Zod + types.ts regenerado).
 
----
+## Riscos
 
-## 3. Frontend
-
-### 3.1 `ProposalDynamicPricingPanel` (refatorar)
-- Se proposta tem `event_start_date` → renderiza modo automático por padrão (sem o comercial precisar ativar):
-  - Header: "Modo: automático por antecedência do evento"
-  - Cards: Evento começa em / Dias até o evento / Valor base / Valor vigente / Faixa vigente / Próxima virada
-  - Tabela read-only: Faixa | Período | Ajuste | Valor | Status (`Expirada`/`Vigente`/`Próxima`/`Futuro`/`Pós evento`)
-  - Ações: Recalcular tabela / Aplicar valor vigente / Ver configurações da regra
-- Botão "Trocar para modo manual" visível só para admin/owner; preserva editor existente da PRICE 1.0
-- Chamada automática a `generate_event_antecedence_pricing_for_proposal` ao abrir/salvar proposta com event_start_date e sem rule auto
-
-### 3.2 Configuração de faixas (admin/owner)
-Nova rota em Settings (ex.: `Settings → Propostas → Faixas de Antecedência`) reusando padrão de páginas de settings existentes. CRUD sobre `proposal_dynamic_pricing_factor_rules` (campos: nome, dias min/max, ajuste, label, status).
-
-### 3.3 Link público (`ProposalPublicView` + `PublicProposalDynamicPricingBanner`)
-- Header/card principal usa `dynamic_pricing_current_amount` quando `dynamic_pricing_enabled=true`
-- Label pequeno: "Valor vigente hoje" (ou "Valor vigente hoje, já com ajuste por antecedência" se ajuste ≠ 0)
-- Bloco "Condições de Pagamento" passa a "Condições Financeiras" agregando:
-  - Condição Comercial Vigente / Valor vigente hoje / Faixa aplicada / Evento começa em / Valor válido até / Próxima atualização / Tabela de antecedência / Forma de pagamento / Cronograma
-- Botão final: **"Aprovar proposta com valor vigente"**
-- Botão pagamento (PRICE 1.1): **"Pagar valor vigente"**
-
-### 3.4 PDF (`PdfDynamicPricingSection`)
-- Nova seção "Condição Comercial por Antecedência" com colunas: Antecedência | Ajuste | Valor | Status
-- Cláusula obrigatória: *"A condição comercial é calculada automaticamente pela antecedência entre a data de pagamento e o primeiro dia do evento. O valor vigente no momento da emissão da cobrança prevalece sobre valores anteriores já expirados."*
-
----
-
-## 4. Integração PRICE 1.1 (pagamentos)
-- `create_proposal_payment_intent`: quando rule ativa (manual ou event_antecedence), `expected_amount = proposals.dynamic_pricing_current_amount`
-- Pix, validação manual, cobrança complementar permanecem inalterados (já consomem `expected_amount`)
-- Bloquear geração de Pix quando `dynamic_pricing_status='requires_requote'` ou `post_event_policy='block_payment'` e pós-evento
-
----
-
-## 5. Detalhes técnicos
-
-- Idempotência: rerun de `generate_event_antecedence_pricing_for_proposal` com mesmos `base_amount`+`event_start_date` não recria tiers; só recalcula snapshot
-- Soft-update: tiers manuais (`auto_generated=false`) são preservados ao alternar para manual
-- Memo cross-tenant: factor rules sempre filtradas por `organization_id` ativa
-- Eventos `proposal_dynamic_pricing_events` ganham types: `auto_generated`, `event_date_changed`, `post_event_reached`
-- Compat PRICE 1.0: rules existentes ficam com `pricing_mode='manual'` por default (zero quebra)
-
----
-
-## 6. Arquivos
-
-**Migration (1)**: `supabase/migrations/<ts>_dynamic_pricing_event_antecedence.sql`
-
-**Novos**:
-- `src/components/settings/PricingFactorRulesPage.tsx`
-- `src/hooks/proposals/usePricingFactorRules.ts`
-- `src/components/proposals/AutoAntecedencePricingTable.tsx` (sub-componente read-only)
-
-**Editados**:
-- `src/lib/proposals/dynamicPricing.ts`
-- `src/services/proposals/proposalDynamicPricing.ts`
-- `src/hooks/proposals/useProposalDynamicPricing.ts`
-- `src/components/proposals/ProposalDynamicPricingPanel.tsx`
-- `src/components/proposals/PublicProposalDynamicPricingBanner.tsx`
-- `src/components/proposals/PdfDynamicPricingSection.tsx`
-- `src/services/proposals/proposalPaymentsService.ts` (apenas garantir uso de `dynamic_pricing_current_amount`)
-- `src/pages/ProposalPublicView.tsx` (label header + botão)
-- `src/pages/ProposalEditor.tsx` / `ProposalEditorModal.tsx` (auto-trigger de geração)
-- Rotas de Settings para a nova página
-
----
-
-## 7. Riscos
-- Propostas sem `event_start_date` → não geram tabela automática (erro controlado, fallback manual)
-- Mudança de `event_start_date` força regeneração (eventos auditados)
-- Necessário backfill de seed das factor rules para orgs existentes
-- Garantir que `dynamic_pricing_current_amount` é sempre consistente antes de gerar payment intent
-
-## 8. Critérios de aceite
-Cobertos os 20 itens do escopo, com typecheck/build verdes e PRICE 1.0/1.1 intactas (rules existentes seguem em `pricing_mode='manual'`).
+- Templates pré-existentes com `revenue_type IS NULL` ⇒ tratado como "sem regra"; UI mostra placeholder e não bloqueia.
+- Trigger em `organizations` já tem outros seeds — adicionar com nome único pra não conflitar.
+- `proposals.payment_mode` poderia colidir com lógica MRR existente — usar campo novo e não tocar nos atuais.
+- Geração automática de tabela dinâmica só dispara se `valid_until` está definido após save (evita race com `event_start_date` ausente).

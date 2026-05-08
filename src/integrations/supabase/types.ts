@@ -22762,14 +22762,21 @@ export type Database = {
       }
       proposal_templates: {
         Row: {
+          allow_complementary_charge: boolean
+          allow_pix_payment: boolean
+          allow_recurring: boolean
           control_prefix: string | null
           created_at: string | null
           created_by: string | null
           currency: string | null
           default_items: Json | null
+          default_payment_mode: string
+          default_validity_days: number | null
           description: string | null
           discount_percent_default: number | null
           due_day_default: number | null
+          dynamic_pricing_applicability: string
+          dynamic_pricing_mode: string
           entry_days_default: number | null
           entry_percent_default: number | null
           id: string
@@ -22788,19 +22795,32 @@ export type Database = {
           organization_id: string
           payment_comment: string | null
           payment_method_default: string | null
+          requires_valid_until: boolean
+          revenue_type: string | null
+          show_dynamic_pricing_on_pdf: boolean
+          show_dynamic_pricing_on_public_link: boolean
+          template_commercial_rules: Json
           terms: string | null
           updated_at: string | null
           validity_days: number | null
+          validity_strategy: string
         }
         Insert: {
+          allow_complementary_charge?: boolean
+          allow_pix_payment?: boolean
+          allow_recurring?: boolean
           control_prefix?: string | null
           created_at?: string | null
           created_by?: string | null
           currency?: string | null
           default_items?: Json | null
+          default_payment_mode?: string
+          default_validity_days?: number | null
           description?: string | null
           discount_percent_default?: number | null
           due_day_default?: number | null
+          dynamic_pricing_applicability?: string
+          dynamic_pricing_mode?: string
           entry_days_default?: number | null
           entry_percent_default?: number | null
           id?: string
@@ -22819,19 +22839,32 @@ export type Database = {
           organization_id: string
           payment_comment?: string | null
           payment_method_default?: string | null
+          requires_valid_until?: boolean
+          revenue_type?: string | null
+          show_dynamic_pricing_on_pdf?: boolean
+          show_dynamic_pricing_on_public_link?: boolean
+          template_commercial_rules?: Json
           terms?: string | null
           updated_at?: string | null
           validity_days?: number | null
+          validity_strategy?: string
         }
         Update: {
+          allow_complementary_charge?: boolean
+          allow_pix_payment?: boolean
+          allow_recurring?: boolean
           control_prefix?: string | null
           created_at?: string | null
           created_by?: string | null
           currency?: string | null
           default_items?: Json | null
+          default_payment_mode?: string
+          default_validity_days?: number | null
           description?: string | null
           discount_percent_default?: number | null
           due_day_default?: number | null
+          dynamic_pricing_applicability?: string
+          dynamic_pricing_mode?: string
           entry_days_default?: number | null
           entry_percent_default?: number | null
           id?: string
@@ -22850,9 +22883,15 @@ export type Database = {
           organization_id?: string
           payment_comment?: string | null
           payment_method_default?: string | null
+          requires_valid_until?: boolean
+          revenue_type?: string | null
+          show_dynamic_pricing_on_pdf?: boolean
+          show_dynamic_pricing_on_public_link?: boolean
+          template_commercial_rules?: Json
           terms?: string | null
           updated_at?: string | null
           validity_days?: number | null
+          validity_strategy?: string
         }
         Relationships: [
           {
@@ -23198,6 +23237,7 @@ export type Database = {
           declined_reason: string | null
           deleted_at: string | null
           discount_amount: number | null
+          dynamic_pricing_applicability: string | null
           dynamic_pricing_current_amount: number | null
           dynamic_pricing_enabled: boolean
           dynamic_pricing_last_calculated_at: string | null
@@ -23217,6 +23257,7 @@ export type Database = {
           parent_proposal_id: string | null
           payment_difference_amount: number | null
           payment_expected_amount: number | null
+          payment_mode: string | null
           payment_paid_amount: number | null
           payment_snapshot: Json
           payment_validation_status: string | null
@@ -23224,6 +23265,7 @@ export type Database = {
           proposal_number: string | null
           proposal_version: number | null
           public_token: string | null
+          revenue_type: string | null
           sent_at: string | null
           signature_status: string | null
           signed_at: string | null
@@ -23234,6 +23276,7 @@ export type Database = {
           title: string | null
           total_amount: number | null
           updated_at: string | null
+          validity_strategy: string | null
           value: number | null
           version: number | null
           viewed_at: string | null
@@ -23262,6 +23305,7 @@ export type Database = {
           declined_reason?: string | null
           deleted_at?: string | null
           discount_amount?: number | null
+          dynamic_pricing_applicability?: string | null
           dynamic_pricing_current_amount?: number | null
           dynamic_pricing_enabled?: boolean
           dynamic_pricing_last_calculated_at?: string | null
@@ -23281,6 +23325,7 @@ export type Database = {
           parent_proposal_id?: string | null
           payment_difference_amount?: number | null
           payment_expected_amount?: number | null
+          payment_mode?: string | null
           payment_paid_amount?: number | null
           payment_snapshot?: Json
           payment_validation_status?: string | null
@@ -23288,6 +23333,7 @@ export type Database = {
           proposal_number?: string | null
           proposal_version?: number | null
           public_token?: string | null
+          revenue_type?: string | null
           sent_at?: string | null
           signature_status?: string | null
           signed_at?: string | null
@@ -23298,6 +23344,7 @@ export type Database = {
           title?: string | null
           total_amount?: number | null
           updated_at?: string | null
+          validity_strategy?: string | null
           value?: number | null
           version?: number | null
           viewed_at?: string | null
@@ -23326,6 +23373,7 @@ export type Database = {
           declined_reason?: string | null
           deleted_at?: string | null
           discount_amount?: number | null
+          dynamic_pricing_applicability?: string | null
           dynamic_pricing_current_amount?: number | null
           dynamic_pricing_enabled?: boolean
           dynamic_pricing_last_calculated_at?: string | null
@@ -23345,6 +23393,7 @@ export type Database = {
           parent_proposal_id?: string | null
           payment_difference_amount?: number | null
           payment_expected_amount?: number | null
+          payment_mode?: string | null
           payment_paid_amount?: number | null
           payment_snapshot?: Json
           payment_validation_status?: string | null
@@ -23352,6 +23401,7 @@ export type Database = {
           proposal_number?: string | null
           proposal_version?: number | null
           public_token?: string | null
+          revenue_type?: string | null
           sent_at?: string | null
           signature_status?: string | null
           signed_at?: string | null
@@ -23362,6 +23412,7 @@ export type Database = {
           title?: string | null
           total_amount?: number | null
           updated_at?: string | null
+          validity_strategy?: string | null
           value?: number | null
           version?: number | null
           viewed_at?: string | null
@@ -33967,6 +34018,10 @@ export type Database = {
       }
       seed_inventory_pricing_rules: {
         Args: { p_org: string }
+        Returns: undefined
+      }
+      seed_recommended_proposal_templates: {
+        Args: { p_org_id: string }
         Returns: undefined
       }
       set_inventory_return_condition: {
