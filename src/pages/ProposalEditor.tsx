@@ -15,6 +15,7 @@ import { ProposalContextCards } from '@/components/proposals/ProposalContextCard
 import { ProposalVisualizarTab } from '@/components/proposals/ProposalVisualizarTab';
 import { ProposalParticipantsManager } from '@/components/proposals/ProposalParticipantsManager';
 import { ProposalInventoryPanel } from '@/components/proposals/ProposalInventoryPanel';
+import { ProposalDynamicPricingPanel } from '@/components/proposals/ProposalDynamicPricingPanel';
 // Analytics moved to OpportunityAnalyticsTab
 import { AIInlineButton } from '@/components/proposals/AIInlineButton';
 import { ViewingNowIndicator } from '@/components/proposals/ViewingNowIndicator';
