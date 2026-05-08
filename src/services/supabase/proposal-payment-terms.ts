@@ -160,7 +160,15 @@ export function calculateInstallments(
     (numInstallments <= 1 && entryPercent === 0 && condition !== 'split_50_50' && condition !== 'split_30_70');
 
   if (isUpfront) {
-    const dueDate = term.first_installment_date || term.entry_date || formatLocalDate(new Date());
+    // PRICE UX 1.0.3 — quando há tabela dinâmica ativa e a proposta ainda
+    // não foi aprovada (sem approvedAmount frozen), o vencimento do à vista
+    // segue a data-limite da faixa vigente. Se a proposta já foi aprovada,
+    // mantemos o que foi congelado em first_installment_date.
+    const dynEnd = options?.dynamicPricingCurrentEndsAt;
+    const isFrozen = options?.approvedAmount != null;
+    const dueDate = !isFrozen && dynEnd
+      ? dynEnd.slice(0, 10)
+      : term.first_installment_date || term.entry_date || formatLocalDate(new Date());
     return [
       {
         number: 1,
