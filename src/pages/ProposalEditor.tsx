@@ -636,7 +636,7 @@ export default function ProposalEditor() {
           clearDraft();
           setLastSaved(null);
           hasRestoredFromStorageRef.current = false;
-          invalidateProposalCaches(queryClient, savedProposalId);
+          invalidateProposalCaches(queryClient, savedProposalId, opportunityId || proposalData?.opportunity_id);
 
           // Update state and navigate AFTER saving everything
           setCurrentProposalId(newProposal.id);
