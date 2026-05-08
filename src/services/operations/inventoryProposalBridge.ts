@@ -29,6 +29,15 @@ interface ProductInventoryConfig {
   default_inventory_category_id: string | null;
   default_inventory_family_id: string | null;
   inventory_quantity_multiplier: number;
+  inventory_demand_rules?: Array<{
+    category_id?: string | null;
+    family_id?: string | null;
+    category_slug?: string | null;
+    family_slug?: string | null;
+    quantity_multiplier?: number;
+    required?: boolean;
+    label?: string | null;
+  }> | null;
 }
 
 export async function generatePreReservationFromProposal(
