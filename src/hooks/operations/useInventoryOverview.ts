@@ -103,6 +103,12 @@ export function useInventoryOverview() {
     enabled,
   });
 
+  const categoryOverviewQ = useQuery({
+    queryKey: ['inventory-overview', 'category-overview', orgId],
+    queryFn: () => getCategoryOverview(orgId as string),
+    enabled,
+  });
+
   const aggregates = useMemo(() => aggregate(itemsQ.data ?? []), [itemsQ.data]);
 
   return {
@@ -119,5 +125,7 @@ export function useInventoryOverview() {
     recentItemsLoading: recentItemsQ.isLoading,
     recentHistory: recentHistoryQ.data ?? [],
     recentHistoryLoading: recentHistoryQ.isLoading,
+    categoryOverview: categoryOverviewQ.data ?? [],
+    categoryOverviewLoading: categoryOverviewQ.isLoading,
   };
 }
