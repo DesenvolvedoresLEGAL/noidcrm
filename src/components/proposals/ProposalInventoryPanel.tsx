@@ -62,10 +62,13 @@ export function ProposalInventoryPanel({ proposalId, closeDatePrevista }: Props)
   const reservations = list.data ?? [];
   const active = reservations.find((r) => r.status === 'active');
 
-  const conflicts =
-    active?.items.filter((i) =>
-      ['partial', 'unavailable'].includes(i.availability_status),
-    ).length ?? 0;
+  const items = (active as any)?.items ?? [];
+  const conflicts = items.filter((i: any) =>
+    ['partial', 'unavailable'].includes(i.availability_status),
+  ).length;
+  const allocatedCount = items.filter((i: any) => i.allocation_status === 'allocated').length;
+  const partialCount = items.filter((i: any) => i.allocation_status === 'partially_allocated').length;
+  const pendingCount = items.filter((i: any) => i.allocation_status === 'unallocated').length;
 
   const handleRecalc = async () => {
     if (!active) return;
