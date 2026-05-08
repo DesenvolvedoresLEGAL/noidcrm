@@ -1142,35 +1142,32 @@ export default function ProposalPublicView() {
       </header>
 
       <main className="max-w-5xl mx-auto px-3 py-4 md:px-4 md:py-8 space-y-4 md:space-y-6">
-        {/* Status Banner */}
-        {(isAccepted || isDeclined) && (
-          <Card className={`border-2 ${isAccepted ? 'border-green-500 bg-green-50' : 'border-red-500 bg-red-50'}`}>
+        {/* Status Banner — PRICE UX 1.0.3: tela completa pós-aprovação quando aceita */}
+        {isAccepted && (
+          <PublicProposalApprovedScreen
+            proposal={proposal}
+            items={items}
+            installments={installments as any}
+            publicPaymentEnabled={publicPaymentEnabled}
+            onDownloadPDF={handleDownloadPDF}
+            downloadingPDF={downloadingPDF}
+            contactConsultantHref={null}
+          />
+        )}
+        {isDeclined && (
+          <Card className="border-2 border-red-500 bg-red-50">
             <CardContent className="py-4 md:py-6 flex items-center gap-3 md:gap-4">
-              {isAccepted ? (
-                <>
-                  <div className="w-10 h-10 md:w-14 md:h-14 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
-                    <CheckCircle2 className="h-6 w-6 md:h-8 md:w-8 text-green-600" />
-                  </div>
-                  <div className="min-w-0">
-                    <h3 className="text-lg md:text-xl font-bold text-green-900">Proposta Aceita!</h3>
-                    <p className="text-sm md:text-base text-green-700">
-                      Aceita em {formatDateBR(proposal.accepted_at)} por {proposal.acceptor_name}
-                    </p>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="w-10 h-10 md:w-14 md:h-14 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
-                    <XCircle className="h-6 w-6 md:h-8 md:w-8 text-red-600" />
-                  </div>
-                  <div className="min-w-0">
-                    <h3 className="text-lg md:text-xl font-bold text-red-900">Proposta Recusada</h3>
-                    <p className="text-sm md:text-base text-red-700">
-                      Recusada em {formatDateBR(proposal.declined_at)}
-                    </p>
-                    {proposal.declined_reason && (
-                      <p className="text-xs md:text-sm text-red-600 mt-1">Motivo: {proposal.declined_reason}</p>
-                    )}
+              <div className="w-10 h-10 md:w-14 md:h-14 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <XCircle className="h-6 w-6 md:h-8 md:w-8 text-red-600" />
+              </div>
+              <div className="min-w-0">
+                <h3 className="text-lg md:text-xl font-bold text-red-900">Proposta Recusada</h3>
+                <p className="text-sm md:text-base text-red-700">
+                  Recusada em {formatDateBR(proposal.declined_at)}
+                </p>
+                {proposal.declined_reason && (
+                  <p className="text-xs md:text-sm text-red-600 mt-1">Motivo: {proposal.declined_reason}</p>
+                )}
                   </div>
                 </>
               )}
