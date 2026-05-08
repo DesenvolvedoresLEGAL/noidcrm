@@ -246,6 +246,7 @@ export function AppSidebar() {
         <SidebarContent className="px-2 py-2">
           {renderSection(principalItems, SECTION_LABELS.principal, 'principal')}
           {renderSection(gestaoItems, SECTION_LABELS.gestao, 'gestao')}
+          {renderSection(operacoesItems, SECTION_LABELS.operacoes, 'operacoes')}
           {renderSection(inteligenciaItems, SECTION_LABELS.inteligencia, 'inteligencia')}
           {renderSection(objetivosItems, SECTION_LABELS.objetivos, 'objetivos')}
           {renderSection(gtmItems, SECTION_LABELS.gtm, 'gtm')}
