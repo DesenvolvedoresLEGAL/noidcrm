@@ -38,6 +38,14 @@ interface Props {
   proposalTotal?: number | null;
   inventoryAdjustedTotal?: number | null;
   eventStartDate?: string | null;
+  /** Aplicabilidade vinda do template (automatic | optional | none) */
+  dynamicPricingApplicability?: 'automatic' | 'optional' | 'none' | null;
+  /** Modo vindo do template (automatic_by_valid_until | manual | none) */
+  dynamicPricingMode?: 'none' | 'automatic_by_valid_until' | 'manual' | null;
+  /** Tipo de receita do template */
+  revenueType?: string | null;
+  /** Validade da proposta (YYYY-MM-DD ou ISO) — referência da tabela automática */
+  validUntil?: string | null;
 }
 
 export function ProposalDynamicPricingPanel({
@@ -45,6 +53,10 @@ export function ProposalDynamicPricingPanel({
   proposalTotal,
   inventoryAdjustedTotal,
   eventStartDate,
+  dynamicPricingApplicability,
+  dynamicPricingMode,
+  revenueType,
+  validUntil,
 }: Props) {
   const { data, isLoading } = useProposalDynamicPricing(proposalId);
   const { data: snapshot } = useProposalDynamicPricingSnapshot(proposalId, !!data?.rule);
@@ -64,8 +76,28 @@ export function ProposalDynamicPricingPanel({
   const [tiers, setTiers] = useState<DynamicPricingTierInput[]>([]);
   const [forceManual, setForceManual] = useState(false);
 
-  const isAuto = data?.rule?.pricing_mode === 'event_antecedence';
-  const showAutoMode = !forceManual && (isAuto || !!eventStartDate);
+  // Estado: não aplicável (template recorrente, assinatura, etc.)
+  const isNotApplicable = dynamicPricingApplicability === 'none';
+
+  // Estado: automático por validade (template ALUGUE Evento e similares)
+  const isAutomaticByValidity =
+    dynamicPricingApplicability === 'automatic' &&
+    dynamicPricingMode === 'automatic_by_valid_until';
+
+  // Referência da tabela automática: validade da proposta tem prioridade,
+  // mantemos compatibilidade com event_start_date legado.
+  const referenceDate = (() => {
+    if (validUntil) return validUntil.slice(0, 10);
+    if (eventStartDate) return eventStartDate.slice(0, 10);
+    return null;
+  })();
+
+  const ruleIsAuto =
+    data?.rule?.pricing_mode === 'event_antecedence' &&
+    !!data?.rule?.auto_generated;
+
+  const showAutoMode =
+    !forceManual && (isAutomaticByValidity || ruleIsAuto || (!dynamicPricingApplicability && !!eventStartDate));
 
   useEffect(() => {
     if (data?.rule) {
@@ -87,22 +119,23 @@ export function ProposalDynamicPricingPanel({
     }
   }, [data, inventoryAdjustedTotal, proposalTotal]);
 
-  // Auto-trigger generation: proposta com event_start_date e sem rule auto correspondente
+  // Auto-trigger geração quando elegível
   useEffect(() => {
+    if (isNotApplicable) return;
     if (!showAutoMode) return;
     if (generate.isPending) return;
-    if (!eventStartDate) return;
+    if (!referenceDate) return;
     const rule = data?.rule;
     if (!rule) {
       generate.mutate(false);
     } else if (
       rule.pricing_mode !== 'event_antecedence' ||
-      rule.event_start_date !== eventStartDate
+      (rule.event_start_date ?? '').slice(0, 10) !== referenceDate
     ) {
       generate.mutate(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showAutoMode, eventStartDate, data?.rule?.id]);
+  }, [isNotApplicable, showAutoMode, referenceDate, data?.rule?.id]);
 
   const overlap = useMemo(() => tiersOverlap(tiers), [tiers]);
   const isActive = !!data?.rule;
