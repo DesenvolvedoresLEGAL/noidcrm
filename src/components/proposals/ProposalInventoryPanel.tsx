@@ -216,6 +216,22 @@ export function ProposalInventoryPanel({ proposalId, closeDatePrevista }: Props)
               <Button variant="outline" size="sm" onClick={handleRecalc} disabled={recalc.isPending}>
                 <RefreshCw className="h-4 w-4 mr-2" /> Recalcular
               </Button>
+              {!definitive && (
+                <Button
+                  size="sm"
+                  onClick={handleConvert}
+                  disabled={!canConvert || convert.isPending}
+                  title={
+                    !canConvert
+                      ? pendingDemands > 0
+                        ? `${pendingDemands} demanda(s) pendentes`
+                        : 'Indisponível'
+                      : undefined
+                  }
+                >
+                  <CheckCircle2 className="h-4 w-4 mr-2" /> Converter em reserva definitiva
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="sm"
@@ -232,6 +248,21 @@ export function ProposalInventoryPanel({ proposalId, closeDatePrevista }: Props)
                 <XCircle className="h-4 w-4 mr-2" /> Cancelar
               </Button>
             </div>
+
+            {definitive && (
+              <div className="rounded-md border p-3 bg-muted/30 mt-2 space-y-1">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-muted-foreground">Reserva definitiva</p>
+                  <Badge variant={reservationStatusBadgeVariant(definitive.status as any)}>
+                    {RESERVATION_STATUS_LABELS[definitive.status as keyof typeof RESERVATION_STATUS_LABELS]}
+                  </Badge>
+                </div>
+                <p className="font-mono text-sm">{definitive.reservation_code}</p>
+                <p className="text-xs text-muted-foreground">
+                  Período: {fmt(definitive.operational_start_date)} → {fmt(definitive.operational_end_date)}
+                </p>
+              </div>
+            )}
           </>
         )}
       </CardContent>
