@@ -189,7 +189,7 @@ export default function ProposalTemplateEditor() {
           {/* Main Area */}
           <div className="flex-1 overflow-y-auto p-6">
             <Tabs defaultValue="content" className="space-y-6">
-              <TabsList className="grid w-full grid-cols-4 max-w-xl">
+              <TabsList className="grid w-full grid-cols-5 max-w-2xl">
                 <TabsTrigger value="content" className="gap-2">
                   <FileText className="h-4 w-4" />
                   <span className="hidden sm:inline">Conteúdo</span>
@@ -201,6 +201,10 @@ export default function ProposalTemplateEditor() {
                 <TabsTrigger value="payment" className="gap-2">
                   <CreditCard className="h-4 w-4" />
                   <span className="hidden sm:inline">Pagamento</span>
+                </TabsTrigger>
+                <TabsTrigger value="rules" className="gap-2">
+                  <Settings2 className="h-4 w-4" />
+                  <span className="hidden sm:inline">Regras</span>
                 </TabsTrigger>
                 <TabsTrigger value="preview" className="gap-2">
                   <Eye className="h-4 w-4" />
