@@ -4,6 +4,11 @@ import {
   getQuantityAvailableForStatus,
   type InventoryItemStatus,
 } from '@/lib/operations/inventoryLabels';
+import {
+  mergeTechnicalSpecs,
+  sanitizeTechnicalSpecs,
+  type TechnicalSpec,
+} from '@/lib/operations/inventoryTechnicalSpecs';
 
 export type InventoryItemRow = Database['public']['Tables']['inventory_items']['Row'];
 
@@ -23,6 +28,8 @@ export interface SerializedItemInput {
   brand?: string | null;
   model?: string | null;
   notes?: string | null;
+  technical_specs?: TechnicalSpec[];
+  _currentMetadata?: unknown;
 }
 
 const SELECT_WITH_REFS =
@@ -58,7 +65,7 @@ export async function createSerializedItem(
       quantity_total: 1,
       quantity_available: getQuantityAvailableForStatus(input.status),
       unit_of_measure: 'un',
-      metadata: {},
+      metadata: { technical_specs: sanitizeTechnicalSpecs(input.technical_specs ?? []) } as any,
       name: input.name.trim(),
       description: emptyToNull(input.description),
       category_id: input.category_id,
@@ -102,6 +109,12 @@ export async function updateSerializedItem(
     patch.status = input.status;
     patch.quantity_available = getQuantityAvailableForStatus(input.status);
   }
+  if (input.technical_specs !== undefined) {
+    patch.metadata = mergeTechnicalSpecs(
+      input._currentMetadata,
+      sanitizeTechnicalSpecs(input.technical_specs),
+    );
+  }
 
   const { data, error } = await supabase
     .from('inventory_items')
@@ -136,6 +149,8 @@ export interface QuantityItemInput {
   brand?: string | null;
   model?: string | null;
   notes?: string | null;
+  technical_specs?: TechnicalSpec[];
+  _currentMetadata?: unknown;
 }
 
 function quantityAvailableForStatus(
@@ -186,7 +201,7 @@ export async function createQuantityItem(
       brand: emptyToNull(input.brand),
       model: emptyToNull(input.model),
       notes: emptyToNull(input.notes),
-      metadata: {},
+      metadata: { technical_specs: sanitizeTechnicalSpecs(input.technical_specs ?? []) } as any,
       created_by: userId ?? null,
       updated_by: userId ?? null,
     })
@@ -227,6 +242,12 @@ export async function updateQuantityItem(
     if (input.status !== undefined) patch.status = status;
     const requested = Number(input.quantity_available ?? 0);
     patch.quantity_available = quantityAvailableForStatus(status, requested, total ?? requested);
+  }
+  if (input.technical_specs !== undefined) {
+    patch.metadata = mergeTechnicalSpecs(
+      input._currentMetadata,
+      sanitizeTechnicalSpecs(input.technical_specs),
+    );
   }
 
   const { data, error } = await supabase

@@ -27,6 +27,12 @@ import {
   UNIT_OF_MEASURE_OPTIONS,
   type InventoryItemStatus,
 } from '@/lib/operations/inventoryLabels';
+import {
+  getTechnicalSpecs,
+  technicalSpecsArraySchema,
+  type TechnicalSpec,
+} from '@/lib/operations/inventoryTechnicalSpecs';
+import { TechnicalSpecsSection } from './TechnicalSpecsSection';
 import { useInventoryCategories } from '@/hooks/operations/useInventoryCategories';
 import { useInventoryLocations } from '@/hooks/operations/useInventoryLocations';
 import { useInventoryQuantityItemMutations } from '@/hooks/operations/useInventoryItems';
@@ -58,6 +64,7 @@ const schema = z
     brand: z.string().trim().max(80, 'Máximo 80 caracteres').optional().or(z.literal('')),
     model: z.string().trim().max(120, 'Máximo 120 caracteres').optional().or(z.literal('')),
     notes: z.string().trim().max(1000, 'Máximo 1000 caracteres').optional().or(z.literal('')),
+    technical_specs: technicalSpecsArraySchema,
   })
   .refine((d) => d.quantity_available <= d.quantity_total, {
     message: 'A quantidade disponível não pode ser maior que a quantidade total.',
@@ -102,6 +109,7 @@ export function InventoryQuantityItemFormDialog({ open, onOpenChange, item }: Pr
       brand: '',
       model: '',
       notes: '',
+      technical_specs: [],
     },
   });
 
@@ -123,6 +131,7 @@ export function InventoryQuantityItemFormDialog({ open, onOpenChange, item }: Pr
         brand: item?.brand ?? '',
         model: item?.model ?? '',
         notes: item?.notes ?? '',
+        technical_specs: getTechnicalSpecs(item?.metadata) as TechnicalSpec[],
       });
     }
   }, [open, item, form]);
@@ -147,10 +156,14 @@ export function InventoryQuantityItemFormDialog({ open, onOpenChange, item }: Pr
       brand: data.brand || null,
       model: data.model || null,
       notes: data.notes || null,
+      technical_specs: ((data as any).technical_specs ?? []) as TechnicalSpec[],
     };
     try {
       if (isEdit && item) {
-        await update.mutateAsync({ id: item.id, input: payload });
+        await update.mutateAsync({
+          id: item.id,
+          input: { ...payload, _currentMetadata: item.metadata } as any,
+        });
         toast.success('Item por quantidade atualizado com sucesso.');
       } else {
         await create.mutateAsync(payload);
@@ -385,6 +398,12 @@ export function InventoryQuantityItemFormDialog({ open, onOpenChange, item }: Pr
               <p className="text-sm text-destructive">{form.formState.errors.notes.message}</p>
             )}
           </div>
+
+          <TechnicalSpecsSection
+            control={form.control}
+            setValue={form.setValue}
+            errors={(form.formState.errors as any)?.technical_specs}
+          />
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

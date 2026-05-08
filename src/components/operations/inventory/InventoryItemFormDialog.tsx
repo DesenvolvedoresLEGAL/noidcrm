@@ -27,6 +27,12 @@ import {
   mapDuplicateError,
   type InventoryItemStatus,
 } from '@/lib/operations/inventoryLabels';
+import {
+  getTechnicalSpecs,
+  technicalSpecsArraySchema,
+  type TechnicalSpec,
+} from '@/lib/operations/inventoryTechnicalSpecs';
+import { TechnicalSpecsSection } from './TechnicalSpecsSection';
 import { useInventoryCategories } from '@/hooks/operations/useInventoryCategories';
 import { useInventoryLocations } from '@/hooks/operations/useInventoryLocations';
 import { useInventoryItemMutations } from '@/hooks/operations/useInventoryItems';
@@ -57,6 +63,7 @@ const schema = z.object({
   brand: z.string().trim().max(80, 'Máximo 80 caracteres').optional().or(z.literal('')),
   model: z.string().trim().max(120, 'Máximo 120 caracteres').optional().or(z.literal('')),
   notes: z.string().trim().max(1000, 'Máximo 1000 caracteres').optional().or(z.literal('')),
+  technical_specs: technicalSpecsArraySchema,
 });
 
 type FormData = z.infer<typeof schema>;
@@ -84,7 +91,7 @@ export function InventoryItemFormDialog({ open, onOpenChange, item }: Props) {
   );
 
   const form = useForm<FormData>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(schema) as any,
     defaultValues: {
       name: '',
       description: '',
@@ -96,6 +103,7 @@ export function InventoryItemFormDialog({ open, onOpenChange, item }: Props) {
       brand: '',
       model: '',
       notes: '',
+      technical_specs: [],
     },
   });
 
@@ -112,6 +120,7 @@ export function InventoryItemFormDialog({ open, onOpenChange, item }: Props) {
         brand: item?.brand ?? '',
         model: item?.model ?? '',
         notes: item?.notes ?? '',
+        technical_specs: getTechnicalSpecs(item?.metadata) as TechnicalSpec[],
       });
     }
   }, [open, item, form]);
@@ -128,10 +137,14 @@ export function InventoryItemFormDialog({ open, onOpenChange, item }: Props) {
       brand: data.brand || null,
       model: data.model || null,
       notes: data.notes || null,
+      technical_specs: (data.technical_specs ?? []) as TechnicalSpec[],
     };
     try {
       if (isEdit && item) {
-        await update.mutateAsync({ id: item.id, input: payload });
+        await update.mutateAsync({
+          id: item.id,
+          input: { ...payload, _currentMetadata: item.metadata } as any,
+        });
         toast.success('Item atualizado com sucesso.');
       } else {
         await create.mutateAsync(payload);
@@ -328,6 +341,12 @@ export function InventoryItemFormDialog({ open, onOpenChange, item }: Props) {
               </p>
             )}
           </div>
+
+          <TechnicalSpecsSection
+            control={form.control}
+            setValue={form.setValue}
+            errors={(form.formState.errors as any)?.technical_specs}
+          />
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

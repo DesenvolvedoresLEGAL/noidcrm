@@ -1,64 +1,61 @@
-## Sprint INV 0.6 — Visão Geral Real do Inventário
+## Sprint INV 0.7 — Especificações Técnicas (metadata.technical_specs)
 
-Transformar `InventoryOverviewTab` num dashboard operacional real com dados das tabelas existentes (`inventory_items`, `inventory_categories`, `inventory_locations`, `inventory_status_history`). Sem novas tabelas, sem RPCs, sem edge functions, sem alterar schema.
+Adicionar camada universal de atributos técnicos flexíveis em `inventory_items.metadata.technical_specs`. Sem nova tabela, sem RPC, sem edge function, sem alteração de schema.
 
 ### Arquivos a criar
 
-1. **`src/services/operations/inventoryOverview.ts`** — funções puras de leitura:
-   - `listOverviewItems(orgId)` — `SELECT id, item_kind, status, quantity_total, quantity_available, quantity_minimum, updated_at FROM inventory_items WHERE organization_id`.
-   - `countCategories(orgId)` / `countLocations(orgId)` via `count: 'exact', head: true`.
-   - `listCriticalItems(orgId)` — busca itens com `status in (maintenance, damaged, lost)` OU (`item_kind='quantity'` e (`quantity_available=0` ou `quantity_available < quantity_minimum`)), join categoria/local, ordenação no frontend (zerado > abaixo > manutenção > danificado > perdido), limit 10.
-   - `listRecentItems(orgId)` — top 8 por `updated_at desc` com category/location.
-   - `listRecentStatusHistory(orgId)` — top 8 de `inventory_status_history` com `item:inventory_items(name,item_kind)`.
+1. **`src/lib/operations/inventoryTechnicalSpecs.ts`** — utilitários puros e schema:
+   - `normalizeSpecKey(label)` — minúsculo, sem acento, espaços → `_`, sem chars especiais, sem `_` duplicados/no início/fim.
+   - `getTechnicalSpecs(metadata)` — leitura segura: retorna `[]` se `metadata` nulo/malformado ou se `technical_specs` não for array.
+   - `mergeTechnicalSpecs(existingMetadata, specs)` — preserva todas as outras chaves do `metadata` e atualiza apenas `technical_specs`.
+   - `TECHNICAL_SPEC_TYPES` = `['text','number','date','boolean','url']`, label map pt-BR (Texto, Número, Data, Sim/Não, URL).
+   - `MAX_SPECS = 30`.
+   - `technicalSpecSchema` (Zod): `key` min 1 max 80, `label` min 2 max 80, `value` min 1 max 200, `type` enum default `text`, `notes` max 300 nullable optional.
+   - `technicalSpecsArraySchema`: `z.array(...).max(30, 'Limite de 30 especificações técnicas por item.').default([]).superRefine` — rejeita `key` ou `label` (lowercased+trim) duplicados com mensagem "Já existe uma especificação com este campo neste item."
 
-2. **`src/hooks/operations/useInventoryOverview.ts`** — hooks TanStack Query:
-   - `useInventoryOverviewData()` → executa as 5 queries em paralelo via `useQueries` ou hooks separados; expõe os agregados calculados (`totals`, `health`, `alerts`, `categoriesCount`, `locationsCount`).
-   - Cálculo derivado no client a partir de `listOverviewItems`: serializados, por quantidade, disponíveis, indisponíveis (blocked/maintenance/damaged/retired/lost), bloqueados, manutenção, danificados, perdidos, baixados, zerados, abaixo do mínimo.
-
-3. **`src/components/operations/inventory/overview/`** (novos componentes pequenos):
-   - `OverviewKpiCards.tsx` — 4 cards principais (Serializados, Por quantidade, Disponíveis, Indisponíveis).
-   - `OverviewHealthCards.tsx` — 7 cards compactos (Bloqueados, Manutenção, Danificados, Perdidos, Baixados, Categorias, Locais).
-   - `OverviewAlertsBlock.tsx` — 4 cards de alerta + estado vazio "Nenhum alerta operacional no momento".
-   - `OverviewCriticalItemsTable.tsx` — tabela "Itens que exigem atenção" (Item, Tipo, Categoria, Local, Status/Alerta, Saldo, Atualizado em).
-   - `OverviewRecentItemsTable.tsx` — "Últimos itens atualizados".
-   - `OverviewRecentStatusTable.tsx` — "Últimas mudanças de status" usando `ITEM_STATUS_LABEL`.
-   - `OverviewEmptyState.tsx` — estado quando não há nenhum item, com CTA "Cadastrar item" que muda a tab ativa para `items`.
+2. **`src/components/operations/inventory/TechnicalSpecsSection.tsx`** — bloco reutilizável (controlado por react-hook-form via `useFieldArray`):
+   - Card com título "Especificações Técnicas" + texto auxiliar.
+   - Estado vazio: "Nenhuma especificação técnica adicionada." + botão "Adicionar especificação".
+   - Cada linha: inputs `label`, `value`, select `type`, input `notes`, botão remover.
+   - Auto-gera `key` no `onBlur`/`onChange` do `label` via `normalizeSpecKey`. Se `key` resultar vazia, mostra erro inline e bloqueia (a validação Zod já cobre `min 1`).
+   - Botão "Adicionar especificação" desabilitado quando atinge 30; tooltip/aviso.
+   - Layout responsivo (grid sm:grid-cols-12), reaproveita `Input`, `Select`, `Button`, `Label`.
 
 ### Arquivos a editar
 
-- **`src/components/operations/inventory/InventoryOverviewTab.tsx`** — reescrito para orquestrar:
-  1. Frase curta no topo
-  2. KPIs principais
-  3. Saúde operacional
-  4. Alertas
-  5. Itens críticos
-  6. Últimos itens atualizados
-  7. Últimas mudanças de status
-  8. Regra de demanda (versão enxuta da existente)
-  9. Próximas capacidades (lista compacta substituindo `conceptCards`/`futureFlows` longos)
-  10. Empty state global se zero itens
-  - Aceita prop opcional `onNavigateToItems?: () => void` para o CTA do empty state.
+3. **`src/services/operations/inventoryItems.ts`**:
+   - Adicionar `technical_specs?: TechnicalSpec[]` em `SerializedItemInput` e `QuantityItemInput`.
+   - Em `createSerializedItem`/`createQuantityItem`: `metadata: { technical_specs: input.technical_specs ?? [] }`.
+   - Em `updateSerializedItem`/`updateQuantityItem`: aceitar opcional `_currentMetadata` e, quando `technical_specs !== undefined`, setar `patch.metadata = { ...(currentMetadata ?? {}), technical_specs }` para preservar outras chaves.
 
-- **`src/pages/operations/Inventory.tsx`** — controlar `Tabs` por estado (`useState`) em vez de `defaultValue`, passar `onNavigateToItems={() => setTab('items')}` ao `InventoryOverviewTab`.
+4. **`src/components/operations/inventory/InventoryItemFormDialog.tsx`** (serializado):
+   - Estender schema com `technical_specs: technicalSpecsArraySchema`.
+   - `useEffect`: carregar `getTechnicalSpecs(item?.metadata)` no reset.
+   - Renderizar `<TechnicalSpecsSection control={form.control} />` abaixo de Observações.
+   - Passar `technical_specs` e `_currentMetadata: item?.metadata` para o update.
 
-- **`src/lib/operations/inventoryLabels.ts`** — adicionar helper `getCriticalSortRank(item)` opcional para ordenação consistente.
+5. **`src/components/operations/inventory/InventoryQuantityItemFormDialog.tsx`** (por quantidade):
+   - Mesmas mudanças do serializado.
+
+6. **`src/hooks/operations/useInventoryItems.ts`**:
+   - Tipos das mutations já são `Partial<...Input>`; nenhuma mudança estrutural — `technical_specs` flui automaticamente.
+
+7. **`src/components/operations/inventory/InventorySerializedItemsTab.tsx`** e **`InventoryQuantityItemsTab.tsx`**:
+   - Adicionar coluna discreta "Specs" exibindo `getTechnicalSpecs(item.metadata).length` (ou `0`). Sem popover/drawer nesta sprint (preferência do brief).
 
 ### Regras técnicas
 
-- Todas as queries filtram por `organization_id` da org corrente (`useCurrentOrganization`). RLS já cobre, mas filtramos explicitamente.
-- Sem service role, sem RPC nova, sem alterar schema.
-- Loading: usar `Skeleton` (componente já existe no projeto) nos cards e linhas das tabelas.
-- Empty states elegantes em cada bloco.
-- Badges reutilizam `getStatusBadgeVariant` e `getStockAlertVariant` já presentes em `inventoryLabels.ts`.
-- Saldo: serializado → `—`; quantidade → `quantity_available / quantity_total`.
-- Datas formatadas com util já usado no projeto (`date-fns` pt-BR — verificar `src/lib/dateUtils.ts`).
+- Salvamento sempre via merge: `{ ...(metadata ?? {}), technical_specs }` — chave `source` ou outras nunca apagadas.
+- Toasts reutilizam mensagens existentes ("Item criado/atualizado com sucesso.", versão "por quantidade" idem).
+- Erros de validação Zod (duplicado, limite, key vazia) aparecem inline no formulário; submit bloqueado.
+- RLS preservada — todas as gravações continuam pelo cliente Supabase autenticado, filtradas por `organization_id` (sem alterações nas regras).
 
 ### Fora de escopo
 
-Chips, kits, reservas, ocupação, transferências, integração proposta/tabela dinâmica, edge functions, RPCs, delete físico, alteração de schema.
+Tabela nova, presets por categoria, templates por tipo, vínculo entre itens, kits, reservas, disponibilidade, proposta, popover/drawer de visualização rápida, KPI "itens com specs" na Visão Geral, edge functions, RPCs, alteração de schema.
 
 ### Riscos
 
-- `inventory_status_history` pode não ter `organization_id` direto — se não tiver, filtrar via join `item:inventory_items!inner(organization_id)` com `.eq('item.organization_id', orgId)`. Verificar no momento da implementação.
-- `useQueries` precisa que cada query tenha `enabled: !!orgId` para evitar disparos prematuros.
-- Lista de "itens críticos" ordenada no client porque PostgREST não suporta `CASE WHEN` em order.
+- `metadata` pode vir como `null` em itens antigos — `getTechnicalSpecs` e `mergeTechnicalSpecs` tratam.
+- `useFieldArray` precisa de `id` estável por linha (React Hook Form gera automaticamente).
+- Coluna "Specs" nas duas tabs aumenta levemente largura — manter classe `text-center w-16` para não poluir.

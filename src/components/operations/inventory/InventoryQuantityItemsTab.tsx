@@ -43,6 +43,7 @@ import { useInventoryLocations } from '@/hooks/operations/useInventoryLocations'
 import type { InventoryItemWithRefs } from '@/services/operations/inventoryItems';
 import { InventoryQuantityItemFormDialog } from './InventoryQuantityItemFormDialog';
 import { InventoryQuantityItemStatusDialog } from './InventoryQuantityItemStatusDialog';
+import { getTechnicalSpecs } from '@/lib/operations/inventoryTechnicalSpecs';
 
 function fmtNum(v: any) {
   if (v === null || v === undefined) return '—';
@@ -261,6 +262,7 @@ export function InventoryQuantityItemsTab() {
                     <TableHead className="text-right">Qtd. disponível</TableHead>
                     <TableHead className="text-right">Estoque mín.</TableHead>
                     <TableHead>Alerta</TableHead>
+                    <TableHead className="text-center w-16">Specs</TableHead>
                     <TableHead>Atualizado em</TableHead>
                     <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
@@ -269,14 +271,14 @@ export function InventoryQuantityItemsTab() {
                   {isLoading ? (
                     Array.from({ length: 3 }).map((_, i) => (
                       <TableRow key={i}>
-                        <TableCell colSpan={11}>
+                        <TableCell colSpan={12}>
                           <Skeleton className="h-6 w-full" />
                         </TableCell>
                       </TableRow>
                     ))
                   ) : filtered.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={11} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={12} className="text-center text-muted-foreground py-8">
                         Nenhum item encontrado com esses filtros.
                       </TableCell>
                     </TableRow>
@@ -315,6 +317,9 @@ export function InventoryQuantityItemsTab() {
                             <Badge variant={getStockAlertVariant(alert)}>
                               {STOCK_ALERT_LABEL[alert]}
                             </Badge>
+                          </TableCell>
+                          <TableCell className="text-center text-sm text-muted-foreground">
+                            {getTechnicalSpecs(it.metadata).length}
                           </TableCell>
                           <TableCell className="text-muted-foreground text-sm">
                             {format(new Date(it.updated_at), 'dd/MM/yyyy HH:mm')}
