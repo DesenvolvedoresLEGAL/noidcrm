@@ -59,6 +59,7 @@ import confetti from 'canvas-confetti';
 import { extractEmail, extractPhone } from '@/lib/contactFormat';
 import { useProposalEngagementTracker } from '@/hooks/useProposalEngagementTracker';
 import { PublicProposalDynamicPricingBanner } from '@/components/proposals/PublicProposalDynamicPricingBanner';
+import { getDynamicPricingBreakdown, formatDateTime as formatDpDateTime } from '@/lib/proposals/dynamicPricing';
 
 // Fallback decline reasons (used if organization has none configured)
 const FALLBACK_DECLINE_REASONS = [
