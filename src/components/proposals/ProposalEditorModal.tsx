@@ -511,7 +511,13 @@ export function ProposalEditorModal({
             <TabsContent value="items" className="mt-4">
               <ProposalItemsManager items={items} onChange={setItems} />
             </TabsContent>
-            <TabsContent value="payment-terms" className="mt-4">
+            <TabsContent value="payment-terms" className="mt-4 space-y-4">
+              {proposalId && (
+                <ProposalDynamicPricingPanel
+                  proposalId={proposalId}
+                  proposalTotal={watch('value') || 0}
+                />
+              )}
               <ProposalPaymentTerms 
                 proposalId={proposalId || ''} 
                 totalAmount={watch('value') || 0}
