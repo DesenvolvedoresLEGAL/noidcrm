@@ -596,6 +596,12 @@ export function OpportunityProposalsTab({ opportunityId, pipelineType }: Opportu
           opportunityId={opportunityId}
         />
       )}
+
+      <ProposalTemplatePickerDialog
+        open={templatePickerOpen}
+        onOpenChange={setTemplatePickerOpen}
+        onConfirm={handleTemplateConfirmed}
+      />
     </div>
   );
 }
