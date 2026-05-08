@@ -63,7 +63,15 @@ export function InventoryPreReservationDetailDialog({ id, open, onOpenChange }: 
   const recalc = useRecalculateInventoryPreReservation();
   const cancel = useCancelInventoryPreReservation();
   const del = useDeletePreReservationItem();
+  const convert = useConvertPreReservationToReservation();
   const r = q.data;
+
+  const pendingDemands = (r?.items ?? []).filter(
+    (i: any) =>
+      i.inventory_item_type !== 'service_no_stock' &&
+      Number(i.allocated_quantity ?? 0) < Number(i.requested_quantity ?? 0),
+  ).length;
+  const canConvert = r?.status === 'active' && pendingDemands === 0;
 
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [allocItemId, setAllocItemId] = useState<string | null>(null);
