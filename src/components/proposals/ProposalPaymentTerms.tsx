@@ -416,26 +416,27 @@ export function ProposalPaymentTerms({
         )}
 
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
-          <TabsList className="grid w-full grid-cols-2 h-10">
-            <TabsTrigger value="one_time" className="text-sm flex items-center gap-2">
-              <Zap className="h-3.5 w-3.5" />
-              Avulso
-              {hasOneTimeItems && (
-                <Badge variant="secondary" className="ml-1 text-[10px] px-1.5">
-                  {formatCurrency(effectiveOneTimeTotal)}
-                </Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="recurring" className="text-sm flex items-center gap-2">
-              <Repeat className="h-3.5 w-3.5" />
-              Recorrente
-              {hasRecurringItems && (
+          {/* Só mostra abas quando houver MRR; caso contrário, é só Avulso */}
+          {hasRecurringItems && (
+            <TabsList className="grid w-full grid-cols-2 h-10">
+              <TabsTrigger value="one_time" className="text-sm flex items-center gap-2">
+                <Zap className="h-3.5 w-3.5" />
+                Avulso
+                {hasOneTimeItems && (
+                  <Badge variant="secondary" className="ml-1 text-[10px] px-1.5">
+                    {formatCurrency(effectiveOneTimeTotal)}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="recurring" className="text-sm flex items-center gap-2">
+                <Repeat className="h-3.5 w-3.5" />
+                Recorrente
                 <Badge className="ml-1 text-[10px] px-1.5 bg-emerald-500">
                   {formatCurrency(recurringMRR)}/mês
                 </Badge>
-              )}
-            </TabsTrigger>
-          </TabsList>
+              </TabsTrigger>
+            </TabsList>
+          )}
 
           {/* ===== AVULSO TAB ===== */}
           <TabsContent value="one_time" className="space-y-4 pt-3">
