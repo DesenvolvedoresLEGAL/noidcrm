@@ -603,26 +603,28 @@ export function ProposalPaymentTerms({
                     </>
                   )}
 
-                  <div className="space-y-1">
-                    <Label className="text-xs flex items-center gap-1">
-                      <Calendar className="h-3 w-3" />
-                      Início
-                    </Label>
-                    <Input
-                      type="date"
-                      value={oneTimeTerm.first_installment_date || ''}
-                      onChange={(e) => {
-                        const newDate = e.target.value;
-                        // Sync entry_date with first_installment_date if entry_percent > 0 and entry_date not manually set
-                        const updates: Partial<typeof oneTimeTerm> = { first_installment_date: newDate };
-                        if ((oneTimeTerm.entry_percent || 0) > 0 && !oneTimeTerm.entry_date) {
-                          updates.entry_date = newDate;
-                        }
-                        updateOneTime(updates);
-                      }}
-                      className="h-8 text-sm"
-                    />
-                  </div>
+                  {/* "Início" só faz sentido fora do "À Vista" — no à vista o vencimento vem da validade/faixa vigente */}
+                  {selectedPreset !== 'a_vista' && (
+                    <div className="space-y-1">
+                      <Label className="text-xs flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        Início
+                      </Label>
+                      <Input
+                        type="date"
+                        value={oneTimeTerm.first_installment_date || ''}
+                        onChange={(e) => {
+                          const newDate = e.target.value;
+                          const updates: Partial<typeof oneTimeTerm> = { first_installment_date: newDate };
+                          if ((oneTimeTerm.entry_percent || 0) > 0 && !oneTimeTerm.entry_date) {
+                            updates.entry_date = newDate;
+                          }
+                          updateOneTime(updates);
+                        }}
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                  )}
 
                   <div className="space-y-1">
                     <Label className="text-xs">Desconto</Label>
