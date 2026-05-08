@@ -247,6 +247,9 @@ export async function updateQuantityItem(
   if (input.description !== undefined) patch.description = emptyToNull(input.description);
   if (input.category_id !== undefined) patch.category_id = input.category_id;
   if (input.location_id !== undefined) patch.location_id = input.location_id;
+  if (input.family_id !== undefined) patch.family_id = input.family_id ?? null;
+  if (input.operational_type !== undefined) patch.operational_type = input.operational_type;
+  if (input.criticality !== undefined) patch.criticality = input.criticality;
   if (input.unit_of_measure !== undefined) patch.unit_of_measure = input.unit_of_measure;
   if (input.brand !== undefined) patch.brand = emptyToNull(input.brand);
   if (input.model !== undefined) patch.model = emptyToNull(input.model);
