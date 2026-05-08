@@ -42,7 +42,8 @@ export interface PaymentInstallment {
   number: number;
   dueDate: string;
   amount: number;
-  type: 'entry' | 'installment';
+  type: 'upfront' | 'entry' | 'balance' | 'installment';
+  label?: string;
 }
 
 export interface RecurringPaymentData {
