@@ -13899,6 +13899,98 @@ export type Database = {
           },
         ]
       }
+      inventory_pricing_rules: {
+        Row: {
+          category_id: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          family_id: string | null
+          id: string
+          max_discount_percent: number | null
+          max_occupancy_rate: number | null
+          min_occupancy_rate: number
+          name: string
+          organization_id: string
+          price_adjustment_type: string
+          price_adjustment_value: number
+          requires_approval: boolean
+          risk_level: string
+          status: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          category_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          family_id?: string | null
+          id?: string
+          max_discount_percent?: number | null
+          max_occupancy_rate?: number | null
+          min_occupancy_rate?: number
+          name: string
+          organization_id: string
+          price_adjustment_type?: string
+          price_adjustment_value?: number
+          requires_approval?: boolean
+          risk_level?: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          category_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          family_id?: string | null
+          id?: string
+          max_discount_percent?: number | null
+          max_occupancy_rate?: number | null
+          min_occupancy_rate?: number
+          name?: string
+          organization_id?: string
+          price_adjustment_type?: string
+          price_adjustment_value?: number
+          requires_approval?: boolean
+          risk_level?: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_pricing_rules_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_pricing_rules_family_id_fkey"
+            columns: ["family_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_families"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_pricing_rules_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_pricing_rules_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_report_legacy_retirement_readiness_v2"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
       inventory_reservation_allocations: {
         Row: {
           allocated_quantity: number
@@ -21563,6 +21655,12 @@ export type Database = {
           discount_percent: number | null
           id: string
           image_url: string | null
+          inventory_adjusted_unit_price: number | null
+          inventory_adjustment_amount: number | null
+          inventory_occupancy_rate: number | null
+          inventory_pricing_factor: number | null
+          inventory_pricing_snapshot: Json
+          inventory_risk_level: string | null
           ipi_percent: number | null
           markup_percent: number | null
           measurement_unit_id: string | null
@@ -21587,6 +21685,12 @@ export type Database = {
           discount_percent?: number | null
           id?: string
           image_url?: string | null
+          inventory_adjusted_unit_price?: number | null
+          inventory_adjustment_amount?: number | null
+          inventory_occupancy_rate?: number | null
+          inventory_pricing_factor?: number | null
+          inventory_pricing_snapshot?: Json
+          inventory_risk_level?: string | null
           ipi_percent?: number | null
           markup_percent?: number | null
           measurement_unit_id?: string | null
@@ -21611,6 +21715,12 @@ export type Database = {
           discount_percent?: number | null
           id?: string
           image_url?: string | null
+          inventory_adjusted_unit_price?: number | null
+          inventory_adjustment_amount?: number | null
+          inventory_occupancy_rate?: number | null
+          inventory_pricing_factor?: number | null
+          inventory_pricing_snapshot?: Json
+          inventory_risk_level?: string | null
           ipi_percent?: number | null
           markup_percent?: number | null
           measurement_unit_id?: string | null
@@ -31856,6 +31966,17 @@ export type Database = {
         }
         Returns: number
       }
+      calculate_inventory_pricing_factor: {
+        Args: {
+          p_base_amount?: number
+          p_category_id?: string
+          p_end_date: string
+          p_family_id?: string
+          p_requested_quantity?: number
+          p_start_date: string
+        }
+        Returns: Json
+      }
       calculate_lead_grade: { Args: { score: number }; Returns: string }
       calculate_weighted_xp:
         | {
@@ -32628,6 +32749,10 @@ export type Database = {
           pre_reserved_items: number
         }[]
       }
+      get_inventory_pricing_pressure: {
+        Args: { p_window_days?: number }
+        Returns: Json
+      }
       get_inventory_reservations_overview: {
         Args: never
         Returns: {
@@ -33146,6 +33271,10 @@ export type Database = {
       }
       seed_default_decision_rules: {
         Args: { _org_id: string }
+        Returns: undefined
+      }
+      seed_inventory_pricing_rules: {
+        Args: { p_org: string }
         Returns: undefined
       }
       set_inventory_return_condition: {
