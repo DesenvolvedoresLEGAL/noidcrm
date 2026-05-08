@@ -115,6 +115,7 @@ export const ITEM_TYPE_LABELS: Record<PreReservationItemType, string> = {
   quantity: 'Por quantidade',
   sku: 'Demanda (SKU)',
   service_no_stock: 'Serviço sem estoque',
+  category_family_demand: 'Demanda por categoria/família',
 };
 
 export function statusBadgeVariant(
