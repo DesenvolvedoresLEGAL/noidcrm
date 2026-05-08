@@ -70,6 +70,9 @@ const ALL_MENU_ITEMS: MenuItem[] = [
   { path: '/app/contracts', label: 'Contratos', icon: FileCheck, section: 'gestao' },
   { path: '/app/forecast', label: 'Forecast', icon: TrendingUp, section: 'gestao' },
   { path: '/app/reports', label: 'Relatórios', icon: BarChart3, section: 'gestao' },
+
+  // OPERAÇÕES
+  { path: '/app/operations/inventory', label: 'Inventário', icon: Boxes, section: 'operacoes' },
   
   // INTELIGÊNCIA
   { path: '/app/insights', label: 'Insights', icon: Lightbulb, section: 'inteligencia' },
