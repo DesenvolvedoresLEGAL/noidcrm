@@ -946,6 +946,11 @@ export default function ProposalEditor() {
 
         {/* Main Content */}
         <div className="flex-1 px-6 overflow-y-auto">
+          {currentProposalId && (
+            <div className="mb-4">
+              <DynamicPricingMismatchAlert proposalId={currentProposalId} />
+            </div>
+          )}
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="mb-4 flex-wrap">
               <TabsTrigger value="content">Conteúdo</TabsTrigger>
