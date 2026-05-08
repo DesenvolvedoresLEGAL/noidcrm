@@ -1018,10 +1018,13 @@ export default function ProposalEditor() {
                   </Alert>
                 )}
                 {currentProposalId && (
-                  <ProposalDynamicPricingPanel
-                    proposalId={currentProposalId}
-                    proposalTotal={itemsTotal}
-                  />
+                  <>
+                    <ProposalDynamicPricingPanel
+                      proposalId={currentProposalId}
+                      proposalTotal={itemsTotal}
+                    />
+                    <ProposalDynamicPaymentPanel proposalId={currentProposalId} />
+                  </>
                 )}
                 <ProposalPaymentTerms 
                   proposalId={currentProposalId || ''} 
