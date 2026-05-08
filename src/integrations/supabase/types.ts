@@ -16679,6 +16679,7 @@ export type Database = {
           engagement_metadata: Json
           engagement_score: number | null
           engagement_updated_at: string | null
+          event_start_date: string | null
           fonte: string | null
           forecast_hygiene_eligible: boolean | null
           id: string
@@ -16785,6 +16786,7 @@ export type Database = {
           engagement_metadata?: Json
           engagement_score?: number | null
           engagement_updated_at?: string | null
+          event_start_date?: string | null
           fonte?: string | null
           forecast_hygiene_eligible?: boolean | null
           id?: string
@@ -16891,6 +16893,7 @@ export type Database = {
           engagement_metadata?: Json
           engagement_score?: number | null
           engagement_updated_at?: string | null
+          event_start_date?: string | null
           fonte?: string | null
           forecast_hygiene_eligible?: boolean | null
           id?: string
@@ -21761,8 +21764,75 @@ export type Database = {
           },
         ]
       }
+      proposal_dynamic_pricing_factor_rules: {
+        Row: {
+          adjustment_type: string
+          adjustment_value: number
+          created_at: string
+          created_by: string | null
+          id: string
+          label: string
+          max_days_before_event: number | null
+          min_days_before_event: number | null
+          name: string
+          organization_id: string
+          sort_order: number
+          status: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          adjustment_type?: string
+          adjustment_value?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          label: string
+          max_days_before_event?: number | null
+          min_days_before_event?: number | null
+          name: string
+          organization_id: string
+          sort_order?: number
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          adjustment_type?: string
+          adjustment_value?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          label?: string
+          max_days_before_event?: number | null
+          min_days_before_event?: number | null
+          name?: string
+          organization_id?: string
+          sort_order?: number
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposal_dynamic_pricing_factor_rules_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_dynamic_pricing_factor_rules_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_report_legacy_retirement_readiness_v2"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
       proposal_dynamic_pricing_rules: {
         Row: {
+          auto_generated: boolean
           base_amount: number
           created_at: string
           created_by: string | null
@@ -21770,18 +21840,23 @@ export type Database = {
           current_amount: number | null
           current_tier_id: string | null
           enabled: boolean
+          event_start_date: string | null
           id: string
           last_calculated_at: string | null
           next_amount: number | null
           next_tier_id: string | null
           notes: string | null
           organization_id: string
+          post_event_policy: string
+          pricing_mode: string
           proposal_id: string
+          show_expired_tiers: boolean
           status: string
           updated_at: string
           updated_by: string | null
         }
         Insert: {
+          auto_generated?: boolean
           base_amount?: number
           created_at?: string
           created_by?: string | null
@@ -21789,18 +21864,23 @@ export type Database = {
           current_amount?: number | null
           current_tier_id?: string | null
           enabled?: boolean
+          event_start_date?: string | null
           id?: string
           last_calculated_at?: string | null
           next_amount?: number | null
           next_tier_id?: string | null
           notes?: string | null
           organization_id: string
+          post_event_policy?: string
+          pricing_mode?: string
           proposal_id: string
+          show_expired_tiers?: boolean
           status?: string
           updated_at?: string
           updated_by?: string | null
         }
         Update: {
+          auto_generated?: boolean
           base_amount?: number
           created_at?: string
           created_by?: string | null
@@ -21808,13 +21888,17 @@ export type Database = {
           current_amount?: number | null
           current_tier_id?: string | null
           enabled?: boolean
+          event_start_date?: string | null
           id?: string
           last_calculated_at?: string | null
           next_amount?: number | null
           next_tier_id?: string | null
           notes?: string | null
           organization_id?: string
+          post_event_policy?: string
+          pricing_mode?: string
           proposal_id?: string
+          show_expired_tiers?: boolean
           status?: string
           updated_at?: string
           updated_by?: string | null
@@ -21882,6 +21966,7 @@ export type Database = {
         Row: {
           adjustment_type: string
           adjustment_value: number
+          auto_generated: boolean
           created_at: string
           ends_at: string | null
           final_amount: number
@@ -21899,6 +21984,7 @@ export type Database = {
         Insert: {
           adjustment_type?: string
           adjustment_value?: number
+          auto_generated?: boolean
           created_at?: string
           ends_at?: string | null
           final_amount?: number
@@ -21916,6 +22002,7 @@ export type Database = {
         Update: {
           adjustment_type?: string
           adjustment_value?: number
+          auto_generated?: boolean
           created_at?: string
           ends_at?: string | null
           final_amount?: number
@@ -23116,6 +23203,7 @@ export type Database = {
           dynamic_pricing_last_calculated_at: string | null
           dynamic_pricing_snapshot: Json
           dynamic_pricing_status: string | null
+          event_start_date: string | null
           expires_at: string | null
           id: string
           introduction: string | null
@@ -23179,6 +23267,7 @@ export type Database = {
           dynamic_pricing_last_calculated_at?: string | null
           dynamic_pricing_snapshot?: Json
           dynamic_pricing_status?: string | null
+          event_start_date?: string | null
           expires_at?: string | null
           id?: string
           introduction?: string | null
@@ -23242,6 +23331,7 @@ export type Database = {
           dynamic_pricing_last_calculated_at?: string | null
           dynamic_pricing_snapshot?: Json
           dynamic_pricing_status?: string | null
+          event_start_date?: string | null
           expires_at?: string | null
           id?: string
           introduction?: string | null
@@ -32986,6 +33076,10 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      generate_event_antecedence_pricing_for_proposal: {
+        Args: { p_force_regenerate?: boolean; p_proposal_id: string }
+        Returns: Json
+      }
       generate_graph_insights: {
         Args: { p_build_id?: string; p_organization_id: string }
         Returns: number
@@ -33865,6 +33959,10 @@ export type Database = {
       }
       seed_default_decision_rules: {
         Args: { _org_id: string }
+        Returns: undefined
+      }
+      seed_default_pricing_factor_rules: {
+        Args: { p_org_id: string }
         Returns: undefined
       }
       seed_inventory_pricing_rules: {
