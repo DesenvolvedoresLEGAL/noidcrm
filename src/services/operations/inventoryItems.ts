@@ -4,20 +4,34 @@ import {
   getQuantityAvailableForStatus,
   type InventoryItemStatus,
 } from '@/lib/operations/inventoryLabels';
+import type { Criticality, OperationalType } from '@/lib/operations/inventoryClassification';
 import {
   mergeTechnicalSpecs,
   sanitizeTechnicalSpecs,
   type TechnicalSpec,
 } from '@/lib/operations/inventoryTechnicalSpecs';
 
-export type InventoryItemRow = Database['public']['Tables']['inventory_items']['Row'];
+export type InventoryItemRow = Database['public']['Tables']['inventory_items']['Row'] & {
+  family_id?: string | null;
+  operational_type?: OperationalType;
+  criticality?: Criticality;
+};
 
 export interface InventoryItemWithRefs extends InventoryItemRow {
-  category: { id: string; name: string; item_kind: string } | null;
+  category:
+    | { id: string; name: string; item_kind: string; slug?: string | null; color?: string | null; icon?: string | null }
+    | null;
+  family: { id: string; name: string; slug?: string | null } | null;
   location: { id: string; name: string; location_type: string } | null;
 }
 
-export interface SerializedItemInput {
+export interface ClassificationFields {
+  family_id?: string | null;
+  operational_type?: OperationalType;
+  criticality?: Criticality;
+}
+
+export interface SerializedItemInput extends ClassificationFields {
   name: string;
   description?: string | null;
   category_id: string;
@@ -33,7 +47,7 @@ export interface SerializedItemInput {
 }
 
 const SELECT_WITH_REFS =
-  '*, category:inventory_categories(id,name,item_kind), location:inventory_locations(id,name,location_type)';
+  '*, category:inventory_categories(id,name,item_kind,slug,color,icon), family:inventory_families(id,name,slug), location:inventory_locations(id,name,location_type)';
 
 const emptyToNull = (v?: string | null) => {
   if (v === undefined || v === null) return null;
