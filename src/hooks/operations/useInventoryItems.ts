@@ -7,6 +7,11 @@ import {
   updateSerializedItem,
   updateSerializedItemStatus,
   type SerializedItemInput,
+  listQuantityItems,
+  createQuantityItem,
+  updateQuantityItem,
+  updateQuantityItemStatus,
+  type QuantityItemInput,
 } from '@/services/operations/inventoryItems';
 import type { InventoryItemStatus } from '@/lib/operations/inventoryLabels';
 
