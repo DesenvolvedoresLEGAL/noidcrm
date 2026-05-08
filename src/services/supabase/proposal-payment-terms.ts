@@ -135,9 +135,15 @@ export function calculateInstallments(
     ? baseTotal // approved amount is already final/frozen
     : baseTotal * (1 - discountPercent / 100);
 
-  const condition = term.payment_condition || 'upfront';
+  // Auto-derive condition from legacy fields se ainda não foi configurada explicitamente
+  let condition = term.payment_condition || 'upfront';
   const numInstallments = term.installments || 1;
   const entryPercent = term.entry_percent || 0;
+  if (!term.payment_condition) {
+    if (entryPercent === 50 && numInstallments === 1) condition = 'split_50_50';
+    else if (entryPercent === 30 && numInstallments === 1) condition = 'split_30_70';
+    else if (numInstallments > 1) condition = 'installments';
+  }
 
   // ----- À vista -----
   const isUpfront =
