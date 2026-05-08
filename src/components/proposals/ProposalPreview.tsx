@@ -363,13 +363,7 @@ export function ProposalPreview({
         </Card>
       )}
 
-      {/* Condição comercial vigente */}
-      {dynamicPricing?.dynamic_pricing_enabled && (
-        <PublicProposalDynamicPricingBanner
-          snapshot={dynamicPricing.dynamic_pricing_snapshot as any}
-          variant="preview"
-        />
-      )}
+      {/* Bloco "Condição comercial vigente" removido — somente condições de pagamento abaixo */}
 
       {/* Payment Terms */}
       {displayPaymentTerms.length > 0 && (
