@@ -31,6 +31,7 @@ import {
   type InventoryItemStatus,
 } from '@/lib/operations/inventoryLabels';
 import { useInventoryOverview } from '@/hooks/operations/useInventoryOverview';
+import { useInventoryPreReservationsOverview } from '@/hooks/operations/useInventoryPreReservations';
 import type { OverviewItemRow } from '@/services/operations/inventoryOverview';
 
 interface Props {
@@ -156,6 +157,7 @@ function balance(it: OverviewItemRow) {
 
 export function InventoryOverviewTab({ onNavigateToItems }: Props = {}) {
   const ov = useInventoryOverview();
+  const preRes = useInventoryPreReservationsOverview();
   const noItems = !ov.isLoading && ov.aggregates.totalItems === 0;
   const { totals, health, alerts } = ov.aggregates;
   const noAlerts =
