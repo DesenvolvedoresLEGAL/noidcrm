@@ -204,6 +204,20 @@ export function ProposalPreview({
     enabled: !!proposalId && paymentTerms.length === 0,
   });
 
+  // Load dynamic pricing snapshot for current commercial condition card
+  const { data: dynamicPricing } = useQuery({
+    queryKey: ['proposal-dynamic-pricing-preview', proposalId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('proposals')
+        .select('dynamic_pricing_enabled, dynamic_pricing_snapshot')
+        .eq('id', proposalId!)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!proposalId,
+  });
+
   const displayItems = items.length > 0 ? items : dbItems;
   const displayPaymentTerms = paymentTerms.length > 0 ? paymentTerms : dbPaymentTerms;
   
