@@ -10,6 +10,7 @@ import { ProposalItem } from '@/services/crm/proposal-items';
 import { PaymentTerm } from '@/services/crm/proposal-payment-terms';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { PublicProposalDynamicPricingBanner } from './PublicProposalDynamicPricingBanner';
 
 interface ProposalPreviewProps {
   proposalId?: string;
