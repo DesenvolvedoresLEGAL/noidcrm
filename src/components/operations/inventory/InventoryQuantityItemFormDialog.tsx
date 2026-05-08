@@ -51,10 +51,10 @@ const schema = z
     unit_of_measure: z.string().min(1, 'Obrigatório').max(20, 'Máximo 20 caracteres'),
     quantity_total: z.coerce.number({ invalid_type_error: 'Número inválido' }).min(0, 'Maior ou igual a 0'),
     quantity_available: z.coerce.number({ invalid_type_error: 'Número inválido' }).min(0, 'Maior ou igual a 0'),
-    quantity_minimum: z
-      .union([z.coerce.number().min(0, 'Maior ou igual a 0'), z.literal('').transform(() => null), z.null()])
-      .optional()
-      .nullable(),
+    quantity_minimum: z.preprocess(
+      (v) => (v === '' || v === null || v === undefined ? null : v),
+      z.union([z.coerce.number().min(0, 'Maior ou igual a 0'), z.null()]),
+    ).nullable().optional(),
     brand: z.string().trim().max(80, 'Máximo 80 caracteres').optional().or(z.literal('')),
     model: z.string().trim().max(120, 'Máximo 120 caracteres').optional().or(z.literal('')),
     notes: z.string().trim().max(1000, 'Máximo 1000 caracteres').optional().or(z.literal('')),
