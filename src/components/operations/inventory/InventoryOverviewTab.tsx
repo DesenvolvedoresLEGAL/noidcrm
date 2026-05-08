@@ -311,6 +311,56 @@ export function InventoryOverviewTab({ onNavigateToItems }: Props = {}) {
         </CardContent>
       </Card>
 
+      {/* Bloco — Pré reservas operacionais */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Pré reservas operacionais</CardTitle>
+          <CardDescription>
+            Reservas comerciais por período. Não alteram o status físico dos itens.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            <MiniKpi
+              title="Ativas"
+              value={Number(preRes.data?.active_pre_reservations ?? 0)}
+              loading={preRes.isLoading}
+              icon={PackageSearch}
+            />
+            <MiniKpi
+              title="Itens"
+              value={Number(preRes.data?.pre_reserved_items ?? 0)}
+              loading={preRes.isLoading}
+              icon={PackageOpen}
+            />
+            <MiniKpi
+              title="Conflitos"
+              value={Number(preRes.data?.availability_conflicts ?? 0)}
+              loading={preRes.isLoading}
+              icon={AlertTriangle}
+            />
+            <MiniKpi
+              title="Críticas"
+              value={Number(preRes.data?.critical_risk_reservations ?? 0)}
+              loading={preRes.isLoading}
+              icon={PackageMinus}
+            />
+            <MiniKpi
+              title="Próxima op."
+              value={
+                preRes.data?.next_operational_start
+                  ? format(new Date(preRes.data.next_operational_start + 'T00:00:00'), 'dd/MM', {
+                      locale: ptBR,
+                    })
+                  : '—'
+              }
+              loading={preRes.isLoading}
+              icon={Boxes}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Bloco 3 — Alertas operacionais */}
       <Card>
         <CardHeader>
