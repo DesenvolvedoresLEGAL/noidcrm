@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
+import { invalidateProposalCaches } from '@/hooks/proposals/useProposalOrchestrator';
 import {
   applyDynamicPrice,
   calculateDynamicPrice,
@@ -89,10 +90,7 @@ export function useApplyProposalDynamicPrice(proposalId: string) {
   return useMutation({
     mutationFn: () => applyDynamicPrice(proposalId),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: KEY(proposalId) });
-      qc.invalidateQueries({ queryKey: SNAPSHOT_KEY(proposalId) });
-      qc.invalidateQueries({ queryKey: EVENTS_KEY(proposalId) });
-      qc.invalidateQueries({ queryKey: ['proposal', proposalId] });
+      invalidateProposalCaches(qc, proposalId);
       toast({ title: 'Valor vigente aplicado à proposta' });
     },
     onError: (e: any) =>
