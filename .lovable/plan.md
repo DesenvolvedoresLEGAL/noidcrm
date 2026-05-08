@@ -1,70 +1,77 @@
-## Sprint INV 0.2 — Schema base do Inventário
+# Sprint INV 0.3 — CRUD de Categorias e Locais
 
-Cria a fundação de banco do módulo Inventário (5 tabelas + 4 enums + RLS + triggers). Sem CRUD, sem UI nova, sem reservas/kits/chips/tabela dinâmica.
+## Objetivo
+Adicionar navegação interna na página `/app/operations/inventory` com 3 tabs (Visão Geral, Categorias, Locais) e implementar CRUD completo (criar, editar, ativar/desativar — sem delete físico) sobre as tabelas `inventory_categories` e `inventory_locations` já existentes.
 
-### 1. Enums (criar)
+## Estrutura de arquivos
 
-- `inventory_item_kind`: `serialized`, `quantity`
-- `inventory_item_status`: `available`, `blocked`, `maintenance`, `damaged`, `retired`, `lost`
-- `inventory_location_type`: `internal`, `external`, `maintenance`, `event`, `technician`, `lost`, `retired`, `other`
-- `inventory_movement_type`: `initial_entry`, `manual_adjustment`, `location_change`, `status_change`, `maintenance_entry`, `maintenance_exit`, `damage_report`, `loss_report`, `retirement`, `release`
+**Novos:**
+- `src/services/operations/inventoryCategories.ts` — list/create/update/toggleStatus
+- `src/services/operations/inventoryLocations.ts` — list/create/update/toggleStatus
+- `src/hooks/operations/useInventoryCategories.ts` — query + mutations (TanStack Query)
+- `src/hooks/operations/useInventoryLocations.ts` — query + mutations
+- `src/components/operations/inventory/InventoryCategoriesTab.tsx` — tabela + empty state + busca/filtro
+- `src/components/operations/inventory/InventoryLocationsTab.tsx` — tabela + empty state + busca/filtro
+- `src/components/operations/inventory/InventoryCategoryFormDialog.tsx` — modal create/edit
+- `src/components/operations/inventory/InventoryLocationFormDialog.tsx` — modal create/edit
+- `src/components/operations/inventory/InventoryOverviewTab.tsx` — extrai conteúdo conceitual atual
+- `src/lib/operations/inventoryLabels.ts` — mapas `item_kind` e `location_type` para labels PT-BR
 
-### 2. Tabelas (todas com `organization_id NOT NULL` + RLS)
+**Editados:**
+- `src/pages/operations/Inventory.tsx` — adiciona `<Tabs>` (Visão Geral | Categorias | Locais), mantém header e badge
 
-1. **`inventory_categories`** — name, description, item_kind (default `serialized`), is_active, sort_order, created_by/updated_by, timestamps. Unique `(organization_id, lower(name))`.
-2. **`inventory_locations`** — name, description, location_type (default `internal`), is_active, sort_order, created_by/updated_by, timestamps. Unique `(organization_id, lower(name))`.
-3. **`inventory_items`** — category_id, location_id, item_kind, status (default `available`), name, description, asset_code, serial_number, brand, model, unit_of_measure (default `'un'`), quantity_total/available/minimum, acquisition_date/cost, notes, metadata jsonb, created_by/updated_by, timestamps.
-   - **Check constraints:**
-     - `quantity_total >= 0 AND quantity_available >= 0 AND quantity_available <= quantity_total`
-     - `(item_kind='serialized' AND quantity_total=1 AND quantity_available IN (0,1)) OR (item_kind='quantity')`
-   - **Unique parciais por org:** `lower(asset_code)` quando preenchido; `lower(serial_number)` quando preenchido.
-4. **`inventory_movements`** — item_id (FK SET NULL), movement_type, quantity, from/to_location_id, from/to_status, reason, notes, related_entity_type/id, metadata jsonb, created_by, created_at. Sem updated_at.
-5. **`inventory_status_history`** — item_id (FK CASCADE), from_status, to_status, reason, metadata jsonb, created_by, created_at. Sem updated_at.
+## Camada de dados
 
-Índices conforme spec (org, category, location, status, kind, created_at desc, related_entity).
+Todas as queries usam `supabase` client com filtro explícito `organization_id = currentOrg.id` (via `useCurrentOrganization`). RLS já garante isolamento; o filtro no SELECT mantém clareza e cache key estável.
 
-### 3. RLS — usar helpers existentes
+- `select * from inventory_categories where organization_id=$org order by sort_order asc, name asc`
+- Insert/update setam `organization_id`, `created_by`/`updated_by = auth.uid()`
+- Toggle: `update ... set is_active = !is_active`
+- Tratamento de erro `23505` (unique_violation) → toast "Já existe ... com este nome."
 
-Já existem: `get_user_organization_id()`, `user_is_org_admin(org_id)`, `user_is_org_member(org_id)`. Sem helpers novos.
+Query keys: `['inventory-categories', orgId]`, `['inventory-locations', orgId]`. Invalidar após cada mutation.
 
-Função nova mínima e segura para checar acesso ao módulo:
+## Validação (Zod)
 
-```sql
-CREATE FUNCTION public.user_can_access_inventory(p_org_id uuid)
-RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM public.organization_members
-    WHERE user_id = auth.uid()
-      AND organization_id = p_org_id
-      AND status = 'active'
-      AND deleted_at IS NULL
-      AND org_role IN ('owner','admin','operations')
-  );
-$$;
+**Categoria:**
+- `name`: trim, 2-80 chars, obrigatório
+- `description`: opcional, max 300
+- `item_kind`: enum `serialized | quantity`, obrigatório
+- `sort_order`: int ≥ 0, default 0
+- `is_active`: boolean, default true
+
+**Local:** mesma estrutura, `location_type` enum com 8 valores (`internal, external, maintenance, event, technician, lost, retired, other`).
+
+## Mapas de label
+
+```ts
+ITEM_KIND_LABEL = { serialized: 'Serializado', quantity: 'Por quantidade' }
+LOCATION_TYPE_LABEL = { internal:'Interno', external:'Externo', maintenance:'Manutenção',
+  event:'Evento', technician:'Técnico', lost:'Perdido', retired:'Baixado', other:'Outro' }
 ```
 
-**Policies em todas as 5 tabelas:**
-- `SELECT` / `INSERT` / `UPDATE`: `user_can_access_inventory(organization_id)`.
-- **Sem `DELETE` policy** (delete físico bloqueado nesta sprint; soft delete via `is_active=false` ou status `retired`/`lost`).
-- Comercial/SDR/finance/cs/manager/viewer ficam fora automaticamente.
+## UI
 
-### 4. Triggers
+- Tabs internas com `@/components/ui/tabs` (padrão shadcn já em uso)
+- Tabela com `@/components/ui/table` + `Badge` para status (Ativa/Inativa, Ativo/Inativo)
+- Modal com `Dialog` + `react-hook-form` + `zodResolver` (padrão `CategoryModal` de produtos como referência)
+- Toggle com `AlertDialog` de confirmação (textos especificados na sprint)
+- Empty state com ícone, título, descrição e CTA "Nova categoria"/"Novo local"
+- Busca por nome (input client-side) e filtro Status (Ativos/Inativos/Todos)
+- Toasts via `sonner` (padrão atual)
 
-- `update_updated_at_column` (já existe) em `inventory_categories`, `inventory_locations`, `inventory_items`.
-- **`trg_inventory_items_status_history`** — `AFTER UPDATE OF status` em `inventory_items`: se `OLD.status IS DISTINCT FROM NEW.status`, insere em `inventory_status_history` (org, item, from/to status, `auth.uid()` como created_by).
-- **`trg_inventory_items_initial_entry`** — `AFTER INSERT` em `inventory_items`: insere `inventory_movements` com `movement_type='initial_entry'`, `quantity=quantity_total`, `to_location_id=location_id`, `to_status=status`, `reason='Cadastro inicial do item'`, `created_by=auth.uid()`. Lógica simples e idempotente por linha nova.
+## Permissões
 
-### 5. Frontend
+- A página já está protegida em `App.tsx` + `usePermissions` (Sprint INV 0.1)
+- RLS no banco restringe a `owner|admin|operations` (Sprint INV 0.2)
+- Frontend: nenhum bypass; mutations dependem de RLS
 
-Nenhuma alteração funcional. Opcional: pequeno texto discreto no rodapé do card de empty state em `src/pages/operations/Inventory.tsx`: "Schema base preparado para categorias, locais, itens, movimentações e histórico." — única edição de UI permitida pela sprint.
+## Fora de escopo
+Items, movements, chips, kits, reservas, seeds automáticos, edge functions, RPCs novas, contadores na Visão Geral (decisão: pular para manter sprint enxuta), delete físico.
 
-### Entrega
+## Riscos
+- Constraint unique de nome por org já existe na Sprint INV 0.2 → tratamento `23505` cobre
+- Cache stale após toggle → invalidação explícita resolve
 
-- 1 migration SQL única com enums + tabelas + índices + RLS + triggers.
-- 1 edição mínima em `Inventory.tsx` (texto técnico discreto).
-- Sem CRUD, sem types manuais (regen automático), sem edge functions, sem mexer em proposta/preço/reservas/chips/kits.
-
-### Riscos
-
-- Baixo. Tabelas novas, isoladas. RLS restritiva por padrão (só owner/admin/operations leem ou escrevem).
-- Trigger de `initial_entry` cria 1 row em `inventory_movements` por item — comportamento desejado.
+## Próximos passos (INV 0.4)
+CRUD de itens serializados consumindo categorias/locais ativos.
