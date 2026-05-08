@@ -120,6 +120,15 @@ export default function ProposalPublicView() {
     }
   }, [token]);
 
+  // Load win reasons as soon as the proposal (and its organization) are available,
+  // so the acceptance modal NEVER falls back to hardcoded non-UUID ids.
+  useEffect(() => {
+    if (proposal?.organization_id) {
+      loadWinReasons();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [proposal?.organization_id, proposal?.opportunity?.pipeline_id]);
+
   useEffect(() => {
     if (proposal?.opportunity?.title) {
       document.title = `${proposal.opportunity.title} | Proposta Comercial`;
