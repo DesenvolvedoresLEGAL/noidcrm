@@ -1031,10 +1031,15 @@ export default function ProposalPublicView() {
     proposal?.status === 'accepted' && proposal?.approved_amount != null
       ? Number(proposal.approved_amount)
       : oneTimeTotal;
+  const dpSnapPublic: any = (proposal as any)?.dynamic_pricing_snapshot ?? null;
   const installments = oneTimeTerm
     ? calculateInstallments(oneTimeTerm, baseForSchedule, {
         proposalExpiresAt: proposal?.expires_at ?? null,
         approvedAmount: proposal?.status === 'accepted' ? Number(proposal?.approved_amount ?? oneTimeTotal) : null,
+        dynamicPricingCurrentEndsAt:
+          (proposal as any)?.dynamic_pricing_enabled && dpSnapPublic?.current_ends_at
+            ? dpSnapPublic.current_ends_at
+            : null,
       })
     : [];
 
