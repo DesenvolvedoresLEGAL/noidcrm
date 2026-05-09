@@ -2,6 +2,36 @@
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type ContactValue = any;
 
+/**
+ * Normalizes a person name to display/storage format:
+ * Capitalizes the first letter of each whitespace/hyphen-separated token,
+ * lowercases the rest. Preserves Portuguese particles (de, da, do, dos, das, e) in lowercase.
+ * Examples: "DANILO" -> "Danilo", "maria DA silva" -> "Maria da Silva".
+ */
+export function formatPersonName(value: string | null | undefined): string {
+  if (!value) return '';
+  const particles = new Set(['de', 'da', 'do', 'dos', 'das', 'e', 'di', 'du']);
+  const trimmed = value.trim().replace(/\s+/g, ' ');
+  if (!trimmed) return '';
+  return trimmed
+    .split(' ')
+    .map((word, idx) => {
+      const lower = word.toLocaleLowerCase('pt-BR');
+      if (idx > 0 && particles.has(lower)) return lower;
+      // Handle hyphenated parts (e.g., "Maria-Clara")
+      return lower
+        .split('-')
+        .map((part) =>
+          part.length === 0
+            ? part
+            : part.charAt(0).toLocaleUpperCase('pt-BR') + part.slice(1),
+        )
+        .join('-');
+    })
+    .join(' ');
+}
+
+
 export function extractEmail(value: ContactValue): string | null {
   if (!value) return null;
   if (typeof value === 'string') return value;

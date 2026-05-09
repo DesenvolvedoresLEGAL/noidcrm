@@ -102,12 +102,13 @@ export function ContactCombobox({
       const { data: orgId } = await supabase.rpc('get_user_organization_id');
       if (!orgId) throw new Error('User must belong to an organization');
 
-      const primeiro_nome = newContactFirstName.trim();
-      const ultimo_nome = newContactLastName.trim();
+      const primeiro_nome = formatPersonName(newContactFirstName);
+      const ultimo_nome = formatPersonName(newContactLastName);
 
       const insertData: any = {
         primeiro_nome,
         ultimo_nome,
+        nome: (primeiro_nome + (ultimo_nome ? ' ' + ultimo_nome : '')).trim(),
         organization_id: orgId,
       };
 
