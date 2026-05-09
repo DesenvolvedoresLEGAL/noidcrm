@@ -296,3 +296,115 @@ export default function ApprovalsPage() {
     </div>
   );
 }
+
+// ============================================================
+// Unified Approvals (Sprint B/C) — humans + agents in one queue
+// ============================================================
+function UnifiedApprovalsList() {
+  const { data, isLoading } = useUnifiedApprovals({ status: 'pending', limit: 100 });
+  const decide = useDecideApproval();
+  const [rejecting, setRejecting] = useState<string | null>(null);
+  const [reason, setReason] = useState('');
+
+  if (isLoading) return <div className="text-muted-foreground text-center py-12">Carregando...</div>;
+  const rows = (data ?? []).filter((row) => row.source === 'approval_requests');
+  if (rows.length === 0) {
+    return (
+      <Card>
+        <CardContent className="py-12 text-center">
+          <ShieldCheck className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+          <p className="text-muted-foreground">Nenhuma operação sensível pendente</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const riskTone: Record<string, string> = {
+    low: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
+    medium: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300',
+    high: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
+    critical: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+  };
+
+  return (
+    <>
+      {rows.map((row) => (
+        <Card key={row.id}>
+          <CardContent className="p-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <code className="text-sm font-semibold text-foreground">{row.action_key}</code>
+                  <Badge className={`text-xs border-0 ${riskTone[row.risk_level] ?? ''}`}>
+                    {row.risk_level.toUpperCase()}
+                  </Badge>
+                  <Badge variant="outline" className="text-xs">{row.requester_type}</Badge>
+                  {row.entity_type && (
+                    <span className="text-xs text-muted-foreground">
+                      {row.entity_type}{row.entity_id ? ` · ${row.entity_id.slice(0, 8)}` : ''}
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Solicitado em {new Date(row.requested_at).toLocaleString('pt-BR')}
+                  {row.expires_at && ` · expira ${new Date(row.expires_at).toLocaleString('pt-BR')}`}
+                </p>
+                {row.payload && Object.keys(row.payload).length > 0 && (
+                  <pre className="mt-2 text-[11px] bg-muted/40 rounded p-2 overflow-x-auto max-w-full">
+                    {JSON.stringify(row.payload, null, 2)}
+                  </pre>
+                )}
+              </div>
+              <div className="flex gap-2 shrink-0">
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => { setRejecting(row.id); setReason(''); }}
+                  disabled={decide.isPending}
+                >
+                  <XCircle className="h-4 w-4 mr-1" /> Rejeitar
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => decide.mutate({ approvalId: row.id, decision: 'approved' })}
+                  disabled={decide.isPending}
+                >
+                  <CheckCircle className="h-4 w-4 mr-1" /> Aprovar
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+
+      <Dialog open={!!rejecting} onOpenChange={() => setRejecting(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rejeitar solicitação</DialogTitle>
+          </DialogHeader>
+          <div>
+            <Label className="text-sm">Motivo (opcional)</Label>
+            <Textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={3} />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRejecting(null)}>Cancelar</Button>
+            <Button
+              variant="destructive"
+              disabled={decide.isPending}
+              onClick={() => {
+                if (!rejecting) return;
+                decide.mutate(
+                  { approvalId: rejecting, decision: 'rejected', reason },
+                  { onSuccess: () => setRejecting(null) },
+                );
+              }}
+            >
+              Confirmar rejeição
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
