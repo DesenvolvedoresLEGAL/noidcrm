@@ -39,6 +39,12 @@ serve(async (req) => {
     const MIN_AGE_HOURS = 24;
     const MAX_SUGGESTIONS_PER_RUN = 20;
 
+    // Fields that must NEVER be auto-applied — user-owned, manual-only.
+    // Keeps the suggestion visible in the UI but blocks the CRON from
+    // overwriting the value (e.g. proposal saves regenerating suggestions
+    // that would otherwise drift the user's expected close date).
+    const MANUAL_ONLY_FIELDS = new Set<string>(['close_date_prevista']);
+
     // Fetch high-confidence suggestions pending for more than 24 hours
     const cutoffTime = new Date(Date.now() - MIN_AGE_HOURS * 60 * 60 * 1000).toISOString();
     
