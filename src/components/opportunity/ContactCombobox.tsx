@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Check, ChevronsUpDown, Plus, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { formatPersonName } from '@/lib/contactFormat';
 import { Button } from '@/components/ui/button';
 import {
   Command,
