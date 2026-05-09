@@ -11,6 +11,20 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Auth guard: require internal cron secret OR an authenticated user JWT
+  const internalSecret = req.headers.get('x-internal-secret');
+  const expectedSecret = Deno.env.get('INTERNAL_WORKFLOW_SECRET');
+  const authHeader = req.headers.get('authorization');
+  const hasInternal = expectedSecret && internalSecret === expectedSecret;
+  const hasAuth = !!authHeader && authHeader.toLowerCase().startsWith('bearer ');
+  if (!hasInternal && !hasAuth) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
+
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;

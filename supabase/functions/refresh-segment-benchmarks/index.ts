@@ -25,7 +25,18 @@ interface OppRow {
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-  try {
+  const internalSecret = req.headers.get('x-internal-secret');
+  const expectedSecret = Deno.env.get('INTERNAL_WORKFLOW_SECRET');
+  const authHeader = req.headers.get('authorization');
+  const hasInternal = expectedSecret && internalSecret === expectedSecret;
+  const hasAuth = !!authHeader && authHeader.toLowerCase().startsWith('bearer ');
+  if (!hasInternal && !hasAuth) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
     const body = await req.json().catch(() => ({}));
     const organizationId: string | undefined = body.organization_id || body.organizationId;
     const onlySegment: string | undefined = body.segment;
