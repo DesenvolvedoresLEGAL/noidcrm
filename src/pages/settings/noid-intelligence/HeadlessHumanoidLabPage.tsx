@@ -60,11 +60,13 @@ function StatCard({
   value,
   hint,
   tone = 'default',
+  onClick,
 }: {
   label: string;
   value: number | string;
   hint?: string;
   tone?: 'default' | 'warning' | 'danger' | 'success';
+  onClick?: () => void;
 }) {
   const toneClass =
     tone === 'danger'
@@ -75,7 +77,11 @@ function StatCard({
           ? 'border-emerald-500/40'
           : '';
   return (
-    <Card className={toneClass}>
+    <Card
+      className={`${toneClass} ${onClick ? 'cursor-pointer hover:bg-muted/40 transition-colors' : ''}`}
+      onClick={onClick}
+      role={onClick ? 'button' : undefined}
+    >
       <CardContent className="p-4">
         <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
         <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
@@ -88,9 +94,11 @@ function StatCard({
 function GoNoGoBanner({
   status,
   blockers,
+  warnings,
 }: {
   status?: 'GO' | 'NO_GO';
-  blockers?: { code: string; message: string; count: number }[];
+  blockers?: { code: string; message: string; count: number; action_keys?: string[] }[];
+  warnings?: { code: string; message: string; count: number }[];
 }) {
   const isGo = status === 'GO';
   return (
@@ -115,19 +123,46 @@ function GoNoGoBanner({
           ? 'Camada Headless Humanoid validada. Esta organização está pronta para liberar novas superfícies controladas.'
           : 'Esta organização ainda não está pronta para Slack interativo, WhatsApp, MCP externo ou automações agentic. Corrija os blockers abaixo antes de liberar novas superfícies.'}
         {!isGo && blockers && blockers.length > 0 && (
-          <ul className="mt-3 space-y-1 text-sm">
+          <ul className="mt-3 space-y-2 text-sm">
             {blockers.map((b) => (
               <li key={b.code} className="flex items-start gap-2">
-                <AlertTriangle className="mt-0.5 h-4 w-4 text-destructive" />
-                <span>
-                  <span className="font-medium">{b.code}</span> · {b.message}{' '}
-                  <Badge variant="outline" className="ml-1">
-                    {b.count}
-                  </Badge>
-                </span>
+                <AlertTriangle className="mt-0.5 h-4 w-4 text-destructive shrink-0" />
+                <div>
+                  <div>
+                    <span className="font-medium">{b.code}</span> · {b.message}{' '}
+                    <Badge variant="outline" className="ml-1">{b.count}</Badge>
+                  </div>
+                  {b.action_keys && b.action_keys.length > 0 && (
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {b.action_keys.map((k) => (
+                        <Badge key={k} variant="destructive" className="font-mono text-[10px]">
+                          {k}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </li>
             ))}
           </ul>
+        )}
+        {warnings && warnings.length > 0 && (
+          <div className="mt-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1">
+              Avisos legados (não bloqueiam GO)
+            </p>
+            <ul className="space-y-1 text-sm">
+              {warnings.map((w) => (
+                <li key={w.code} className="flex items-start gap-2 text-muted-foreground">
+                  <Clock className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span>
+                    <span className="font-medium">{w.code}</span> · {w.message}{' '}
+                    <Badge variant="outline" className="ml-1">{w.count}</Badge>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
       </AlertDescription>
     </Alert>
