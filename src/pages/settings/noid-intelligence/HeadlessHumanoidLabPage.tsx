@@ -331,11 +331,12 @@ function RegistryTab() {
   const [search, setSearch] = useState('');
   const [preset, setPreset] = useState<'none' | 'risky_no_approval'>('none');
 
-  // Apply preset coming from snapshot card
-  if (nav.registryPreset === 'risky_no_approval' && preset !== 'risky_no_approval') {
-    setPreset('risky_no_approval');
-    nav.setRegistryPreset(null);
-  }
+  useEffect(() => {
+    if (nav.registryPreset === 'risky_no_approval') {
+      setPreset('risky_no_approval');
+      nav.setRegistryPreset(null);
+    }
+  }, [nav.registryPreset, nav]);
 
   const allowlist = health?.safe_allowlist ?? [];
   const riskyKeys = new Set(health?.risky_action_keys ?? []);
