@@ -5349,6 +5349,87 @@ export type Database = {
           },
         ]
       }
+      approval_requests: {
+        Row: {
+          action_key: string
+          approver_user_id: string | null
+          created_at: string
+          decided_at: string | null
+          decision_reason: string | null
+          entity_id: string | null
+          entity_type: string | null
+          execution_id: string | null
+          expires_at: string | null
+          id: string
+          metadata: Json
+          organization_id: string
+          payload: Json
+          requested_at: string
+          requester_agent_id: string | null
+          requester_type: string
+          requester_user_id: string | null
+          risk_level: Database["public"]["Enums"]["action_risk_level"]
+          status: string
+        }
+        Insert: {
+          action_key: string
+          approver_user_id?: string | null
+          created_at?: string
+          decided_at?: string | null
+          decision_reason?: string | null
+          entity_id?: string | null
+          entity_type?: string | null
+          execution_id?: string | null
+          expires_at?: string | null
+          id?: string
+          metadata?: Json
+          organization_id: string
+          payload?: Json
+          requested_at?: string
+          requester_agent_id?: string | null
+          requester_type: string
+          requester_user_id?: string | null
+          risk_level?: Database["public"]["Enums"]["action_risk_level"]
+          status?: string
+        }
+        Update: {
+          action_key?: string
+          approver_user_id?: string | null
+          created_at?: string
+          decided_at?: string | null
+          decision_reason?: string | null
+          entity_id?: string | null
+          entity_type?: string | null
+          execution_id?: string | null
+          expires_at?: string | null
+          id?: string
+          metadata?: Json
+          organization_id?: string
+          payload?: Json
+          requested_at?: string
+          requester_agent_id?: string | null
+          requester_type?: string
+          requester_user_id?: string | null
+          risk_level?: Database["public"]["Enums"]["action_risk_level"]
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "approval_requests_action_key_fkey"
+            columns: ["action_key"]
+            isOneToOne: false
+            referencedRelation: "action_registry"
+            referencedColumns: ["action_key"]
+          },
+          {
+            foreignKeyName: "approval_requests_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "action_executions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       article_feedback: {
         Row: {
           article_id: string
@@ -30380,6 +30461,48 @@ export type Database = {
           },
         ]
       }
+      unified_approval_queue_view: {
+        Row: {
+          action_key: string | null
+          decided_at: string | null
+          decided_by: string | null
+          decision_reason: string | null
+          entity_id: string | null
+          entity_type: string | null
+          execution_id: string | null
+          expires_at: string | null
+          id: string | null
+          organization_id: string | null
+          payload: Json | null
+          requested_at: string | null
+          requester_agent_id: string | null
+          requester_type: string | null
+          requester_user_id: string | null
+          risk_level: string | null
+          source: string | null
+          status: string | null
+        }
+        Relationships: []
+      }
+      unified_audit_view: {
+        Row: {
+          action_key: string | null
+          actor_agent_id: string | null
+          actor_type: string | null
+          actor_user_id: string | null
+          after_state: Json | null
+          before_state: Json | null
+          entity_id: string | null
+          entity_type: string | null
+          id: string | null
+          metadata: Json | null
+          occurred_at: string | null
+          organization_id: string | null
+          source: string | null
+          status: string | null
+        }
+        Relationships: []
+      }
       unified_timeline: {
         Row: {
           account_id: string | null
@@ -33183,6 +33306,10 @@ export type Database = {
         }
         Returns: Json
       }
+      decide_approval: {
+        Args: { p_approval_id: string; p_decision: string; p_reason?: string }
+        Returns: Json
+      }
       dedupe_prospect_contacts: {
         Args: { p_prospect_id: string }
         Returns: number
@@ -34190,6 +34317,17 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      request_approval: {
+        Args: {
+          p_action_key: string
+          p_entity_id?: string
+          p_entity_type?: string
+          p_execution_id?: string
+          p_expires_in_hours?: number
+          p_payload?: Json
+        }
+        Returns: Json
       }
       reset_monthly_volts: { Args: never; Returns: undefined }
       resolve_primary_contact: {
