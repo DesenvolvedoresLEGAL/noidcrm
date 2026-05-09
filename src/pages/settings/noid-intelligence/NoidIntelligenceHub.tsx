@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   Bot, Workflow, ShieldCheck, ScrollText, BarChart3,
-  Wrench, Brain, Server, ArrowRight, Construction, Network, TrendingUp
+  Wrench, Brain, Server, ArrowRight, Construction, Network, TrendingUp, FlaskConical
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -107,6 +107,15 @@ const hubItems = [
     path: '/app/settings/noid-intelligence/learning',
     available: true,
     badge: 'Learning',
+  },
+  {
+    id: 'hh-lab',
+    title: 'Headless Humanoid Lab',
+    description: 'Valide a camada agent-ready (registry, approvals, audit)',
+    icon: FlaskConical,
+    path: '/app/settings/noid-intelligence/hh-lab',
+    available: true,
+    badge: 'Lab',
   },
 ];
 

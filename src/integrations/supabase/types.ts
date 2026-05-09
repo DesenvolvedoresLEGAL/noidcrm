@@ -12692,6 +12692,98 @@ export type Database = {
           },
         ]
       }
+      headless_humanoid_test_results: {
+        Row: {
+          action_key: string | null
+          actual_result: Json
+          approval_id: string | null
+          audit_found: boolean | null
+          created_at: string
+          error_message: string | null
+          execution_id: string | null
+          expected_result: Json
+          id: string
+          organization_id: string
+          status: string
+          test_key: string
+          test_name: string
+          test_run_id: string
+        }
+        Insert: {
+          action_key?: string | null
+          actual_result?: Json
+          approval_id?: string | null
+          audit_found?: boolean | null
+          created_at?: string
+          error_message?: string | null
+          execution_id?: string | null
+          expected_result?: Json
+          id?: string
+          organization_id: string
+          status: string
+          test_key: string
+          test_name: string
+          test_run_id: string
+        }
+        Update: {
+          action_key?: string | null
+          actual_result?: Json
+          approval_id?: string | null
+          audit_found?: boolean | null
+          created_at?: string
+          error_message?: string | null
+          execution_id?: string | null
+          expected_result?: Json
+          id?: string
+          organization_id?: string
+          status?: string
+          test_key?: string
+          test_name?: string
+          test_run_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "headless_humanoid_test_results_test_run_id_fkey"
+            columns: ["test_run_id"]
+            isOneToOne: false
+            referencedRelation: "headless_humanoid_test_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      headless_humanoid_test_runs: {
+        Row: {
+          created_at: string
+          finished_at: string | null
+          id: string
+          organization_id: string
+          started_at: string
+          started_by: string
+          status: string
+          summary: Json
+        }
+        Insert: {
+          created_at?: string
+          finished_at?: string | null
+          id?: string
+          organization_id: string
+          started_at?: string
+          started_by: string
+          status?: string
+          summary?: Json
+        }
+        Update: {
+          created_at?: string
+          finished_at?: string | null
+          id?: string
+          organization_id?: string
+          started_at?: string
+          started_by?: string
+          status?: string
+          summary?: Json
+        }
+        Relationships: []
+      }
       health_score_drivers: {
         Row: {
           benchmark_value: number | null
@@ -33484,6 +33576,10 @@ export type Database = {
               similarity: number
             }[]
           }
+      finish_headless_humanoid_test_run: {
+        Args: { p_run_id: string }
+        Returns: Json
+      }
       fn_cnae_to_segmento: { Args: { p_cnae: string }; Returns: string }
       fn_infer_segmento_from_name: { Args: { p_nome: string }; Returns: string }
       fn_list_accounts_for_segmento_backfill: {
@@ -33765,6 +33861,10 @@ export type Database = {
         Returns: Json
       }
       get_global_seat_metrics: { Args: never; Returns: Json }
+      get_headless_humanoid_health: {
+        Args: { p_org_id?: string }
+        Returns: Json
+      }
       get_index_usage_stats: {
         Args: never
         Returns: {
@@ -34437,6 +34537,10 @@ export type Database = {
         }
         Returns: string
       }
+      run_headless_humanoid_test: {
+        Args: { p_run_id: string; p_test_key: string }
+        Returns: Json
+      }
       seed_default_decision_rules: {
         Args: { _org_id: string }
         Returns: undefined
@@ -34465,6 +34569,7 @@ export type Database = {
         Args: { _enabled: boolean; _org_id: string }
         Returns: boolean
       }
+      start_headless_humanoid_test_run: { Args: never; Returns: string }
       sync_enriched_contacts_to_account: {
         Args: {
           p_account_id: string
