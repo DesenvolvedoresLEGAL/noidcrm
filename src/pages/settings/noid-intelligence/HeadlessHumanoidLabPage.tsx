@@ -321,15 +321,35 @@ function SnapshotTab() {
 
 function RegistryTab() {
   const { data, isLoading } = useActionRegistry();
+  const { data: health } = useHeadlessHumanoidHealth();
+  const nav = useLabNav();
   const [riskFilter, setRiskFilter] = useState<string>('all');
   const [executorFilter, setExecutorFilter] = useState<string>('all');
   const [surfaceFilter, setSurfaceFilter] = useState<string>('all');
   const [approvalFilter, setApprovalFilter] = useState<string>('all');
   const [activeFilter, setActiveFilter] = useState<string>('active');
   const [search, setSearch] = useState('');
+  const [preset, setPreset] = useState<'none' | 'risky_no_approval'>('none');
+
+  // Apply preset coming from snapshot card
+  if (nav.registryPreset === 'risky_no_approval' && preset !== 'risky_no_approval') {
+    setPreset('risky_no_approval');
+    nav.setRegistryPreset(null);
+  }
+
+  const allowlist = health?.safe_allowlist ?? [];
+  const riskyKeys = new Set(health?.risky_action_keys ?? []);
 
   const filtered = useMemo(() => {
     return (data ?? []).filter((a: any) => {
+      if (preset === 'risky_no_approval') {
+        if (!a.is_active) return false;
+        if (!['high', 'critical'].includes(a.risk_level)) return false;
+        if (a.approval_required) return false;
+        if (allowlist.includes(a.action_key)) return false;
+        if (search && !a.action_key.toLowerCase().includes(search.toLowerCase())) return false;
+        return true;
+      }
       if (search && !a.action_key.toLowerCase().includes(search.toLowerCase())) return false;
       if (riskFilter !== 'all' && a.risk_level !== riskFilter) return false;
       if (executorFilter !== 'all' && a.executor_type !== executorFilter) return false;
@@ -345,7 +365,7 @@ function RegistryTab() {
       }
       return true;
     });
-  }, [data, search, riskFilter, executorFilter, surfaceFilter, approvalFilter, activeFilter]);
+  }, [data, search, riskFilter, executorFilter, surfaceFilter, approvalFilter, activeFilter, preset, allowlist]);
 
   if (isLoading) return <Skeleton className="h-96 w-full" />;
 
