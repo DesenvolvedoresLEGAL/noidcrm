@@ -150,10 +150,7 @@ serve(async (req) => {
       JSON.stringify({
         eligible,
         requiresVerification,
-        fraudScore,
-        riskLevel,
-        riskFlags,
-        message: !eligible 
+        message: !eligible
           ? 'Não foi possível iniciar o trial. Entre em contato com o suporte.'
           : requiresVerification
           ? 'Verificação adicional necessária. Confirme seu telefone.'
@@ -164,12 +161,12 @@ serve(async (req) => {
 
   } catch (error: any) {
     console.error('[Trial Eligibility] Error:', error);
-    
+
+    // Do not leak internal error details to clients.
     return new Response(
-      JSON.stringify({ 
-        eligible: false, 
-        reason: 'Internal error',
-        error: error.message 
+      JSON.stringify({
+        eligible: false,
+        message: 'Serviço indisponível. Tente novamente em instantes.',
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
