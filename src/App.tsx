@@ -148,6 +148,7 @@ const EmailAgentMetricsPage = lazy(() => import("./pages/settings/noid-intellige
 const AgentOutcomesPage = lazy(() => import("./pages/settings/noid-intelligence/AgentOutcomesPage"));
 const DecisionRulesPage = lazy(() => import("./pages/settings/noid-intelligence/DecisionRulesPage"));
 const LearningPerformancePage = lazy(() => import("./pages/settings/noid-intelligence/LearningPerformancePage"));
+const HeadlessHumanoidLabPage = lazy(() => import("./pages/settings/noid-intelligence/HeadlessHumanoidLabPage"));
 
 // GTM Routes - Revenue Operating System
 const SDRCommandCenter = lazy(() => import("./pages/gtm/SDRCommandCenter"));
