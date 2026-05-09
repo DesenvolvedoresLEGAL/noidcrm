@@ -72,10 +72,21 @@ export default function ApprovalsPage() {
       <div>
         <h1 className="text-2xl font-bold text-foreground">Aprovações</h1>
         <p className="text-muted-foreground mt-1">
-          Fila de aprovação de ações dos agentes
+          Fila unificada de aprovações de agentes e operações sensíveis
         </p>
       </div>
 
+      <Tabs defaultValue="agents" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="agents">Agentes (e-mails)</TabsTrigger>
+          <TabsTrigger value="unified">Operações sensíveis</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="unified" className="space-y-3">
+          <UnifiedApprovalsList />
+        </TabsContent>
+
+        <TabsContent value="agents" className="space-y-3">
       {isLoading ? (
         <div className="text-muted-foreground text-center py-12">Carregando...</div>
       ) : !queue || queue.length === 0 ? (
