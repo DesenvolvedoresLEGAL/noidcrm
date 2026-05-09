@@ -1,77 +1,112 @@
-## Objetivo
+# Auditoria: Arquitetura Agent-Ready (Headless Humanoid)
 
-Eliminar o ruído entre "Subtotal Avulso" (R$ 1.994,00) e "Valor Vigente" (R$ 2.193,40) deixando a matemática explícita dentro do próprio bloco "Itens Avulsos" — tanto no link público quanto no PDF — e adicionando uma linha curta de urgência citando o próximo valor e a data de virada.
+Boa notícia: **~80% da arquitetura proposta já está implementada**. O que falta não é refundação — é **formalizar contratos** (Action Registry) e **unificar pontas soltas** (audit single source, approval router).
 
-## Mudanças
+---
 
-### 1. Link público — `src/pages/ProposalPublicView.tsx`
+## Status por camada
 
-No `<tfoot>` do bloco "Itens Avulsos" (linhas ~1412–1432), quando `dynamic_pricing_enabled` e snapshot ativo:
+### ✅ 1. Core Data Layer — COMPLETO
+Todas as tabelas existem: `accounts`, `contacts`, `opportunities`, `proposals`, `proposal_items`, `activities`, `contracts`, `billing_invoices`, `inventory_items`, `inventory_reservations`, `score_history`, `audit_log`, `ai_agent_approval_queue`.
 
-- Renomear a linha existente "Subtotal Avulso" para **"Subtotal dos Itens"** (cinza, peso normal). Continua mostrando `oneTimeTotal` (R$ 1.994).
-- Adicionar nova linha **"Ajuste por antecedência (+X%)"** em destaque âmbar, com o delta `current_amount − base_amount` e o percentual calculado.
-- Adicionar nova linha de fechamento **"Total Vigente Hoje"** em negrito grande, mostrando `snapshot.current_amount` (R$ 2.193,40), casando com header e Condições de Pagamento.
-- Logo abaixo do tfoot, micro-texto sutil com gatilho de urgência:
-  > "Condição vigente até DD/MM/AAAA HH:mm. A partir de DD/MM, novo valor: R$ X.XXX,XX."
-  Usa `current_ends_at`, `next_starts_at` e `next_amount`. Se não houver `next_amount`, exibe só a parte da validade.
+### ✅ 2. Business Logic Layer — COMPLETO
+- RPCs: `calculate_lead_grade`, `has_role`, `get_user_organization_id`, dezenas de triggers de negócio (close_date, win_rate, opportunity_title_upper, etc.)
+- Edge functions: 50+ (auto-apply-ai-suggestions, calculate-opportunity-score, post-acceptance-effects, generate-recommendations, etc.)
+- Services TS: `proposalOrchestrator`, `inventoryProposalBridge`, `agentBuilderService`, etc.
+- Regras já vivem **fora da tela** (triggers DB + edge functions + services).
 
-Quando `dynamic_pricing` não estiver ativo, o bloco continua exatamente como hoje (sem regressão).
+### ⚠️ 3. Action Registry — PARCIAL
+**Existe:** `mcp_tools` + `ai_agent_tools` + `ai_agent_execution_actions` cobrem o caso "ferramentas que o agente pode chamar".
+**Falta:** Tabela canônica `action_registry` com TODAS as ações operacionais (humanas + agentes) listando: `action_key`, `required_role`, `approval_required`, `risk_level`, `input_schema`, `available_surfaces`. Hoje as ações estão **espalhadas** entre edge functions, RPCs e mutações no front — não há um catálogo único consultável.
 
-### 2. PDF — `src/lib/proposalPdfGenerator.ts`
+### ⚠️ 4. Tool Layer — PARCIAL
+**Existe:** Catálogo de tools no contexto Noid Intelligence (`mcp_tools`, `ai_agent_tools`, registry com risk levels — ver memory `tool-registry-catalog-and-risk-levels`).
+**Falta:** Tools wrappando ações **CRM operacionais** (`noid_create_opportunity`, `noid_generate_proposal`, `noid_request_approval`, `noid_reserve_inventory`). Hoje os agentes têm tools de IA/sourcing, mas não de operação CRM end-to-end.
 
-No bloco "RESUMO DO INVESTIMENTO" (linhas ~680–766), quando `dynamic_pricing_enabled` + snapshot ativo:
+### ✅ 5. Permission & Approval Layer — COMPLETO
+- RBAC: `user_roles`, `permission_sets`, `has_role()`, `can_view_all()`
+- RLS: aplicado em todas as tabelas multi-tenant
+- Approvals: `ai_agent_approval_queue`, `agent_guardrails`, `ai_agent_escalation_policies`, `ai_agent_execution_policies`
+- UI: `ApprovalsPage`, `DecisionRulesPage`
+**Gap menor:** essa lógica é específica de agentes IA. Não há um **approval router unificado** que sirva também para ações humanas críticas (ex: desconto > limite, cancelar contrato) com a mesma fila.
 
-- Manter a linha "Total Avulso" (subtotal dos itens, R$ 1.994).
-- Inserir nova linha **"Ajuste por antecedência (+X%)"** em laranja/âmbar, mostrando o delta.
-- Substituir o "VALOR TOTAL DA PROPOSTA" para usar `current_amount` (já é o caminho atual via `effectiveOneTimeAmount`, garantir consistência visual).
-- Adicionar linha rodapé (8pt, cinza) dentro da caixa: "Condição vigente até …; próximo valor R$ X em DD/MM."
+### ⚠️ 6. Audit & Memory Layer — FRAGMENTADO
+**Existe (4 tabelas distintas):**
+- `audit_log` — CRM/operacional
+- `auth_audit_log` — login/sessão
+- `security_audit_log` — eventos de segurança
+- `mcp_audit_logs` — invocações de tools/agentes
+- `ai_agent_audit` — execuções de agentes
+- `ai_runs`, `ai_agent_execution_runs`, `ai_agent_run_outcomes` — runs de IA
 
-Recalcular `summaryBoxHeight` para acomodar as 1–2 linhas extras.
+**Gap:** Não há **view unificada** (`unified_audit_view`) com schema comum (`actor_type`, `actor_id`, `agent_id`, `action_key`, `before_state`, `after_state`, `approval_id`). Hoje, para investigar "quem fez o quê", precisa consultar 5+ tabelas.
 
-### 3. Helpers
+### ⚠️ 7. Experience Layer — PARCIAL
+**Existe:** Web (CRM completo), notificações (`notifications_v2`, push, email, daily digest), Slack (integração de notificações).
+**Falta:** Slack/WhatsApp como **superfícies de execução** (não só de leitura). Hoje Slack notifica mas não permite "aprovar desconto da proposta 184" via botão. Humanoid Agent ainda não tem UI de execução cross-surface.
 
-Criar utilitário compartilhado `getDynamicPricingBreakdown(snapshot, baseOneTimeTotal)` em `src/lib/proposals/dynamicPricing.ts` que retorna:
+---
 
-```ts
-{
-  base: number;          // subtotal dos itens
-  current: number;       // valor vigente
-  delta: number;         // current - base
-  adjustmentPercent: number; // (delta/base)*100
-  endsAt: string | null;
-  nextAmount: number | null;
-  nextStartsAt: string | null;
-  hasAdjustment: boolean; // |delta| > 0.01
-}
-```
+## Score consolidado
 
-Usado por ProposalPublicView e proposalPdfGenerator para garantir cálculo único.
+| Camada | Status | % |
+|---|---|---|
+| 1. Core Data | ✅ | 100% |
+| 2. Business Logic | ✅ | 95% |
+| 3. Action Registry | ⚠️ | 40% |
+| 4. Tool Layer | ⚠️ | 50% |
+| 5. Permission/Approval | ✅ | 90% |
+| 6. Audit/Memory | ⚠️ | 60% (existe, mas fragmentado) |
+| 7. Experience | ⚠️ | 55% |
 
-## Comportamento esperado (cenário Repdiu)
+**Média: ~70% pronto.**
+
+---
+
+## Recomendação de roadmap (3 sprints)
+
+### Sprint A — Action Registry canônico (1 semana)
+1. Criar tabela `action_registry` (action_key PK, required_role, risk_level, approval_required, input_schema jsonb, output_schema jsonb, executor_type [edge_function|rpc|service], executor_ref, available_surfaces text[], audit_enabled).
+2. Seed inicial com **20 ações críticas** já existentes (ex: `proposal.apply_discount`, `opportunity.change_stage`, `contract.cancel`, `inventory.reserve`).
+3. Criar RPC `execute_action(action_key, payload)` que valida role/approval/RLS antes de despachar para o executor real.
+4. Frontend: hook `useAction(action_key)` que substitui chamadas diretas a edge functions.
+
+### Sprint B — Audit unificado + Approval router (1 semana)
+1. View `unified_audit_view` somando audit_log + ai_agent_audit + mcp_audit_logs + auth_audit_log com schema comum.
+2. Estender `ai_agent_approval_queue` → `approval_queue` (genérica, com `actor_type` aceitando 'human' também).
+3. UI única em `/approvals` para humanos + agentes.
+
+### Sprint C — Tools CRM + Slack actions (1 semana)
+1. Wrapping de 10 ações CRM como MCP tools (`noid_create_opportunity`, `noid_generate_proposal`, `noid_apply_discount`, etc.) chamando `execute_action()`.
+2. Slack interactive buttons (Block Kit) para approvals.
+3. Documentar header **HEADLESS HUMANOID REQUIREMENT** no AGENTS.md como checklist obrigatório.
+
+---
+
+## Arquivos principais já existentes (referência)
 
 ```text
-Itens Avulsos
-─────────────────────────────────────
-Subtotal dos Itens .............. R$ 1.994,00
-Ajuste por antecedência (+10%) .. + R$ 199,40
-─────────────────────────────────────
-Total Vigente Hoje .............. R$ 2.193,40
+DB:
+- audit_log, ai_agent_audit, mcp_audit_logs (audit fragmentado)
+- ai_agent_approval_queue, agent_guardrails (approval só agentes)
+- mcp_tools, ai_agent_tools, ai_agent_execution_actions (tool registry parcial)
+- user_roles, permission_sets, RLS em todas as tabelas
 
-Condição vigente até 16/05/2026 20:59.
-A partir de 16/05/2026, novo valor: R$ 2.392,80.
+Edge functions: supabase/functions/* (50+)
+Services: src/services/ai-agents/*, src/services/crm/*
+Memories relevantes: tool-registry-catalog-and-risk-levels,
+  agent-governance-and-publication-flow, comprehensive-audit-infrastructure
 ```
 
-Header e Condições de Pagamento continuam mostrando R$ 2.193,40 — agora coerente com o que aparece logo após os itens.
+---
 
-## Riscos e validação
+## Resposta direta
 
-- **Sem regressão para propostas sem tabela dinâmica**: blocos novos só renderizam quando `dynamic_pricing_enabled && snapshot.current_amount != null && snapshot.status !== 'disabled'`.
-- **MRR**: mudanças são escopadas ao bloco one-time; recurring permanece intocado.
-- **PDF QA visual**: gerar PDF da PROP-2026-00492 após a mudança, conferir alinhamento, altura da caixa e quebras de página.
-- **Histórico**: propostas já aceitas mostram o snapshot persistido (`approved_amount`); o novo rodapé deve respeitar o snapshot histórico já gravado, não o vigente atual.
+**Sim, a arquitetura existe na essência.** O que falta é:
+1. **Catálogo único** de ações (Action Registry).
+2. **Audit unificado** (view consolidando 5 tabelas).
+3. **Approval router genérico** (humano + agente na mesma fila).
+4. **Tools CRM operacionais** expostas via MCP.
+5. **Superfícies executáveis** além do web (Slack/WhatsApp interativos).
 
-## Arquivos impactados
-
-- `src/lib/proposals/dynamicPricing.ts` (novo helper)
-- `src/pages/ProposalPublicView.tsx` (tfoot do bloco Avulsos)
-- `src/lib/proposalPdfGenerator.ts` (caixa "Resumo do Investimento")
+Posso começar pelo **Sprint A (Action Registry)** que é o que destrava todo o resto, ou prefere outra ordem?
