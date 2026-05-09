@@ -7,9 +7,37 @@ const corsHeaders = {
 
 const ORGANIZATION_ID = 'd1b68a0f-4e2a-48ce-a03d-19c2751f5f2d';
 
+// In-memory IP rate limiter (per edge instance): max 5 submissions / 10 min
+const RATE_LIMIT_MAX = 5;
+const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
+const ipHits = new Map<string, number[]>();
+
+function isRateLimited(ip: string): boolean {
+  const now = Date.now();
+  const arr = (ipHits.get(ip) || []).filter((t) => now - t < RATE_LIMIT_WINDOW_MS);
+  if (arr.length >= RATE_LIMIT_MAX) {
+    ipHits.set(ip, arr);
+    return true;
+  }
+  arr.push(now);
+  ipHits.set(ip, arr);
+  return false;
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
+  }
+
+  // Per-IP rate limit (mitigates CRM spam attacks)
+  const clientIp = (req.headers.get('x-forwarded-for')?.split(',')[0] || req.headers.get('x-real-ip') || 'unknown').trim();
+  if (isRateLimited(clientIp)) {
+    return new Response(
+      JSON.stringify({ error: 'Muitas requisições. Tente novamente em alguns minutos.' }),
+      { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
   }
 
   try {
@@ -20,6 +48,9 @@ Deno.serve(async (req) => {
     if (!body.nome?.trim()) errors.push('nome é obrigatório');
     if (!body.empresa?.trim()) errors.push('empresa é obrigatório');
     if (!body.email?.trim()) errors.push('email é obrigatório');
+    else if (!EMAIL_RE.test(body.email.trim())) errors.push('email inválido');
+    // Honeypot: bots tipicamente preenchem este campo invisível
+    if (body.website || body.hp_field) errors.push('spam detectado');
 
     if (errors.length > 0) {
       return new Response(
