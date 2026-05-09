@@ -52,7 +52,7 @@ async function registerExecution(
     p_surface: ctx?.surface ?? 'web',
   });
   if (error) return { ok: false, error: error.message };
-  return (data ?? { ok: false, error: 'no_response' }) as RegisterActionResult;
+  return (data ?? { ok: false, error: 'no_response' }) as unknown as RegisterActionResult;
 }
 
 async function completeExecution(
