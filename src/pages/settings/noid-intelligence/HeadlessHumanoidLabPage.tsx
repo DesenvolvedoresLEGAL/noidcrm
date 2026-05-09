@@ -638,121 +638,214 @@ function ExecutionsTab() {
 
 function ApprovalsTab() {
   const { data, isLoading } = useApprovalQueue();
+  const { data: health } = useHeadlessHumanoidHealth();
   const decide = useDecideApproval();
+  const [section, setSection] = useState<'active' | 'history' | 'legacy'>('active');
+  const [period, setPeriod] = useState<'7' | '30' | 'all'>('7');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected' | 'no_exec'>('all');
+
+  const labInstall = health?.lab_install_at ? new Date(health.lab_install_at).getTime() : 0;
+
+  const partitions = useMemo(() => {
+    const all = (data ?? []) as any[];
+    const cutoff = period === 'all' ? 0 : Date.now() - parseInt(period) * 86400000;
+    const inPeriod = (r: any) =>
+      period === 'all' ? true : new Date(r.requested_at).getTime() >= cutoff;
+
+    // Legacy: any pre-Lab approval OR any item from ai_agent_approval_queue without exec
+    const isLegacy = (r: any) =>
+      (!r.execution_id && new Date(r.requested_at).getTime() < labInstall) ||
+      (r.source === 'ai_agent_approval_queue' && !r.execution_id);
+
+    const active = all.filter(
+      (r) => !isLegacy(r) && r.status === 'pending' && inPeriod(r),
+    );
+    const history = all.filter(
+      (r) => !isLegacy(r) && ['approved', 'rejected', 'expired', 'cancelled'].includes(r.status) && inPeriod(r),
+    );
+    const legacy = all.filter(isLegacy);
+    return { active, history, legacy };
+  }, [data, period, labInstall]);
+
+  const visible = useMemo(() => {
+    let rows = partitions[section];
+    if (statusFilter === 'no_exec') rows = rows.filter((r: any) => !r.execution_id);
+    else if (statusFilter !== 'all') rows = rows.filter((r: any) => r.status === statusFilter);
+    return rows;
+  }, [partitions, section, statusFilter]);
 
   if (isLoading) return <Skeleton className="h-96" />;
+
   return (
-    <div className="rounded-md border">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Solicitada</TableHead>
-            <TableHead>action_key</TableHead>
-            <TableHead>Risco</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Execução</TableHead>
-            <TableHead>Decisão</TableHead>
-            <TableHead className="text-right">Ações</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {(data ?? []).length === 0 && (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="inline-flex rounded-md border bg-muted p-1">
+          {(
+            [
+              ['active', `Ativas (${partitions.active.length})`],
+              ['history', `Histórico (${partitions.history.length})`],
+              ['legacy', `Legados sem execução (${partitions.legacy.length})`],
+            ] as const
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              onClick={() => setSection(key)}
+              className={`px-3 py-1 text-xs rounded ${
+                section === key ? 'bg-background shadow-sm' : 'text-muted-foreground'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <Select value={period} onValueChange={(v) => setPeriod(v as any)}>
+          <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="7">Últimos 7 dias</SelectItem>
+            <SelectItem value="30">Últimos 30 dias</SelectItem>
+            <SelectItem value="all">Tudo</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
+          <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Status · todos</SelectItem>
+            <SelectItem value="pending">Pendentes</SelectItem>
+            <SelectItem value="approved">Aprovadas</SelectItem>
+            <SelectItem value="rejected">Rejeitadas</SelectItem>
+            <SelectItem value="no_exec">Sem execution_id</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {section === 'legacy' && partitions.legacy.length > 0 && (
+        <Alert>
+          <Clock className="h-4 w-4" />
+          <AlertTitle>Aprovações legadas</AlertTitle>
+          <AlertDescription>
+            São registros anteriores à implantação do Headless Humanoid Lab ou da fila paralela
+            ai_agent_approval_queue. Não bloqueiam GO; mostradas apenas para saneamento.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
             <TableRow>
-              <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                Sem aprovações registradas.
-              </TableCell>
+              <TableHead>Solicitada</TableHead>
+              <TableHead>action_key</TableHead>
+              <TableHead>Risco</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Execução</TableHead>
+              <TableHead>Decisão</TableHead>
+              <TableHead className="text-right">Ações</TableHead>
             </TableRow>
-          )}
-          {(data ?? []).map((r: any) => {
-            const isSandbox = r.action_key?.startsWith('sandbox.');
-            return (
-              <TableRow key={r.id}>
-                <TableCell className="text-xs">
-                  {formatDistanceToNow(new Date(r.requested_at), {
-                    addSuffix: true,
-                    locale: ptBR,
-                  })}
-                </TableCell>
-                <TableCell className="font-mono text-xs">{r.action_key}</TableCell>
-                <TableCell>
-                  <Badge variant={r.risk_level === 'critical' ? 'destructive' : 'secondary'}>
-                    {r.risk_level}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <Badge
-                    variant={
-                      r.status === 'pending'
-                        ? 'secondary'
-                        : r.status === 'approved'
-                          ? 'default'
-                          : 'destructive'
-                    }
-                  >
-                    {r.status}
-                  </Badge>
-                </TableCell>
-                <TableCell className="font-mono text-[10px]">
-                  {r.execution_id ? (
-                    r.execution_id.slice(0, 8)
-                  ) : (
-                    <span className="text-destructive">sem exec</span>
-                  )}
-                </TableCell>
-                <TableCell className="text-xs">{r.decision_reason ?? '—'}</TableCell>
-                <TableCell className="text-right">
-                  {r.status === 'pending' && isSandbox ? (
-                    <div className="flex justify-end gap-1">
-                      <Button
-                        size="sm"
-                        variant="default"
-                        onClick={() =>
-                          decide
-                            .mutateAsync({
-                              approvalId: r.id,
-                              decision: 'approved',
-                              reason: 'Sandbox approval via Lab',
-                            })
-                            .then(() => toast({ title: 'Aprovação registrada' }))
-                            .catch((e) =>
-                              toast({ title: 'Erro', description: e.message, variant: 'destructive' }),
-                            )
-                        }
-                      >
-                        Aprovar
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={() =>
-                          decide
-                            .mutateAsync({
-                              approvalId: r.id,
-                              decision: 'rejected',
-                              reason: 'Sandbox reject via Lab',
-                            })
-                            .then(() => toast({ title: 'Rejeição registrada' }))
-                            .catch((e) =>
-                              toast({ title: 'Erro', description: e.message, variant: 'destructive' }),
-                            )
-                        }
-                      >
-                        Rejeitar
-                      </Button>
-                    </div>
-                  ) : r.status === 'pending' ? (
-                    <span className="text-xs text-muted-foreground">
-                      Decisão real fora do Lab
-                    </span>
-                  ) : (
-                    <span className="text-xs text-muted-foreground">—</span>
-                  )}
+          </TableHeader>
+          <TableBody>
+            {visible.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                  Sem aprovações nesta visão.
                 </TableCell>
               </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
+            )}
+            {visible.map((r: any) => {
+              const isSandbox = r.action_key?.startsWith('sandbox.');
+              const isLegacyRow =
+                (!r.execution_id && new Date(r.requested_at).getTime() < labInstall) ||
+                (r.source === 'ai_agent_approval_queue' && !r.execution_id);
+              return (
+                <TableRow key={r.id}>
+                  <TableCell className="text-xs">
+                    {formatDistanceToNow(new Date(r.requested_at), {
+                      addSuffix: true,
+                      locale: ptBR,
+                    })}
+                  </TableCell>
+                  <TableCell className="font-mono text-xs">{r.action_key}</TableCell>
+                  <TableCell>
+                    <Badge variant={r.risk_level === 'critical' ? 'destructive' : 'secondary'}>
+                      {r.risk_level}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge
+                      variant={
+                        r.status === 'pending'
+                          ? 'secondary'
+                          : r.status === 'approved'
+                            ? 'default'
+                            : 'destructive'
+                      }
+                    >
+                      {r.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="font-mono text-[10px]">
+                    {r.execution_id ? (
+                      r.execution_id.slice(0, 8)
+                    ) : isLegacyRow ? (
+                      <Badge variant="outline" className="text-[10px]">legado sem execução</Badge>
+                    ) : (
+                      <span className="text-destructive">sem exec</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-xs">{r.decision_reason ?? '—'}</TableCell>
+                  <TableCell className="text-right">
+                    {r.status === 'pending' && isSandbox ? (
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          size="sm"
+                          variant="default"
+                          onClick={() =>
+                            decide
+                              .mutateAsync({
+                                approvalId: r.id,
+                                decision: 'approved',
+                                reason: 'Sandbox approval via Lab',
+                              })
+                              .then(() => toast({ title: 'Aprovação registrada' }))
+                              .catch((e) =>
+                                toast({ title: 'Erro', description: e.message, variant: 'destructive' }),
+                              )
+                          }
+                        >
+                          Aprovar
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() =>
+                            decide
+                              .mutateAsync({
+                                approvalId: r.id,
+                                decision: 'rejected',
+                                reason: 'Sandbox reject via Lab',
+                              })
+                              .then(() => toast({ title: 'Rejeição registrada' }))
+                              .catch((e) =>
+                                toast({ title: 'Erro', description: e.message, variant: 'destructive' }),
+                              )
+                          }
+                        >
+                          Rejeitar
+                        </Button>
+                      </div>
+                    ) : r.status === 'pending' ? (
+                      <span className="text-xs text-muted-foreground">
+                        Decisão real fora do Lab
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 }
