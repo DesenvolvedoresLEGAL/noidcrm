@@ -103,6 +103,13 @@ serve(async (req) => {
           continue;
         }
 
+        // Manual-only fields: never auto-apply, leave pending for user decision.
+        if (MANUAL_ONLY_FIELDS.has(suggestion.field_name)) {
+          skipped++;
+          console.log(`[auto-apply-ai-suggestions] Skipping ${suggestion.id}: field "${suggestion.field_name}" is manual-only`);
+          continue;
+        }
+
         // Get current value to ensure we're not overwriting user changes
         const { data: currentOpp, error: getError } = await supabase
           .from('opportunities')
