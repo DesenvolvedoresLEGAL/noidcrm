@@ -224,6 +224,8 @@ export default function ApprovalsPage() {
           })}
         </div>
       )}
+        </TabsContent>
+      </Tabs>
 
       {/* Edit Modal */}
       <Dialog open={!!editModal} onOpenChange={() => setEditModal(null)}>
