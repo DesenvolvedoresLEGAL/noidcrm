@@ -13,8 +13,15 @@ serve(async (req) => {
 
   try {
     const ABACATEPAY_API_KEY = Deno.env.get('ABACATEPAY_API_KEY');
+    const ABACATEPAY_WEBHOOK_SECRET = Deno.env.get('ABACATEPAY_WEBHOOK_SECRET');
     if (!ABACATEPAY_API_KEY) {
       throw new Error('ABACATEPAY_API_KEY not configured');
+    }
+    if (!ABACATEPAY_WEBHOOK_SECRET) {
+      console.error('ABACATEPAY_WEBHOOK_SECRET not configured — refusing webhook');
+      return new Response(JSON.stringify({ error: 'Webhook signing secret not configured' }), {
+        status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     const supabaseClient = createClient(
@@ -22,13 +29,39 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const body = await req.json();
-    const signature = req.headers.get('x-abacatepay-signature');
+    const rawBody = await req.text();
+    const signature = req.headers.get('x-abacatepay-signature') || '';
 
-    console.log('AbacatePay webhook received:', { 
-      event: body.event, 
-      hasSignature: !!signature 
-    });
+    // Verify HMAC-SHA256 signature in constant time
+    const enc = new TextEncoder();
+    const key = await crypto.subtle.importKey(
+      'raw', enc.encode(ABACATEPAY_WEBHOOK_SECRET),
+      { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+    );
+    const sigBytes = new Uint8Array(await crypto.subtle.sign('HMAC', key, enc.encode(rawBody)));
+    const expectedHex = Array.from(sigBytes).map((b) => b.toString(16).padStart(2, '0')).join('');
+
+    // Normalize provided signature (strip optional "sha256=" prefix)
+    const providedHex = signature.replace(/^sha256=/i, '').trim().toLowerCase();
+
+    const constantTimeEqual = (a: string, b: string) => {
+      if (a.length !== b.length) return false;
+      let r = 0;
+      for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i);
+      return r === 0;
+    };
+
+    if (!providedHex || !constantTimeEqual(providedHex, expectedHex)) {
+      console.error('AbacatePay webhook signature invalid', { hasSignature: !!signature });
+      return new Response(JSON.stringify({ error: 'Invalid signature' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const body = JSON.parse(rawBody);
+
+    console.log('AbacatePay webhook received:', { event: body.event });
+
 
     // Process different event types
     const { event, data } = body;
