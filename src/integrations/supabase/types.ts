@@ -738,6 +738,13 @@ export type Database = {
             referencedRelation: "action_registry"
             referencedColumns: ["action_key"]
           },
+          {
+            foreignKeyName: "action_executions_action_key_fkey"
+            columns: ["action_key"]
+            isOneToOne: false
+            referencedRelation: "mcp_action_catalog_view"
+            referencedColumns: ["tool_name"]
+          },
         ]
       }
       action_registry: {
@@ -5420,6 +5427,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "action_registry"
             referencedColumns: ["action_key"]
+          },
+          {
+            foreignKeyName: "approval_requests_action_key_fkey"
+            columns: ["action_key"]
+            isOneToOne: false
+            referencedRelation: "mcp_action_catalog_view"
+            referencedColumns: ["tool_name"]
           },
           {
             foreignKeyName: "approval_requests_execution_id_fkey"
@@ -30114,6 +30128,75 @@ export type Database = {
             referencedColumns: ["organization_id"]
           },
         ]
+      }
+      mcp_action_catalog_view: {
+        Row: {
+          agent_executable: boolean | null
+          approval_required: boolean | null
+          audit_enabled: boolean | null
+          available_surfaces:
+            | Database["public"]["Enums"]["action_surface"][]
+            | null
+          description: string | null
+          domain: string | null
+          executor_type:
+            | Database["public"]["Enums"]["action_executor_type"]
+            | null
+          human_executable: boolean | null
+          input_schema: Json | null
+          invocation_contract: Json | null
+          is_active: boolean | null
+          name: string | null
+          output_schema: Json | null
+          required_role: string | null
+          risk_level: Database["public"]["Enums"]["action_risk_level"] | null
+          tool_name: string | null
+        }
+        Insert: {
+          agent_executable?: boolean | null
+          approval_required?: boolean | null
+          audit_enabled?: boolean | null
+          available_surfaces?:
+            | Database["public"]["Enums"]["action_surface"][]
+            | null
+          description?: string | null
+          domain?: string | null
+          executor_type?:
+            | Database["public"]["Enums"]["action_executor_type"]
+            | null
+          human_executable?: boolean | null
+          input_schema?: Json | null
+          invocation_contract?: never
+          is_active?: boolean | null
+          name?: string | null
+          output_schema?: Json | null
+          required_role?: string | null
+          risk_level?: Database["public"]["Enums"]["action_risk_level"] | null
+          tool_name?: string | null
+        }
+        Update: {
+          agent_executable?: boolean | null
+          approval_required?: boolean | null
+          audit_enabled?: boolean | null
+          available_surfaces?:
+            | Database["public"]["Enums"]["action_surface"][]
+            | null
+          description?: string | null
+          domain?: string | null
+          executor_type?:
+            | Database["public"]["Enums"]["action_executor_type"]
+            | null
+          human_executable?: boolean | null
+          input_schema?: Json | null
+          invocation_contract?: never
+          is_active?: boolean | null
+          name?: string | null
+          output_schema?: Json | null
+          required_role?: string | null
+          risk_level?: Database["public"]["Enums"]["action_risk_level"] | null
+          tool_name?: string | null
+        }
+        Relationships: []
       }
       mv_notification_admin_metrics: {
         Row: {
