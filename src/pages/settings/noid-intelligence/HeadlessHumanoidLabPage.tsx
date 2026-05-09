@@ -449,7 +449,7 @@ function ExecutionsTab() {
           size="sm"
           onClick={() => setOnlyOrphans((v) => !v)}
         >
-          Somente órfãs (>5min)
+          Somente órfãs (&gt;5min)
         </Button>
       </div>
 
