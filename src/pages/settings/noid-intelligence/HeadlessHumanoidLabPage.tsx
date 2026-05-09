@@ -44,6 +44,17 @@ import { toast } from '@/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
+// Cross-tab navigation: lets cards/banners deep-link into other tabs with a preset filter
+type LabNav = {
+  setTab: (t: string) => void;
+  registryPreset: 'risky_no_approval' | null;
+  setRegistryPreset: (p: 'risky_no_approval' | null) => void;
+  riskyKeys: string[];
+};
+const LabNavContext = createContext<LabNav | null>(null);
+const useLabNav = () => useContext(LabNavContext)!;
+
+
 function StatCard({
   label,
   value,
