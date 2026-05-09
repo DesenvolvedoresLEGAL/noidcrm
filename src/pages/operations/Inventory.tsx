@@ -74,5 +74,6 @@ export default function Inventory() {
         </TabsContent>
       </Tabs>
     </PageContainer>
+    </Layout>
   );
 }
