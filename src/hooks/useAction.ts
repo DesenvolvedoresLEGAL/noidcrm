@@ -133,5 +133,82 @@ export function useAction(actionKey: string) {
     [actionKey],
   );
 
-  return { run, loading, lastError };
+  /**
+   * Sprint D — Dispatch via the generic `execute-action` edge function.
+   * Use this for actions whose executor_type is `rpc` or `edge_function` (the
+   * server resolves and runs them, persisting register/complete automatically).
+   * For `service`-type actions, prefer `run({ execute })`.
+   */
+  const runServer = useCallback(
+    async <TInput,>(opts: {
+      input?: TInput;
+      context?: ActionContext;
+      successMessage?: string;
+      errorMessage?: string;
+      onSuccess?: (output: unknown) => void;
+    }) => {
+      setLoading(true);
+      setLastError(null);
+      try {
+        const { data, error } = await supabase.functions.invoke('execute-action', {
+          body: {
+            action_key: actionKey,
+            input: opts.input ?? {},
+            context: opts.context
+              ? {
+                  entity_type: opts.context.entityType,
+                  entity_id: opts.context.entityId,
+                  surface: opts.context.surface ?? 'web',
+                }
+              : undefined,
+          },
+        });
+        if (error) throw error;
+        const res = data as {
+          ok: boolean;
+          error?: string;
+          execution_id?: string;
+          awaiting_approval?: boolean;
+          dispatch?: 'client';
+          output?: unknown;
+        };
+        if (!res?.ok) {
+          const msg = res?.error ?? 'unknown_error';
+          setLastError(msg);
+          toast({
+            title: opts.errorMessage ?? 'Falha ao executar',
+            description: msg,
+            variant: 'destructive',
+          });
+          return { ok: false as const, error: msg };
+        }
+        if (res.awaiting_approval) {
+          toast({ title: 'Aprovação solicitada', description: 'Esta ação foi enviada para a fila.' });
+          return { ok: true as const, awaitingApproval: true, executionId: res.execution_id };
+        }
+        if (res.dispatch === 'client') {
+          // Caller should follow up with completeExecution after running the service code.
+          return { ok: true as const, clientDispatch: true, executionId: res.execution_id };
+        }
+        if (opts.successMessage) toast({ title: opts.successMessage });
+        opts.onSuccess?.(res.output);
+        return { ok: true as const, output: res.output, executionId: res.execution_id };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        setLastError(message);
+        toast({
+          title: opts.errorMessage ?? 'Falha ao executar',
+          description: message,
+          variant: 'destructive',
+        });
+        return { ok: false as const, error: message };
+      } finally {
+        setLoading(false);
+      }
+    },
+    [actionKey],
+  );
+
+  return { run, runServer, loading, lastError };
 }
+
