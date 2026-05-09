@@ -40,6 +40,7 @@ const pathToBreadcrumb: Record<string, { label: string; parent?: { label: string
   '/app/settings/noid-intelligence/tools': { label: 'Ferramentas', parent: { label: 'NOID Intelligence', href: '/app/settings/noid-intelligence' } },
   '/app/settings/noid-intelligence/memories': { label: 'Memórias', parent: { label: 'NOID Intelligence', href: '/app/settings/noid-intelligence' } },
   '/app/settings/noid-intelligence/environments': { label: 'Ambientes', parent: { label: 'NOID Intelligence', href: '/app/settings/noid-intelligence' } },
+  '/app/settings/noid-intelligence/hh-lab': { label: 'Headless Humanoid Lab', parent: { label: 'NOID Intelligence', href: '/app/settings/noid-intelligence' } },
 };
 
 export default function SettingsLayout() {
