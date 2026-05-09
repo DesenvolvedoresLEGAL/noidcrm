@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { z } from 'zod';
-import { extractEmail, extractPhone } from '@/lib/contactFormat';
+import { extractEmail, extractPhone, formatPersonName } from '@/lib/contactFormat';
 
 // JSONB structured types for emails and phones
 export interface ContactEmail {
@@ -164,12 +164,15 @@ export async function createContact(dto: unknown): Promise<Contact> {
     throw new Error('User must belong to an organization');
   }
 
+  const primeiro = formatPersonName(validated.primeiro_nome);
+  const ultimo = formatPersonName(validated.ultimo_nome || '');
+
   const { data, error } = await supabase
     .from('contacts')
     .insert([{
-      nome: validated.primeiro_nome + (validated.ultimo_nome ? ' ' + validated.ultimo_nome : ''),
-      primeiro_nome: validated.primeiro_nome,
-      ultimo_nome: validated.ultimo_nome || '',
+      nome: primeiro + (ultimo ? ' ' + ultimo : ''),
+      primeiro_nome: primeiro,
+      ultimo_nome: ultimo,
       account_id: validated.account_id,
       cargo: validated.cargo,
       departamento: validated.departamento || null,
@@ -189,9 +192,22 @@ export async function createContact(dto: unknown): Promise<Contact> {
 export async function updateContact(id: string, dto: unknown): Promise<Contact> {
   const validated = contactSchema.partial().parse(dto);
 
+  const patch: Record<string, unknown> = { ...validated };
+  if (typeof validated.primeiro_nome === 'string') {
+    patch.primeiro_nome = formatPersonName(validated.primeiro_nome);
+  }
+  if (typeof validated.ultimo_nome === 'string') {
+    patch.ultimo_nome = formatPersonName(validated.ultimo_nome);
+  }
+  if (patch.primeiro_nome !== undefined || patch.ultimo_nome !== undefined) {
+    const primeiro = (patch.primeiro_nome as string | undefined) ?? '';
+    const ultimo = (patch.ultimo_nome as string | undefined) ?? '';
+    patch.nome = (primeiro + (ultimo ? ' ' + ultimo : '')).trim();
+  }
+
   const { data, error } = await supabase
     .from('contacts')
-    .update(validated as any)
+    .update(patch as any)
     .eq('id', id)
     .select()
     .single();
