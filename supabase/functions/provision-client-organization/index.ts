@@ -18,6 +18,16 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Auth guard: internal-only — provisions orgs with service role.
+  const internalSecret = req.headers.get('x-internal-secret');
+  const expectedSecret = Deno.env.get('INTERNAL_WORKFLOW_SECRET');
+  if (!expectedSecret || internalSecret !== expectedSecret) {
+    return new Response(JSON.stringify({ success: false, error: 'Unauthorized' }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
   try {
     console.log('[provision-client-organization] Starting client provisioning...');
     
