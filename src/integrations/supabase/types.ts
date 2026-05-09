@@ -666,6 +666,155 @@ export type Database = {
           },
         ]
       }
+      action_executions: {
+        Row: {
+          action_key: string
+          actor_agent_id: string | null
+          actor_type: string
+          actor_user_id: string | null
+          after_state: Json | null
+          approval_id: string | null
+          before_state: Json | null
+          completed_at: string | null
+          created_at: string
+          duration_ms: number | null
+          entity_id: string | null
+          entity_type: string | null
+          error_message: string | null
+          id: string
+          input_payload: Json
+          organization_id: string | null
+          output_payload: Json | null
+          status: string
+          surface: Database["public"]["Enums"]["action_surface"]
+        }
+        Insert: {
+          action_key: string
+          actor_agent_id?: string | null
+          actor_type: string
+          actor_user_id?: string | null
+          after_state?: Json | null
+          approval_id?: string | null
+          before_state?: Json | null
+          completed_at?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          entity_id?: string | null
+          entity_type?: string | null
+          error_message?: string | null
+          id?: string
+          input_payload?: Json
+          organization_id?: string | null
+          output_payload?: Json | null
+          status?: string
+          surface?: Database["public"]["Enums"]["action_surface"]
+        }
+        Update: {
+          action_key?: string
+          actor_agent_id?: string | null
+          actor_type?: string
+          actor_user_id?: string | null
+          after_state?: Json | null
+          approval_id?: string | null
+          before_state?: Json | null
+          completed_at?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          entity_id?: string | null
+          entity_type?: string | null
+          error_message?: string | null
+          id?: string
+          input_payload?: Json
+          organization_id?: string | null
+          output_payload?: Json | null
+          status?: string
+          surface?: Database["public"]["Enums"]["action_surface"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "action_executions_action_key_fkey"
+            columns: ["action_key"]
+            isOneToOne: false
+            referencedRelation: "action_registry"
+            referencedColumns: ["action_key"]
+          },
+        ]
+      }
+      action_registry: {
+        Row: {
+          action_key: string
+          agent_executable: boolean
+          approval_required: boolean
+          approval_threshold: Json | null
+          audit_enabled: boolean
+          available_surfaces: Database["public"]["Enums"]["action_surface"][]
+          created_at: string
+          description: string
+          domain: string
+          executor_ref: string
+          executor_type: Database["public"]["Enums"]["action_executor_type"]
+          human_executable: boolean
+          input_schema: Json
+          is_active: boolean
+          metadata: Json
+          name: string
+          output_schema: Json
+          required_permission: string | null
+          required_role: string | null
+          risk_level: Database["public"]["Enums"]["action_risk_level"]
+          tags: string[] | null
+          updated_at: string
+        }
+        Insert: {
+          action_key: string
+          agent_executable?: boolean
+          approval_required?: boolean
+          approval_threshold?: Json | null
+          audit_enabled?: boolean
+          available_surfaces?: Database["public"]["Enums"]["action_surface"][]
+          created_at?: string
+          description: string
+          domain: string
+          executor_ref: string
+          executor_type: Database["public"]["Enums"]["action_executor_type"]
+          human_executable?: boolean
+          input_schema?: Json
+          is_active?: boolean
+          metadata?: Json
+          name: string
+          output_schema?: Json
+          required_permission?: string | null
+          required_role?: string | null
+          risk_level?: Database["public"]["Enums"]["action_risk_level"]
+          tags?: string[] | null
+          updated_at?: string
+        }
+        Update: {
+          action_key?: string
+          agent_executable?: boolean
+          approval_required?: boolean
+          approval_threshold?: Json | null
+          audit_enabled?: boolean
+          available_surfaces?: Database["public"]["Enums"]["action_surface"][]
+          created_at?: string
+          description?: string
+          domain?: string
+          executor_ref?: string
+          executor_type?: Database["public"]["Enums"]["action_executor_type"]
+          human_executable?: boolean
+          input_schema?: Json
+          is_active?: boolean
+          metadata?: Json
+          name?: string
+          output_schema?: Json
+          required_permission?: string | null
+          required_role?: string | null
+          risk_level?: Database["public"]["Enums"]["action_risk_level"]
+          tags?: string[] | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       activation_checklist: {
         Row: {
           completed_at: string | null
@@ -32853,6 +33002,17 @@ export type Database = {
       cleanup_expired_oauth_nonces: { Args: never; Returns: number }
       cleanup_expired_snapshots: { Args: never; Returns: number }
       cleanup_orphaned_playbook_runs: { Args: never; Returns: number }
+      complete_action_execution: {
+        Args: {
+          p_after_state?: Json
+          p_duration_ms?: number
+          p_error?: string
+          p_execution_id: string
+          p_output?: Json
+          p_status: string
+        }
+        Returns: boolean
+      }
       consume_volts: {
         Args: { p_action_type?: string; p_amount: number; p_org_id: string }
         Returns: Json
@@ -33990,6 +34150,16 @@ export type Database = {
         }
         Returns: string
       }
+      register_action_execution: {
+        Args: {
+          p_action_key: string
+          p_entity_id?: string
+          p_entity_type?: string
+          p_input?: Json
+          p_surface?: Database["public"]["Enums"]["action_surface"]
+        }
+        Returns: Json
+      }
       reject_hypothesis: {
         Args: { _hypothesis_id: string; _reason?: string }
         Returns: {
@@ -34158,6 +34328,9 @@ export type Database = {
     }
     Enums: {
       accelerator_tier_type: "NONE" | "BRONZE" | "SILVER" | "GOLD" | "DIAMOND"
+      action_executor_type: "edge_function" | "rpc" | "service" | "manual"
+      action_risk_level: "low" | "medium" | "high" | "critical"
+      action_surface: "web" | "slack" | "whatsapp" | "email" | "agent" | "api"
       app_role:
         | "admin"
         | "manager"
@@ -34479,6 +34652,9 @@ export const Constants = {
   public: {
     Enums: {
       accelerator_tier_type: ["NONE", "BRONZE", "SILVER", "GOLD", "DIAMOND"],
+      action_executor_type: ["edge_function", "rpc", "service", "manual"],
+      action_risk_level: ["low", "medium", "high", "critical"],
+      action_surface: ["web", "slack", "whatsapp", "email", "agent", "api"],
       app_role: ["admin", "manager", "sales", "cs", "owner", "platform_admin"],
       archetype_level_type: [
         "Entrada",
