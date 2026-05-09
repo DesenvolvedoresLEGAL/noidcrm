@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, createContext, useContext, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -44,16 +44,29 @@ import { toast } from '@/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
+// Cross-tab navigation: lets cards/banners deep-link into other tabs with a preset filter
+type LabNav = {
+  setTab: (t: string) => void;
+  registryPreset: 'risky_no_approval' | null;
+  setRegistryPreset: (p: 'risky_no_approval' | null) => void;
+  riskyKeys: string[];
+};
+const LabNavContext = createContext<LabNav | null>(null);
+const useLabNav = () => useContext(LabNavContext)!;
+
+
 function StatCard({
   label,
   value,
   hint,
   tone = 'default',
+  onClick,
 }: {
   label: string;
   value: number | string;
   hint?: string;
   tone?: 'default' | 'warning' | 'danger' | 'success';
+  onClick?: () => void;
 }) {
   const toneClass =
     tone === 'danger'
@@ -64,7 +77,11 @@ function StatCard({
           ? 'border-emerald-500/40'
           : '';
   return (
-    <Card className={toneClass}>
+    <Card
+      className={`${toneClass} ${onClick ? 'cursor-pointer hover:bg-muted/40 transition-colors' : ''}`}
+      onClick={onClick}
+      role={onClick ? 'button' : undefined}
+    >
       <CardContent className="p-4">
         <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
         <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
@@ -77,9 +94,11 @@ function StatCard({
 function GoNoGoBanner({
   status,
   blockers,
+  warnings,
 }: {
   status?: 'GO' | 'NO_GO';
-  blockers?: { code: string; message: string; count: number }[];
+  blockers?: { code: string; message: string; count: number; action_keys?: string[] }[];
+  warnings?: { code: string; message: string; count: number }[];
 }) {
   const isGo = status === 'GO';
   return (
@@ -104,19 +123,46 @@ function GoNoGoBanner({
           ? 'Camada Headless Humanoid validada. Esta organização está pronta para liberar novas superfícies controladas.'
           : 'Esta organização ainda não está pronta para Slack interativo, WhatsApp, MCP externo ou automações agentic. Corrija os blockers abaixo antes de liberar novas superfícies.'}
         {!isGo && blockers && blockers.length > 0 && (
-          <ul className="mt-3 space-y-1 text-sm">
+          <ul className="mt-3 space-y-2 text-sm">
             {blockers.map((b) => (
               <li key={b.code} className="flex items-start gap-2">
-                <AlertTriangle className="mt-0.5 h-4 w-4 text-destructive" />
-                <span>
-                  <span className="font-medium">{b.code}</span> · {b.message}{' '}
-                  <Badge variant="outline" className="ml-1">
-                    {b.count}
-                  </Badge>
-                </span>
+                <AlertTriangle className="mt-0.5 h-4 w-4 text-destructive shrink-0" />
+                <div>
+                  <div>
+                    <span className="font-medium">{b.code}</span> · {b.message}{' '}
+                    <Badge variant="outline" className="ml-1">{b.count}</Badge>
+                  </div>
+                  {b.action_keys && b.action_keys.length > 0 && (
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {b.action_keys.map((k) => (
+                        <Badge key={k} variant="destructive" className="font-mono text-[10px]">
+                          {k}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </li>
             ))}
           </ul>
+        )}
+        {warnings && warnings.length > 0 && (
+          <div className="mt-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1">
+              Avisos legados (não bloqueiam GO)
+            </p>
+            <ul className="space-y-1 text-sm">
+              {warnings.map((w) => (
+                <li key={w.code} className="flex items-start gap-2 text-muted-foreground">
+                  <Clock className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span>
+                    <span className="font-medium">{w.code}</span> · {w.message}{' '}
+                    <Badge variant="outline" className="ml-1">{w.count}</Badge>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
       </AlertDescription>
     </Alert>
@@ -125,6 +171,7 @@ function GoNoGoBanner({
 
 function SnapshotTab() {
   const { data: health, isLoading } = useHeadlessHumanoidHealth();
+  const nav = useLabNav();
 
   if (isLoading) {
     return (
@@ -154,7 +201,11 @@ function SnapshotTab() {
 
   return (
     <div className="space-y-6">
-      <GoNoGoBanner status={health.go_no_go_status} blockers={health.blockers} />
+      <GoNoGoBanner
+        status={health.go_no_go_status}
+        blockers={health.current_blockers ?? health.blockers}
+        warnings={health.legacy_warnings}
+      />
 
       <div>
         <h3 className="text-sm font-medium mb-2">Registry</h3>
@@ -191,6 +242,19 @@ function SnapshotTab() {
             label="Risco alto/crítico sem approval"
             value={health.risky_actions_without_approval ?? 0}
             tone={(health.risky_actions_without_approval ?? 0) > 0 ? 'danger' : 'success'}
+            hint={
+              (health.risky_actions_without_approval ?? 0) > 0
+                ? 'Clique para abrir no Action Registry'
+                : undefined
+            }
+            onClick={
+              (health.risky_actions_without_approval ?? 0) > 0
+                ? () => {
+                    nav.setRegistryPreset('risky_no_approval');
+                    nav.setTab('registry');
+                  }
+                : undefined
+            }
           />
         </div>
       </div>
@@ -228,9 +292,14 @@ function SnapshotTab() {
           <StatCard label="Aprovadas 24h" value={a.approved_24h} />
           <StatCard label="Rejeitadas 24h" value={a.rejected_24h} />
           <StatCard
-            label="Approvals sem execução"
-            value={health.orphan_approvals ?? 0}
-            tone={(health.orphan_approvals ?? 0) > 0 ? 'danger' : 'success'}
+            label="Approvals novas sem execução"
+            value={health.orphan_approvals_new ?? 0}
+            tone={(health.orphan_approvals_new ?? 0) > 0 ? 'danger' : 'success'}
+            hint={
+              (health.orphan_approvals_legacy ?? 0) > 0
+                ? `+${health.orphan_approvals_legacy} legadas (não bloqueiam)`
+                : undefined
+            }
           />
         </div>
       </div>
@@ -252,15 +321,36 @@ function SnapshotTab() {
 
 function RegistryTab() {
   const { data, isLoading } = useActionRegistry();
+  const { data: health } = useHeadlessHumanoidHealth();
+  const nav = useLabNav();
   const [riskFilter, setRiskFilter] = useState<string>('all');
   const [executorFilter, setExecutorFilter] = useState<string>('all');
   const [surfaceFilter, setSurfaceFilter] = useState<string>('all');
   const [approvalFilter, setApprovalFilter] = useState<string>('all');
   const [activeFilter, setActiveFilter] = useState<string>('active');
   const [search, setSearch] = useState('');
+  const [preset, setPreset] = useState<'none' | 'risky_no_approval'>('none');
+
+  useEffect(() => {
+    if (nav.registryPreset === 'risky_no_approval') {
+      setPreset('risky_no_approval');
+      nav.setRegistryPreset(null);
+    }
+  }, [nav.registryPreset, nav]);
+
+  const allowlist = health?.safe_allowlist ?? [];
+  const riskyKeys = new Set(health?.risky_action_keys ?? []);
 
   const filtered = useMemo(() => {
     return (data ?? []).filter((a: any) => {
+      if (preset === 'risky_no_approval') {
+        if (!a.is_active) return false;
+        if (!['high', 'critical'].includes(a.risk_level)) return false;
+        if (a.approval_required) return false;
+        if (allowlist.includes(a.action_key)) return false;
+        if (search && !a.action_key.toLowerCase().includes(search.toLowerCase())) return false;
+        return true;
+      }
       if (search && !a.action_key.toLowerCase().includes(search.toLowerCase())) return false;
       if (riskFilter !== 'all' && a.risk_level !== riskFilter) return false;
       if (executorFilter !== 'all' && a.executor_type !== executorFilter) return false;
@@ -276,13 +366,35 @@ function RegistryTab() {
       }
       return true;
     });
-  }, [data, search, riskFilter, executorFilter, surfaceFilter, approvalFilter, activeFilter]);
+  }, [data, search, riskFilter, executorFilter, surfaceFilter, approvalFilter, activeFilter, preset, allowlist]);
 
   if (isLoading) return <Skeleton className="h-96 w-full" />;
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          size="sm"
+          variant={preset === 'risky_no_approval' ? 'destructive' : 'outline'}
+          onClick={() =>
+            setPreset((p) => (p === 'risky_no_approval' ? 'none' : 'risky_no_approval'))
+          }
+        >
+          <ShieldAlert className="mr-1 h-4 w-4" />
+          Risco sem aprovação
+          {(health?.risky_actions_without_approval ?? 0) > 0 && (
+            <Badge variant="secondary" className="ml-2">
+              {health?.risky_actions_without_approval}
+            </Badge>
+          )}
+        </Button>
+        {preset === 'risky_no_approval' && (
+          <span className="text-xs text-muted-foreground">
+            Mostrando apenas ações high/critical ativas sem approval_required (allowlist excluída).
+          </span>
+        )}
+      </div>
+      <div className="flex flex-wrap gap-2" hidden={preset === 'risky_no_approval'}>
         <Input
           placeholder="Buscar action_key..."
           value={search}
@@ -363,7 +475,12 @@ function RegistryTab() {
             {filtered.map((a: any) => (
               <TableRow key={a.action_key}>
                 <TableCell>
-                  <div className="font-mono text-xs">{a.action_key}</div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-mono text-xs">{a.action_key}</span>
+                    {riskyKeys.has(a.action_key) && (
+                      <Badge variant="destructive" className="text-[10px]">bloqueia GO</Badge>
+                    )}
+                  </div>
                   <div className="text-xs text-muted-foreground">{a.name}</div>
                 </TableCell>
                 <TableCell>
@@ -521,121 +638,214 @@ function ExecutionsTab() {
 
 function ApprovalsTab() {
   const { data, isLoading } = useApprovalQueue();
+  const { data: health } = useHeadlessHumanoidHealth();
   const decide = useDecideApproval();
+  const [section, setSection] = useState<'active' | 'history' | 'legacy'>('active');
+  const [period, setPeriod] = useState<'7' | '30' | 'all'>('7');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected' | 'no_exec'>('all');
+
+  const labInstall = health?.lab_install_at ? new Date(health.lab_install_at).getTime() : 0;
+
+  const partitions = useMemo(() => {
+    const all = (data ?? []) as any[];
+    const cutoff = period === 'all' ? 0 : Date.now() - parseInt(period) * 86400000;
+    const inPeriod = (r: any) =>
+      period === 'all' ? true : new Date(r.requested_at).getTime() >= cutoff;
+
+    // Legacy: any pre-Lab approval OR any item from ai_agent_approval_queue without exec
+    const isLegacy = (r: any) =>
+      (!r.execution_id && new Date(r.requested_at).getTime() < labInstall) ||
+      (r.source === 'ai_agent_approval_queue' && !r.execution_id);
+
+    const active = all.filter(
+      (r) => !isLegacy(r) && r.status === 'pending' && inPeriod(r),
+    );
+    const history = all.filter(
+      (r) => !isLegacy(r) && ['approved', 'rejected', 'expired', 'cancelled'].includes(r.status) && inPeriod(r),
+    );
+    const legacy = all.filter(isLegacy);
+    return { active, history, legacy };
+  }, [data, period, labInstall]);
+
+  const visible = useMemo(() => {
+    let rows = partitions[section];
+    if (statusFilter === 'no_exec') rows = rows.filter((r: any) => !r.execution_id);
+    else if (statusFilter !== 'all') rows = rows.filter((r: any) => r.status === statusFilter);
+    return rows;
+  }, [partitions, section, statusFilter]);
 
   if (isLoading) return <Skeleton className="h-96" />;
+
   return (
-    <div className="rounded-md border">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Solicitada</TableHead>
-            <TableHead>action_key</TableHead>
-            <TableHead>Risco</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Execução</TableHead>
-            <TableHead>Decisão</TableHead>
-            <TableHead className="text-right">Ações</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {(data ?? []).length === 0 && (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="inline-flex rounded-md border bg-muted p-1">
+          {(
+            [
+              ['active', `Ativas (${partitions.active.length})`],
+              ['history', `Histórico (${partitions.history.length})`],
+              ['legacy', `Legados sem execução (${partitions.legacy.length})`],
+            ] as const
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              onClick={() => setSection(key)}
+              className={`px-3 py-1 text-xs rounded ${
+                section === key ? 'bg-background shadow-sm' : 'text-muted-foreground'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <Select value={period} onValueChange={(v) => setPeriod(v as any)}>
+          <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="7">Últimos 7 dias</SelectItem>
+            <SelectItem value="30">Últimos 30 dias</SelectItem>
+            <SelectItem value="all">Tudo</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
+          <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Status · todos</SelectItem>
+            <SelectItem value="pending">Pendentes</SelectItem>
+            <SelectItem value="approved">Aprovadas</SelectItem>
+            <SelectItem value="rejected">Rejeitadas</SelectItem>
+            <SelectItem value="no_exec">Sem execution_id</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {section === 'legacy' && partitions.legacy.length > 0 && (
+        <Alert>
+          <Clock className="h-4 w-4" />
+          <AlertTitle>Aprovações legadas</AlertTitle>
+          <AlertDescription>
+            São registros anteriores à implantação do Headless Humanoid Lab ou da fila paralela
+            ai_agent_approval_queue. Não bloqueiam GO; mostradas apenas para saneamento.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
             <TableRow>
-              <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                Sem aprovações registradas.
-              </TableCell>
+              <TableHead>Solicitada</TableHead>
+              <TableHead>action_key</TableHead>
+              <TableHead>Risco</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Execução</TableHead>
+              <TableHead>Decisão</TableHead>
+              <TableHead className="text-right">Ações</TableHead>
             </TableRow>
-          )}
-          {(data ?? []).map((r: any) => {
-            const isSandbox = r.action_key?.startsWith('sandbox.');
-            return (
-              <TableRow key={r.id}>
-                <TableCell className="text-xs">
-                  {formatDistanceToNow(new Date(r.requested_at), {
-                    addSuffix: true,
-                    locale: ptBR,
-                  })}
-                </TableCell>
-                <TableCell className="font-mono text-xs">{r.action_key}</TableCell>
-                <TableCell>
-                  <Badge variant={r.risk_level === 'critical' ? 'destructive' : 'secondary'}>
-                    {r.risk_level}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <Badge
-                    variant={
-                      r.status === 'pending'
-                        ? 'secondary'
-                        : r.status === 'approved'
-                          ? 'default'
-                          : 'destructive'
-                    }
-                  >
-                    {r.status}
-                  </Badge>
-                </TableCell>
-                <TableCell className="font-mono text-[10px]">
-                  {r.execution_id ? (
-                    r.execution_id.slice(0, 8)
-                  ) : (
-                    <span className="text-destructive">sem exec</span>
-                  )}
-                </TableCell>
-                <TableCell className="text-xs">{r.decision_reason ?? '—'}</TableCell>
-                <TableCell className="text-right">
-                  {r.status === 'pending' && isSandbox ? (
-                    <div className="flex justify-end gap-1">
-                      <Button
-                        size="sm"
-                        variant="default"
-                        onClick={() =>
-                          decide
-                            .mutateAsync({
-                              approvalId: r.id,
-                              decision: 'approved',
-                              reason: 'Sandbox approval via Lab',
-                            })
-                            .then(() => toast({ title: 'Aprovação registrada' }))
-                            .catch((e) =>
-                              toast({ title: 'Erro', description: e.message, variant: 'destructive' }),
-                            )
-                        }
-                      >
-                        Aprovar
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={() =>
-                          decide
-                            .mutateAsync({
-                              approvalId: r.id,
-                              decision: 'rejected',
-                              reason: 'Sandbox reject via Lab',
-                            })
-                            .then(() => toast({ title: 'Rejeição registrada' }))
-                            .catch((e) =>
-                              toast({ title: 'Erro', description: e.message, variant: 'destructive' }),
-                            )
-                        }
-                      >
-                        Rejeitar
-                      </Button>
-                    </div>
-                  ) : r.status === 'pending' ? (
-                    <span className="text-xs text-muted-foreground">
-                      Decisão real fora do Lab
-                    </span>
-                  ) : (
-                    <span className="text-xs text-muted-foreground">—</span>
-                  )}
+          </TableHeader>
+          <TableBody>
+            {visible.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                  Sem aprovações nesta visão.
                 </TableCell>
               </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
+            )}
+            {visible.map((r: any) => {
+              const isSandbox = r.action_key?.startsWith('sandbox.');
+              const isLegacyRow =
+                (!r.execution_id && new Date(r.requested_at).getTime() < labInstall) ||
+                (r.source === 'ai_agent_approval_queue' && !r.execution_id);
+              return (
+                <TableRow key={r.id}>
+                  <TableCell className="text-xs">
+                    {formatDistanceToNow(new Date(r.requested_at), {
+                      addSuffix: true,
+                      locale: ptBR,
+                    })}
+                  </TableCell>
+                  <TableCell className="font-mono text-xs">{r.action_key}</TableCell>
+                  <TableCell>
+                    <Badge variant={r.risk_level === 'critical' ? 'destructive' : 'secondary'}>
+                      {r.risk_level}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge
+                      variant={
+                        r.status === 'pending'
+                          ? 'secondary'
+                          : r.status === 'approved'
+                            ? 'default'
+                            : 'destructive'
+                      }
+                    >
+                      {r.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="font-mono text-[10px]">
+                    {r.execution_id ? (
+                      r.execution_id.slice(0, 8)
+                    ) : isLegacyRow ? (
+                      <Badge variant="outline" className="text-[10px]">legado sem execução</Badge>
+                    ) : (
+                      <span className="text-destructive">sem exec</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-xs">{r.decision_reason ?? '—'}</TableCell>
+                  <TableCell className="text-right">
+                    {r.status === 'pending' && isSandbox ? (
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          size="sm"
+                          variant="default"
+                          onClick={() =>
+                            decide
+                              .mutateAsync({
+                                approvalId: r.id,
+                                decision: 'approved',
+                                reason: 'Sandbox approval via Lab',
+                              })
+                              .then(() => toast({ title: 'Aprovação registrada' }))
+                              .catch((e) =>
+                                toast({ title: 'Erro', description: e.message, variant: 'destructive' }),
+                              )
+                          }
+                        >
+                          Aprovar
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() =>
+                            decide
+                              .mutateAsync({
+                                approvalId: r.id,
+                                decision: 'rejected',
+                                reason: 'Sandbox reject via Lab',
+                              })
+                              .then(() => toast({ title: 'Rejeição registrada' }))
+                              .catch((e) =>
+                                toast({ title: 'Erro', description: e.message, variant: 'destructive' }),
+                              )
+                          }
+                        >
+                          Rejeitar
+                        </Button>
+                      </div>
+                    ) : r.status === 'pending' ? (
+                      <span className="text-xs text-muted-foreground">
+                        Decisão real fora do Lab
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 }
@@ -862,6 +1072,15 @@ function AuditTab() {
 
 export default function HeadlessHumanoidLabPage() {
   const { isAdmin, isOwner, loading } = useCurrentOrganization();
+  const [tab, setTab] = useState<string>('snapshot');
+  const [registryPreset, setRegistryPreset] = useState<'risky_no_approval' | null>(null);
+  const { data: health } = useHeadlessHumanoidHealth();
+  const navValue: LabNav = {
+    setTab,
+    registryPreset,
+    setRegistryPreset,
+    riskyKeys: health?.risky_action_keys ?? [],
+  };
 
   if (loading) {
     return (
@@ -885,55 +1104,45 @@ export default function HeadlessHumanoidLabPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Headless Humanoid Lab</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Valide se o NOID RevenueOS está pronto para agentes, APIs, tools e superfícies externas.
-        </p>
+    <LabNavContext.Provider value={navValue}>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Headless Humanoid Lab</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Valide se o NOID RevenueOS está pronto para agentes, APIs, tools e superfícies externas.
+          </p>
+        </div>
+
+        <Tabs value={tab} onValueChange={setTab}>
+          <TabsList className="flex flex-wrap h-auto">
+            <TabsTrigger value="snapshot" className="gap-2">
+              <Activity className="h-4 w-4" /> Visão Geral
+            </TabsTrigger>
+            <TabsTrigger value="registry" className="gap-2">
+              <GitBranch className="h-4 w-4" /> Action Registry
+            </TabsTrigger>
+            <TabsTrigger value="executions" className="gap-2">
+              <ListChecks className="h-4 w-4" /> Execuções
+            </TabsTrigger>
+            <TabsTrigger value="approvals" className="gap-2">
+              <ShieldCheck className="h-4 w-4" /> Aprovações
+            </TabsTrigger>
+            <TabsTrigger value="tests" className="gap-2">
+              <PlayCircle className="h-4 w-4" /> Test Runner
+            </TabsTrigger>
+            <TabsTrigger value="audit" className="gap-2">
+              <Eye className="h-4 w-4" /> Auditoria
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="snapshot" className="mt-4"><SnapshotTab /></TabsContent>
+          <TabsContent value="registry" className="mt-4"><RegistryTab /></TabsContent>
+          <TabsContent value="executions" className="mt-4"><ExecutionsTab /></TabsContent>
+          <TabsContent value="approvals" className="mt-4"><ApprovalsTab /></TabsContent>
+          <TabsContent value="tests" className="mt-4"><TestRunnerTab /></TabsContent>
+          <TabsContent value="audit" className="mt-4"><AuditTab /></TabsContent>
+        </Tabs>
       </div>
-
-      <Tabs defaultValue="snapshot">
-        <TabsList className="flex flex-wrap h-auto">
-          <TabsTrigger value="snapshot" className="gap-2">
-            <Activity className="h-4 w-4" /> Visão Geral
-          </TabsTrigger>
-          <TabsTrigger value="registry" className="gap-2">
-            <GitBranch className="h-4 w-4" /> Action Registry
-          </TabsTrigger>
-          <TabsTrigger value="executions" className="gap-2">
-            <ListChecks className="h-4 w-4" /> Execuções
-          </TabsTrigger>
-          <TabsTrigger value="approvals" className="gap-2">
-            <ShieldCheck className="h-4 w-4" /> Aprovações
-          </TabsTrigger>
-          <TabsTrigger value="tests" className="gap-2">
-            <PlayCircle className="h-4 w-4" /> Test Runner
-          </TabsTrigger>
-          <TabsTrigger value="audit" className="gap-2">
-            <Eye className="h-4 w-4" /> Auditoria
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="snapshot" className="mt-4">
-          <SnapshotTab />
-        </TabsContent>
-        <TabsContent value="registry" className="mt-4">
-          <RegistryTab />
-        </TabsContent>
-        <TabsContent value="executions" className="mt-4">
-          <ExecutionsTab />
-        </TabsContent>
-        <TabsContent value="approvals" className="mt-4">
-          <ApprovalsTab />
-        </TabsContent>
-        <TabsContent value="tests" className="mt-4">
-          <TestRunnerTab />
-        </TabsContent>
-        <TabsContent value="audit" className="mt-4">
-          <AuditTab />
-        </TabsContent>
-      </Tabs>
-    </div>
+    </LabNavContext.Provider>
   );
 }

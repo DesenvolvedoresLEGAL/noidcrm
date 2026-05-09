@@ -9,12 +9,15 @@ export interface HealthBlocker {
   code: string;
   message: string;
   count: number;
+  action_keys?: string[];
 }
 
 export interface HeadlessHumanoidHealth {
   ok: boolean;
   organization_id?: string;
   generated_at?: string;
+  lab_install_at?: string;
+  safe_allowlist?: string[];
   registry_summary?: {
     total: number;
     active: number;
@@ -39,13 +42,19 @@ export interface HeadlessHumanoidHealth {
   orphan_executions?: number;
   failed_executions?: number;
   risky_actions_without_approval?: number;
+  risky_action_keys?: string[];
   actions_without_surface?: number;
   actions_without_role_high_risk?: number;
   actions_without_risk_level?: number;
   orphan_approvals?: number;
+  orphan_approvals_new?: number;
+  orphan_approvals_legacy?: number;
+  legacy_ai_agent_queue?: number;
   audit_events_24h?: number;
   go_no_go_status?: 'GO' | 'NO_GO';
   blockers?: HealthBlocker[];
+  current_blockers?: HealthBlocker[];
+  legacy_warnings?: HealthBlocker[];
   error?: string;
 }
 
@@ -209,6 +218,9 @@ export const SANDBOX_TESTS = [
   { key: 'approve_releases', name: 'Aprovar approval libera execução' },
   { key: 'reject_blocks', name: 'Rejeitar approval bloqueia execução' },
   { key: 'insufficient_role', name: 'Tentativa com role insuficiente é bloqueada' },
+  { key: 'governance_no_risky_without_approval', name: 'Nenhuma ação high/critical sem approval (allowlist)' },
+  { key: 'governance_mark_won_requires_approval', name: 'opportunity.mark_won exige aprovação' },
+  { key: 'governance_accept_internally_requires_approval', name: 'proposal.accept_internally exige aprovação' },
 ] as const;
 
 export function useTestRuns() {
