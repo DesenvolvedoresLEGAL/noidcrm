@@ -218,6 +218,9 @@ export const SANDBOX_TESTS = [
   { key: 'approve_releases', name: 'Aprovar approval libera execução' },
   { key: 'reject_blocks', name: 'Rejeitar approval bloqueia execução' },
   { key: 'insufficient_role', name: 'Tentativa com role insuficiente é bloqueada' },
+  { key: 'governance_no_risky_without_approval', name: 'Nenhuma ação high/critical sem approval (allowlist)' },
+  { key: 'governance_mark_won_requires_approval', name: 'opportunity.mark_won exige aprovação' },
+  { key: 'governance_accept_internally_requires_approval', name: 'proposal.accept_internally exige aprovação' },
 ] as const;
 
 export function useTestRuns() {
