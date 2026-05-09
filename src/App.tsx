@@ -883,6 +883,7 @@ const App = () => (
                 <Route path="/app/settings/noid-intelligence/mcp-registry" element={<McpRegistryPage />} />
                 <Route path="/app/settings/noid-intelligence/decision-rules" element={<DecisionRulesPage />} />
                 <Route path="/app/settings/noid-intelligence/learning" element={<LearningPerformancePage />} />
+                <Route path="/app/settings/noid-intelligence/hh-lab" element={<HeadlessHumanoidLabPage />} />
               </Route>
 
               {/* Individual System Settings Pages */}
