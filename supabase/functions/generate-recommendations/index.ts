@@ -68,6 +68,18 @@ function buildRecFromInsight(insight: any) {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+  const internalSecret = req.headers.get('x-internal-secret');
+  const expectedSecret = Deno.env.get('INTERNAL_WORKFLOW_SECRET');
+  const authHeader = req.headers.get('authorization');
+  const hasInternal = expectedSecret && internalSecret === expectedSecret;
+  const hasAuth = !!authHeader && authHeader.toLowerCase().startsWith('bearer ');
+  if (!hasInternal && !hasAuth) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
   try {
     const client = createClient(SUPABASE_URL, SERVICE_KEY);
     let body: { organization_id?: string; since?: string } = {};

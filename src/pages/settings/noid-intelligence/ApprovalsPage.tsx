@@ -17,6 +17,7 @@ import { useApprovalQueue, useApproveAction, useRejectAction } from '@/hooks/use
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { Label } from '@/components/ui/label';
+import { sanitizeHtml } from '@/lib/sanitizeHtml';
 
 export default function ApprovalsPage() {
   const { profile } = useCurrentUser();
@@ -164,7 +165,7 @@ export default function ApprovalsPage() {
                         {email?.body_html && (
                           <div className="border rounded-lg p-3 bg-muted/30">
                             <p className="text-xs font-medium text-muted-foreground mb-2">Preview do email:</p>
-                            <div className="text-sm prose prose-sm max-w-none dark:prose-invert" dangerouslySetInnerHTML={{ __html: email.body_html }} />
+                            <div className="text-sm prose prose-sm max-w-none dark:prose-invert" dangerouslySetInnerHTML={{ __html: sanitizeHtml(email.body_html) }} />
                           </div>
                         )}
 
