@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useRunDetails } from '@/hooks/useAgentExecution';
 import { EXECUTION_STATUS_LABELS, EXECUTION_STATUS_COLORS, DELIVERY_STATUS_LABELS } from '@/types/ai-agents';
 import type { ExecutionRunStatus } from '@/types/ai-agents';
+import { sanitizeHtml } from '@/lib/sanitizeHtml';
 
 export default function RunDetailPage() {
   const { runId } = useParams<{ runId: string }>();
@@ -156,7 +157,7 @@ export default function RunDetailPage() {
               </CardHeader>
               <CardContent>
                 {email.body_html ? (
-                  <div className="prose prose-sm max-w-none dark:prose-invert border rounded p-3" dangerouslySetInnerHTML={{ __html: email.body_html }} />
+                  <div className="prose prose-sm max-w-none dark:prose-invert border rounded p-3" dangerouslySetInnerHTML={{ __html: sanitizeHtml(email.body_html) }} />
                 ) : (
                   <p className="text-sm whitespace-pre-wrap">{email.body_text}</p>
                 )}
