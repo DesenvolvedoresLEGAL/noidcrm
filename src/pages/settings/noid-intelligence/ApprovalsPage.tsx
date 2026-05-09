@@ -18,6 +18,8 @@ import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { Label } from '@/components/ui/label';
 import { sanitizeHtml } from '@/lib/sanitizeHtml';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useUnifiedApprovals, useDecideApproval } from '@/hooks/useGovernance';
 
 export default function ApprovalsPage() {
   const { profile } = useCurrentUser();
