@@ -242,6 +242,19 @@ function SnapshotTab() {
             label="Risco alto/crítico sem approval"
             value={health.risky_actions_without_approval ?? 0}
             tone={(health.risky_actions_without_approval ?? 0) > 0 ? 'danger' : 'success'}
+            hint={
+              (health.risky_actions_without_approval ?? 0) > 0
+                ? 'Clique para abrir no Action Registry'
+                : undefined
+            }
+            onClick={
+              (health.risky_actions_without_approval ?? 0) > 0
+                ? () => {
+                    nav.setRegistryPreset('risky_no_approval');
+                    nav.setTab('registry');
+                  }
+                : undefined
+            }
           />
         </div>
       </div>
@@ -279,9 +292,14 @@ function SnapshotTab() {
           <StatCard label="Aprovadas 24h" value={a.approved_24h} />
           <StatCard label="Rejeitadas 24h" value={a.rejected_24h} />
           <StatCard
-            label="Approvals sem execução"
-            value={health.orphan_approvals ?? 0}
-            tone={(health.orphan_approvals ?? 0) > 0 ? 'danger' : 'success'}
+            label="Approvals novas sem execução"
+            value={health.orphan_approvals_new ?? 0}
+            tone={(health.orphan_approvals_new ?? 0) > 0 ? 'danger' : 'success'}
+            hint={
+              (health.orphan_approvals_legacy ?? 0) > 0
+                ? `+${health.orphan_approvals_legacy} legadas (não bloqueiam)`
+                : undefined
+            }
           />
         </div>
       </div>
