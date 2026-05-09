@@ -171,6 +171,7 @@ function GoNoGoBanner({
 
 function SnapshotTab() {
   const { data: health, isLoading } = useHeadlessHumanoidHealth();
+  const nav = useLabNav();
 
   if (isLoading) {
     return (
@@ -200,7 +201,11 @@ function SnapshotTab() {
 
   return (
     <div className="space-y-6">
-      <GoNoGoBanner status={health.go_no_go_status} blockers={health.blockers} />
+      <GoNoGoBanner
+        status={health.go_no_go_status}
+        blockers={health.current_blockers ?? health.blockers}
+        warnings={health.legacy_warnings}
+      />
 
       <div>
         <h3 className="text-sm font-medium mb-2">Registry</h3>
