@@ -475,7 +475,12 @@ function RegistryTab() {
             {filtered.map((a: any) => (
               <TableRow key={a.action_key}>
                 <TableCell>
-                  <div className="font-mono text-xs">{a.action_key}</div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-mono text-xs">{a.action_key}</span>
+                    {riskyKeys.has(a.action_key) && (
+                      <Badge variant="destructive" className="text-[10px]">bloqueia GO</Badge>
+                    )}
+                  </div>
                   <div className="text-xs text-muted-foreground">{a.name}</div>
                 </TableCell>
                 <TableCell>
