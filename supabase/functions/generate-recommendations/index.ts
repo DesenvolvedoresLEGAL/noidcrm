@@ -80,6 +80,7 @@ Deno.serve(async (req) => {
     });
   }
 
+  try {
     const client = createClient(SUPABASE_URL, SERVICE_KEY);
     let body: { organization_id?: string; since?: string } = {};
     try { body = await req.json(); } catch (_) { /* */ }
