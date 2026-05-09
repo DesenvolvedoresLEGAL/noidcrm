@@ -1104,55 +1104,45 @@ export default function HeadlessHumanoidLabPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Headless Humanoid Lab</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Valide se o NOID RevenueOS está pronto para agentes, APIs, tools e superfícies externas.
-        </p>
+    <LabNavContext.Provider value={navValue}>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Headless Humanoid Lab</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Valide se o NOID RevenueOS está pronto para agentes, APIs, tools e superfícies externas.
+          </p>
+        </div>
+
+        <Tabs value={tab} onValueChange={setTab}>
+          <TabsList className="flex flex-wrap h-auto">
+            <TabsTrigger value="snapshot" className="gap-2">
+              <Activity className="h-4 w-4" /> Visão Geral
+            </TabsTrigger>
+            <TabsTrigger value="registry" className="gap-2">
+              <GitBranch className="h-4 w-4" /> Action Registry
+            </TabsTrigger>
+            <TabsTrigger value="executions" className="gap-2">
+              <ListChecks className="h-4 w-4" /> Execuções
+            </TabsTrigger>
+            <TabsTrigger value="approvals" className="gap-2">
+              <ShieldCheck className="h-4 w-4" /> Aprovações
+            </TabsTrigger>
+            <TabsTrigger value="tests" className="gap-2">
+              <PlayCircle className="h-4 w-4" /> Test Runner
+            </TabsTrigger>
+            <TabsTrigger value="audit" className="gap-2">
+              <Eye className="h-4 w-4" /> Auditoria
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="snapshot" className="mt-4"><SnapshotTab /></TabsContent>
+          <TabsContent value="registry" className="mt-4"><RegistryTab /></TabsContent>
+          <TabsContent value="executions" className="mt-4"><ExecutionsTab /></TabsContent>
+          <TabsContent value="approvals" className="mt-4"><ApprovalsTab /></TabsContent>
+          <TabsContent value="tests" className="mt-4"><TestRunnerTab /></TabsContent>
+          <TabsContent value="audit" className="mt-4"><AuditTab /></TabsContent>
+        </Tabs>
       </div>
-
-      <Tabs defaultValue="snapshot">
-        <TabsList className="flex flex-wrap h-auto">
-          <TabsTrigger value="snapshot" className="gap-2">
-            <Activity className="h-4 w-4" /> Visão Geral
-          </TabsTrigger>
-          <TabsTrigger value="registry" className="gap-2">
-            <GitBranch className="h-4 w-4" /> Action Registry
-          </TabsTrigger>
-          <TabsTrigger value="executions" className="gap-2">
-            <ListChecks className="h-4 w-4" /> Execuções
-          </TabsTrigger>
-          <TabsTrigger value="approvals" className="gap-2">
-            <ShieldCheck className="h-4 w-4" /> Aprovações
-          </TabsTrigger>
-          <TabsTrigger value="tests" className="gap-2">
-            <PlayCircle className="h-4 w-4" /> Test Runner
-          </TabsTrigger>
-          <TabsTrigger value="audit" className="gap-2">
-            <Eye className="h-4 w-4" /> Auditoria
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="snapshot" className="mt-4">
-          <SnapshotTab />
-        </TabsContent>
-        <TabsContent value="registry" className="mt-4">
-          <RegistryTab />
-        </TabsContent>
-        <TabsContent value="executions" className="mt-4">
-          <ExecutionsTab />
-        </TabsContent>
-        <TabsContent value="approvals" className="mt-4">
-          <ApprovalsTab />
-        </TabsContent>
-        <TabsContent value="tests" className="mt-4">
-          <TestRunnerTab />
-        </TabsContent>
-        <TabsContent value="audit" className="mt-4">
-          <AuditTab />
-        </TabsContent>
-      </Tabs>
-    </div>
+    </LabNavContext.Provider>
   );
 }
