@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Boxes, Construction } from 'lucide-react';
+import { Layout } from '@/components/Layout';
 import { PageContainer } from '@/components/ui/page-container';
 import { PageHeader } from '@/components/ui/page-header';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -23,14 +24,17 @@ export default function Inventory() {
 
   if (!canAccess) {
     return (
-      <AccessDenied
-        title="Acesso restrito"
-        description="O módulo Inventário está disponível apenas para perfis operacionais (Owner, Admin ou Operacional)."
-      />
+      <Layout pageTitle="Inventário">
+        <AccessDenied
+          title="Acesso restrito"
+          description="O módulo Inventário está disponível apenas para perfis operacionais (Owner, Admin ou Operacional)."
+        />
+      </Layout>
     );
   }
 
   return (
+    <Layout pageTitle="Inventário">
     <PageContainer>
       <PageHeader
         icon={Boxes}
@@ -70,5 +74,6 @@ export default function Inventory() {
         </TabsContent>
       </Tabs>
     </PageContainer>
+    </Layout>
   );
 }
