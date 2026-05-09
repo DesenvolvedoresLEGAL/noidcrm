@@ -1072,6 +1072,15 @@ function AuditTab() {
 
 export default function HeadlessHumanoidLabPage() {
   const { isAdmin, isOwner, loading } = useCurrentOrganization();
+  const [tab, setTab] = useState<string>('snapshot');
+  const [registryPreset, setRegistryPreset] = useState<'risky_no_approval' | null>(null);
+  const { data: health } = useHeadlessHumanoidHealth();
+  const navValue: LabNav = {
+    setTab,
+    registryPreset,
+    setRegistryPreset,
+    riskyKeys: health?.risky_action_keys ?? [],
+  };
 
   if (loading) {
     return (
