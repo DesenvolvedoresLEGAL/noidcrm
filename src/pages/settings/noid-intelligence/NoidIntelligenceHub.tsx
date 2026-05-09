@@ -108,6 +108,15 @@ const hubItems = [
     available: true,
     badge: 'Learning',
   },
+  {
+    id: 'hh-lab',
+    title: 'Headless Humanoid Lab',
+    description: 'Valide a camada agent-ready (registry, approvals, audit)',
+    icon: FlaskConical,
+    path: '/app/settings/noid-intelligence/hh-lab',
+    available: true,
+    badge: 'Lab',
+  },
 ];
 
 export default function NoidIntelligenceHub() {
