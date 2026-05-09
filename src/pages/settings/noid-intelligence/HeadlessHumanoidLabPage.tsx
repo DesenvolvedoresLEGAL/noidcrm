@@ -372,7 +372,29 @@ function RegistryTab() {
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          size="sm"
+          variant={preset === 'risky_no_approval' ? 'destructive' : 'outline'}
+          onClick={() =>
+            setPreset((p) => (p === 'risky_no_approval' ? 'none' : 'risky_no_approval'))
+          }
+        >
+          <ShieldAlert className="mr-1 h-4 w-4" />
+          Risco sem aprovação
+          {(health?.risky_actions_without_approval ?? 0) > 0 && (
+            <Badge variant="secondary" className="ml-2">
+              {health?.risky_actions_without_approval}
+            </Badge>
+          )}
+        </Button>
+        {preset === 'risky_no_approval' && (
+          <span className="text-xs text-muted-foreground">
+            Mostrando apenas ações high/critical ativas sem approval_required (allowlist excluída).
+          </span>
+        )}
+      </div>
+      <div className="flex flex-wrap gap-2" hidden={preset === 'risky_no_approval'}>
         <Input
           placeholder="Buscar action_key..."
           value={search}
