@@ -115,5 +115,7 @@ export async function recalculateAccountRFM(p: {
     p_period_end: p.periodEnd,
   });
   if (error) throw error;
-  return Number(data ?? 0);
+  const payload = (data ?? null) as { success?: boolean; processed_accounts?: number } | number | null;
+  if (typeof payload === 'number') return payload;
+  return Number(payload?.processed_accounts ?? 0);
 }
