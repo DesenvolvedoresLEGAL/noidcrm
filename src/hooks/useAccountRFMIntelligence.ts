@@ -33,14 +33,19 @@ export function useRecalculateAccountRFM() {
       qc.invalidateQueries({ queryKey: ['account-rfm-intelligence'] });
       toast({
         title: 'RFM recalculado',
-        description: `${count} conta(s) atualizadas.`,
+        description:
+          count > 0
+            ? `${count} conta(s) atualizada(s).`
+            : 'Nenhuma conta com receita fechada no período.',
       });
     },
     onError: (err: Error) => {
+      console.error('[recalculateAccountRFM] error:', err);
       toast({
         variant: 'destructive',
         title: 'Erro ao recalcular RFM',
-        description: err.message,
+        description:
+          'Não foi possível recalcular o RFM. Verifique se existem vendas fechadas no período ou consulte os logs.',
       });
     },
   });

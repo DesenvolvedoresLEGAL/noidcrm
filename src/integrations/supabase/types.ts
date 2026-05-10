@@ -34432,7 +34432,7 @@ export type Database = {
           p_period_end: string
           p_period_start: string
         }
-        Returns: number
+        Returns: Json
       }
       recalculate_email_kb_quality: {
         Args: { p_opportunity_id: string }
