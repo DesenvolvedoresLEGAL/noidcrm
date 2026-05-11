@@ -668,9 +668,15 @@ function AddItemForm({ products, measurementUnits, onAdd, onCancel }: AddItemFor
     onAdd(customItem);
   };
 
-  // Calculate preview total
-  const previewTotal = (customItem.unit_price || 0) * (customItem.quantity || 1) * (1 - (customItem.discount_percent || 0) / 100);
   const isRecurring = customItem.billing_type === 'recurring';
+  const isPointDay = customItem.billing_type === 'point_day';
+  // Calculate preview total
+  const previewTotal = isPointDay
+    ? Math.max(1, customItem.quantity_points || 1) *
+      Math.max(1, customItem.billing_days || 1) *
+      (customItem.unit_price_point_day || 0) *
+      (1 - (customItem.discount_percent || 0) / 100)
+    : (customItem.unit_price || 0) * (customItem.quantity || 1) * (1 - (customItem.discount_percent || 0) / 100);
 
   return (
     <div className="space-y-4">
