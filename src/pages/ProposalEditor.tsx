@@ -254,10 +254,16 @@ export default function ProposalEditor() {
   });
 
   // Load opportunity data
+  // IMPORTANT: use a distinct query key from `opportunityKeys.detail` because
+  // `getOpportunity` returns a slimmer shape (without `stages[]`) than
+  // `useOpportunityDetails`. Sharing the same key would overwrite the cached
+  // detail and make the pipeline chevron bar in OpportunityDetail disappear
+  // until a hard refresh.
+  const opportunityCtxId = opportunityId || proposalData?.opportunity_id;
   const { data: opportunityData } = useQuery({
-    queryKey: opportunityKeys.detail(opportunityId || proposalData?.opportunity_id),
-    queryFn: () => getOpportunity(opportunityId || proposalData?.opportunity_id!),
-    enabled: !!(opportunityId || proposalData?.opportunity_id),
+    queryKey: [...opportunityKeys.detail(opportunityCtxId), 'proposal-editor-context'],
+    queryFn: () => getOpportunity(opportunityCtxId!),
+    enabled: !!opportunityCtxId,
   });
 
   // Validate pipeline type - proposals only allowed in sales pipelines
