@@ -245,11 +245,15 @@ async function processJob(supabase: any, job: any) {
       .single();
     if (org?.primary_color) primaryColor = org.primary_color;
 
-    // Use total_amount (which already includes payment term discount) as the source of truth
-    // Fallback: if total_amount not set, compute from value
-    const proposalValue = parseFloat(proposal.total_amount || proposal.value || "0");
+    // Source of truth for the COMMERCIAL APPROVED value:
+    // dynamic pricing (when active) > total_amount > value.
+    const approved = resolveApprovedProposalAmount(proposal as any);
+    const proposalValue = approved.amount;
     const totalValue = proposalValue.toLocaleString("pt-BR", { minimumFractionDigits: 2 });
     const proposalTitle = proposal.title || proposal.proposal_number || "Proposta";
+    console.log(
+      `[post-acceptance-effects] Approved value for ${proposal_id}: ${proposalValue} (source=${approved.source}, base=${approved.base_amount}, dyn=${approved.dynamic_amount})`,
+    );
 
     // ===== STAGE 1: NOTIFICATIONS (per-stage idempotency) =====
     let notificationsCreated = 0;
