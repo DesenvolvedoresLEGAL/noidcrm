@@ -370,7 +370,7 @@ Deno.serve(async (req) => {
     let normalized: NormalizedProfile = cleanNormalized({});
     if (totalContentLength > 50 && OPENAI_API_KEY) {
       try {
-        const analysisResp = await fetch("https://api.openai.com/v1/chat/completions", {
+        const analysisResp = await fetchWithTimeout("https://api.openai.com/v1/chat/completions", {
           method: "POST",
           headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
           body: JSON.stringify({
