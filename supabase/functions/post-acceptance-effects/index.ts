@@ -153,7 +153,9 @@ async function processJob(supabase: any, job: any) {
     // ===== LOAD DATA =====
     const { data: proposal, error: proposalError } = await supabase
       .from("proposals")
-      .select("id, title, proposal_number, value, organization_id, total_amount, acceptor_name, opportunity_id, client_name")
+      .select(
+        `id, title, proposal_number, organization_id, acceptor_name, opportunity_id, client_name, ${APPROVED_VALUE_SELECT_COLUMNS}`,
+      )
       .eq("id", proposal_id)
       .single();
 
