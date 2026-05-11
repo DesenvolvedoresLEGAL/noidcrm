@@ -780,12 +780,17 @@ function AddItemForm({ products, measurementUnits, onAdd, onCancel }: AddItemFor
                       {product.billing_type === 'recurring' && (
                         <Badge className="bg-emerald-500 text-white text-[10px] px-1.5 py-0">MRR</Badge>
                       )}
+                      {product.billing_type === 'point_day' && (
+                        <Badge className="bg-sky-500 text-white text-[10px] px-1.5 py-0">PT-DIA</Badge>
+                      )}
                       <div className="flex flex-col">
                         <span>{product.name}</span>
                         <span className="text-xs text-muted-foreground">
-                          {product.billing_type === 'recurring' 
+                          {product.billing_type === 'recurring'
                             ? `R$ ${(product.monthly_price || product.price || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês`
-                            : `R$ ${(product.price || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                            : product.billing_type === 'point_day'
+                              ? `R$ ${(product.default_unit_price_point_day || product.price || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/ponto-dia`
+                              : `R$ ${(product.price || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
                           }
                         </span>
                       </div>
