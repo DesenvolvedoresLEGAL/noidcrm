@@ -25,6 +25,11 @@ import {
 import { ITEM_KIND_OPTIONS } from '@/lib/operations/inventoryLabels';
 import { useInventoryCategoryMutations } from '@/hooks/operations/useInventoryCategories';
 import type { InventoryCategory } from '@/services/operations/inventoryCategories';
+import {
+  EQUIPMENT_PROFILE_OPTIONS,
+  getEquipmentProfile,
+  type EquipmentProfile,
+} from '@/lib/operations/inventoryEquipmentProfile';
 
 const schema = z.object({
   name: z
@@ -36,6 +41,7 @@ const schema = z.object({
   item_kind: z.enum(['serialized', 'quantity'], {
     required_error: 'Selecione o tipo padrão',
   }),
+  equipment_profile: z.enum(['generic', 'router', 'sim_card']).default('generic'),
   sort_order: z
     .number({ invalid_type_error: 'Informe um número inteiro' })
     .int('Apenas números inteiros')
