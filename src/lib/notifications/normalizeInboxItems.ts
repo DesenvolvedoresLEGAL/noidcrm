@@ -13,6 +13,9 @@ function categorize(type: string): 'activities' | 'proposals' | 'conversations' 
   if (!type) return 'all';
   if (type.startsWith('activity_')) return 'activities';
   if (type.startsWith('proposal_')) return 'proposals';
+  // Won deals are surfaced in the Propostas tab so reps see closed business
+  // alongside the proposal lifecycle events that produced them.
+  if (type === 'deal_won' || type === 'team_deal_won') return 'proposals';
   if (type === 'client_replied' || type === 'email_reply_received') return 'conversations';
   return 'all';
 }
