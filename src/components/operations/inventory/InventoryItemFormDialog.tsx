@@ -65,29 +65,50 @@ const STATUSES = [
   'lost',
 ] as const;
 
-const schema = z.object({
-  name: z.string().trim().min(2, 'Mínimo 2 caracteres').max(120, 'Máximo 120 caracteres'),
-  description: z.string().trim().max(500, 'Máximo 500 caracteres').optional().or(z.literal('')),
-  category_id: z.string().uuid('Selecione uma categoria.'),
-  family_id: z.string().uuid().nullable().optional(),
-  operational_type: z.enum([
-    'equipment','accessory','part','consumable','logical_kit','infrastructure','tool','other',
-  ]),
-  criticality: z.enum(['low','medium','high','critical']),
-  location_id: z.string().uuid('Selecione um local.'),
-  status: z.enum(STATUSES),
-  asset_code: z.string().trim().max(80, 'Máximo 80 caracteres').optional().or(z.literal('')),
-  serial_number: z
-    .string()
-    .trim()
-    .max(120, 'Máximo 120 caracteres')
-    .optional()
-    .or(z.literal('')),
-  brand: z.string().trim().max(80, 'Máximo 80 caracteres').optional().or(z.literal('')),
-  model: z.string().trim().max(120, 'Máximo 120 caracteres').optional().or(z.literal('')),
-  notes: z.string().trim().max(1000, 'Máximo 1000 caracteres').optional().or(z.literal('')),
-  technical_specs: technicalSpecsArraySchema,
-});
+const schema = z
+  .object({
+    name: z.string().trim().min(2, 'Mínimo 2 caracteres').max(120, 'Máximo 120 caracteres'),
+    description: z.string().trim().max(500, 'Máximo 500 caracteres').optional().or(z.literal('')),
+    category_id: z.string().uuid('Selecione uma categoria.'),
+    family_id: z.string().uuid().nullable().optional(),
+    operational_type: z.enum([
+      'equipment','accessory','part','consumable','logical_kit','infrastructure','tool','other',
+    ]),
+    criticality: z.enum(['low','medium','high','critical']),
+    location_id: z.string().uuid('Selecione um local.'),
+    status: z.enum(STATUSES),
+    asset_code: z.string().trim().max(80, 'Máximo 80 caracteres').optional().or(z.literal('')),
+    serial_number: z
+      .string()
+      .trim()
+      .max(120, 'Máximo 120 caracteres')
+      .optional()
+      .or(z.literal('')),
+    brand: z.string().trim().max(80, 'Máximo 80 caracteres').optional().or(z.literal('')),
+    model: z.string().trim().max(120, 'Máximo 120 caracteres').optional().or(z.literal('')),
+    notes: z.string().trim().max(1000, 'Máximo 1000 caracteres').optional().or(z.literal('')),
+    technical_specs: technicalSpecsArraySchema,
+    equipment_profile: z.enum(['generic', 'router', 'sim_card']).default('generic'),
+    router_factory: routerFactorySchema.partial().optional(),
+    sim_card_factory: simCardFactorySchema.partial().optional(),
+  })
+  .superRefine((val, ctx) => {
+    if (val.equipment_profile === 'router') {
+      const r = routerFactorySchema.safeParse(val.router_factory ?? {});
+      if (!r.success) {
+        for (const issue of r.error.issues) {
+          ctx.addIssue({ ...issue, path: ['router_factory', ...issue.path] });
+        }
+      }
+    } else if (val.equipment_profile === 'sim_card') {
+      const r = simCardFactorySchema.safeParse(val.sim_card_factory ?? {});
+      if (!r.success) {
+        for (const issue of r.error.issues) {
+          ctx.addIssue({ ...issue, path: ['sim_card_factory', ...issue.path] });
+        }
+      }
+    }
+  });
 
 type FormData = z.infer<typeof schema>;
 
