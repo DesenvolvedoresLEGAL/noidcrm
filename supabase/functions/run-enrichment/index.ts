@@ -537,7 +537,7 @@ ${scrapedContent.slice(0, 18000)}`,
     let briefData: any = null;
     if (companyProfile && OPENAI_API_KEY) {
       try {
-        const briefResp = await fetch("https://api.openai.com/v1/chat/completions", {
+        const briefResp = await fetchWithTimeout("https://api.openai.com/v1/chat/completions", {
           method: "POST",
           headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
           body: JSON.stringify({
