@@ -141,12 +141,12 @@ All colors MUST be HSL.
     --shadow-glow: 0 0 24px hsl(235 91% 62% / 0.22);
 
     --sidebar-background: 0 0% 4%;
-    --sidebar-foreground: 240 14% 78%;
+    --sidebar-foreground: 240 14% 72%;
     --sidebar-primary: 235 91% 62%;
     --sidebar-primary-foreground: 240 14% 96%;
-    --sidebar-accent: 235 91% 62%;
-    --sidebar-accent-foreground: 240 14% 96%;
-    --sidebar-border: 230 40% 18%;
+    --sidebar-accent: 235 60% 14%;
+    --sidebar-accent-foreground: 235 91% 78%;
+    --sidebar-border: 230 40% 16%;
     --sidebar-ring: 235 91% 62%;
   }
 }
