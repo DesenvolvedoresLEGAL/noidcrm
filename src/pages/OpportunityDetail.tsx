@@ -447,6 +447,7 @@ export default function OpportunityDetail() {
                       <OpportunityProposalsTab 
                         opportunityId={opportunity.id} 
                         pipelineType={opportunity.pipeline?.pipeline_type}
+                        onNavigateToAnalytics={() => setActiveTab('analytics')}
                       />
                     </TabsContent>
                   )}
