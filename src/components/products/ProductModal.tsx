@@ -425,6 +425,14 @@ export function ProductModal({ open, onOpenChange, product }: ProductModalProps)
                       <strong>Cálculo:</strong> pontos × diárias × preço por ponto-dia.
                       Estoque reservado considera apenas a quantidade de pontos durante o período do evento.
                     </div>
+                    {organization?.id && (
+                      <ProductBOMEditor
+                        organizationId={organization.id}
+                        productId={product?.id ?? null}
+                        value={bomItems}
+                        onChange={setBomItems}
+                      />
+                    )}
                   </div>
                 ) : billingType === 'one_time' ? (
                   /* AVULSO FIELDS */
