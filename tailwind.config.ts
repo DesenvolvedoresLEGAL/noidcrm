@@ -31,6 +31,11 @@ export default {
       'mouse': { 'raw': '(hover: hover)' },
     },
     extend: {
+      fontFamily: {
+        sans: ['Satoshi', 'ui-sans-serif', 'system-ui', '-apple-system', 'sans-serif'],
+        display: ['"Space Grotesk"', 'Satoshi', 'ui-sans-serif', 'sans-serif'],
+        mono: ['"IBM Plex Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -180,6 +185,8 @@ export default {
       },
       backgroundImage: {
         'gradient-primary': 'var(--gradient-primary)',
+        'gradient-neural': 'var(--gradient-neural)',
+        'gradient-cognitive': 'var(--gradient-cognitive)',
         'gradient-subtle': 'var(--gradient-subtle)',
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
         'shimmer': 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.1) 50%, transparent 100%)',

@@ -1,90 +1,100 @@
-## Causa raiz
+## Objetivo
 
-A RPC `public.recalculate_account_rfm` agrega `MAX(o.owner_user_id)` (linha 174 da definição), e `owner_user_id` é `uuid`. Postgres não tem `max(uuid)`, daí o erro `function max(uuid) does not exist` ao clicar em "Recalcular RFM".
+Aplicar a nova identidade visual do HUMANOID — **Neural Cognition Spectrum™** (paleta) e **Cognitive Typography System™** (tipografia) — como base de design tokens do NOID RevenueOS, sem refatorar componentes individuais. Tudo flui pelos tokens semânticos, então a mudança propaga automaticamente.
 
-Demais pontos do briefing já estão OK no estado atual:
-- Assinatura `(p_organization_id uuid, p_period_start date, p_period_end date)` ✅
-- Frontend chama com `p_organization_id / p_period_start / p_period_end` (`src/services/crm/account-rfm.ts`) ✅
-- `SECURITY DEFINER` + `SET search_path = public` ✅
-- Upsert por `(organization_id, account_id, period_start, period_end)` ✅
-- Limpeza de snapshots obsoletos ✅
+## Escopo
 
-Faltando: substituir `MAX(uuid)`, retornar JSON amigável (hoje retorna `int`), garantir grants, e ajustar tratamento de erro/refetch no frontend.
+**Dentro:**
+- Atualizar `src/index.css` (tokens HSL, gradientes, sombras, fontes, sidebar)
+- Atualizar `tailwind.config.ts` (fontFamily, novos tokens auxiliares opcionais: `cortex`, `deep-neural`, `indigo`, `quantum-gold`, `mind-white`, `electric-cyan`)
+- Carregar fontes em `index.html` (Space Grotesk, Satoshi, IBM Plex Mono via CDN/Fontsource)
+- Atualizar `meta theme-color` para Indigo `#3742FF`
 
-## Plano
+**Fora:**
+- Reescrita de componentes existentes
+- Mudança de estrutura de páginas
+- Lógica de negócio
+- Páginas públicas (landing) ficam intactas — só herdam tokens
 
-### 1. Migration — corrigir `recalculate_account_rfm`
+## Mapeamento Paleta → Tokens Semânticos
 
-Recriar a função com:
+| Token | Light | Dark | Origem |
+|---|---|---|---|
+| `--background` | `0 0% 100%` (branco) | `230 53% 13%` Deep Neural | Mind White / Deep Neural |
+| `--foreground` | `230 53% 13%` | `240 14% 96%` Mind White | Deep Neural / Mind White |
+| `--card` | `0 0% 100%` | `0 0% 4%` Cortex Black | Mind White / Cortex |
+| `--primary` | `236 100% 61%` Indigo | mesmo | Indigo Intelligence #3742FF |
+| `--accent` | `188 100% 51%` Cyan | mesmo | Electric Cyan #03E3FF |
+| `--secondary` | `230 53% 13%` Deep Neural | mesmo | Deep Neural Blue |
+| `--warning` / quantum | `44 92% 50%` | mesmo | Quantum Gold #F2B90C |
+| `--success` | `151 67% 49%` | mesmo | #27D380 |
+| `--destructive` | `0 100% 68%` | mesmo | Danger #FF5C5C |
+| `--muted` | `240 14% 96%` | `230 40% 18%` | Mind White / Deep Neural variant |
+| `--border` | `240 14% 90%` | `230 40% 22%` | derivado |
+| `--ring` | Indigo | Indigo | foco institucional |
 
-- **Owner pelo deal mais recente** (sem `MAX(uuid)`):
-  ```sql
-  (array_agg(o.owner_user_id ORDER BY o.closed_at DESC NULLS LAST))
-    FILTER (WHERE o.owner_user_id IS NOT NULL)
-  )[1] AS owner_id
-  ```
-- **`last_won_date`** continua como `MAX(o.closed_at)` (timestamp, válido).
-- **GROUP BY** mantém apenas `o.account_id` (já está correto — `account_id` não é agregado).
-- **Retorno trocado para `jsonb`**:
-  - Sucesso com vendas:
-    ```json
-    {"success": true, "processed_accounts": N, "period_start": "...", "period_end": "..."}
-    ```
-  - Sem vendas no período:
-    ```json
-    {"success": true, "processed_accounts": 0, "message": "Nenhuma conta com receita fechada encontrada no período."}
-    ```
-- **Early-return** se a CTE base estiver vazia (evita executar upsert/delete à toa).
-- **Permanece** `SECURITY DEFINER`, `SET search_path = public`, validação de `auth.uid()`, organização e role admin/owner.
+Sidebar dark usa Cortex Black `#0A0A0A`; light mantém branco institucional com texto Deep Neural.
 
-### 2. Migration — drop da assinatura antiga + grants
+## Gradientes e Sombras
 
-- `DROP FUNCTION IF EXISTS public.recalculate_account_rfm(uuid, date, date);` antes de recriar (mudança de tipo de retorno exige drop).
-- `GRANT EXECUTE ON FUNCTION public.recalculate_account_rfm(uuid, date, date) TO authenticated;`
-- `GRANT EXECUTE ON FUNCTION public.get_account_rfm_intelligence(uuid, date, date, uuid, text, text) TO authenticated;` (idempotente).
+```css
+--gradient-neural: linear-gradient(135deg, hsl(236 100% 61%) 0%, hsl(188 100% 51%) 60%, hsl(44 92% 50%) 100%);
+--gradient-cognitive: linear-gradient(180deg, hsl(230 53% 13%) 0%, hsl(0 0% 4%) 100%);
+--gradient-primary: var(--gradient-neural); /* alias p/ retrocompat */
+--shadow-glow: 0 0 40px hsl(236 100% 61% / 0.25);
+```
 
-### 3. Frontend — `src/services/crm/account-rfm.ts`
+## Tipografia
 
-`recalculateAccountRFM` hoje devolve `Number(data ?? 0)`. Adaptar para o novo payload JSON, mantendo a assinatura `Promise<number>` para não quebrar o hook:
+`index.html` `<head>`:
+```html
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link href="https://api.fontshare.com/v2/css?f[]=satoshi@300,400,500,700&display=swap" rel="stylesheet" />
+```
 
+`tailwind.config.ts` → `fontFamily`:
 ```ts
-const payload = data as { success: boolean; processed_accounts?: number } | null;
-return Number(payload?.processed_accounts ?? 0);
+sans: ['Satoshi', 'ui-sans-serif', 'system-ui', 'sans-serif'],      // operacional (default body)
+display: ['"Space Grotesk"', 'Satoshi', 'sans-serif'],              // institucional
+mono: ['"IBM Plex Mono"', 'ui-monospace', 'monospace'],             // técnico
 ```
 
-### 4. Frontend — `src/hooks/useAccountRFMIntelligence.ts`
-
-- Em `onSuccess`, manter `invalidateQueries({ queryKey: ['account-rfm-intelligence'] })` (já invalida cards, segmentação e tabela — a página inteira lê dessa chave).
-- Toast de sucesso adaptado: quando `count === 0`, mostrar "Nenhuma conta com receita fechada no período." em vez de "0 conta(s) atualizadas."
-- Toast de erro: mensagem amigável fixa "Não foi possível recalcular o RFM. Verifique se existem vendas fechadas no período ou consulte os logs.", preservando `err.message` em `description` opcional/`console.error` para debug.
-
-### 5. Validação
-
-Após aplicar a migration, rodar no SQL Editor:
-```sql
-select public.recalculate_account_rfm(
-  '<org_id>'::uuid, '2025-05-10'::date, '2026-05-10'::date
-);
-select public.get_account_rfm_intelligence(
-  '<org_id>'::uuid, '2025-05-10'::date, '2026-05-10'::date, null, null, null
-);
+`index.css` `body`: `@apply font-sans` (Satoshi). `h1..h3` recebem `font-display` via base layer:
+```css
+@layer base {
+  h1, h2, h3 { @apply font-display tracking-tight; }
+  code, kbd, pre, samp, .font-technical { @apply font-mono; }
+}
 ```
-E testar pela UI o fluxo: Contas → RFM Intelligence → Recalcular RFM.
 
-## Arquivos impactados
+Capitalização sentence case já é o padrão atual; nenhum CSS global de uppercase será adicionado.
 
-- `supabase/migrations/<novo>.sql` — drop + recreate `recalculate_account_rfm` + grants.
-- `src/services/crm/account-rfm.ts` — adaptar leitura do novo retorno JSON.
-- `src/hooks/useAccountRFMIntelligence.ts` — toasts e mensagens.
+## Arquivos Impactados
+
+1. `src/index.css` — substituir bloco `:root` e `.dark`, gradientes, sombras, base de tipografia
+2. `tailwind.config.ts` — adicionar `fontFamily` + `backgroundImage.gradient-neural/cognitive` (manter `gradient-primary` como alias)
+3. `index.html` — `<link>` das 3 fontes + `theme-color="#3742FF"`
 
 ## Riscos
 
-- **Mudança de tipo de retorno** (int → jsonb) exige `DROP FUNCTION` antes do `CREATE OR REPLACE`. Sem outras dependências da função (apenas o frontend a chama), risco baixo.
-- **Política de owner**: passar a usar o owner do deal **mais recente** (em vez de um uuid arbitrário do `MAX`) é semanticamente mais correto e alinhado ao briefing.
-- Sem mudança em RLS, schema de `account_rfm_snapshots`, ou em `get_account_rfm_intelligence`.
+- Componentes que usam classes Tailwind cruas (`text-white`, `bg-black`, `text-purple-*`) não respondem a tokens. Não vou caçar todos nesta sprint — eles continuam funcionando, apenas ficam visualmente fora do sistema. Posso abrir sprint follow-up de auditoria se quiser.
+- Quantum Gold passa a ocupar o slot `--warning`. Cores de aviso ficam levemente mais quentes que o âmbar atual — desejado pelo guia (gold = consciência operacional/atenção).
+- Carregar 3 famílias via CDN adiciona ~80KB. Aceitável; alternativa é Fontsource (npm) em sprint posterior.
 
-## Fora de escopo
+## Critérios de Aceite
 
-- Reescrever lógica de scoring/segmentação RFM.
-- Alterar `account_rfm_snapshots` ou `get_account_rfm_intelligence`.
-- Mudanças em multi-tenancy / RLS.
+- Tokens HSL refletindo a paleta oficial em light e dark
+- Body em Satoshi, headings em Space Grotesk, mono em IBM Plex Mono
+- `bg-primary` renderiza Indigo `#3742FF`
+- `bg-accent` renderiza Electric Cyan `#03E3FF`
+- `bg-gradient-neural` aplica o Neural Flow Gradient
+- Build e typecheck passam
+- Nenhum componente quebra (mudança puramente em tokens/fontes)
+
+## Fora de Escopo (próxima sprint, se quiser)
+
+- Auditoria e refactor de classes cruas (`text-white`, gradientes hardcoded em landing)
+- Migração de fontes para `@fontsource` (offline/perf)
+- Ajuste fino de componentes onde Quantum Gold deveria substituir warning padrão
