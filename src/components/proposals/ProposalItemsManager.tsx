@@ -865,6 +865,33 @@ function AddItemForm({ products, measurementUnits, onAdd, onCancel }: AddItemFor
                 </div>
               </div>
             </label>
+            <label className={`flex items-center gap-3 cursor-pointer flex-1 p-3 rounded-lg border transition-colors ${
+              customItem.billing_type === 'point_day'
+                ? 'bg-sky-50 border-sky-300 dark:bg-sky-950/30 dark:border-sky-700'
+                : 'hover:bg-muted'
+            }`}>
+              <input
+                type="radio"
+                name="item_billing_type"
+                value="point_day"
+                checked={customItem.billing_type === 'point_day'}
+                onChange={() => setCustomItem(prev => ({
+                  ...prev,
+                  billing_type: 'point_day',
+                  quantity_points: prev.quantity_points ?? 1,
+                  billing_days: prev.billing_days ?? 1,
+                  unit_price_point_day: prev.unit_price_point_day ?? prev.unit_price ?? 0,
+                }))}
+                className="h-4 w-4"
+              />
+              <div className="flex items-center gap-2">
+                <Zap className="h-4 w-4 text-sky-500" />
+                <div>
+                  <span className="text-sm font-medium">Ponto-dia</span>
+                  <p className="text-xs text-muted-foreground">Pontos × diárias</p>
+                </div>
+              </div>
+            </label>
           </div>
         </div>
       )}
