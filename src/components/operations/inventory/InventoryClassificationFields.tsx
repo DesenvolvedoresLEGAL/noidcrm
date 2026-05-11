@@ -42,6 +42,7 @@ export function InventoryClassificationFields({
   criticality,
   itemKindFilter,
   onChange,
+  onCategoryProfileChange,
   errors,
 }: Props) {
   const { data: categories } = useInventoryCategories();
