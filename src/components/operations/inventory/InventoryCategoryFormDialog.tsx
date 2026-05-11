@@ -169,6 +169,30 @@ export function InventoryCategoryFormDialog({ open, onOpenChange, category }: Pr
           </div>
 
           <div className="space-y-2">
+            <Label>Perfil de equipamento</Label>
+            <Select
+              value={form.watch('equipment_profile')}
+              onValueChange={(v) =>
+                form.setValue('equipment_profile', v as EquipmentProfile, { shouldDirty: true })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {EQUIPMENT_PROFILE_OPTIONS.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Roteador exige SSID/senha de fábrica e IMEI. Chip exige ICCID, linha e APN.
+            </p>
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="sort_order">Ordem</Label>
             <Input
               id="sort_order"
