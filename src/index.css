@@ -98,10 +98,10 @@ All colors MUST be HSL.
     --popover: 0 0% 4%;
     --popover-foreground: 240 14% 96%;
 
-    --primary: 236 100% 61%;
+    --primary: 235 91% 62%;
     --primary-foreground: 240 14% 96%;
-    --primary-light: 236 100% 72%;
-    --primary-dark: 236 70% 45%;
+    --primary-light: 235 91% 72%;
+    --primary-dark: 235 70% 45%;
 
     --accent: 188 100% 51%;
     --accent-foreground: 230 53% 13%;
@@ -125,20 +125,29 @@ All colors MUST be HSL.
 
     --border: 230 40% 22%;
     --input: 230 40% 22%;
-    --ring: 236 100% 61%;
+    --ring: 235 91% 62%;
 
-    --shadow-card: 0 1px 3px hsl(0 0% 0% / 0.4);
-    --shadow-card-hover: 0 8px 24px hsl(236 100% 61% / 0.3);
-    --shadow-glow: 0 0 40px hsl(236 100% 61% / 0.35);
+    /* Cognitive card hierarchy — dark */
+    --card-primary: 230 45% 10%;
+    --card-primary-foreground: 240 14% 96%;
+    --card-operational: 0 0% 4%;
+    --card-operational-foreground: 240 14% 96%;
+    --card-passive: 230 40% 14%;
+    --card-passive-foreground: 240 14% 70%;
 
-    --sidebar-background: 0 0% 4%;    /* Cortex Black */
-    --sidebar-foreground: 240 14% 96%;
-    --sidebar-primary: 236 100% 61%;
+    --shadow-card: 0 1px 2px hsl(0 0% 0% / 0.35);
+    --shadow-card-hover: 0 4px 16px hsl(0 0% 0% / 0.45);
+    --shadow-elevated: 0 8px 28px hsl(0 0% 0% / 0.55);
+    --shadow-glow: 0 0 24px hsl(235 91% 62% / 0.22);
+
+    --sidebar-background: 0 0% 4%;
+    --sidebar-foreground: 240 14% 78%;
+    --sidebar-primary: 235 91% 62%;
     --sidebar-primary-foreground: 240 14% 96%;
-    --sidebar-accent: 230 40% 18%;
+    --sidebar-accent: 235 91% 62%;
     --sidebar-accent-foreground: 240 14% 96%;
-    --sidebar-border: 230 40% 22%;
-    --sidebar-ring: 236 100% 61%;
+    --sidebar-border: 230 40% 18%;
+    --sidebar-ring: 235 91% 62%;
   }
 }
 
