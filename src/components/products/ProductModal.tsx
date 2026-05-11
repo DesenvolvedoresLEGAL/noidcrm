@@ -177,13 +177,21 @@ export function ProductModal({ open, onOpenChange, product }: ProductModalProps)
               : data.price,
       };
 
+      let saved: any;
       if (product) {
-        return updateProduct(product.id, payload);
+        saved = await updateProduct(product.id, payload);
+      } else {
+        saved = await createProduct(payload);
       }
-      return createProduct(payload);
+      // Persist BOM only for point_day products
+      if (data.billing_type === 'point_day' && organization?.id && saved?.id) {
+        await replaceProductBomItems(organization.id, saved.id, bomItems);
+      }
+      return saved;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['product-bom'] });
       toast({
         title: product ? 'Produto atualizado' : 'Produto criado',
         description: 'Operação realizada com sucesso.',
