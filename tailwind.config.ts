@@ -31,6 +31,11 @@ export default {
       'mouse': { 'raw': '(hover: hover)' },
     },
     extend: {
+      fontFamily: {
+        sans: ['Satoshi', 'ui-sans-serif', 'system-ui', '-apple-system', 'sans-serif'],
+        display: ['"Space Grotesk"', 'Satoshi', 'ui-sans-serif', 'sans-serif'],
+        mono: ['"IBM Plex Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
