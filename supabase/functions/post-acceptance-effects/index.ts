@@ -33,12 +33,43 @@ serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const { proposalId } = body;
 
-    // If proposalId provided, process that specific job
-    // Otherwise, process all pending/failed jobs (worker mode)
+    // Authorization rules:
+    //  - Worker mode (no proposalId): requires internal secret.
+    //  - Specific proposalId: must reference a proposal that is currently `accepted`.
+    //    Internal callers can additionally bootstrap the job if missing.
     let jobs: any[] = [];
 
+    if (!proposalId && !isInternalCaller) {
+      return new Response(JSON.stringify({ error: 'Unauthorized: worker mode requires internal secret' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     if (proposalId) {
-      // Ensure job exists (trigger should have created it, but be safe)
+      // Validate proposal exists and is accepted (anti-abuse for anon callers)
+      const { data: prop } = await supabase
+        .from("proposals")
+        .select("id, organization_id, status, accepted_at")
+        .eq("id", proposalId)
+        .maybeSingle();
+
+      if (!prop) {
+        return new Response(JSON.stringify({ error: 'Proposal not found' }), {
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      if (prop.status !== 'accepted' || !prop.accepted_at) {
+        return new Response(JSON.stringify({ error: 'Proposal is not accepted' }), {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Ensure job exists (trigger should have created it, but be safe — only for internal callers
+      // OR when proposal is verifiably accepted, which we just checked above).
       const { data: existingJob } = await supabase
         .from("acceptance_effect_jobs")
         .select("*")
@@ -46,19 +77,12 @@ serve(async (req) => {
         .maybeSingle();
 
       if (!existingJob) {
-        // Get org_id from proposal
-        const { data: prop } = await supabase
-          .from("proposals")
-          .select("organization_id")
-          .eq("id", proposalId)
-          .single();
-        if (prop) {
-          await supabase.from("acceptance_effect_jobs").upsert({
-            proposal_id: proposalId,
-            organization_id: prop.organization_id,
-            status: "pending",
-          }, { onConflict: "proposal_id" });
-        }
+        await supabase.from("acceptance_effect_jobs").upsert({
+          proposal_id: proposalId,
+          organization_id: prop.organization_id,
+          accepted_at: prop.accepted_at,
+          status: "pending",
+        }, { onConflict: "proposal_id,accepted_at" });
       }
 
       const { data } = await supabase
