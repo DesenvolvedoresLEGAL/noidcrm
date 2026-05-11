@@ -268,11 +268,11 @@ Deno.serve(async (req) => {
     let mainContentLength = 0;
     if (scrapeTarget && FIRECRAWL_API_KEY) {
       try {
-        const scrapeResp = await fetch("https://api.firecrawl.dev/v2/scrape", {
+        const scrapeResp = await fetchWithTimeout("https://api.firecrawl.dev/v2/scrape", {
           method: "POST",
           headers: { Authorization: `Bearer ${FIRECRAWL_API_KEY}`, "Content-Type": "application/json" },
           body: JSON.stringify({ url: scrapeTarget, formats: ["markdown"], onlyMainContent: true }),
-        });
+        }, 45000);
         const scrapeData = await scrapeResp.json();
         const mainContent = scrapeData?.data?.markdown || scrapeData?.markdown || "";
         scrapedContent += mainContent;
