@@ -90,7 +90,7 @@ serve(async (req) => {
         .select("*")
         .eq("proposal_id", proposalId)
         .in("status", ["pending", "failed"])
-        .is("notifications_processed_at", null)
+        .or("notifications_processed_at.is.null,slack_processed_at.is.null")
         .limit(1);
       jobs = data || [];
     } else {
