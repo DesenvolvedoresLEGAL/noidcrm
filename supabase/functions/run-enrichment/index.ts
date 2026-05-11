@@ -241,7 +241,7 @@ Deno.serve(async (req) => {
 
     if (!website) {
       try {
-        const identityResp = await fetch(`${supabaseUrl}/functions/v1/enrich-prospect-identity`, {
+        const identityResp = await fetchWithTimeout(`${supabaseUrl}/functions/v1/enrich-prospect-identity`, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${supabaseKey}`,
@@ -249,7 +249,7 @@ Deno.serve(async (req) => {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ prospect_id }),
-        });
+        }, 15000);
         if (identityResp.ok) {
           const identityData = await identityResp.json();
           prospect = { ...prospect, ...(identityData?.updates || {}) };
