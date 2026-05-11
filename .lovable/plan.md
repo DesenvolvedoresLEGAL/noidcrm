@@ -1,70 +1,61 @@
-## Diagnóstico
+## Problema identificado
 
-Investiguei o fluxo de criação de item do inventário e encontrei **dois problemas combinados** que explicam o que aconteceu:
+O cadastro de Roteador está sendo tratado como se pudesse cair no perfil de Chip/SIM durante a validação visual do formulário. Na prática, isso gera o erro “Dados do chip: ICCID obrigatório” mesmo quando a intenção do usuário é cadastrar apenas um roteador.
 
-### 1. A categoria "Roteadores" está com perfil `generic` (não `router`)
+A regra de negócio correta é:
 
+```text
+Cadastro de item no estoque:
+- Roteador é cadastrado sozinho.
+- Chip é cadastrado sozinho.
+- Não existe associação roteador + chip no cadastro inicial.
+
+Após venda/proposta aprovada:
+- Separar roteador do estoque.
+- Separar chip(s) do estoque.
+- Associar operacionalmente roteador + até 3 chips: principal + backups.
 ```
-inventory_categories → Roteadores | equipment_profile = generic
-```
 
-Como o perfil é `generic`, os campos dedicados de roteador (SSID de fábrica, Senha Wi‑Fi, Usuário admin, Senha admin, IMEI) **não aparecem** no formulário. Por isso o time recorreu a "Especificações técnicas" como gambiarra para cadastrar nome de rede, senha, interface etc. Isso não é o caminho previsto.
+## Plano de correção
 
-### 2. O botão "Criar" falha em silêncio quando há erro de validação
+1. **Separar definitivamente os perfis no formulário de item serializado**
+   - Garantir que uma categoria `Roteador` renderize e valide somente os campos de fábrica do roteador.
+   - Garantir que `sim_card_factory` seja ignorado/removido do payload quando o perfil atual for `router`.
+   - Garantir que `router_factory` seja ignorado/removido do payload quando o perfil atual for `sim_card`.
+   - Evitar que campos invisíveis de Chip bloqueiem o botão `Criar` no cadastro de Roteador.
 
-O formulário usa `react-hook-form + zod`. Quando algum campo obrigatório (Local, Categoria, Nome) não está preenchido, o `handleSubmit` **bloqueia** o envio mas **não dá nenhum feedback visível** — a mensagem de erro vermelha aparece junto do campo, que está fora do viewport (o usuário está rolado no fim, no bloco de Especificações técnicas).
+2. **Corrigir o feedback de erro que está confundindo a operação**
+   - Ajustar o utilitário de erro para apontar para o campo real: `SSID`, `Senha Wi-Fi`, `IMEI`, `ICCID`, etc.
+   - Adicionar IDs nos inputs específicos de Roteador/Chip para o scroll/focus funcionar corretamente dentro do modal.
+   - O toast deve mostrar erro de Chip apenas quando o usuário estiver cadastrando um Chip.
 
-Resultado: para o usuário, "o botão CRIAR simplesmente não funciona". Não há toast, não há scroll, não há request HTTP.
+3. **Blindar a seleção de categoria**
+   - Ao selecionar uma categoria, sincronizar `equipment_profile` a partir da categoria selecionada de forma estável.
+   - Quando trocar de categoria, limpar o bloco que não pertence ao novo perfil para não carregar lixo invisível de validação.
 
-A RLS de `inventory_items` está OK (`inv_insert` com `WITH CHECK`), então o problema **não é backend** — é UX de validação.
+4. **Manter a associação roteador + chip fora do cadastro de item**
+   - Não criar associação no item de inventário.
+   - Não mover regra de associação para o cadastro de roteador.
+   - Preservar a customização operacional na alocação/reserva, que é o lugar certo para ocorrer depois da venda.
 
----
-
-## Plano de correção (somente frontend, sem migração)
-
-### A. Feedback claro quando a validação falha
-
-Em `src/components/operations/inventory/InventoryItemFormDialog.tsx`:
-
-1. Passar um callback `onError` para `form.handleSubmit(onSubmit, onError)`.
-2. No `onError`, exibir `toast.error("Revise os campos destacados antes de criar.")` listando os 1‑2 primeiros campos com problema (ex: "Local atual obrigatório").
-3. Rolar a `DialogContent` até o primeiro campo com erro (via `scrollIntoView({ block: 'center' })` no elemento referenciado pela chave do erro).
-4. Garantir que o botão Criar **nunca** fique bloqueado silenciosamente: se `noCategories` ou `noLocations`, mostrar um banner amarelo no topo do diálogo explicando o que precisa ser cadastrado antes (com link/atalho para "Categorias" e "Locais").
-
-Aplicar o mesmo padrão no `InventoryQuantityItemFormDialog` (item por quantidade) para evitar a mesma armadilha.
-
-### B. Tornar o perfil do roteador detectável e ajustável direto do formulário
-
-Quando o usuário escolher uma categoria cujo `equipment_profile = generic` mas cujo nome dê indício de roteador/chip (ex.: contém "rote", "wifi", "chip", "sim"), exibir um **callout informativo** logo abaixo do select de Categoria:
-
-> "Esta categoria está marcada como **Genérica**. Para abrir os campos específicos de Roteador (SSID, Senha, IMEI), edite a categoria e selecione o perfil 'Roteador'."
-
-Adicionar botão "Editar categoria" que abre o `InventoryCategoryFormDialog` já existente, pré‑selecionado naquela categoria. Ao salvar, o callout some e os `RouterFactoryFields` aparecem automaticamente (a lógica já existe via `onCategoryProfileChange`).
-
-### C. Não perder o que já foi digitado em "Especificações técnicas"
-
-Como o time já preencheu "Nome da Rede / Senha / Interface" em Tech Specs, adicionar um **botão de migração** dentro do callout: "Mover dados para campos do Roteador" — copia automaticamente specs com chaves conhecidas (`nome rede` → `ssid_factory`, `senha` → `wifi_password_factory`, `interface` → `admin_user`, `senha interface` → `admin_password`) para `router_factory` quando o perfil virar `router`, e remove essas linhas do `technical_specs`.
-
-### D. Verificação
-
-1. Reproduzir: abrir o diálogo, deixar Local em branco, clicar Criar → deve mostrar toast + rolar até o campo Local.
-2. Abrir a categoria "Roteadores" e mudar o perfil para "Roteador" no dialog de categorias → o formulário de item deve passar a renderizar `RouterFactoryFields` automaticamente.
-3. Preencher SSID, Wi‑Fi pass, admin user/pass, IMEI + Local + Nome → request `INSERT inventory_items` deve retornar 201 e o item aparecer na listagem.
-
----
+5. **Verificação objetiva**
+   - Testar schema localmente para confirmar:
+     - Roteador completo cria sem exigir ICCID.
+     - Chip completo cria sem exigir IMEI/SSID.
+     - Roteador incompleto mostra erro de roteador, não de chip.
+   - Revisar o payload enviado por `createSerializedItem` para confirmar que roteador salva apenas `metadata.router` e não `metadata.sim_card`.
 
 ## Arquivos impactados
 
-- `src/components/operations/inventory/InventoryItemFormDialog.tsx` (onError + callout + banner + migração de specs)
-- `src/components/operations/inventory/InventoryQuantityItemFormDialog.tsx` (mesmo padrão de onError)
-- `src/components/operations/inventory/InventoryClassificationFields.tsx` (expor nome da categoria selecionada para o callout)
+- `src/components/operations/inventory/InventoryItemFormDialog.tsx`
+- `src/components/operations/inventory/EquipmentProfileFactoryFields.tsx`
+- `src/lib/operations/formErrorFeedback.ts`
+- `src/lib/operations/inventoryEquipmentProfile.test.ts`
 
-Sem mudanças em backend, RLS, migrações ou tipos do Supabase.
+## Fora do escopo
 
-## Riscos
-
-Baixo. As mudanças são puramente de UX/validação no frontend. A migração opcional de Tech Specs → router_factory roda só com confirmação explícita do usuário, então não há risco de perda de dados.
-
-## Próximos passos sugeridos (fora deste plano)
-
-- Marcar a categoria "Roteadores" como `equipment_profile = router` direto (uma linha de UPDATE) para destravar o time imediatamente. Posso fazer junto se você autorizar.
+- Não alterar fluxo de proposta aprovada.
+- Não criar associação roteador + chip agora.
+- Não alterar RLS.
+- Não alterar estrutura de tabelas.
+- Não mexer em UX premium/design system.
