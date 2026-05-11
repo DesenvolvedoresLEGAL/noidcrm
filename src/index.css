@@ -18,11 +18,11 @@ All colors MUST be HSL.
     --popover: 0 0% 100%;
     --popover-foreground: 230 53% 13%;
 
-    /* Indigo Intelligence #3742FF */
-    --primary: 236 100% 61%;
+    /* Indigo Intelligence v2 #2F3DF5 — institutional, less consumer */
+    --primary: 235 91% 57%;
     --primary-foreground: 240 14% 96%;
-    --primary-light: 236 100% 72%;
-    --primary-dark: 236 70% 45%;
+    --primary-light: 235 91% 68%;
+    --primary-dark: 235 70% 42%;
 
     /* Electric Cyan #03E3FF */
     --accent: 188 100% 51%;
