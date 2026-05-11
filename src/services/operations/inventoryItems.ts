@@ -10,6 +10,12 @@ import {
   sanitizeTechnicalSpecs,
   type TechnicalSpec,
 } from '@/lib/operations/inventoryTechnicalSpecs';
+import {
+  mergeFactoryRouter,
+  mergeFactorySim,
+  type RouterFactory,
+  type SimCardFactory,
+} from '@/lib/operations/inventoryEquipmentProfile';
 
 export type InventoryItemRow = Database['public']['Tables']['inventory_items']['Row'] & {
   family_id?: string | null;
