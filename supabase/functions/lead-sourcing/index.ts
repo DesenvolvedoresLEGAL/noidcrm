@@ -1349,6 +1349,10 @@ async function handleEventFirecrawl(
   await logRunEvent(supabase, organizationId, run.id, "info", `Scraping ${maxListPages} list pages`, { total_list_pages: listPagesToScrape.length });
 
   for (let i = 0; i < maxListPages; i++) {
+    if (isTimeoutExceeded()) {
+      await logRunEvent(supabase, organizationId, run.id, "warn", "Tempo limite excedido durante scrape — retornando resultados parciais", { scraped_so_far: scrapedContents.length });
+      break;
+    }
     const page = listPagesToScrape[i];
     try {
       const scrollActions: any[] = [];
