@@ -36,7 +36,9 @@ Deno.serve(async (req) => {
     // Fetch proposal
     const { data: proposal, error: pError } = await supabase
       .from("proposals")
-      .select("id, opportunity_id, organization_id, status, title, client_name, client_email, value, created_at, accepted_at, expires_at")
+      .select(
+        `id, opportunity_id, organization_id, status, title, client_name, client_email, created_at, accepted_at, expires_at, ${APPROVED_VALUE_SELECT_COLUMNS}`,
+      )
       .eq("id", proposal_id)
       .single();
 
