@@ -517,18 +517,30 @@ function generateProposalHTML(proposal: any, items: any[], paymentTerms: any[], 
           </tr>
         </thead>
         <tbody>
-          ${items.map(item => `
+          ${items.map(item => {
+            const isPointDay = item.billing_type === 'point_day';
+            const points = item.quantity_points;
+            const days = item.billing_days;
+            const ppd = item.unit_price_point_day;
+            const qtyCell = isPointDay && points && days
+              ? `${points} pts × ${days} ${days === 1 ? 'diária' : 'diárias'}`
+              : `${item.quantity}${item.measurement_unit?.abbreviation ? ' ' + item.measurement_unit.abbreviation : ''}`;
+            const priceCell = isPointDay && ppd != null
+              ? `R$ ${Number(ppd).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} <span style="font-size:0.75em;color:#666;">/ ponto-dia</span>`
+              : `R$ ${item.unit_price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+            return `
             <tr>
               <td>
                 <div class="item-name">${item.name}</div>
                 ${item.description ? `<div class="item-desc">${item.description}</div>` : ''}
               </td>
-              <td class="text-center">${item.quantity}${item.measurement_unit?.abbreviation ? ' ' + item.measurement_unit.abbreviation : ''}</td>
-              <td class="text-right">R$ ${item.unit_price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+              <td class="text-center">${qtyCell}</td>
+              <td class="text-right">${priceCell}</td>
               <td class="text-right">${item.discount_percent > 0 ? `${item.discount_percent}%` : '-'}</td>
               <td class="text-right"><strong>R$ ${item.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong></td>
             </tr>
-          `).join('')}
+            `;
+          }).join('')}
         </tbody>
       </table>
 

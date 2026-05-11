@@ -19,10 +19,14 @@ export interface Product {
   ipi_percent: number;
   image_url?: string;
   // Billing type fields
-  billing_type: 'one_time' | 'recurring';
+  billing_type: 'one_time' | 'recurring' | 'point_day';
   billing_cycle?: 'monthly' | 'quarterly' | 'semiannual' | 'annual';
   monthly_price?: number;
   minimum_contract_months?: number;
+  // Point-day billing fields
+  default_unit_price_point_day?: number;
+  default_billing_days?: number;
+  default_quantity_points?: number;
   // Commission tracking
   counts_for_commission: boolean;
   // Sync fields
@@ -45,10 +49,13 @@ const productSchema = z.object({
   ipi_percent: z.number().min(0).max(100).optional(),
   image_url: z.string().url().optional().nullable(),
   // Billing type fields
-  billing_type: z.enum(['one_time', 'recurring']).optional(),
+  billing_type: z.enum(['one_time', 'recurring', 'point_day']).optional(),
   billing_cycle: z.enum(['monthly', 'quarterly', 'semiannual', 'annual']).optional(),
   monthly_price: z.number().min(0).optional(),
   minimum_contract_months: z.number().int().min(1).optional(),
+  default_unit_price_point_day: z.number().min(0).optional(),
+  default_billing_days: z.number().int().min(1).optional(),
+  default_quantity_points: z.number().int().min(1).optional(),
   // Commission tracking
   counts_for_commission: z.boolean().optional(),
 });
@@ -119,6 +126,9 @@ export async function createProduct(dto: unknown): Promise<Product> {
       billing_cycle: validated.billing_cycle ?? 'monthly',
       monthly_price: validated.monthly_price,
       minimum_contract_months: validated.minimum_contract_months ?? 12,
+      default_unit_price_point_day: validated.default_unit_price_point_day,
+      default_billing_days: validated.default_billing_days,
+      default_quantity_points: validated.default_quantity_points ?? 1,
       // Commission tracking - defaults to true
       counts_for_commission: validated.counts_for_commission ?? true,
     }])

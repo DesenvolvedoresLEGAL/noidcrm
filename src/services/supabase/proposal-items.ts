@@ -18,8 +18,12 @@ export interface ProposalItem {
   image_url?: string;
   characteristics?: string[];
   measurement_unit_id?: string;
-  billing_type?: 'one_time' | 'recurring';
+  billing_type?: 'one_time' | 'recurring' | 'point_day';
   counts_for_commission?: boolean;
+  // Point-day fields
+  quantity_points?: number;
+  billing_days?: number;
+  unit_price_point_day?: number;
   minimum_contract_months?: number;
   created_at?: string;
   updated_at?: string;
@@ -56,7 +60,7 @@ export async function createProposalItem(item: Omit<ProposalItem, 'id' | 'create
     order_index: item.order_index,
     name: item.name,
     description: item.description,
-    quantity: item.quantity,
+    quantity: calculatedItem.quantity ?? item.quantity,
     unit_cost: item.unit_cost,
     markup_percent: item.markup_percent,
     unit_price: calculatedItem.unit_price || 0,
@@ -68,6 +72,9 @@ export async function createProposalItem(item: Omit<ProposalItem, 'id' | 'create
     measurement_unit_id: item.measurement_unit_id,
     billing_type: item.billing_type || 'one_time',
     counts_for_commission: item.counts_for_commission ?? true,
+    quantity_points: item.billing_type === 'point_day' ? (calculatedItem.quantity_points ?? item.quantity_points ?? 1) : null,
+    billing_days: item.billing_type === 'point_day' ? (calculatedItem.billing_days ?? item.billing_days ?? 1) : null,
+    unit_price_point_day: item.billing_type === 'point_day' ? (calculatedItem.unit_price_point_day ?? item.unit_price_point_day ?? 0) : null,
   };
 
   const { data, error } = await supabase
@@ -124,14 +131,28 @@ export async function reorderProposalItems(proposalId: string, itemIds: string[]
 }
 
 export function calculateItemTotals(item: Partial<ProposalItem>): Partial<ProposalItem> {
-  const quantity = item.quantity || 1;
   const discountPercent = item.discount_percent || 0;
 
-  // CRITICAL: Always preserve unit_price - never recalculate from markup
-  // unit_price comes directly from the product price and should be the source of truth
-  const unitPrice = item.unit_price || 0;
+  // Point-day branch: total = points × days × price_per_point_day × (1 - discount%)
+  if (item.billing_type === 'point_day') {
+    const points = Math.max(1, Number(item.quantity_points || 1));
+    const days = Math.max(1, Number(item.billing_days || 1));
+    const ppd = Number(item.unit_price_point_day || item.unit_price || 0);
+    const total = points * days * ppd * (1 - discountPercent / 100);
+    return {
+      ...item,
+      quantity_points: points,
+      billing_days: days,
+      unit_price_point_day: Number(ppd.toFixed(2)),
+      quantity: points * days,
+      unit_price: Number(ppd.toFixed(2)),
+      total: Number(total.toFixed(2)),
+    };
+  }
 
-  // Calculate total: (unit_price * quantity) * (1 - discount%)
+  const quantity = item.quantity || 1;
+  // CRITICAL: Always preserve unit_price - never recalculate from markup
+  const unitPrice = item.unit_price || 0;
   const subtotal = unitPrice * quantity;
   const total = subtotal * (1 - discountPercent / 100);
 

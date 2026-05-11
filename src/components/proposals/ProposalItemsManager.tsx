@@ -58,13 +58,28 @@ interface ProposalItemsManagerProps {
   paymentDiscountPercent?: number;
 }
 
-// Calculate totals with direct unit_price support
+// Calculate totals with point_day support
 function calculateItemTotalsLocal(item: Partial<ProposalItem>): Partial<ProposalItem> {
-  const quantity = item.quantity || 1;
-  const unitPrice = item.unit_price || 0;
   const discountPercent = item.discount_percent || 0;
 
-  // Total = unit_price * quantity * (1 - discount%)
+  if (item.billing_type === 'point_day') {
+    const points = Math.max(1, Number(item.quantity_points || 1));
+    const days = Math.max(1, Number(item.billing_days || 1));
+    const ppd = Number(item.unit_price_point_day || item.unit_price || 0);
+    const total = points * days * ppd * (1 - discountPercent / 100);
+    return {
+      ...item,
+      quantity_points: points,
+      billing_days: days,
+      unit_price_point_day: Number(ppd.toFixed(2)),
+      quantity: points * days,
+      unit_price: Number(ppd.toFixed(2)),
+      total: Number(total.toFixed(2)),
+    };
+  }
+
+  const quantity = item.quantity || 1;
+  const unitPrice = item.unit_price || 0;
   const subtotal = unitPrice * quantity;
   const total = subtotal * (1 - discountPercent / 100);
 
@@ -120,7 +135,7 @@ export function ProposalItemsManager({ items, onChange, paymentDiscountPercent =
       order_index: items.length,
       name: newItem.name || '',
       description: newItem.description,
-      quantity: newItem.quantity || 1,
+      quantity: itemWithCalculations.quantity ?? newItem.quantity ?? 1,
       unit_cost: newItem.unit_cost || 0,
       markup_percent: newItem.markup_percent || 0,
       unit_price: itemWithCalculations.unit_price || 0,
@@ -134,6 +149,9 @@ export function ProposalItemsManager({ items, onChange, paymentDiscountPercent =
       billing_type: newItem.billing_type || 'one_time',
       counts_for_commission: newItem.counts_for_commission ?? true,
       minimum_contract_months: newItem.minimum_contract_months || 1,
+      quantity_points: itemWithCalculations.quantity_points ?? newItem.quantity_points,
+      billing_days: itemWithCalculations.billing_days ?? newItem.billing_days,
+      unit_price_point_day: itemWithCalculations.unit_price_point_day ?? newItem.unit_price_point_day,
     };
 
     onChange([...items, item]);
@@ -409,6 +427,7 @@ function SortableRow({ item, index, totalItems, measurementUnits, onUpdate, onDe
   // Fallback for legacy items without billing_type
   const billingType = item.billing_type || 'one_time';
   const isRecurring = billingType === 'recurring';
+  const isPointDay = billingType === 'point_day';
 
   return (
     <TableRow ref={setNodeRef} style={style} className="group align-top">
@@ -459,78 +478,143 @@ function SortableRow({ item, index, totalItems, measurementUnits, onUpdate, onDe
         </div>
       </TableCell>
       <TableCell className="pt-3">
-        <Badge 
-          variant={isRecurring ? 'default' : 'secondary'}
-          className={isRecurring ? 'bg-emerald-500 hover:bg-emerald-600 text-white' : 'bg-amber-100 text-amber-700 hover:bg-amber-200'}
+        <Badge
+          variant={isRecurring || isPointDay ? 'default' : 'secondary'}
+          className={
+            isRecurring
+              ? 'bg-emerald-500 hover:bg-emerald-600 text-white'
+              : isPointDay
+                ? 'bg-sky-500 hover:bg-sky-600 text-white'
+                : 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+          }
         >
           {isRecurring ? (
             <><Repeat className="h-3 w-3 mr-1" />MRR</>
+          ) : isPointDay ? (
+            <><Zap className="h-3 w-3 mr-1" />Ponto-dia</>
           ) : (
             <><Zap className="h-3 w-3 mr-1" />Avulso</>
           )}
         </Badge>
       </TableCell>
-      <TableCell className="pt-3">
-        <Input
-          type="number"
-          min="1"
-          step="0.01"
-          defaultValue={item.quantity}
-          onBlur={(e) => {
-            const num = parseFloat(e.target.value);
-            onUpdate(item.id!, { quantity: num > 0 ? num : 1 });
-          }}
-          className="w-20 h-8 text-sm"
-        />
-      </TableCell>
-      <TableCell className="pt-3">
-        <Select 
-          value={item.measurement_unit_id || ''} 
-          onValueChange={(value) => onUpdate(item.id!, { measurement_unit_id: value || undefined })}
-        >
-          <SelectTrigger className="w-20 h-8 text-sm">
-            <SelectValue placeholder="-" />
-          </SelectTrigger>
-          <SelectContent>
-            {measurementUnits.map(unit => (
-              <SelectItem key={unit.id} value={unit.id}>
-                {unit.abbreviation}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </TableCell>
-      <TableCell className="pt-3">
-        <Input
-          type="number"
-          min="0"
-          step="0.01"
-          defaultValue={item.unit_cost}
-          onBlur={(e) => {
-            const num = parseFloat(e.target.value);
-            onUpdate(item.id!, { unit_cost: num >= 0 ? num : 0 });
-          }}
-          className="w-28 h-8 text-sm"
-        />
-      </TableCell>
-      <TableCell className="pt-3">
-        <div className="flex flex-col">
-          <Input
-            type="number"
-            min="0"
-            step="0.01"
-            defaultValue={item.unit_price}
-            onBlur={(e) => {
-              const num = parseFloat(e.target.value);
-              onUpdate(item.id!, { unit_price: num >= 0 ? num : 0 });
-            }}
-            className="w-28 h-8 text-sm"
-          />
-          {isRecurring && (
-            <span className="text-xs text-emerald-600 mt-0.5">/mês</span>
-          )}
-        </div>
-      </TableCell>
+      {isPointDay ? (
+        <>
+          <TableCell className="pt-3" colSpan={2}>
+            <div className="flex items-center gap-1">
+              <Input
+                type="number"
+                min="1"
+                step="1"
+                defaultValue={item.quantity_points ?? 1}
+                onBlur={(e) => {
+                  const num = Math.max(1, parseInt(e.target.value || '1', 10));
+                  onUpdate(item.id!, { quantity_points: num });
+                }}
+                className="w-16 h-8 text-sm"
+                title="Pontos"
+              />
+              <span className="text-xs text-muted-foreground">pts ×</span>
+              <Input
+                type="number"
+                min="1"
+                step="1"
+                defaultValue={item.billing_days ?? 1}
+                onBlur={(e) => {
+                  const num = Math.max(1, parseInt(e.target.value || '1', 10));
+                  onUpdate(item.id!, { billing_days: num });
+                }}
+                className="w-16 h-8 text-sm"
+                title="Diárias"
+              />
+              <span className="text-xs text-muted-foreground">dias</span>
+            </div>
+          </TableCell>
+          <TableCell className="pt-3" />
+          <TableCell className="pt-3">
+            <div className="flex flex-col">
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                defaultValue={item.unit_price_point_day ?? item.unit_price ?? 0}
+                onBlur={(e) => {
+                  const num = parseFloat(e.target.value);
+                  onUpdate(item.id!, {
+                    unit_price_point_day: num >= 0 ? num : 0,
+                    unit_price: num >= 0 ? num : 0,
+                  });
+                }}
+                className="w-28 h-8 text-sm"
+              />
+              <span className="text-xs text-sky-600 mt-0.5">/ponto-dia</span>
+            </div>
+          </TableCell>
+        </>
+      ) : (
+        <>
+          <TableCell className="pt-3">
+            <Input
+              type="number"
+              min="1"
+              step="0.01"
+              defaultValue={item.quantity}
+              onBlur={(e) => {
+                const num = parseFloat(e.target.value);
+                onUpdate(item.id!, { quantity: num > 0 ? num : 1 });
+              }}
+              className="w-20 h-8 text-sm"
+            />
+          </TableCell>
+          <TableCell className="pt-3">
+            <Select
+              value={item.measurement_unit_id || ''}
+              onValueChange={(value) => onUpdate(item.id!, { measurement_unit_id: value || undefined })}
+            >
+              <SelectTrigger className="w-20 h-8 text-sm">
+                <SelectValue placeholder="-" />
+              </SelectTrigger>
+              <SelectContent>
+                {measurementUnits.map(unit => (
+                  <SelectItem key={unit.id} value={unit.id}>
+                    {unit.abbreviation}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </TableCell>
+          <TableCell className="pt-3">
+            <Input
+              type="number"
+              min="0"
+              step="0.01"
+              defaultValue={item.unit_cost}
+              onBlur={(e) => {
+                const num = parseFloat(e.target.value);
+                onUpdate(item.id!, { unit_cost: num >= 0 ? num : 0 });
+              }}
+              className="w-28 h-8 text-sm"
+            />
+          </TableCell>
+          <TableCell className="pt-3">
+            <div className="flex flex-col">
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                defaultValue={item.unit_price}
+                onBlur={(e) => {
+                  const num = parseFloat(e.target.value);
+                  onUpdate(item.id!, { unit_price: num >= 0 ? num : 0 });
+                }}
+                className="w-28 h-8 text-sm"
+              />
+              {isRecurring && (
+                <span className="text-xs text-emerald-600 mt-0.5">/mês</span>
+              )}
+            </div>
+          </TableCell>
+        </>
+      )}
       <TableCell className="pt-3">
         <Input
           type="number"
@@ -598,25 +682,24 @@ function AddItemForm({ products, measurementUnits, onAdd, onCancel }: AddItemFor
     const product = products.find(p => p.id === productId);
     if (product) {
       setSelectedProductId(productId);
-      
-      // Use product.cost as unit_cost
-      // For recurring products, use monthly_price if available, otherwise use price
+
       const cost = product.cost || 0;
       const isRecurring = product.billing_type === 'recurring';
-      const price = isRecurring && product.monthly_price 
-        ? product.monthly_price 
-        : (product.price || 0);
-      
-      // Calculate markup for display only
+      const isPointDay = product.billing_type === 'point_day';
+      const price = isRecurring && product.monthly_price
+        ? product.monthly_price
+        : isPointDay && product.default_unit_price_point_day
+          ? product.default_unit_price_point_day
+          : (product.price || 0);
+
       let markupPercent = 0;
       if (cost > 0 && price > cost) {
         markupPercent = ((price - cost) / cost) * 100;
       }
 
-      // Try to match product unit with measurement_units
       let matchedUnitId = defaultUnit?.id;
       if (product.unit) {
-        const matchingUnit = measurementUnits.find(u => 
+        const matchingUnit = measurementUnits.find(u =>
           u.abbreviation.toLowerCase() === product.unit.toLowerCase() ||
           u.name.toLowerCase() === product.unit.toLowerCase()
         );
@@ -624,7 +707,7 @@ function AddItemForm({ products, measurementUnits, onAdd, onCancel }: AddItemFor
           matchedUnitId = matchingUnit.id;
         }
       }
-      
+
       setCustomItem({
         product_id: productId,
         name: product.name,
@@ -639,6 +722,9 @@ function AddItemForm({ products, measurementUnits, onAdd, onCancel }: AddItemFor
         billing_type: product.billing_type || 'one_time',
         counts_for_commission: product.counts_for_commission ?? true,
         minimum_contract_months: product.minimum_contract_months || 1,
+        quantity_points: isPointDay ? (product.default_quantity_points ?? 1) : undefined,
+        billing_days: isPointDay ? (product.default_billing_days ?? 1) : undefined,
+        unit_price_point_day: isPointDay ? (product.default_unit_price_point_day ?? price) : undefined,
       });
     }
   };
@@ -648,9 +734,15 @@ function AddItemForm({ products, measurementUnits, onAdd, onCancel }: AddItemFor
     onAdd(customItem);
   };
 
-  // Calculate preview total
-  const previewTotal = (customItem.unit_price || 0) * (customItem.quantity || 1) * (1 - (customItem.discount_percent || 0) / 100);
   const isRecurring = customItem.billing_type === 'recurring';
+  const isPointDay = customItem.billing_type === 'point_day';
+  // Calculate preview total
+  const previewTotal = isPointDay
+    ? Math.max(1, customItem.quantity_points || 1) *
+      Math.max(1, customItem.billing_days || 1) *
+      (customItem.unit_price_point_day || 0) *
+      (1 - (customItem.discount_percent || 0) / 100)
+    : (customItem.unit_price || 0) * (customItem.quantity || 1) * (1 - (customItem.discount_percent || 0) / 100);
 
   return (
     <div className="space-y-4">
@@ -688,12 +780,17 @@ function AddItemForm({ products, measurementUnits, onAdd, onCancel }: AddItemFor
                       {product.billing_type === 'recurring' && (
                         <Badge className="bg-emerald-500 text-white text-[10px] px-1.5 py-0">MRR</Badge>
                       )}
+                      {product.billing_type === 'point_day' && (
+                        <Badge className="bg-sky-500 text-white text-[10px] px-1.5 py-0">PT-DIA</Badge>
+                      )}
                       <div className="flex flex-col">
                         <span>{product.name}</span>
                         <span className="text-xs text-muted-foreground">
-                          {product.billing_type === 'recurring' 
+                          {product.billing_type === 'recurring'
                             ? `R$ ${(product.monthly_price || product.price || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês`
-                            : `R$ ${(product.price || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                            : product.billing_type === 'point_day'
+                              ? `R$ ${(product.default_unit_price_point_day || product.price || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/ponto-dia`
+                              : `R$ ${(product.price || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
                           }
                         </span>
                       </div>
@@ -773,12 +870,115 @@ function AddItemForm({ products, measurementUnits, onAdd, onCancel }: AddItemFor
                 </div>
               </div>
             </label>
+            <label className={`flex items-center gap-3 cursor-pointer flex-1 p-3 rounded-lg border transition-colors ${
+              customItem.billing_type === 'point_day'
+                ? 'bg-sky-50 border-sky-300 dark:bg-sky-950/30 dark:border-sky-700'
+                : 'hover:bg-muted'
+            }`}>
+              <input
+                type="radio"
+                name="item_billing_type"
+                value="point_day"
+                checked={customItem.billing_type === 'point_day'}
+                onChange={() => setCustomItem(prev => ({
+                  ...prev,
+                  billing_type: 'point_day',
+                  quantity_points: prev.quantity_points ?? 1,
+                  billing_days: prev.billing_days ?? 1,
+                  unit_price_point_day: prev.unit_price_point_day ?? prev.unit_price ?? 0,
+                }))}
+                className="h-4 w-4"
+              />
+              <div className="flex items-center gap-2">
+                <Zap className="h-4 w-4 text-sky-500" />
+                <div>
+                  <span className="text-sm font-medium">Ponto-dia</span>
+                  <p className="text-xs text-muted-foreground">Pontos × diárias</p>
+                </div>
+              </div>
+            </label>
+          </div>
+        </div>
+      )}
+
+      {/* Point-day specific fields */}
+      {(selectedProductId || mode === 'custom') && isPointDay && (
+        <div className="border rounded-lg p-4 space-y-4 bg-sky-50/50 dark:bg-sky-950/20">
+          <Label className="text-sm font-semibold">Cobrança por Ponto-dia</Label>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label>Pontos</Label>
+              <Input
+                type="number"
+                min={1}
+                step={1}
+                value={customItem.quantity_points ?? 1}
+                onChange={(e) => {
+                  const num = Math.max(1, parseInt(e.target.value || '1', 10));
+                  setCustomItem(prev => ({ ...prev, quantity_points: num }));
+                }}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Diárias</Label>
+              <Input
+                type="number"
+                min={1}
+                step={1}
+                value={customItem.billing_days ?? 1}
+                onChange={(e) => {
+                  const num = Math.max(1, parseInt(e.target.value || '1', 10));
+                  setCustomItem(prev => ({ ...prev, billing_days: num }));
+                }}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Preço / ponto-dia (R$)</Label>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                defaultValue={customItem.unit_price_point_day ?? 0}
+                onBlur={(e) => {
+                  const num = parseFloat(e.target.value) || 0;
+                  setCustomItem(prev => ({ ...prev, unit_price_point_day: num, unit_price: num }));
+                }}
+              />
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {(customItem.quantity_points ?? 1)} pts × {(customItem.billing_days ?? 1)} diárias × R${' '}
+            {(customItem.unit_price_point_day ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+          </p>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Desconto (%)</Label>
+              <Input
+                type="number"
+                min="0"
+                max="100"
+                step="0.1"
+                defaultValue={customItem.discount_percent}
+                onBlur={(e) => {
+                  const num = parseFloat(e.target.value) || 0;
+                  setCustomItem(prev => ({ ...prev, discount_percent: num }));
+                }}
+              />
+            </div>
+            <div className="flex items-end">
+              <div className="w-full p-3 rounded-lg bg-sky-100 dark:bg-sky-900/40 text-right">
+                <div className="text-xs text-muted-foreground">Total do item</div>
+                <div className="text-lg font-bold text-sky-700 dark:text-sky-300">
+                  R$ {previewTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
 
       {/* Common fields */}
-      {(selectedProductId || mode === 'custom') && (
+      {(selectedProductId || mode === 'custom') && !isPointDay && (
         <>
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">

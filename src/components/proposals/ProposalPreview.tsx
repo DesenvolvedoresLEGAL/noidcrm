@@ -325,21 +325,38 @@ export function ProposalPreview({
                   </tr>
                 </thead>
                 <tbody>
-                  {displayItems.map((item, idx) => (
+                  {displayItems.map((item, idx) => {
+                    const isPointDay = (item as any).billing_type === 'point_day';
+                    const points = (item as any).quantity_points;
+                    const days = (item as any).billing_days;
+                    const ppd = (item as any).unit_price_point_day;
+                    return (
                     <tr key={item.id || idx} className="border-b border-border/50">
                       <td className="py-3">
                         <div className="font-medium">{item.name}</div>
+                        {isPointDay && points && days && (
+                          <div className="text-xs text-muted-foreground mt-0.5">
+                            {points} {points === 1 ? 'ponto' : 'pontos'} × {days} {days === 1 ? 'diária' : 'diárias'}
+                          </div>
+                        )}
                         {item.description && (
                           <div className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
                             {stripHtml(item.description)}
                           </div>
                         )}
                       </td>
-                      <td className="text-center py-3">{item.quantity}</td>
-                      <td className="text-right py-3">{formatCurrency(item.unit_price)}</td>
+                      <td className="text-center py-3">
+                        {isPointDay && points && days ? `${points}×${days}` : item.quantity}
+                      </td>
+                      <td className="text-right py-3">
+                        {isPointDay && ppd
+                          ? `${formatCurrency(ppd)} / ponto-dia`
+                          : formatCurrency(item.unit_price)}
+                      </td>
                       <td className="text-right py-3 font-medium">{formatCurrency(item.total)}</td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
                 <tfoot>
                   <tr className="border-t-2">
