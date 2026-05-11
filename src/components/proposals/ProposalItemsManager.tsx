@@ -478,78 +478,143 @@ function SortableRow({ item, index, totalItems, measurementUnits, onUpdate, onDe
         </div>
       </TableCell>
       <TableCell className="pt-3">
-        <Badge 
-          variant={isRecurring ? 'default' : 'secondary'}
-          className={isRecurring ? 'bg-emerald-500 hover:bg-emerald-600 text-white' : 'bg-amber-100 text-amber-700 hover:bg-amber-200'}
+        <Badge
+          variant={isRecurring || isPointDay ? 'default' : 'secondary'}
+          className={
+            isRecurring
+              ? 'bg-emerald-500 hover:bg-emerald-600 text-white'
+              : isPointDay
+                ? 'bg-sky-500 hover:bg-sky-600 text-white'
+                : 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+          }
         >
           {isRecurring ? (
             <><Repeat className="h-3 w-3 mr-1" />MRR</>
+          ) : isPointDay ? (
+            <><Zap className="h-3 w-3 mr-1" />Ponto-dia</>
           ) : (
             <><Zap className="h-3 w-3 mr-1" />Avulso</>
           )}
         </Badge>
       </TableCell>
-      <TableCell className="pt-3">
-        <Input
-          type="number"
-          min="1"
-          step="0.01"
-          defaultValue={item.quantity}
-          onBlur={(e) => {
-            const num = parseFloat(e.target.value);
-            onUpdate(item.id!, { quantity: num > 0 ? num : 1 });
-          }}
-          className="w-20 h-8 text-sm"
-        />
-      </TableCell>
-      <TableCell className="pt-3">
-        <Select 
-          value={item.measurement_unit_id || ''} 
-          onValueChange={(value) => onUpdate(item.id!, { measurement_unit_id: value || undefined })}
-        >
-          <SelectTrigger className="w-20 h-8 text-sm">
-            <SelectValue placeholder="-" />
-          </SelectTrigger>
-          <SelectContent>
-            {measurementUnits.map(unit => (
-              <SelectItem key={unit.id} value={unit.id}>
-                {unit.abbreviation}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </TableCell>
-      <TableCell className="pt-3">
-        <Input
-          type="number"
-          min="0"
-          step="0.01"
-          defaultValue={item.unit_cost}
-          onBlur={(e) => {
-            const num = parseFloat(e.target.value);
-            onUpdate(item.id!, { unit_cost: num >= 0 ? num : 0 });
-          }}
-          className="w-28 h-8 text-sm"
-        />
-      </TableCell>
-      <TableCell className="pt-3">
-        <div className="flex flex-col">
-          <Input
-            type="number"
-            min="0"
-            step="0.01"
-            defaultValue={item.unit_price}
-            onBlur={(e) => {
-              const num = parseFloat(e.target.value);
-              onUpdate(item.id!, { unit_price: num >= 0 ? num : 0 });
-            }}
-            className="w-28 h-8 text-sm"
-          />
-          {isRecurring && (
-            <span className="text-xs text-emerald-600 mt-0.5">/mês</span>
-          )}
-        </div>
-      </TableCell>
+      {isPointDay ? (
+        <>
+          <TableCell className="pt-3" colSpan={2}>
+            <div className="flex items-center gap-1">
+              <Input
+                type="number"
+                min="1"
+                step="1"
+                defaultValue={item.quantity_points ?? 1}
+                onBlur={(e) => {
+                  const num = Math.max(1, parseInt(e.target.value || '1', 10));
+                  onUpdate(item.id!, { quantity_points: num });
+                }}
+                className="w-16 h-8 text-sm"
+                title="Pontos"
+              />
+              <span className="text-xs text-muted-foreground">pts ×</span>
+              <Input
+                type="number"
+                min="1"
+                step="1"
+                defaultValue={item.billing_days ?? 1}
+                onBlur={(e) => {
+                  const num = Math.max(1, parseInt(e.target.value || '1', 10));
+                  onUpdate(item.id!, { billing_days: num });
+                }}
+                className="w-16 h-8 text-sm"
+                title="Diárias"
+              />
+              <span className="text-xs text-muted-foreground">dias</span>
+            </div>
+          </TableCell>
+          <TableCell className="pt-3" />
+          <TableCell className="pt-3">
+            <div className="flex flex-col">
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                defaultValue={item.unit_price_point_day ?? item.unit_price ?? 0}
+                onBlur={(e) => {
+                  const num = parseFloat(e.target.value);
+                  onUpdate(item.id!, {
+                    unit_price_point_day: num >= 0 ? num : 0,
+                    unit_price: num >= 0 ? num : 0,
+                  });
+                }}
+                className="w-28 h-8 text-sm"
+              />
+              <span className="text-xs text-sky-600 mt-0.5">/ponto-dia</span>
+            </div>
+          </TableCell>
+        </>
+      ) : (
+        <>
+          <TableCell className="pt-3">
+            <Input
+              type="number"
+              min="1"
+              step="0.01"
+              defaultValue={item.quantity}
+              onBlur={(e) => {
+                const num = parseFloat(e.target.value);
+                onUpdate(item.id!, { quantity: num > 0 ? num : 1 });
+              }}
+              className="w-20 h-8 text-sm"
+            />
+          </TableCell>
+          <TableCell className="pt-3">
+            <Select
+              value={item.measurement_unit_id || ''}
+              onValueChange={(value) => onUpdate(item.id!, { measurement_unit_id: value || undefined })}
+            >
+              <SelectTrigger className="w-20 h-8 text-sm">
+                <SelectValue placeholder="-" />
+              </SelectTrigger>
+              <SelectContent>
+                {measurementUnits.map(unit => (
+                  <SelectItem key={unit.id} value={unit.id}>
+                    {unit.abbreviation}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </TableCell>
+          <TableCell className="pt-3">
+            <Input
+              type="number"
+              min="0"
+              step="0.01"
+              defaultValue={item.unit_cost}
+              onBlur={(e) => {
+                const num = parseFloat(e.target.value);
+                onUpdate(item.id!, { unit_cost: num >= 0 ? num : 0 });
+              }}
+              className="w-28 h-8 text-sm"
+            />
+          </TableCell>
+          <TableCell className="pt-3">
+            <div className="flex flex-col">
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                defaultValue={item.unit_price}
+                onBlur={(e) => {
+                  const num = parseFloat(e.target.value);
+                  onUpdate(item.id!, { unit_price: num >= 0 ? num : 0 });
+                }}
+                className="w-28 h-8 text-sm"
+              />
+              {isRecurring && (
+                <span className="text-xs text-emerald-600 mt-0.5">/mês</span>
+              )}
+            </div>
+          </TableCell>
+        </>
+      )}
       <TableCell className="pt-3">
         <Input
           type="number"
