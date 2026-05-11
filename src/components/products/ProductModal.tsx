@@ -153,9 +153,11 @@ export function ProductModal({ open, onOpenChange, product }: ProductModalProps)
         counts_for_commission: (product as any)?.counts_for_commission ?? true,
       });
       setImagePreview(product?.image_url || '');
+      if (!product) setBomItems([]);
     } else {
       form.reset();
       setImagePreview('');
+      setBomItems([]);
     }
   }, [open, product, form]);
 
