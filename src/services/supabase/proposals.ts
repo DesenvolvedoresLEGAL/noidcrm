@@ -947,39 +947,67 @@ export async function updateProposalTotals(proposalId: string): Promise<void> {
  * Called after saving proposal items to keep values in sync
  */
 export async function syncOpportunityValue(proposalId: string): Promise<void> {
-  // Fetch the proposal with its opportunity_id and total_amount
+  // Fetch the proposal with its opportunity_id and ALL fields needed to compute the
+  // approved commercial value (priority: payment_expected_amount > dynamic_pricing_current_amount
+  // > snapshot.current_amount > total_amount > value).
   const { data: proposal, error } = await supabase
     .from('proposals')
-    .select('opportunity_id, total_amount')
+    .select(
+      'opportunity_id, total_amount, value, payment_expected_amount, dynamic_pricing_enabled, dynamic_pricing_status, dynamic_pricing_current_amount, dynamic_pricing_snapshot',
+    )
     .eq('id', proposalId)
     .single();
-  
+
   if (error) {
     console.error('[syncOpportunityValue] Error fetching proposal:', error);
     throw new Error(`Erro ao buscar proposta: ${error.message}`);
   }
-  
+
   if (!proposal?.opportunity_id) {
     console.log('[syncOpportunityValue] No opportunity linked, skipping sync');
     return;
   }
-  
+
   // Calculate commission total from proposal items
   const totals = await calculateProposalTotal(proposalId);
-  
-  // Update the opportunity's valor_previsto and commission_value
+
+  // Resolve approved value (dynamic pricing aware)
+  const p: any = proposal;
+  const dynActive =
+    !!p.dynamic_pricing_enabled &&
+    (!p.dynamic_pricing_status ||
+      ['active', 'current', 'vigente', 'approved', 'aprovado'].includes(
+        String(p.dynamic_pricing_status).toLowerCase(),
+      ));
+  const dynCurrent = Number(p.dynamic_pricing_current_amount) || 0;
+  const snapshotCurrent = Number(p.dynamic_pricing_snapshot?.current_amount) || 0;
+  const expected = Number(p.payment_expected_amount) || 0;
+  const approvedValue =
+    expected > 0
+      ? expected
+      : dynActive && dynCurrent > 0
+        ? dynCurrent
+        : dynActive && snapshotCurrent > 0
+          ? snapshotCurrent
+          : Number(p.total_amount) || Number(p.value) || 0;
+
   const { error: updateError } = await supabase
     .from('opportunities')
-    .update({ 
-      valor_previsto: proposal.total_amount || 0,
+    .update({
+      valor_previsto: approvedValue,
       commission_value: totals.commissionTotal || 0,
     })
     .eq('id', proposal.opportunity_id);
-  
+
   if (updateError) {
     console.error('[syncOpportunityValue] Error updating opportunity:', updateError);
     throw new Error(`Erro ao sincronizar valor da oportunidade: ${updateError.message}`);
   }
-  
-  console.log('[syncOpportunityValue] Updated opportunity - valor_previsto:', proposal.total_amount, 'commission_value:', totals.commissionTotal);
+
+  console.log(
+    '[syncOpportunityValue] Updated opportunity - valor_previsto:',
+    approvedValue,
+    'commission_value:',
+    totals.commissionTotal,
+  );
 }
