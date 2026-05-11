@@ -8,122 +8,122 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
+    /* HUMANOID Neural Cognition Spectrum — Light */
     --background: 0 0% 100%;
-    --foreground: 250 80% 8%;
+    --foreground: 230 53% 13%;
 
     --card: 0 0% 100%;
-    --card-foreground: 250 80% 8%;
+    --card-foreground: 230 53% 13%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 250 80% 8%;
+    --popover-foreground: 230 53% 13%;
 
-    /* LEGAL Primary Purple #4D2BFB */
-    --primary: 254 95% 58%;
-    --primary-foreground: 0 0% 100%;
-    --primary-light: 254 95% 70%;
-    --primary-dark: 254 95% 45%;
+    /* Indigo Intelligence #3742FF */
+    --primary: 236 100% 61%;
+    --primary-foreground: 240 14% 96%;
+    --primary-light: 236 100% 72%;
+    --primary-dark: 236 70% 45%;
 
-    /* LEGAL Cyan #03F9FF */
-    --accent: 183 99% 51%;
-    --accent-foreground: 250 80% 8%;
-    --accent-light: 183 99% 65%;
-    
-    /* LEGAL Dark Blue #020CBC */
-    --secondary: 242 98% 40%;
-    --secondary-foreground: 0 0% 100%;
+    /* Electric Cyan #03E3FF */
+    --accent: 188 100% 51%;
+    --accent-foreground: 230 53% 13%;
+    --accent-light: 188 100% 65%;
 
-    --muted: 250 20% 96%;
-    --muted-foreground: 250 15% 45%;
+    /* Deep Neural Blue #101733 */
+    --secondary: 230 53% 13%;
+    --secondary-foreground: 240 14% 96%;
 
-    --destructive: 0 84% 60%;
+    --muted: 240 14% 96%;
+    --muted-foreground: 230 20% 40%;
+
+    --destructive: 0 100% 68%;
     --destructive-foreground: 0 0% 100%;
 
-    /* Semantic Status Tokens */
-    --success: 142 71% 45%;
+    /* Functional palette */
+    --success: 151 67% 49%;
     --success-foreground: 0 0% 100%;
-    --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 100%;
-    --info: 217 91% 60%;
-    --info-foreground: 0 0% 100%;
+    --warning: 44 92% 50%;            /* Quantum Gold */
+    --warning-foreground: 230 53% 13%;
+    --info: 188 100% 51%;
+    --info-foreground: 230 53% 13%;
 
-    --border: 250 20% 90%;
-    --input: 250 20% 90%;
-    --ring: 254 95% 58%;
+    --border: 240 14% 90%;
+    --input: 240 14% 90%;
+    --ring: 236 100% 61%;
 
     --radius: 1rem;
 
-    /* Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(254 95% 58%), hsl(183 99% 51%));
-    --gradient-subtle: linear-gradient(180deg, hsl(0 0% 100%), hsl(250 20% 98%));
-    
-    /* Shadows */
-    --shadow-card: 0 1px 3px hsl(250 20% 10% / 0.08);
-    --shadow-card-hover: 0 8px 24px hsl(254 95% 58% / 0.12);
-    --shadow-glow: 0 0 40px hsl(254 95% 58% / 0.2);
+    --gradient-neural: linear-gradient(135deg, hsl(236 100% 61%) 0%, hsl(188 100% 51%) 60%, hsl(44 92% 50%) 100%);
+    --gradient-cognitive: linear-gradient(180deg, hsl(230 53% 13%) 0%, hsl(0 0% 4%) 100%);
+    --gradient-primary: var(--gradient-neural);
+    --gradient-subtle: linear-gradient(180deg, hsl(0 0% 100%), hsl(240 14% 97%));
 
-    /* Sidebar */
-    --sidebar-background: 250 95% 98%;
-    --sidebar-foreground: 250 80% 8%;
-    --sidebar-primary: 254 95% 58%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 250 20% 96%;
-    --sidebar-accent-foreground: 250 80% 8%;
-    --sidebar-border: 250 20% 90%;
-    --sidebar-ring: 254 95% 58%;
+    --shadow-card: 0 1px 3px hsl(230 53% 13% / 0.08);
+    --shadow-card-hover: 0 8px 24px hsl(236 100% 61% / 0.15);
+    --shadow-glow: 0 0 40px hsl(236 100% 61% / 0.25);
+
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 230 53% 13%;
+    --sidebar-primary: 236 100% 61%;
+    --sidebar-primary-foreground: 240 14% 96%;
+    --sidebar-accent: 240 14% 96%;
+    --sidebar-accent-foreground: 230 53% 13%;
+    --sidebar-border: 240 14% 90%;
+    --sidebar-ring: 236 100% 61%;
   }
 
   .dark {
-    --background: 250 80% 5%;
-    --foreground: 0 0% 98%;
+    /* HUMANOID Neural Cognition Spectrum — Dark */
+    --background: 230 53% 13%;        /* Deep Neural Blue */
+    --foreground: 240 14% 96%;        /* Mind White */
 
-    --card: 250 60% 8%;
-    --card-foreground: 0 0% 98%;
+    --card: 0 0% 4%;                  /* Cortex Black */
+    --card-foreground: 240 14% 96%;
 
-    --popover: 250 60% 8%;
-    --popover-foreground: 0 0% 98%;
+    --popover: 0 0% 4%;
+    --popover-foreground: 240 14% 96%;
 
-    --primary: 254 95% 58%;
-    --primary-foreground: 0 0% 100%;
-    --primary-light: 254 95% 70%;
-    --primary-dark: 254 95% 45%;
+    --primary: 236 100% 61%;
+    --primary-foreground: 240 14% 96%;
+    --primary-light: 236 100% 72%;
+    --primary-dark: 236 70% 45%;
 
-    --accent: 183 99% 51%;
-    --accent-foreground: 250 80% 8%;
-    --accent-light: 183 99% 65%;
+    --accent: 188 100% 51%;
+    --accent-foreground: 230 53% 13%;
+    --accent-light: 188 100% 65%;
 
-    --secondary: 242 98% 50%;
-    --secondary-foreground: 0 0% 100%;
+    --secondary: 230 53% 18%;
+    --secondary-foreground: 240 14% 96%;
 
-    --muted: 250 40% 15%;
-    --muted-foreground: 250 20% 65%;
+    --muted: 230 40% 18%;
+    --muted-foreground: 240 14% 70%;
 
-    --destructive: 0 84% 60%;
+    --destructive: 0 100% 68%;
     --destructive-foreground: 0 0% 100%;
 
-    /* Semantic Status Tokens */
-    --success: 142 71% 50%;
+    --success: 151 67% 49%;
     --success-foreground: 0 0% 100%;
-    --warning: 38 92% 55%;
-    --warning-foreground: 0 0% 100%;
-    --info: 217 91% 65%;
-    --info-foreground: 0 0% 100%;
+    --warning: 44 92% 50%;
+    --warning-foreground: 230 53% 13%;
+    --info: 188 100% 51%;
+    --info-foreground: 230 53% 13%;
 
-    --border: 250 40% 20%;
-    --input: 250 40% 20%;
-    --ring: 254 95% 58%;
+    --border: 230 40% 22%;
+    --input: 230 40% 22%;
+    --ring: 236 100% 61%;
 
-    --shadow-card: 0 1px 3px hsl(0 0% 0% / 0.3);
-    --shadow-card-hover: 0 8px 24px hsl(254 95% 58% / 0.25);
-    --shadow-glow: 0 0 40px hsl(254 95% 58% / 0.3);
+    --shadow-card: 0 1px 3px hsl(0 0% 0% / 0.4);
+    --shadow-card-hover: 0 8px 24px hsl(236 100% 61% / 0.3);
+    --shadow-glow: 0 0 40px hsl(236 100% 61% / 0.35);
 
-    --sidebar-background: 250 60% 8%;
-    --sidebar-foreground: 0 0% 98%;
-    --sidebar-primary: 254 95% 58%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 250 40% 15%;
-    --sidebar-accent-foreground: 0 0% 98%;
-    --sidebar-border: 250 40% 20%;
-    --sidebar-ring: 254 95% 58%;
+    --sidebar-background: 0 0% 4%;    /* Cortex Black */
+    --sidebar-foreground: 240 14% 96%;
+    --sidebar-primary: 236 100% 61%;
+    --sidebar-primary-foreground: 240 14% 96%;
+    --sidebar-accent: 230 40% 18%;
+    --sidebar-accent-foreground: 240 14% 96%;
+    --sidebar-border: 230 40% 22%;
+    --sidebar-ring: 236 100% 61%;
   }
 }
 
