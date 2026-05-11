@@ -34261,6 +34261,8 @@ export type Database = {
           allocation_item_type: string
           allocation_status: string
           created_at: string
+          custom_config: Json
+          equipment_profile: string
           id: string
           inventory_item_code: string
           inventory_item_name: string
