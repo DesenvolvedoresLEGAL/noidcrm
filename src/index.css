@@ -18,11 +18,11 @@ All colors MUST be HSL.
     --popover: 0 0% 100%;
     --popover-foreground: 230 53% 13%;
 
-    /* Indigo Intelligence #3742FF */
-    --primary: 236 100% 61%;
+    /* Indigo Intelligence v2 #2F3DF5 — institutional, less consumer */
+    --primary: 235 91% 57%;
     --primary-foreground: 240 14% 96%;
-    --primary-light: 236 100% 72%;
-    --primary-dark: 236 70% 45%;
+    --primary-light: 235 91% 68%;
+    --primary-dark: 235 70% 42%;
 
     /* Electric Cyan #03E3FF */
     --accent: 188 100% 51%;
@@ -47,29 +47,44 @@ All colors MUST be HSL.
     --info: 188 100% 51%;
     --info-foreground: 230 53% 13%;
 
-    --border: 240 14% 90%;
-    --input: 240 14% 90%;
-    --ring: 236 100% 61%;
+    --border: 240 14% 92%;
+    --input: 240 14% 92%;
+    --ring: 235 91% 57%;
 
-    --radius: 1rem;
+    --radius: 0.875rem;                /* 14px — premium minimal */
 
-    --gradient-neural: linear-gradient(135deg, hsl(236 100% 61%) 0%, hsl(188 100% 51%) 60%, hsl(44 92% 50%) 100%);
+    /* Cognitive card hierarchy */
+    --card-primary: 0 0% 100%;
+    --card-primary-foreground: 230 53% 13%;
+    --card-operational: 0 0% 100%;
+    --card-operational-foreground: 230 53% 13%;
+    --card-passive: 240 14% 98%;
+    --card-passive-foreground: 230 20% 35%;
+
+    --gradient-neural: linear-gradient(135deg, hsl(235 91% 57%) 0%, hsl(188 100% 51%) 60%, hsl(44 92% 50%) 100%);
     --gradient-cognitive: linear-gradient(180deg, hsl(230 53% 13%) 0%, hsl(0 0% 4%) 100%);
     --gradient-primary: var(--gradient-neural);
-    --gradient-subtle: linear-gradient(180deg, hsl(0 0% 100%), hsl(240 14% 97%));
+    --gradient-subtle: linear-gradient(180deg, hsl(0 0% 100%), hsl(240 14% 98%));
 
-    --shadow-card: 0 1px 3px hsl(230 53% 13% / 0.08);
-    --shadow-card-hover: 0 8px 24px hsl(236 100% 61% / 0.15);
-    --shadow-glow: 0 0 40px hsl(236 100% 61% / 0.25);
+    /* Institutional shadows — almost invisible */
+    --shadow-card: 0 1px 2px hsl(230 53% 13% / 0.04);
+    --shadow-card-hover: 0 4px 16px hsl(230 53% 13% / 0.06);
+    --shadow-elevated: 0 8px 28px hsl(230 53% 13% / 0.08);
+    --shadow-glow: 0 0 24px hsl(235 91% 57% / 0.15);
+
+    /* Premium motion */
+    --ease-cognitive: cubic-bezier(0.16, 1, 0.3, 1);
+    --duration-fast: 150ms;
+    --duration-base: 200ms;
 
     --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 230 53% 13%;
-    --sidebar-primary: 236 100% 61%;
+    --sidebar-foreground: 230 30% 32%;
+    --sidebar-primary: 235 91% 57%;
     --sidebar-primary-foreground: 240 14% 96%;
-    --sidebar-accent: 240 14% 96%;
-    --sidebar-accent-foreground: 230 53% 13%;
-    --sidebar-border: 240 14% 90%;
-    --sidebar-ring: 236 100% 61%;
+    --sidebar-accent: 235 60% 96%;
+    --sidebar-accent-foreground: 235 91% 50%;
+    --sidebar-border: 240 14% 94%;
+    --sidebar-ring: 235 91% 57%;
   }
 
   .dark {
@@ -83,10 +98,10 @@ All colors MUST be HSL.
     --popover: 0 0% 4%;
     --popover-foreground: 240 14% 96%;
 
-    --primary: 236 100% 61%;
+    --primary: 235 91% 62%;
     --primary-foreground: 240 14% 96%;
-    --primary-light: 236 100% 72%;
-    --primary-dark: 236 70% 45%;
+    --primary-light: 235 91% 72%;
+    --primary-dark: 235 70% 45%;
 
     --accent: 188 100% 51%;
     --accent-foreground: 230 53% 13%;
@@ -110,20 +125,29 @@ All colors MUST be HSL.
 
     --border: 230 40% 22%;
     --input: 230 40% 22%;
-    --ring: 236 100% 61%;
+    --ring: 235 91% 62%;
 
-    --shadow-card: 0 1px 3px hsl(0 0% 0% / 0.4);
-    --shadow-card-hover: 0 8px 24px hsl(236 100% 61% / 0.3);
-    --shadow-glow: 0 0 40px hsl(236 100% 61% / 0.35);
+    /* Cognitive card hierarchy — dark */
+    --card-primary: 230 45% 10%;
+    --card-primary-foreground: 240 14% 96%;
+    --card-operational: 0 0% 4%;
+    --card-operational-foreground: 240 14% 96%;
+    --card-passive: 230 40% 14%;
+    --card-passive-foreground: 240 14% 70%;
 
-    --sidebar-background: 0 0% 4%;    /* Cortex Black */
-    --sidebar-foreground: 240 14% 96%;
-    --sidebar-primary: 236 100% 61%;
+    --shadow-card: 0 1px 2px hsl(0 0% 0% / 0.35);
+    --shadow-card-hover: 0 4px 16px hsl(0 0% 0% / 0.45);
+    --shadow-elevated: 0 8px 28px hsl(0 0% 0% / 0.55);
+    --shadow-glow: 0 0 24px hsl(235 91% 62% / 0.22);
+
+    --sidebar-background: 0 0% 4%;
+    --sidebar-foreground: 240 14% 72%;
+    --sidebar-primary: 235 91% 62%;
     --sidebar-primary-foreground: 240 14% 96%;
-    --sidebar-accent: 230 40% 18%;
-    --sidebar-accent-foreground: 240 14% 96%;
-    --sidebar-border: 230 40% 22%;
-    --sidebar-ring: 236 100% 61%;
+    --sidebar-accent: 235 60% 14%;
+    --sidebar-accent-foreground: 235 91% 78%;
+    --sidebar-border: 230 40% 16%;
+    --sidebar-ring: 235 91% 62%;
   }
 }
 
@@ -248,13 +272,72 @@ All colors MUST be HSL.
     background-image: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--accent)));
   }
 
-  /* Hover lift effect */
+  /* Hover lift effect — premium subtle */
   .hover-lift {
-    @apply transition-transform duration-300;
+    transition: transform var(--duration-base, 200ms) var(--ease-cognitive, cubic-bezier(0.16, 1, 0.3, 1)),
+                box-shadow var(--duration-base, 200ms) var(--ease-cognitive, cubic-bezier(0.16, 1, 0.3, 1));
   }
 
   .hover-lift:hover {
-    transform: translateY(-4px);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-card-hover);
+  }
+
+  /* ─── Cognitive card hierarchy ─── */
+  .card-intelligence {
+    @apply relative rounded-[14px] border;
+    background: hsl(var(--card-primary));
+    color: hsl(var(--card-primary-foreground));
+    border-color: hsl(var(--border) / 0.6);
+    box-shadow: var(--shadow-card);
+    transition: box-shadow var(--duration-base) var(--ease-cognitive),
+                transform var(--duration-base) var(--ease-cognitive);
+  }
+  .card-intelligence:hover {
+    box-shadow: var(--shadow-elevated);
+  }
+
+  .card-operational {
+    @apply relative rounded-[14px] border;
+    background: hsl(var(--card-operational));
+    color: hsl(var(--card-operational-foreground));
+    border-color: hsl(var(--border) / 0.7);
+    box-shadow: var(--shadow-card);
+  }
+
+  .card-passive {
+    @apply relative rounded-[14px] border;
+    background: hsl(var(--card-passive));
+    color: hsl(var(--card-passive-foreground));
+    border-color: hsl(var(--border) / 0.5);
+  }
+
+  /* ─── Premium motion utility ─── */
+  .ease-cognitive {
+    transition-timing-function: var(--ease-cognitive);
+  }
+
+  /* ─── Cockpit sidebar polish ─── */
+  [data-sidebar="menu-button"] {
+    transition: background-color var(--duration-base) var(--ease-cognitive),
+                color var(--duration-base) var(--ease-cognitive);
+  }
+  [data-sidebar="menu-button"] svg {
+    opacity: 0.62;
+    transition: opacity var(--duration-base) var(--ease-cognitive);
+  }
+  [data-sidebar="menu-button"]:hover svg,
+  [data-sidebar="menu-button"][data-active="true"] svg {
+    opacity: 1;
+  }
+  [data-sidebar="menu-button"][data-active="true"] {
+    box-shadow: inset 2px 0 0 hsl(var(--primary)),
+                0 0 0 1px hsl(var(--primary) / 0.06);
+  }
+  [data-sidebar="group-label"] {
+    @apply uppercase tracking-[0.14em];
+    font-size: 0.68rem;
+    color: hsl(var(--sidebar-foreground) / 0.5);
   }
 
   /* Staggered animation delays */
