@@ -231,6 +231,39 @@ export function InventoryItemFormDialog({ open, onOpenChange, item }: Props) {
   const noCategories = serializedCategories.length === 0;
   const noLocations = activeLocations.length === 0;
 
+  // Detect when the chosen category looks like a router/chip but the profile is generic
+  const selectedCategory = useMemo(
+    () => (categories ?? []).find((c) => c.id === form.watch('category_id')),
+    [categories, form.watch('category_id')],
+  );
+  const categoryName = (selectedCategory as any)?.name as string | undefined;
+  const looksLikeRouter = !!categoryName && /(rote|wifi|wi-fi|modem|router)/i.test(categoryName);
+  const looksLikeSim = !!categoryName && /(chip|sim|esim)/i.test(categoryName);
+  const profileMismatch =
+    profile === 'generic' && (looksLikeRouter || looksLikeSim) && !!selectedCategory;
+
+  const { update: updateCategory } = useInventoryCategoryMutations();
+  const promoteCategoryProfile = async () => {
+    if (!selectedCategory) return;
+    const desired: 'router' | 'sim_card' = looksLikeRouter ? 'router' : 'sim_card';
+    try {
+      await updateCategory.mutateAsync({
+        id: selectedCategory.id,
+        input: { equipment_profile: desired },
+      });
+      setProfile(desired);
+      form.setValue('equipment_profile', desired, { shouldValidate: true });
+      toast.success(
+        desired === 'router'
+          ? 'Categoria marcada como Roteador. Preencha os dados de fábrica abaixo.'
+          : 'Categoria marcada como Chip. Preencha os dados do SIM abaixo.',
+      );
+    } catch (err: any) {
+      toast.error(err?.message ?? 'Não foi possível atualizar a categoria.');
+    }
+  };
+
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
