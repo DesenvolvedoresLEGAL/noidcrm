@@ -364,7 +364,56 @@ export function ProductModal({ open, onOpenChange, product }: ProductModalProps)
                 </div>
 
                 {/* Conditional Fields Based on Billing Type */}
-                {billingType === 'one_time' ? (
+                {billingType === 'point_day' ? (
+                  /* PONTO-DIA FIELDS */
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <Label htmlFor="default_quantity_points">Pontos padrão</Label>
+                        <Input
+                          id="default_quantity_points"
+                          type="number"
+                          min="1"
+                          step="1"
+                          {...form.register('default_quantity_points')}
+                          placeholder="1"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="default_billing_days">Diárias padrão</Label>
+                        <Input
+                          id="default_billing_days"
+                          type="number"
+                          min="1"
+                          step="1"
+                          {...form.register('default_billing_days')}
+                          placeholder="1"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="default_unit_price_point_day">Preço por ponto-dia (R$) *</Label>
+                        <Input
+                          id="default_unit_price_point_day"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          {...form.register('default_unit_price_point_day')}
+                          placeholder="0,00"
+                          className={form.formState.errors.default_unit_price_point_day ? 'border-destructive' : ''}
+                        />
+                        {form.formState.errors.default_unit_price_point_day && (
+                          <p className="text-sm text-destructive mt-1">
+                            {form.formState.errors.default_unit_price_point_day.message as string}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="p-3 bg-sky-50 dark:bg-sky-950/30 rounded-lg border border-sky-200 dark:border-sky-800 text-sm">
+                      <strong>Cálculo:</strong> pontos × diárias × preço por ponto-dia.
+                      Estoque reservado considera apenas a quantidade de pontos durante o período do evento.
+                    </div>
+                  </div>
+                ) : billingType === 'one_time' ? (
                   /* AVULSO FIELDS */
                   <div className="space-y-4">
                     <div className="grid grid-cols-4 gap-4">
