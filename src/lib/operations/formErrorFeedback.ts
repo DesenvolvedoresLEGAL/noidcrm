@@ -20,6 +20,18 @@ const FIELD_LABELS: Record<string, string> = {
   router_factory: 'Dados de fábrica do roteador',
   sim_card_factory: 'Dados do chip',
   technical_specs: 'Especificações técnicas',
+  // Leaf-level (router)
+  'router_factory.ssid_factory': 'SSID de fábrica',
+  'router_factory.wifi_password_factory': 'Senha Wi-Fi de fábrica',
+  'router_factory.admin_user': 'Usuário admin',
+  'router_factory.admin_password': 'Senha admin',
+  'router_factory.imei': 'IMEI',
+  // Leaf-level (sim card)
+  'sim_card_factory.iccid': 'ICCID',
+  'sim_card_factory.line_number': 'Número da linha',
+  'sim_card_factory.carrier': 'Operadora',
+  'sim_card_factory.apn': 'APN',
+  'sim_card_factory.pin': 'PIN',
 };
 
 function firstLeaf(errors: any, path: string[] = []): { path: string[]; message?: string } | null {
@@ -38,13 +50,11 @@ function firstLeaf(errors: any, path: string[] = []): { path: string[]; message?
 
 function findFocusTarget(path: string[]): HTMLElement | null {
   if (path.length === 0) return null;
-  // Try id by leaf or root key (we use ids on inputs like "name", "asset_code")
-  const ids = [path.join('.'), path[0]];
+  const ids = [path.join('.'), path[path.length - 1], path[0]];
   for (const id of ids) {
     const el = document.getElementById(id);
     if (el) return el;
   }
-  // Generic: any element with [aria-invalid="true"] inside the dialog
   const invalid = document.querySelector<HTMLElement>('[role="dialog"] [aria-invalid="true"]');
   if (invalid) return invalid;
   return null;
@@ -56,8 +66,8 @@ export function showFormErrors(errors: FieldErrors): void {
     toast.error('Revise os campos destacados antes de continuar.');
     return;
   }
-  const rootKey = leaf.path[0];
-  const label = FIELD_LABELS[rootKey] ?? rootKey;
+  const dotted = leaf.path.join('.');
+  const label = FIELD_LABELS[dotted] ?? FIELD_LABELS[leaf.path[0]] ?? leaf.path[0];
   const msg = leaf.message ? `${label}: ${leaf.message}` : `Revise o campo "${label}".`;
   toast.error(msg);
 
