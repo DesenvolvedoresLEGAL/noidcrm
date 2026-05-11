@@ -765,24 +765,43 @@ REMETENTE: SDR da NOID.`,
       }
     }
 
+      // (sucesso async — resposta já foi enviada ao cliente)
+     } catch (e) {
+       console.error("run-enrichment background error:", e);
+       try {
+         await supabase
+           .from("enrichment_runs")
+           .update({
+             status: "failed",
+             merge_status: "failed",
+             error_message: e instanceof Error ? e.message : String(e),
+             finished_at: new Date().toISOString(),
+           })
+           .eq("id", run.id);
+       } catch (markErr) {
+         console.error("failed to mark run as failed:", markErr);
+       }
+     }
+    })();
+
+    // Schedule background task and respond immediately so the gateway
+    // never times out (was hitting 504 after 60s).
+    // @ts-ignore - EdgeRuntime is available in Supabase Deno runtime
+    if (typeof EdgeRuntime !== "undefined" && EdgeRuntime?.waitUntil) {
+      // @ts-ignore
+      EdgeRuntime.waitUntil(pipeline);
+    } else {
+      pipeline.catch((err) => console.error("pipeline orphan error:", err));
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
         run_id: run.id,
-        status: providersFailed.length > 0 && providersCompleted.length === 0 ? "failed" : "completed",
-        quality_score: qualityScore,
-        quality_grade: qualityGrade,
-        quality_label: qualityLabel,
-        fallback_used: fallbackUsed,
-        fallback_reason: fallbackUsed ? fallbackReason : null,
-        content_length: totalContentLength,
-        missing_fields: missingFields,
-        prompt_version: PROMPT_VERSION,
-        has_company_profile: hasNormalized,
-        has_brief: !!briefData,
-        score_bonus: scoreBonus,
+        status: "processing",
+        message: "Enrichment iniciado em background. Acompanhe via enrichment_runs.",
       }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 202, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {
     console.error("run-enrichment error:", e);
