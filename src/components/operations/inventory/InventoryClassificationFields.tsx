@@ -28,6 +28,7 @@ interface Props {
     operational_type: OperationalType;
     criticality: Criticality;
   }) => void;
+  onCategoryProfileChange?: (profile: 'generic' | 'router' | 'sim_card') => void;
   errors?: {
     category_id?: { message?: string };
     family_id?: { message?: string };
