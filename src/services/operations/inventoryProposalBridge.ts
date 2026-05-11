@@ -121,7 +121,7 @@ export async function generatePreReservationFromProposal(
           family_id: comp.inventory_family_id ?? cfg.default_inventory_family_id ?? null,
           requested_quantity: qty,
           demand_label: comp.label ?? `${it.name} — componente`,
-          demand_source: 'product_bom',
+          demand_source: 'product_rule',
           product_id: comp.component_product_id ?? it.product_id ?? null,
           proposal_item_id: it.id,
           notes: it.name,
