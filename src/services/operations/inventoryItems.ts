@@ -152,6 +152,18 @@ export async function updateSerializedItem(
       sanitizeTechnicalSpecs(input.technical_specs),
     );
   }
+  if (input.router_factory !== undefined) {
+    patch.metadata = mergeFactoryRouter(
+      patch.metadata ?? input._currentMetadata,
+      input.router_factory,
+    );
+  }
+  if (input.sim_card_factory !== undefined) {
+    patch.metadata = mergeFactorySim(
+      patch.metadata ?? input._currentMetadata,
+      input.sim_card_factory,
+    );
+  }
 
   const { data, error } = await supabase
     .from('inventory_items')
