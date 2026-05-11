@@ -138,6 +138,7 @@ export default function WinLossHub() {
           data={winLossData}
           isLoading={isLoading}
           terminology={terminology}
+          pipelineType={pipelineType}
         />
 
         {/* AI Insights Banner */}
