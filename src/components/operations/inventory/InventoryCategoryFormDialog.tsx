@@ -25,6 +25,11 @@ import {
 import { ITEM_KIND_OPTIONS } from '@/lib/operations/inventoryLabels';
 import { useInventoryCategoryMutations } from '@/hooks/operations/useInventoryCategories';
 import type { InventoryCategory } from '@/services/operations/inventoryCategories';
+import {
+  EQUIPMENT_PROFILE_OPTIONS,
+  getEquipmentProfile,
+  type EquipmentProfile,
+} from '@/lib/operations/inventoryEquipmentProfile';
 
 const schema = z.object({
   name: z
@@ -36,6 +41,7 @@ const schema = z.object({
   item_kind: z.enum(['serialized', 'quantity'], {
     required_error: 'Selecione o tipo padrão',
   }),
+  equipment_profile: z.enum(['generic', 'router', 'sim_card']).default('generic'),
   sort_order: z
     .number({ invalid_type_error: 'Informe um número inteiro' })
     .int('Apenas números inteiros')
@@ -61,6 +67,7 @@ export function InventoryCategoryFormDialog({ open, onOpenChange, category }: Pr
       name: '',
       description: '',
       item_kind: 'serialized',
+      equipment_profile: 'generic',
       sort_order: 0,
     },
   });
@@ -71,6 +78,7 @@ export function InventoryCategoryFormDialog({ open, onOpenChange, category }: Pr
         name: category?.name ?? '',
         description: category?.description ?? '',
         item_kind: (category?.item_kind as 'serialized' | 'quantity') ?? 'serialized',
+        equipment_profile: getEquipmentProfile((category as any)?.equipment_profile),
         sort_order: category?.sort_order ?? 0,
       });
     }
@@ -81,6 +89,7 @@ export function InventoryCategoryFormDialog({ open, onOpenChange, category }: Pr
       name: data.name,
       description: data.description || null,
       item_kind: data.item_kind,
+      equipment_profile: data.equipment_profile,
       sort_order: data.sort_order,
     };
     try {
@@ -156,6 +165,30 @@ export function InventoryCategoryFormDialog({ open, onOpenChange, category }: Pr
             </Select>
             <p className="text-xs text-muted-foreground">
               Itens serializados possuem identidade única. Itens por quantidade controlam saldo.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Perfil de equipamento</Label>
+            <Select
+              value={form.watch('equipment_profile')}
+              onValueChange={(v) =>
+                form.setValue('equipment_profile', v as EquipmentProfile, { shouldDirty: true })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {EQUIPMENT_PROFILE_OPTIONS.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Roteador exige SSID/senha de fábrica e IMEI. Chip exige ICCID, linha e APN.
             </p>
           </div>
 

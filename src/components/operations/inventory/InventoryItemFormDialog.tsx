@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -36,8 +36,21 @@ import {
   type Criticality,
   type OperationalType,
 } from '@/lib/operations/inventoryClassification';
+import {
+  getRouterFactory,
+  getSimCardFactory,
+  routerFactorySchema,
+  simCardFactorySchema,
+  type EquipmentProfile,
+  type RouterFactory,
+  type SimCardFactory,
+} from '@/lib/operations/inventoryEquipmentProfile';
 import { TechnicalSpecsSection } from './TechnicalSpecsSection';
 import { InventoryClassificationFields } from './InventoryClassificationFields';
+import {
+  RouterFactoryFields,
+  SimCardFactoryFields,
+} from './EquipmentProfileFactoryFields';
 import { useInventoryCategories } from '@/hooks/operations/useInventoryCategories';
 import { useInventoryLocations } from '@/hooks/operations/useInventoryLocations';
 import { useInventoryItemMutations } from '@/hooks/operations/useInventoryItems';
@@ -52,29 +65,50 @@ const STATUSES = [
   'lost',
 ] as const;
 
-const schema = z.object({
-  name: z.string().trim().min(2, 'Mínimo 2 caracteres').max(120, 'Máximo 120 caracteres'),
-  description: z.string().trim().max(500, 'Máximo 500 caracteres').optional().or(z.literal('')),
-  category_id: z.string().uuid('Selecione uma categoria.'),
-  family_id: z.string().uuid().nullable().optional(),
-  operational_type: z.enum([
-    'equipment','accessory','part','consumable','logical_kit','infrastructure','tool','other',
-  ]),
-  criticality: z.enum(['low','medium','high','critical']),
-  location_id: z.string().uuid('Selecione um local.'),
-  status: z.enum(STATUSES),
-  asset_code: z.string().trim().max(80, 'Máximo 80 caracteres').optional().or(z.literal('')),
-  serial_number: z
-    .string()
-    .trim()
-    .max(120, 'Máximo 120 caracteres')
-    .optional()
-    .or(z.literal('')),
-  brand: z.string().trim().max(80, 'Máximo 80 caracteres').optional().or(z.literal('')),
-  model: z.string().trim().max(120, 'Máximo 120 caracteres').optional().or(z.literal('')),
-  notes: z.string().trim().max(1000, 'Máximo 1000 caracteres').optional().or(z.literal('')),
-  technical_specs: technicalSpecsArraySchema,
-});
+const schema = z
+  .object({
+    name: z.string().trim().min(2, 'Mínimo 2 caracteres').max(120, 'Máximo 120 caracteres'),
+    description: z.string().trim().max(500, 'Máximo 500 caracteres').optional().or(z.literal('')),
+    category_id: z.string().uuid('Selecione uma categoria.'),
+    family_id: z.string().uuid().nullable().optional(),
+    operational_type: z.enum([
+      'equipment','accessory','part','consumable','logical_kit','infrastructure','tool','other',
+    ]),
+    criticality: z.enum(['low','medium','high','critical']),
+    location_id: z.string().uuid('Selecione um local.'),
+    status: z.enum(STATUSES),
+    asset_code: z.string().trim().max(80, 'Máximo 80 caracteres').optional().or(z.literal('')),
+    serial_number: z
+      .string()
+      .trim()
+      .max(120, 'Máximo 120 caracteres')
+      .optional()
+      .or(z.literal('')),
+    brand: z.string().trim().max(80, 'Máximo 80 caracteres').optional().or(z.literal('')),
+    model: z.string().trim().max(120, 'Máximo 120 caracteres').optional().or(z.literal('')),
+    notes: z.string().trim().max(1000, 'Máximo 1000 caracteres').optional().or(z.literal('')),
+    technical_specs: technicalSpecsArraySchema,
+    equipment_profile: z.enum(['generic', 'router', 'sim_card']).default('generic'),
+    router_factory: routerFactorySchema.partial().optional(),
+    sim_card_factory: simCardFactorySchema.partial().optional(),
+  })
+  .superRefine((val, ctx) => {
+    if (val.equipment_profile === 'router') {
+      const r = routerFactorySchema.safeParse(val.router_factory ?? {});
+      if (!r.success) {
+        for (const issue of r.error.issues) {
+          ctx.addIssue({ ...issue, path: ['router_factory', ...issue.path] });
+        }
+      }
+    } else if (val.equipment_profile === 'sim_card') {
+      const r = simCardFactorySchema.safeParse(val.sim_card_factory ?? {});
+      if (!r.success) {
+        for (const issue of r.error.issues) {
+          ctx.addIssue({ ...issue, path: ['sim_card_factory', ...issue.path] });
+        }
+      }
+    }
+  });
 
 type FormData = z.infer<typeof schema>;
 
@@ -117,11 +151,20 @@ export function InventoryItemFormDialog({ open, onOpenChange, item }: Props) {
       model: '',
       notes: '',
       technical_specs: [],
+      equipment_profile: 'generic',
+      router_factory: { ssid_factory: '', wifi_password_factory: '', admin_user: '', admin_password: '', imei: '' },
+      sim_card_factory: { iccid: '', line_number: '', carrier: '', apn: '', pin: '' },
     },
   });
 
+  const [profile, setProfile] = useState<EquipmentProfile>('generic');
+
   useEffect(() => {
     if (open) {
+      const initialProfile = (((item as any)?.category?.equipment_profile) ?? 'generic') as EquipmentProfile;
+      setProfile(initialProfile === 'router' || initialProfile === 'sim_card' ? initialProfile : 'generic');
+      const router = getRouterFactory(item?.metadata) ?? { ssid_factory: '', wifi_password_factory: '', admin_user: '', admin_password: '', imei: '' };
+      const sim = getSimCardFactory(item?.metadata) ?? { iccid: '', line_number: '', carrier: '', apn: '', pin: '' };
       form.reset({
         name: item?.name ?? '',
         description: item?.description ?? '',
@@ -137,12 +180,15 @@ export function InventoryItemFormDialog({ open, onOpenChange, item }: Props) {
         model: item?.model ?? '',
         notes: item?.notes ?? '',
         technical_specs: getTechnicalSpecs(item?.metadata) as TechnicalSpec[],
+        equipment_profile: initialProfile,
+        router_factory: router,
+        sim_card_factory: sim,
       });
     }
   }, [open, item, form]);
 
   const onSubmit = async (data: FormData) => {
-    const payload = {
+    const payload: any = {
       name: data.name,
       description: data.description || null,
       category_id: data.category_id,
@@ -157,6 +203,8 @@ export function InventoryItemFormDialog({ open, onOpenChange, item }: Props) {
       model: data.model || null,
       notes: data.notes || null,
       technical_specs: (data.technical_specs ?? []) as TechnicalSpec[],
+      router_factory: profile === 'router' ? (data.router_factory as RouterFactory) : null,
+      sim_card_factory: profile === 'sim_card' ? (data.sim_card_factory as SimCardFactory) : null,
     };
     try {
       if (isEdit && item) {
@@ -226,11 +274,18 @@ export function InventoryItemFormDialog({ open, onOpenChange, item }: Props) {
               form.setValue('operational_type', next.operational_type);
               form.setValue('criticality', next.criticality);
             }}
+            onCategoryProfileChange={(p) => {
+              setProfile(p);
+              form.setValue('equipment_profile', p, { shouldValidate: true });
+            }}
             errors={{
               category_id: form.formState.errors.category_id as any,
               family_id: form.formState.errors.family_id as any,
             }}
           />
+
+          {profile === 'router' && <RouterFactoryFields form={form} />}
+          {profile === 'sim_card' && <SimCardFactoryFields form={form} />}
 
           <div className="space-y-2">
             <Label>Local atual</Label>

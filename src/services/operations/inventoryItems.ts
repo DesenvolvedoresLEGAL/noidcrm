@@ -10,6 +10,12 @@ import {
   sanitizeTechnicalSpecs,
   type TechnicalSpec,
 } from '@/lib/operations/inventoryTechnicalSpecs';
+import {
+  mergeFactoryRouter,
+  mergeFactorySim,
+  type RouterFactory,
+  type SimCardFactory,
+} from '@/lib/operations/inventoryEquipmentProfile';
 
 export type InventoryItemRow = Database['public']['Tables']['inventory_items']['Row'] & {
   family_id?: string | null;
@@ -43,6 +49,8 @@ export interface SerializedItemInput extends ClassificationFields {
   model?: string | null;
   notes?: string | null;
   technical_specs?: TechnicalSpec[];
+  router_factory?: RouterFactory | null;
+  sim_card_factory?: SimCardFactory | null;
   _currentMetadata?: unknown;
 }
 
@@ -71,6 +79,15 @@ export async function createSerializedItem(
   userId: string | undefined,
   input: SerializedItemInput,
 ) {
+  let metadata: Record<string, unknown> = {
+    technical_specs: sanitizeTechnicalSpecs(input.technical_specs ?? []),
+  };
+  if (input.router_factory !== undefined) {
+    metadata = mergeFactoryRouter(metadata, input.router_factory);
+  }
+  if (input.sim_card_factory !== undefined) {
+    metadata = mergeFactorySim(metadata, input.sim_card_factory);
+  }
   const { data, error } = await supabase
     .from('inventory_items')
     .insert({
@@ -79,7 +96,7 @@ export async function createSerializedItem(
       quantity_total: 1,
       quantity_available: getQuantityAvailableForStatus(input.status),
       unit_of_measure: 'un',
-      metadata: { technical_specs: sanitizeTechnicalSpecs(input.technical_specs ?? []) } as any,
+      metadata: metadata as any,
       name: input.name.trim(),
       description: emptyToNull(input.description),
       category_id: input.category_id,
@@ -133,6 +150,18 @@ export async function updateSerializedItem(
     patch.metadata = mergeTechnicalSpecs(
       input._currentMetadata,
       sanitizeTechnicalSpecs(input.technical_specs),
+    );
+  }
+  if (input.router_factory !== undefined) {
+    patch.metadata = mergeFactoryRouter(
+      patch.metadata ?? input._currentMetadata,
+      input.router_factory,
+    );
+  }
+  if (input.sim_card_factory !== undefined) {
+    patch.metadata = mergeFactorySim(
+      patch.metadata ?? input._currentMetadata,
+      input.sim_card_factory,
     );
   }
 

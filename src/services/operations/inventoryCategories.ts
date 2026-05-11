@@ -14,6 +14,7 @@ export interface InventoryCategoryInput {
   icon?: string | null;
   sort_order?: number;
   is_active?: boolean;
+  equipment_profile?: 'generic' | 'router' | 'sim_card';
 }
 
 export async function listInventoryCategories(organizationId: string) {
@@ -47,6 +48,7 @@ export async function createInventoryCategory(
       icon: input.icon ?? null,
       sort_order: input.sort_order ?? 0,
       is_active: input.is_active ?? true,
+      equipment_profile: input.equipment_profile ?? 'generic',
       created_by: userId ?? null,
       updated_by: userId ?? null,
     } as any)

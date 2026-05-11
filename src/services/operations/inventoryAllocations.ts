@@ -30,6 +30,8 @@ export interface AllocationRow {
   allocation_status: AllocationStatus;
   notes: string | null;
   created_at: string;
+  equipment_profile?: 'generic' | 'router' | 'sim_card';
+  custom_config?: Record<string, unknown> | null;
 }
 
 const ALLOC_TABLE = 'inventory_pre_reservation_allocations';
@@ -105,4 +107,19 @@ export async function recalculatePreReservationItemAllocation(itemId: string) {
   );
   if (error) throw error;
   return data;
+}
+
+export async function updateAllocationCustomConfig(
+  allocationId: string,
+  customConfig: Record<string, unknown>,
+  userId?: string | null,
+) {
+  const { error } = await supabase
+    .from(ALLOC_TABLE as never)
+    .update({
+      custom_config: customConfig as never,
+      updated_by: userId ?? null,
+    } as never)
+    .eq('id', allocationId);
+  if (error) throw error;
 }

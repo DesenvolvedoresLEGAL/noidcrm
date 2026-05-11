@@ -28,6 +28,7 @@ interface Props {
     operational_type: OperationalType;
     criticality: Criticality;
   }) => void;
+  onCategoryProfileChange?: (profile: 'generic' | 'router' | 'sim_card') => void;
   errors?: {
     category_id?: { message?: string };
     family_id?: { message?: string };
@@ -41,6 +42,7 @@ export function InventoryClassificationFields({
   criticality,
   itemKindFilter,
   onChange,
+  onCategoryProfileChange,
   errors,
 }: Props) {
   const { data: categories } = useInventoryCategories();
@@ -69,6 +71,18 @@ export function InventoryClassificationFields({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [categoryId, activeFamilies]);
+
+  // Notify parent when category profile changes
+  useEffect(() => {
+    if (!onCategoryProfileChange) return;
+    const cat = (categories ?? []).find((c) => c.id === categoryId);
+    const profile = ((cat as any)?.equipment_profile ?? 'generic') as
+      | 'generic'
+      | 'router'
+      | 'sim_card';
+    onCategoryProfileChange(profile === 'router' || profile === 'sim_card' ? profile : 'generic');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categoryId, categories]);
 
   const update = (patch: Partial<{ category_id: string; family_id: string | null; operational_type: OperationalType; criticality: Criticality }>) => {
     onChange({
