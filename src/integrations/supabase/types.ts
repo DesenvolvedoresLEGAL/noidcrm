@@ -13463,6 +13463,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           description: string | null
+          equipment_profile: string
           icon: string | null
           id: string
           is_active: boolean
@@ -13479,6 +13480,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description?: string | null
+          equipment_profile?: string
           icon?: string | null
           id?: string
           is_active?: boolean
@@ -13495,6 +13497,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description?: string | null
+          equipment_profile?: string
           icon?: string | null
           id?: string
           is_active?: boolean
@@ -14334,6 +14337,7 @@ export type Database = {
           allocation_status: string
           created_at: string
           created_by: string | null
+          custom_config: Json
           dispatched_at: string | null
           dispatched_by: string | null
           id: string
@@ -14363,6 +14367,7 @@ export type Database = {
           allocation_status?: string
           created_at?: string
           created_by?: string | null
+          custom_config?: Json
           dispatched_at?: string | null
           dispatched_by?: string | null
           id?: string
@@ -14392,6 +14397,7 @@ export type Database = {
           allocation_status?: string
           created_at?: string
           created_by?: string | null
+          custom_config?: Json
           dispatched_at?: string | null
           dispatched_by?: string | null
           id?: string
