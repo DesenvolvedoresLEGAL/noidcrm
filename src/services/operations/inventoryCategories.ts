@@ -14,6 +14,7 @@ export interface InventoryCategoryInput {
   icon?: string | null;
   sort_order?: number;
   is_active?: boolean;
+  equipment_profile?: 'generic' | 'router' | 'sim_card';
 }
 
 export async function listInventoryCategories(organizationId: string) {
