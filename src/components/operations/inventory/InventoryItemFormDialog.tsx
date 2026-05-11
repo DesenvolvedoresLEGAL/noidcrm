@@ -55,6 +55,9 @@ import { useInventoryCategories } from '@/hooks/operations/useInventoryCategorie
 import { useInventoryLocations } from '@/hooks/operations/useInventoryLocations';
 import { useInventoryItemMutations } from '@/hooks/operations/useInventoryItems';
 import type { InventoryItemWithRefs } from '@/services/operations/inventoryItems';
+import { showFormErrors } from '@/lib/operations/formErrorFeedback';
+import { useInventoryCategoryMutations } from '@/hooks/operations/useInventoryCategories';
+import { AlertCircle, Wifi } from 'lucide-react';
 
 const STATUSES = [
   'available',
