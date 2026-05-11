@@ -135,7 +135,7 @@ export function ProposalItemsManager({ items, onChange, paymentDiscountPercent =
       order_index: items.length,
       name: newItem.name || '',
       description: newItem.description,
-      quantity: newItem.quantity || 1,
+      quantity: itemWithCalculations.quantity ?? newItem.quantity ?? 1,
       unit_cost: newItem.unit_cost || 0,
       markup_percent: newItem.markup_percent || 0,
       unit_price: itemWithCalculations.unit_price || 0,
@@ -149,6 +149,9 @@ export function ProposalItemsManager({ items, onChange, paymentDiscountPercent =
       billing_type: newItem.billing_type || 'one_time',
       counts_for_commission: newItem.counts_for_commission ?? true,
       minimum_contract_months: newItem.minimum_contract_months || 1,
+      quantity_points: itemWithCalculations.quantity_points ?? newItem.quantity_points,
+      billing_days: itemWithCalculations.billing_days ?? newItem.billing_days,
+      unit_price_point_day: itemWithCalculations.unit_price_point_day ?? newItem.unit_price_point_day,
     };
 
     onChange([...items, item]);
