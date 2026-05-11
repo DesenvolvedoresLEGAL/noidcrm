@@ -90,6 +90,7 @@ serve(async (req) => {
         .select("*")
         .eq("proposal_id", proposalId)
         .in("status", ["pending", "failed"])
+        .is("notifications_processed_at", null)
         .limit(1);
       jobs = data || [];
     } else {
