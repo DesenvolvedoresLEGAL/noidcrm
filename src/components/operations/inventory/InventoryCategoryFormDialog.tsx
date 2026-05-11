@@ -67,6 +67,7 @@ export function InventoryCategoryFormDialog({ open, onOpenChange, category }: Pr
       name: '',
       description: '',
       item_kind: 'serialized',
+      equipment_profile: 'generic',
       sort_order: 0,
     },
   });
@@ -77,6 +78,7 @@ export function InventoryCategoryFormDialog({ open, onOpenChange, category }: Pr
         name: category?.name ?? '',
         description: category?.description ?? '',
         item_kind: (category?.item_kind as 'serialized' | 'quantity') ?? 'serialized',
+        equipment_profile: getEquipmentProfile((category as any)?.equipment_profile),
         sort_order: category?.sort_order ?? 0,
       });
     }
@@ -87,6 +89,7 @@ export function InventoryCategoryFormDialog({ open, onOpenChange, category }: Pr
       name: data.name,
       description: data.description || null,
       item_kind: data.item_kind,
+      equipment_profile: data.equipment_profile,
       sort_order: data.sort_order,
     };
     try {
