@@ -344,6 +344,23 @@ export function ProductModal({ open, onOpenChange, product }: ProductModalProps)
                       </div>
                     </div>
                   </label>
+                  <label className="flex items-center gap-3 cursor-pointer flex-1 p-2 rounded-lg hover:bg-muted transition-colors">
+                    <input
+                      type="radio"
+                      name="billing_type"
+                      value="point_day"
+                      checked={billingType === 'point_day'}
+                      onChange={() => form.setValue('billing_type', 'point_day')}
+                      className="h-4 w-4 accent-sky-500"
+                    />
+                    <div className="flex items-center gap-2">
+                      <Zap className="h-4 w-4 text-sky-500" />
+                      <div>
+                        <span className="font-medium text-sm">Ponto-dia</span>
+                        <p className="text-xs text-muted-foreground">Pontos × diárias</p>
+                      </div>
+                    </div>
+                  </label>
                 </div>
 
                 {/* Conditional Fields Based on Billing Type */}
