@@ -40,10 +40,14 @@ const productSchema = z.object({
   image_url: z.string().url().optional().or(z.literal('')),
   active: z.boolean(),
   // Billing type fields
-  billing_type: z.enum(['one_time', 'recurring']),
+  billing_type: z.enum(['one_time', 'recurring', 'point_day']),
   billing_cycle: z.enum(['monthly', 'quarterly', 'semiannual', 'annual']).optional(),
   monthly_price: z.preprocess(parseNumber, z.number().min(0, 'Preço mensal deve ser positivo').optional()),
   minimum_contract_months: z.preprocess(parseNumber, z.number().int().min(1).optional()),
+  // Point-day fields
+  default_unit_price_point_day: z.preprocess(parseNumber, z.number().min(0).optional()),
+  default_billing_days: z.preprocess(parseNumber, z.number().int().min(1).optional()),
+  default_quantity_points: z.preprocess(parseNumber, z.number().int().min(1).optional()),
   // Commission tracking
   counts_for_commission: z.boolean(),
 }).refine(
@@ -51,6 +55,12 @@ const productSchema = z.object({
   {
     message: 'Preço mensal é obrigatório para produtos recorrentes',
     path: ['monthly_price'],
+  }
+).refine(
+  (data) => data.billing_type !== 'point_day' || (data.default_unit_price_point_day !== undefined && data.default_unit_price_point_day > 0),
+  {
+    message: 'Preço por ponto-dia é obrigatório',
+    path: ['default_unit_price_point_day'],
   }
 );
 
@@ -92,6 +102,9 @@ export function ProductModal({ open, onOpenChange, product }: ProductModalProps)
       billing_cycle: 'monthly',
       monthly_price: undefined,
       minimum_contract_months: 12,
+      default_unit_price_point_day: undefined,
+      default_billing_days: 1,
+      default_quantity_points: 1,
       counts_for_commission: true,
     },
   });
@@ -131,6 +144,9 @@ export function ProductModal({ open, onOpenChange, product }: ProductModalProps)
         billing_cycle: (product as any)?.billing_cycle || 'monthly',
         monthly_price: (product as any)?.monthly_price || undefined,
         minimum_contract_months: (product as any)?.minimum_contract_months || 12,
+        default_unit_price_point_day: (product as any)?.default_unit_price_point_day ?? undefined,
+        default_billing_days: (product as any)?.default_billing_days ?? 1,
+        default_quantity_points: (product as any)?.default_quantity_points ?? 1,
         counts_for_commission: (product as any)?.counts_for_commission ?? true,
       });
       setImagePreview(product?.image_url || '');
@@ -147,8 +163,13 @@ export function ProductModal({ open, onOpenChange, product }: ProductModalProps)
         ...data,
         category_id: data.category_id || null,
         image_url: data.image_url || null,
-        // If recurring, set price = monthly_price for consistency
-        price: data.billing_type === 'recurring' ? data.monthly_price : data.price,
+        // For recurring use monthly_price; for point_day use default_unit_price_point_day
+        price:
+          data.billing_type === 'recurring'
+            ? data.monthly_price
+            : data.billing_type === 'point_day'
+              ? data.default_unit_price_point_day
+              : data.price,
       };
 
       if (product) {
