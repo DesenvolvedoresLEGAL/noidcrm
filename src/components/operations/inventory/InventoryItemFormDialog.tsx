@@ -274,7 +274,20 @@ export function InventoryItemFormDialog({ open, onOpenChange, item }: Props) {
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        {(noCategories || noLocations) && (
+          <div className="rounded-md border border-amber-300/60 bg-amber-50 dark:bg-amber-950/30 p-3 text-sm text-amber-900 dark:text-amber-200 flex gap-2">
+            <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+            <div>
+              <p className="font-medium">Cadastro incompleto antes de criar itens.</p>
+              <ul className="list-disc pl-5 mt-1 space-y-0.5">
+                {noCategories && <li>Crie ao menos uma categoria do tipo "Serializado".</li>}
+                {noLocations && <li>Crie ao menos um local de inventário ativo.</li>}
+              </ul>
+            </div>
+          </div>
+        )}
+
+        <form onSubmit={form.handleSubmit(onSubmit, showFormErrors)} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="name">Nome do item</Label>
             <Input id="name" placeholder="Ex: Router BLUE 001" {...form.register('name')} />
