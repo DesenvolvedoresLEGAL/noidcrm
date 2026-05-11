@@ -36,12 +36,26 @@ import {
   type Criticality,
   type OperationalType,
 } from '@/lib/operations/inventoryClassification';
+import {
+  getRouterFactory,
+  getSimCardFactory,
+  routerFactorySchema,
+  simCardFactorySchema,
+  type EquipmentProfile,
+  type RouterFactory,
+  type SimCardFactory,
+} from '@/lib/operations/inventoryEquipmentProfile';
 import { TechnicalSpecsSection } from './TechnicalSpecsSection';
 import { InventoryClassificationFields } from './InventoryClassificationFields';
+import {
+  RouterFactoryFields,
+  SimCardFactoryFields,
+} from './EquipmentProfileFactoryFields';
 import { useInventoryCategories } from '@/hooks/operations/useInventoryCategories';
 import { useInventoryLocations } from '@/hooks/operations/useInventoryLocations';
 import { useInventoryItemMutations } from '@/hooks/operations/useInventoryItems';
 import type { InventoryItemWithRefs } from '@/services/operations/inventoryItems';
+import { useState } from 'react';
 
 const STATUSES = [
   'available',
