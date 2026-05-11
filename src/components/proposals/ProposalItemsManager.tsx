@@ -852,6 +852,30 @@ function AddItemForm({ products, measurementUnits, onAdd, onCancel }: AddItemFor
             {(customItem.quantity_points ?? 1)} pts × {(customItem.billing_days ?? 1)} diárias × R${' '}
             {(customItem.unit_price_point_day ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
           </p>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Desconto (%)</Label>
+              <Input
+                type="number"
+                min="0"
+                max="100"
+                step="0.1"
+                defaultValue={customItem.discount_percent}
+                onBlur={(e) => {
+                  const num = parseFloat(e.target.value) || 0;
+                  setCustomItem(prev => ({ ...prev, discount_percent: num }));
+                }}
+              />
+            </div>
+            <div className="flex items-end">
+              <div className="w-full p-3 rounded-lg bg-sky-100 dark:bg-sky-900/40 text-right">
+                <div className="text-xs text-muted-foreground">Total do item</div>
+                <div className="text-lg font-bold text-sky-700 dark:text-sky-300">
+                  R$ {previewTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
