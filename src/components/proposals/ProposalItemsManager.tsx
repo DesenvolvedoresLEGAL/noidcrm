@@ -803,8 +803,60 @@ function AddItemForm({ products, measurementUnits, onAdd, onCancel }: AddItemFor
         </div>
       )}
 
+      {/* Point-day specific fields */}
+      {(selectedProductId || mode === 'custom') && isPointDay && (
+        <div className="border rounded-lg p-4 space-y-4 bg-sky-50/50 dark:bg-sky-950/20">
+          <Label className="text-sm font-semibold">Cobrança por Ponto-dia</Label>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label>Pontos</Label>
+              <Input
+                type="number"
+                min={1}
+                step={1}
+                value={customItem.quantity_points ?? 1}
+                onChange={(e) => {
+                  const num = Math.max(1, parseInt(e.target.value || '1', 10));
+                  setCustomItem(prev => ({ ...prev, quantity_points: num }));
+                }}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Diárias</Label>
+              <Input
+                type="number"
+                min={1}
+                step={1}
+                value={customItem.billing_days ?? 1}
+                onChange={(e) => {
+                  const num = Math.max(1, parseInt(e.target.value || '1', 10));
+                  setCustomItem(prev => ({ ...prev, billing_days: num }));
+                }}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Preço / ponto-dia (R$)</Label>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                defaultValue={customItem.unit_price_point_day ?? 0}
+                onBlur={(e) => {
+                  const num = parseFloat(e.target.value) || 0;
+                  setCustomItem(prev => ({ ...prev, unit_price_point_day: num, unit_price: num }));
+                }}
+              />
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {(customItem.quantity_points ?? 1)} pts × {(customItem.billing_days ?? 1)} diárias × R${' '}
+            {(customItem.unit_price_point_day ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+          </p>
+        </div>
+      )}
+
       {/* Common fields */}
-      {(selectedProductId || mode === 'custom') && (
+      {(selectedProductId || mode === 'custom') && !isPointDay && (
         <>
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
