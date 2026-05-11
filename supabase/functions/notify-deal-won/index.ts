@@ -1,4 +1,8 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  resolveApprovedProposalAmount,
+  APPROVED_VALUE_SELECT_COLUMNS,
+} from "../_shared/approved-proposal-value.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -32,7 +36,9 @@ Deno.serve(async (req) => {
     // Fetch proposal
     const { data: proposal, error: pError } = await supabase
       .from("proposals")
-      .select("id, opportunity_id, organization_id, status, title, client_name, client_email, value, created_at, accepted_at, expires_at")
+      .select(
+        `id, opportunity_id, organization_id, status, title, client_name, client_email, created_at, accepted_at, expires_at, ${APPROVED_VALUE_SELECT_COLUMNS}`,
+      )
       .eq("id", proposal_id)
       .single();
 
@@ -94,21 +100,27 @@ Deno.serve(async (req) => {
       .eq("proposal_id", proposal_id)
       .maybeSingle();
 
-    // Calculate total from items
+    // Compute the legacy item-based total for auditing/observability only.
     const rawTotal = (items || []).reduce((sum: number, item: Record<string, unknown>) => {
       return sum + (Number(item.total) || 0);
     }, 0);
-
-    // Apply payment term discount to one_time items only
     const paymentDiscountPercent = Number(paymentTerms?.discount_percent) || 0;
-    let totalAmount = rawTotal;
+    let itemsNetTotal = rawTotal;
     if (paymentDiscountPercent > 0) {
       const oneTimeTotal = (items || []).reduce((sum: number, item: Record<string, unknown>) => {
         return sum + ((item.billing_type !== "recurring") ? (Number(item.total) || 0) : 0);
       }, 0);
       const discountAmount = oneTimeTotal * (paymentDiscountPercent / 100);
-      totalAmount = rawTotal - discountAmount;
+      itemsNetTotal = rawTotal - discountAmount;
     }
+
+    // SOURCE OF TRUTH for ERP: the approved commercial value, which already includes
+    // dynamic-pricing adjustments (event antecedence, etc.).
+    const approved = resolveApprovedProposalAmount(proposal as any);
+    const totalAmount = approved.amount > 0 ? approved.amount : itemsNetTotal;
+    console.log(
+      `[notify-deal-won] Approved value for ${proposal_id}: ${totalAmount} (source=${approved.source}, base=${approved.base_amount}, dyn=${approved.dynamic_amount}, items_net=${itemsNetTotal})`,
+    );
 
     // Derive vencimento
     let vencimento: string | null = null;
@@ -140,6 +152,12 @@ Deno.serve(async (req) => {
       id: proposal.id,
       title: (opportunity?.title as string) || proposal.title || "Sem título",
       amount: totalAmount,
+      base_amount: approved.base_amount || itemsNetTotal,
+      approved_amount: approved.amount || null,
+      amount_source: approved.source,
+      dynamic_pricing_enabled: approved.dynamic_enabled,
+      dynamic_pricing_status: approved.dynamic_status,
+      dynamic_pricing_snapshot: approved.snapshot,
       status: "won",
       won_date: proposal.accepted_at,
       created_at: proposal.created_at,

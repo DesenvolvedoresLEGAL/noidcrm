@@ -241,21 +241,39 @@ export function useOwnerDashboard() {
       const wonSalesThisMonthIds = wonSalesThisMonth.map(o => o.id);
       const { data: acceptedProposalsThisMonth } = await supabase
         .from('proposals')
-        .select('opportunity_id, total_amount')
+        .select(
+          'opportunity_id, total_amount, value, dynamic_pricing_enabled, dynamic_pricing_status, dynamic_pricing_current_amount, dynamic_pricing_snapshot, payment_expected_amount',
+        )
         .eq('organization_id', organizationId)
         .eq('status', 'accepted')
         .in('opportunity_id', wonSalesThisMonthIds.length > 0 ? wonSalesThisMonthIds : ['none']);
 
-      // Calculate one-time revenue from accepted proposals (total - recurring MRR)
+      // Calculate one-time revenue from accepted proposals using APPROVED value
+      // (dynamic-pricing aware) instead of raw total_amount.
       const wonOppsWithAcceptedProposal = new Set<string>();
       let oneTimeFromProposals = 0;
       (acceptedProposalsThisMonth || []).forEach((p: any) => {
         if (!p.opportunity_id) return;
         wonOppsWithAcceptedProposal.add(p.opportunity_id);
-        const proposalTotal = p.total_amount || 0;
+        const dynActive =
+          !!p.dynamic_pricing_enabled &&
+          (!p.dynamic_pricing_status ||
+            ['active', 'current', 'vigente', 'approved', 'aprovado'].includes(
+              String(p.dynamic_pricing_status).toLowerCase(),
+            ));
+        const dynCurrent = Number(p.dynamic_pricing_current_amount) || 0;
+        const snapshotCurrent = Number(p.dynamic_pricing_snapshot?.current_amount) || 0;
+        const expected = Number(p.payment_expected_amount) || 0;
+        const approved =
+          expected > 0
+            ? expected
+            : dynActive && dynCurrent > 0
+              ? dynCurrent
+              : dynActive && snapshotCurrent > 0
+                ? snapshotCurrent
+                : Number(p.total_amount) || Number(p.value) || 0;
         const recurringPart = recurringMRRByOpportunity.get(p.opportunity_id) || 0;
-        // One-time = total com desconto - parte recurring
-        oneTimeFromProposals += Math.max(0, proposalTotal - recurringPart);
+        oneTimeFromProposals += Math.max(0, approved - recurringPart);
       });
 
       // Fallback: opps without accepted proposal AND without recurring → use valor_previsto

@@ -1,5 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  resolveApprovedProposalAmount,
+  APPROVED_VALUE_SELECT_COLUMNS,
+} from "../_shared/approved-proposal-value.ts";
 
 
 const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY') ?? Deno.env.get('LOVABLE_API_KEY');
@@ -149,7 +153,9 @@ async function processJob(supabase: any, job: any) {
     // ===== LOAD DATA =====
     const { data: proposal, error: proposalError } = await supabase
       .from("proposals")
-      .select("id, title, proposal_number, value, organization_id, total_amount, acceptor_name, opportunity_id, client_name")
+      .select(
+        `id, title, proposal_number, organization_id, acceptor_name, opportunity_id, client_name, ${APPROVED_VALUE_SELECT_COLUMNS}`,
+      )
       .eq("id", proposal_id)
       .single();
 
@@ -239,11 +245,15 @@ async function processJob(supabase: any, job: any) {
       .single();
     if (org?.primary_color) primaryColor = org.primary_color;
 
-    // Use total_amount (which already includes payment term discount) as the source of truth
-    // Fallback: if total_amount not set, compute from value
-    const proposalValue = parseFloat(proposal.total_amount || proposal.value || "0");
+    // Source of truth for the COMMERCIAL APPROVED value:
+    // dynamic pricing (when active) > total_amount > value.
+    const approved = resolveApprovedProposalAmount(proposal as any);
+    const proposalValue = approved.amount;
     const totalValue = proposalValue.toLocaleString("pt-BR", { minimumFractionDigits: 2 });
     const proposalTitle = proposal.title || proposal.proposal_number || "Proposta";
+    console.log(
+      `[post-acceptance-effects] Approved value for ${proposal_id}: ${proposalValue} (source=${approved.source}, base=${approved.base_amount}, dyn=${approved.dynamic_amount})`,
+    );
 
     // ===== STAGE 1: NOTIFICATIONS (per-stage idempotency) =====
     let notificationsCreated = 0;
@@ -269,6 +279,9 @@ async function processJob(supabase: any, job: any) {
           acceptor_name: acceptorName,
           seller_name: sellerName,
           value: proposalValue,
+          amount_source: approved.source,
+          base_amount: approved.base_amount,
+          dynamic_amount: approved.dynamic_amount,
           account_name: accountName,
           primary_color: primaryColor,
           show_celebration: true,
@@ -314,6 +327,9 @@ async function processJob(supabase: any, job: any) {
               acceptor_name: acceptorName,
               seller_name: sellerName,
               value: proposalValue,
+              amount_source: approved.source,
+              base_amount: approved.base_amount,
+              dynamic_amount: approved.dynamic_amount,
               account_name: accountName,
               primary_color: primaryColor,
               show_celebration: true,
