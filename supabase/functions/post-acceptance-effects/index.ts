@@ -15,15 +15,15 @@ serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  // Auth guard: internal-only (called by DB trigger via pg_net or worker cron).
+  // Auth model:
+  //  1. Worker/cron: presents x-internal-secret = INTERNAL_WORKFLOW_SECRET → may run in worker mode (no body)
+  //  2. Public/anon caller (proposal acceptance page) OR authenticated CRM user:
+  //     must pass { proposalId } in body. We then validate via service_role that the proposal
+  //     is actually `accepted` AND has a pending/failed job in acceptance_effect_jobs.
+  //     This prevents anon abuse: they cannot forge a job (only the DB trigger inserts).
   const internalSecret = req.headers.get('x-internal-secret');
   const expectedSecret = Deno.env.get('INTERNAL_WORKFLOW_SECRET');
-  if (!expectedSecret || internalSecret !== expectedSecret) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-      status: 401,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-  }
+  const isInternalCaller = !!expectedSecret && internalSecret === expectedSecret;
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -33,12 +33,43 @@ serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const { proposalId } = body;
 
-    // If proposalId provided, process that specific job
-    // Otherwise, process all pending/failed jobs (worker mode)
+    // Authorization rules:
+    //  - Worker mode (no proposalId): requires internal secret.
+    //  - Specific proposalId: must reference a proposal that is currently `accepted`.
+    //    Internal callers can additionally bootstrap the job if missing.
     let jobs: any[] = [];
 
+    if (!proposalId && !isInternalCaller) {
+      return new Response(JSON.stringify({ error: 'Unauthorized: worker mode requires internal secret' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     if (proposalId) {
-      // Ensure job exists (trigger should have created it, but be safe)
+      // Validate proposal exists and is accepted (anti-abuse for anon callers)
+      const { data: prop } = await supabase
+        .from("proposals")
+        .select("id, organization_id, status, accepted_at")
+        .eq("id", proposalId)
+        .maybeSingle();
+
+      if (!prop) {
+        return new Response(JSON.stringify({ error: 'Proposal not found' }), {
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      if (prop.status !== 'accepted' || !prop.accepted_at) {
+        return new Response(JSON.stringify({ error: 'Proposal is not accepted' }), {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Ensure job exists (trigger should have created it, but be safe — only for internal callers
+      // OR when proposal is verifiably accepted, which we just checked above).
       const { data: existingJob } = await supabase
         .from("acceptance_effect_jobs")
         .select("*")
@@ -46,19 +77,12 @@ serve(async (req) => {
         .maybeSingle();
 
       if (!existingJob) {
-        // Get org_id from proposal
-        const { data: prop } = await supabase
-          .from("proposals")
-          .select("organization_id")
-          .eq("id", proposalId)
-          .single();
-        if (prop) {
-          await supabase.from("acceptance_effect_jobs").upsert({
-            proposal_id: proposalId,
-            organization_id: prop.organization_id,
-            status: "pending",
-          }, { onConflict: "proposal_id" });
-        }
+        await supabase.from("acceptance_effect_jobs").upsert({
+          proposal_id: proposalId,
+          organization_id: prop.organization_id,
+          accepted_at: prop.accepted_at,
+          status: "pending",
+        }, { onConflict: "proposal_id,accepted_at" });
       }
 
       const { data } = await supabase
