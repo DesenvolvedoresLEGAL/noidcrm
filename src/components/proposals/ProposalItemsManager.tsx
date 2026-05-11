@@ -58,13 +58,28 @@ interface ProposalItemsManagerProps {
   paymentDiscountPercent?: number;
 }
 
-// Calculate totals with direct unit_price support
+// Calculate totals with point_day support
 function calculateItemTotalsLocal(item: Partial<ProposalItem>): Partial<ProposalItem> {
-  const quantity = item.quantity || 1;
-  const unitPrice = item.unit_price || 0;
   const discountPercent = item.discount_percent || 0;
 
-  // Total = unit_price * quantity * (1 - discount%)
+  if (item.billing_type === 'point_day') {
+    const points = Math.max(1, Number(item.quantity_points || 1));
+    const days = Math.max(1, Number(item.billing_days || 1));
+    const ppd = Number(item.unit_price_point_day || item.unit_price || 0);
+    const total = points * days * ppd * (1 - discountPercent / 100);
+    return {
+      ...item,
+      quantity_points: points,
+      billing_days: days,
+      unit_price_point_day: Number(ppd.toFixed(2)),
+      quantity: points * days,
+      unit_price: Number(ppd.toFixed(2)),
+      total: Number(total.toFixed(2)),
+    };
+  }
+
+  const quantity = item.quantity || 1;
+  const unitPrice = item.unit_price || 0;
   const subtotal = unitPrice * quantity;
   const total = subtotal * (1 - discountPercent / 100);
 
