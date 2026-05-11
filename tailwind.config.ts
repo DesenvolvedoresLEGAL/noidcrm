@@ -84,6 +84,12 @@ export default {
         card: {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
+          primary: "hsl(var(--card-primary))",
+          "primary-foreground": "hsl(var(--card-primary-foreground))",
+          operational: "hsl(var(--card-operational))",
+          "operational-foreground": "hsl(var(--card-operational-foreground))",
+          passive: "hsl(var(--card-passive))",
+          "passive-foreground": "hsl(var(--card-passive-foreground))",
         },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
@@ -99,12 +105,20 @@ export default {
       boxShadow: {
         'card': 'var(--shadow-card)',
         'card-hover': 'var(--shadow-card-hover)',
+        'elevated': 'var(--shadow-elevated)',
         'glow': 'var(--shadow-glow)',
       },
       borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
+        lg: "var(--radius)",                              /* 14px */
+        md: "calc(var(--radius) - 4px)",                  /* 10px */
+        sm: "calc(var(--radius) - 8px)",                  /* 6px  */
+        xl: "calc(var(--radius) + 4px)",                  /* 18px */
+      },
+      transitionTimingFunction: {
+        cognitive: 'cubic-bezier(0.16, 1, 0.3, 1)',
+      },
+      transitionDuration: {
+        DEFAULT: '200ms',
       },
       keyframes: {
         "accordion-down": {
