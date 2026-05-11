@@ -47,29 +47,44 @@ All colors MUST be HSL.
     --info: 188 100% 51%;
     --info-foreground: 230 53% 13%;
 
-    --border: 240 14% 90%;
-    --input: 240 14% 90%;
-    --ring: 236 100% 61%;
+    --border: 240 14% 92%;
+    --input: 240 14% 92%;
+    --ring: 235 91% 57%;
 
-    --radius: 1rem;
+    --radius: 0.875rem;                /* 14px — premium minimal */
 
-    --gradient-neural: linear-gradient(135deg, hsl(236 100% 61%) 0%, hsl(188 100% 51%) 60%, hsl(44 92% 50%) 100%);
+    /* Cognitive card hierarchy */
+    --card-primary: 0 0% 100%;
+    --card-primary-foreground: 230 53% 13%;
+    --card-operational: 0 0% 100%;
+    --card-operational-foreground: 230 53% 13%;
+    --card-passive: 240 14% 98%;
+    --card-passive-foreground: 230 20% 35%;
+
+    --gradient-neural: linear-gradient(135deg, hsl(235 91% 57%) 0%, hsl(188 100% 51%) 60%, hsl(44 92% 50%) 100%);
     --gradient-cognitive: linear-gradient(180deg, hsl(230 53% 13%) 0%, hsl(0 0% 4%) 100%);
     --gradient-primary: var(--gradient-neural);
-    --gradient-subtle: linear-gradient(180deg, hsl(0 0% 100%), hsl(240 14% 97%));
+    --gradient-subtle: linear-gradient(180deg, hsl(0 0% 100%), hsl(240 14% 98%));
 
-    --shadow-card: 0 1px 3px hsl(230 53% 13% / 0.08);
-    --shadow-card-hover: 0 8px 24px hsl(236 100% 61% / 0.15);
-    --shadow-glow: 0 0 40px hsl(236 100% 61% / 0.25);
+    /* Institutional shadows — almost invisible */
+    --shadow-card: 0 1px 2px hsl(230 53% 13% / 0.04);
+    --shadow-card-hover: 0 4px 16px hsl(230 53% 13% / 0.06);
+    --shadow-elevated: 0 8px 28px hsl(230 53% 13% / 0.08);
+    --shadow-glow: 0 0 24px hsl(235 91% 57% / 0.15);
+
+    /* Premium motion */
+    --ease-cognitive: cubic-bezier(0.16, 1, 0.3, 1);
+    --duration-fast: 150ms;
+    --duration-base: 200ms;
 
     --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 230 53% 13%;
-    --sidebar-primary: 236 100% 61%;
+    --sidebar-foreground: 230 30% 28%;
+    --sidebar-primary: 235 91% 57%;
     --sidebar-primary-foreground: 240 14% 96%;
-    --sidebar-accent: 240 14% 96%;
-    --sidebar-accent-foreground: 230 53% 13%;
-    --sidebar-border: 240 14% 90%;
-    --sidebar-ring: 236 100% 61%;
+    --sidebar-accent: 235 91% 57%;
+    --sidebar-accent-foreground: 235 91% 57%;
+    --sidebar-border: 240 14% 94%;
+    --sidebar-ring: 235 91% 57%;
   }
 
   .dark {
