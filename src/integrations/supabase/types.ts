@@ -13945,6 +13945,7 @@ export type Database = {
           allocation_status: string
           created_at: string
           created_by: string | null
+          custom_config: Json
           id: string
           notes: string | null
           organization_id: string
@@ -13961,6 +13962,7 @@ export type Database = {
           allocation_status?: string
           created_at?: string
           created_by?: string | null
+          custom_config?: Json
           id?: string
           notes?: string | null
           organization_id: string
@@ -13977,6 +13979,7 @@ export type Database = {
           allocation_status?: string
           created_at?: string
           created_by?: string | null
+          custom_config?: Json
           id?: string
           notes?: string | null
           organization_id?: string
