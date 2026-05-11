@@ -69,6 +69,18 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// Hard timeout wrapper for any external fetch — prevents the function
+// from hanging when Firecrawl/OpenAI/identity provider become slow.
+async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: ctrl.signal });
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 interface NormalizedProfile {
   company_summary: string | null;
   business_model: string | null;
@@ -208,6 +220,13 @@ Deno.serve(async (req) => {
       .single();
     if (runErr) throw new Error(`Failed to create run: ${runErr.message}`);
 
+    // === BACKGROUND PROCESSING ===
+    // Heavy work (scraping + 2 OpenAI calls) frequently exceeds the 60s gateway
+    // window, causing 504s for the user. We push everything to background and
+    // return run_id immediately. The frontend polls enrichment_runs for status.
+    const pipeline = (async () => {
+     try {
+
     const providersCompleted: string[] = [];
     const providersFailed: string[] = [];
 
@@ -222,7 +241,7 @@ Deno.serve(async (req) => {
 
     if (!website) {
       try {
-        const identityResp = await fetch(`${supabaseUrl}/functions/v1/enrich-prospect-identity`, {
+        const identityResp = await fetchWithTimeout(`${supabaseUrl}/functions/v1/enrich-prospect-identity`, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${supabaseKey}`,
@@ -230,7 +249,7 @@ Deno.serve(async (req) => {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ prospect_id }),
-        });
+        }, 15000);
         if (identityResp.ok) {
           const identityData = await identityResp.json();
           prospect = { ...prospect, ...(identityData?.updates || {}) };
@@ -249,11 +268,11 @@ Deno.serve(async (req) => {
     let mainContentLength = 0;
     if (scrapeTarget && FIRECRAWL_API_KEY) {
       try {
-        const scrapeResp = await fetch("https://api.firecrawl.dev/v2/scrape", {
+        const scrapeResp = await fetchWithTimeout("https://api.firecrawl.dev/v2/scrape", {
           method: "POST",
           headers: { Authorization: `Bearer ${FIRECRAWL_API_KEY}`, "Content-Type": "application/json" },
           body: JSON.stringify({ url: scrapeTarget, formats: ["markdown"], onlyMainContent: true }),
-        });
+        }, 45000);
         const scrapeData = await scrapeResp.json();
         const mainContent = scrapeData?.data?.markdown || scrapeData?.markdown || "";
         scrapedContent += mainContent;
@@ -351,7 +370,7 @@ Deno.serve(async (req) => {
     let normalized: NormalizedProfile = cleanNormalized({});
     if (totalContentLength > 50 && OPENAI_API_KEY) {
       try {
-        const analysisResp = await fetch("https://api.openai.com/v1/chat/completions", {
+        const analysisResp = await fetchWithTimeout("https://api.openai.com/v1/chat/completions", {
           method: "POST",
           headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -412,7 +431,7 @@ ${scrapedContent.slice(0, 18000)}`,
             ],
             tool_choice: { type: "function", function: { name: "extract_normalized_profile" } },
           }),
-        });
+        }, 90000);
 
         if (analysisResp.ok) {
           const aiData = await analysisResp.json();
@@ -518,7 +537,7 @@ ${scrapedContent.slice(0, 18000)}`,
     let briefData: any = null;
     if (companyProfile && OPENAI_API_KEY) {
       try {
-        const briefResp = await fetch("https://api.openai.com/v1/chat/completions", {
+        const briefResp = await fetchWithTimeout("https://api.openai.com/v1/chat/completions", {
           method: "POST",
           headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -583,7 +602,7 @@ REMETENTE: SDR da NOID.`,
             ],
             tool_choice: { type: "function", function: { name: "generate_brief" } },
           }),
-        });
+        }, 90000);
 
         if (briefResp.ok) {
           const briefAiData = await briefResp.json();
@@ -746,24 +765,43 @@ REMETENTE: SDR da NOID.`,
       }
     }
 
+      // (sucesso async — resposta já foi enviada ao cliente)
+     } catch (e) {
+       console.error("run-enrichment background error:", e);
+       try {
+         await supabase
+           .from("enrichment_runs")
+           .update({
+             status: "failed",
+             merge_status: "failed",
+             fallback_reason: e instanceof Error ? e.message.slice(0, 500) : String(e).slice(0, 500),
+             finished_at: new Date().toISOString(),
+           })
+           .eq("id", run.id);
+       } catch (markErr) {
+         console.error("failed to mark run as failed:", markErr);
+       }
+     }
+    })();
+
+    // Schedule background task and respond immediately so the gateway
+    // never times out (was hitting 504 after 60s).
+    // @ts-ignore - EdgeRuntime is available in Supabase Deno runtime
+    if (typeof EdgeRuntime !== "undefined" && EdgeRuntime?.waitUntil) {
+      // @ts-ignore
+      EdgeRuntime.waitUntil(pipeline);
+    } else {
+      pipeline.catch((err) => console.error("pipeline orphan error:", err));
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
         run_id: run.id,
-        status: providersFailed.length > 0 && providersCompleted.length === 0 ? "failed" : "completed",
-        quality_score: qualityScore,
-        quality_grade: qualityGrade,
-        quality_label: qualityLabel,
-        fallback_used: fallbackUsed,
-        fallback_reason: fallbackUsed ? fallbackReason : null,
-        content_length: totalContentLength,
-        missing_fields: missingFields,
-        prompt_version: PROMPT_VERSION,
-        has_company_profile: hasNormalized,
-        has_brief: !!briefData,
-        score_bonus: scoreBonus,
+        status: "processing",
+        message: "Enrichment iniciado em background. Acompanhe via enrichment_runs.",
       }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 202, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {
     console.error("run-enrichment error:", e);

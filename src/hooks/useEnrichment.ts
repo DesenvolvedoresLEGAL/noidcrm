@@ -79,13 +79,46 @@ export function useRunEnrichment() {
         body: { prospect_id: prospectId, workspace_id: workspaceId, force_fallback: !!forceFallback },
       });
       if (error) throw error;
+
+      // Background mode: a função retorna 202 com run_id e status="processing".
+      // Fazemos polling em enrichment_runs até concluir/falhar (timeout 4 min).
+      if (data?.status === 'processing' && data?.run_id) {
+        const runId = data.run_id as string;
+        const deadline = Date.now() + 4 * 60 * 1000;
+        while (Date.now() < deadline) {
+          await new Promise((r) => setTimeout(r, 3000));
+          const { data: row } = await supabase
+            .from('enrichment_runs')
+            .select('*')
+            .eq('id', runId)
+            .maybeSingle();
+          if (row && (row.status === 'completed' || row.status === 'failed')) {
+            return {
+              ...data,
+              status: row.status,
+              quality_score: row.quality_score,
+              quality_grade: row.quality_grade,
+              quality_label: row.quality_label,
+              fallback_used: row.fallback_used,
+              fallback_reason: row.fallback_reason,
+              error: row.status === 'failed' ? (row.fallback_reason || 'Falha no enriquecimento') : undefined,
+            };
+          }
+        }
+        throw new Error('Enriquecimento demorou mais que 4 minutos. Verifique o histórico.');
+      }
+
       return data;
     },
     onSuccess: (data, variables) => {
-      const grade = (data as any)?.quality_grade;
-      const score = (data as any)?.quality_score;
-      const suffix = grade && typeof score === 'number' ? ` (${grade} · ${score}%)` : '';
-      toast.success(`Enriquecimento concluído!${suffix}`);
+      if ((data as any)?.status === 'failed') {
+        toast.error(`Enriquecimento falhou: ${(data as any)?.fallback_reason || 'erro desconhecido'}`);
+      } else {
+        const grade = (data as any)?.quality_grade;
+        const score = (data as any)?.quality_score;
+        const suffix = grade && typeof score === 'number' ? ` (${grade} · ${score}%)` : '';
+        toast.success(`Enriquecimento concluído!${suffix}`);
+      }
       queryClient.invalidateQueries({ queryKey: ['enrichment-run', variables.prospectId] });
       queryClient.invalidateQueries({ queryKey: ['enriched-company-profile', variables.prospectId] });
       queryClient.invalidateQueries({ queryKey: ['commercial-brief', variables.prospectId] });
