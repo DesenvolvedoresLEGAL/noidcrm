@@ -616,25 +616,24 @@ function AddItemForm({ products, measurementUnits, onAdd, onCancel }: AddItemFor
     const product = products.find(p => p.id === productId);
     if (product) {
       setSelectedProductId(productId);
-      
-      // Use product.cost as unit_cost
-      // For recurring products, use monthly_price if available, otherwise use price
+
       const cost = product.cost || 0;
       const isRecurring = product.billing_type === 'recurring';
-      const price = isRecurring && product.monthly_price 
-        ? product.monthly_price 
-        : (product.price || 0);
-      
-      // Calculate markup for display only
+      const isPointDay = product.billing_type === 'point_day';
+      const price = isRecurring && product.monthly_price
+        ? product.monthly_price
+        : isPointDay && product.default_unit_price_point_day
+          ? product.default_unit_price_point_day
+          : (product.price || 0);
+
       let markupPercent = 0;
       if (cost > 0 && price > cost) {
         markupPercent = ((price - cost) / cost) * 100;
       }
 
-      // Try to match product unit with measurement_units
       let matchedUnitId = defaultUnit?.id;
       if (product.unit) {
-        const matchingUnit = measurementUnits.find(u => 
+        const matchingUnit = measurementUnits.find(u =>
           u.abbreviation.toLowerCase() === product.unit.toLowerCase() ||
           u.name.toLowerCase() === product.unit.toLowerCase()
         );
@@ -642,7 +641,7 @@ function AddItemForm({ products, measurementUnits, onAdd, onCancel }: AddItemFor
           matchedUnitId = matchingUnit.id;
         }
       }
-      
+
       setCustomItem({
         product_id: productId,
         name: product.name,
@@ -657,6 +656,9 @@ function AddItemForm({ products, measurementUnits, onAdd, onCancel }: AddItemFor
         billing_type: product.billing_type || 'one_time',
         counts_for_commission: product.counts_for_commission ?? true,
         minimum_contract_months: product.minimum_contract_months || 1,
+        quantity_points: isPointDay ? (product.default_quantity_points ?? 1) : undefined,
+        billing_days: isPointDay ? (product.default_billing_days ?? 1) : undefined,
+        unit_price_point_day: isPointDay ? (product.default_unit_price_point_day ?? price) : undefined,
       });
     }
   };
