@@ -30,6 +30,8 @@ export interface AllocationRow {
   allocation_status: AllocationStatus;
   notes: string | null;
   created_at: string;
+  equipment_profile?: 'generic' | 'router' | 'sim_card';
+  custom_config?: Record<string, unknown> | null;
 }
 
 const ALLOC_TABLE = 'inventory_pre_reservation_allocations';
