@@ -333,6 +333,33 @@ export function InventoryItemFormDialog({ open, onOpenChange, item }: Props) {
             }}
           />
 
+          {profileMismatch && (
+            <div className="rounded-md border border-primary/40 bg-primary/5 p-3 text-sm flex items-start gap-2">
+              <Wifi className="h-4 w-4 mt-0.5 text-primary shrink-0" />
+              <div className="flex-1 space-y-2">
+                <p>
+                  A categoria <span className="font-medium">{categoryName}</span> está marcada como{' '}
+                  <span className="font-medium">Genérica</span>. Para abrir os campos específicos de{' '}
+                  {looksLikeRouter ? 'Roteador (SSID, Senha Wi-Fi, IMEI)' : 'Chip (ICCID, Operadora, APN)'}{' '}
+                  use a opção abaixo.
+                </p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={updateCategory.isPending}
+                  onClick={promoteCategoryProfile}
+                >
+                  {updateCategory.isPending
+                    ? 'Atualizando...'
+                    : looksLikeRouter
+                      ? 'Marcar categoria como Roteador'
+                      : 'Marcar categoria como Chip'}
+                </Button>
+              </div>
+            </div>
+          )}
+
           {profile === 'router' && <RouterFactoryFields form={form} />}
           {profile === 'sim_card' && <SimCardFactoryFields form={form} />}
 
