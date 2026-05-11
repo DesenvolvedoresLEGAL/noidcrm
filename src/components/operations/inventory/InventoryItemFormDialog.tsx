@@ -55,6 +55,9 @@ import { useInventoryCategories } from '@/hooks/operations/useInventoryCategorie
 import { useInventoryLocations } from '@/hooks/operations/useInventoryLocations';
 import { useInventoryItemMutations } from '@/hooks/operations/useInventoryItems';
 import type { InventoryItemWithRefs } from '@/services/operations/inventoryItems';
+import { showFormErrors } from '@/lib/operations/formErrorFeedback';
+import { useInventoryCategoryMutations } from '@/hooks/operations/useInventoryCategories';
+import { AlertCircle, Wifi } from 'lucide-react';
 
 const STATUSES = [
   'available',
@@ -228,6 +231,39 @@ export function InventoryItemFormDialog({ open, onOpenChange, item }: Props) {
   const noCategories = serializedCategories.length === 0;
   const noLocations = activeLocations.length === 0;
 
+  // Detect when the chosen category looks like a router/chip but the profile is generic
+  const selectedCategory = useMemo(
+    () => (categories ?? []).find((c) => c.id === form.watch('category_id')),
+    [categories, form.watch('category_id')],
+  );
+  const categoryName = (selectedCategory as any)?.name as string | undefined;
+  const looksLikeRouter = !!categoryName && /(rote|wifi|wi-fi|modem|router)/i.test(categoryName);
+  const looksLikeSim = !!categoryName && /(chip|sim|esim)/i.test(categoryName);
+  const profileMismatch =
+    profile === 'generic' && (looksLikeRouter || looksLikeSim) && !!selectedCategory;
+
+  const { update: updateCategory } = useInventoryCategoryMutations();
+  const promoteCategoryProfile = async () => {
+    if (!selectedCategory) return;
+    const desired: 'router' | 'sim_card' = looksLikeRouter ? 'router' : 'sim_card';
+    try {
+      await updateCategory.mutateAsync({
+        id: selectedCategory.id,
+        input: { equipment_profile: desired },
+      });
+      setProfile(desired);
+      form.setValue('equipment_profile', desired, { shouldValidate: true });
+      toast.success(
+        desired === 'router'
+          ? 'Categoria marcada como Roteador. Preencha os dados de fábrica abaixo.'
+          : 'Categoria marcada como Chip. Preencha os dados do SIM abaixo.',
+      );
+    } catch (err: any) {
+      toast.error(err?.message ?? 'Não foi possível atualizar a categoria.');
+    }
+  };
+
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -238,7 +274,20 @@ export function InventoryItemFormDialog({ open, onOpenChange, item }: Props) {
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        {(noCategories || noLocations) && (
+          <div className="rounded-md border border-amber-300/60 bg-amber-50 dark:bg-amber-950/30 p-3 text-sm text-amber-900 dark:text-amber-200 flex gap-2">
+            <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+            <div>
+              <p className="font-medium">Cadastro incompleto antes de criar itens.</p>
+              <ul className="list-disc pl-5 mt-1 space-y-0.5">
+                {noCategories && <li>Crie ao menos uma categoria do tipo "Serializado".</li>}
+                {noLocations && <li>Crie ao menos um local de inventário ativo.</li>}
+              </ul>
+            </div>
+          </div>
+        )}
+
+        <form onSubmit={form.handleSubmit(onSubmit, showFormErrors)} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="name">Nome do item</Label>
             <Input id="name" placeholder="Ex: Router BLUE 001" {...form.register('name')} />
@@ -283,6 +332,33 @@ export function InventoryItemFormDialog({ open, onOpenChange, item }: Props) {
               family_id: form.formState.errors.family_id as any,
             }}
           />
+
+          {profileMismatch && (
+            <div className="rounded-md border border-primary/40 bg-primary/5 p-3 text-sm flex items-start gap-2">
+              <Wifi className="h-4 w-4 mt-0.5 text-primary shrink-0" />
+              <div className="flex-1 space-y-2">
+                <p>
+                  A categoria <span className="font-medium">{categoryName}</span> está marcada como{' '}
+                  <span className="font-medium">Genérica</span>. Para abrir os campos específicos de{' '}
+                  {looksLikeRouter ? 'Roteador (SSID, Senha Wi-Fi, IMEI)' : 'Chip (ICCID, Operadora, APN)'}{' '}
+                  use a opção abaixo.
+                </p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={updateCategory.isPending}
+                  onClick={promoteCategoryProfile}
+                >
+                  {updateCategory.isPending
+                    ? 'Atualizando...'
+                    : looksLikeRouter
+                      ? 'Marcar categoria como Roteador'
+                      : 'Marcar categoria como Chip'}
+                </Button>
+              </div>
+            </div>
+          )}
 
           {profile === 'router' && <RouterFactoryFields form={form} />}
           {profile === 'sim_card' && <SimCardFactoryFields form={form} />}
