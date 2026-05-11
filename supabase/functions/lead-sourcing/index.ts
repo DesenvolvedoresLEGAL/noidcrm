@@ -2045,6 +2045,10 @@ async function handleEventFirecrawl(
     }
 
     for (let ci = 0; ci < chunks.length; ci++) {
+      if (isTimeoutExceeded()) {
+        await logRunEvent(supabase, organizationId, run.id, "warn", "Tempo limite excedido durante extração IA — retornando resultados parciais", { chunks_done: ci, chunks_total: chunks.length });
+        break;
+      }
       const chunk = chunks[ci];
       try {
         const aiResp = await fetch("https://api.openai.com/v1/chat/completions", {
