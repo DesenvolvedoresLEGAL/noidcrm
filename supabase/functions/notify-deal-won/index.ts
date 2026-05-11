@@ -100,21 +100,27 @@ Deno.serve(async (req) => {
       .eq("proposal_id", proposal_id)
       .maybeSingle();
 
-    // Calculate total from items
+    // Compute the legacy item-based total for auditing/observability only.
     const rawTotal = (items || []).reduce((sum: number, item: Record<string, unknown>) => {
       return sum + (Number(item.total) || 0);
     }, 0);
-
-    // Apply payment term discount to one_time items only
     const paymentDiscountPercent = Number(paymentTerms?.discount_percent) || 0;
-    let totalAmount = rawTotal;
+    let itemsNetTotal = rawTotal;
     if (paymentDiscountPercent > 0) {
       const oneTimeTotal = (items || []).reduce((sum: number, item: Record<string, unknown>) => {
         return sum + ((item.billing_type !== "recurring") ? (Number(item.total) || 0) : 0);
       }, 0);
       const discountAmount = oneTimeTotal * (paymentDiscountPercent / 100);
-      totalAmount = rawTotal - discountAmount;
+      itemsNetTotal = rawTotal - discountAmount;
     }
+
+    // SOURCE OF TRUTH for ERP: the approved commercial value, which already includes
+    // dynamic-pricing adjustments (event antecedence, etc.).
+    const approved = resolveApprovedProposalAmount(proposal as any);
+    const totalAmount = approved.amount > 0 ? approved.amount : itemsNetTotal;
+    console.log(
+      `[notify-deal-won] Approved value for ${proposal_id}: ${totalAmount} (source=${approved.source}, base=${approved.base_amount}, dyn=${approved.dynamic_amount}, items_net=${itemsNetTotal})`,
+    );
 
     // Derive vencimento
     let vencimento: string | null = null;
