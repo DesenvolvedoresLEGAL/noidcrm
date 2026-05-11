@@ -54,7 +54,7 @@ export async function generatePreReservationFromProposal(
 
   const { data: items, error: iErr } = await supabase
     .from('proposal_items')
-    .select('id, name, quantity, product_id')
+    .select('id, name, quantity, product_id, billing_type, quantity_points')
     .eq('proposal_id', input.proposal_id);
   if (iErr) throw iErr;
 
