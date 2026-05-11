@@ -55,7 +55,6 @@ import { useInventoryCategories } from '@/hooks/operations/useInventoryCategorie
 import { useInventoryLocations } from '@/hooks/operations/useInventoryLocations';
 import { useInventoryItemMutations } from '@/hooks/operations/useInventoryItems';
 import type { InventoryItemWithRefs } from '@/services/operations/inventoryItems';
-import { useState } from 'react';
 
 const STATUSES = [
   'available',
