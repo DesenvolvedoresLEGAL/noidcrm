@@ -78,11 +78,11 @@ All colors MUST be HSL.
     --duration-base: 200ms;
 
     --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 230 30% 28%;
+    --sidebar-foreground: 230 30% 32%;
     --sidebar-primary: 235 91% 57%;
     --sidebar-primary-foreground: 240 14% 96%;
-    --sidebar-accent: 235 91% 57%;
-    --sidebar-accent-foreground: 235 91% 57%;
+    --sidebar-accent: 235 60% 96%;
+    --sidebar-accent-foreground: 235 91% 50%;
     --sidebar-border: 240 14% 94%;
     --sidebar-ring: 235 91% 57%;
   }
