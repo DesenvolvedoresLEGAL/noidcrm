@@ -1,117 +1,125 @@
+
+# Plano — Suporte a produtos cobrados por Ponto-dia
+
 ## Objetivo
+Permitir que produtos (LEGAL™ Core Indoor etc.) sejam vendidos por **pontos × diárias × preço por ponto-dia**, mantendo:
+- Cálculo financeiro = `quantity_points × billing_days × unit_price_point_day`
+- Reserva de estoque = apenas `quantity_points` durante o período do evento
+- BOM (composição técnica) replicada por ponto
+- Compatibilidade total com produtos atuais (`one_time`, `recurring`, unidade "dia")
 
-A aba **Visão Geral** precisa responder em até 5 segundos: por que estamos perdendo, quanto custa, e o que fazer agora. Mudança apenas na aba "Visão Geral" — sem refatoração estrutural fora dela.
+---
 
-## Escopo (arquivos)
+## 1. Banco de dados (migrações)
 
-- `src/components/intelligence/winloss/WinLossKPIStrip.tsx` — rótulos dos cards.
-- `src/components/intelligence/winloss/tabs/WinLossOverviewTab.tsx` — reordenação, novos blocos, regras de filtro.
-- `src/components/intelligence/winloss/tabs/LossAnalysisSection.tsx` — substituir "Fatores de Perda" por bloco executivo "Por que estamos perdendo" e enriquecer "Top Motivos de Perda" com valor perdido. Remover "Perdas por Categoria" da aba (já não está nesta seção, mas vou retirá-la do Overview).
-- `src/components/intelligence/winloss/MonthlyPulseCards.tsx` — exibir variação vs mês anterior, valor perdido e ganhos/perdas (já tem maior parte; só ajuste de copy).
-- **Novo:** `src/components/intelligence/winloss/AIDiagnosisCard.tsx` — Diagnóstico Executivo da IA (cliente-side, derivado dos dados já carregados, sem nova chamada de IA — lê `data.lossReasonsByMacro`, `lostValue`, `avgCycleWon/Lost`, `factors`).
-- **Novo:** `src/components/intelligence/winloss/MonthSignalsCard.tsx` — "Sinais do Mês" (mostrado só com filtro = `month`).
-- `src/pages/intelligence/WinLossHub.tsx` — passar `timeframe` para `WinLossOverviewTab`.
+### 1.1 `products` — novo billing model
+- Expandir constraint `products_billing_type_check` para incluir `'point_day'`.
+- Novos campos:
+  - `default_unit_price_point_day numeric` (preço sugerido por ponto-dia)
+  - `default_billing_days integer` (sugestão padrão de diárias, opcional)
+  - `default_quantity_points integer default 1`
+- Nova tabela **`product_bom_items`** (composição técnica / receita por ponto):
+  - `product_id` → produto "pai"
+  - `component_product_id` → produto/equipamento físico
+  - `quantity_per_point numeric not null default 1`
+  - `inventory_category_id`, `inventory_family_id` (fallback quando o componente não é produto)
+  - `label`, `notes`, `order_index`
+  - RLS por organization_id
 
-## 1. Renomear cards do topo (KPI Strip)
+### 1.2 `proposal_items` — novos campos
+- Expandir `proposal_items_billing_type_check` para incluir `'point_day'`.
+- Novos campos:
+  - `quantity_points integer`
+  - `billing_days integer`
+  - `unit_price_point_day numeric`
+- Trigger `before insert/update`:
+  - Se `billing_type = 'point_day'`:
+    - Validar `quantity_points >= 1` e `billing_days >= 1`
+    - `quantity := quantity_points * billing_days` (mantém compatibilidade do campo `quantity` legado para somatórios)
+    - `unit_price := unit_price_point_day`
+    - `total := quantity_points * billing_days * unit_price_point_day * (1 - discount_percent/100)`
 
-Em `WinLossKPIStrip.tsx`, sobrepor labels (apenas para `pipeline_type='sales'`, mantendo terminologia atual para qualification/onboarding):
+### 1.3 Reservas de estoque
+- Em `inventoryProposalBridge.generatePreReservationFromProposal` (e equivalente RPC, se houver):
+  - Para itens com `billing_type = 'point_day'`:
+    - `requested_quantity = quantity_points` (NÃO `quantity`)
+    - Período = `event_start_date` → `event_end_date` (já existente)
+    - Se o produto tiver linhas em `product_bom_items`, gerar **uma reserva por componente**, com `requested_quantity = quantity_points × quantity_per_point`, usando `serialized_item_id` / `quantity_item_id` / `category_family_demand` conforme o componente.
+    - Caso contrário, manter o comportamento atual baseado em `inventory_control_mode` do produto pai, multiplicando por `quantity_points` (não por `quantity`).
 
-- "Deals Ganhos" → "Ganhos"
-- "Deals Perdidos" → "Perdidos"
-- "Ticket Médio Won" → "Ticket Médio Ganho"
-- "Ciclo Médio (dias)" → "Ciclo Médio Geral"
+### 1.4 Totais de proposta
+- Atualizar função `calculateProposalTotal` (e o RPC `orchestrate_proposal_financials` se ele recalcular) para tratar `point_day` como `one_time` para fins de desconto de pagamento, mas usando `total` já calculado pelo trigger.
 
-O ciclo médio passa a ser média ponderada de `avgCycleWon` e `avgCycleLost` quando ambos existirem (atualmente só mostra `avgCycleWon`).
+---
 
-## 2. Nova ordem da Visão Geral
+## 2. Frontend — Cadastro de produto
+Arquivo principal: `src/components/products/*` e `src/services/supabase/products.ts`.
+- Adicionar opção **"Ponto-dia"** no seletor de billing type.
+- Quando selecionado, exibir:
+  - Preço por ponto-dia (`default_unit_price_point_day`)
+  - Diárias padrão (`default_billing_days`)
+  - Pontos padrão (`default_quantity_points`)
+- Nova aba/seção **"Composição técnica (BOM)"**: CRUD de `product_bom_items` (buscar componentes por produto OU por categoria/família de inventário).
+- Atualizar zod schema em `productSchema`.
 
-`WinLossOverviewTab` renderiza, nesta ordem:
+---
 
-1. (Header e Filtros e KPI Strip continuam acima, no `WinLossHub` — não muda.)
-2. **Diagnóstico Executivo da IA** (novo)
-3. **Alertas Inteligentes** (subir — hoje está no fim)
-4. **Pulso Mensal** (condicional ao filtro)
-5. **Análise de Perdas** (com "Por que estamos perdendo" + "Top Motivos de Perda" enriquecidos; sem "Perdas por Categoria")
-6. **Análise de Ganhos**
-7. **Ciclo de Venda**
-8. **Tendência de Motivos de Perda** ou **Sinais do Mês** (condicional)
+## 3. Frontend — Editor de proposta
+Arquivo principal: `src/components/proposals/ProposalItemsManager.tsx` e modal de edição de item.
+- Quando o item tem `billing_type = 'point_day'` (herdado do produto ou trocado manualmente):
+  - Esconder `quantity` puro.
+  - Exibir três inputs: **Pontos**, **Diárias**, **Preço por ponto-dia**.
+  - Linha de cálculo em tempo real:
+    `3 pts × 2 diárias × R$ 397 = R$ 2.382`
+- `calculateItemTotals` (em `src/services/supabase/proposal-items.ts`):
+  - Branch para `point_day`: `total = quantity_points * billing_days * unit_price_point_day * (1 - discount%)`.
+- Garantir um único registro por produto (não criar linhas múltiplas).
 
-Remover do Overview: `LossReasonsByCategoryChart` ("Perdas por Categoria"). Mantém-se disponível em outras abas (Revenue Impact / Relatório).
+---
 
-## 3. Diagnóstico Executivo da IA (novo bloco)
+## 4. Visualização cliente / PDF / link público
+Arquivos: `ProposalPreview.tsx`, `ProposalPDFViewer.tsx`, `PublicProposal*`, snapshots.
+- Renderizador de linha de item, quando `billing_type = 'point_day'`:
+  ```
+  LEGAL™ Core Indoor
+  3 pontos × 2 diárias
+  R$ 397 / ponto-dia
+  Total: R$ 2.382
+  ```
+- Snapshot de aceite (`proposal_acceptance_snapshot` / bundle público) precisa serializar os 3 campos novos para que o histórico mostre o mesmo cálculo.
 
-Componente client-side determinístico (sem nova chamada à IA) que lê `WinLossDataResult` e gera:
+---
 
-- **Principal motivo de perda**: `lossReasonsByMacro[0]` (categoria + label).
-- **Valor perdido associado**: soma `final_value` das `losses` cuja categoria == top macro.
-- **Δ ciclo (perda − ganho)**: `avgCycleLost - avgCycleWon`.
-- **Recomendação**: regra simples por categoria top:
-  - `timing` → "ativar alerta para oportunidades paradas > 7 dias e playbook de retomada por urgência"
-  - `competition` → "revisar diferenciais vs concorrentes ranqueados em Perdas por Concorrente"
-  - `price` → "revisar política comercial / aprovar desconto para faixa X"
-  - `feature/operational/internal/no_fit/other` → mensagens análogas pré-definidas.
-- **Severidade**: `low | medium | high | critical` calculada por `(lostValue / (wonValue+lostValue))` + share do top motivo.
+## 5. Compatibilidade
+- Itens `one_time` / `recurring` / com unidade "dia" continuam usando `quantity × unit_price` — sem mudança.
+- Migração de dados: nenhuma alteração em registros existentes; apenas novas colunas nullable e check constraint expandida.
+- Edge functions de PDF / sync ERP (Umma, Human) precisam apenas ler `total` já calculado; só mudam se renderizam descrição linha-a-linha (vamos auditar `generate-proposal-pdf` e ajustar o render de item).
 
-Copy padrão exatamente no formato do enunciado, com badge de severidade colorida.
+---
 
-## 4. Alertas Inteligentes acima
+## 6. Itens fora de escopo (futuro)
+- UI de bulk apply do modelo Ponto-dia para Outdoor/Prime/Access Point — basta cadastrar cada produto com `billing_type = 'point_day'`.
+- Pricing dinâmico por antecedência sobre `unit_price_point_day` (pode reaproveitar `proposal_dynamic_pricing` posteriormente).
 
-`SmartAlertsCard` passa do bloco "Análise Avançada" para logo após o Diagnóstico Executivo. Largura full.
+---
 
-## 5. Remover "Perdas por Categoria"
+## Arquivos impactados (resumo)
+**Backend / DB**
+- Nova migração: constraint + colunas em `products` e `proposal_items`, tabela `product_bom_items` + RLS, ajuste do trigger de totais e do RPC `orchestrate_proposal_financials`.
 
-Apagar `LossReasonsByCategoryChart` do JSX de `WinLossOverviewTab`. O componente continua existindo para reuso em outras abas.
+**Services**
+- `src/services/supabase/products.ts` (schema + tipos)
+- `src/services/supabase/proposal-items.ts` (`calculateItemTotals`, `calculateProposalTotal`)
+- `src/services/operations/inventoryProposalBridge.ts` (reserva = pontos, BOM expand)
+- Novo: `src/services/supabase/product-bom.ts`
 
-## 6. "Por que estamos perdendo" (substitui "Fatores de Perda")
-
-Em `LossAnalysisSection.tsx`, terceiro card vira "Por que estamos perdendo". Cada linha (categoria) mostra:
-
-- Ícone + label da categoria
-- `% das perdas` (= count/totalFactors)
-- `quantidade de deals`
-- `valor perdido estimado` (somar `final_value` das `losses` cuja categoria casa)
-- `tendência vs período anterior` — calculada comparando contagem da categoria nos últimos 30 dias do range vs 30 dias anteriores (delta em pp). Se não houver dados suficientes, mostrar "—".
-- `ação recomendada` — micro-copy curta (1 linha) por categoria, mesma tabela do Diagnóstico.
-
-## 7. "Top Motivos de Perda" enriquecido
-
-Mesmo componente. Para cada `lossReasonsByMacro[i]` exibir, ao lado do contador:
-
-`{label} — {count} deals | {pct}% | {formatCurrency(valorPerdido)} perdidos`
-
-`valorPerdido` calculado a partir das `losses` filtradas pela categoria + specifics.
-
-## 8. Regra do Pulso Mensal
-
-`WinLossOverviewTab` recebe `timeframe`. Condicional:
-
-- `timeframe === 'month'` → não renderiza `MonthlyPulseCards`.
-- `quarter | semester | year | custom` → renderiza, mostrando todos os meses com: win rate, ganhos, perdas, valor perdido, variação vs mês anterior (`prevWinRate` já existe; adicionar valor perdido visível).
-
-## 9. Regra da Tendência
-
-- `timeframe !== 'month'` → mantém `LossReasonsTrendChart`.
-- `timeframe === 'month'` → renderiza novo `MonthSignalsCard` com até 3 sinais derivados:
-  1. Concorrência: % das perdas com `competitor` preenchido.
-  2. Categoria que virou principal causa (top atual diferente do top do período anterior).
-  3. Categoria que mais subiu em pontos percentuais vs período anterior.
-
-Cada sinal: ícone + frase curta no formato do enunciado.
-
-## 10. Visual
-
-Manter cards/tipografia atuais (`Card`, `Badge`, `Progress`). Sem novos componentes visuais pesados. Severidade usa `bg-{rose|amber|yellow|emerald}-500/10` já em uso.
-
-## Critério de sucesso
-
-- Ordem e nomes batem com o enunciado.
-- Filtro "Mês" esconde Pulso Mensal e mostra "Sinais do Mês".
-- Filtros maiores mostram Pulso Mensal e Tendência.
-- Diagnóstico e Alertas Inteligentes ficam visíveis sem rolar até o fim.
-- "Por que estamos perdendo" mostra valor perdido e ação recomendada por linha.
-- Nenhuma chamada extra ao banco — tudo derivado de `useWinLossData`.
+**UI**
+- `src/components/products/*` (form de produto + aba BOM)
+- `src/components/proposals/ProposalItemsManager.tsx` + modal de item
+- `src/components/proposals/ProposalPreview.tsx`, `ProposalPDFViewer.tsx`, `PublicProposal*`
+- Edge function `generate-proposal-pdf` (render de linha)
 
 ## Riscos
-
-- Baixo. Apenas presentation/derivações no frontend. Sem mudanças em hooks de dados, RLS, edge functions ou schema.
-- Cuidado para não quebrar as outras abas que reusam `LossAnalysisSection` — só esta seção é usada na Visão Geral, então a mudança fica isolada.
+- Trigger novo no `proposal_items` precisa coexistir com o cálculo client-side (`calculateItemTotals`) — usaremos o trigger como fonte de verdade e o client-side só para preview.
+- Reserva de estoque: garantir que a função existente não multiplique duas vezes por `quantity` quando o item é `point_day`.
+- Snapshots antigos (`proposals.snapshot`) sem campos `point_day` — renderer precisa fallback para layout atual.

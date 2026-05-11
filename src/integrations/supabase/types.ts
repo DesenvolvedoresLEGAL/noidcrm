@@ -21505,6 +21505,94 @@ export type Database = {
           },
         ]
       }
+      product_bom_items: {
+        Row: {
+          component_product_id: string | null
+          created_at: string
+          id: string
+          inventory_category_id: string | null
+          inventory_family_id: string | null
+          label: string | null
+          notes: string | null
+          order_index: number
+          organization_id: string
+          product_id: string
+          quantity_per_point: number
+          updated_at: string
+        }
+        Insert: {
+          component_product_id?: string | null
+          created_at?: string
+          id?: string
+          inventory_category_id?: string | null
+          inventory_family_id?: string | null
+          label?: string | null
+          notes?: string | null
+          order_index?: number
+          organization_id: string
+          product_id: string
+          quantity_per_point?: number
+          updated_at?: string
+        }
+        Update: {
+          component_product_id?: string | null
+          created_at?: string
+          id?: string
+          inventory_category_id?: string | null
+          inventory_family_id?: string | null
+          label?: string | null
+          notes?: string | null
+          order_index?: number
+          organization_id?: string
+          product_id?: string
+          quantity_per_point?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_bom_items_component_product_id_fkey"
+            columns: ["component_product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_bom_items_inventory_category_id_fkey"
+            columns: ["inventory_category_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_bom_items_inventory_family_id_fkey"
+            columns: ["inventory_family_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_families"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_bom_items_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_bom_items_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_report_legacy_retirement_readiness_v2"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "product_bom_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_categories: {
         Row: {
           color: string
@@ -21621,11 +21709,14 @@ export type Database = {
           cost: number | null
           counts_for_commission: boolean
           created_at: string | null
+          default_billing_days: number | null
           default_inventory_category_id: string | null
           default_inventory_family_id: string | null
           default_inventory_item_type: string | null
           default_quantity_item_id: string | null
+          default_quantity_points: number | null
           default_serialized_item_id: string | null
+          default_unit_price_point_day: number | null
           deleted_at: string | null
           description: string | null
           external_id: string | null
@@ -21656,11 +21747,14 @@ export type Database = {
           cost?: number | null
           counts_for_commission?: boolean
           created_at?: string | null
+          default_billing_days?: number | null
           default_inventory_category_id?: string | null
           default_inventory_family_id?: string | null
           default_inventory_item_type?: string | null
           default_quantity_item_id?: string | null
+          default_quantity_points?: number | null
           default_serialized_item_id?: string | null
+          default_unit_price_point_day?: number | null
           deleted_at?: string | null
           description?: string | null
           external_id?: string | null
@@ -21691,11 +21785,14 @@ export type Database = {
           cost?: number | null
           counts_for_commission?: boolean
           created_at?: string | null
+          default_billing_days?: number | null
           default_inventory_category_id?: string | null
           default_inventory_family_id?: string | null
           default_inventory_item_type?: string | null
           default_quantity_item_id?: string | null
+          default_quantity_points?: number | null
           default_serialized_item_id?: string | null
+          default_unit_price_point_day?: number | null
           deleted_at?: string | null
           description?: string | null
           external_id?: string | null
@@ -22433,6 +22530,7 @@ export type Database = {
       }
       proposal_items: {
         Row: {
+          billing_days: number | null
           billing_type: string | null
           characteristics: Json | null
           counts_for_commission: boolean
@@ -22457,12 +22555,15 @@ export type Database = {
           product_id: string | null
           proposal_id: string
           quantity: number | null
+          quantity_points: number | null
           total: number | null
           unit_cost: number | null
           unit_price: number | null
+          unit_price_point_day: number | null
           updated_at: string | null
         }
         Insert: {
+          billing_days?: number | null
           billing_type?: string | null
           characteristics?: Json | null
           counts_for_commission?: boolean
@@ -22487,12 +22588,15 @@ export type Database = {
           product_id?: string | null
           proposal_id: string
           quantity?: number | null
+          quantity_points?: number | null
           total?: number | null
           unit_cost?: number | null
           unit_price?: number | null
+          unit_price_point_day?: number | null
           updated_at?: string | null
         }
         Update: {
+          billing_days?: number | null
           billing_type?: string | null
           characteristics?: Json | null
           counts_for_commission?: boolean
@@ -22517,9 +22621,11 @@ export type Database = {
           product_id?: string | null
           proposal_id?: string
           quantity?: number | null
+          quantity_points?: number | null
           total?: number | null
           unit_cost?: number | null
           unit_price?: number | null
+          unit_price_point_day?: number | null
           updated_at?: string | null
         }
         Relationships: [
