@@ -266,6 +266,8 @@ export default function WinLossHub() {
               organizationId={organization?.id || ''}
               pipelineContext={pipelineContext}
               terminology={terminology}
+              timeframe={timeframe}
+              dateRange={dateRange}
             />
           </TabsContent>
 
