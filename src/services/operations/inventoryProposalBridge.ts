@@ -76,6 +76,26 @@ export async function generatePreReservationFromProposal(
     );
   }
 
+  // Load BOM rows for any referenced product (used for point_day expansion).
+  const bomMap = new Map<string, Array<{
+    component_product_id: string | null;
+    inventory_category_id: string | null;
+    inventory_family_id: string | null;
+    quantity_per_point: number;
+    label: string | null;
+  }>>();
+  if (productIds.length > 0) {
+    const { data: bomRows } = await (supabase as any)
+      .from('product_bom_items')
+      .select('product_id, component_product_id, inventory_category_id, inventory_family_id, quantity_per_point, label')
+      .in('product_id', productIds);
+    for (const row of (bomRows ?? []) as any[]) {
+      const arr = bomMap.get(row.product_id) ?? [];
+      arr.push(row);
+      bomMap.set(row.product_id, arr);
+    }
+  }
+
   const period = computeOperationalPeriod(input.event_start_date, input.event_end_date);
 
   const reservationItems: CreatePreReservationPayload['items'] = [];
@@ -88,6 +108,27 @@ export async function generatePreReservationFromProposal(
         ? Number((it as any).quantity_points ?? 1)
         : Number(it.quantity ?? 1);
     const baseQty = physicalQty * Number(cfg.inventory_quantity_multiplier ?? 1);
+
+    // 0) point_day com BOM: expandir reserva pelos componentes da composição técnica.
+    const bom = it.product_id ? bomMap.get(it.product_id) : undefined;
+    if ((it as any).billing_type === 'point_day' && bom && bom.length > 0) {
+      for (const comp of bom) {
+        const qty = physicalQty * Number(comp.quantity_per_point ?? 1);
+        if (!qty) continue;
+        reservationItems.push({
+          inventory_item_type: 'category_family_demand',
+          category_id: comp.inventory_category_id ?? cfg.default_inventory_category_id ?? null,
+          family_id: comp.inventory_family_id ?? cfg.default_inventory_family_id ?? null,
+          requested_quantity: qty,
+          demand_label: comp.label ?? `${it.name} — componente`,
+          demand_source: 'product_rule',
+          product_id: comp.component_product_id ?? it.product_id ?? null,
+          proposal_item_id: it.id,
+          notes: it.name,
+        });
+      }
+      continue;
+    }
 
     // 1) Regras de demanda compostas (kits lógicos) têm prioridade.
     const rules = Array.isArray(cfg.inventory_demand_rules)

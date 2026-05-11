@@ -18,6 +18,8 @@ import { ImageUpload } from './ImageUpload';
 import { useState, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Repeat, Zap, TrendingUp } from 'lucide-react';
+import { ProductBOMEditor } from './ProductBOMEditor';
+import { replaceProductBomItems, type ProductBomItemInput } from '@/services/supabase/product-bom';
 
 // Helper para tratar NaN/vazio como undefined
 const parseNumber = (val: unknown) => {
@@ -79,6 +81,7 @@ export function ProductModal({ open, onOpenChange, product }: ProductModalProps)
   const { units } = useMeasurementUnits();
   const { organization } = useCurrentOrganization();
   const [imagePreview, setImagePreview] = useState<string>('');
+  const [bomItems, setBomItems] = useState<ProductBomItemInput[]>([]);
 
   // Get default unit abbreviation
   const defaultUnit = units.find(u => u.is_default)?.abbreviation || 'un';
@@ -150,9 +153,11 @@ export function ProductModal({ open, onOpenChange, product }: ProductModalProps)
         counts_for_commission: (product as any)?.counts_for_commission ?? true,
       });
       setImagePreview(product?.image_url || '');
+      if (!product) setBomItems([]);
     } else {
       form.reset();
       setImagePreview('');
+      setBomItems([]);
     }
   }, [open, product, form]);
 
@@ -172,13 +177,21 @@ export function ProductModal({ open, onOpenChange, product }: ProductModalProps)
               : data.price,
       };
 
+      let saved: any;
       if (product) {
-        return updateProduct(product.id, payload);
+        saved = await updateProduct(product.id, payload);
+      } else {
+        saved = await createProduct(payload);
       }
-      return createProduct(payload);
+      // Persist BOM only for point_day products
+      if (data.billing_type === 'point_day' && organization?.id && saved?.id) {
+        await replaceProductBomItems(organization.id, saved.id, bomItems);
+      }
+      return saved;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['product-bom'] });
       toast({
         title: product ? 'Produto atualizado' : 'Produto criado',
         description: 'Operação realizada com sucesso.',
@@ -412,6 +425,14 @@ export function ProductModal({ open, onOpenChange, product }: ProductModalProps)
                       <strong>Cálculo:</strong> pontos × diárias × preço por ponto-dia.
                       Estoque reservado considera apenas a quantidade de pontos durante o período do evento.
                     </div>
+                    {organization?.id && (
+                      <ProductBOMEditor
+                        organizationId={organization.id}
+                        productId={product?.id ?? null}
+                        value={bomItems}
+                        onChange={setBomItems}
+                      />
+                    )}
                   </div>
                 ) : billingType === 'one_time' ? (
                   /* AVULSO FIELDS */
