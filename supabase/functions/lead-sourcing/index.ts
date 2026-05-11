@@ -1077,6 +1077,9 @@ async function handleEventFirecrawl(
   // (discoveredUrls stays empty → no Firecrawl spend → no AI chunking).
   const allExhibitors: any[] = [];
   let providerUsed: string = "firecrawl";
+  // Hard run-level timeout (Firecrawl/AI fallback can otherwise hang for hours).
+  const MAX_RUN_MS = 5 * 60 * 1000;
+  const isTimeoutExceeded = () => (Date.now() - startTime) > MAX_RUN_MS;
   try {
     const { tryExpoFPFromUrl } = await import("./providers/index.ts");
     const expofp = await tryExpoFPFromUrl(eventUrl);
