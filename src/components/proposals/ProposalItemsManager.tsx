@@ -427,6 +427,7 @@ function SortableRow({ item, index, totalItems, measurementUnits, onUpdate, onDe
   // Fallback for legacy items without billing_type
   const billingType = item.billing_type || 'one_time';
   const isRecurring = billingType === 'recurring';
+  const isPointDay = billingType === 'point_day';
 
   return (
     <TableRow ref={setNodeRef} style={style} className="group align-top">
