@@ -151,11 +151,20 @@ export function InventoryItemFormDialog({ open, onOpenChange, item }: Props) {
       model: '',
       notes: '',
       technical_specs: [],
+      equipment_profile: 'generic',
+      router_factory: { ssid_factory: '', wifi_password_factory: '', admin_user: '', admin_password: '', imei: '' },
+      sim_card_factory: { iccid: '', line_number: '', carrier: '', apn: '', pin: '' },
     },
   });
 
+  const [profile, setProfile] = useState<EquipmentProfile>('generic');
+
   useEffect(() => {
     if (open) {
+      const initialProfile = (((item as any)?.category?.equipment_profile) ?? 'generic') as EquipmentProfile;
+      setProfile(initialProfile === 'router' || initialProfile === 'sim_card' ? initialProfile : 'generic');
+      const router = getRouterFactory(item?.metadata) ?? { ssid_factory: '', wifi_password_factory: '', admin_user: '', admin_password: '', imei: '' };
+      const sim = getSimCardFactory(item?.metadata) ?? { iccid: '', line_number: '', carrier: '', apn: '', pin: '' };
       form.reset({
         name: item?.name ?? '',
         description: item?.description ?? '',
@@ -171,6 +180,9 @@ export function InventoryItemFormDialog({ open, onOpenChange, item }: Props) {
         model: item?.model ?? '',
         notes: item?.notes ?? '',
         technical_specs: getTechnicalSpecs(item?.metadata) as TechnicalSpec[],
+        equipment_profile: initialProfile,
+        router_factory: router,
+        sim_card_factory: sim,
       });
     }
   }, [open, item, form]);
