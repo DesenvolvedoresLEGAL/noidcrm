@@ -220,6 +220,13 @@ Deno.serve(async (req) => {
       .single();
     if (runErr) throw new Error(`Failed to create run: ${runErr.message}`);
 
+    // === BACKGROUND PROCESSING ===
+    // Heavy work (scraping + 2 OpenAI calls) frequently exceeds the 60s gateway
+    // window, causing 504s for the user. We push everything to background and
+    // return run_id immediately. The frontend polls enrichment_runs for status.
+    const pipeline = (async () => {
+     try {
+
     const providersCompleted: string[] = [];
     const providersFailed: string[] = [];
 
