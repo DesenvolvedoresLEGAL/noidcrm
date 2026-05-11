@@ -774,7 +774,7 @@ REMETENTE: SDR da NOID.`,
            .update({
              status: "failed",
              merge_status: "failed",
-             error_message: e instanceof Error ? e.message : String(e),
+             fallback_reason: e instanceof Error ? e.message.slice(0, 500) : String(e).slice(0, 500),
              finished_at: new Date().toISOString(),
            })
            .eq("id", run.id);
