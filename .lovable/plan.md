@@ -1,87 +1,81 @@
-## Diagnóstico
+# Análise Forense — Notificação Perdida (CANON MEDICAL → R$ 1.994,00)
 
-A FISPAL FOOD não retorna 462 expositores por dois motivos distintos, um em cada URL testada:
+## Linha do tempo do incidente
 
-**BUSCA 1 — `fispalfoodservice.com.br/quero-visitar/lista-de-expositores/`**
-A página oficial do evento NÃO contém a lista de expositores em HTML. Ela é apenas um teaser que linka para a plataforma da Informa Markets (`app.informamarkets.com.br`). Por isso o engine extraiu só 9 leads — eram itens do header / footer / nav (DISTRITO ANHEMBI, footer, Contatos, Informações, Informa Markets, Links Rápidos…), não expositores.
+1. **11/05/2026 18:42:59 UTC** — Aline Cavalcante aceita a proposta `053419df-bd83-4941-9673-53b7e41b0a75` na página pública.
+2. Trigger `on_proposal_accepted` (em `public.proposals`) dispara e enfileira o job em `acceptance_effect_jobs`:
+   - `id = 66c9f722-110f-4f80-aaaa-1d1bf58feff1`
+   - `status = pending`, `attempt_count = 0`
+   - `notifications_processed_at = NULL`, `slack_processed_at = NULL`
+3. Cliente (`ProposalPublicView` + `acceptProposal`/`updateProposal` em `src/services/supabase/proposals.ts`) faz **fire-and-forget** `supabase.functions.invoke('post-acceptance-effects', ...)`.
+4. A edge function `post-acceptance-effects` exige `x-internal-secret = INTERNAL_WORKFLOW_SECRET` no header, retorna **401 Unauthorized**.
+5. Como é fire-and-forget, o erro só vai para `console.error` no navegador do cliente externo. Nenhum retry. Job permanece `pending` para sempre.
+6. Não existe **nenhum cron** drenando `acceptance_effect_jobs`, nem chamada `pg_net` no trigger.
+7. Resultado: **40 jobs pendentes acumulados desde 23/04/2026**, todos sem notificação in-app, sem Slack, sem celebração.
 
-**BUSCA 2 — `app.informamarkets.com.br/event/fispal-food-service-2026/exhibitors/...`**
-Esta página é o app Next.js da Informa Markets, **renderizada por Swapcard**. Ela traz um SSR com `__NEXT_DATA__` contendo um Apollo Cache com:
+## Causa raiz (3 falhas combinadas)
 
-```text
-Core_Exhibitor:RXhoaWJpdG9yXzE0NzQzNzI=   (462 referências)
-pageInfo.endCursor: "WzAuMDAwNTY2..."
-totalCount: 462
-```
+| # | Falha | Arquivo |
+|---|------|---------|
+| 1 | Função gated por `INTERNAL_WORKFLOW_SECRET`, mas é chamada do navegador (anon) sem o secret | `supabase/functions/post-acceptance-effects/index.ts` (linhas 22-30) |
+| 2 | Ausência de `[functions.post-acceptance-effects] verify_jwt = false` (proposta pública = anon) | `supabase/config.toml` |
+| 3 | Sem worker (cron + pg_net) que processe a fila, então qualquer falha do path do cliente nunca é compensada | nenhuma migração existente |
 
-O Firecrawl/Caramelo não sabe ler esse formato e cai no fluxo genérico de scraping + paginação infinita, ficando >25 min até estourar (sem timeout efetivo no `handleEventFirecrawl`).
+---
 
-Confirmado por probe direto: `curl` da BUSCA 2 retorna HTTP 200 com `"totalCount":462` no SSR e cursor de paginação válido — não exige login para a primeira página.
+## Plano de correção
 
-## O que precisa mudar
+### 1. Corrigir auth da edge function `post-acceptance-effects`
+- Remover o gate exclusivo por `x-internal-secret`. Aceitar duas vias:
+  - **Worker/cron**: `x-internal-secret` válido → modo worker drena fila.
+  - **Cliente (público ou autenticado)**: aceita `proposalId` no body, valida via `service_role` que o registro `proposals.id = proposalId` está com `status = 'accepted'` (ou que existe job pendente em `acceptance_effect_jobs` para esse `proposalId`). Se sim, processa. Se não, 403.
+- Manter idempotência por `notifications_processed_at` / `slack_processed_at` que já existem.
 
-### 1. Novo provider `informa-markets` (Swapcard)
-Arquivo: `supabase/functions/lead-sourcing/providers/informa-markets.ts`
+### 2. Configurar `verify_jwt = false`
+- Adicionar bloco em `supabase/config.toml`:
+  ```toml
+  [functions.post-acceptance-effects]
+  verify_jwt = false
+  ```
 
-Estratégia (mesmo padrão arquitetural do `expofp.ts`):
+### 3. Cron worker (segurança em camadas)
+- Criar migração com `pg_cron` + `pg_net` que dispara `post-acceptance-effects` em **modo worker** (sem `proposalId`) a cada **1 minuto**, enviando `x-internal-secret` lido do Vault.
+- A função já tem o modo worker pronto (`jobs = pending OR failed, attempt_count < 5`), só precisa ser acionada.
+- Garantir secret `INTERNAL_WORKFLOW_SECRET` existe (verificar via `secrets--fetch_secrets`); se não, criar.
 
-- **detect**: hostname termina em `informamarkets.com.br` / `informamarkets.com` OU HTML contém `Core_Exhibitor:` + `cdn-api.swapcard.com`.
-- **fetch SSR**: GET na URL do evento, extrai `<script id="__NEXT_DATA__">`, lê o Apollo Cache. Pega:
-  - `eventId` e `viewId` (do `pageProps.event` e da própria URL base64).
-  - Primeira página de expositores (refs `Core_Exhibitor:*` + objetos correspondentes com `name`, `logoUrl`, `bookmarkedCount`, etc.).
-  - `pageInfo.endCursor` e `pageInfo.hasNextPage`.
-- **paginate via Swapcard GraphQL**: POST `https://app.swapcard.com/api/graphql` (endpoint público usado pelo próprio frontend) com a query `EventViewExhibitors` passando `viewId` + `after: endCursor`. Loop até `hasNextPage = false` ou hit de safety cap (ex.: 2000).
-- **normalize**: devolve `{ external_id, name, country, categories, source_url, raw }` igual ao ExpoFPExhibitor.
-- **safety**: timeout por request (10s), no-retry agressivo, max 50 páginas.
+### 4. Backfill imediato (drenar 40 jobs)
+- Após deploy, invocar o worker uma vez via `supabase--curl_edge_functions` com `x-internal-secret` para processar os 40 jobs pendentes.
+- Validar especificamente o job da CANON MEDICAL (`66c9f722`):
+  - Confirmar `notifications_processed_at IS NOT NULL`.
+  - Confirmar `slack_processed_at IS NOT NULL`.
+  - Confirmar inserts em `notifications`, `notifications_v2` e `notification_events` para a organização `d1b68a0f-...`.
 
-Exporta no `providers/index.ts`: `tryInformaMarketsFromUrl`.
+### 5. Memória arquitetural
+- Atualizar `mem://architectural-decision/proposals/acceptance-side-effect-redundancy` (já listado no índice) para deixar explícito:
+  - Cliente NÃO deve depender só de fire-and-forget; cron drena fila.
+  - Função aceita anon **somente** quando `proposalId` corresponde a job pendente válido.
 
-### 2. Follow automático do link marketing → plataforma
-Em `handleEventFirecrawl`, antes do Step 0 atual:
-
-- Se a URL informada NÃO é uma plataforma conhecida (informamarkets, expofp, swapcard, mapyourshow…) e o HTML inicial contiver um link para uma plataforma conhecida (`app.informamarkets.com.br/event/...`, `*.expofp.com`, `*.swapcard.com`), **trocar `eventUrl` pela URL da plataforma** e logar `info: "URL marketing trocada por plataforma de expositores"`.
-- Isso resolve o caso BUSCA 1 sem o usuário precisar saber qual link usar.
-
-### 3. Step 0 estendido
-Em `handleEventFirecrawl` (~linha 1080):
-- Tentar ExpoFP (já existe).
-- Se não detectado, tentar `tryInformaMarketsFromUrl`.
-- Se algum bater, popular `allExhibitors`, marcar `providerUsed = "informa-markets"`, **pular** todo Firecrawl/AI chunking (mesmo no-op atual do ExpoFP).
-
-### 4. Timeout global do run
-Hoje o run pode rodar indefinidamente. Adicionar:
-- Constante `MAX_RUN_MS = 5 * 60 * 1000` no início de `handleEventFirecrawl`.
-- Helper `isTimeoutExceeded(startTime)` chamado entre cada step grande (após map, após cada batch de scrape, após cada chunk de IA).
-- Ao estourar, fechar o run com `status = "completed_partial"`, `error_summary = "Tempo limite excedido — retorne resultados parciais"` e os expositores já coletados.
-
-### 5. Mensagem de erro mais clara
-Se nenhum provider bater **e** o scrape genérico devolver <30 expositores num evento que claramente é grande (heurística: HTML > 100KB ou contém palavras como `expositores`, `exhibitors`, `lista`), logar warn:
-> "Esta página parece ser apenas um teaser. Cole o link da plataforma de expositores (ex.: app.informamarkets.com.br, *.expofp.com, *.swapcard.com)."
-
-### 6. Memória do projeto
-Atualizar `mem://architectural-decision/intelligence/expofp-provider-sourcing` (ou criar `informa-markets-provider-sourcing`) registrando: Informa Markets = wrapper Swapcard; SSR contém Apollo Cache; paginação via GraphQL público; segue redirect marketing→app.
+---
 
 ## Arquivos impactados
 
-- `supabase/functions/lead-sourcing/providers/informa-markets.ts` (novo)
-- `supabase/functions/lead-sourcing/providers/index.ts` (re-export)
-- `supabase/functions/lead-sourcing/index.ts` (Step 0 estendido + follow link + timeout)
-- `mem://architectural-decision/intelligence/informa-markets-provider-sourcing` (nova memória)
+- `supabase/functions/post-acceptance-effects/index.ts` — refatorar gate de auth.
+- `supabase/config.toml` — adicionar bloco `verify_jwt = false`.
+- `supabase/migrations/<novo>.sql` — `pg_cron` chamando worker via `pg_net` a cada 1 min, com secret do Vault.
+- `mem://architectural-decision/proposals/acceptance-side-effect-redundancy` — atualizar regra.
 
-## Riscos
+## Riscos & mitigações
 
-- Endpoint GraphQL Swapcard público pode ter rate-limit (mitigado: 1 req sequencial, 25 itens por página, headers de browser).
-- Estrutura do Apollo Cache pode variar entre eventos (mitigado: parser defensivo + fallback para Firecrawl se SSR não trouxer refs).
-- Eventos Informa atrás de login não funcionarão por aqui — nestes casos o provider devolve `{result: null, error: "auth_required"}` e cai no fluxo genérico com mensagem clara.
+- **Risco**: chamar worker sem rate-limit pode reprocessar jobs em flight.
+  - Mitigação: já existe `status = 'processing'` + `attempt_count` na função; `LIMIT 10` por execução; cron 1/min.
+- **Risco**: anon abusar de `proposalId` para spam.
+  - Mitigação: só processa se job já existe em `acceptance_effect_jobs` (criado pelo trigger) — anon não consegue forjar.
+- **Risco**: notificações duplicadas no backfill.
+  - Mitigação: idempotência por `notifications_processed_at` + dedupe por `metadata->>proposal_id` já implementados.
 
-## Resultado esperado
+## Validação pós-deploy
 
-- BUSCA 1 → engine detecta link `app.informamarkets.com.br`, segue, provider Informa-Markets pagina via Swapcard GraphQL, retorna **~462 expositores** em segundos.
-- BUSCA 2 → mesmo provider age direto, **sem hang de 25 min**.
-- Qualquer run que travar é morto em 5 min com resultado parcial salvo.
-
-## Fora de escopo
-
-- Login/credenciais Informa Markets (apenas dados públicos do SSR/GraphQL).
-- Mudanças em ExpoFP, MapYourShow, A2Z (intactos).
-- UI do Kairós (apenas backend).
+1. `SELECT count(*) FROM acceptance_effect_jobs WHERE status='pending'` → deve cair de 40 para 0.
+2. `SELECT count(*) FROM notifications_v2 WHERE metadata->>'proposal_id'='053419df-...'` → > 0.
+3. Confirmar com o usuário (Wagner) que recebeu notificação in-app + mensagem no Slack para CANON MEDICAL.
+4. Aceitar uma proposta de teste e confirmar que notificação chega em < 5s (path do cliente) ou < 60s (path do worker).
