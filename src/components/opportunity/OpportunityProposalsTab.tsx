@@ -23,31 +23,30 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { 
-  Plus, 
-  FileText, 
-  Pencil, 
-  FileDown, 
-  ExternalLink, 
-  Eye, 
-  MoreHorizontal, 
-  Send, 
-  Copy, 
-  CheckCircle, 
-  XCircle, 
+import {
+  Plus,
+  FileText,
+  Pencil,
+  FileDown,
+  ExternalLink,
+  MoreHorizontal,
+  Send,
+  Copy,
+  CheckCircle,
+  XCircle,
   Trash2,
   Loader2,
   AlertTriangle,
-  DollarSign,
-  Package,
-  Calendar,
-  CreditCard
+  TrendingUp,
+  Sparkles,
+  RefreshCw,
+  Link as LinkIcon,
 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { 
-  listProposals, 
-  deleteProposal, 
-  duplicateProposal, 
+import {
+  listProposals,
+  deleteProposal,
+  duplicateProposal,
   updateProposal,
   generatePublicToken,
   getProposalWithDetails,
@@ -60,100 +59,122 @@ import { buildProposalPublicUrl, buildProposalDirectUrl } from '@/lib/proposalUr
 import { formatDateBR } from '@/lib/dateUtils';
 import { toast } from 'sonner';
 import { proposalKeys } from '@/lib/query-keys';
+import { orchestrateProposalFinancials } from '@/services/proposals/proposalOrchestrator';
+import {
+  getEffectiveAmount,
+  getDynamicAdjustment,
+  getCommercialStatus,
+  getCommercialStatusLabel,
+  getCommercialStatusTone,
+  getNextAction,
+  getProposalsBreakdown,
+  pickActiveProposal,
+  formatBRL,
+  formatPct,
+} from '@/lib/proposals/effectiveAmount';
+import { cn } from '@/lib/utils';
 
-// Proposal items + payment-terms detail cache (specific to this tab).
 const proposalDetailsKey = (opportunityId: string) =>
   ['proposal-details', opportunityId] as const;
-
 
 interface OpportunityProposalsTabProps {
   opportunityId: string;
   pipelineType?: 'qualification' | 'sales' | 'onboarding' | 'renewal' | null;
+  onNavigateToAnalytics?: () => void;
 }
 
-const statusConfig: Record<string, { label: string; className: string }> = {
-  draft: { label: 'Rascunho', className: 'bg-slate-100 text-slate-700 border-slate-200' },
-  sent: { label: 'Enviada', className: 'bg-blue-100 text-blue-700 border-blue-200' },
-  viewed: { label: 'Visualizada', className: 'bg-purple-100 text-purple-700 border-purple-200' },
-  accepted: { label: 'Aceita', className: 'bg-green-100 text-green-700 border-green-200' },
-  rejected: { label: 'Recusada', className: 'bg-red-100 text-red-700 border-red-200' },
-  expired: { label: 'Expirada', className: 'bg-amber-100 text-amber-700 border-amber-200' },
+const paymentMethodLabels: Record<string, string> = {
+  pix: 'PIX',
+  boleto: 'Boleto',
+  cartao: 'Cartão',
+  transferencia: 'Transferência',
 };
 
-const paymentMethodLabels: Record<string, { label: string; icon: string }> = {
-  pix: { label: 'PIX', icon: '⚡' },
-  boleto: { label: 'Boleto', icon: '📄' },
-  cartao: { label: 'Cartão', icon: '💳' },
-  transferencia: { label: 'Transferência', icon: '🏦' },
+// Token-aware tone classes (no raw color literals)
+const TONE_CLASSES: Record<string, { bg: string; text: string; border: string; badge: string }> = {
+  success: {
+    bg: 'bg-success/10',
+    text: 'text-success',
+    border: 'border-success/30',
+    badge: 'bg-success/15 text-success border-success/30',
+  },
+  warning: {
+    bg: 'bg-warning/10',
+    text: 'text-warning',
+    border: 'border-warning/30',
+    badge: 'bg-warning/15 text-warning border-warning/30',
+  },
+  danger: {
+    bg: 'bg-destructive/10',
+    text: 'text-destructive',
+    border: 'border-destructive/30',
+    badge: 'bg-destructive/15 text-destructive border-destructive/30',
+  },
+  info: {
+    bg: 'bg-primary/10',
+    text: 'text-primary',
+    border: 'border-primary/30',
+    badge: 'bg-primary/15 text-primary border-primary/30',
+  },
+  muted: {
+    bg: 'bg-muted',
+    text: 'text-muted-foreground',
+    border: 'border-border',
+    badge: 'bg-muted text-muted-foreground border-border',
+  },
 };
 
-const formatCurrency = (value: number, currency: string = 'BRL') => {
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: currency,
-  }).format(value);
-};
-
-export function OpportunityProposalsTab({ opportunityId, pipelineType }: OpportunityProposalsTabProps) {
-  const canCreateProposals = pipelineType === 'sales' || pipelineType === null || pipelineType === undefined;
+export function OpportunityProposalsTab({
+  opportunityId,
+  pipelineType,
+  onNavigateToAnalytics,
+}: OpportunityProposalsTabProps) {
+  const canCreateProposals =
+    pipelineType === 'sales' || pipelineType === null || pipelineType === undefined;
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  
+
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [proposalToDelete, setProposalToDelete] = useState<string | null>(null);
   const [loadingPDF, setLoadingPDF] = useState<string | null>(null);
   const [loadingLink, setLoadingLink] = useState<string | null>(null);
+  const [recalculatingId, setRecalculatingId] = useState<string | null>(null);
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const [emailProposalId, setEmailProposalId] = useState<string | null>(null);
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
 
-  // Fetch proposals
   const { data, isLoading } = useQuery({
     queryKey: [...proposalKeys.lists(), opportunityId],
     queryFn: () => listProposals({ opportunityId }),
   });
-
   const proposals = data?.data || [];
 
-  // Fetch items and payment terms for all proposals
   const { data: proposalDetails } = useQuery({
     queryKey: proposalDetailsKey(opportunityId),
     queryFn: async () => {
       if (!proposals.length) return {};
-      
-      const details: Record<string, { items: any[]; paymentTerms: any[]; calculatedTotal: number }> = {};
-      
+      const details: Record<string, { items: any[]; paymentTerms: any[] }> = {};
       await Promise.all(
         proposals.map(async (proposal: any) => {
           const [items, paymentTerms] = await Promise.all([
             listProposalItems(proposal.id),
             getPaymentTerms(proposal.id),
           ]);
-          
-          const calculatedTotal = proposal.total_amount || items.reduce((sum, item) => sum + (item.total || 0), 0);
-          
-          details[proposal.id] = { items, paymentTerms, calculatedTotal };
-        })
+          details[proposal.id] = { items, paymentTerms };
+        }),
       );
-      
       return details;
     },
     enabled: proposals.length > 0,
   });
 
-  // Calculate KPIs
-  const kpis = {
-    total: proposals.length,
-    accepted: proposals.filter((p: any) => p.status === 'accepted').length,
-    viewed: proposals.filter((p: any) => ['viewed', 'accepted', 'rejected'].includes(p.status || '')).length,
-    totalValue: proposals.reduce((sum: number, p: any) => {
-      const details = proposalDetails?.[p.id];
-      const value = details?.calculatedTotal || p.total_amount || 0;
-      return sum + value;
-    }, 0),
-  };
+  const breakdown = getProposalsBreakdown(proposals);
+  const activeProposal = pickActiveProposal(proposals as any[]);
+  const activeEffective = activeProposal ? getEffectiveAmount(activeProposal) : null;
+  const activeDynamic = activeProposal ? getDynamicAdjustment(activeProposal) : null;
+  const activeStatus = activeProposal ? getCommercialStatus(activeProposal) : null;
+  const activeNextAction = activeProposal ? getNextAction(activeProposal) : null;
 
-  // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: deleteProposal,
     onSuccess: () => {
@@ -163,100 +184,116 @@ export function OpportunityProposalsTab({ opportunityId, pipelineType }: Opportu
       setDeleteDialogOpen(false);
       setProposalToDelete(null);
     },
-    onError: () => {
-      toast.error('Erro ao excluir proposta');
-    },
+    onError: () => toast.error('Erro ao excluir proposta'),
   });
 
-  // Duplicate mutation
   const duplicateMutation = useMutation({
     mutationFn: duplicateProposal,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [...proposalKeys.lists(), opportunityId] });
       toast.success('Proposta duplicada com sucesso');
     },
-    onError: () => {
-      toast.error('Erro ao duplicar proposta');
-    },
+    onError: () => toast.error('Erro ao duplicar proposta'),
   });
 
-  // Update status mutation
   const updateStatusMutation = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: string }) => updateProposal(id, { status }),
+    mutationFn: ({ id, status }: { id: string; status: string }) =>
+      updateProposal(id, { status }),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: [...proposalKeys.lists(), opportunityId] });
-      const statusLabel = variables.status === 'accepted' ? 'aceita' : 'recusada';
-      toast.success(`Proposta marcada como ${statusLabel}`);
+      const label = variables.status === 'accepted' ? 'aceita' : 'recusada';
+      toast.success(`Proposta marcada como ${label}`);
     },
-    onError: () => {
-      toast.error('Erro ao atualizar status');
-    },
+    onError: () => toast.error('Erro ao atualizar status'),
   });
 
-  const handleSendEmail = (proposal: any) => {
-    setEmailProposalId(proposal.id);
-    setEmailDialogOpen(true);
-  };
-
-  const handleNewProposal = () => {
-    setTemplatePickerOpen(true);
-  };
-
+  const handleNewProposal = () => setTemplatePickerOpen(true);
   const handleTemplateConfirmed = (templateId: string) => {
     navigate(`/app/proposals/new?opportunity_id=${opportunityId}&template_id=${templateId}`);
   };
-
-  const handleEditProposal = (proposalId: string) => {
+  const handleEditProposal = (proposalId: string) =>
     navigate(`/app/proposals/${proposalId}/edit`);
-  };
 
   const handleGeneratePDF = async (proposalId: string) => {
     setLoadingPDF(proposalId);
     try {
-      // Fetch proposal with all related data (organization, account, contact, seller)
       const proposal = await getProposalWithDetails(proposalId);
       if (!proposal) throw new Error('Proposta não encontrada');
-
       const items = await listProposalItems(proposalId);
       const paymentTerms = await getPaymentTerms(proposalId);
-
-      // Use centralized helper to build PDF data
-      // Use centralized helper to build PDF data
       const { pdfData, pdfItems, installments } = buildProposalPDFData(
         proposal,
         items,
-        paymentTerms
+        paymentTerms,
       );
-
       await downloadProposalPDF(pdfData, pdfItems, installments);
       toast.success('PDF gerado com sucesso!');
-    } catch (error) {
-      console.error('Error generating PDF:', error);
+    } catch (e) {
+      console.error(e);
       toast.error('Erro ao gerar PDF');
     } finally {
       setLoadingPDF(null);
     }
   };
 
-  const handleQuickView = async (proposalId: string, existingToken?: string) => {
-    setLoadingLink(proposalId);
+  const ensureToken = async (proposal: any): Promise<string> => {
+    if (proposal.public_token) return proposal.public_token;
+    const token = await generatePublicToken(proposal.id);
+    queryClient.invalidateQueries({ queryKey: [...proposalKeys.lists(), opportunityId] });
+    return token;
+  };
+
+  const handleCopyLink = async (proposal: any) => {
+    setLoadingLink(proposal.id);
     try {
-      let token = existingToken;
-      
-      if (!token) {
-        token = await generatePublicToken(proposalId);
-        queryClient.invalidateQueries({ queryKey: [...proposalKeys.lists(), opportunityId] });
-      }
-      
-      const publicUrl = buildProposalPublicUrl(token);
-      await navigator.clipboard.writeText(publicUrl);
-      window.open(buildProposalDirectUrl(token), '_blank');
-      toast.success('Link copiado e aberto em nova aba!');
-    } catch (error) {
-      console.error('Error generating link:', error);
-      toast.error('Erro ao gerar link');
+      const token = await ensureToken(proposal);
+      await navigator.clipboard.writeText(buildProposalPublicUrl(token));
+      toast.success('Link copiado');
+    } catch (e) {
+      console.error(e);
+      toast.error('Erro ao copiar link');
     } finally {
       setLoadingLink(null);
+    }
+  };
+
+  const handleOpenProposal = async (proposal: any) => {
+    try {
+      const token = await ensureToken(proposal);
+      window.open(buildProposalDirectUrl(token), '_blank');
+    } catch (e) {
+      console.error(e);
+      toast.error('Erro ao abrir proposta');
+    }
+  };
+
+  const handleRecalculate = async (proposalId: string) => {
+    setRecalculatingId(proposalId);
+    try {
+      const res = await orchestrateProposalFinancials(proposalId, 'manual_recalc_tab');
+      if (!res?.ok) throw new Error(res?.error || res?.reason || 'Falha ao recalcular');
+      await queryClient.invalidateQueries({
+        queryKey: [...proposalKeys.lists(), opportunityId],
+      });
+      toast.success('Valor vigente recalculado');
+    } catch (e: any) {
+      toast.error(e?.message ?? 'Erro ao recalcular valor vigente');
+    } finally {
+      setRecalculatingId(null);
+    }
+  };
+
+  const handleSendWhatsApp = async (proposal: any) => {
+    try {
+      const token = await ensureToken(proposal);
+      const url = buildProposalPublicUrl(token);
+      const text = encodeURIComponent(
+        `Olá! Segue a proposta ${proposal.proposal_number ?? ''}: ${url}`,
+      );
+      window.open(`https://wa.me/?text=${text}`, '_blank');
+    } catch (e) {
+      console.error(e);
+      toast.error('Erro ao abrir WhatsApp');
     }
   };
 
@@ -266,84 +303,101 @@ export function OpportunityProposalsTab({ opportunityId, pipelineType }: Opportu
   };
 
   const confirmDelete = () => {
-    if (proposalToDelete) {
-      deleteMutation.mutate(proposalToDelete);
-    }
+    if (proposalToDelete) deleteMutation.mutate(proposalToDelete);
   };
 
   return (
     <div className="space-y-6">
       {!canCreateProposals && (
-        <Alert variant="default" className="border-amber-500/50 bg-amber-500/10">
-          <AlertTriangle className="h-4 w-4 text-amber-500" />
-          <AlertTitle className="text-amber-600">Propostas não disponíveis</AlertTitle>
+        <Alert variant="default" className="border-warning/40 bg-warning/10">
+          <AlertTriangle className="h-4 w-4 text-warning" />
+          <AlertTitle className="text-warning">Propostas não disponíveis</AlertTitle>
           <AlertDescription className="text-muted-foreground">
-            Propostas só podem ser criadas em funis de vendas. Qualifique esta oportunidade primeiro para criar propostas.
+            Propostas só podem ser criadas em funis de vendas. Qualifique esta oportunidade
+            primeiro para criar propostas.
           </AlertDescription>
         </Alert>
       )}
 
-      {/* KPIs Section */}
-      {proposals.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <Card className="bg-gradient-to-br from-slate-50 to-slate-100 border-slate-200">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-slate-200 rounded-lg">
-                  <FileText className="h-4 w-4 text-slate-700" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-slate-900">{kpis.total}</p>
-                  <p className="text-xs text-slate-600">Total</p>
-                </div>
+      {/* Summary cards (commercial decision oriented) */}
+      {proposals.length > 0 && activeProposal && activeEffective && activeDynamic && activeStatus && activeNextAction && (
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+          {/* 1 - Propostas */}
+          <Card>
+            <CardContent className="p-4 space-y-1">
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">Propostas</p>
+              <p className="text-2xl font-bold leading-none">{breakdown.total}</p>
+              <div className="text-xs text-muted-foreground space-y-0.5 pt-1">
+                {breakdown.sent > 0 && <div>{breakdown.sent} enviada{breakdown.sent > 1 ? 's' : ''}</div>}
+                {breakdown.viewed > 0 && <div>{breakdown.viewed} visualizada{breakdown.viewed > 1 ? 's' : ''}</div>}
+                {breakdown.accepted > 0 && <div className="text-success">{breakdown.accepted} aceita{breakdown.accepted > 1 ? 's' : ''}</div>}
+                {breakdown.expired > 0 && <div className="text-destructive">{breakdown.expired} vencida{breakdown.expired > 1 ? 's' : ''}</div>}
+                {breakdown.rejected > 0 && <div className="text-destructive">{breakdown.rejected} recusada{breakdown.rejected > 1 ? 's' : ''}</div>}
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-green-200 rounded-lg">
-                  <CheckCircle className="h-4 w-4 text-green-700" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-green-900">{kpis.accepted}</p>
-                  <p className="text-xs text-green-600">Aceitas</p>
-                </div>
-              </div>
+          {/* 2 - Valor Vigente */}
+          <Card className={cn('border', TONE_CLASSES.success.border)}>
+            <CardContent className="p-4 space-y-1">
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">Valor Vigente</p>
+              <p className={cn('text-2xl font-bold leading-none', TONE_CLASSES.success.text)}>
+                {formatBRL(activeEffective.value, activeProposal.currency)}
+              </p>
+              <p className="text-xs text-muted-foreground pt-1">
+                Valor válido para aprovação agora
+              </p>
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-purple-200 rounded-lg">
-                  <Eye className="h-4 w-4 text-purple-700" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-purple-900">{kpis.viewed}</p>
-                  <p className="text-xs text-purple-600">Visualizadas</p>
-                </div>
-              </div>
+          {/* 3 - Ajuste Dinâmico */}
+          <Card className={cn(activeDynamic.applied ? `border ${TONE_CLASSES.warning.border}` : '')}>
+            <CardContent className="p-4 space-y-1">
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">Ajuste Dinâmico</p>
+              {activeDynamic.applied ? (
+                <>
+                  <p className={cn('text-2xl font-bold leading-none flex items-center gap-1', TONE_CLASSES.warning.text)}>
+                    <TrendingUp className="h-5 w-5" />
+                    {formatPct(activeDynamic.pct ?? 0)}
+                  </p>
+                  <p className="text-xs text-muted-foreground pt-1">Tabela dinâmica aplicada</p>
+                </>
+              ) : (
+                <>
+                  <p className="text-2xl font-bold leading-none text-muted-foreground">—</p>
+                  <p className="text-xs text-muted-foreground pt-1">Tabela dinâmica não aplicada</p>
+                </>
+              )}
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-200">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-emerald-200 rounded-lg">
-                  <DollarSign className="h-4 w-4 text-emerald-700" />
-                </div>
-                <div>
-                  <p className="text-lg font-bold text-emerald-900">{formatCurrency(kpis.totalValue)}</p>
-                  <p className="text-xs text-emerald-600">Valor Total</p>
-                </div>
-              </div>
+          {/* 4 - Status Comercial */}
+          <Card>
+            <CardContent className="p-4 space-y-2">
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">Status Comercial</p>
+              <Badge className={cn('text-sm py-1 px-2.5', TONE_CLASSES[getCommercialStatusTone(activeStatus)].badge)}>
+                {getCommercialStatusLabel(activeStatus)}
+              </Badge>
+              {activeProposal.expires_at && (
+                <p className="text-xs text-muted-foreground">
+                  Validade {formatDateBR(activeProposal.expires_at)}
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* 5 - Próxima Ação */}
+          <Card className={cn('border', TONE_CLASSES[activeNextAction.tone].border)}>
+            <CardContent className="p-4 space-y-1">
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">Próxima Ação</p>
+              <p className={cn('text-sm font-semibold leading-snug', TONE_CLASSES[activeNextAction.tone].text)}>
+                {activeNextAction.label}
+              </p>
             </CardContent>
           </Card>
         </div>
       )}
-      
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">Propostas</h3>
@@ -363,16 +417,14 @@ export function OpportunityProposalsTab({ opportunityId, pipelineType }: Opportu
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
             <FileText className="h-12 w-12 text-muted-foreground/50 mb-4" />
-            <h4 className="text-lg font-medium mb-2">Nenhuma proposta</h4>
-            <p className="text-sm text-muted-foreground mb-4">
-              {canCreateProposals 
-                ? 'Crie uma proposta para esta oportunidade'
-                : 'Esta oportunidade ainda não possui propostas'}
+            <h4 className="text-lg font-medium mb-2">Nenhuma proposta criada para esta oportunidade</h4>
+            <p className="text-sm text-muted-foreground mb-4 max-w-md">
+              Crie uma proposta para formalizar a condição comercial e liberar o link público para o cliente.
             </p>
             {canCreateProposals && (
               <Button onClick={handleNewProposal}>
                 <Plus className="h-4 w-4 mr-2" />
-                Criar Proposta
+                Nova proposta
               </Button>
             )}
           </CardContent>
@@ -381,38 +433,39 @@ export function OpportunityProposalsTab({ opportunityId, pipelineType }: Opportu
         <div className="space-y-4">
           {proposals.map((proposal: any) => {
             const details = proposalDetails?.[proposal.id];
-            const displayValue =
-              proposal.dynamic_pricing_current_amount ??
-              proposal.payment_expected_amount ??
-              proposal.total_amount ??
-              details?.calculatedTotal ??
-              0;
-            const itemCount = details?.items?.length || 0;
+            const itemCount = details?.items?.length ?? proposal.items_count ?? 0;
             const paymentTerm = details?.paymentTerms?.[0];
             const paymentMethod = paymentTerm?.payment_method;
-            const statusInfo = statusConfig[proposal.status] || statusConfig.draft;
+            const eff = getEffectiveAmount(proposal);
+            const dyn = getDynamicAdjustment(proposal);
+            const cs = getCommercialStatus(proposal);
+            const csTone = getCommercialStatusTone(cs);
+            const next = getNextAction(proposal);
             const isLoadingPDF = loadingPDF === proposal.id;
             const isLoadingLink = loadingLink === proposal.id;
-            
+            const isRecalculating = recalculatingId === proposal.id;
+
+            const showAlert = dyn.applied || cs === 'expired' || cs === 'expiring_soon';
+
             return (
               <Card key={proposal.id} className="hover:border-primary/50 transition-colors">
                 <CardContent className="p-5">
-                  {/* Header Row */}
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-1">
-                        <h4 
+                  {/* Header */}
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <h4
                           className="font-semibold text-base hover:text-primary cursor-pointer transition-colors"
-                          onClick={() => handleQuickView(proposal.id, proposal.public_token)}
+                          onClick={() => handleOpenProposal(proposal)}
                         >
                           {proposal.title || 'Proposta sem título'}
                         </h4>
-                        <Badge className={statusInfo.className}>
-                          {statusInfo.label}
+                        <Badge className={cn('text-xs', TONE_CLASSES[csTone].badge)}>
+                          {getCommercialStatusLabel(cs)}
                         </Badge>
                       </div>
-                      <p className="text-sm text-muted-foreground">
-                        <span className="font-mono bg-muted px-1.5 py-0.5 rounded text-xs">
+                      <p className="text-xs text-muted-foreground">
+                        <span className="font-mono bg-muted px-1.5 py-0.5 rounded">
                           {proposal.proposal_number || 'Sem número'}
                         </span>
                         <span className="mx-2">•</span>
@@ -421,58 +474,121 @@ export function OpportunityProposalsTab({ opportunityId, pipelineType }: Opportu
                     </div>
                   </div>
 
-                  {/* Metrics Row */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-3 bg-muted/50 rounded-lg mb-4">
-                    <div className="flex items-center gap-2">
-                      <DollarSign className="h-4 w-4 text-emerald-600" />
-                      <div>
-                        <p className="text-sm font-semibold">{formatCurrency(displayValue, proposal.currency)}</p>
-                        <p className="text-xs text-muted-foreground">Valor Total</p>
-                      </div>
+                  {/* Financial block */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-3 bg-muted/40 rounded-lg mb-3">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Valor Vigente</p>
+                      <p className={cn('text-lg font-bold', TONE_CLASSES.success.text)}>
+                        {formatBRL(eff.value, proposal.currency)}
+                      </p>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Package className="h-4 w-4 text-blue-600" />
-                      <div>
-                        <p className="text-sm font-semibold">{itemCount} {itemCount === 1 ? 'item' : 'itens'}</p>
-                        <p className="text-xs text-muted-foreground">Qtd Itens</p>
-                      </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Valor Original</p>
+                      <p className={cn(
+                        'text-base font-medium',
+                        eff.value !== eff.originalValue ? 'line-through text-muted-foreground' : '',
+                      )}>
+                        {formatBRL(eff.originalValue, proposal.currency)}
+                      </p>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-orange-600" />
-                      <div>
-                      <p className="text-sm font-semibold">
-                          {proposal.expires_at
-                            ? formatDateBR(proposal.expires_at)
-                            : '-'
-                          }
+                    <div>
+                      <p className="text-xs text-muted-foreground">Ajuste</p>
+                      {dyn.applied ? (
+                        <p className={cn('text-base font-semibold', TONE_CLASSES.warning.text)}>
+                          {formatPct(dyn.pct ?? 0)}{' '}
+                          <span className="text-xs font-normal text-muted-foreground">
+                            (tabela dinâmica)
+                          </span>
                         </p>
-                        <p className="text-xs text-muted-foreground">Validade</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <CreditCard className="h-4 w-4 text-purple-600" />
-                      <div>
-                        <p className="text-sm font-semibold">
-                          {paymentMethod 
-                            ? `${paymentMethodLabels[paymentMethod]?.icon || ''} ${paymentMethodLabels[paymentMethod]?.label || paymentMethod}`
-                            : '-'
-                          }
-                        </p>
-                        <p className="text-xs text-muted-foreground">Pagamento</p>
-                      </div>
+                      ) : (
+                        <p className="text-base font-medium text-muted-foreground">Sem ajuste</p>
+                      )}
                     </div>
                   </div>
 
-                  {/* Views indicator */}
-                  {(proposal.views_count || 0) > 0 && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
-                      <Eye className="h-4 w-4" />
-                      <span>{proposal.views_count} {proposal.views_count === 1 ? 'visualização' : 'visualizações'}</span>
+                  {/* Operational metadata */}
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground mb-3">
+                    <span>Itens: <span className="text-foreground font-medium">{itemCount}</span></span>
+                    <span>
+                      Validade:{' '}
+                      <span className="text-foreground font-medium">
+                        {proposal.expires_at ? formatDateBR(proposal.expires_at) : '-'}
+                      </span>
+                    </span>
+                    <span>
+                      Pagamento:{' '}
+                      <span className="text-foreground font-medium">
+                        {paymentMethod ? paymentMethodLabels[paymentMethod] ?? paymentMethod : '-'}
+                      </span>
+                    </span>
+                    {(proposal.views_count ?? 0) > 0 && (
+                      <button
+                        type="button"
+                        onClick={onNavigateToAnalytics}
+                        className="text-primary hover:underline"
+                      >
+                        Ver analytics da proposta
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Conditional alert */}
+                  {showAlert && (
+                    <div className={cn(
+                      'rounded-md border px-3 py-2 text-sm mb-3',
+                      cs === 'expired'
+                        ? `${TONE_CLASSES.danger.bg} ${TONE_CLASSES.danger.border} ${TONE_CLASSES.danger.text}`
+                        : cs === 'expiring_soon'
+                          ? `${TONE_CLASSES.warning.bg} ${TONE_CLASSES.warning.border} ${TONE_CLASSES.warning.text}`
+                          : `${TONE_CLASSES.warning.bg} ${TONE_CLASSES.warning.border} ${TONE_CLASSES.warning.text}`,
+                    )}>
+                      {cs === 'expired'
+                        ? 'Proposta vencida. Duplique a proposta para gerar nova condição comercial.'
+                        : cs === 'expiring_soon'
+                          ? 'Proposta vence em menos de 48h. Priorize follow up.'
+                          : `Condição comercial vigente: o valor válido para aprovação é ${formatBRL(eff.value, proposal.currency)}.`}
                     </div>
                   )}
 
-                  {/* Actions Row */}
-                  <div className="flex items-center gap-2 pt-3 border-t">
+                  {/* AI summary */}
+                  <details className="mb-3 group">
+                    <summary className="text-xs text-muted-foreground cursor-pointer flex items-center gap-1 hover:text-foreground">
+                      <Sparkles className="h-3 w-3" />
+                      Resumo para IA
+                    </summary>
+                    <ul className="mt-2 text-xs text-muted-foreground space-y-0.5 pl-5 list-disc">
+                      <li>Status: {getCommercialStatusLabel(cs)}</li>
+                      <li>Valor vigente: {formatBRL(eff.value, proposal.currency)}</li>
+                      <li>
+                        Tabela dinâmica:{' '}
+                        {dyn.applied ? `${formatPct(dyn.pct ?? 0)} aplicado` : 'não aplicada'}
+                      </li>
+                      {proposal.expires_at && (
+                        <li>Validade: {formatDateBR(proposal.expires_at)}</li>
+                      )}
+                      <li>Próxima ação: {next.label}</li>
+                    </ul>
+                  </details>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-2 pt-3 border-t flex-wrap">
+                    <Button variant="outline" size="sm" onClick={() => handleOpenProposal(proposal)}>
+                      <ExternalLink className="h-4 w-4 mr-2" />
+                      Abrir
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleCopyLink(proposal)}
+                      disabled={isLoadingLink}
+                    >
+                      {isLoadingLink ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <LinkIcon className="h-4 w-4 mr-2" />
+                      )}
+                      Copiar link
+                    </Button>
                     <Button
                       variant="outline"
                       size="sm"
@@ -486,26 +602,7 @@ export function OpportunityProposalsTab({ opportunityId, pipelineType }: Opportu
                       )}
                       PDF
                     </Button>
-
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleQuickView(proposal.id, proposal.public_token)}
-                      disabled={isLoadingLink}
-                    >
-                      {isLoadingLink ? (
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      ) : (
-                        <ExternalLink className="h-4 w-4 mr-2" />
-                      )}
-                      Link Rápido
-                    </Button>
-
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleEditProposal(proposal.id)}
-                    >
+                    <Button variant="outline" size="sm" onClick={() => handleEditProposal(proposal.id)}>
                       <Pencil className="h-4 w-4 mr-2" />
                       Editar
                     </Button>
@@ -517,41 +614,59 @@ export function OpportunityProposalsTab({ opportunityId, pipelineType }: Opportu
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleSendEmail(proposal)}>
+                        <DropdownMenuItem onClick={() => {
+                          setEmailProposalId(proposal.id);
+                          setEmailDialogOpen(true);
+                        }}>
                           <Send className="h-4 w-4 mr-2" />
-                          Enviar por E-mail
+                          Enviar por e-mail
                         </DropdownMenuItem>
-                        <DropdownMenuItem 
+                        <DropdownMenuItem onClick={() => handleSendWhatsApp(proposal)}>
+                          <Send className="h-4 w-4 mr-2" />
+                          Enviar por WhatsApp
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
                           onClick={() => duplicateMutation.mutate(proposal.id)}
                           disabled={duplicateMutation.isPending}
                         >
                           <Copy className="h-4 w-4 mr-2" />
-                          Duplicar Proposta
+                          Duplicar proposta
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => handleRecalculate(proposal.id)}
+                          disabled={isRecalculating}
+                        >
+                          {isRecalculating ? (
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          ) : (
+                            <RefreshCw className="h-4 w-4 mr-2" />
+                          )}
+                          Recalcular valor vigente
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem 
+                        <DropdownMenuItem
                           onClick={() => updateStatusMutation.mutate({ id: proposal.id, status: 'accepted' })}
                           disabled={proposal.status === 'accepted' || updateStatusMutation.isPending}
-                          className="text-green-600"
+                          className="text-success"
                         >
                           <CheckCircle className="h-4 w-4 mr-2" />
-                          Marcar como Aceita
+                          Marcar como aceita
                         </DropdownMenuItem>
-                        <DropdownMenuItem 
+                        <DropdownMenuItem
                           onClick={() => updateStatusMutation.mutate({ id: proposal.id, status: 'rejected' })}
                           disabled={proposal.status === 'rejected' || updateStatusMutation.isPending}
-                          className="text-red-600"
+                          className="text-destructive"
                         >
                           <XCircle className="h-4 w-4 mr-2" />
-                          Marcar como Recusada
+                          Registrar recusa
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem 
+                        <DropdownMenuItem
                           onClick={() => handleDelete(proposal.id)}
                           className="text-destructive"
                         >
                           <Trash2 className="h-4 w-4 mr-2" />
-                          Excluir Proposta
+                          Excluir proposta
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -563,7 +678,6 @@ export function OpportunityProposalsTab({ opportunityId, pipelineType }: Opportu
         </div>
       )}
 
-      {/* Delete confirmation dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -585,7 +699,7 @@ export function OpportunityProposalsTab({ opportunityId, pipelineType }: Opportu
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      {/* Send Email Composer */}
+
       {emailProposalId && (
         <ProposalEmailComposer
           open={emailDialogOpen}
