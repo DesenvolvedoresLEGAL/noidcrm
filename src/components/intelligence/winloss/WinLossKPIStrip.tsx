@@ -7,7 +7,13 @@ interface WinLossKPIStripProps {
   data: WinLossDataResult | undefined;
   isLoading: boolean;
   terminology: { wonPlural: string; lostPlural: string; rateLabel: string };
+  pipelineType?: string;
 }
+
+// Para pipelines de venda, encurtamos os rótulos. Outros tipos mantêm a terminologia original.
+const SHORT_LABELS: Record<string, { won: string; lost: string }> = {
+  sales: { won: 'Ganhos', lost: 'Perdidos' },
+};
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
