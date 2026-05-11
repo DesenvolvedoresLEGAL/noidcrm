@@ -1,82 +1,117 @@
-## Diagnóstico — por que aparece "0 / Nenhuma proposta"
+## Objetivo
 
-A tela `Win/Loss Hub → Aprovações` carrega o hook `useProposalApprovalsHistory`, que faz:
+A aba **Visão Geral** precisa responder em até 5 segundos: por que estamos perdendo, quanto custa, e o que fazer agora. Mudança apenas na aba "Visão Geral" — sem refatoração estrutural fora dela.
 
-```ts
-.in('status', ['accepted', 'declined', 'expired'])
-```
+## Escopo (arquivos)
 
-Mas no banco, os status reais da tabela `proposals` são:
+- `src/components/intelligence/winloss/WinLossKPIStrip.tsx` — rótulos dos cards.
+- `src/components/intelligence/winloss/tabs/WinLossOverviewTab.tsx` — reordenação, novos blocos, regras de filtro.
+- `src/components/intelligence/winloss/tabs/LossAnalysisSection.tsx` — substituir "Fatores de Perda" por bloco executivo "Por que estamos perdendo" e enriquecer "Top Motivos de Perda" com valor perdido. Remover "Perdas por Categoria" da aba (já não está nesta seção, mas vou retirá-la do Overview).
+- `src/components/intelligence/winloss/MonthlyPulseCards.tsx` — exibir variação vs mês anterior, valor perdido e ganhos/perdas (já tem maior parte; só ajuste de copy).
+- **Novo:** `src/components/intelligence/winloss/AIDiagnosisCard.tsx` — Diagnóstico Executivo da IA (cliente-side, derivado dos dados já carregados, sem nova chamada de IA — lê `data.lossReasonsByMacro`, `lostValue`, `avgCycleWon/Lost`, `factors`).
+- **Novo:** `src/components/intelligence/winloss/MonthSignalsCard.tsx` — "Sinais do Mês" (mostrado só com filtro = `month`).
+- `src/pages/intelligence/WinLossHub.tsx` — passar `timeframe` para `WinLossOverviewTab`.
 
-```
-draft | sent | accepted | rejected
-```
+## 1. Renomear cards do topo (KPI Strip)
 
-Ou seja:
-- **`declined` não existe** → o filtro elimina TODAS as 8 propostas recusadas (incluindo as que acabaram de ser sincronizadas pelo gatilho de oportunidade perdida).
-- **`expired` também não existe como status** — propostas vencidas continuam com `status='sent'` e apenas `expires_at < now()`.
+Em `WinLossKPIStrip.tsx`, sobrepor labels (apenas para `pipeline_type='sales'`, mantendo terminologia atual para qualification/onboarding):
 
-Resultado: mesmo com 147 aceitas + 6 recusadas no banco, a aba sempre mostra 0.
+- "Deals Ganhos" → "Ganhos"
+- "Deals Perdidos" → "Perdidos"
+- "Ticket Médio Won" → "Ticket Médio Ganho"
+- "Ciclo Médio (dias)" → "Ciclo Médio Geral"
 
-## O que vou fazer (100% frontend)
+O ciclo médio passa a ser média ponderada de `avgCycleWon` e `avgCycleLost` quando ambos existirem (atualmente só mostra `avgCycleWon`).
 
-### 1. Corrigir o hook `src/hooks/useProposalApprovalsHistory.ts`
-- Trocar o filtro para `status IN ('accepted','rejected')` + uma busca paralela de "expiradas" = `status='sent' AND expires_at < now() AND expires_at >= from`.
-- Normalizar `rejected → 'declined'` no retorno (a UI já trabalha com esse termo) **ou** ajustar a UI para `rejected`. Vou normalizar para `declined` — menor impacto.
-- Manter o filtro de janela por data (`accepted_at`/`declined_at`/`expires_at`) e o cruzamento com `pipeline_type='sales'`.
+## 2. Nova ordem da Visão Geral
 
-### 2. Renomear menu e título
-- `WinLossHub.tsx` linha 254: `Aprovações` → `Relatório`.
-- `ProposalApprovalsTab.tsx` título do card: `Aprovações & Reprovações de Propostas` → `Relatório de Decisões de Propostas`.
-- Manter o ícone `FileCheck` (ou trocar por `FileText`, mais coerente).
-- Manter `value="approvals"` da Tabs (chave interna) para não quebrar deep links — só o label muda.
+`WinLossOverviewTab` renderiza, nesta ordem:
 
-### 3. Transformar em verdadeiro relatório acionável
-Adicionar logo abaixo dos contadores 3 modos de visualização (segmented):
+1. (Header e Filtros e KPI Strip continuam acima, no `WinLossHub` — não muda.)
+2. **Diagnóstico Executivo da IA** (novo)
+3. **Alertas Inteligentes** (subir — hoje está no fim)
+4. **Pulso Mensal** (condicional ao filtro)
+5. **Análise de Perdas** (com "Por que estamos perdendo" + "Top Motivos de Perda" enriquecidos; sem "Perdas por Categoria")
+6. **Análise de Ganhos**
+7. **Ciclo de Venda**
+8. **Tendência de Motivos de Perda** ou **Sinais do Mês** (condicional)
 
-```text
-[ Lista ]  [ Por Cliente ]  [ Por Vendedor ]
-```
+Remover do Overview: `LossReasonsByCategoryChart` ("Perdas por Categoria"). Mantém-se disponível em outras abas (Revenue Impact / Relatório).
 
-- **Lista** → comportamento atual (cards individuais com motivo, feedback, IP, etc.).
-- **Por Cliente** → agrupa por `account.nome_fantasia ?? razao_social`, exibindo:
-  - total de propostas, aceitas, recusadas, expiradas
-  - valor aprovado vs perdido
-  - lista expansível com o motivo de cada decisão
-- **Por Vendedor** → mesma estrutura agrupada por `owner_name`, com taxa de aprovação (`accepted / (accepted + declined)`).
+## 3. Diagnóstico Executivo da IA (novo bloco)
 
-Ambos os agrupamentos reusam o mesmo dataset já carregado — sem chamadas extras ao banco.
+Componente client-side determinístico (sem nova chamada à IA) que lê `WinLossDataResult` e gera:
 
-### 4. Trazer o nome do cliente para o relatório
-O hook já carrega `opportunity` mas não a `account`. Vou estender o `select` para também trazer:
+- **Principal motivo de perda**: `lossReasonsByMacro[0]` (categoria + label).
+- **Valor perdido associado**: soma `final_value` das `losses` cuja categoria == top macro.
+- **Δ ciclo (perda − ganho)**: `avgCycleLost - avgCycleWon`.
+- **Recomendação**: regra simples por categoria top:
+  - `timing` → "ativar alerta para oportunidades paradas > 7 dias e playbook de retomada por urgência"
+  - `competition` → "revisar diferenciais vs concorrentes ranqueados em Perdas por Concorrente"
+  - `price` → "revisar política comercial / aprovar desconto para faixa X"
+  - `feature/operational/internal/no_fit/other` → mensagens análogas pré-definidas.
+- **Severidade**: `low | medium | high | critical` calculada por `(lostValue / (wonValue+lostValue))` + share do top motivo.
 
-```ts
-opportunity:opportunities!inner(
-  id, title, valor_previsto, pipeline_id, owner_user_id, organization_id,
-  account:accounts(id, nome_fantasia, razao_social, name)
-)
-```
+Copy padrão exatamente no formato do enunciado, com badge de severidade colorida.
 
-E adicionar `account_id`, `account_name` ao tipo `ProposalApprovalEntry` — usado nos cards e no agrupamento "Por Cliente".
+## 4. Alertas Inteligentes acima
 
-### 5. Exportar CSV completo
-Adicionar coluna `Cliente` no CSV (já existe `Vendedor`). Continua exportando o filtro corrente.
+`SmartAlertsCard` passa do bloco "Análise Avançada" para logo após o Diagnóstico Executivo. Largura full.
 
-## Arquivos impactados
+## 5. Remover "Perdas por Categoria"
 
-- `src/hooks/useProposalApprovalsHistory.ts` — fix do filtro de status, segunda query para expiradas, enriquecimento com `account`.
-- `src/components/intelligence/winloss/tabs/ProposalApprovalsTab.tsx` — renomear título, adicionar segmented control de modo, renderizadores `GroupedByAccount` e `GroupedBySeller`, coluna `Cliente` no CSV, mostrar nome do cliente em cada card.
-- `src/pages/intelligence/WinLossHub.tsx` — label `Aprovações` → `Relatório`.
+Apagar `LossReasonsByCategoryChart` do JSX de `WinLossOverviewTab`. O componente continua existindo para reuso em outras abas.
 
-## Riscos
+## 6. "Por que estamos perdendo" (substitui "Fatores de Perda")
 
-- **Baixo**. Sem mudanças de schema, RLS, edge functions ou tipos do Supabase. Mantemos a chave `value="approvals"` para não quebrar deep links.
-- O label "expired" continua sendo derivado em runtime (não é um status persistido) — assumido como aceitável para um relatório.
+Em `LossAnalysisSection.tsx`, terceiro card vira "Por que estamos perdendo". Cada linha (categoria) mostra:
+
+- Ícone + label da categoria
+- `% das perdas` (= count/totalFactors)
+- `quantidade de deals`
+- `valor perdido estimado` (somar `final_value` das `losses` cuja categoria casa)
+- `tendência vs período anterior` — calculada comparando contagem da categoria nos últimos 30 dias do range vs 30 dias anteriores (delta em pp). Se não houver dados suficientes, mostrar "—".
+- `ação recomendada` — micro-copy curta (1 linha) por categoria, mesma tabela do Diagnóstico.
+
+## 7. "Top Motivos de Perda" enriquecido
+
+Mesmo componente. Para cada `lossReasonsByMacro[i]` exibir, ao lado do contador:
+
+`{label} — {count} deals | {pct}% | {formatCurrency(valorPerdido)} perdidos`
+
+`valorPerdido` calculado a partir das `losses` filtradas pela categoria + specifics.
+
+## 8. Regra do Pulso Mensal
+
+`WinLossOverviewTab` recebe `timeframe`. Condicional:
+
+- `timeframe === 'month'` → não renderiza `MonthlyPulseCards`.
+- `quarter | semester | year | custom` → renderiza, mostrando todos os meses com: win rate, ganhos, perdas, valor perdido, variação vs mês anterior (`prevWinRate` já existe; adicionar valor perdido visível).
+
+## 9. Regra da Tendência
+
+- `timeframe !== 'month'` → mantém `LossReasonsTrendChart`.
+- `timeframe === 'month'` → renderiza novo `MonthSignalsCard` com até 3 sinais derivados:
+  1. Concorrência: % das perdas com `competitor` preenchido.
+  2. Categoria que virou principal causa (top atual diferente do top do período anterior).
+  3. Categoria que mais subiu em pontos percentuais vs período anterior.
+
+Cada sinal: ícone + frase curta no formato do enunciado.
+
+## 10. Visual
+
+Manter cards/tipografia atuais (`Card`, `Badge`, `Progress`). Sem novos componentes visuais pesados. Severidade usa `bg-{rose|amber|yellow|emerald}-500/10` já em uso.
 
 ## Critério de sucesso
 
-1. Após o fix, a aba **Relatório** com filtro "Ano" deve mostrar **147 Aprovadas + 6 Recusadas** (números atuais do banco) — o usuário hoje vê 0/0.
-2. Cada card exibe o nome do cliente (`nome_fantasia` quando houver).
-3. O modo "Por Cliente" mostra cada conta como um bloco com contadores e valor aprovado/perdido.
-4. O modo "Por Vendedor" mostra a taxa de aprovação por vendedor.
-5. Menu lateral e título passam a chamar **Relatório**.
+- Ordem e nomes batem com o enunciado.
+- Filtro "Mês" esconde Pulso Mensal e mostra "Sinais do Mês".
+- Filtros maiores mostram Pulso Mensal e Tendência.
+- Diagnóstico e Alertas Inteligentes ficam visíveis sem rolar até o fim.
+- "Por que estamos perdendo" mostra valor perdido e ação recomendada por linha.
+- Nenhuma chamada extra ao banco — tudo derivado de `useWinLossData`.
+
+## Riscos
+
+- Baixo. Apenas presentation/derivações no frontend. Sem mudanças em hooks de dados, RLS, edge functions ou schema.
+- Cuidado para não quebrar as outras abas que reusam `LossAnalysisSection` — só esta seção é usada na Visão Geral, então a mudança fica isolada.

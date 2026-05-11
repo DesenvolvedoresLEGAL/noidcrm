@@ -138,6 +138,7 @@ export default function WinLossHub() {
           data={winLossData}
           isLoading={isLoading}
           terminology={terminology}
+          pipelineType={pipelineType}
         />
 
         {/* AI Insights Banner */}
@@ -265,6 +266,8 @@ export default function WinLossHub() {
               organizationId={organization?.id || ''}
               pipelineContext={pipelineContext}
               terminology={terminology}
+              timeframe={timeframe}
+              dateRange={dateRange}
             />
           </TabsContent>
 
