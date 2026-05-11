@@ -1,4 +1,8 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  resolveApprovedProposalAmount,
+  APPROVED_VALUE_SELECT_COLUMNS,
+} from "../_shared/approved-proposal-value.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
