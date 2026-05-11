@@ -60,7 +60,7 @@ export async function createProposalItem(item: Omit<ProposalItem, 'id' | 'create
     order_index: item.order_index,
     name: item.name,
     description: item.description,
-    quantity: item.quantity,
+    quantity: calculatedItem.quantity ?? item.quantity,
     unit_cost: item.unit_cost,
     markup_percent: item.markup_percent,
     unit_price: calculatedItem.unit_price || 0,
@@ -72,6 +72,9 @@ export async function createProposalItem(item: Omit<ProposalItem, 'id' | 'create
     measurement_unit_id: item.measurement_unit_id,
     billing_type: item.billing_type || 'one_time',
     counts_for_commission: item.counts_for_commission ?? true,
+    quantity_points: item.billing_type === 'point_day' ? (calculatedItem.quantity_points ?? item.quantity_points ?? 1) : null,
+    billing_days: item.billing_type === 'point_day' ? (calculatedItem.billing_days ?? item.billing_days ?? 1) : null,
+    unit_price_point_day: item.billing_type === 'point_day' ? (calculatedItem.unit_price_point_day ?? item.unit_price_point_day ?? 0) : null,
   };
 
   const { data, error } = await supabase
