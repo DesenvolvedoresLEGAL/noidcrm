@@ -431,7 +431,7 @@ ${scrapedContent.slice(0, 18000)}`,
             ],
             tool_choice: { type: "function", function: { name: "extract_normalized_profile" } },
           }),
-        });
+        }, 90000);
 
         if (analysisResp.ok) {
           const aiData = await analysisResp.json();
