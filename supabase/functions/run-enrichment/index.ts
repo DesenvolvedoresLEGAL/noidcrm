@@ -602,7 +602,7 @@ REMETENTE: SDR da NOID.`,
             ],
             tool_choice: { type: "function", function: { name: "generate_brief" } },
           }),
-        });
+        }, 90000);
 
         if (briefResp.ok) {
           const briefAiData = await briefResp.json();
