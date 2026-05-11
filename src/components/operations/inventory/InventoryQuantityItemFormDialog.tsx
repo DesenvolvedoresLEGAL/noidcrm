@@ -42,6 +42,8 @@ import { useInventoryCategories } from '@/hooks/operations/useInventoryCategorie
 import { useInventoryLocations } from '@/hooks/operations/useInventoryLocations';
 import { useInventoryQuantityItemMutations } from '@/hooks/operations/useInventoryItems';
 import type { InventoryItemWithRefs } from '@/services/operations/inventoryItems';
+import { showFormErrors } from '@/lib/operations/formErrorFeedback';
+import { AlertCircle } from 'lucide-react';
 
 const STATUSES = [
   'available',
