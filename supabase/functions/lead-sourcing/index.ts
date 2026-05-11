@@ -1136,8 +1136,76 @@ async function handleEventFirecrawl(
       { error: String(providerErr) }
     );
   }
+
+  // ── Step 0b: Informa Markets / Swapcard provider ──
+  // Marketing pages (e.g. fispalfoodservice.com.br) link to app.informamarkets.com.br;
+  // the helper follows that link automatically and paginates the public GraphQL.
+  if (allExhibitors.length === 0) {
+    try {
+      const { tryInformaMarketsFromUrl } = await import("./providers/index.ts");
+      const informa = await tryInformaMarketsFromUrl(eventUrl);
+      if (informa.detection) {
+        await logRunEvent(supabase, organizationId, run.id, "info", "Informa Markets detectado", {
+          event_slug: informa.detection.eventSlug,
+          view_id: informa.detection.viewId,
+          resolved_url: informa.resolved_url ?? eventUrl,
+        });
+        if (informa.result && informa.result.exhibitors.length > 0) {
+          for (const ex of informa.result.exhibitors) {
+            allExhibitors.push({
+              company_name: ex.name,
+              website: null,
+              category: ex.categories[0] || null,
+              description: null,
+              booth: ex.raw?.withEvent?.booth ?? null,
+              country: ex.country,
+              city: null,
+              exhibitor_profile_url: ex.source_url,
+              signals: [
+                "informa_markets_official",
+                ex.country ? "has_country" : null,
+                ex.categories.length > 0 ? "has_category" : null,
+              ].filter(Boolean) as string[],
+              confidence: 95,
+              _source_url: ex.source_url,
+              _page_type: "informa_markets_graphql",
+              _extraction_method: "informa_markets_graphql",
+              _logo_url: ex.raw?.logoUrl || null,
+              _informa_external_id: ex.external_id,
+              _informa_categories: ex.categories,
+            });
+          }
+          providerUsed = "informa-markets";
+          metrics.exhibitors_extracted_raw = allExhibitors.length;
+          metrics.html_hybrid_extracted = allExhibitors.length;
+          (metrics as any).provider = "informa-markets";
+          (metrics as any).informa_view_id = informa.result.view_id;
+          (metrics as any).informa_event_id = informa.result.event_id;
+          (metrics as any).informa_total_count = informa.result.total_count;
+          (metrics as any).informa_pages_fetched = informa.result.pages_fetched;
+          (metrics as any).informa_resolved_url = informa.resolved_url ?? eventUrl;
+          await logRunEvent(supabase, organizationId, run.id, "info",
+            `Informa Markets forneceu ${informa.result.exhibitors.length}/${informa.result.total_count ?? "?"} expositores em ${informa.result.pages_fetched} páginas — pulando Firecrawl`,
+            { provider: "informa-markets", count: informa.result.exhibitors.length }
+          );
+        } else if (informa.error) {
+          await logRunEvent(supabase, organizationId, run.id, "warn",
+            "Informa Markets detectado mas GraphQL falhou — caindo para Firecrawl",
+            { error: informa.error }
+          );
+        }
+      }
+    } catch (providerErr) {
+      await logRunEvent(supabase, organizationId, run.id, "warn",
+        "Erro ao tentar provider Informa Markets — seguindo com Firecrawl",
+        { error: String(providerErr) }
+      );
+    }
+  }
+
   (metrics as any).provider = providerUsed;
-  const expofpHandled = allExhibitors.length > 0;
+  const providerHandled = allExhibitors.length > 0;
+  const expofpHandled = providerHandled; // legacy var name used downstream
 
   // ── Step 1: Map — discover all URLs ──
   let discoveredUrls: string[] = [];
