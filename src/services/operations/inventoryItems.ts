@@ -49,6 +49,8 @@ export interface SerializedItemInput extends ClassificationFields {
   model?: string | null;
   notes?: string | null;
   technical_specs?: TechnicalSpec[];
+  router_factory?: RouterFactory | null;
+  sim_card_factory?: SimCardFactory | null;
   _currentMetadata?: unknown;
 }
 
