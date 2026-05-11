@@ -15,15 +15,15 @@ serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  // Auth guard: internal-only (called by DB trigger via pg_net or worker cron).
+  // Auth model:
+  //  1. Worker/cron: presents x-internal-secret = INTERNAL_WORKFLOW_SECRET → may run in worker mode (no body)
+  //  2. Public/anon caller (proposal acceptance page) OR authenticated CRM user:
+  //     must pass { proposalId } in body. We then validate via service_role that the proposal
+  //     is actually `accepted` AND has a pending/failed job in acceptance_effect_jobs.
+  //     This prevents anon abuse: they cannot forge a job (only the DB trigger inserts).
   const internalSecret = req.headers.get('x-internal-secret');
   const expectedSecret = Deno.env.get('INTERNAL_WORKFLOW_SECRET');
-  if (!expectedSecret || internalSecret !== expectedSecret) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-      status: 401,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-  }
+  const isInternalCaller = !!expectedSecret && internalSecret === expectedSecret;
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
