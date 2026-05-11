@@ -90,15 +90,20 @@ serve(async (req) => {
         .select("*")
         .eq("proposal_id", proposalId)
         .in("status", ["pending", "failed"])
+        .or("notifications_processed_at.is.null,slack_processed_at.is.null")
         .limit(1);
       jobs = data || [];
     } else {
-      // Worker mode: pick up pending/failed jobs
+      // Worker mode is a safety net for fresh acceptance events only.
+      // Historical replays/backfills must always be invoked with an explicit proposalId.
+      const workerCutoff = new Date(Date.now() - 30 * 60 * 1000).toISOString();
       const { data } = await supabase
         .from("acceptance_effect_jobs")
         .select("*")
         .in("status", ["pending", "failed"])
         .lt("attempt_count", 5)
+        .gte("accepted_at", workerCutoff)
+        .gte("created_at", workerCutoff)
         .order("created_at", { ascending: true })
         .limit(10);
       jobs = data || [];
