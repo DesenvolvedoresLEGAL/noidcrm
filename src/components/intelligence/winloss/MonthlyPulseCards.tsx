@@ -42,7 +42,10 @@ export function MonthlyPulseCards({ data }: MonthlyPulseCardsProps) {
                   <span className="text-emerald-500">{pulse.wins}W</span>
                   <span className="text-red-500">{pulse.losses}L</span>
                 </div>
-                <p className="text-[10px] text-muted-foreground truncate">{formatCurrency(pulse.wonValue)}</p>
+                <p className="text-[10px] text-emerald-600 truncate">+ {formatCurrency(pulse.wonValue)}</p>
+                {pulse.lostValue > 0 && (
+                  <p className="text-[10px] text-red-500 truncate">− {formatCurrency(pulse.lostValue)}</p>
+                )}
               </CardContent>
             </Card>
           );
