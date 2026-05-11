@@ -18,10 +18,28 @@ const SHORT_LABELS: Record<string, { won: string; lost: string }> = {
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
 
-export function WinLossKPIStrip({ data, isLoading, terminology }: WinLossKPIStripProps) {
+export function WinLossKPIStrip({ data, isLoading, terminology, pipelineType }: WinLossKPIStripProps) {
+  const short = pipelineType ? SHORT_LABELS[pipelineType] : undefined;
+  const wonLabel = short?.won ?? terminology.wonPlural;
+  const lostLabel = short?.lost ?? terminology.lostPlural;
+
+  // Ciclo Médio Geral: média ponderada de won + lost (quando ambos existem).
+  const wonCycles = data?.validWinCyclesCount ?? 0;
+  const lostCycles = data?.validLossCyclesCount ?? 0;
+  const avgWon = data?.avgCycleWon ?? null;
+  const avgLost = data?.avgCycleLost ?? null;
+  let avgCycleGeneral: number | null = null;
+  if (avgWon != null && avgLost != null && wonCycles + lostCycles > 0) {
+    avgCycleGeneral = Math.round((avgWon * wonCycles + avgLost * lostCycles) / (wonCycles + lostCycles));
+  } else if (avgWon != null) {
+    avgCycleGeneral = avgWon;
+  } else if (avgLost != null) {
+    avgCycleGeneral = avgLost;
+  }
+
   const kpis = [
     {
-      label: terminology.wonPlural,
+      label: wonLabel,
       value: data?.wonCount || 0,
       format: 'number' as const,
       icon: TrendingUp,
@@ -29,7 +47,7 @@ export function WinLossKPIStrip({ data, isLoading, terminology }: WinLossKPIStri
       bg: 'bg-emerald-500/10',
     },
     {
-      label: terminology.lostPlural,
+      label: lostLabel,
       value: data?.lostCount || 0,
       format: 'number' as const,
       icon: TrendingDown,
@@ -53,7 +71,7 @@ export function WinLossKPIStrip({ data, isLoading, terminology }: WinLossKPIStri
       bg: 'bg-yellow-500/10',
     },
     {
-      label: 'Ticket Médio Won',
+      label: 'Ticket Médio Ganho',
       value: data?.avgTicketWon || 0,
       format: 'currency' as const,
       icon: BarChart3,
@@ -61,8 +79,8 @@ export function WinLossKPIStrip({ data, isLoading, terminology }: WinLossKPIStri
       bg: 'bg-emerald-500/10',
     },
     {
-      label: 'Ciclo Médio (dias)',
-      value: data?.avgCycleWon ?? 0,
+      label: 'Ciclo Médio Geral',
+      value: avgCycleGeneral ?? 0,
       format: 'number' as const,
       icon: Clock,
       color: 'text-violet-500',
