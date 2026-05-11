@@ -18,6 +18,8 @@ import { ImageUpload } from './ImageUpload';
 import { useState, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Repeat, Zap, TrendingUp } from 'lucide-react';
+import { ProductBOMEditor } from './ProductBOMEditor';
+import { replaceProductBomItems, type ProductBomItemInput } from '@/services/supabase/product-bom';
 
 // Helper para tratar NaN/vazio como undefined
 const parseNumber = (val: unknown) => {
