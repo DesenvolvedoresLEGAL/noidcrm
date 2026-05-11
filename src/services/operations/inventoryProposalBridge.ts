@@ -82,7 +82,12 @@ export async function generatePreReservationFromProposal(
   for (const it of items ?? []) {
     const cfg = it.product_id ? productMap.get(it.product_id) : undefined;
     if (!cfg || cfg.inventory_control_mode === 'none') continue;
-    const baseQty = Number(it.quantity ?? 1) * Number(cfg.inventory_quantity_multiplier ?? 1);
+    // For point_day items, physical reservation is per POINT (not points × days).
+    const physicalQty =
+      (it as any).billing_type === 'point_day'
+        ? Number((it as any).quantity_points ?? 1)
+        : Number(it.quantity ?? 1);
+    const baseQty = physicalQty * Number(cfg.inventory_quantity_multiplier ?? 1);
 
     // 1) Regras de demanda compostas (kits lógicos) têm prioridade.
     const rules = Array.isArray(cfg.inventory_demand_rules)
