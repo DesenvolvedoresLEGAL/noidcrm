@@ -1,81 +1,71 @@
-# Análise Forense — Notificação Perdida (CANON MEDICAL → R$ 1.994,00)
+## Diagnóstico confirmado
 
-## Linha do tempo do incidente
-
-1. **11/05/2026 18:42:59 UTC** — Aline Cavalcante aceita a proposta `053419df-bd83-4941-9673-53b7e41b0a75` na página pública.
-2. Trigger `on_proposal_accepted` (em `public.proposals`) dispara e enfileira o job em `acceptance_effect_jobs`:
-   - `id = 66c9f722-110f-4f80-aaaa-1d1bf58feff1`
-   - `status = pending`, `attempt_count = 0`
-   - `notifications_processed_at = NULL`, `slack_processed_at = NULL`
-3. Cliente (`ProposalPublicView` + `acceptProposal`/`updateProposal` em `src/services/supabase/proposals.ts`) faz **fire-and-forget** `supabase.functions.invoke('post-acceptance-effects', ...)`.
-4. A edge function `post-acceptance-effects` exige `x-internal-secret = INTERNAL_WORKFLOW_SECRET` no header, retorna **401 Unauthorized**.
-5. Como é fire-and-forget, o erro só vai para `console.error` no navegador do cliente externo. Nenhum retry. Job permanece `pending` para sempre.
-6. Não existe **nenhum cron** drenando `acceptance_effect_jobs`, nem chamada `pg_net` no trigger.
-7. Resultado: **40 jobs pendentes acumulados desde 23/04/2026**, todos sem notificação in-app, sem Slack, sem celebração.
-
-## Causa raiz (3 falhas combinadas)
-
-| # | Falha | Arquivo |
-|---|------|---------|
-| 1 | Função gated por `INTERNAL_WORKFLOW_SECRET`, mas é chamada do navegador (anon) sem o secret | `supabase/functions/post-acceptance-effects/index.ts` (linhas 22-30) |
-| 2 | Ausência de `[functions.post-acceptance-effects] verify_jwt = false` (proposta pública = anon) | `supabase/config.toml` |
-| 3 | Sem worker (cron + pg_net) que processe a fila, então qualquer falha do path do cliente nunca é compensada | nenhuma migração existente |
-
----
+- A proposta aceita da CANON (`PROP-2026-00673`) tem:
+  - `total_amount/value`: R$ 1.994,00
+  - `dynamic_pricing_current_amount`: R$ 2.392,80
+  - `payment_expected_amount`: R$ 2.392,80
+  - oportunidade de vendas já está com `valor_previsto`: R$ 2.392,80
+- O Slack e a bandeja foram gerados pelo `post-acceptance-effects` usando `proposal.total_amount`, por isso saíram com R$ 1.994,00.
+- O ERP foi chamado por `notify-deal-won`, que recalcula o total pelos itens e também ignora `dynamic_pricing_current_amount/payment_expected_amount`, por isso enviou R$ 1.994,00.
+- A bandeja lateral não destacou a venda porque `deal_won` cai na categoria `all`; hoje só `proposal_*` entra na aba “Propostas”, e a notificação ainda foi criada com mensagem/metadata de R$ 1.994,00.
+- Forecast atual usa `opportunities.valor_previsto`; para CANON já está correto em R$ 2.392,80. O risco está em telas/hooks que ainda somam propostas aceitas por `total_amount`.
 
 ## Plano de correção
 
-### 1. Corrigir auth da edge function `post-acceptance-effects`
-- Remover o gate exclusivo por `x-internal-secret`. Aceitar duas vias:
-  - **Worker/cron**: `x-internal-secret` válido → modo worker drena fila.
-  - **Cliente (público ou autenticado)**: aceita `proposalId` no body, valida via `service_role` que o registro `proposals.id = proposalId` está com `status = 'accepted'` (ou que existe job pendente em `acceptance_effect_jobs` para esse `proposalId`). Se sim, processa. Se não, 403.
-- Manter idempotência por `notifications_processed_at` / `slack_processed_at` que já existem.
+1. **Criar uma fonte única de valor aprovado da proposta**
+   - Adicionar helper compartilhado para resolver o valor comercial aprovado com prioridade:
+     1. `payment_expected_amount`
+     2. `dynamic_pricing_current_amount`, quando `dynamic_pricing_enabled = true` e status válido
+     3. `dynamic_pricing_snapshot.current_amount`
+     4. fallback `total_amount`
+     5. fallback `value`
+   - Incluir metadados de auditoria: fonte usada, valor base, valor dinâmico, tier aprovado/current tier e snapshot.
 
-### 2. Configurar `verify_jwt = false`
-- Adicionar bloco em `supabase/config.toml`:
-  ```toml
-  [functions.post-acceptance-effects]
-  verify_jwt = false
-  ```
+2. **Corrigir Slack e notificações internas**
+   - Alterar `post-acceptance-effects` para buscar os campos de tabela dinâmica e usar o valor aprovado resolvido.
+   - Gravar em `notification_events.payload.value` e em `notifications_v2.message` o valor correto: R$ 2.392,80.
+   - Preservar idempotência por estágio para não reenviar notificações antigas em massa.
 
-### 3. Cron worker (segurança em camadas)
-- Criar migração com `pg_cron` + `pg_net` que dispara `post-acceptance-effects` em **modo worker** (sem `proposalId`) a cada **1 minuto**, enviando `x-internal-secret` lido do Vault.
-- A função já tem o modo worker pronto (`jobs = pending OR failed, attempt_count < 5`), só precisa ser acionada.
-- Garantir secret `INTERNAL_WORKFLOW_SECRET` existe (verificar via `secrets--fetch_secrets`); se não, criar.
+3. **Corrigir envio ao ERP**
+   - Alterar `notify-deal-won` para usar a mesma regra de valor aprovado.
+   - Payload para ERP deve enviar `amount = 2392.80` quando houver tabela dinâmica vigente/aprovada.
+   - Incluir campos auxiliares no payload, se aceitos pelo ERP, como `base_amount`, `approved_amount`, `amount_source`, `dynamic_pricing_snapshot`, sem remover campos existentes.
 
-### 4. Backfill imediato (drenar 40 jobs)
-- Após deploy, invocar o worker uma vez via `supabase--curl_edge_functions` com `x-internal-secret` para processar os 40 jobs pendentes.
-- Validar especificamente o job da CANON MEDICAL (`66c9f722`):
-  - Confirmar `notifications_processed_at IS NOT NULL`.
-  - Confirmar `slack_processed_at IS NOT NULL`.
-  - Confirmar inserts em `notifications`, `notifications_v2` e `notification_events` para a organização `d1b68a0f-...`.
+4. **Corrigir métricas que leem propostas aceitas diretamente**
+   - Revisar hooks/views/RPCs que somam `proposals.total_amount` para propostas aceitas.
+   - Priorizar valor aprovado dinâmico em dashboard/relatórios onde a fonte é proposta aceita.
+   - Manter Forecast que usa `opportunities.valor_previsto`, mas garantir que sincronização da oportunidade use valor aprovado, não `total_amount`.
 
-### 5. Memória arquitetural
-- Atualizar `mem://architectural-decision/proposals/acceptance-side-effect-redundancy` (já listado no índice) para deixar explícito:
-  - Cliente NÃO deve depender só de fire-and-forget; cron drena fila.
-  - Função aceita anon **somente** quando `proposalId` corresponde a job pendente válido.
+5. **Corrigir a bandeja lateral do CRM**
+   - Categorizar `deal_won` como `proposals` ou `priority`, para aparecer claramente na bandeja e nos filtros relevantes.
+   - Garantir badge/unread para venda ganha como alta prioridade.
+   - Ajustar mensagem da CANON já existente no banco para mostrar R$ 2.392,80, sem criar avalanche de novas notificações.
 
----
+6. **Reparar especificamente a CANON sem replay global**
+   - Atualizar somente os registros da CANON em:
+     - `notification_events.payload.value`
+     - `notifications_v2.message`
+     - notificações legadas relacionadas, se existirem
+   - Reenviar somente o Slack da CANON com valor correto, evitando worker/backfill em lote.
+   - Reenviar/sincronizar somente o ERP da CANON com `amount = 2392.80`, com idempotência/log claro para não duplicar cobrança se o ERP suportar atualização/upsert.
+
+7. **Validação final**
+   - Conferir no banco que CANON está com valor R$ 2.392,80 em oportunidade, evento, inbox e payload de ERP.
+   - Conferir logs das duas funções (`post-acceptance-effects`, `notify-deal-won`).
+   - Testar uma execução específica por `proposalId`, nunca worker em lote.
 
 ## Arquivos impactados
 
-- `supabase/functions/post-acceptance-effects/index.ts` — refatorar gate de auth.
-- `supabase/config.toml` — adicionar bloco `verify_jwt = false`.
-- `supabase/migrations/<novo>.sql` — `pg_cron` chamando worker via `pg_net` a cada 1 min, com secret do Vault.
-- `mem://architectural-decision/proposals/acceptance-side-effect-redundancy` — atualizar regra.
+- `supabase/functions/post-acceptance-effects/index.ts`
+- `supabase/functions/notify-deal-won/index.ts`
+- Possível novo helper em `supabase/functions/_shared/approved-proposal-value.ts`
+- `src/lib/notifications/normalizeInboxItems.ts`
+- `src/services/supabase/proposals.ts`
+- Hooks de dashboard/relatórios que ainda usam `proposals.total_amount` para receita aceita
+- Migração/RPC se necessário para centralizar cálculo no banco e corrigir dados da CANON com segurança
 
-## Riscos & mitigações
+## Riscos e mitigação
 
-- **Risco**: chamar worker sem rate-limit pode reprocessar jobs em flight.
-  - Mitigação: já existe `status = 'processing'` + `attempt_count` na função; `LIMIT 10` por execução; cron 1/min.
-- **Risco**: anon abusar de `proposalId` para spam.
-  - Mitigação: só processa se job já existe em `acceptance_effect_jobs` (criado pelo trigger) — anon não consegue forjar.
-- **Risco**: notificações duplicadas no backfill.
-  - Mitigação: idempotência por `notifications_processed_at` + dedupe por `metadata->>proposal_id` já implementados.
-
-## Validação pós-deploy
-
-1. `SELECT count(*) FROM acceptance_effect_jobs WHERE status='pending'` → deve cair de 40 para 0.
-2. `SELECT count(*) FROM notifications_v2 WHERE metadata->>'proposal_id'='053419df-...'` → > 0.
-3. Confirmar com o usuário (Wagner) que recebeu notificação in-app + mensagem no Slack para CANON MEDICAL.
-4. Aceitar uma proposta de teste e confirmar que notificação chega em < 5s (path do cliente) ou < 60s (path do worker).
+- **Risco de duplicar Slack/ERP:** só executar por `proposalId` da CANON e não usar worker global.
+- **Risco de métrica divergente:** centralizar a regra e substituir leituras diretas de `total_amount`.
+- **Risco de cobrança duplicada no ERP:** preferir upsert/atualização quando o endpoint suportar; se não houver garantia, registrar tentativa e sinalizar que é reenvio corretivo da mesma proposta.
