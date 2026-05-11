@@ -274,11 +274,18 @@ export function InventoryItemFormDialog({ open, onOpenChange, item }: Props) {
               form.setValue('operational_type', next.operational_type);
               form.setValue('criticality', next.criticality);
             }}
+            onCategoryProfileChange={(p) => {
+              setProfile(p);
+              form.setValue('equipment_profile', p, { shouldValidate: true });
+            }}
             errors={{
               category_id: form.formState.errors.category_id as any,
               family_id: form.formState.errors.family_id as any,
             }}
           />
+
+          {profile === 'router' && <RouterFactoryFields form={form} />}
+          {profile === 'sim_card' && <SimCardFactoryFields form={form} />}
 
           <div className="space-y-2">
             <Label>Local atual</Label>
