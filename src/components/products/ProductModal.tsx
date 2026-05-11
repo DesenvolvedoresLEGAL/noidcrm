@@ -81,6 +81,7 @@ export function ProductModal({ open, onOpenChange, product }: ProductModalProps)
   const { units } = useMeasurementUnits();
   const { organization } = useCurrentOrganization();
   const [imagePreview, setImagePreview] = useState<string>('');
+  const [bomItems, setBomItems] = useState<ProductBomItemInput[]>([]);
 
   // Get default unit abbreviation
   const defaultUnit = units.find(u => u.is_default)?.abbreviation || 'un';
