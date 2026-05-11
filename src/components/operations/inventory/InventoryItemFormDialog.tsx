@@ -188,7 +188,7 @@ export function InventoryItemFormDialog({ open, onOpenChange, item }: Props) {
   }, [open, item, form]);
 
   const onSubmit = async (data: FormData) => {
-    const payload = {
+    const payload: any = {
       name: data.name,
       description: data.description || null,
       category_id: data.category_id,
@@ -203,6 +203,8 @@ export function InventoryItemFormDialog({ open, onOpenChange, item }: Props) {
       model: data.model || null,
       notes: data.notes || null,
       technical_specs: (data.technical_specs ?? []) as TechnicalSpec[],
+      router_factory: profile === 'router' ? (data.router_factory as RouterFactory) : null,
+      sim_card_factory: profile === 'sim_card' ? (data.sim_card_factory as SimCardFactory) : null,
     };
     try {
       if (isEdit && item) {
