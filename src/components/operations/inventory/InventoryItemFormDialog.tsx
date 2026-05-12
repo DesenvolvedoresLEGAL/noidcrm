@@ -178,12 +178,43 @@ export function InventoryItemFormDialog({ open, onOpenChange, item }: Props) {
 
   const [profile, setProfile] = useState<EquipmentProfile>('generic');
 
+  const familyById = useMemo(() => {
+    const m = new Map<string, any>();
+    (families ?? []).forEach((f) => m.set(f.id, f));
+    return m;
+  }, [families]);
+
+  const watchedFamilyId = form.watch('family_id');
+  const selectedFamily = watchedFamilyId ? familyById.get(watchedFamilyId) : null;
+  const familyTemplate: FamilySpecTemplateField[] = useMemo(() => {
+    const tpl = (selectedFamily as any)?.technical_spec_template;
+    return Array.isArray(tpl) ? tpl : [];
+  }, [selectedFamily]);
+  const activeTemplate = useMemo(() => getActiveTemplateFields(familyTemplate), [familyTemplate]);
+  const templateKeys = useMemo(() => new Set(activeTemplate.map((f) => f.key)), [activeTemplate]);
+
   useEffect(() => {
     if (open) {
       const initialProfile = (((item as any)?.category?.equipment_profile) ?? 'generic') as EquipmentProfile;
       setProfile(initialProfile === 'router' || initialProfile === 'sim_card' ? initialProfile : 'generic');
       const router = getRouterFactory(item?.metadata) ?? { ssid_factory: '', wifi_password_factory: '', admin_user: '', admin_password: '', imei: '' };
       const sim = getSimCardFactory(item?.metadata) ?? { iccid: '', line_number: '', carrier: '', apn: '', pin: '' };
+      const allSpecs = getTechnicalSpecs(item?.metadata) as TechnicalSpec[];
+      const fam = (item as any)?.family_id ? familyById.get((item as any).family_id) : null;
+      const tpl = Array.isArray(fam?.technical_spec_template) ? fam.technical_spec_template : [];
+      const tplKeys = new Set(getActiveTemplateFields(tpl).map((f) => f.key));
+      const tplValues: Record<string, string> = {};
+      const customSpecs: TechnicalSpec[] = [];
+      allSpecs.forEach((s) => {
+        if (s?.key && tplKeys.has(s.key)) {
+          tplValues[s.key] = s.value ?? '';
+        } else {
+          customSpecs.push({ ...s, source: 'custom' });
+        }
+      });
+      setTemplateValues(tplValues);
+      setTemplateErrors({});
+      lastFamilyIdRef.current = (item as any)?.family_id ?? null;
       form.reset({
         name: item?.name ?? '',
         description: item?.description ?? '',
@@ -198,13 +229,51 @@ export function InventoryItemFormDialog({ open, onOpenChange, item }: Props) {
         brand: item?.brand ?? '',
         model: item?.model ?? '',
         notes: item?.notes ?? '',
-        technical_specs: getTechnicalSpecs(item?.metadata) as TechnicalSpec[],
+        technical_specs: customSpecs,
         equipment_profile: initialProfile,
         router_factory: router,
         sim_card_factory: sim,
       });
     }
-  }, [open, item, form]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, item]);
+
+  // When family changes after initial load, migrate values: keep matching keys,
+  // move incompatible template values into custom extras.
+  useEffect(() => {
+    if (!open) return;
+    const prev = lastFamilyIdRef.current;
+    if (prev === watchedFamilyId) return;
+    lastFamilyIdRef.current = watchedFamilyId ?? null;
+    // skip the first run after reset (prev was set to item family above)
+    const newTplKeys = templateKeys;
+    const carriedTplValues: Record<string, string> = {};
+    const movedToCustom: TechnicalSpec[] = [];
+    Object.entries(templateValues).forEach(([k, v]) => {
+      if (newTplKeys.has(k)) carriedTplValues[k] = v;
+      else if (v) {
+        // preserve as custom extra
+        movedToCustom.push({
+          key: k,
+          label: k,
+          value: v,
+          type: 'text',
+          notes: null,
+          source: 'custom',
+        });
+      }
+    });
+    setTemplateValues(carriedTplValues);
+    setTemplateErrors({});
+    if (movedToCustom.length > 0) {
+      const current = (form.getValues('technical_specs') ?? []) as TechnicalSpec[];
+      form.setValue('technical_specs', [...current, ...movedToCustom], { shouldDirty: true });
+      toast.message(
+        'Alguns dados técnicos anteriores foram preservados em Campos extras porque não fazem parte da nova família.',
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchedFamilyId, open]);
 
   const onSubmit = async (data: FormData) => {
     const payload: any = {
