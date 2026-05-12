@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { getLastAuthAuditWarning } from '@/lib/authDiagnostics';
 
 type AuthStatusState = {
   authHealth: 'idle' | 'ok' | 'error';
@@ -9,6 +10,9 @@ type AuthStatusState = {
   authMessage?: string;
   restMessage?: string;
   lastAuthError?: string;
+  authClientOk?: boolean;
+  bestEffortModeActive?: boolean;
+  lastAuthAuditError?: string;
 };
 
 export default function AuthStatus() {
@@ -47,8 +51,15 @@ export default function AuthStatus() {
       }
 
       const { error } = await supabase.auth.getSession();
+      next.authClientOk = !error;
+      next.bestEffortModeActive = true;
       if (error) {
         next.lastAuthError = error.message;
+      }
+
+      const lastAuditWarning = getLastAuthAuditWarning();
+      if (lastAuditWarning) {
+        next.lastAuthAuditError = `${lastAuditWarning.timestamp} | ${lastAuditWarning.message}`;
       }
 
       if (active) setState(next);
@@ -69,6 +80,8 @@ export default function AuthStatus() {
           <li><strong>Supabase URL:</strong> {supabaseUrl || 'missing'}</li>
           <li><strong>hasAnonKey:</strong> {String(Boolean(anonKey))}</li>
           <li><strong>origin:</strong> {typeof window !== 'undefined' ? window.location.origin : 'n/a'}</li>
+          <li><strong>auth client ok:</strong> {String(Boolean(state.authClientOk))}</li>
+          <li><strong>auth audit best effort mode:</strong> {String(Boolean(state.bestEffortModeActive))}</li>
           <li><strong>environment:</strong> {import.meta.env.MODE}</li>
           <li><strong>build version:</strong> {import.meta.env.VITE_APP_VERSION || 'n/a'}</li>
           <li><strong>auth health:</strong> {state.authHealth} {state.authStatusCode ? `(${state.authStatusCode})` : ''}</li>
@@ -76,6 +89,7 @@ export default function AuthStatus() {
           <li><strong>auth health message:</strong> {state.authMessage || 'n/a'}</li>
           <li><strong>rest health message:</strong> {state.restMessage || 'n/a'}</li>
           <li><strong>last auth error:</strong> {state.lastAuthError || 'none'}</li>
+          <li><strong>last auth audit error:</strong> {state.lastAuthAuditError || 'none'}</li>
         </ul>
       </div>
     </main>

@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useDeviceFingerprint } from './useDeviceFingerprint';
+import { logAuthAuditBestEffortFailed, logAuthLoginSuccessWithAuditWarning } from '@/lib/authDiagnostics';
 
 type AuthEventType = 'login' | 'logout' | 'signup' | 'failed_login' | 'password_reset' | 'session_refresh';
 
@@ -21,6 +22,9 @@ export function useSupabaseAuth() {
   ) => {
     try {
       window.setTimeout(() => {
+        const ctrl = new AbortController();
+        const timeout = window.setTimeout(() => ctrl.abort(), 2000);
+
         supabase.functions.invoke('track-auth-event', {
           body: {
             event_type: eventType,
@@ -35,7 +39,48 @@ export function useSupabaseAuth() {
               pageUrl: window.location.href,
             },
           },
-        }).catch((err) => console.warn('[Auth] Tracking failed:', err));
+          signal: ctrl.signal,
+        }).then(({ data, error }) => {
+          if (error) {
+            const message = String((error as any)?.message || error || 'unknown_error');
+            logAuthAuditBestEffortFailed({
+              status: (error as any)?.context?.status,
+              message,
+              isHtmlResponse: message.toLowerCase().includes('<html') || message.toLowerCase().includes('text/html'),
+            });
+            return;
+          }
+
+          if (data?.success === false) {
+            logAuthAuditBestEffortFailed({
+              message: String(data?.error || 'tracking_unavailable'),
+              isHtmlResponse: false,
+            });
+            return;
+          }
+
+          if (data?.inserted === false) {
+            logAuthAuditBestEffortFailed({
+              message: 'auth_audit_insert_failed',
+              isHtmlResponse: false,
+            });
+            if (eventType === 'login' || eventType === 'session_refresh') {
+              logAuthLoginSuccessWithAuditWarning(userId);
+            }
+          }
+        }).catch((err) => {
+          const message = String((err as any)?.message || err || 'unknown_error');
+          logAuthAuditBestEffortFailed({
+            status: (err as any)?.context?.status,
+            message,
+            isHtmlResponse: message.toLowerCase().includes('<html') || message.toLowerCase().includes('text/html'),
+          });
+          if (eventType === 'login' || eventType === 'session_refresh') {
+            logAuthLoginSuccessWithAuditWarning(userId);
+          }
+        }).finally(() => {
+          window.clearTimeout(timeout);
+        });
       }, 0);
     } catch (e) {
       console.warn('[Auth] Tracking error:', e);
