@@ -68,15 +68,17 @@ export function getEffectiveAmount(proposal: any): EffectiveAmount {
   if (proposal?.status === 'accepted' && approved > 0) {
     value = approved;
     source = 'approved';
+  } else if (expected > 0) {
+    // PRICE UX 1.0.5: payment_expected_amount is the NET value (após desconto manual
+    // aplicado em proposal_payment_terms). É a fonte única de verdade do "Valor Vigente".
+    value = expected;
+    source = 'expected';
   } else if (dynActive && dynCurrent > 0) {
     value = dynCurrent;
     source = 'dynamic';
   } else if (dynActive && snapCurrent > 0) {
     value = snapCurrent;
     source = 'dynamic';
-  } else if (expected > 0) {
-    value = expected;
-    source = 'expected';
   }
 
   const originalValue = total || value;
