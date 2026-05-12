@@ -1033,14 +1033,25 @@ export async function reopenOpportunity(
 
   const now = new Date().toISOString();
 
-  // 3. Update opportunity: reopen it. Do NOT clear closed_at: it is the immutable
-  // historical close event used by reports/forecast/win-rate.
+  // 3. Update opportunity: reopen it.
+  // The close event is being reverted, so closed_at / won_at / lost_at MUST be
+  // cleared. Otherwise dashboards, forecast, win-rate and OTE keep counting the
+  // deal as closed in the original period. The audit_log entry below preserves
+  // the historical timestamps for traceability. If the opportunity is later
+  // re-closed (won or lost), markOpportunityAsWon/Lost will set fresh values.
   const { data: updatedOpp, error: updateError } = await supabase
     .from('opportunities')
     .update({
       status: 'open',
       stage_id: targetStageId,
       updated_at: now,
+      closed_at: null,
+      won_at: null,
+      lost_at: null,
+      loss_reason_id: null,
+      loss_comment: null,
+      loss_accountability: null,
+      is_recoverable: null,
     })
     .eq('id', id)
     .select()
