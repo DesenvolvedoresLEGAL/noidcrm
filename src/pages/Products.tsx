@@ -40,6 +40,7 @@ export default function Products() {
   // ALL HOOKS MUST BE AT THE TOP - before any conditional returns
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const { organization, loading: orgLoading, sessionChecked, hasSession } = useCurrentUser();
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
@@ -47,10 +48,8 @@ export default function Products() {
   const [priceMin, setPriceMin] = useState<string>('');
   const [priceMax, setPriceMax] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [modalOpen, setModalOpen] = useState(false);
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [exportModalOpen, setExportModalOpen] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<Product | undefined>();
   const [deleteDialog, setDeleteDialog] = useState<string | null>(null);
 
   const { categories } = useProductCategories();
