@@ -5,11 +5,14 @@ import { normalizeSlug } from '@/lib/operations/inventoryClassification';
 export type InventoryCategory = Database['public']['Tables']['inventory_categories']['Row'];
 export type InventoryItemKind = Database['public']['Enums']['inventory_item_kind'];
 
+export type InventoryCategoryControlMode = 'serialized' | 'quantity' | 'mixed';
+
 export interface InventoryCategoryInput {
   name: string;
   slug?: string | null;
   description?: string | null;
   item_kind: InventoryItemKind;
+  control_mode?: InventoryCategoryControlMode;
   color?: string | null;
   icon?: string | null;
   sort_order?: number;
