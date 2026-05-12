@@ -1,5 +1,9 @@
 import { supabase } from '@/integrations/supabase/client';
 import { normalizeSlug } from '@/lib/operations/inventoryClassification';
+import {
+  sanitizeFamilyTemplate,
+  type FamilySpecTemplateField,
+} from '@/lib/operations/inventoryFamilyTemplate';
 
 export type InventoryFamilyItemKind = 'serialized' | 'quantity';
 
@@ -13,6 +17,7 @@ export interface InventoryFamily {
   sort_order: number;
   is_active: boolean;
   item_kind: InventoryFamilyItemKind;
+  technical_spec_template: FamilySpecTemplateField[];
   created_at: string;
   updated_at: string;
 }
@@ -25,6 +30,7 @@ export interface InventoryFamilyInput {
   sort_order?: number;
   is_active?: boolean;
   item_kind?: InventoryFamilyItemKind;
+  technical_spec_template?: FamilySpecTemplateField[];
 }
 
 export async function listInventoryFamilies(
