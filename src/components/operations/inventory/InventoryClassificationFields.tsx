@@ -52,13 +52,18 @@ export function InventoryClassificationFields({
   const activeCategories = useMemo(
     () =>
       (categories ?? []).filter(
-        (c) => c.is_active && (!itemKindFilter || c.item_kind === itemKindFilter),
+        (c) => c.is_active && (!itemKindFilter || categoryAcceptsKind(c, itemKindFilter)),
       ),
     [categories, itemKindFilter],
   );
   const activeFamilies = useMemo(
-    () => (families ?? []).filter((f) => f.is_active),
-    [families],
+    () =>
+      (families ?? []).filter(
+        (f) =>
+          f.is_active &&
+          (!itemKindFilter || ((f as any).item_kind ?? 'serialized') === itemKindFilter),
+      ),
+    [families, itemKindFilter],
   );
 
   // Clear family if it doesn't belong to current category anymore
