@@ -38,15 +38,19 @@ async function getGeoIP(ip: string): Promise<GeoIPData | null> {
       return null;
     }
     
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 1500);
     const response = await fetch(
-      `http://ip-api.com/json/${ip}?fields=country,countryCode,city,regionName,isp,proxy,hosting`
+      `http://ip-api.com/json/${ip}?fields=country,countryCode,city,regionName,isp,proxy,hosting`,
+      { signal: ctrl.signal }
     );
-    
+    clearTimeout(timer);
+
     if (!response.ok) return null;
-    
+    const ct = response.headers.get('content-type') || '';
+    if (!ct.includes('application/json')) return null;
     const data = await response.json();
     if (data.status === 'fail') return null;
-    
     return data;
   } catch (error) {
     console.error('[track-auth-event] GeoIP lookup failed:', error);
@@ -124,19 +128,24 @@ Deno.serve(async (req: Request) => {
       }
     };
 
-    const { error: insertError } = await supabase
-      .from('auth_audit_log')
-      .insert(auditRecord);
-
-    if (insertError) {
-      console.error('[track-auth-event] Insert error:', insertError);
-      throw insertError;
+    let inserted = true;
+    try {
+      const { error: insertError } = await supabase
+        .from('auth_audit_log')
+        .insert(auditRecord);
+      if (insertError) {
+        inserted = false;
+        console.warn('[track-auth-event] Insert failed (non-blocking):', insertError?.message || insertError);
+      }
+    } catch (e) {
+      inserted = false;
+      const msg = e instanceof Error ? e.message : String(e);
+      console.warn('[track-auth-event] Insert threw (non-blocking):', msg.slice(0, 200));
     }
 
-    console.log(`[track-auth-event] Successfully logged ${event_type} for ${email} from ${clientIP} (${geoData?.country || 'unknown'})`);
-
-    return new Response(JSON.stringify({ 
+    return new Response(JSON.stringify({
       success: true,
+      inserted,
       ip: clientIP,
       country: geoData?.country || null,
     }), {
@@ -145,12 +154,13 @@ Deno.serve(async (req: Request) => {
 
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[track-auth-event] Error:', error);
-    return new Response(JSON.stringify({ 
-      success: false, 
-      error: errorMessage 
+    // Never break the auth flow: respond 200 with success:false.
+    console.warn('[track-auth-event] Soft error (non-blocking):', errorMessage.slice(0, 200));
+    return new Response(JSON.stringify({
+      success: false,
+      error: 'tracking_unavailable',
     }), {
-      status: 500,
+      status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }
