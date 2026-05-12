@@ -171,11 +171,17 @@ export interface DynamicPricingSnapshot {
   status: DynamicPricingStatus | string;
   message?: string | null;
   reference_at?: string | null;
+  /** PRICE UX 1.0.4 — tipo da data de referência usada no cálculo */
+  reference_type?: 'current_date' | 'payment_due_date' | 'custom_date' | 'approval_date' | string | null;
+  /** PRICE UX 1.0.4 — data de referência comercial efetiva */
+  reference_date?: string | null;
   current_tier_id?: string | null;
   current_label?: string | null;
   current_amount?: number | null;
   current_starts_at?: string | null;
   current_ends_at?: string | null;
+  current_adjustment_type?: string | null;
+  current_adjustment_value?: number | null;
   previous_tier_id?: string | null;
   previous_label?: string | null;
   previous_amount?: number | null;
@@ -187,6 +193,21 @@ export interface DynamicPricingSnapshot {
   last_end?: string | null;
   computed_at?: string | null;
 }
+
+/** PRICE UX 1.0.4 — rótulos amigáveis para o tipo de data de referência */
+export const REFERENCE_TYPE_LABEL: Record<string, string> = {
+  current_date: 'Pagamento imediato',
+  payment_due_date: 'Vencimento da cobrança',
+  custom_date: 'Data personalizada',
+  approval_date: 'Condição especial aprovada',
+};
+
+export const REFERENCE_TYPE_DESCRIPTION: Record<string, string> = {
+  current_date: 'Calculado pela data atual',
+  payment_due_date: 'Calculado pela data prevista de pagamento',
+  custom_date: 'Calculado pela data personalizada definida',
+  approval_date: 'Preço congelado no momento da aprovação',
+};
 
 export function formatBRL(value?: number | null): string {
   if (value == null || Number.isNaN(value)) return '—';
