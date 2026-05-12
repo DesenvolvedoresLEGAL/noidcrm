@@ -13,12 +13,15 @@ export const TECHNICAL_SPEC_TYPE_LABEL: Record<TechnicalSpecType, string> = {
 
 export const MAX_TECHNICAL_SPECS = 30;
 
+export type TechnicalSpecSource = 'family_template' | 'custom';
+
 export interface TechnicalSpec {
   key: string;
   label: string;
   value: string;
   type: TechnicalSpecType;
   notes?: string | null;
+  source?: TechnicalSpecSource;
 }
 
 export function normalizeSpecKey(label: string): string {
@@ -72,6 +75,7 @@ export const technicalSpecSchema = z.object({
     .optional()
     .nullable()
     .or(z.literal('')),
+  source: z.enum(['family_template', 'custom']).optional(),
 });
 
 export const technicalSpecsArraySchema = z
@@ -119,5 +123,6 @@ export function sanitizeTechnicalSpecs(specs: TechnicalSpec[] | undefined | null
     value: (s.value ?? '').toString().trim(),
     type: (TECHNICAL_SPEC_TYPES as readonly string[]).includes(s.type) ? s.type : 'text',
     notes: s.notes ? String(s.notes).trim() : null,
+    source: s.source === 'family_template' ? 'family_template' : 'custom',
   }));
 }
