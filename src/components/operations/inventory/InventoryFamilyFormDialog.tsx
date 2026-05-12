@@ -25,11 +25,19 @@ import {
 import { useInventoryCategories } from '@/hooks/operations/useInventoryCategories';
 import { useInventoryFamilyMutations } from '@/hooks/operations/useInventoryFamilies';
 import type { InventoryFamily } from '@/services/operations/inventoryFamilies';
+import {
+  ITEM_KIND_OPTIONS,
+  getCategoryControlMode,
+  type CategoryControlMode,
+} from '@/lib/operations/inventoryLabels';
 
 const schema = z.object({
   category_id: z.string().uuid('Selecione uma categoria.'),
   name: z.string().trim().min(2, 'Mínimo 2 caracteres').max(80, 'Máximo 80 caracteres'),
   description: z.string().trim().max(300, 'Máximo 300 caracteres').optional().or(z.literal('')),
+  item_kind: z.enum(['serialized', 'quantity'], {
+    required_error: 'Selecione o tipo padrão do item.',
+  }),
   sort_order: z.coerce.number().int('Apenas inteiros').min(0, 'Mínimo 0').default(0),
 });
 
