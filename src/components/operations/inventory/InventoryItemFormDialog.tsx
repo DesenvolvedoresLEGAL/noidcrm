@@ -134,6 +134,7 @@ export function InventoryItemFormDialog({ open, onOpenChange, item }: Props) {
   const isEdit = !!item;
   const { create, update } = useInventoryItemMutations();
   const { data: categories } = useInventoryCategories();
+  const { data: families } = useInventoryFamilies();
   const { data: locations } = useInventoryLocations();
 
   const serializedCategories = useMemo(
@@ -145,6 +146,12 @@ export function InventoryItemFormDialog({ open, onOpenChange, item }: Props) {
     () => (locations ?? []).filter((l) => l.is_active),
     [locations],
   );
+
+  // Track values for the family-template fields separately from custom extras.
+  // The form's `technical_specs` represents only the *custom* extras section.
+  const [templateValues, setTemplateValues] = useState<Record<string, string>>({});
+  const [templateErrors, setTemplateErrors] = useState<Record<string, string>>({});
+  const lastFamilyIdRef = useRef<string | null>(null);
 
   const form = useForm<FormData>({
     resolver: zodResolver(schema) as any,
