@@ -115,7 +115,7 @@ export function ReopenOpportunityModal({
               <p className="font-medium">Esta ação irá:</p>
               <ul className="list-disc list-inside mt-1 space-y-0.5">
                 <li>Reverter o status para "Aberta"</li>
-                <li>Cancelar propostas aceitas</li>
+                <li>Marcar propostas aceitas como recusadas por cancelamento do cliente</li>
                 <li>Mover para a etapa selecionada</li>
               </ul>
             </div>
