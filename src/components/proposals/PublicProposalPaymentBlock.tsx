@@ -1,12 +1,16 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { AlertTriangle, Copy, Loader2, QrCode } from 'lucide-react';
+import { AlertTriangle, CalendarClock, Copy, Loader2, QrCode } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { createPaymentIntent } from '@/services/proposals/proposalPaymentsService';
 import { createPixChargeFromPaymentIntent } from '@/services/proposals/erpBillingBridgeService';
 import { formatBRL, formatDateTime } from '@/lib/proposals/proposalPayments';
-import type { DynamicPricingSnapshot } from '@/lib/proposals/dynamicPricing';
+import {
+  REFERENCE_TYPE_DESCRIPTION,
+  REFERENCE_TYPE_LABEL,
+  type DynamicPricingSnapshot,
+} from '@/lib/proposals/dynamicPricing';
 
 interface Props {
   proposalId: string;
@@ -93,6 +97,20 @@ export function PublicProposalPaymentBlock({ proposalId, snapshot }: Props) {
               {snapshot?.current_ends_at && (
                 <div className="text-xs text-muted-foreground">
                   Válido até {formatDateTime(snapshot.current_ends_at)}
+                </div>
+              )}
+              {snapshot?.reference_type && snapshot.reference_type !== 'current_date' && (
+                <div className="mt-2 rounded-md border border-primary/30 bg-primary/5 p-2 text-xs flex items-start gap-2">
+                  <CalendarClock className="h-3.5 w-3.5 mt-0.5 text-primary shrink-0" />
+                  <div>
+                    <span className="font-medium text-primary">
+                      {REFERENCE_TYPE_LABEL[snapshot.reference_type] ?? 'Referência personalizada'}
+                    </span>
+                    <span className="text-muted-foreground">
+                      {' '}— {REFERENCE_TYPE_DESCRIPTION[snapshot.reference_type] ?? ''}
+                      {snapshot.reference_date ? ` (${formatDateTime(snapshot.reference_date)})` : ''}
+                    </span>
+                  </div>
                 </div>
               )}
             </div>

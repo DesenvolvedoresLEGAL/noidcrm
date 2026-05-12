@@ -239,6 +239,17 @@ export function ProposalDynamicPricingPanel({
             } />
           </div>
 
+          {snapshot?.reference_type && snapshot.reference_type !== 'current_date' && (
+            <div className="rounded-md border border-primary/30 bg-primary/5 p-3 text-xs">
+              <div className="font-semibold text-primary mb-1">
+                Precificação baseada em: {snapshot.reference_type === 'payment_due_date' ? 'Vencimento da cobrança' : snapshot.reference_type === 'custom_date' ? 'Data personalizada' : 'Data da aprovação'}
+              </div>
+              <div className="text-muted-foreground">
+                Data de referência: {snapshot.reference_date ? formatDateTime(snapshot.reference_date) : '—'}
+              </div>
+            </div>
+          )}
+
           <Separator />
 
           <ReadOnlyTierTable

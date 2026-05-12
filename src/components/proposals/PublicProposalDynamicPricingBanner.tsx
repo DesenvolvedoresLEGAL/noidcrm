@@ -1,9 +1,11 @@
-import { AlertTriangle, Clock, TrendingUp } from 'lucide-react';
+import { AlertTriangle, CalendarClock, Clock, TrendingUp } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   formatBRL,
   formatDateTime,
+  REFERENCE_TYPE_DESCRIPTION,
+  REFERENCE_TYPE_LABEL,
   type DynamicPricingSnapshot,
 } from '@/lib/proposals/dynamicPricing';
 
@@ -39,6 +41,21 @@ export function PublicProposalDynamicPricingBanner({ snapshot, variant = 'public
           <TrendingUp className="h-4 w-4" />
           Condição comercial vigente
         </div>
+
+        {snapshot.reference_type && snapshot.reference_type !== 'current_date' && (
+          <div className="rounded-md border border-primary/30 bg-primary/5 p-3 text-xs flex items-start gap-2">
+            <CalendarClock className="h-4 w-4 mt-0.5 text-primary shrink-0" />
+            <div>
+              <div className="font-medium text-primary">
+                {REFERENCE_TYPE_LABEL[snapshot.reference_type] ?? 'Data de referência personalizada'}
+              </div>
+              <div className="text-muted-foreground">
+                {REFERENCE_TYPE_DESCRIPTION[snapshot.reference_type] ?? ''}
+                {snapshot.reference_date ? ` — referência: ${formatDateTime(snapshot.reference_date)}` : ''}
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>

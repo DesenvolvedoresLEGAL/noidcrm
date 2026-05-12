@@ -127,8 +127,11 @@ export function PublicProposalApprovedScreen({
             <>
               <Separator />
               <div className="rounded-lg border bg-muted/30 p-4">
-                <div className="text-xs uppercase text-muted-foreground mb-2">
+                <div className="text-xs uppercase text-muted-foreground mb-2 flex items-center gap-2 flex-wrap">
                   Condição comercial vigente aplicada
+                  {dynSnap?.price_frozen_on_approval && (
+                    <Badge variant="secondary" className="text-[10px]">Preço congelado na aprovação</Badge>
+                  )}
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
                   <div>
@@ -145,6 +148,25 @@ export function PublicProposalApprovedScreen({
                       {dynSnap.current_valid_until ? formatDateBR(dynSnap.current_valid_until) : '—'}
                     </div>
                   </div>
+                  {dynSnap?.reference_type && (
+                    <>
+                      <div>
+                        <div className="text-muted-foreground">Calculado por</div>
+                        <div className="font-medium">
+                          {dynSnap.reference_type === 'current_date' && 'Data atual'}
+                          {dynSnap.reference_type === 'payment_due_date' && 'Data prevista de pagamento'}
+                          {dynSnap.reference_type === 'custom_date' && 'Data personalizada'}
+                          {dynSnap.reference_type === 'approval_date' && 'Data da aprovação'}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-muted-foreground">Data de referência</div>
+                        <div className="font-medium">
+                          {dynSnap.reference_date ? formatDateBR(dynSnap.reference_date) : '—'}
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             </>

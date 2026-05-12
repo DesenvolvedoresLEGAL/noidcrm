@@ -1,6 +1,7 @@
 import {
   formatBRL,
   formatDateTime,
+  REFERENCE_TYPE_LABEL,
   tierStatusFromDates,
   TIER_STATUS_LABEL,
   type DynamicPricingSnapshot,
@@ -19,6 +20,9 @@ const CLAUSE =
 const ANTECEDENCE_CLAUSE =
   'A condição comercial é calculada automaticamente pela antecedência entre a data de pagamento e o primeiro dia do evento. O valor vigente no momento da emissão da cobrança prevalece sobre valores anteriores já expirados.';
 
+const REFERENCE_CLAUSE =
+  'Quando a precificação é referenciada à data prevista de pagamento, o valor vigente é determinado por essa data. Diferenças entre a data prevista e a data efetiva poderão gerar cobrança complementar.';
+
 /**
  * Renderização HTML para inclusão no preview/PDF da proposta.
  */
@@ -28,12 +32,22 @@ export function PdfDynamicPricingSection({ snapshot, tiers }: Props) {
 
   const isAuto = (snapshot as any).pricing_mode === 'event_antecedence';
   const eventDate = (snapshot as any).event_start_date as string | null;
+  const refType = snapshot.reference_type;
+  const showRef = refType && refType !== 'current_date';
 
   return (
     <section className="my-6 break-inside-avoid">
       <h3 className="text-base font-bold mb-2">
         {isAuto ? 'Condição Comercial por Antecedência' : 'Condição Comercial Dinâmica'}
       </h3>
+
+      {showRef && (
+        <p className="text-xs mb-2">
+          <strong>Data de referência:</strong>{' '}
+          {REFERENCE_TYPE_LABEL[refType as string] ?? refType}
+          {snapshot.reference_date ? ` — ${formatDateTime(snapshot.reference_date)}` : ''}
+        </p>
+      )}
 
       <table className="w-full text-sm border border-collapse">
         <thead>
@@ -99,6 +113,9 @@ export function PdfDynamicPricingSection({ snapshot, tiers }: Props) {
       <p className="text-xs text-muted-foreground mt-2">
         {isAuto ? ANTECEDENCE_CLAUSE : CLAUSE}
       </p>
+      {showRef && (
+        <p className="text-xs text-muted-foreground mt-1">{REFERENCE_CLAUSE}</p>
+      )}
     </section>
   );
 }
