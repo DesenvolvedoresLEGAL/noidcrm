@@ -139,3 +139,38 @@ export function mapDuplicateError(err: any): string | null {
   }
   return null;
 }
+
+// ============= Sprint INV 0.7.1: Modo de controle de categoria =============
+
+export type CategoryControlMode = 'serialized' | 'quantity' | 'mixed';
+
+export const CATEGORY_CONTROL_MODE_LABEL: Record<CategoryControlMode, string> = {
+  serialized: 'Serializado',
+  quantity: 'Por quantidade',
+  mixed: 'Mista',
+};
+
+export const CATEGORY_CONTROL_MODE_OPTIONS: { value: CategoryControlMode; label: string }[] = [
+  { value: 'serialized', label: 'Serializado' },
+  { value: 'quantity', label: 'Por quantidade' },
+  { value: 'mixed', label: 'Mista' },
+];
+
+/**
+ * Lê o modo de controle efetivo de uma categoria, com fallback para o campo
+ * legado `item_kind` quando `control_mode` ainda não foi populado.
+ */
+export function getCategoryControlMode(category: any): CategoryControlMode {
+  const mode = category?.control_mode ?? category?.item_kind ?? 'serialized';
+  if (mode === 'serialized' || mode === 'quantity' || mode === 'mixed') return mode;
+  return 'serialized';
+}
+
+export function categoryAcceptsKind(
+  category: any,
+  kind: 'serialized' | 'quantity',
+): boolean {
+  const mode = getCategoryControlMode(category);
+  if (mode === 'mixed') return true;
+  return mode === kind;
+}
