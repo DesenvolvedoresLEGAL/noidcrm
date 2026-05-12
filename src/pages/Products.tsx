@@ -420,15 +420,6 @@ export default function Products() {
         </Card>
       </div>
 
-      <ProductModal
-        open={modalOpen}
-        onOpenChange={(open) => {
-          setModalOpen(open);
-          if (!open) setEditingProduct(undefined);
-        }}
-        product={editingProduct}
-      />
-
       <ImportProductsModal
         open={importModalOpen}
         onOpenChange={setImportModalOpen}
