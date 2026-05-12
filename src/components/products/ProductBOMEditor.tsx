@@ -80,9 +80,10 @@ export function ProductBOMEditor({ organizationId, productId, value, onChange }:
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div>
-          <Label className="text-base">Composição técnica (BOM)</Label>
+          <Label className="text-base">Composição de Inventário</Label>
           <p className="text-xs text-muted-foreground">
-            Define os componentes reservados por <strong>cada ponto</strong>. Reserva total = pontos × quantidade aqui.
+            Define os componentes físicos reservados por <strong>cada ponto</strong> na entrega.
+            Reserva total = pontos × quantidade aqui.
           </p>
         </div>
         <Button type="button" size="sm" variant="outline" onClick={addRow}>
@@ -92,7 +93,7 @@ export function ProductBOMEditor({ organizationId, productId, value, onChange }:
 
       {value.length === 0 ? (
         <div className="text-sm text-muted-foreground border border-dashed rounded-md p-4 text-center">
-          Nenhum componente. Sem BOM, a reserva usa o próprio produto.
+          Nenhum componente. Sem composição, a reserva usa o próprio produto.
         </div>
       ) : (
         <div className="space-y-2">
