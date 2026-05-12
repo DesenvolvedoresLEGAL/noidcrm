@@ -395,7 +395,7 @@ export default function Products() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => { setEditingProduct(product); setModalOpen(true); }}
+                              onClick={() => navigate(`/app/products/${product.id}/edit`)}
                               title="Editar"
                             >
                               <Pencil className="h-4 w-4" />
