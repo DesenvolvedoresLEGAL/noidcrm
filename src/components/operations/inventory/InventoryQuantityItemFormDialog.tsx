@@ -518,11 +518,37 @@ export function InventoryQuantityItemFormDialog({ open, onOpenChange, item }: Pr
             )}
           </div>
 
+          {activeTemplate.length > 0 && (
+            <FamilyTemplateSpecsFields
+              template={activeTemplate}
+              value={activeTemplate.map((f) => ({
+                key: f.key,
+                label: f.label,
+                value: templateValues[f.key] ?? '',
+                type: 'text',
+                source: 'family_template',
+              }))}
+              onChange={(next) => {
+                const map: Record<string, string> = {};
+                next.forEach((s) => {
+                  if (s?.key) map[s.key] = s.value ?? '';
+                });
+                setTemplateValues(map);
+              }}
+              errorByKey={templateErrors}
+            />
+          )}
+
           <TechnicalSpecsSection
             control={form.control}
             setValue={form.setValue}
             errors={(form.formState.errors as any)?.technical_specs}
           />
+          {activeTemplate.length > 0 && (
+            <p className="text-xs text-muted-foreground -mt-2">
+              Adicione atributos técnicos adicionais que não fazem parte do template da família.
+            </p>
+          )}
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
