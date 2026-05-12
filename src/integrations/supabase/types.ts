@@ -13542,6 +13542,7 @@ export type Database = {
           organization_id: string
           slug: string
           sort_order: number
+          technical_spec_template: Json
           updated_at: string
           updated_by: string | null
         }
@@ -13557,6 +13558,7 @@ export type Database = {
           organization_id: string
           slug: string
           sort_order?: number
+          technical_spec_template?: Json
           updated_at?: string
           updated_by?: string | null
         }
@@ -13572,6 +13574,7 @@ export type Database = {
           organization_id?: string
           slug?: string
           sort_order?: number
+          technical_spec_template?: Json
           updated_at?: string
           updated_by?: string | null
         }
