@@ -45,6 +45,8 @@ export default function Opportunities() {
   // Enable realtime subscriptions for automatic updates
   useRealtimeOpportunities();
 
+  const opportunitiesQueryKey = [...opportunityKeys.lists(), selectedPipelineId, visibleUserIds];
+
   // React Query: pipelines
   const { data: pipelines = [], isLoading: pipelinesLoading } = useQuery({
     queryKey: ['pipelines'],
@@ -53,7 +55,7 @@ export default function Opportunities() {
 
   // React Query: opportunities
   const { data: opportunitiesData, isLoading: oppsLoading } = useQuery({
-    queryKey: [...opportunityKeys.lists(), selectedPipelineId, visibleUserIds],
+    queryKey: opportunitiesQueryKey,
     queryFn: () => listOpportunities({
       pipeline_id: selectedPipelineId,
       owner_user_ids: visibleUserIds || undefined,
@@ -91,7 +93,7 @@ export default function Opportunities() {
     const newProb = targetStage?.probability;
 
     queryClient.setQueryData(
-      [...opportunityKeys.lists(), visibleUserIds],
+      opportunitiesQueryKey,
       (old: any) => {
         if (!old?.data) return old;
         return {
@@ -111,7 +113,7 @@ export default function Opportunities() {
       toast({ title: 'Sucesso', description: 'Oportunidade movida com sucesso' });
     } catch (error) {
       // Rollback
-      queryClient.setQueryData([...opportunityKeys.lists(), visibleUserIds], { data: previousOpportunities, total: previousOpportunities.length });
+      queryClient.setQueryData(opportunitiesQueryKey, { data: previousOpportunities, total: previousOpportunities.length });
       console.error('Erro ao mover oportunidade:', error);
       toast({ title: 'Erro', description: 'Erro ao mover oportunidade', variant: 'destructive' });
     }
