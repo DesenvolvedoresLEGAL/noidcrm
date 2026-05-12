@@ -60,6 +60,7 @@ import { extractEmail, extractPhone } from '@/lib/contactFormat';
 import { useProposalEngagementTracker } from '@/hooks/useProposalEngagementTracker';
 import { PublicProposalDynamicPricingBanner } from '@/components/proposals/PublicProposalDynamicPricingBanner';
 import { getDynamicPricingBreakdown, formatDateTime as formatDpDateTime } from '@/lib/proposals/dynamicPricing';
+import { getEffectiveAmount } from '@/lib/proposals/effectiveAmount';
 
 // Fallback decline reasons (used if organization has none configured)
 const FALLBACK_DECLINE_REASONS = [
@@ -115,6 +116,20 @@ export default function ProposalPublicView() {
     proposalId: proposal?.id || '',
     enabled: !!proposal?.id,
   });
+
+  const resolveNetApprovedAmount = (proposalLike: any, fallback = 0) => {
+    const effective = getEffectiveAmount(proposalLike);
+    return effective.value > 0 ? Number(effective.value.toFixed(2)) : Number(fallback.toFixed(2));
+  };
+
+  const pickPaymentTerm = (terms: any[], type: 'one_time' | 'recurring') =>
+    terms
+      .filter((term) => term.payment_type === type)
+      .sort((a, b) => {
+        const discountDelta = Number(b.discount_percent || 0) - Number(a.discount_percent || 0);
+        if (type === 'one_time' && discountDelta !== 0) return discountDelta;
+        return new Date(b.updated_at || b.created_at || 0).getTime() - new Date(a.updated_at || a.created_at || 0).getTime();
+      })[0];
 
   useEffect(() => {
     if (token) {
@@ -284,21 +299,18 @@ export default function ProposalPublicView() {
     setDownloadingPDF(true);
     try {
       // Calculate installments for PDF
-      const oneTimeTerm = paymentTerms.find(t => t.payment_type === 'one_time');
-      const recurringTerm = paymentTerms.find(t => t.payment_type === 'recurring');
+      const oneTimeTerm = pickPaymentTerm(paymentTerms, 'one_time');
+      const recurringTerm = pickPaymentTerm(paymentTerms, 'recurring');
       // Calculate only one-time items total for installments (exclude MRR)
       const oneTimeItems = items.filter(item => (item.billing_type || 'one_time') !== 'recurring');
       const oneTimeTotal = oneTimeItems.reduce((sum, item) => sum + item.total, 0);
       const dpSnapForPdf: any = (proposal as any)?.dynamic_pricing_snapshot ?? null;
-      const oneTimeAmountForPdf =
-        (proposal as any)?.dynamic_pricing_enabled && dpSnapForPdf?.current_amount != null
-          ? Number(dpSnapForPdf.current_amount)
-          : oneTimeTotal;
+      const oneTimeAmountForPdf = resolveNetApprovedAmount(proposal, oneTimeTotal);
       const pdfInstallments = oneTimeTerm
         ? calculateInstallments(oneTimeTerm, oneTimeAmountForPdf, {
             proposalExpiresAt: (proposal as any)?.expires_at ?? null,
             approvedAmount:
-              (proposal as any)?.status === 'accepted'
+              ((proposal as any)?.status === 'accepted' || oneTimeTerm?.discount_percent)
                 ? Number((proposal as any)?.approved_amount ?? oneTimeAmountForPdf)
                 : null,
             dynamicPricingCurrentEndsAt:
@@ -466,11 +478,9 @@ export default function ProposalPublicView() {
       const snap = (proposal?.dynamic_pricing_snapshot ?? {}) as any;
       const oneTimeItemsLocal = items.filter((it: any) => (it.billing_type || 'one_time') !== 'recurring');
       const oneTimeTotalLocal = oneTimeItemsLocal.reduce((s: number, it: any) => s + Number(it.total ?? 0), 0);
-      const approvedAmountLocal = Number(
-        snap?.current_amount ?? proposal?.dynamic_pricing_current_amount ?? oneTimeTotalLocal ?? proposal?.total_amount ?? 0
-      );
-      const oneTimeTermLocal = paymentTerms.find((t: any) => t.payment_type === 'one_time');
-      const recurringTermLocal = paymentTerms.find((t: any) => t.payment_type === 'recurring');
+      const approvedAmountLocal = resolveNetApprovedAmount(proposal, oneTimeTotalLocal);
+      const oneTimeTermLocal = pickPaymentTerm(paymentTerms, 'one_time');
+      const recurringTermLocal = pickPaymentTerm(paymentTerms, 'recurring');
       const approvedSchedule = oneTimeTermLocal
         ? calculateInstallments(oneTimeTermLocal as any, approvedAmountLocal, {
             proposalExpiresAt: proposal?.expires_at ?? null,
@@ -1019,8 +1029,8 @@ export default function ProposalPublicView() {
   const recurringItems = items.filter(item => item.billing_type === 'recurring');
   const oneTimeTotal = oneTimeItems.reduce((sum, item) => sum + item.total, 0);
   const recurringMRR = recurringItems.reduce((sum, item) => sum + item.total, 0);
-  const oneTimeTerm = paymentTerms.find(t => t.payment_type === 'one_time');
-  const recurringTerm = paymentTerms.find(t => t.payment_type === 'recurring');
+  const oneTimeTerm = pickPaymentTerm(paymentTerms, 'one_time');
+  const recurringTerm = pickPaymentTerm(paymentTerms, 'recurring');
   
   // Dynamic pricing snapshot is the single source of truth for the one-time base
   // when active. Manual discount is then applied on top of that base — never on the
@@ -1050,7 +1060,7 @@ export default function ProposalPublicView() {
   const installments = oneTimeTerm
     ? calculateInstallments(oneTimeTerm, baseForSchedule, {
         proposalExpiresAt: proposal?.expires_at ?? null,
-        approvedAmount: proposal?.status === 'accepted' ? Number(proposal?.approved_amount ?? oneTimeTotal) : null,
+        approvedAmount: proposal?.status === 'accepted' ? Number(proposal?.approved_amount ?? effectiveOneTimeAmount) : null,
         dynamicPricingCurrentEndsAt:
           (proposal as any)?.dynamic_pricing_enabled && dpSnapPublic?.current_ends_at
             ? dpSnapPublic.current_ends_at

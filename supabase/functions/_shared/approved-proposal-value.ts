@@ -2,18 +2,20 @@
  * Resolve the COMMERCIAL APPROVED VALUE of a proposal.
  *
  * Priority (the first non-null/positive wins):
- *   1. payment_expected_amount (set by orchestration when dynamic pricing applies)
- *   2. dynamic_pricing_current_amount, when dynamic_pricing_enabled = true and
+ *   1. approved_amount (frozen on acceptance, already NET)
+ *   2. payment_expected_amount (set by orchestration as NET after manual discount)
+ *   3. dynamic_pricing_current_amount, when dynamic_pricing_enabled = true and
  *      dynamic_pricing_status indicates an active commercial value
- *   3. dynamic_pricing_snapshot.current_amount (same conditions)
- *   4. total_amount (legacy net total of items + payment-term discount)
- *   5. value (very legacy fallback)
+ *   4. dynamic_pricing_snapshot.current_amount (same conditions)
+ *   5. total_amount (legacy net total of items + payment-term discount)
+ *   6. value (very legacy fallback)
  *
  * This is the authoritative value used for Slack, in-app notifications,
  * ERP sync, and any "valor aprovado" surfaced to humans or external systems.
  */
 
 export interface ProposalValueLike {
+  approved_amount?: number | string | null;
   total_amount?: number | string | null;
   value?: number | string | null;
   dynamic_pricing_enabled?: boolean | null;
@@ -24,6 +26,7 @@ export interface ProposalValueLike {
 }
 
 export type ApprovedAmountSource =
+  | "approved_amount"
   | "payment_expected_amount"
   | "dynamic_pricing_current_amount"
   | "dynamic_pricing_snapshot"
@@ -68,6 +71,7 @@ export function resolveApprovedProposalAmount(
   const totalAmount = toNumber(proposal.total_amount) ?? 0;
   const legacyValue = toNumber(proposal.value) ?? 0;
   const baseAmount = totalAmount || legacyValue || 0;
+  const approvedAmount = toNumber(proposal.approved_amount);
 
   const snapshot = proposal.dynamic_pricing_snapshot ?? null;
   const dynEnabled = !!proposal.dynamic_pricing_enabled;
@@ -87,7 +91,10 @@ export function resolveApprovedProposalAmount(
   let amount = 0;
   let source: ApprovedAmountSource = "none";
 
-  if (expected && expected > 0) {
+  if (approvedAmount && approvedAmount > 0) {
+    amount = approvedAmount;
+    source = "approved_amount";
+  } else if (expected && expected > 0) {
     amount = expected;
     source = "payment_expected_amount";
   } else if (dynEnabled && isActiveStatus(dynStatus) && dynCurrent && dynCurrent > 0) {
@@ -123,4 +130,4 @@ export function resolveApprovedProposalAmount(
 }
 
 export const APPROVED_VALUE_SELECT_COLUMNS =
-  "total_amount, value, dynamic_pricing_enabled, dynamic_pricing_status, dynamic_pricing_current_amount, dynamic_pricing_snapshot, payment_expected_amount";
+  "approved_amount, total_amount, value, dynamic_pricing_enabled, dynamic_pricing_status, dynamic_pricing_current_amount, dynamic_pricing_snapshot, payment_expected_amount";
