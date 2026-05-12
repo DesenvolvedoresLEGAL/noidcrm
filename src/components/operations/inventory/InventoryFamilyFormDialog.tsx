@@ -174,6 +174,44 @@ export function InventoryFamilyFormDialog({ open, onOpenChange, family, defaultC
           </div>
 
           <div className="space-y-2">
+            <Label>Tipo padrão do item</Label>
+            <Select
+              value={form.watch('item_kind')}
+              onValueChange={(v) =>
+                form.setValue('item_kind', v as 'serialized' | 'quantity', { shouldValidate: true })
+              }
+              disabled={!selectedCategory || controlMode !== 'mixed'}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {ITEM_KIND_OPTIONS.filter((o) => {
+                  if (controlMode === 'mixed') return true;
+                  return o.value === controlMode;
+                }).map((o) => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {selectedCategory && controlMode !== 'mixed' ? (
+              <p className="text-xs text-muted-foreground">
+                O modo de controle desta categoria é fixo. Para permitir os dois tipos, edite a
+                categoria e mude para "Mista".
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Categorias mistas aceitam famílias serializadas e por quantidade.
+              </p>
+            )}
+            {form.formState.errors.item_kind && (
+              <p className="text-sm text-destructive">{form.formState.errors.item_kind.message}</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="sort_order">Ordem</Label>
             <Input
               id="sort_order"
