@@ -800,37 +800,8 @@ export async function generateProposalPDFClient(
     }
 
     yPos += summaryBoxHeight + 12;
-    }
+  }
 
-    // MRR
-    if (recurringMRR > 0 || (recurringPayment && recurringPayment.monthly_value > 0)) {
-      const mrr = recurringPayment?.monthly_value || recurringMRR;
-      const months = recurringPayment?.contract_months || 12;
-      const contractTotal = recurringPayment?.contract_total || mrr * months;
-
-      doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'normal');
-      doc.text('MRR (Mensal):', margin + 8, lineY);
-      doc.setTextColor(22, 163, 74);
-      doc.setFont('helvetica', 'bold');
-      doc.text(`${formatCurrency(mrr, currency)}/mês`, margin + contentWidth - 8, lineY, { align: 'right' });
-      lineY += 8;
-
-      doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
-      doc.setFont('helvetica', 'normal');
-      doc.text(`Contrato (${months} meses):`, margin + 8, lineY);
-      doc.setTextColor(textDark.r, textDark.g, textDark.b);
-      doc.setFont('helvetica', 'bold');
-      doc.text(formatCurrency(contractTotal, currency), margin + contentWidth - 8, lineY, { align: 'right' });
-      lineY += 8;
-    }
-
-    // Divider line
-    doc.setDrawColor(borderColor.r, borderColor.g, borderColor.b);
-    doc.setLineWidth(0.3);
-    doc.line(margin + 8, lineY - 2, margin + contentWidth - 8, lineY - 2);
-    lineY += 4;
 
   // Check for new page before payment terms
   if (yPos > pageHeight - 80 && installments.length > 0) {
