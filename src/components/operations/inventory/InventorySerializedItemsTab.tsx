@@ -75,7 +75,7 @@ export function InventorySerializedItemsTab() {
   const [statusItem, setStatusItem] = useState<InventoryItemWithRefs | null>(null);
 
   const serializedCategories = useMemo(
-    () => (categories ?? []).filter((c) => c.is_active && c.item_kind === 'serialized'),
+    () => (categories ?? []).filter((c) => c.is_active && categoryAcceptsKind(c, 'serialized')),
     [categories],
   );
   const activeLocations = useMemo(
