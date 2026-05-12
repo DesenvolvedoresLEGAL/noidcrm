@@ -70,7 +70,7 @@ export function InventoryCategoryFormDialog({ open, onOpenChange, category }: Pr
     defaultValues: {
       name: '',
       description: '',
-      item_kind: 'serialized',
+      control_mode: 'serialized',
       equipment_profile: 'generic',
       sort_order: 0,
     },
@@ -81,7 +81,7 @@ export function InventoryCategoryFormDialog({ open, onOpenChange, category }: Pr
       form.reset({
         name: category?.name ?? '',
         description: category?.description ?? '',
-        item_kind: (category?.item_kind as 'serialized' | 'quantity') ?? 'serialized',
+        control_mode: getCategoryControlMode(category),
         equipment_profile: getEquipmentProfile((category as any)?.equipment_profile),
         sort_order: category?.sort_order ?? 0,
       });
@@ -89,10 +89,15 @@ export function InventoryCategoryFormDialog({ open, onOpenChange, category }: Pr
   }, [open, category, form]);
 
   const onSubmit = async (data: FormData) => {
+    // Mantemos o campo legado `item_kind` espelhado (mixed -> serialized) para
+    // compatibilidade com telas antigas. A regra real passa a ser `control_mode`.
+    const legacyItemKind: 'serialized' | 'quantity' =
+      data.control_mode === 'quantity' ? 'quantity' : 'serialized';
     const payload = {
       name: data.name,
       description: data.description || null,
-      item_kind: data.item_kind,
+      item_kind: legacyItemKind,
+      control_mode: data.control_mode as CategoryControlMode,
       equipment_profile: data.equipment_profile,
       sort_order: data.sort_order,
     };
