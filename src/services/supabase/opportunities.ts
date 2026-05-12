@@ -1033,12 +1033,12 @@ export async function reopenOpportunity(
 
   const now = new Date().toISOString();
 
-  // 3. Update opportunity: reopen it
+  // 3. Update opportunity: reopen it. Do NOT clear closed_at: it is the immutable
+  // historical close event used by reports/forecast/win-rate.
   const { data: updatedOpp, error: updateError } = await supabase
     .from('opportunities')
     .update({
       status: 'open',
-      closed_at: null,
       stage_id: targetStageId,
       updated_at: now,
     })
@@ -1051,32 +1051,29 @@ export async function reopenOpportunity(
     throw new Error('Erro ao reabrir oportunidade');
   }
 
-  // 4. Reopen terminal proposals (accepted/rejected) tied to this opportunity.
-  //    Reopening the opportunity must NOT mark accepted proposals as rejected.
-  //    We bring them back to 'sent' so the public link still works and the
-  //    client never sees a misleading "Recusada" banner.
+  // 4. A won opportunity reopened because the client cancelled must make the
+  //    previously accepted proposal terminal as rejected/cancelled, not sent.
   const { error: proposalError } = await supabase
     .from('proposals')
     .update({
-      status: 'sent',
-      accepted_at: null,
-      declined_at: null,
-      declined_reason: null,
-      signature_status: 'pending',
+      status: 'rejected',
+      declined_at: now,
+      declined_reason: `Cliente cancelou após aprovação. Motivo: ${input.reason}`,
+      signature_status: 'declined',
     })
     .eq('opportunity_id', id)
-    .in('status', ['accepted', 'rejected']);
+    .eq('status', 'accepted');
 
   if (proposalError) {
     console.warn('Error reopening proposals:', proposalError);
     // Don't throw - opportunity was already reopened
   }
 
-  // 5. Update win_loss_record if exists
+  // 5. Preserve the original won record but annotate the reopen reason.
+  //    Do not use outcome='reopened': win_loss_records only accepts won/lost/abandoned.
   const { error: winLossError } = await supabase
     .from('win_loss_records')
     .update({
-      outcome: 'reopened',
       reason_seller: `Reaberto: ${input.reason}`,
     })
     .eq('opportunity_id', id);
