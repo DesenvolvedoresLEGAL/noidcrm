@@ -213,7 +213,8 @@ export function InventoryFamiliesTab() {
                           </div>
                         </TableCell>
                       </TableRow>
-                    ))
+                      );
+                    })
                   )}
                 </TableBody>
               </Table>
