@@ -5,6 +5,26 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+function jsonResponse(payload: Record<string, unknown>, status = 200) {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+}
+
+async function withTimeout<T>(operation: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(`${label}_timeout`)), timeoutMs);
+  });
+
+  try {
+    return await Promise.race([operation, timeout]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+}
+
 interface GeoIPData {
   country: string;
   countryCode: string;
@@ -68,7 +88,13 @@ Deno.serve(async (req: Request) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const body = await req.json();
+    let body: Record<string, unknown>;
+    try {
+      body = await req.json();
+    } catch {
+      console.warn('[track-auth-event] Invalid JSON payload (non-blocking)');
+      return jsonResponse({ success: false, error: 'invalid_payload' });
+    }
     const {
       event_type,
       user_id,
@@ -80,7 +106,8 @@ Deno.serve(async (req: Request) => {
     } = body;
 
     if (!event_type || !email) {
-      throw new Error('event_type and email are required');
+      console.warn('[track-auth-event] Missing event_type/email (non-blocking)');
+      return jsonResponse({ success: false, error: 'missing_required_fields' });
     }
 
     console.log(`[track-auth-event] Processing ${event_type} for ${email}`);
@@ -130,12 +157,17 @@ Deno.serve(async (req: Request) => {
 
     let inserted = true;
     try {
-      const { error: insertError } = await supabase
-        .from('auth_audit_log')
-        .insert(auditRecord);
+      const { error: insertError } = await withTimeout(
+        supabase
+          .from('auth_audit_log')
+          .insert(auditRecord),
+        1800,
+        'auth_audit_insert'
+      );
       if (insertError) {
         inserted = false;
-        console.warn('[track-auth-event] Insert failed (non-blocking):', insertError?.message || insertError);
+        const msg = insertError?.message || String(insertError);
+        console.warn('[track-auth-event] Insert failed (non-blocking):', msg.slice(0, 200));
       }
     } catch (e) {
       inserted = false;
@@ -143,25 +175,20 @@ Deno.serve(async (req: Request) => {
       console.warn('[track-auth-event] Insert threw (non-blocking):', msg.slice(0, 200));
     }
 
-    return new Response(JSON.stringify({
+    return jsonResponse({
       success: true,
       inserted,
       ip: clientIP,
       country: geoData?.country || null,
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
 
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     // Never break the auth flow: respond 200 with success:false.
     console.warn('[track-auth-event] Soft error (non-blocking):', errorMessage.slice(0, 200));
-    return new Response(JSON.stringify({
+    return jsonResponse({
       success: false,
       error: 'tracking_unavailable',
-    }), {
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }
 });
