@@ -224,10 +224,22 @@ export function InventoryOccupancyCalendarPage() {
 
       <Tabs value={view} onValueChange={(v) => setView(v as ViewMode)}>
         <TabsList>
+          <TabsTrigger value="month">Calendário mensal</TabsTrigger>
           <TabsTrigger value="item">Por item</TabsTrigger>
           <TabsTrigger value="category">Por categoria</TabsTrigger>
           <TabsTrigger value="reservation">Por reserva</TabsTrigger>
         </TabsList>
+        <TabsContent value="month">
+          <MonthlyOccupancyCalendar
+            data={occupancy.data ?? []}
+            isLoading={occupancy.isLoading}
+            initialMonth={start}
+            onChangeMonth={(s, e) => {
+              setStart(s);
+              setEnd(e);
+            }}
+          />
+        </TabsContent>
         <TabsContent value="item">
           <OccupancyByItemTable
             data={occupancy.data ?? []}
