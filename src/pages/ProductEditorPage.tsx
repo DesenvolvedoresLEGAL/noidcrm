@@ -469,7 +469,7 @@ export default function ProductEditorPage() {
                   </div>
 
                   {/* Campos comuns: Unidade, Custo, Imposto */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 items-end">
                     <div>
                       <Label>Unidade *</Label>
                       <Select
