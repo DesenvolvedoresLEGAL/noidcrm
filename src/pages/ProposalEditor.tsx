@@ -1071,6 +1071,109 @@ export default function ProposalEditor() {
                   </div>
                 </div>
 
+                {/* Evento / Operação - usado para reservas automáticas no inventário */}
+                <div className="rounded-md border border-dashed p-4 space-y-3">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                    <Label className="text-sm font-semibold">Evento / Operação</Label>
+                    <span className="text-xs text-muted-foreground">
+                      define a janela de reserva automática no inventário ao aceitar a proposta
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="space-y-2">
+                      <Label>Início do evento</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            type="button"
+                            className={cn(
+                              "w-full justify-start text-left font-normal",
+                              !(watch as any)('event_start_date') && "text-muted-foreground"
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {(watch as any)('event_start_date')
+                              ? formatDateBR((watch as any)('event_start_date'))
+                              : "Selecione a data"}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={(watch as any)('event_start_date')
+                              ? parseDateOnly((watch as any)('event_start_date'))
+                              : undefined}
+                            onSelect={(date) => {
+                              if (date) {
+                                const y = date.getFullYear();
+                                const m = String(date.getMonth() + 1).padStart(2, '0');
+                                const d = String(date.getDate()).padStart(2, '0');
+                                (setValue as any)('event_start_date', `${y}-${m}-${d}`);
+                              } else {
+                                (setValue as any)('event_start_date', '');
+                              }
+                            }}
+                            initialFocus
+                            locale={ptBR}
+                            className="pointer-events-auto"
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Fim do evento</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            type="button"
+                            className={cn(
+                              "w-full justify-start text-left font-normal",
+                              !(watch as any)('event_end_date') && "text-muted-foreground"
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {(watch as any)('event_end_date')
+                              ? formatDateBR((watch as any)('event_end_date'))
+                              : "Selecione a data"}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={(watch as any)('event_end_date')
+                              ? parseDateOnly((watch as any)('event_end_date'))
+                              : undefined}
+                            onSelect={(date) => {
+                              if (date) {
+                                const y = date.getFullYear();
+                                const m = String(date.getMonth() + 1).padStart(2, '0');
+                                const d = String(date.getDate()).padStart(2, '0');
+                                (setValue as any)('event_end_date', `${y}-${m}-${d}`);
+                              } else {
+                                (setValue as any)('event_end_date', '');
+                              }
+                            }}
+                            initialFocus
+                            locale={ptBR}
+                            className="pointer-events-auto"
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Local do evento</Label>
+                      <input
+                        {...(register as any)('event_location')}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        placeholder="Ex: São Paulo Expo - Hospitalar"
+                      />
+                    </div>
+                  </div>
+                </div>
+
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <Label>Introdução</Label>
