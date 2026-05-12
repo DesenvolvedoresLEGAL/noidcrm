@@ -422,7 +422,7 @@ export function ProposalPreview({
                     (() => {
                       const dpSnap: any = (dynamicPricing as any)?.dynamic_pricing_snapshot ?? null;
                       const dpEnabled = !!(dynamicPricing as any)?.dynamic_pricing_enabled;
-                      const schedule = calculateInstallments(term, oneTimeTotal, {
+                      const schedule = calculateInstallments(term, effectiveOneTimeBase, {
                         dynamicPricingCurrentEndsAt:
                           dpEnabled && dpSnap?.current_ends_at ? dpSnap.current_ends_at : null,
                       });
