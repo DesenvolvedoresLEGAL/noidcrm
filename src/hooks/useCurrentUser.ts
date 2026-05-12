@@ -120,22 +120,22 @@ async function fetchCurrentUser(): Promise<CurrentUserData | null> {
       const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
 
       if (refreshError || !refreshData.session) {
-        // Verificar se há uma sessão de roleplay ativa antes de fazer logout
-        try {
-          const { useRoleplaySessionStore } = await import('./useRoleplaySession');
-          const isInActiveSession = useRoleplaySessionStore.getState().isInActiveSession;
-
-          if (isInActiveSession) {
-            throw new Error('Sessão expirada. Salve seu progresso e faça login novamente.');
-          }
-        } catch {
-          // Ignorar erro de importação do roleplay store
-        }
-
-        try {
-          await supabase.auth.signOut();
-        } catch {
-          // Ignorar erro de signOut
+        // HARDENING: NÃO deslogar automaticamente em falha de refresh.
+        // Erros transitórios (522/CORS/timeout do backend) faziam o app
+        // chutar todo mundo pra /login. A sessão local pode continuar
+        // válida — apenas reportamos o erro pro React Query e deixamos
+        // o usuário no app. Logout só acontece via ação explícita ou
+        // quando getSession() comprovar ausência de sessão.
+        const refreshMsg = String(refreshError?.message || '').toLowerCase();
+        const isTransient =
+          !refreshError ||
+          refreshMsg.includes('fetch') ||
+          refreshMsg.includes('network') ||
+          refreshMsg.includes('timeout') ||
+          refreshMsg.includes('522') ||
+          refreshMsg.includes('failed');
+        if (isTransient) {
+          throw new Error('transient_auth_error');
         }
         return null;
       }
