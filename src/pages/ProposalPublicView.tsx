@@ -1639,9 +1639,23 @@ export default function ProposalPublicView() {
                     <div className="bg-amber-50 dark:bg-amber-950/30 rounded-lg p-4 border border-amber-200 dark:border-amber-800">
                       <p className="text-sm font-semibold mb-3">Resumo Financeiro</p>
                       <div className="space-y-2">
+                        {dynamicAdjustment !== 0 && (
+                          <div className="flex justify-between text-xs text-muted-foreground">
+                            <span>Subtotal dos itens:</span>
+                            <span>{formatCurrency(oneTimeTotal)}</span>
+                          </div>
+                        )}
+                        {dynamicAdjustment !== 0 && (
+                          <div className="flex justify-between text-xs text-muted-foreground">
+                            <span>Ajuste por antecedência:</span>
+                            <span>{dynamicAdjustment >= 0 ? '+ ' : '- '}{formatCurrency(Math.abs(dynamicAdjustment))}</span>
+                          </div>
+                        )}
                         <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Subtotal Avulso:</span>
-                          <span>{formatCurrency(oneTimeTotal)}</span>
+                          <span className="text-muted-foreground">
+                            {dynamicAdjustment !== 0 ? 'Subtotal vigente:' : 'Subtotal Avulso:'}
+                          </span>
+                          <span>{formatCurrency(effectiveOneTimeBase)}</span>
                         </div>
                         <div className="flex justify-between text-sm text-red-600 font-medium">
                           <span>Desconto ({paymentDiscountPercent}%):</span>
