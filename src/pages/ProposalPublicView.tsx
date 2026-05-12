@@ -1396,8 +1396,25 @@ export default function ProposalPublicView() {
                                   />
                                 )}
                               </td>
-                              <td className="text-center py-3 px-2 md:py-4 md:px-4 text-sm">{item.quantity}</td>
-                              <td className="text-right py-3 px-2 md:py-4 md:px-4 text-sm hidden sm:table-cell">{formatCurrency(item.unit_price)}</td>
+                              <td className="text-center py-3 px-2 md:py-4 md:px-4 text-sm">
+                                {(item as any).billing_type === 'point_day' && (item as any).quantity_points && (item as any).billing_days ? (
+                                  <span className="whitespace-nowrap">
+                                    {(item as any).quantity_points} {(item as any).quantity_points === 1 ? 'pt' : 'pts'} × {(item as any).billing_days} {(item as any).billing_days === 1 ? 'diária' : 'diárias'}
+                                  </span>
+                                ) : (
+                                  item.quantity
+                                )}
+                              </td>
+                              <td className="text-right py-3 px-2 md:py-4 md:px-4 text-sm hidden sm:table-cell">
+                                {(item as any).billing_type === 'point_day' && (item as any).unit_price_point_day != null ? (
+                                  <span className="whitespace-nowrap">
+                                    {formatCurrency((item as any).unit_price_point_day)}
+                                    <span className="text-xs text-muted-foreground"> / ponto-dia</span>
+                                  </span>
+                                ) : (
+                                  formatCurrency(item.unit_price)
+                                )}
+                              </td>
                               {hasItemDiscounts && (
                                 <td className="text-right py-3 px-2 md:py-4 md:px-4 text-sm hidden sm:table-cell">
                                   {item.discount_percent > 0 ? (
