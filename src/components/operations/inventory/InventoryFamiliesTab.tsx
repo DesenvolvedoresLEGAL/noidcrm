@@ -158,14 +158,14 @@ export function InventoryFamiliesTab() {
                   {isLoading ? (
                     Array.from({ length: 3 }).map((_, i) => (
                       <TableRow key={i}>
-                        <TableCell colSpan={7}>
+                        <TableCell colSpan={8}>
                           <Skeleton className="h-6 w-full" />
                         </TableCell>
                       </TableRow>
                     ))
                   ) : (families ?? []).length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                         Nenhuma família encontrada.
                       </TableCell>
                     </TableRow>
