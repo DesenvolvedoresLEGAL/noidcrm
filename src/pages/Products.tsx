@@ -197,7 +197,7 @@ export default function Products() {
                 Configurações
               </Link>
             </Button>
-            <Button onClick={() => { setEditingProduct(undefined); setModalOpen(true); }}>
+            <Button onClick={() => navigate('/app/products/new')}>
               <Plus className="h-4 w-4 mr-2" />
               Novo Produto
             </Button>
