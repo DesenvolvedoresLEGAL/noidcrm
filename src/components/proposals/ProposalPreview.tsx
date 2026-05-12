@@ -220,25 +220,35 @@ export function ProposalPreview({
 
   const displayItems = items.length > 0 ? items : dbItems;
   const displayPaymentTerms = paymentTerms.length > 0 ? paymentTerms : dbPaymentTerms;
-  
-  // Calculate totals from items
-  const calculatedSubtotal = displayItems.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
-  
+
   // Separate by billing type
   const oneTimeItems = displayItems.filter(item => (item.billing_type || 'one_time') !== 'recurring');
   const recurringItems = displayItems.filter(item => item.billing_type === 'recurring');
-  
+
   const oneTimeTotal = oneTimeItems.reduce((sum, item) => sum + item.total, 0);
   const recurringTotal = recurringItems.reduce((sum, item) => sum + item.total, 0);
-  
-  // Apply payment discount to one-time total
-  const paymentDiscountAmount = oneTimeTotal * (paymentDiscountPercent / 100);
-  const oneTimeWithDiscount = oneTimeTotal - paymentDiscountAmount;
-  
+
+  // Dynamic pricing snapshot is the single source of truth for the one-time base
+  // when active. Discount is then applied on top of that base.
+  const dpSnapPreview: any = (dynamicPricing as any)?.dynamic_pricing_snapshot ?? null;
+  const dpEnabledPreview = !!(dynamicPricing as any)?.dynamic_pricing_enabled;
+  const dynamicOneTimeAmount =
+    dpEnabledPreview && dpSnapPreview?.current_amount != null
+      ? Number(dpSnapPreview.current_amount)
+      : null;
+  const effectiveOneTimeBase = dynamicOneTimeAmount ?? oneTimeTotal;
+
+  // Subtotal exibido = soma dos itens (vigente quando dinâmica ativa)
+  const calculatedSubtotal = effectiveOneTimeBase + recurringTotal;
+
+  // Apply payment discount to the effective one-time base
+  const paymentDiscountAmount = effectiveOneTimeBase * (paymentDiscountPercent / 100);
+  const oneTimeWithDiscount = effectiveOneTimeBase - paymentDiscountAmount;
+
   // Calculate contract total for recurring (assume 12 months)
   const contractMonths = 12;
   const recurringContractTotal = recurringTotal * contractMonths;
-  
+
   // Grand total with discount applied
   const calculatedTotal = oneTimeWithDiscount + recurringContractTotal;
   const displayTotal = totalValue || calculatedTotal;
