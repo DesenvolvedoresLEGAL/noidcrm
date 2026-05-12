@@ -42,8 +42,8 @@ const schema = z.object({
     .min(2, 'Mínimo 2 caracteres')
     .max(80, 'Máximo 80 caracteres'),
   description: z.string().trim().max(300, 'Máximo 300 caracteres').optional().or(z.literal('')),
-  item_kind: z.enum(['serialized', 'quantity'], {
-    required_error: 'Selecione o tipo padrão',
+  control_mode: z.enum(['serialized', 'quantity', 'mixed'], {
+    required_error: 'Selecione o modo de controle permitido',
   }),
   equipment_profile: z.enum(['generic', 'router', 'sim_card']).default('generic'),
   sort_order: z
