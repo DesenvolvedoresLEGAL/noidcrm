@@ -1313,8 +1313,10 @@ export default function ProposalPublicView() {
                 {paymentDiscountPercent > 0 && (
                   <>
                     <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Subtotal:</span>
-                      <span>{formatCurrency(oneTimeTotal + recurringContractTotal)}</span>
+                      <span className="text-muted-foreground">
+                        {dynamicAdjustment !== 0 ? 'Subtotal vigente:' : 'Subtotal:'}
+                      </span>
+                      <span>{formatCurrency(effectiveOneTimeBase + recurringContractTotal)}</span>
                     </div>
                     <div className="flex justify-between text-sm text-red-600">
                       <span>Desconto ({paymentDiscountPercent}%):</span>
