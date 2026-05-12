@@ -84,7 +84,7 @@ export function InventorySerializedItemsTab() {
     [locations],
   );
   const activeFamilies = useMemo(
-    () => (families ?? []).filter((f) => f.is_active),
+    () => (families ?? []).filter((f) => f.is_active && (f.item_kind ?? 'serialized') === 'serialized'),
     [families],
   );
 
