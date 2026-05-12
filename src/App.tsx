@@ -497,6 +497,26 @@ const App = () => (
                 }
               />
               <Route
+                path="/app/products/new"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <ProductEditorPage />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/products/:id/edit"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <ProductEditorPage />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="/app/accounts"
                 element={
                   <ProtectedRoute>
