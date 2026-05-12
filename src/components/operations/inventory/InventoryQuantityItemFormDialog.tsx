@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -34,12 +34,18 @@ import {
   type TechnicalSpec,
 } from '@/lib/operations/inventoryTechnicalSpecs';
 import {
+  getActiveTemplateFields,
+  type FamilySpecTemplateField,
+} from '@/lib/operations/inventoryFamilyTemplate';
+import {
   type Criticality,
   type OperationalType,
 } from '@/lib/operations/inventoryClassification';
 import { TechnicalSpecsSection } from './TechnicalSpecsSection';
+import { FamilyTemplateSpecsFields } from './FamilyTemplateSpecsFields';
 import { InventoryClassificationFields } from './InventoryClassificationFields';
 import { useInventoryCategories } from '@/hooks/operations/useInventoryCategories';
+import { useInventoryFamilies } from '@/hooks/operations/useInventoryFamilies';
 import { useInventoryLocations } from '@/hooks/operations/useInventoryLocations';
 import { useInventoryQuantityItemMutations } from '@/hooks/operations/useInventoryItems';
 import type { InventoryItemWithRefs } from '@/services/operations/inventoryItems';
