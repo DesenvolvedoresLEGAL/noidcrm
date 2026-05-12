@@ -99,7 +99,7 @@ export function InventoryQuantityItemFormDialog({ open, onOpenChange, item }: Pr
   const { data: locations } = useInventoryLocations();
 
   const quantityCategories = useMemo(
-    () => (categories ?? []).filter((c) => c.is_active && c.item_kind === 'quantity'),
+    () => (categories ?? []).filter((c) => c.is_active && categoryAcceptsKind(c, 'quantity')),
     [categories],
   );
   const activeLocations = useMemo(
