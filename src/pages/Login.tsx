@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/hooks/useTranslation';
 import { Loader2, Mail, Zap } from 'lucide-react';
 import { AuthHeroPanel } from '@/components/auth/AuthHeroPanel';
+import { getLoginErrorDescription, logAuthConfigCheck, logAuthLoginError } from '@/lib/authDiagnostics';
 
 const cardVariants = {
   hidden: { opacity: 0, y: 30, scale: 0.95 },
@@ -42,6 +43,10 @@ export default function Login() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
+  useEffect(() => {
+    logAuthConfigCheck();
+  }, []);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -50,16 +55,17 @@ export default function Login() {
       const { data, error } = await signIn(email, password);
       
       if (error) {
+        logAuthLoginError(error);
         if (error.message.includes('Invalid login credentials')) {
           toast({
             title: 'Credenciais inválidas',
-            description: 'Email ou senha incorretos.',
+            description: getLoginErrorDescription(error),
             variant: 'destructive',
           });
         } else if (error.message.includes('Email not confirmed')) {
           toast({
             title: 'Email não confirmado',
-            description: 'Por favor, confirme seu email antes de fazer login.',
+            description: getLoginErrorDescription(error),
             variant: 'destructive',
           });
         } else {
@@ -81,9 +87,10 @@ export default function Login() {
         navigate('/app/dashboard');
       }
     } catch (error: any) {
+      logAuthLoginError(error);
       toast({
         title: t('loginError', { ns: 'auth' }),
-        description: error.message,
+        description: getLoginErrorDescription(error),
         variant: 'destructive',
       });
     } finally {
