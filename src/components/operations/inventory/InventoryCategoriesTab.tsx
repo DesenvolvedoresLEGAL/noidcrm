@@ -146,7 +146,7 @@ export function InventoryCategoriesTab() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Nome</TableHead>
-                    <TableHead>Tipo padrão</TableHead>
+                    <TableHead>Modo de controle</TableHead>
                     <TableHead>Descrição</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Ordem</TableHead>
