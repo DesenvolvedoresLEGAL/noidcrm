@@ -667,7 +667,7 @@ export default function ProductEditorPage() {
             </div>
 
             {/* Coluna direita: resumo + flags */}
-            <div className="space-y-4 lg:sticky lg:top-24 lg:self-start">
+            <div className="space-y-4 xl:sticky xl:top-24 xl:self-start">
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base flex items-center gap-2">
