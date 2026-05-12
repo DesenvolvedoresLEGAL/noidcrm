@@ -23739,6 +23739,7 @@ export type Database = {
           dynamic_pricing_snapshot: Json
           dynamic_pricing_status: string | null
           event_end_date: string | null
+          event_location: string | null
           event_start_date: string | null
           expires_at: string | null
           id: string
@@ -23814,6 +23815,7 @@ export type Database = {
           dynamic_pricing_snapshot?: Json
           dynamic_pricing_status?: string | null
           event_end_date?: string | null
+          event_location?: string | null
           event_start_date?: string | null
           expires_at?: string | null
           id?: string
@@ -23889,6 +23891,7 @@ export type Database = {
           dynamic_pricing_snapshot?: Json
           dynamic_pricing_status?: string | null
           event_end_date?: string | null
+          event_location?: string | null
           event_start_date?: string | null
           expires_at?: string | null
           id?: string
