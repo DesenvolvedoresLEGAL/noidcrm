@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
-import { format, addDays, startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns';
-import { ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react';
+import { format, addDays, startOfMonth, endOfMonth } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
