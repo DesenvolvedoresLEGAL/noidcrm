@@ -276,6 +276,40 @@ export function InventoryItemFormDialog({ open, onOpenChange, item }: Props) {
   }, [watchedFamilyId, open]);
 
   const onSubmit = async (data: FormData) => {
+    // Validate required template fields
+    const errs: Record<string, string> = {};
+    activeTemplate.forEach((f) => {
+      if (f.required && !(templateValues[f.key] ?? '').toString().trim()) {
+        errs[f.key] = `Preencha o campo obrigatório: ${f.label}`;
+      }
+    });
+    if (Object.keys(errs).length > 0) {
+      setTemplateErrors(errs);
+      toast.error(Object.values(errs)[0]);
+      return;
+    }
+    setTemplateErrors({});
+
+    const templateSpecs: TechnicalSpec[] = activeTemplate
+      .filter((f) => (templateValues[f.key] ?? '').toString().trim().length > 0)
+      .map((f) => ({
+        key: f.key,
+        label: f.label,
+        value: (templateValues[f.key] ?? '').toString().trim(),
+        type: f.type === 'password' || f.type === 'select' ? 'text' : (f.type as any),
+        notes: null,
+        source: 'family_template',
+      }));
+    const customSpecs = ((data.technical_specs ?? []) as TechnicalSpec[]).map((s) => ({
+      ...s,
+      source: 'custom' as const,
+    }));
+    const combined = [...templateSpecs, ...customSpecs];
+    if (combined.length > 50) {
+      toast.error('Limite de 50 especificações técnicas por item.');
+      return;
+    }
+
     const payload: any = {
       name: data.name,
       description: data.description || null,
@@ -290,7 +324,7 @@ export function InventoryItemFormDialog({ open, onOpenChange, item }: Props) {
       brand: data.brand || null,
       model: data.model || null,
       notes: data.notes || null,
-      technical_specs: (data.technical_specs ?? []) as TechnicalSpec[],
+      technical_specs: combined,
       router_factory: profile === 'router' ? (data.router_factory as RouterFactory) : null,
       sim_card_factory: profile === 'sim_card' ? (data.sim_card_factory as SimCardFactory) : null,
     };
