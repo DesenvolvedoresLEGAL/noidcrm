@@ -53,9 +53,12 @@ export default function Opportunities() {
 
   // React Query: opportunities
   const { data: opportunitiesData, isLoading: oppsLoading } = useQuery({
-    queryKey: [...opportunityKeys.lists(), visibleUserIds],
-    queryFn: () => listOpportunities({ owner_user_ids: visibleUserIds || undefined }),
-    enabled: visibleUserIds !== undefined || visibleUserIds === null,
+    queryKey: [...opportunityKeys.lists(), selectedPipelineId, visibleUserIds],
+    queryFn: () => listOpportunities({
+      pipeline_id: selectedPipelineId,
+      owner_user_ids: visibleUserIds || undefined,
+    }),
+    enabled: !!selectedPipelineId && (visibleUserIds !== undefined || visibleUserIds === null),
   });
 
   const opportunities = opportunitiesData?.data || [];
