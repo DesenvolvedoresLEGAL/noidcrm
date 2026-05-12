@@ -181,7 +181,8 @@ export async function calculateDynamicPrice(
 ): Promise<DynamicPricingSnapshot> {
   const { data, error } = await c.rpc('calculate_proposal_dynamic_price', {
     p_proposal_id: proposalId,
-    p_reference_at: referenceAt ?? new Date().toISOString(),
+    // Quando undefined, o backend resolve via condição financeira (PRICE UX 1.0.4)
+    p_reference_at: referenceAt ?? null,
   });
   if (error) throw error;
   return data as DynamicPricingSnapshot;
@@ -189,13 +190,28 @@ export async function calculateDynamicPrice(
 
 export async function applyDynamicPrice(
   proposalId: string,
+  referenceAt?: string,
 ): Promise<DynamicPricingSnapshot> {
   const { data, error } = await c.rpc('apply_dynamic_price_to_proposal', {
     p_proposal_id: proposalId,
-    p_reference_at: new Date().toISOString(),
+    p_reference_at: referenceAt ?? null,
   });
   if (error) throw error;
   return data as DynamicPricingSnapshot;
+}
+
+/** PRICE UX 1.0.4 — devolve a data de referência comercial resolvida do backend */
+export async function resolveDynamicPricingReference(
+  proposalId: string,
+): Promise<{ reference_type: string; reference_at: string } | null> {
+  const { data, error } = await c.rpc('resolve_dynamic_pricing_reference_date', {
+    p_proposal_id: proposalId,
+  });
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : data;
+  return row
+    ? { reference_type: row.reference_type, reference_at: row.reference_at }
+    : null;
 }
 
 export async function listDynamicPricingEvents(

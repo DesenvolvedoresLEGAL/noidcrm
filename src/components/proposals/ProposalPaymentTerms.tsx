@@ -60,27 +60,63 @@ const CONTRACT_MONTHS_OPTIONS = [
 
 // Quick presets for one-time payments
 const PAYMENT_PRESETS = [
-  { 
-    id: 'a_vista', 
-    label: 'À Vista', 
-    config: { entry_percent: 0, installments: 1, installment_interval_days: 30 } 
+  {
+    id: 'a_vista',
+    label: 'À Vista',
+    config: { entry_percent: 0, installments: 1, installment_interval_days: 30 }
   },
-  { 
-    id: '50_50', 
-    label: '50% + 50%', 
-    config: { entry_percent: 50, installments: 1, installment_interval_days: 30 } 
+  {
+    id: '50_50',
+    label: '50% + 50%',
+    config: { entry_percent: 50, installments: 1, installment_interval_days: 30 }
   },
-  { 
-    id: '30_60_90', 
-    label: '30/60/90', 
-    config: { entry_percent: 0, installments: 3, installment_interval_days: 30 } 
+  {
+    id: '30_60_90',
+    label: '30/60/90',
+    config: { entry_percent: 0, installments: 3, installment_interval_days: 30 }
   },
-  { 
-    id: 'parcelado', 
-    label: 'Parcelado', 
+  {
+    id: 'net_35',
+    label: 'Faturado 35d',
+    config: { entry_percent: 0, installments: 1, installment_interval_days: 35, payment_due_days: 35 }
+  },
+  {
+    id: 'parcelado',
+    label: 'Parcelado',
     config: null // Opens custom config
   },
 ];
+
+// PRICE UX 1.0.4 — opções de data de referência da tabela dinâmica
+const REFERENCE_TYPE_OPTIONS = [
+  { value: 'current_date', label: 'Pagamento imediato (data atual)' },
+  { value: 'payment_due_date', label: 'Vencimento da cobrança' },
+  { value: 'custom_date', label: 'Data personalizada' },
+  { value: 'approval_date', label: 'Condição especial aprovada' },
+] as const;
+
+// Default por condição quando o usuário ainda não escolheu explicitamente
+function defaultReferenceTypeForCondition(
+  condition: PaymentTerm['payment_condition'] | undefined,
+  freeze: boolean,
+): NonNullable<PaymentTerm['dynamic_pricing_reference_type']> {
+  if (!condition || condition === 'upfront') return 'current_date';
+  if (condition === 'split_50_50' || condition === 'split_30_70') {
+    return freeze ? 'approval_date' : 'current_date';
+  }
+  if (
+    condition === 'net_7' ||
+    condition === 'net_15' ||
+    condition === 'net_30' ||
+    condition === 'net_35' ||
+    condition === 'invoiced' ||
+    condition === 'installments' ||
+    condition === 'custom_schedule'
+  ) {
+    return 'payment_due_date';
+  }
+  return 'current_date';
+}
 
 interface ProposalPaymentTermsProps {
   proposalId: string;
@@ -212,7 +248,9 @@ export function ProposalPaymentTerms({
     if (oneTime) {
       setOneTimeTerm({ ...oneTime, payment_method: (oneTime as any).payment_method || 'boleto' });
       // Detect preset
-      if (oneTime.entry_percent === 0 && oneTime.installments === 1) {
+      if (oneTime.payment_condition === 'net_35' || (oneTime as any).payment_due_days === 35) {
+        setSelectedPreset('net_35');
+      } else if (oneTime.entry_percent === 0 && oneTime.installments === 1) {
         setSelectedPreset('a_vista');
       } else if (oneTime.entry_percent === 50 && oneTime.installments === 1) {
         setSelectedPreset('50_50');
@@ -266,7 +304,7 @@ export function ProposalPaymentTerms({
   const handlePresetSelect = (presetId: string) => {
     setSelectedPreset(presetId);
     const preset = PAYMENT_PRESETS.find(p => p.id === presetId);
-    
+
     if (preset?.config) {
       const baseDate = oneTimeTerm.first_installment_date || getTodayDate();
       const paymentCondition: PaymentTerm['payment_condition'] = presetId === 'a_vista'
@@ -275,20 +313,32 @@ export function ProposalPaymentTerms({
           ? 'split_50_50'
           : presetId === '30_60_90'
             ? 'installments'
-            : 'custom_schedule';
-      const newTerm = { 
-        ...oneTimeTerm, 
+            : presetId === 'net_35'
+              ? 'net_35'
+              : 'custom_schedule';
+      const freezeDefault = presetId === '50_50';
+      const refType = defaultReferenceTypeForCondition(paymentCondition, freezeDefault);
+      const newTerm = {
+        ...oneTimeTerm,
         ...preset.config,
         payment_condition: paymentCondition,
         first_installment_date: baseDate,
         // Sync entry_date with first_installment_date when entry_percent > 0
-        entry_date: preset.config.entry_percent > 0 ? baseDate : undefined,
+        entry_date: (preset.config as any).entry_percent > 0 ? baseDate : undefined,
+        // PRICE UX 1.0.4 — defaults de referência de precificação
+        dynamic_pricing_reference_type: refType,
+        freeze_price_on_approval: freezeDefault,
+        payment_due_days: (preset.config as any).payment_due_days ?? oneTimeTerm.payment_due_days ?? null,
       };
-      setOneTimeTerm(newTerm);
+      setOneTimeTerm(newTerm as any);
       setShowAdvanced(false);
       autoSave('one_time', newTerm);
     } else {
-      updateOneTime({ payment_condition: 'installments', installments: oneTimeTerm.installments || 2 });
+      updateOneTime({
+        payment_condition: 'installments',
+        installments: oneTimeTerm.installments || 2,
+        dynamic_pricing_reference_type: defaultReferenceTypeForCondition('installments', false),
+      });
       // Parcelado - show advanced options
       setShowAdvanced(true);
     }
@@ -532,6 +582,76 @@ export function ProposalPaymentTerms({
                         </button>
                       ))}
                     </div>
+                  </div>
+
+                  {/* PRICE UX 1.0.4 — Precificação baseada em */}
+                  <div className="space-y-2 pt-1 border-t border-primary/20">
+                    <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground flex items-center gap-1">
+                      <Calendar className="h-3 w-3" />
+                      Precificação baseada em
+                    </Label>
+                    <Select
+                      value={
+                        oneTimeTerm.dynamic_pricing_reference_type
+                        ?? defaultReferenceTypeForCondition(
+                          oneTimeTerm.payment_condition,
+                          !!oneTimeTerm.freeze_price_on_approval,
+                        )
+                      }
+                      onValueChange={(v) =>
+                        updateOneTime({
+                          dynamic_pricing_reference_type: v as PaymentTerm['dynamic_pricing_reference_type'],
+                          freeze_price_on_approval:
+                            v === 'approval_date' ? true : oneTimeTerm.freeze_price_on_approval,
+                        })
+                      }
+                    >
+                      <SelectTrigger className="h-8 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {REFERENCE_TYPE_OPTIONS.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    {oneTimeTerm.dynamic_pricing_reference_type === 'custom_date' && (
+                      <Input
+                        type="date"
+                        value={oneTimeTerm.dynamic_pricing_reference_date || ''}
+                        onChange={(e) =>
+                          updateOneTime({ dynamic_pricing_reference_date: e.target.value })
+                        }
+                        className="h-8 text-sm"
+                      />
+                    )}
+
+                    {(oneTimeTerm.payment_condition === 'split_50_50'
+                      || oneTimeTerm.payment_condition === 'split_30_70') && (
+                      <label className="flex items-center gap-2 text-xs text-muted-foreground pt-1">
+                        <input
+                          type="checkbox"
+                          className="h-3.5 w-3.5"
+                          checked={!!oneTimeTerm.freeze_price_on_approval}
+                          onChange={(e) =>
+                            updateOneTime({
+                              freeze_price_on_approval: e.target.checked,
+                              dynamic_pricing_reference_type: e.target.checked
+                                ? 'approval_date'
+                                : 'current_date',
+                            })
+                          }
+                        />
+                        Congelar valor aprovado (saldo não recalculado)
+                      </label>
+                    )}
+
+                    <p className="text-[11px] text-muted-foreground">
+                      Define qual data ancora a faixa vigente da tabela dinâmica (ex.: vencimento futuro em condições faturadas).
+                    </p>
                   </div>
                 </div>
 

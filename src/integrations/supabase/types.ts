@@ -23117,20 +23117,25 @@ export type Database = {
           created_at: string | null
           discount_percent: number | null
           due_day: number | null
+          dynamic_pricing_reference_date: string | null
+          dynamic_pricing_reference_type: string
           entry_date: string | null
           entry_percent: number | null
           first_installment_date: string | null
           first_payment_date: string | null
+          freeze_price_on_approval: boolean
           id: string
           installment_interval_days: number | null
           installments: number | null
           monthly_value: number | null
           organization_id: string
           payment_condition: string
+          payment_due_days: number | null
           payment_method: string | null
           payment_type: string
           proposal_id: string
           recurring_due_day: number | null
+          requires_commercial_approval: boolean
           second_payment_due_date: string | null
           second_payment_due_strategy: string | null
           updated_at: string | null
@@ -23145,20 +23150,25 @@ export type Database = {
           created_at?: string | null
           discount_percent?: number | null
           due_day?: number | null
+          dynamic_pricing_reference_date?: string | null
+          dynamic_pricing_reference_type?: string
           entry_date?: string | null
           entry_percent?: number | null
           first_installment_date?: string | null
           first_payment_date?: string | null
+          freeze_price_on_approval?: boolean
           id?: string
           installment_interval_days?: number | null
           installments?: number | null
           monthly_value?: number | null
           organization_id: string
           payment_condition?: string
+          payment_due_days?: number | null
           payment_method?: string | null
           payment_type?: string
           proposal_id: string
           recurring_due_day?: number | null
+          requires_commercial_approval?: boolean
           second_payment_due_date?: string | null
           second_payment_due_strategy?: string | null
           updated_at?: string | null
@@ -23173,20 +23183,25 @@ export type Database = {
           created_at?: string | null
           discount_percent?: number | null
           due_day?: number | null
+          dynamic_pricing_reference_date?: string | null
+          dynamic_pricing_reference_type?: string
           entry_date?: string | null
           entry_percent?: number | null
           first_installment_date?: string | null
           first_payment_date?: string | null
+          freeze_price_on_approval?: boolean
           id?: string
           installment_interval_days?: number | null
           installments?: number | null
           monthly_value?: number | null
           organization_id?: string
           payment_condition?: string
+          payment_due_days?: number | null
           payment_method?: string | null
           payment_type?: string
           proposal_id?: string
           recurring_due_day?: number | null
+          requires_commercial_approval?: boolean
           second_payment_due_date?: string | null
           second_payment_due_strategy?: string | null
           updated_at?: string | null
@@ -23736,6 +23751,8 @@ export type Database = {
           dynamic_pricing_enabled: boolean
           dynamic_pricing_last_calculated_at: string | null
           dynamic_pricing_mode: string | null
+          dynamic_pricing_reference_date: string | null
+          dynamic_pricing_reference_type: string | null
           dynamic_pricing_snapshot: Json
           dynamic_pricing_status: string | null
           event_end_date: string | null
@@ -23759,6 +23776,8 @@ export type Database = {
           payment_snapshot: Json
           payment_validation_status: string | null
           pdf_url: string | null
+          price_frozen_at: string | null
+          price_frozen_on_approval: boolean
           proposal_number: string | null
           proposal_version: number | null
           public_payment_enabled: boolean | null
@@ -23812,6 +23831,8 @@ export type Database = {
           dynamic_pricing_enabled?: boolean
           dynamic_pricing_last_calculated_at?: string | null
           dynamic_pricing_mode?: string | null
+          dynamic_pricing_reference_date?: string | null
+          dynamic_pricing_reference_type?: string | null
           dynamic_pricing_snapshot?: Json
           dynamic_pricing_status?: string | null
           event_end_date?: string | null
@@ -23835,6 +23856,8 @@ export type Database = {
           payment_snapshot?: Json
           payment_validation_status?: string | null
           pdf_url?: string | null
+          price_frozen_at?: string | null
+          price_frozen_on_approval?: boolean
           proposal_number?: string | null
           proposal_version?: number | null
           public_payment_enabled?: boolean | null
@@ -23888,6 +23911,8 @@ export type Database = {
           dynamic_pricing_enabled?: boolean
           dynamic_pricing_last_calculated_at?: string | null
           dynamic_pricing_mode?: string | null
+          dynamic_pricing_reference_date?: string | null
+          dynamic_pricing_reference_type?: string | null
           dynamic_pricing_snapshot?: Json
           dynamic_pricing_status?: string | null
           event_end_date?: string | null
@@ -23911,6 +23936,8 @@ export type Database = {
           payment_snapshot?: Json
           payment_validation_status?: string | null
           pdf_url?: string | null
+          price_frozen_at?: string | null
+          price_frozen_on_approval?: boolean
           proposal_number?: string | null
           proposal_version?: number | null
           public_payment_enabled?: boolean | null
@@ -34663,6 +34690,13 @@ export type Database = {
         Returns: Json
       }
       reset_monthly_volts: { Args: never; Returns: undefined }
+      resolve_dynamic_pricing_reference_date: {
+        Args: { p_proposal_id: string }
+        Returns: {
+          reference_at: string
+          reference_type: string
+        }[]
+      }
       resolve_primary_contact: {
         Args: { p_prospect_id: string }
         Returns: string
