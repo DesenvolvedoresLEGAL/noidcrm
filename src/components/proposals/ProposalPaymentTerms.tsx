@@ -583,6 +583,76 @@ export function ProposalPaymentTerms({
                       ))}
                     </div>
                   </div>
+
+                  {/* PRICE UX 1.0.4 — Precificação baseada em */}
+                  <div className="space-y-2 pt-1 border-t border-primary/20">
+                    <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground flex items-center gap-1">
+                      <Calendar className="h-3 w-3" />
+                      Precificação baseada em
+                    </Label>
+                    <Select
+                      value={
+                        oneTimeTerm.dynamic_pricing_reference_type
+                        ?? defaultReferenceTypeForCondition(
+                          oneTimeTerm.payment_condition,
+                          !!oneTimeTerm.freeze_price_on_approval,
+                        )
+                      }
+                      onValueChange={(v) =>
+                        updateOneTime({
+                          dynamic_pricing_reference_type: v as PaymentTerm['dynamic_pricing_reference_type'],
+                          freeze_price_on_approval:
+                            v === 'approval_date' ? true : oneTimeTerm.freeze_price_on_approval,
+                        })
+                      }
+                    >
+                      <SelectTrigger className="h-8 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {REFERENCE_TYPE_OPTIONS.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    {oneTimeTerm.dynamic_pricing_reference_type === 'custom_date' && (
+                      <Input
+                        type="date"
+                        value={oneTimeTerm.dynamic_pricing_reference_date || ''}
+                        onChange={(e) =>
+                          updateOneTime({ dynamic_pricing_reference_date: e.target.value })
+                        }
+                        className="h-8 text-sm"
+                      />
+                    )}
+
+                    {(oneTimeTerm.payment_condition === 'split_50_50'
+                      || oneTimeTerm.payment_condition === 'split_30_70') && (
+                      <label className="flex items-center gap-2 text-xs text-muted-foreground pt-1">
+                        <input
+                          type="checkbox"
+                          className="h-3.5 w-3.5"
+                          checked={!!oneTimeTerm.freeze_price_on_approval}
+                          onChange={(e) =>
+                            updateOneTime({
+                              freeze_price_on_approval: e.target.checked,
+                              dynamic_pricing_reference_type: e.target.checked
+                                ? 'approval_date'
+                                : 'current_date',
+                            })
+                          }
+                        />
+                        Congelar valor aprovado (saldo não recalculado)
+                      </label>
+                    )}
+
+                    <p className="text-[11px] text-muted-foreground">
+                      Define qual data ancora a faixa vigente da tabela dinâmica (ex.: vencimento futuro em condições faturadas).
+                    </p>
+                  </div>
                 </div>
 
                 {/* Main Config - Always visible */}
