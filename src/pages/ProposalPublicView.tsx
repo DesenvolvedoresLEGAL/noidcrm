@@ -1046,7 +1046,7 @@ export default function ProposalPublicView() {
   const baseForSchedule =
     proposal?.status === 'accepted' && proposal?.approved_amount != null
       ? Number(proposal.approved_amount)
-      : effectiveOneTimeAmount;
+      : effectiveOneTimeBase;
   const installments = oneTimeTerm
     ? calculateInstallments(oneTimeTerm, baseForSchedule, {
         proposalExpiresAt: proposal?.expires_at ?? null,
