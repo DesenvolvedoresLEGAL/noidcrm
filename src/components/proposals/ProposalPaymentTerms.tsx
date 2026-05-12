@@ -248,7 +248,9 @@ export function ProposalPaymentTerms({
     if (oneTime) {
       setOneTimeTerm({ ...oneTime, payment_method: (oneTime as any).payment_method || 'boleto' });
       // Detect preset
-      if (oneTime.entry_percent === 0 && oneTime.installments === 1) {
+      if (oneTime.payment_condition === 'net_35' || (oneTime as any).payment_due_days === 35) {
+        setSelectedPreset('net_35');
+      } else if (oneTime.entry_percent === 0 && oneTime.installments === 1) {
         setSelectedPreset('a_vista');
       } else if (oneTime.entry_percent === 50 && oneTime.installments === 1) {
         setSelectedPreset('50_50');
