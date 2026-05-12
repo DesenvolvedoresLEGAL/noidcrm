@@ -109,7 +109,7 @@ serve(async (req: Request) => {
 
     const acceptedAt = new Date();
     const approved = resolveApprovedProposalAmount(proposal as any);
-    const approvedValue = Number((approved.amount || proposal.total_amount || proposal.value || proposal.opportunity?.valor_previsto || 0).toFixed(2));
+    const approvedValue = Number(Number(approved.amount || proposal.total_amount || proposal.value || proposal.opportunity?.valor_previsto || 0).toFixed(2));
     const approvalSnapshot = {
       proposal_id: proposalId,
       approved_at: acceptedAt.toISOString(),
