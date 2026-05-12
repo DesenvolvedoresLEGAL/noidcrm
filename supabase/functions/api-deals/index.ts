@@ -410,7 +410,7 @@ async function handleGet(
 
   const { data: proposal, error } = await supabase
     .from("proposals")
-    .select("id, opportunity_id, organization_id, status, title, client_name, client_email, value, subtotal, discount_amount, total_amount, created_at, accepted_at, expires_at")
+    .select("id, opportunity_id, organization_id, status, title, client_name, client_email, value, subtotal, discount_amount, total_amount, payment_expected_amount, dynamic_pricing_current_amount, created_at, accepted_at, expires_at")
     .eq("id", id)
     .eq("organization_id", orgId)
     .is("deleted_at", null)
