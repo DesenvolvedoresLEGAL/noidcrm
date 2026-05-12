@@ -4,6 +4,7 @@ import {
   resolveApprovedProposalAmount,
   APPROVED_VALUE_SELECT_COLUMNS,
 } from "../_shared/approved-proposal-value.ts";
+import { generatePreReservationFromProposalServer } from "../_shared/inventory-from-proposal.ts";
 
 
 const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY') ?? Deno.env.get('LOVABLE_API_KEY');
