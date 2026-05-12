@@ -255,6 +255,11 @@ export async function createProposal(dto: unknown): Promise<Proposal> {
   if (validated.layout_id) insertData.layout_id = validated.layout_id;
   if (validated.currency) insertData.currency = validated.currency;
   if (validated.pdf_url) insertData.pdf_url = validated.pdf_url;
+  if (validated.event_start_date !== undefined) insertData.event_start_date = normalizeEventDate(validated.event_start_date);
+  if (validated.event_end_date !== undefined) insertData.event_end_date = normalizeEventDate(validated.event_end_date);
+  if (validated.event_location !== undefined) {
+    insertData.event_location = validated.event_location === '' ? null : validated.event_location;
+  }
 
   const { data, error } = await supabase
     .from('proposals')
