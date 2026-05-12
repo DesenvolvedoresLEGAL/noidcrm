@@ -62,6 +62,7 @@ export async function createInventoryFamily(
       description: input.description ?? null,
       sort_order: input.sort_order ?? 0,
       is_active: input.is_active ?? true,
+      item_kind: input.item_kind ?? 'serialized',
       created_by: userId ?? null,
       updated_by: userId ?? null,
     })
