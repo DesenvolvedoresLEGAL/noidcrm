@@ -95,7 +95,7 @@ serve(async (req) => {
         .select("*")
         .eq("proposal_id", proposalId)
         .in("status", ["pending", "failed"])
-        .or("notifications_processed_at.is.null,slack_processed_at.is.null")
+        .or("notifications_processed_at.is.null,slack_processed_at.is.null,inventory_processed_at.is.null")
         .limit(1);
       jobs = data || [];
     } else {
@@ -634,6 +634,8 @@ async function processJob(supabase: any, job: any) {
       proposalId: proposal_id,
       notifications_created: notificationsCreated,
       slack_sent: slackSent,
+      inventory_status: inventoryStatus,
+      inventory_pre_reservation_id: inventoryPreReservationId,
       status: allDone ? "completed" : "partial",
     };
   } catch (error) {
