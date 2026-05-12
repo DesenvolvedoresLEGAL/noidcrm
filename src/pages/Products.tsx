@@ -8,13 +8,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Plus, Pencil, Trash2, Search, Settings, ImageIcon, Upload, Download, AlertCircle, Copy } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { listProducts, deleteProduct, toggleProductStatus, createProduct, type Product } from '@/services/supabase/products';
-import { ProductModal } from '@/components/products/ProductModal';
+// ProductModal removido em favor de página dedicada (/app/products/:id/edit)
 import { ImportProductsModal } from '@/components/products/ImportProductsModal';
 import { ExportProductsModal } from '@/components/products/ExportProductsModal';
 import { ProductAnalytics } from '@/components/products/ProductAnalytics';
 import { useToast } from '@/hooks/use-toast';
 import { useProductCategories } from '@/hooks/useProductCategories';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
@@ -40,6 +40,7 @@ export default function Products() {
   // ALL HOOKS MUST BE AT THE TOP - before any conditional returns
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const { organization, loading: orgLoading, sessionChecked, hasSession } = useCurrentUser();
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
@@ -47,10 +48,8 @@ export default function Products() {
   const [priceMin, setPriceMin] = useState<string>('');
   const [priceMax, setPriceMax] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [modalOpen, setModalOpen] = useState(false);
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [exportModalOpen, setExportModalOpen] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<Product | undefined>();
   const [deleteDialog, setDeleteDialog] = useState<string | null>(null);
 
   const { categories } = useProductCategories();
@@ -198,7 +197,7 @@ export default function Products() {
                 Configurações
               </Link>
             </Button>
-            <Button onClick={() => { setEditingProduct(undefined); setModalOpen(true); }}>
+            <Button onClick={() => navigate('/app/products/new')}>
               <Plus className="h-4 w-4 mr-2" />
               Novo Produto
             </Button>
@@ -396,7 +395,7 @@ export default function Products() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => { setEditingProduct(product); setModalOpen(true); }}
+                              onClick={() => navigate(`/app/products/${product.id}/edit`)}
                               title="Editar"
                             >
                               <Pencil className="h-4 w-4" />
@@ -420,15 +419,6 @@ export default function Products() {
           </CardContent>
         </Card>
       </div>
-
-      <ProductModal
-        open={modalOpen}
-        onOpenChange={(open) => {
-          setModalOpen(open);
-          if (!open) setEditingProduct(undefined);
-        }}
-        product={editingProduct}
-      />
 
       <ImportProductsModal
         open={importModalOpen}

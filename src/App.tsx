@@ -53,6 +53,7 @@ const Opportunities = lazy(() => import("./pages/Opportunities"));
 const Activities = lazy(() => import("./pages/Activities"));
 const Proposals = lazy(() => import("./pages/Proposals"));
 const Products = lazy(() => import("./pages/Products"));
+const ProductEditorPage = lazy(() => import("./pages/ProductEditorPage"));
 const Accounts = lazy(() => import("./pages/Accounts"));
 const AccountDetail = lazy(() => import("./pages/AccountDetail"));
 const AccountEditor = lazy(() => import("./pages/AccountEditor"));
@@ -491,6 +492,26 @@ const App = () => (
                   <ProtectedRoute>
                     <LazyRoute>
                       <Products />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/products/new"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <ProductEditorPage />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/products/:id/edit"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <ProductEditorPage />
                     </LazyRoute>
                   </ProtectedRoute>
                 }

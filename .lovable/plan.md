@@ -1,91 +1,58 @@
-## Diagnóstico
+## Objetivo
+Reformular a experiência de edição de produto/serviço: sair do modal estreito, padronizar campos de Custo e Imposto (renomear IPI), corrigir cálculo de margem para ponto-dia e recorrente, e garantir persistência de todas as configurações ao salvar.
 
-- A proposta aceita da Canon (`053419df...`) gerou job de aceite e notificações, mas não gerou inventário.
-- O fluxo atual `post-acceptance-effects` só processa comemoração/notificações/Slack; não existe etapa de inventário nele.
-- Já existe um gerador manual de pré-reserva (`generatePreReservationFromProposal`), mas ele depende de alguém abrir a proposta e informar datas.
-- No caso Canon, `proposals.event_start_date` e `opportunities.event_start_date` estão vazios, e os produtos da proposta (`LEGAL™ XGo Pro`, `Fast Delivery`) estão com `inventory_control_mode = none`; mesmo com automação, hoje eles não reservariam nada sem configuração de estoque.
-- O calendário atual renderiza uma grade horizontal por dia/item, por isso “estica” e fica ruim para uso operacional.
+## Mudanças propostas
 
-## Plano de implementação
+### 1. Edição em página dedicada (substitui modal)
+- Criar rotas:
+  - `/produtos/novo` → `ProductEditorPage` (modo create)
+  - `/produtos/:id/editar` → `ProductEditorPage` (modo edit)
+- A página usa o `Layout` padrão (sidebar + breadcrumb), com largura confortável (`max-w-5xl` central) e seções em cards ao invés de tudo espremido num diálogo.
+- Em `Products.tsx`, os botões "Novo produto" e o ícone de editar passam a navegar para essas rotas (em vez de abrir `ProductModal`).
+- `ProductModal.tsx` fica deprecated (mantido apenas se algum outro fluxo usar; remover imports órfãos).
+- Layout da página em colunas:
+  - **Coluna esquerda (principal):** Identidade (nome, código, categoria, tipo, descrição rica), Imagem, Configuração de Preço (com sub-modos), BOM.
+  - **Coluna direita (sticky):** Resumo (preço efetivo, custo, imposto, margem), Status, Contabiliza na Meta, botões Salvar/Cancelar.
 
-### 1. Criar uma etapa automática de inventário no pós-aceite
-- Estender o job de aceite com campos próprios de inventário: processado em, status, erro, pré-reserva criada, reserva criada.
-- No `post-acceptance-effects`, adicionar uma etapa idempotente de inventário:
-  - Se a proposta aceita já tiver pré-reserva/reserva, não duplicar.
-  - Se não tiver, gerar pré-reserva automaticamente a partir dos itens da proposta.
-  - Usar a regra atual de ponto-dia/BOM: quantidade física = pontos, não pontos × diárias; componentes = pontos × quantidade por ponto.
-  - Se o produto não tiver controle de inventário, registrar aviso claro no job/log para operação saber que nada foi reservado por configuração ausente.
+### 2. Padronização Custo + Imposto em TODOS os modos
+- Renomear rótulo "IPI (%)" → **"Imposto (%)"** na UI (manter coluna `ipi_percent` no banco — só muda label e helper text). Adicionar tooltip: "Imposto incidente (IPI/ISS/etc) usado no cálculo de margem".
+- Adicionar campos **Custo (R$)** e **Imposto (%)** ao bloco de **Ponto-dia** (hoje só existem em Avulso/Recorrente).
+- Garantir que esses campos estão no `defaultValues`, no `reset()` ao abrir produto existente, e no `onSubmit` para todos os 3 modos.
 
-### 2. Resolver datas de evento de forma segura
-- Usar `proposals.event_start_date` como primeira fonte.
-- Se vazio, usar `proposal_dynamic_pricing_rules.event_start_date` quando existir.
-- Se ainda vazio, usar `opportunities.event_start_date`.
-- Para fim do evento, adicionar suporte persistente a `event_end_date` em propostas/oportunidades ou, se ausente, usar `billing_days` dos itens ponto-dia para calcular o fim.
-- Se nenhuma data puder ser resolvida, não criar reserva “falsa”; criar alerta/notificação operacional pedindo data do evento.
+### 3. Cálculo de margem unificado
+- Criar helper `computeMargin({ billing_type, price, monthly_price, point_day_price, points, days, cost, tax_percent })` em `src/lib/products/margin.ts`.
+- Regra:
+  - `revenue` = preço efetivo do modo (avulso: `price`; recorrente: `monthly_price`; ponto-dia: `unit_price_point_day × points × days`).
+  - `tax_amount = revenue × (tax_percent/100)`
+  - `net_revenue = revenue − tax_amount`
+  - `margin% = (net_revenue − cost) / net_revenue × 100` (quando `net_revenue > 0`).
+- O componente de Resumo mostra: Preço, Imposto, Custo, Margem (R$ e %).
+- Hoje em Recorrente o card só mostra margem se `monthlyPrice > 0` mas o cálculo ignora imposto e em Ponto-dia não existe — corrigir ambos.
 
-### 3. Pré-reserva quando a proposta está “na mesa”
-- Adicionar automação também para proposta enviada/ativa com data de evento:
-  - Ao enviar proposta, criar pré-reserva automaticamente para segurar capacidade.
-  - Ao aceitar, reaproveitar a pré-reserva existente em vez de criar outra.
-  - Ao editar itens/datas de uma proposta enviada ainda não aceita, recalcular/recriar a pré-reserva vinculada com segurança, sem afetar reservas definitivas.
+### 4. Persistência completa ao salvar
+- Auditar `onSubmit` em `ProductEditorPage`:
+  - Garantir que campos específicos do modo selecionado são enviados (`monthly_price`, `billing_cycle`, `minimum_contract_months` para recorrente; `default_unit_price_point_day`, `default_billing_days`, `default_quantity_points` para ponto-dia).
+  - Garantir que `cost` e `ipi_percent` (Imposto) sempre sejam enviados, independente do modo.
+  - BOM (`product_bom_items`) é salvo via `replaceProductBomItems` após `createProduct`/`updateProduct` — confirmar ordem e tratamento de erro (toast separado se BOM falhar mas produto salvar).
+- Confirmar Zod schema em `src/services/supabase/products.ts` aceita todos os campos (já aceita).
+- Após salvar em modo create, navegar para `/produtos/:id/editar` (mantém usuário no produto recém-criado).
 
-### 4. Fluxo de aceite e confirmação operacional
-- No aceite do cliente:
-  - Garantir pré-reserva automaticamente.
-  - Notificar perfis operacionais/Admin/Owner com link para a pré-reserva.
-  - Se todos os itens já estiverem alocados e sem conflito, converter automaticamente para reserva definitiva com `confirmation_trigger = proposal_approved`.
-  - Se houver demanda por categoria/família ainda não alocada, manter como pré-reserva ativa e destacar “pendente de alocação/confirmação”.
-- Manter a conversão manual existente para o time operacional confirmar depois de alocar itens físicos.
-
-### 5. Ajustar produtos LEGAL que devem reservar estoque
-- Criar uma rotina/validação para apontar produtos vendidos com estoque sem configuração (`inventory_control_mode = none`).
-- Para a Canon, deixar claro que `LEGAL™ XGo Pro` não reservou porque ainda está sem vínculo de inventário.
-- Preparar UI/alerta para configurar rapidamente o controle de estoque/BOM dos produtos relevantes.
-
-### 6. Melhorar a tela de pré-reservas
-- Exibir origem “Proposta aceita/enviada” com cliente, proposta, evento, operação e itens/componentes.
-- Adicionar filtros rápidos: próximas operações, pendentes de alocação, conflitos, sem data, sem configuração de inventário.
-- Mostrar ação clara: “Alocar itens” e “Confirmar reserva”.
-
-### 7. Redesenhar o calendário de inventário
-- Trocar a grade horizontal gigante por uma visão mensal real.
-- Mostrar cards/barras por dia ou por período, com:
-  - Pré-reservas
-  - Reservas confirmadas
-  - Preparação/despacho/operação/retorno
-  - Cliente/proposta/código
-  - Risco/conflito
-- Manter alternativas tabulares compactas:
-  - Por reserva
-  - Por categoria/família
-  - Por item físico apenas quando necessário
-- Limitar a visão padrão ao mês selecionado, com navegação mês anterior/próximo.
-
-### 8. Validação/backfill
-- Criar uma rotina segura para reprocessar propostas aceitas recentes sem inventário.
-- Aplicar no caso Canon/Hospitalar depois que as datas e produtos estiverem configurados.
-- Validar no banco e na UI:
-  - Pré-reserva criada
-  - Itens/componentes criados
-  - Quantidade ponto-dia correta
-  - Calendário mensal mostrando a ocupação entre 19/05 e 22/05
-  - Notificação operacional criada
+### 5. Limpezas e detalhes UX
+- Hint visual mostrando o "modo de cobrança ativo" no topo (badge).
+- Manter `ProductBOMEditor` exatamente como hoje, só dentro da nova página.
+- Mobile: colunas viram stack vertical; resumo desce para o final (sem `sticky`).
 
 ## Arquivos impactados
+- **Novo:** `src/pages/ProductEditorPage.tsx`
+- **Novo:** `src/lib/products/margin.ts`
+- **Edit:** `src/App.tsx` (rotas)
+- **Edit:** `src/pages/Products.tsx` (navegação ao invés de modal)
+- **Edit:** `src/components/products/ProductModal.tsx` (manter como wrapper opcional ou remover usos)
+- (Sem migração de banco — `ipi_percent` permanece, só muda label.)
 
-- `supabase/functions/post-acceptance-effects/index.ts`
-- Nova/ajustada lógica server-side para gerar pré-reservas por proposta
-- Migração para campos de job de inventário e possível `event_end_date`
-- `src/services/operations/inventoryProposalBridge.ts`
-- `src/components/operations/inventory/InventoryPreReservationsTab.tsx`
-- `src/components/operations/inventory/InventoryOccupancyCalendarPage.tsx`
-- Serviços/hooks de inventário já existentes para invalidação e listagem
-- Possível ajuste em editor de proposta para capturar início/fim do evento de forma explícita
+## Riscos
+- Outros pontos do app que abrem `ProductModal` diretamente (busca rápida de produto?) — verificar com `rg "ProductModal"` antes de remover.
+- Recalcular margem com imposto pode mudar números exibidos historicamente; deixar claro no tooltip do card.
 
-## Riscos e controles
-
-- Não vou criar reserva sem data válida; isso vira alerta operacional.
-- Não vou duplicar reserva: tudo será idempotente por `proposal_id`.
-- Reserva definitiva automática só se a alocação já estiver completa e sem conflito.
-- RLS/multitenancy serão preservados; automação server-side validará `organization_id`.
-- Produtos antigos sem controle de estoque continuam funcionando comercialmente, apenas não bloqueiam inventário até serem configurados.
+## Próximos passos
+Após aprovação: implemento a página, rotas, helper de margem, atualizo `Products.tsx` e adiciono Custo/Imposto ao bloco Ponto-dia.
