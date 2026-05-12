@@ -156,16 +156,18 @@ export function InventoryCategoryFormDialog({ open, onOpenChange, category }: Pr
           </div>
 
           <div className="space-y-2">
-            <Label>Tipo padrão do item</Label>
+            <Label>Modo de controle permitido</Label>
             <Select
-              value={form.watch('item_kind')}
-              onValueChange={(v) => form.setValue('item_kind', v as 'serialized' | 'quantity')}
+              value={form.watch('control_mode')}
+              onValueChange={(v) =>
+                form.setValue('control_mode', v as CategoryControlMode, { shouldValidate: true })
+              }
             >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {ITEM_KIND_OPTIONS.map((o) => (
+                {CATEGORY_CONTROL_MODE_OPTIONS.map((o) => (
                   <SelectItem key={o.value} value={o.value}>
                     {o.label}
                   </SelectItem>
@@ -173,7 +175,8 @@ export function InventoryCategoryFormDialog({ open, onOpenChange, category }: Pr
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              Itens serializados possuem identidade única. Itens por quantidade controlam saldo.
+              Defina se esta categoria aceita itens serializados, itens por quantidade ou ambos.
+              O tipo final de cada item é decidido pela família.
             </p>
           </div>
 
