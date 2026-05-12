@@ -1,54 +1,73 @@
-# Fix — Quick View e PDF mostram valor errado após recalcular tabela dinâmica
 
-## Causa raiz
+## Problema
 
-`apply_dynamic_price_to_proposal` (botão "Recalcular e sincronizar agora") grava corretamente o valor R$ 1.477,50 (referência custom_date 17/06, pós-evento +50%) em `proposals.dynamic_pricing_snapshot`/`dynamic_pricing_current_amount`/`payment_expected_amount`.
+Hoje a proposta mostra valores divergentes quando há tabela dinâmica ativa **+** desconto manual da condição comercial:
 
-Porém, `orchestrate_proposal_financials` (chamada em todo "Salvar proposta" e via trigger de `proposal_items`) imediatamente sobrescreve o snapshot:
+| Local | Mostra | Base usada |
+|---|---|---|
+| Header (resumo da proposta) | Subtotal R$ 4.194,00 / Desconto -R$ 419,40 / **Total R$ 4.613,40** | mistura: subtotal base, desconto sobre base, total dinâmico |
+| Itens avulsos (rodapé) | Subtotal R$ 4.194,00 + ajuste antecedência → R$ 4.613,40 | correto |
+| Condição Comercial Vigente | R$ 4.613,40 | correto |
+| Condições de Pagamento → Resumo Financeiro | Subtotal R$ 4.194,00 / Desconto -R$ 419,40 / **Total R$ 3.774,60** | base bruta (ignora dinâmica) |
+| Pagamento à vista (parcelas) | **R$ 4.152,06** | dinâmica (4.613,40 × 0,9) |
 
-```
--- linha 158 do migration 20260508232217
-v_snapshot := public.calculate_proposal_dynamic_price(p_proposal_id, now());
-...
--- linhas 167-175
-UPDATE proposals SET
-   dynamic_pricing_snapshot = v_snapshot,
-   dynamic_pricing_current_amount = v_current_amount,
-   payment_expected_amount = v_current_amount
-```
+Causa raiz: cada bloco escolhe sua própria base (ora `oneTimeTotal` bruto, ora `dynamic_pricing_snapshot.current_amount`, ora `proposal.total_amount`). Quando há ajuste por antecedência **e** desconto manual, os valores não fecham.
 
-`now()` é forçado em vez do `reference_at` resolvido, então o snapshot volta para a faixa "vigente hoje" (R$ 1.280,50, +30%). A view pública e o PDF leem tudo de `dynamic_pricing_snapshot.current_amount` (linhas 1030-1036 de `ProposalPublicView.tsx`), por isso exibem o valor antigo no header, no bloco "Condição Comercial Vigente" e nas Condições de Pagamento.
+## Princípio (fonte única da verdade)
 
-## O que vai ser feito
+Quando a tabela dinâmica está ativa (`dynamic_pricing_enabled && snapshot.status === 'active'`):
 
-### 1. Migration `fix_orchestrator_dynamic_pricing_reference`
+- **Base avulsa** (subtotal de partida para todos os cálculos de pagamento) = `snapshot.current_amount` (já inclui ajuste por antecedência / referência).
+- **Desconto manual** (`payment_terms.discount_percent`) é aplicado **sobre a base avulsa**.
+- **Total líquido avulso** = base avulsa − desconto.
+- **Parcelas** (à vista, 50/50, 30/60/90, etc.) são calculadas a partir da **base avulsa**, mantendo a lógica atual de `calculateInstallments`.
 
-Recriar `orchestrate_proposal_financials`:
+Quando a tabela dinâmica está desativada, base avulsa = `oneTimeTotal` (soma dos itens one-time, comportamento atual).
 
-- **Resolver referência via helper**: chamar `resolve_dynamic_pricing_reference_date(p_proposal_id)` em vez de hard-coded `now()`.
-- **Calcular com a referência correta**: `calculate_proposal_dynamic_price(p_proposal_id, v_ref_at)`.
-- **Persistir referência junto com snapshot**: incluir `dynamic_pricing_reference_type = v_ref_type` e `dynamic_pricing_reference_date = v_ref_at` no UPDATE, e mergir essas chaves dentro do JSON `dynamic_pricing_snapshot` (igual ao apply faz).
-- **Respeitar freeze**: se `price_frozen_on_approval = true`, pular o bloco que sobrescreve `dynamic_pricing_snapshot`/`current_amount`/`payment_expected_amount` (mantém o valor congelado).
-- **Não regenerar tiers desnecessariamente**: manter `generate_event_antecedence_pricing_for_proposal(..., true)` apenas quando os tiers ainda não existem ou houve mudança real de validade — não destruir tiers já gerados (mantém comportamento atual de `can_auto_generate_dynamic_pricing`).
+Header e Resumo Financeiro devem usar exatamente a mesma trinca: **Subtotal · Desconto · Total**.
 
-### 2. Validar consumo no front
+## Mudanças (frontend / apresentação apenas)
 
-Sem mudanças necessárias: `ProposalPublicView` (header, bloco "Condição Comercial Vigente", "Condições de Pagamento", instalments) e `proposalPdfGenerator` já leem `dynamic_pricing_snapshot.current_amount` / `current_ends_at`. Uma vez que o snapshot deixar de ser sobrescrito, ambas surfaces refletem o valor correto.
+Nenhuma mudança em banco, edge function ou regra de negócio. Apenas alinhar a leitura nas views.
 
-### 3. Aceite
+### 1. `src/pages/ProposalPublicView.tsx`
+- Criar `effectiveOneTimeBase = dpEnabled && snap.current_amount ? snap.current_amount : oneTimeTotal`.
+- Recalcular `paymentDiscountAmount` e `oneTimeWithDiscount` a partir de `effectiveOneTimeBase`.
+- **Header (linhas ~1308–1319)**: Subtotal = `effectiveOneTimeBase + recurringContractTotal`; Desconto = `paymentDiscountAmount`; Total exibido = `oneTimeWithDiscount + recurringContractTotal` (não `proposal.total_amount`).
+- **Resumo Financeiro (linhas ~1632–1645)**: Subtotal Avulso = `effectiveOneTimeBase`; Desconto = `paymentDiscountAmount`; Total com Desconto = `oneTimeWithDiscount`.
+- Manter `oneTimeTotalForInstallments` apontando para `effectiveOneTimeBase` (já está, garantir consistência).
+- Quando há ajuste por antecedência diferente do bruto, mostrar uma micro-linha "Inclui ajuste de antecedência (+R$ X)" no Resumo Financeiro para o cliente entender por que o subtotal subiu.
 
-- Definir referência custom_date 17/06 → clicar "Recalcular e sincronizar agora" → `current_amount = R$ 1.477,50` no editor.
-- Salvar a proposta novamente → snapshot continua R$ 1.477,50 (orquestrador respeita referência).
-- Abrir Visualização Rápida → header, "Condição Comercial Vigente" e "Condições de Pagamento" mostram R$ 1.477,50 e indicam que a precificação foi calculada por data personalizada (17/06).
-- PDF: mesmo valor + cláusula de referência personalizada (já implementada na 1.0.4).
-- Proposta `upfront` sem reference_type override continua funcionando como hoje (resolve_helper devolve `current_date` → `now()`).
-- Proposta `split_50_50 + freeze` aprovada: orquestrador não sobrescreve snapshot.
+### 2. `src/components/proposals/ProposalPreview.tsx` (visualização rápida no editor)
+- Carregar `dynamic_pricing_snapshot` (já carregado em `dynamicPricing` query).
+- Aplicar a mesma lógica `effectiveOneTimeBase` em `calculatedSubtotal`, `paymentDiscountAmount`, `oneTimeWithDiscount`, `displayTotal` (linhas 225–244).
+- Usar a mesma base em `calculateInstallments` (linha ~415).
 
-## Arquivos
+### 3. `src/components/proposals/PublicProposalApprovedScreen.tsx`
+- Garantir que o "Resumo Financeiro" pós-aprovação também leia da snapshot quando `freeze_price_on_approval` ou snapshot aprovado existir (já usa `approved_amount`; só validar consistência do desconto em cima dessa base).
 
-- `supabase/migrations/<nova migration>.sql` — recria `orchestrate_proposal_financials`.
+### 4. `src/lib/proposalPdfGenerator.ts`
+- Replicar a regra ao montar o PDF: `effectiveOneTimeBase` → Subtotal, Desconto, Total e parcelas (área das linhas 285–310 e blocos de "Resumo" / "Condições de Pagamento").
 
-## Riscos
+### 5. Coerência visual (microcopy)
+- Header e Resumo Financeiro: rotular o subtotal como **"Subtotal vigente"** quando `dpEnabled && current_amount !== oneTimeTotal`, para deixar claro que já inclui o ajuste por antecedência. Caso contrário manter "Subtotal".
 
-- A função é chamada por triggers em `proposal_items` e por `Save Items → Save Payment → Totals`. Manter mesma assinatura `(uuid, text)` e mesmo retorno JSONB. Apenas a lógica interna muda.
-- `can_auto_generate_dynamic_pricing` continua governando regeneração de tiers; sem alteração nesse caminho.
+## Validação manual
+
+Cenário do print (Motoppar / EXPOSEC 2026):
+- Itens base: R$ 4.194,00
+- Ajuste antecedência: +10% → vigente R$ 4.613,40
+- Desconto manual: 10%
+
+Esperado em **todos** os locais:
+- Subtotal vigente: **R$ 4.613,40**
+- Desconto (10%): **− R$ 461,34**
+- Total com Desconto: **R$ 4.152,06**
+- Pagamento à vista: **R$ 4.152,06** ✓ (já está)
+
+## Riscos / Não-objetivos
+
+- Não alterar `orchestrate_proposal_financials` nem `dynamic_pricing_snapshot` (dados continuam corretos).
+- Não alterar `calculateInstallments` (já recebe a base certa).
+- Não tocar em itens recorrentes (MRR) — desconto manual continua só em one-time.
+- Não mudar `proposal.total_amount` no banco; apenas a exibição passa a refletir base + desconto coerentes.
