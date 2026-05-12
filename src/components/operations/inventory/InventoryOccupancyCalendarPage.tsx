@@ -1,5 +1,17 @@
 import { useMemo, useState } from 'react';
-import { format, addDays, startOfMonth, endOfMonth } from 'date-fns';
+import {
+  format,
+  addDays,
+  startOfMonth,
+  endOfMonth,
+  startOfWeek,
+  endOfWeek,
+  addMonths,
+  isSameMonth,
+  isSameDay,
+} from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -23,7 +35,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
-type ViewMode = 'item' | 'category' | 'reservation';
+type ViewMode = 'month' | 'item' | 'category' | 'reservation';
 
 function formatPercent(rate: number) {
   return `${Math.round((rate ?? 0) * 100)}%`;
@@ -36,7 +48,7 @@ export function InventoryOccupancyCalendarPage() {
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [familyId, setFamilyId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
-  const [view, setView] = useState<ViewMode>('item');
+  const [view, setView] = useState<ViewMode>('month');
 
   const { data: categories = [] } = useInventoryCategories();
   const { data: families = [] } = useInventoryFamilies(categoryId ?? undefined);
@@ -47,7 +59,7 @@ export function InventoryOccupancyCalendarPage() {
     category_id: categoryId,
     family_id: familyId,
     status: statusFilter,
-    view_mode: view,
+    view_mode: (view === 'month' ? 'item' : view) as 'item' | 'category' | 'reservation',
   };
 
   const occupancy = useInventoryOccupancyCalendar(filters);
@@ -212,10 +224,22 @@ export function InventoryOccupancyCalendarPage() {
 
       <Tabs value={view} onValueChange={(v) => setView(v as ViewMode)}>
         <TabsList>
+          <TabsTrigger value="month">Calendário mensal</TabsTrigger>
           <TabsTrigger value="item">Por item</TabsTrigger>
           <TabsTrigger value="category">Por categoria</TabsTrigger>
           <TabsTrigger value="reservation">Por reserva</TabsTrigger>
         </TabsList>
+        <TabsContent value="month">
+          <MonthlyOccupancyCalendar
+            data={occupancy.data ?? []}
+            isLoading={occupancy.isLoading}
+            initialMonth={start}
+            onChangeMonth={(s, e) => {
+              setStart(s);
+              setEnd(e);
+            }}
+          />
+        </TabsContent>
         <TabsContent value="item">
           <OccupancyByItemTable
             data={occupancy.data ?? []}
@@ -506,4 +530,286 @@ function OccupancyByReservationTable({
       </CardContent>
     </Card>
   );
+}
+
+// =====================================================================
+// Calendário mensal — visão estilo agenda, com barras por dia agregando
+// pré-reservas, reservas e operação. Detecta sobreposições/conflitos.
+// =====================================================================
+type DayBucket = {
+  pre_reservation: number;
+  reservation: number;
+  in_operation: number;
+  maintenance: number;
+  conflict: boolean;
+  events: OccupancyRow[];
+};
+
+function MonthlyOccupancyCalendar({
+  data,
+  isLoading,
+  initialMonth,
+  onChangeMonth,
+}: {
+  data: OccupancyRow[];
+  isLoading: boolean;
+  initialMonth: string;
+  onChangeMonth: (start: string, end: string) => void;
+}) {
+  const [cursor, setCursor] = useState<Date>(() => startOfMonth(new Date(initialMonth)));
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+
+  const monthStart = startOfMonth(cursor);
+  const monthEnd = endOfMonth(cursor);
+  const gridStart = startOfWeek(monthStart, { locale: ptBR, weekStartsOn: 0 });
+  const gridEnd = endOfWeek(monthEnd, { locale: ptBR, weekStartsOn: 0 });
+
+  const days = useMemo(() => {
+    const out: Date[] = [];
+    let cur = gridStart;
+    while (cur <= gridEnd) {
+      out.push(cur);
+      cur = addDays(cur, 1);
+    }
+    return out;
+  }, [gridStart, gridEnd]);
+
+  const buckets = useMemo(() => {
+    const map = new Map<string, DayBucket>();
+    days.forEach((d) => {
+      map.set(format(d, 'yyyy-MM-dd'), {
+        pre_reservation: 0,
+        reservation: 0,
+        in_operation: 0,
+        maintenance: 0,
+        conflict: false,
+        events: [],
+      });
+    });
+    data.forEach((r) => {
+      if (!r.start_date || !r.end_date) return;
+      const s = new Date(r.start_date);
+      const e = new Date(r.end_date);
+      let cur = s;
+      while (cur <= e) {
+        const key = format(cur, 'yyyy-MM-dd');
+        const b = map.get(key);
+        if (b) {
+          b.events.push(r);
+          const t = r.occupancy_type;
+          if (t === 'pre_reservation') b.pre_reservation += 1;
+          else if (
+            t === 'reservation' ||
+            t === 'in_preparation' ||
+            t === 'dispatched' ||
+            t === 'returned'
+          )
+            b.reservation += 1;
+          else if (t === 'in_operation') b.in_operation += 1;
+          else if (t === 'maintenance') b.maintenance += 1;
+          if (r.risk_level === 'critico') b.conflict = true;
+        }
+        cur = addDays(cur, 1);
+      }
+    });
+    return map;
+  }, [data, days]);
+
+  const goPrev = () => {
+    const next = addMonths(cursor, -1);
+    setCursor(next);
+    onChangeMonth(format(startOfMonth(next), 'yyyy-MM-dd'), format(endOfMonth(next), 'yyyy-MM-dd'));
+  };
+  const goNext = () => {
+    const next = addMonths(cursor, 1);
+    setCursor(next);
+    onChangeMonth(format(startOfMonth(next), 'yyyy-MM-dd'), format(endOfMonth(next), 'yyyy-MM-dd'));
+  };
+  const goToday = () => {
+    const next = startOfMonth(new Date());
+    setCursor(next);
+    onChangeMonth(format(startOfMonth(next), 'yyyy-MM-dd'), format(endOfMonth(next), 'yyyy-MM-dd'));
+  };
+
+  const weekHeaders = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+
+  if (isLoading) return <Skeleton className="h-[520px] w-full" />;
+
+  const selectedBucket = selectedDay ? buckets.get(selectedDay) : null;
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <CardTitle className="capitalize text-base">
+            {format(cursor, "MMMM 'de' yyyy", { locale: ptBR })}
+          </CardTitle>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={goPrev}
+              className="rounded border px-2 py-1 text-xs hover:bg-muted"
+              aria-label="Mês anterior"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={goToday}
+              className="rounded border px-3 py-1 text-xs hover:bg-muted"
+            >
+              Hoje
+            </button>
+            <button
+              type="button"
+              onClick={goNext}
+              className="rounded border px-2 py-1 text-xs hover:bg-muted"
+              aria-label="Próximo mês"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-3 pt-2 text-xs text-muted-foreground">
+          <LegendDot className="bg-amber-400" label="Pré reserva" />
+          <LegendDot className="bg-blue-500" label="Reservada" />
+          <LegendDot className="bg-emerald-500" label="Em operação" />
+          <LegendDot className="bg-slate-400" label="Manutenção" />
+          <LegendDot className="bg-destructive" label="Conflito" />
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-7 gap-px overflow-hidden rounded-md border bg-border text-xs">
+          {weekHeaders.map((w) => (
+            <div
+              key={w}
+              className="bg-muted/50 px-2 py-1 text-center font-medium uppercase tracking-wide text-muted-foreground"
+            >
+              {w}
+            </div>
+          ))}
+          {days.map((d) => {
+            const key = format(d, 'yyyy-MM-dd');
+            const b = buckets.get(key)!;
+            const inMonth = isSameMonth(d, cursor);
+            const isToday = isSameDay(d, new Date());
+            const isSelected = selectedDay === key;
+            const hasAny =
+              b.pre_reservation + b.reservation + b.in_operation + b.maintenance > 0;
+            return (
+              <button
+                type="button"
+                key={key}
+                onClick={() => setSelectedDay(isSelected ? null : key)}
+                className={cnLocal(
+                  'relative flex min-h-[88px] flex-col items-stretch gap-1 bg-background p-1.5 text-left transition-colors hover:bg-muted/40',
+                  !inMonth && 'opacity-40',
+                  isSelected && 'ring-2 ring-primary ring-inset',
+                )}
+              >
+                <div className="flex items-center justify-between">
+                  <span
+                    className={cnLocal(
+                      'text-[11px] font-medium',
+                      isToday &&
+                        'flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground',
+                    )}
+                  >
+                    {format(d, 'd')}
+                  </span>
+                  {b.conflict && (
+                    <span className="h-1.5 w-1.5 rounded-full bg-destructive" title="Conflito" />
+                  )}
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  {b.pre_reservation > 0 && (
+                    <DayBar color="bg-amber-400/80 text-amber-950" count={b.pre_reservation} label="pré" />
+                  )}
+                  {b.reservation > 0 && (
+                    <DayBar color="bg-blue-500/80 text-white" count={b.reservation} label="res" />
+                  )}
+                  {b.in_operation > 0 && (
+                    <DayBar color="bg-emerald-500/80 text-white" count={b.in_operation} label="op" />
+                  )}
+                  {b.maintenance > 0 && (
+                    <DayBar color="bg-slate-400/80 text-white" count={b.maintenance} label="man" />
+                  )}
+                  {!hasAny && inMonth && (
+                    <span className="text-[10px] text-muted-foreground/60">livre</span>
+                  )}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        {selectedBucket && selectedDay && (
+          <div className="mt-4 rounded-md border p-3">
+            <div className="mb-2 text-sm font-medium">
+              Detalhes — {format(new Date(selectedDay), "EEEE, dd 'de' MMMM", { locale: ptBR })}
+            </div>
+            {selectedBucket.events.length === 0 ? (
+              <div className="text-xs text-muted-foreground">Sem ocupação neste dia.</div>
+            ) : (
+              <div className="space-y-1 text-xs">
+                {selectedBucket.events.slice(0, 30).map((ev, i) => (
+                  <div key={i} className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 truncate">
+                      <Badge
+                        variant={OCCUPANCY_BADGE_VARIANT[ev.occupancy_type] ?? 'outline'}
+                        className="text-[10px]"
+                      >
+                        {OCCUPANCY_TYPE_LABELS[ev.occupancy_type] ?? ev.occupancy_type}
+                      </Badge>
+                      <span className="truncate font-medium">{ev.item_name ?? '—'}</span>
+                      <span className="truncate text-muted-foreground">
+                        {ev.client_name ?? ''}
+                      </span>
+                    </div>
+                    <span className="whitespace-nowrap text-muted-foreground">
+                      {format(new Date(ev.start_date), 'dd/MM')} →{' '}
+                      {format(new Date(ev.end_date), 'dd/MM')}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function DayBar({
+  color,
+  count,
+  label,
+}: {
+  color: string;
+  count: number;
+  label: string;
+}) {
+  return (
+    <div
+      className={`flex items-center justify-between rounded px-1.5 py-0.5 text-[10px] font-medium leading-tight ${color}`}
+    >
+      <span className="uppercase">{label}</span>
+      <span>{count}</span>
+    </div>
+  );
+}
+
+function LegendDot({ className, label }: { className: string; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className={`h-2 w-2 rounded-full ${className}`} />
+      {label}
+    </span>
+  );
+}
+
+// pequeno cn local para evitar import; usa join simples
+function cnLocal(...cls: Array<string | false | null | undefined>) {
+  return cls.filter(Boolean).join(' ');
 }
