@@ -91,6 +91,11 @@ export function useApplyProposalDynamicPrice(proposalId: string) {
     mutationFn: () => applyDynamicPrice(proposalId),
     onSuccess: () => {
       invalidateProposalCaches(qc, proposalId);
+      qc.invalidateQueries({ queryKey: KEY(proposalId) });
+      qc.invalidateQueries({ queryKey: SNAPSHOT_KEY(proposalId) });
+      qc.invalidateQueries({ queryKey: EVENTS_KEY(proposalId) });
+      qc.invalidateQueries({ queryKey: ['proposal-mismatch-row', proposalId] });
+      qc.invalidateQueries({ queryKey: ['proposal', proposalId] });
       toast({ title: 'Valor vigente aplicado à proposta' });
     },
     onError: (e: any) =>
