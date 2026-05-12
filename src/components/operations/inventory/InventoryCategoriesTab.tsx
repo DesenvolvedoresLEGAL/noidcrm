@@ -33,7 +33,10 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ITEM_KIND_LABEL } from '@/lib/operations/inventoryLabels';
+import {
+  CATEGORY_CONTROL_MODE_LABEL,
+  getCategoryControlMode,
+} from '@/lib/operations/inventoryLabels';
 import {
   useInventoryCategories,
   useInventoryCategoryMutations,
@@ -143,7 +146,7 @@ export function InventoryCategoriesTab() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Nome</TableHead>
-                    <TableHead>Tipo padrão</TableHead>
+                    <TableHead>Modo de controle</TableHead>
                     <TableHead>Descrição</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Ordem</TableHead>
@@ -170,7 +173,7 @@ export function InventoryCategoriesTab() {
                     filtered.map((c) => (
                       <TableRow key={c.id}>
                         <TableCell className="font-medium">{c.name}</TableCell>
-                        <TableCell>{ITEM_KIND_LABEL[c.item_kind] ?? c.item_kind}</TableCell>
+                        <TableCell>{CATEGORY_CONTROL_MODE_LABEL[getCategoryControlMode(c)]}</TableCell>
                         <TableCell className="max-w-xs truncate text-muted-foreground">
                           {c.description || '—'}
                         </TableCell>

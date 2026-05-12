@@ -32,6 +32,7 @@ import {
   ITEM_STATUS_LABEL,
   ITEM_STATUS_OPTIONS,
   getStatusBadgeVariant,
+  categoryAcceptsKind,
   type InventoryItemStatus,
 } from '@/lib/operations/inventoryLabels';
 import {
@@ -75,7 +76,7 @@ export function InventorySerializedItemsTab() {
   const [statusItem, setStatusItem] = useState<InventoryItemWithRefs | null>(null);
 
   const serializedCategories = useMemo(
-    () => (categories ?? []).filter((c) => c.is_active && c.item_kind === 'serialized'),
+    () => (categories ?? []).filter((c) => c.is_active && categoryAcceptsKind(c, 'serialized')),
     [categories],
   );
   const activeLocations = useMemo(
@@ -83,7 +84,7 @@ export function InventorySerializedItemsTab() {
     [locations],
   );
   const activeFamilies = useMemo(
-    () => (families ?? []).filter((f) => f.is_active),
+    () => (families ?? []).filter((f) => f.is_active && (f.item_kind ?? 'serialized') === 'serialized'),
     [families],
   );
 

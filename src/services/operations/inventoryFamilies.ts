@@ -1,6 +1,8 @@
 import { supabase } from '@/integrations/supabase/client';
 import { normalizeSlug } from '@/lib/operations/inventoryClassification';
 
+export type InventoryFamilyItemKind = 'serialized' | 'quantity';
+
 export interface InventoryFamily {
   id: string;
   organization_id: string;
@@ -10,6 +12,7 @@ export interface InventoryFamily {
   description: string | null;
   sort_order: number;
   is_active: boolean;
+  item_kind: InventoryFamilyItemKind;
   created_at: string;
   updated_at: string;
 }
@@ -21,6 +24,7 @@ export interface InventoryFamilyInput {
   description?: string | null;
   sort_order?: number;
   is_active?: boolean;
+  item_kind?: InventoryFamilyItemKind;
 }
 
 export async function listInventoryFamilies(
@@ -58,6 +62,7 @@ export async function createInventoryFamily(
       description: input.description ?? null,
       sort_order: input.sort_order ?? 0,
       is_active: input.is_active ?? true,
+      item_kind: input.item_kind ?? 'serialized',
       created_by: userId ?? null,
       updated_by: userId ?? null,
     })

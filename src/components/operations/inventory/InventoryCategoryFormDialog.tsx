@@ -22,7 +22,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ITEM_KIND_OPTIONS } from '@/lib/operations/inventoryLabels';
+import {
+  CATEGORY_CONTROL_MODE_OPTIONS,
+  getCategoryControlMode,
+  type CategoryControlMode,
+} from '@/lib/operations/inventoryLabels';
 import { useInventoryCategoryMutations } from '@/hooks/operations/useInventoryCategories';
 import type { InventoryCategory } from '@/services/operations/inventoryCategories';
 import {
@@ -38,8 +42,8 @@ const schema = z.object({
     .min(2, 'Mínimo 2 caracteres')
     .max(80, 'Máximo 80 caracteres'),
   description: z.string().trim().max(300, 'Máximo 300 caracteres').optional().or(z.literal('')),
-  item_kind: z.enum(['serialized', 'quantity'], {
-    required_error: 'Selecione o tipo padrão',
+  control_mode: z.enum(['serialized', 'quantity', 'mixed'], {
+    required_error: 'Selecione o modo de controle permitido',
   }),
   equipment_profile: z.enum(['generic', 'router', 'sim_card']).default('generic'),
   sort_order: z
@@ -66,7 +70,7 @@ export function InventoryCategoryFormDialog({ open, onOpenChange, category }: Pr
     defaultValues: {
       name: '',
       description: '',
-      item_kind: 'serialized',
+      control_mode: 'serialized',
       equipment_profile: 'generic',
       sort_order: 0,
     },
@@ -77,7 +81,7 @@ export function InventoryCategoryFormDialog({ open, onOpenChange, category }: Pr
       form.reset({
         name: category?.name ?? '',
         description: category?.description ?? '',
-        item_kind: (category?.item_kind as 'serialized' | 'quantity') ?? 'serialized',
+        control_mode: getCategoryControlMode(category),
         equipment_profile: getEquipmentProfile((category as any)?.equipment_profile),
         sort_order: category?.sort_order ?? 0,
       });
@@ -85,10 +89,15 @@ export function InventoryCategoryFormDialog({ open, onOpenChange, category }: Pr
   }, [open, category, form]);
 
   const onSubmit = async (data: FormData) => {
+    // Mantemos o campo legado `item_kind` espelhado (mixed -> serialized) para
+    // compatibilidade com telas antigas. A regra real passa a ser `control_mode`.
+    const legacyItemKind: 'serialized' | 'quantity' =
+      data.control_mode === 'quantity' ? 'quantity' : 'serialized';
     const payload = {
       name: data.name,
       description: data.description || null,
-      item_kind: data.item_kind,
+      item_kind: legacyItemKind,
+      control_mode: data.control_mode as CategoryControlMode,
       equipment_profile: data.equipment_profile,
       sort_order: data.sort_order,
     };
@@ -147,16 +156,18 @@ export function InventoryCategoryFormDialog({ open, onOpenChange, category }: Pr
           </div>
 
           <div className="space-y-2">
-            <Label>Tipo padrão do item</Label>
+            <Label>Modo de controle permitido</Label>
             <Select
-              value={form.watch('item_kind')}
-              onValueChange={(v) => form.setValue('item_kind', v as 'serialized' | 'quantity')}
+              value={form.watch('control_mode')}
+              onValueChange={(v) =>
+                form.setValue('control_mode', v as CategoryControlMode, { shouldValidate: true })
+              }
             >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {ITEM_KIND_OPTIONS.map((o) => (
+                {CATEGORY_CONTROL_MODE_OPTIONS.map((o) => (
                   <SelectItem key={o.value} value={o.value}>
                     {o.label}
                   </SelectItem>
@@ -164,7 +175,8 @@ export function InventoryCategoryFormDialog({ open, onOpenChange, category }: Pr
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              Itens serializados possuem identidade única. Itens por quantidade controlam saldo.
+              Defina se esta categoria aceita itens serializados, itens por quantidade ou ambos.
+              O tipo final de cada item é decidido pela família.
             </p>
           </div>
 

@@ -1,58 +1,113 @@
-## Objetivo
-Reformular a experiência de edição de produto/serviço: sair do modal estreito, padronizar campos de Custo e Imposto (renomear IPI), corrigir cálculo de margem para ponto-dia e recorrente, e garantir persistência de todas as configurações ao salvar.
+# Sprint INV 0.7.1 — Categorias Mistas e Controle por Família/Item
 
-## Mudanças propostas
+Objetivo: permitir que uma categoria (ex.: Conectividade) aceite famílias e itens **serializados e por quantidade ao mesmo tempo**, sem afetar dados existentes nem reservas. Categoria define o que é **permitido**, família define o **tipo padrão**, item salva o **tipo final**.
 
-### 1. Edição em página dedicada (substitui modal)
-- Criar rotas:
-  - `/produtos/novo` → `ProductEditorPage` (modo create)
-  - `/produtos/:id/editar` → `ProductEditorPage` (modo edit)
-- A página usa o `Layout` padrão (sidebar + breadcrumb), com largura confortável (`max-w-5xl` central) e seções em cards ao invés de tudo espremido num diálogo.
-- Em `Products.tsx`, os botões "Novo produto" e o ícone de editar passam a navegar para essas rotas (em vez de abrir `ProductModal`).
-- `ProductModal.tsx` fica deprecated (mantido apenas se algum outro fluxo usar; remover imports órfãos).
-- Layout da página em colunas:
-  - **Coluna esquerda (principal):** Identidade (nome, código, categoria, tipo, descrição rica), Imagem, Configuração de Preço (com sub-modos), BOM.
-  - **Coluna direita (sticky):** Resumo (preço efetivo, custo, imposto, margem), Status, Contabiliza na Meta, botões Salvar/Cancelar.
+## 1. Banco de dados (migration)
 
-### 2. Padronização Custo + Imposto em TODOS os modos
-- Renomear rótulo "IPI (%)" → **"Imposto (%)"** na UI (manter coluna `ipi_percent` no banco — só muda label e helper text). Adicionar tooltip: "Imposto incidente (IPI/ISS/etc) usado no cálculo de margem".
-- Adicionar campos **Custo (R$)** e **Imposto (%)** ao bloco de **Ponto-dia** (hoje só existem em Avulso/Recorrente).
-- Garantir que esses campos estão no `defaultValues`, no `reset()` ao abrir produto existente, e no `onSubmit` para todos os 3 modos.
+Criar enum dedicado para categoria (item nunca pode ser `mixed`):
 
-### 3. Cálculo de margem unificado
-- Criar helper `computeMargin({ billing_type, price, monthly_price, point_day_price, points, days, cost, tax_percent })` em `src/lib/products/margin.ts`.
-- Regra:
-  - `revenue` = preço efetivo do modo (avulso: `price`; recorrente: `monthly_price`; ponto-dia: `unit_price_point_day × points × days`).
-  - `tax_amount = revenue × (tax_percent/100)`
-  - `net_revenue = revenue − tax_amount`
-  - `margin% = (net_revenue − cost) / net_revenue × 100` (quando `net_revenue > 0`).
-- O componente de Resumo mostra: Preço, Imposto, Custo, Margem (R$ e %).
-- Hoje em Recorrente o card só mostra margem se `monthlyPrice > 0` mas o cálculo ignora imposto e em Ponto-dia não existe — corrigir ambos.
+```sql
+create type public.inventory_category_control_mode as enum ('serialized','quantity','mixed');
 
-### 4. Persistência completa ao salvar
-- Auditar `onSubmit` em `ProductEditorPage`:
-  - Garantir que campos específicos do modo selecionado são enviados (`monthly_price`, `billing_cycle`, `minimum_contract_months` para recorrente; `default_unit_price_point_day`, `default_billing_days`, `default_quantity_points` para ponto-dia).
-  - Garantir que `cost` e `ipi_percent` (Imposto) sempre sejam enviados, independente do modo.
-  - BOM (`product_bom_items`) é salvo via `replaceProductBomItems` após `createProduct`/`updateProduct` — confirmar ordem e tratamento de erro (toast separado se BOM falhar mas produto salvar).
-- Confirmar Zod schema em `src/services/supabase/products.ts` aceita todos os campos (já aceita).
-- Após salvar em modo create, navegar para `/produtos/:id/editar` (mantém usuário no produto recém-criado).
+alter table public.inventory_categories
+  add column control_mode public.inventory_category_control_mode
+  not null default 'serialized';
 
-### 5. Limpezas e detalhes UX
-- Hint visual mostrando o "modo de cobrança ativo" no topo (badge).
-- Manter `ProductBOMEditor` exatamente como hoje, só dentro da nova página.
-- Mobile: colunas viram stack vertical; resumo desce para o final (sem `sticky`).
+update public.inventory_categories
+set control_mode = item_kind::text::public.inventory_category_control_mode;
+
+alter table public.inventory_families
+  add column item_kind public.inventory_item_kind not null default 'serialized';
+
+-- Backfill família a partir do item_kind atual da categoria,
+-- defaultando para serialized quando a categoria for mista.
+update public.inventory_families f
+set item_kind = case
+  when c.item_kind = 'quantity' then 'quantity'::public.inventory_item_kind
+  else 'serialized'::public.inventory_item_kind
+end
+from public.inventory_categories c
+where f.category_id = c.id;
+```
+
+Validação de coerência (trigger `BEFORE INSERT/UPDATE` em `inventory_families`):
+- Se `category.control_mode = 'serialized'` → `family.item_kind` deve ser `serialized`.
+- Se `category.control_mode = 'quantity'` → `family.item_kind` deve ser `quantity`.
+- Se `mixed` → ambos permitidos.
+
+`inventory_categories.item_kind` **permanece** (legado/backward compat). Não tocar em `inventory_items.item_kind` nem em RLS.
+
+## 2. Frontend — Categoria
+
+`InventoryCategoryFormDialog.tsx` + `InventoryCategoriesTab.tsx` + `services/operations/inventoryCategories.ts`:
+
+- Substituir “Tipo padrão do item” por **“Modo de controle permitido”** com opções: Serializado, Por quantidade, Mista.
+- Persistir em `control_mode`. Continuar enviando `item_kind` espelhado (serialized/quantity; quando “Mista”, gravar `serialized` como fallback no campo legado).
+- Listagem: coluna **“Modo de controle”** lendo `control_mode` (com fallback `?? item_kind ?? 'serialized'`).
+- Adicionar `control_mode` aos tipos em `InventoryCategoryInput` e ao retorno de `listInventoryCategories`.
+
+## 3. Frontend — Família
+
+`InventoryFamilyFormDialog.tsx` + `services/operations/inventoryFamilies.ts` + `useInventoryFamilies`:
+
+- Adicionar campo **“Tipo padrão do item”** (Serializado / Por quantidade) no form.
+- Bloquear opções incompatíveis com o `control_mode` da categoria selecionada; mensagem: *“O tipo padrão desta família precisa respeitar o modo de controle permitido da categoria.”*
+- Para categoria `serialized`/`quantity`, fixar e desabilitar o select com o valor único.
+- Adicionar `item_kind` em `InventoryFamily`, `InventoryFamilyInput`, `create` e `update`.
+- Mostrar coluna “Tipo” na listagem de famílias.
+
+## 4. Frontend — Itens Serializados
+
+`InventorySerializedItemsTab.tsx` (linha 78) e form de item:
+- Filtro de categorias: `control_mode IN ('serialized','mixed')` (com fallback para `item_kind === 'serialized'`).
+- Após escolher categoria, o select de família deve filtrar `family.item_kind === 'serialized'`.
+
+## 5. Frontend — Itens por Quantidade
+
+`InventoryQuantityItemsTab.tsx` (linha 88) e `InventoryQuantityItemFormDialog.tsx`:
+- Filtro de categorias: `control_mode IN ('quantity','mixed')`.
+- Select de família filtrando `family.item_kind === 'quantity'`.
+
+## 6. Produto — Composição de Inventário
+
+`ProductBOMEditor.tsx` e referências em `ProductEditorPage.tsx` / `ProductModal.tsx`:
+- Renomear rótulo “Composição técnica (BOM)” → **“Composição de Inventário”**.
+- Subtexto novo: *“Defina quais tipos de itens físicos este produto exige para ser entregue. O sistema usará essa composição para calcular disponibilidade, reserva e ocupação do estoque. A quantidade deve representar o consumo por ponto vendido.”*
+- Mensagem vazia: *“Nenhum componente. Sem composição definida, a reserva usa o próprio produto.”*
+- Toasts/labels internos com “BOM” → “Composição de Inventário” (manter “composição técnica” quando precisar reforço técnico).
+- Selects de categoria/família passam a aceitar categorias `mixed`; família continua determinando o tipo do componente. Sem mudança na estrutura de dados do BOM.
+
+## 7. Fora de escopo
+
+Reservas, pré-reserva automática, disponibilidade por período, ocupação, kits, QR Code, upload de imagem, edge functions, cron, novas RPCs, remoção de `inventory_categories.item_kind`, mudanças no schema de produto além do label.
 
 ## Arquivos impactados
-- **Novo:** `src/pages/ProductEditorPage.tsx`
-- **Novo:** `src/lib/products/margin.ts`
-- **Edit:** `src/App.tsx` (rotas)
-- **Edit:** `src/pages/Products.tsx` (navegação ao invés de modal)
-- **Edit:** `src/components/products/ProductModal.tsx` (manter como wrapper opcional ou remover usos)
-- (Sem migração de banco — `ipi_percent` permanece, só muda label.)
+
+- Migration nova em `supabase/migrations/`
+- `src/services/operations/inventoryCategories.ts`
+- `src/services/operations/inventoryFamilies.ts`
+- `src/components/operations/inventory/InventoryCategoryFormDialog.tsx`
+- `src/components/operations/inventory/InventoryCategoriesTab.tsx`
+- `src/components/operations/inventory/InventoryFamilyFormDialog.tsx`
+- `src/components/operations/inventory/InventoryFamiliesTab.tsx`
+- `src/components/operations/inventory/InventorySerializedItemsTab.tsx` + form de item serializado
+- `src/components/operations/inventory/InventoryQuantityItemsTab.tsx` + `InventoryQuantityItemFormDialog.tsx`
+- `src/components/products/ProductBOMEditor.tsx`
+- `src/pages/ProductEditorPage.tsx` e `src/components/products/ProductModal.tsx` (textos)
+- `src/lib/operations/inventoryLabels.ts` (novo `CATEGORY_CONTROL_MODE_LABEL` e options)
 
 ## Riscos
-- Outros pontos do app que abrem `ProductModal` diretamente (busca rápida de produto?) — verificar com `rg "ProductModal"` antes de remover.
-- Recalcular margem com imposto pode mudar números exibidos historicamente; deixar claro no tooltip do card.
 
-## Próximos passos
-Após aprovação: implemento a página, rotas, helper de margem, atualizo `Products.tsx` e adiciono Custo/Imposto ao bloco Ponto-dia.
+- Tipos do Supabase (`types.ts`) regeneram após migration; código TS deve usar fallback `control_mode ?? item_kind` durante a transição.
+- Trigger de validação em famílias pode rejeitar dados legados inconsistentes — o backfill já alinha; verificar no smoke test.
+- Filtros novos podem esconder categorias antigas se `control_mode` não for preenchido — fallback no frontend cobre.
+
+## Critérios de aceite (resumo)
+
+- Categoria “Conectividade” pode ser salva como **Mista**.
+- Família serializada e por quantidade convivem na mesma categoria mista.
+- Item serializado só vê categorias `serialized`/`mixed` e famílias serializadas.
+- Item por quantidade só vê categorias `quantity`/`mixed` e famílias por quantidade.
+- Produto exibe “Composição de Inventário” com novo subtexto.
+- Nenhum item gravado com `item_kind = mixed`.
+- Visão Geral, Reservas, Locais, RLS e permissões intactos.

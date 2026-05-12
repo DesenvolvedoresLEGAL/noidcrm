@@ -25,11 +25,19 @@ import {
 import { useInventoryCategories } from '@/hooks/operations/useInventoryCategories';
 import { useInventoryFamilyMutations } from '@/hooks/operations/useInventoryFamilies';
 import type { InventoryFamily } from '@/services/operations/inventoryFamilies';
+import {
+  ITEM_KIND_OPTIONS,
+  getCategoryControlMode,
+  type CategoryControlMode,
+} from '@/lib/operations/inventoryLabels';
 
 const schema = z.object({
   category_id: z.string().uuid('Selecione uma categoria.'),
   name: z.string().trim().min(2, 'Mínimo 2 caracteres').max(80, 'Máximo 80 caracteres'),
   description: z.string().trim().max(300, 'Máximo 300 caracteres').optional().or(z.literal('')),
+  item_kind: z.enum(['serialized', 'quantity'], {
+    required_error: 'Selecione o tipo padrão do item.',
+  }),
   sort_order: z.coerce.number().int('Apenas inteiros').min(0, 'Mínimo 0').default(0),
 });
 
@@ -49,7 +57,7 @@ export function InventoryFamilyFormDialog({ open, onOpenChange, family, defaultC
 
   const form = useForm<FormData>({
     resolver: zodResolver(schema) as any,
-    defaultValues: { category_id: '', name: '', description: '', sort_order: 0 },
+    defaultValues: { category_id: '', name: '', description: '', item_kind: 'serialized', sort_order: 0 },
   });
 
   useEffect(() => {
@@ -58,10 +66,29 @@ export function InventoryFamilyFormDialog({ open, onOpenChange, family, defaultC
         category_id: family?.category_id ?? defaultCategoryId ?? '',
         name: family?.name ?? '',
         description: family?.description ?? '',
+        item_kind: ((family as any)?.item_kind as 'serialized' | 'quantity') ?? 'serialized',
         sort_order: family?.sort_order ?? 0,
       });
     }
   }, [open, family, defaultCategoryId, form]);
+
+  const selectedCategoryId = form.watch('category_id');
+  const selectedCategory = (categories ?? []).find((c) => c.id === selectedCategoryId);
+  const controlMode: CategoryControlMode = selectedCategory
+    ? getCategoryControlMode(selectedCategory)
+    : 'mixed';
+
+  // Quando a categoria não for "mixed", o tipo da família é fixo. Forçamos
+  // o valor para evitar incoerências antes do submit.
+  useEffect(() => {
+    if (!selectedCategory) return;
+    if (controlMode === 'serialized' && form.getValues('item_kind') !== 'serialized') {
+      form.setValue('item_kind', 'serialized', { shouldValidate: true });
+    } else if (controlMode === 'quantity' && form.getValues('item_kind') !== 'quantity') {
+      form.setValue('item_kind', 'quantity', { shouldValidate: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [controlMode, selectedCategoryId]);
 
   const onSubmit = async (data: FormData) => {
     try {
@@ -72,6 +99,7 @@ export function InventoryFamilyFormDialog({ open, onOpenChange, family, defaultC
             category_id: data.category_id,
             name: data.name,
             description: data.description || null,
+            item_kind: data.item_kind,
             sort_order: data.sort_order,
           },
         });
@@ -81,6 +109,7 @@ export function InventoryFamilyFormDialog({ open, onOpenChange, family, defaultC
           category_id: data.category_id,
           name: data.name,
           description: data.description || null,
+          item_kind: data.item_kind,
           sort_order: data.sort_order,
         });
         toast.success('Família criada com sucesso.');
@@ -142,6 +171,44 @@ export function InventoryFamilyFormDialog({ open, onOpenChange, family, defaultC
           <div className="space-y-2">
             <Label htmlFor="description">Descrição</Label>
             <Textarea id="description" rows={2} {...form.register('description')} />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Tipo padrão do item</Label>
+            <Select
+              value={form.watch('item_kind')}
+              onValueChange={(v) =>
+                form.setValue('item_kind', v as 'serialized' | 'quantity', { shouldValidate: true })
+              }
+              disabled={!selectedCategory || controlMode !== 'mixed'}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {ITEM_KIND_OPTIONS.filter((o) => {
+                  if (controlMode === 'mixed') return true;
+                  return o.value === controlMode;
+                }).map((o) => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {selectedCategory && controlMode !== 'mixed' ? (
+              <p className="text-xs text-muted-foreground">
+                O modo de controle desta categoria é fixo. Para permitir os dois tipos, edite a
+                categoria e mude para "Mista".
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Categorias mistas aceitam famílias serializadas e por quantidade.
+              </p>
+            )}
+            {form.formState.errors.item_kind && (
+              <p className="text-sm text-destructive">{form.formState.errors.item_kind.message}</p>
+            )}
           </div>
 
           <div className="space-y-2">
