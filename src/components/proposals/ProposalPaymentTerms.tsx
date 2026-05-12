@@ -60,27 +60,63 @@ const CONTRACT_MONTHS_OPTIONS = [
 
 // Quick presets for one-time payments
 const PAYMENT_PRESETS = [
-  { 
-    id: 'a_vista', 
-    label: 'À Vista', 
-    config: { entry_percent: 0, installments: 1, installment_interval_days: 30 } 
+  {
+    id: 'a_vista',
+    label: 'À Vista',
+    config: { entry_percent: 0, installments: 1, installment_interval_days: 30 }
   },
-  { 
-    id: '50_50', 
-    label: '50% + 50%', 
-    config: { entry_percent: 50, installments: 1, installment_interval_days: 30 } 
+  {
+    id: '50_50',
+    label: '50% + 50%',
+    config: { entry_percent: 50, installments: 1, installment_interval_days: 30 }
   },
-  { 
-    id: '30_60_90', 
-    label: '30/60/90', 
-    config: { entry_percent: 0, installments: 3, installment_interval_days: 30 } 
+  {
+    id: '30_60_90',
+    label: '30/60/90',
+    config: { entry_percent: 0, installments: 3, installment_interval_days: 30 }
   },
-  { 
-    id: 'parcelado', 
-    label: 'Parcelado', 
+  {
+    id: 'net_35',
+    label: 'Faturado 35d',
+    config: { entry_percent: 0, installments: 1, installment_interval_days: 35, payment_due_days: 35 }
+  },
+  {
+    id: 'parcelado',
+    label: 'Parcelado',
     config: null // Opens custom config
   },
 ];
+
+// PRICE UX 1.0.4 — opções de data de referência da tabela dinâmica
+const REFERENCE_TYPE_OPTIONS = [
+  { value: 'current_date', label: 'Pagamento imediato (data atual)' },
+  { value: 'payment_due_date', label: 'Vencimento da cobrança' },
+  { value: 'custom_date', label: 'Data personalizada' },
+  { value: 'approval_date', label: 'Condição especial aprovada' },
+] as const;
+
+// Default por condição quando o usuário ainda não escolheu explicitamente
+function defaultReferenceTypeForCondition(
+  condition: PaymentTerm['payment_condition'] | undefined,
+  freeze: boolean,
+): NonNullable<PaymentTerm['dynamic_pricing_reference_type']> {
+  if (!condition || condition === 'upfront') return 'current_date';
+  if (condition === 'split_50_50' || condition === 'split_30_70') {
+    return freeze ? 'approval_date' : 'current_date';
+  }
+  if (
+    condition === 'net_7' ||
+    condition === 'net_15' ||
+    condition === 'net_30' ||
+    condition === 'net_35' ||
+    condition === 'invoiced' ||
+    condition === 'installments' ||
+    condition === 'custom_schedule'
+  ) {
+    return 'payment_due_date';
+  }
+  return 'current_date';
+}
 
 interface ProposalPaymentTermsProps {
   proposalId: string;
