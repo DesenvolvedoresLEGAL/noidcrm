@@ -166,17 +166,28 @@ async function buildDeal(
     .eq("proposal_id", proposalId)
     .order("order_index");
 
-  // Proposal-level financials (single source of truth - net = total - discount)
+  // Proposal-level financials — SINGLE SOURCE OF TRUTH for ERP.
+  // Priority for the NET amount actually charged to the client:
+  //   1) payment_expected_amount  → NET after dynamic pricing AND manual discount (set by orchestrate_proposal_financials)
+  //   2) dynamic_pricing_current_amount → gross vigente (dynamic pricing only)
+  //   3) total_amount → sum of items (no dynamic pricing, no manual discount)
+  //   4) subtotal - discount_amount
   const proposalSubtotal = Number(proposal.subtotal) || 0;
   const proposalDiscountAmount = Number(proposal.discount_amount) || 0;
   const proposalTotalAmount = Number(proposal.total_amount) || 0;
-  // Derive net from total (already net) when present, fallback to subtotal - discount
-  const netTotal = proposalTotalAmount > 0
-    ? proposalTotalAmount
-    : Math.max(proposalSubtotal - proposalDiscountAmount, 0);
+  const proposalPaymentExpected = Number((proposal as any).payment_expected_amount) || 0;
+  const proposalDynamicCurrent = Number((proposal as any).dynamic_pricing_current_amount) || 0;
+
+  const netTotal = proposalPaymentExpected > 0
+    ? proposalPaymentExpected
+    : proposalDynamicCurrent > 0
+      ? proposalDynamicCurrent
+      : proposalTotalAmount > 0
+        ? proposalTotalAmount
+        : Math.max(proposalSubtotal - proposalDiscountAmount, 0);
   const discountTotal = proposalDiscountAmount > 0
     ? proposalDiscountAmount
-    : Math.max(proposalSubtotal - proposalTotalAmount, 0);
+    : Math.max(proposalSubtotal - netTotal, 0);
   const discountPercent = proposalSubtotal > 0
     ? Number(((discountTotal / proposalSubtotal) * 100).toFixed(2))
     : 0;
@@ -363,7 +374,7 @@ async function handleList(
 
   const { data: proposals, error, count } = await supabase
     .from("proposals")
-    .select("id, opportunity_id, organization_id, status, title, client_name, client_email, value, subtotal, discount_amount, total_amount, created_at, accepted_at, expires_at", { count: "exact" })
+    .select("id, opportunity_id, organization_id, status, title, client_name, client_email, value, subtotal, discount_amount, total_amount, payment_expected_amount, dynamic_pricing_current_amount, created_at, accepted_at, expires_at", { count: "exact" })
     .eq("organization_id", orgId)
     .in("status", proposalStatuses)
     .is("deleted_at", null)
@@ -399,7 +410,7 @@ async function handleGet(
 
   const { data: proposal, error } = await supabase
     .from("proposals")
-    .select("id, opportunity_id, organization_id, status, title, client_name, client_email, value, subtotal, discount_amount, total_amount, created_at, accepted_at, expires_at")
+    .select("id, opportunity_id, organization_id, status, title, client_name, client_email, value, subtotal, discount_amount, total_amount, payment_expected_amount, dynamic_pricing_current_amount, created_at, accepted_at, expires_at")
     .eq("id", id)
     .eq("organization_id", orgId)
     .is("deleted_at", null)
