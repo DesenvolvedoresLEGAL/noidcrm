@@ -1,9 +1,11 @@
-import { AlertTriangle, Clock, TrendingUp } from 'lucide-react';
+import { AlertTriangle, CalendarClock, Clock, TrendingUp } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   formatBRL,
   formatDateTime,
+  REFERENCE_TYPE_DESCRIPTION,
+  REFERENCE_TYPE_LABEL,
   type DynamicPricingSnapshot,
 } from '@/lib/proposals/dynamicPricing';
 
