@@ -249,6 +249,7 @@ serve(async (req: Request) => {
             acceptor_name: acceptorName,
             acceptor_document: acceptorDocument,
             acceptor_position: acceptorPosition,
+            final_value: approvedValue,
           };
           if (safeWinReasonId) updateData.win_reason_id = safeWinReasonId;
           if (keyDifferentiator) updateData.key_differentiator = keyDifferentiator;
@@ -411,6 +412,7 @@ serve(async (req: Request) => {
             .update({
               stage_id: wonStage.id,
               status: "won",
+              valor_previsto: approvedValue,
             })
             .eq("id", opportunity.id);
           
@@ -419,7 +421,7 @@ serve(async (req: Request) => {
           console.log("No 'Ganhamos' stage found, just updating status to won");
           await supabaseClient
             .from("opportunities")
-            .update({ status: "won" })
+            .update({ status: "won", valor_previsto: approvedValue })
             .eq("id", opportunity.id);
         }
 
@@ -514,7 +516,7 @@ serve(async (req: Request) => {
               owner_user_id: opportunity.owner_user_id,
               title: `Contrato - ${proposal.title || opportunity.title}`,
               status: "active",
-              contract_value: proposal.total_amount || proposal.value || opportunity.valor_previsto,
+              contract_value: approvedValue,
               monthly_value: monthlyValue,
               one_time_value: oneTimeValue,
               contract_type: contractType,
