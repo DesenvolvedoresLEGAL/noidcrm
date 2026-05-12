@@ -22,7 +22,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ITEM_KIND_OPTIONS } from '@/lib/operations/inventoryLabels';
+import {
+  CATEGORY_CONTROL_MODE_OPTIONS,
+  getCategoryControlMode,
+  type CategoryControlMode,
+} from '@/lib/operations/inventoryLabels';
 import { useInventoryCategoryMutations } from '@/hooks/operations/useInventoryCategories';
 import type { InventoryCategory } from '@/services/operations/inventoryCategories';
 import {
