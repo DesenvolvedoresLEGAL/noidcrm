@@ -14,7 +14,7 @@ import { ExportProductsModal } from '@/components/products/ExportProductsModal';
 import { ProductAnalytics } from '@/components/products/ProductAnalytics';
 import { useToast } from '@/hooks/use-toast';
 import { useProductCategories } from '@/hooks/useProductCategories';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
