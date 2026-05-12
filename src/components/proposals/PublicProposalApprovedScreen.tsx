@@ -49,7 +49,11 @@ export function PublicProposalApprovedScreen({
   const snap = (proposal?.approval_snapshot ?? {}) as any;
   const dynSnap = snap?.dynamic_pricing ?? {};
   const approvedAmount =
-    snap?.approved_amount ?? proposal?.approved_amount ?? proposal?.dynamic_pricing_current_amount ?? proposal?.total_amount;
+    snap?.approved_amount
+    ?? proposal?.approved_amount
+    ?? proposal?.payment_expected_amount
+    ?? proposal?.dynamic_pricing_current_amount
+    ?? proposal?.total_amount;
   const consultant = snap?.consultant ?? {};
   const paymentMethod = snap?.payment_method ?? null;
   const paymentCondition = snap?.payment_condition ?? 'upfront';
