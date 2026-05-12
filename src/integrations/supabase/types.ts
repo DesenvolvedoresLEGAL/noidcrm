@@ -77,6 +77,11 @@ export type Database = {
           attempt_count: number
           created_at: string
           id: string
+          inventory_details: Json | null
+          inventory_error: string | null
+          inventory_pre_reservation_id: string | null
+          inventory_processed_at: string | null
+          inventory_status: string | null
           last_error: string | null
           notifications_processed_at: string | null
           opportunity_id: string | null
@@ -91,6 +96,11 @@ export type Database = {
           attempt_count?: number
           created_at?: string
           id?: string
+          inventory_details?: Json | null
+          inventory_error?: string | null
+          inventory_pre_reservation_id?: string | null
+          inventory_processed_at?: string | null
+          inventory_status?: string | null
           last_error?: string | null
           notifications_processed_at?: string | null
           opportunity_id?: string | null
@@ -105,6 +115,11 @@ export type Database = {
           attempt_count?: number
           created_at?: string
           id?: string
+          inventory_details?: Json | null
+          inventory_error?: string | null
+          inventory_pre_reservation_id?: string | null
+          inventory_processed_at?: string | null
+          inventory_status?: string | null
           last_error?: string | null
           notifications_processed_at?: string | null
           opportunity_id?: string | null
@@ -17024,6 +17039,7 @@ export type Database = {
           engagement_metadata: Json
           engagement_score: number | null
           engagement_updated_at: string | null
+          event_end_date: string | null
           event_start_date: string | null
           fonte: string | null
           forecast_hygiene_eligible: boolean | null
@@ -17131,6 +17147,7 @@ export type Database = {
           engagement_metadata?: Json
           engagement_score?: number | null
           engagement_updated_at?: string | null
+          event_end_date?: string | null
           event_start_date?: string | null
           fonte?: string | null
           forecast_hygiene_eligible?: boolean | null
@@ -17238,6 +17255,7 @@ export type Database = {
           engagement_metadata?: Json
           engagement_score?: number | null
           engagement_updated_at?: string | null
+          event_end_date?: string | null
           event_start_date?: string | null
           fonte?: string | null
           forecast_hygiene_eligible?: boolean | null
@@ -23711,6 +23729,7 @@ export type Database = {
           dynamic_pricing_mode: string | null
           dynamic_pricing_snapshot: Json
           dynamic_pricing_status: string | null
+          event_end_date: string | null
           event_start_date: string | null
           expires_at: string | null
           id: string
@@ -23785,6 +23804,7 @@ export type Database = {
           dynamic_pricing_mode?: string | null
           dynamic_pricing_snapshot?: Json
           dynamic_pricing_status?: string | null
+          event_end_date?: string | null
           event_start_date?: string | null
           expires_at?: string | null
           id?: string
@@ -23859,6 +23879,7 @@ export type Database = {
           dynamic_pricing_mode?: string | null
           dynamic_pricing_snapshot?: Json
           dynamic_pricing_status?: string | null
+          event_end_date?: string | null
           event_start_date?: string | null
           expires_at?: string | null
           id?: string

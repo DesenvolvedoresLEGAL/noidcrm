@@ -4,6 +4,7 @@ import {
   resolveApprovedProposalAmount,
   APPROVED_VALUE_SELECT_COLUMNS,
 } from "../_shared/approved-proposal-value.ts";
+import { generatePreReservationFromProposalServer } from "../_shared/inventory-from-proposal.ts";
 
 
 const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY') ?? Deno.env.get('LOVABLE_API_KEY');
@@ -94,7 +95,7 @@ serve(async (req) => {
         .select("*")
         .eq("proposal_id", proposalId)
         .in("status", ["pending", "failed"])
-        .or("notifications_processed_at.is.null,slack_processed_at.is.null")
+        .or("notifications_processed_at.is.null,slack_processed_at.is.null,inventory_processed_at.is.null")
         .limit(1);
       jobs = data || [];
     } else {
@@ -520,15 +521,103 @@ async function processJob(supabase: any, job: any) {
       slackSent = true;
     }
 
+    // ===== STAGE 3: INVENTORY PRE-RESERVATION (idempotent, non-blocking) =====
+    let inventoryStatus: string = "skipped";
+    let inventoryPreReservationId: string | null = null;
+    let inventoryDetails: any = null;
+    if (!job.inventory_processed_at) {
+      try {
+        const invResult = await generatePreReservationFromProposalServer(supabase, proposal_id);
+        inventoryStatus = invResult.status;
+        inventoryDetails = (invResult as any).details ?? null;
+        if (invResult.status === "created" || invResult.status === "reused") {
+          inventoryPreReservationId = (invResult as any).pre_reservation_id ?? null;
+        }
+        await supabase
+          .from("acceptance_effect_jobs")
+          .update({
+            inventory_processed_at: new Date().toISOString(),
+            inventory_status: invResult.status,
+            inventory_pre_reservation_id: inventoryPreReservationId,
+            inventory_error: invResult.status === "error" ? (invResult as any).error : null,
+            inventory_details: inventoryDetails,
+          })
+          .eq("id", jobId);
+
+        // Notify operations team when there is something actionable
+        if (
+          invResult.status === "created" ||
+          invResult.status === "no_event_date" ||
+          invResult.status === "no_inventory_items"
+        ) {
+          try {
+            const { data: opsMembers } = await supabase
+              .from("organization_members")
+              .select("user_id, org_role")
+              .eq("organization_id", proposal.organization_id)
+              .eq("status", "active")
+              .in("org_role", ["owner", "admin", "operations", "operacional"]);
+            const titleByStatus: Record<string, string> = {
+              created: "📦 Pré-reserva gerada — confirme no inventário",
+              no_event_date: "⚠️ Proposta aceita sem data de evento",
+              no_inventory_items: "⚠️ Proposta aceita sem itens com controle de estoque",
+            };
+            const messageByStatus: Record<string, string> = {
+              created: `Pré-reserva criada para ${accountName} (proposta ${proposal.proposal_number || ""}). Aloque os itens e confirme a reserva no inventário.`,
+              no_event_date: `Proposta aceita por ${accountName} sem data de evento. Informe a data para gerar a pré-reserva no inventário.`,
+              no_inventory_items: `Proposta aceita por ${accountName} sem produtos vinculados a inventário. Configure o controle de estoque dos produtos para reservar capacidade.`,
+            };
+            const ops = (opsMembers || []).map((m) => ({
+              user_id: m.user_id,
+              organization_id: proposal.organization_id,
+              type: "inventory_action_required",
+              title: titleByStatus[invResult.status],
+              message: messageByStatus[invResult.status],
+              metadata: {
+                proposal_id,
+                opportunity_id: opportunity?.id || null,
+                pre_reservation_id: inventoryPreReservationId,
+                inventory_status: invResult.status,
+                account_name: accountName,
+              },
+            }));
+            if (ops.length > 0) {
+              await supabase.from("notifications").insert(ops);
+            }
+          } catch (notifErr) {
+            console.error("[inventory] failed to notify ops (non-fatal):", notifErr);
+          }
+        }
+        console.log(`[inventory] proposal ${proposal_id} → status=${invResult.status}`);
+      } catch (invErr: any) {
+        console.error("[inventory] stage failed:", invErr);
+        await supabase
+          .from("acceptance_effect_jobs")
+          .update({
+            inventory_processed_at: new Date().toISOString(),
+            inventory_status: "error",
+            inventory_error: invErr?.message ?? String(invErr),
+          })
+          .eq("id", jobId);
+        inventoryStatus = "error";
+      }
+    } else {
+      inventoryStatus = job.inventory_status ?? "already_processed";
+      inventoryPreReservationId = job.inventory_pre_reservation_id ?? null;
+    }
+
     // ===== CHECK COMPLETION =====
     // Reload job to check current state
     const { data: updatedJob } = await supabase
       .from("acceptance_effect_jobs")
-      .select("notifications_processed_at, slack_processed_at")
+      .select("notifications_processed_at, slack_processed_at, inventory_processed_at")
       .eq("id", jobId)
       .single();
 
-    const allDone = updatedJob?.notifications_processed_at && updatedJob?.slack_processed_at;
+    const allDone =
+      updatedJob?.notifications_processed_at &&
+      updatedJob?.slack_processed_at &&
+      updatedJob?.inventory_processed_at;
 
     await supabase.from("acceptance_effect_jobs")
       .update({
@@ -545,6 +634,8 @@ async function processJob(supabase: any, job: any) {
       proposalId: proposal_id,
       notifications_created: notificationsCreated,
       slack_sent: slackSent,
+      inventory_status: inventoryStatus,
+      inventory_pre_reservation_id: inventoryPreReservationId,
       status: allDone ? "completed" : "partial",
     };
   } catch (error) {
