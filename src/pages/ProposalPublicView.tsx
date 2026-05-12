@@ -1022,17 +1022,23 @@ export default function ProposalPublicView() {
   const oneTimeTerm = paymentTerms.find(t => t.payment_type === 'one_time');
   const recurringTerm = paymentTerms.find(t => t.payment_type === 'recurring');
   
-  // Calculate discount from payment terms
-  const paymentDiscountPercent = oneTimeTerm?.discount_percent || 0;
-  const paymentDiscountAmount = oneTimeTotal * (paymentDiscountPercent / 100);
-  const oneTimeWithDiscount = oneTimeTotal - paymentDiscountAmount;
-  const recurringContractTotal = recurringMRR * (recurringTerm?.contract_months || recurringTerm?.contract_duration_months || 12);
+  // Dynamic pricing snapshot is the single source of truth for the one-time base
+  // when active. Manual discount is then applied on top of that base — never on the
+  // raw items subtotal — so header / financial summary / installments all match.
   const dpSnapPublic: any = (proposal as any)?.dynamic_pricing_snapshot ?? null;
   const dynamicOneTimeAmount =
     (proposal as any)?.dynamic_pricing_enabled && dpSnapPublic?.current_amount != null
       ? Number(dpSnapPublic.current_amount)
       : null;
-  const effectiveOneTimeAmount = dynamicOneTimeAmount ?? oneTimeWithDiscount;
+  const effectiveOneTimeBase = dynamicOneTimeAmount ?? oneTimeTotal;
+  const dynamicAdjustment = dynamicOneTimeAmount != null ? dynamicOneTimeAmount - oneTimeTotal : 0;
+
+  // Calculate discount from payment terms (over the effective base, not the raw subtotal)
+  const paymentDiscountPercent = oneTimeTerm?.discount_percent || 0;
+  const paymentDiscountAmount = effectiveOneTimeBase * (paymentDiscountPercent / 100);
+  const oneTimeWithDiscount = effectiveOneTimeBase - paymentDiscountAmount;
+  const recurringContractTotal = recurringMRR * (recurringTerm?.contract_months || recurringTerm?.contract_duration_months || 12);
+  const effectiveOneTimeAmount = oneTimeWithDiscount;
   const totalAmount = effectiveOneTimeAmount + recurringContractTotal;
   
   // CRITICAL: Use oneTimeTotal for installments, not totalAmount (which includes MRR items)
@@ -1040,7 +1046,7 @@ export default function ProposalPublicView() {
   const baseForSchedule =
     proposal?.status === 'accepted' && proposal?.approved_amount != null
       ? Number(proposal.approved_amount)
-      : effectiveOneTimeAmount;
+      : effectiveOneTimeBase;
   const installments = oneTimeTerm
     ? calculateInstallments(oneTimeTerm, baseForSchedule, {
         proposalExpiresAt: proposal?.expires_at ?? null,
@@ -1307,8 +1313,10 @@ export default function ProposalPublicView() {
                 {paymentDiscountPercent > 0 && (
                   <>
                     <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Subtotal:</span>
-                      <span>{formatCurrency(oneTimeTotal + recurringContractTotal)}</span>
+                      <span className="text-muted-foreground">
+                        {dynamicAdjustment !== 0 ? 'Subtotal vigente:' : 'Subtotal:'}
+                      </span>
+                      <span>{formatCurrency(effectiveOneTimeBase + recurringContractTotal)}</span>
                     </div>
                     <div className="flex justify-between text-sm text-red-600">
                       <span>Desconto ({paymentDiscountPercent}%):</span>
@@ -1631,9 +1639,23 @@ export default function ProposalPublicView() {
                     <div className="bg-amber-50 dark:bg-amber-950/30 rounded-lg p-4 border border-amber-200 dark:border-amber-800">
                       <p className="text-sm font-semibold mb-3">Resumo Financeiro</p>
                       <div className="space-y-2">
+                        {dynamicAdjustment !== 0 && (
+                          <div className="flex justify-between text-xs text-muted-foreground">
+                            <span>Subtotal dos itens:</span>
+                            <span>{formatCurrency(oneTimeTotal)}</span>
+                          </div>
+                        )}
+                        {dynamicAdjustment !== 0 && (
+                          <div className="flex justify-between text-xs text-muted-foreground">
+                            <span>Ajuste por antecedência:</span>
+                            <span>{dynamicAdjustment >= 0 ? '+ ' : '- '}{formatCurrency(Math.abs(dynamicAdjustment))}</span>
+                          </div>
+                        )}
                         <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Subtotal Avulso:</span>
-                          <span>{formatCurrency(oneTimeTotal)}</span>
+                          <span className="text-muted-foreground">
+                            {dynamicAdjustment !== 0 ? 'Subtotal vigente:' : 'Subtotal Avulso:'}
+                          </span>
+                          <span>{formatCurrency(effectiveOneTimeBase)}</span>
                         </div>
                         <div className="flex justify-between text-sm text-red-600 font-medium">
                           <span>Desconto ({paymentDiscountPercent}%):</span>

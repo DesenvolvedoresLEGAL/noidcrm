@@ -512,10 +512,9 @@ export async function generateProposalPDFClient(
   
   // Get payment discount from proposal
   const paymentDiscountPercent = proposal.discount_percent || 0;
-  const paymentDiscountAmount = oneTimeTotal * (paymentDiscountPercent / 100);
-  const oneTimeWithDiscount = oneTimeTotal - paymentDiscountAmount;
 
   // Dynamic pricing breakdown — when active, vigent value supersedes the items subtotal
+  // and becomes the base for the manual discount.
   const dpSnapshot: any = (proposal as any)?.dynamic_pricing_snapshot ?? null;
   const dpEnabled = !!(proposal as any)?.dynamic_pricing_enabled;
   const dpBreakdown = getDynamicPricingBreakdown(
@@ -523,9 +522,10 @@ export async function generateProposalPDFClient(
     oneTimeTotal,
   );
   const showDpBreakdown = dpBreakdown.active && dpBreakdown.hasAdjustment;
-  const effectiveOneTimeForTotal = dpBreakdown.active
-    ? dpBreakdown.current
-    : oneTimeWithDiscount;
+  const effectiveOneTimeBase = dpBreakdown.active ? dpBreakdown.current : oneTimeTotal;
+  const paymentDiscountAmount = effectiveOneTimeBase * (paymentDiscountPercent / 100);
+  const oneTimeWithDiscount = effectiveOneTimeBase - paymentDiscountAmount;
+  const effectiveOneTimeForTotal = oneTimeWithDiscount;
 
   // Calculate grand total with discount applied
   const recurringContractTotal = recurringPayment?.contract_total || recurringMRR * (recurringPayment?.contract_months || 12);
@@ -746,7 +746,20 @@ export async function generateProposalPDFClient(
       lineY += 8;
     }
 
-    // Payment discount line
+    // "Subtotal Vigente" / "Total Vigente Hoje" line (when dynamic pricing active)
+    // — appears BEFORE the discount so the math reads naturally:
+    // Subtotal Itens → Ajuste antecedência → Subtotal Vigente → Desconto → Total
+    if (showDpBreakdown) {
+      doc.setTextColor(217, 119, 6); // amber-600
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      const vigenteLabel = hasDiscount ? 'Subtotal Vigente:' : 'Total Vigente Hoje:';
+      doc.text(vigenteLabel, margin + 8, lineY);
+      doc.text(formatCurrency(dpBreakdown.current, currency), margin + contentWidth - 8, lineY, { align: 'right' });
+      lineY += 8;
+    }
+
+    // Payment discount line (applied over the vigent base when DP is active)
     if (hasDiscount) {
       doc.setTextColor(220, 38, 38); // Red color for discount
       doc.setFontSize(9);
@@ -762,7 +775,7 @@ export async function generateProposalPDFClient(
       const mrr = recurringPayment?.monthly_value || recurringMRR;
       const months = recurringPayment?.contract_months || 12;
       const contractTotal = recurringPayment?.contract_total || mrr * months;
-      
+
       doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
       doc.setFontSize(9);
       doc.setFont('helvetica', 'normal');
@@ -771,7 +784,7 @@ export async function generateProposalPDFClient(
       doc.setFont('helvetica', 'bold');
       doc.text(`${formatCurrency(mrr, currency)}/mês`, margin + contentWidth - 8, lineY, { align: 'right' });
       lineY += 8;
-      
+
       doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
       doc.setFont('helvetica', 'normal');
       doc.text(`Contrato (${months} meses):`, margin + 8, lineY);
@@ -780,21 +793,11 @@ export async function generateProposalPDFClient(
       doc.text(formatCurrency(contractTotal, currency), margin + contentWidth - 8, lineY, { align: 'right' });
       lineY += 8;
     }
-    
+
     // Divider line
     doc.setDrawColor(borderColor.r, borderColor.g, borderColor.b);
     doc.setLineWidth(0.3);
     doc.line(margin + 8, lineY - 2, margin + contentWidth - 8, lineY - 2);
-
-    // "Total Vigente Hoje" line (when dynamic pricing active) — sits above grand total
-    if (showDpBreakdown) {
-      doc.setTextColor(217, 119, 6); // amber-600
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Total Vigente Hoje:', margin + 8, lineY + 6);
-      doc.text(formatCurrency(dpBreakdown.current, currency), margin + contentWidth - 8, lineY + 6, { align: 'right' });
-      lineY += 8;
-    }
 
     // Grand total
     doc.setTextColor(primaryRgb.r, primaryRgb.g, primaryRgb.b);
