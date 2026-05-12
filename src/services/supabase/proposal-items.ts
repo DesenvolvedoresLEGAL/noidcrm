@@ -176,9 +176,12 @@ export async function calculateProposalTotal(proposalId: string): Promise<{
     .from('proposal_payment_terms')
     .select('discount_percent, payment_type')
     .eq('proposal_id', proposalId)
-    .maybeSingle();
+    .eq('payment_type', 'one_time');
 
-  const paymentDiscountPercent = paymentTerms?.discount_percent || 0;
+  const paymentDiscountPercent = (paymentTerms || []).reduce(
+    (max, term) => Math.max(max, Number(term.discount_percent) || 0),
+    0,
+  );
 
   const subtotal = items.reduce((sum, item) => {
     const itemSubtotal = item.unit_price * item.quantity;
