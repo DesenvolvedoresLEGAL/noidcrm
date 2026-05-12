@@ -59,7 +59,7 @@ export function InventoryOccupancyCalendarPage() {
     category_id: categoryId,
     family_id: familyId,
     status: statusFilter,
-    view_mode: view,
+    view_mode: (view === 'month' ? 'item' : view) as 'item' | 'category' | 'reservation',
   };
 
   const occupancy = useInventoryOccupancyCalendar(filters);
