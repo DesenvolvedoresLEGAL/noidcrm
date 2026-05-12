@@ -48,7 +48,7 @@ export function InventoryOccupancyCalendarPage() {
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [familyId, setFamilyId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
-  const [view, setView] = useState<ViewMode>('item');
+  const [view, setView] = useState<ViewMode>('month');
 
   const { data: categories = [] } = useInventoryCategories();
   const { data: families = [] } = useInventoryFamilies(categoryId ?? undefined);
