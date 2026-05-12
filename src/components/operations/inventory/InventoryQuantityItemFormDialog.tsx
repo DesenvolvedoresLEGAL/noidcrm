@@ -25,6 +25,7 @@ import {
 import {
   ITEM_STATUS_OPTIONS,
   UNIT_OF_MEASURE_OPTIONS,
+  categoryAcceptsKind,
   type InventoryItemStatus,
 } from '@/lib/operations/inventoryLabels';
 import {
@@ -98,7 +99,7 @@ export function InventoryQuantityItemFormDialog({ open, onOpenChange, item }: Pr
   const { data: locations } = useInventoryLocations();
 
   const quantityCategories = useMemo(
-    () => (categories ?? []).filter((c) => c.is_active && c.item_kind === 'quantity'),
+    () => (categories ?? []).filter((c) => c.is_active && categoryAcceptsKind(c, 'quantity')),
     [categories],
   );
   const activeLocations = useMemo(

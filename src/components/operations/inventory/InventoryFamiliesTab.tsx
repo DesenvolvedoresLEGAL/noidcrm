@@ -39,6 +39,7 @@ import {
 } from '@/hooks/operations/useInventoryFamilies';
 import type { InventoryFamily } from '@/services/operations/inventoryFamilies';
 import { InventoryFamilyFormDialog } from './InventoryFamilyFormDialog';
+import { ITEM_KIND_LABEL } from '@/lib/operations/inventoryLabels';
 
 export function InventoryFamiliesTab() {
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
@@ -145,6 +146,7 @@ export function InventoryFamiliesTab() {
                   <TableRow>
                     <TableHead>Nome</TableHead>
                     <TableHead>Categoria</TableHead>
+                    <TableHead>Tipo</TableHead>
                     <TableHead>Slug</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Ordem</TableHead>
@@ -156,14 +158,14 @@ export function InventoryFamiliesTab() {
                   {isLoading ? (
                     Array.from({ length: 3 }).map((_, i) => (
                       <TableRow key={i}>
-                        <TableCell colSpan={7}>
+                        <TableCell colSpan={8}>
                           <Skeleton className="h-6 w-full" />
                         </TableCell>
                       </TableRow>
                     ))
                   ) : (families ?? []).length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                         Nenhuma família encontrada.
                       </TableCell>
                     </TableRow>
@@ -173,6 +175,9 @@ export function InventoryFamiliesTab() {
                         <TableCell className="font-medium">{f.name}</TableCell>
                         <TableCell className="text-muted-foreground">
                           {categoryById.get(f.category_id) ?? '—'}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {ITEM_KIND_LABEL[(f as any).item_kind ?? 'serialized'] ?? '—'}
                         </TableCell>
                         <TableCell className="text-muted-foreground text-xs">{f.slug}</TableCell>
                         <TableCell>
