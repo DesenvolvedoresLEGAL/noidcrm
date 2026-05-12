@@ -787,27 +787,58 @@ export async function markOpportunityAsLost(
       const now = new Date();
       const salesCycleDays = Math.floor((now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
 
-      const { data: insertedRecord } = await supabase
+      // Check if a record already exists (e.g. opportunity reopened from won
+      // and now being lost). If so, convert it to 'lost' instead of inserting
+      // a duplicate row that would be double-counted by reporting views.
+      const { data: existingRecord } = await supabase
         .from('win_loss_records')
-        .insert({
-          organization_id: orgMembership,
-          opportunity_id: id,
-          outcome: 'lost',
-          reason_id: details.lossReasonId,
-          reason_seller: details.comment || null,
-          competitor: details.competitor || null,
-          price_factor: details.priceFactor || false,
-          timing_factor: details.timingFactor || false,
-          feature_factor: details.featureFactor || false,
-          relationship_factor: details.relationshipFactor || false,
-          loss_accountability: details.lossAccountability || null,
-          is_recoverable: details.isRecoverable || null,
-          final_value: data.valor_previsto,
-          sales_cycle_days: salesCycleDays,
-          recorded_by: userData?.user?.id
-        })
         .select('id')
-        .single();
+        .eq('opportunity_id', id)
+        .maybeSingle();
+
+      const lostPayload = {
+        outcome: 'lost' as const,
+        reason_id: details.lossReasonId,
+        reason_seller: details.comment || null,
+        competitor: details.competitor || null,
+        price_factor: details.priceFactor || false,
+        timing_factor: details.timingFactor || false,
+        feature_factor: details.featureFactor || false,
+        relationship_factor: details.relationshipFactor || false,
+        loss_accountability: details.lossAccountability || null,
+        is_recoverable: details.isRecoverable || null,
+        final_value: data.valor_previsto,
+        sales_cycle_days: salesCycleDays,
+        recorded_by: userData?.user?.id,
+        // Clear win-only fields in case this row was previously a 'won' record.
+        win_reason_id: null,
+        discount_percent: null,
+        key_differentiator: null,
+        customer_feedback: null,
+      };
+
+      let insertedRecord: { id: string } | null = null;
+
+      if (existingRecord) {
+        const { data: updated } = await supabase
+          .from('win_loss_records')
+          .update(lostPayload)
+          .eq('id', existingRecord.id)
+          .select('id')
+          .single();
+        insertedRecord = updated ?? { id: existingRecord.id };
+      } else {
+        const { data: inserted } = await supabase
+          .from('win_loss_records')
+          .insert({
+            organization_id: orgMembership,
+            opportunity_id: id,
+            ...lostPayload,
+          })
+          .select('id')
+          .single();
+        insertedRecord = inserted ?? null;
+      }
 
       // Trigger automatic memory extraction
       if (insertedRecord?.id) {
@@ -1033,14 +1064,25 @@ export async function reopenOpportunity(
 
   const now = new Date().toISOString();
 
-  // 3. Update opportunity: reopen it. Do NOT clear closed_at: it is the immutable
-  // historical close event used by reports/forecast/win-rate.
+  // 3. Update opportunity: reopen it.
+  // The close event is being reverted, so closed_at / won_at / lost_at MUST be
+  // cleared. Otherwise dashboards, forecast, win-rate and OTE keep counting the
+  // deal as closed in the original period. The audit_log entry below preserves
+  // the historical timestamps for traceability. If the opportunity is later
+  // re-closed (won or lost), markOpportunityAsWon/Lost will set fresh values.
   const { data: updatedOpp, error: updateError } = await supabase
     .from('opportunities')
     .update({
       status: 'open',
       stage_id: targetStageId,
       updated_at: now,
+      closed_at: null,
+      won_at: null,
+      lost_at: null,
+      loss_reason_id: null,
+      loss_comment: null,
+      loss_accountability: null,
+      is_recoverable: null,
     })
     .eq('id', id)
     .select()
@@ -1069,17 +1111,17 @@ export async function reopenOpportunity(
     // Don't throw - opportunity was already reopened
   }
 
-  // 5. Preserve the original won record but annotate the reopen reason.
-  //    Do not use outcome='reopened': win_loss_records only accepts won/lost/abandoned.
+  // 5. Delete the previous win_loss_records entry. The close event is being
+  //    reverted, so dashboards/forecast/Win-Loss Hub/OTE must stop counting it.
+  //    A new record will be created when the opportunity is re-closed (won/lost).
+  //    The audit_log entry below preserves the original outcome for traceability.
   const { error: winLossError } = await supabase
     .from('win_loss_records')
-    .update({
-      reason_seller: `Reaberto: ${input.reason}`,
-    })
+    .delete()
     .eq('opportunity_id', id);
 
   if (winLossError) {
-    console.warn('Error updating win_loss_record:', winLossError);
+    console.warn('Error deleting win_loss_record on reopen:', winLossError);
   }
 
   // 6. Log audit entry
