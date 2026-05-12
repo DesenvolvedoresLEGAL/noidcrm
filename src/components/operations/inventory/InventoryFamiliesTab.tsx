@@ -170,9 +170,22 @@ export function InventoryFamiliesTab() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    (families ?? []).map((f) => (
+                    (families ?? []).map((f) => {
+                      const tplCount = Array.isArray((f as any).technical_spec_template)
+                        ? (f as any).technical_spec_template.length
+                        : 0;
+                      return (
                       <TableRow key={f.id}>
-                        <TableCell className="font-medium">{f.name}</TableCell>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-2">
+                            <span>{f.name}</span>
+                            {tplCount > 0 && (
+                              <Badge variant="outline" className="text-[10px]">
+                                {tplCount} {tplCount === 1 ? 'campo técnico' : 'campos técnicos'}
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
                         <TableCell className="text-muted-foreground">
                           {categoryById.get(f.category_id) ?? '—'}
                         </TableCell>
