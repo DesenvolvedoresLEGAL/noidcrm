@@ -20,21 +20,23 @@ export function useSupabaseAuth() {
     errorMessage?: string
   ) => {
     try {
-      supabase.functions.invoke('track-auth-event', {
-        body: {
-          event_type: eventType,
-          user_id: userId,
-          email,
-          success,
-          error_message: errorMessage,
-          fingerprint,
-          audit_context: {
-            userAgent: navigator.userAgent,
-            referrer: document.referrer || '',
-            pageUrl: window.location.href,
+      window.setTimeout(() => {
+        supabase.functions.invoke('track-auth-event', {
+          body: {
+            event_type: eventType,
+            user_id: userId,
+            email,
+            success,
+            error_message: errorMessage,
+            fingerprint,
+            audit_context: {
+              userAgent: navigator.userAgent,
+              referrer: document.referrer || '',
+              pageUrl: window.location.href,
+            },
           },
-        },
-      }).catch((err) => console.warn('[Auth] Tracking failed:', err));
+        }).catch((err) => console.warn('[Auth] Tracking failed:', err));
+      }, 0);
     } catch (e) {
       console.warn('[Auth] Tracking error:', e);
     }
@@ -93,10 +95,7 @@ export function useSupabaseAuth() {
   };
 
   const signIn = async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     
     if (error) {
       trackAuthEvent('failed_login', email, undefined, false, error.message);
