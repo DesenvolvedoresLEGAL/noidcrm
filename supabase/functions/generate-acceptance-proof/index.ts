@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { resolveApprovedProposalAmount } from "../_shared/approved-proposal-value.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -51,6 +52,14 @@ serve(async (req: Request) => {
 
     console.log("Generating acceptance proof for proposal:", proposalId);
 
+    const { error: orchestrationError } = await supabaseClient.rpc("orchestrate_proposal_financials", {
+      p_proposal_id: proposalId,
+      p_reason: "generate_acceptance_proof_preflight",
+    });
+    if (orchestrationError) {
+      console.error("[generate-acceptance-proof] Financial preflight failed:", orchestrationError);
+    }
+
     // Get proposal details with opportunity and pipeline info - FETCH ALL FIELDS for duplication
     const { data: proposal, error: proposalError } = await supabaseClient
       .from("proposals")
@@ -98,6 +107,24 @@ serve(async (req: Request) => {
       throw new Error("Proposal not found");
     }
 
+    const approved = resolveApprovedProposalAmount(proposal as any);
+    const approvedValue = Number((approved.amount || proposal.total_amount || proposal.value || proposal.opportunity?.valor_previsto || 0).toFixed(2));
+    const approvalSnapshot = {
+      proposal_id: proposalId,
+      approved_at: acceptedAt.toISOString(),
+      approved_amount: approvedValue,
+      amount_source: approved.source,
+      base_amount: approved.base_amount,
+      payment_expected_amount: proposal.payment_expected_amount ?? null,
+      dynamic_pricing: {
+        enabled: approved.dynamic_enabled,
+        status: approved.dynamic_status,
+        current_amount: approved.dynamic_amount,
+        current_tier_id: approved.current_tier_id,
+        current_label: approved.current_tier_label,
+      },
+    };
+
     // Generate acceptance hash
     const acceptedAt = new Date();
     const { data: hashData } = await supabaseClient.rpc(
@@ -134,6 +161,8 @@ serve(async (req: Request) => {
         acceptor_ip: acceptorIp,
         acceptor_user_agent: acceptorUserAgent,
         acceptance_hash: acceptanceHash,
+        approved_amount: approvedValue,
+        approval_snapshot: approvalSnapshot,
         win_reason_id: safeWinReasonId,
         key_differentiator: keyDifferentiator || null,
         customer_feedback: customerFeedback || null,
@@ -160,7 +189,8 @@ serve(async (req: Request) => {
             proposal_id: proposalId,
             proposal_title: proposal.title,
             proposal_number: proposal.proposal_number,
-            proposal_value: proposal.total_amount || proposal.value,
+            proposal_value: approvedValue,
+            amount_source: approved.source,
             acceptor_name: acceptorName,
             acceptor_document: acceptorDocument,
             acceptor_position: acceptorPosition,
@@ -197,7 +227,7 @@ serve(async (req: Request) => {
           win_reason_id: safeWinReasonId,
           key_differentiator: keyDifferentiator || null,
           customer_feedback: customerFeedback || null,
-          final_value: proposal.total_amount || proposal.value || opportunity.valor_previsto,
+          final_value: approvedValue,
           sales_cycle_days: salesCycleDays,
           closed_by_proposal_id: proposalId,
           recorded_by_customer: true,
