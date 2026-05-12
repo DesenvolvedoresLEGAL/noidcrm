@@ -107,6 +107,7 @@ serve(async (req: Request) => {
       throw new Error("Proposal not found");
     }
 
+    const acceptedAt = new Date();
     const approved = resolveApprovedProposalAmount(proposal as any);
     const approvedValue = Number((approved.amount || proposal.total_amount || proposal.value || proposal.opportunity?.valor_previsto || 0).toFixed(2));
     const approvalSnapshot = {
@@ -126,7 +127,6 @@ serve(async (req: Request) => {
     };
 
     // Generate acceptance hash
-    const acceptedAt = new Date();
     const { data: hashData } = await supabaseClient.rpc(
       "generate_acceptance_hash",
       {
