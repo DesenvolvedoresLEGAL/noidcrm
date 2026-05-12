@@ -512,10 +512,9 @@ export async function generateProposalPDFClient(
   
   // Get payment discount from proposal
   const paymentDiscountPercent = proposal.discount_percent || 0;
-  const paymentDiscountAmount = oneTimeTotal * (paymentDiscountPercent / 100);
-  const oneTimeWithDiscount = oneTimeTotal - paymentDiscountAmount;
 
   // Dynamic pricing breakdown — when active, vigent value supersedes the items subtotal
+  // and becomes the base for the manual discount.
   const dpSnapshot: any = (proposal as any)?.dynamic_pricing_snapshot ?? null;
   const dpEnabled = !!(proposal as any)?.dynamic_pricing_enabled;
   const dpBreakdown = getDynamicPricingBreakdown(
@@ -523,9 +522,10 @@ export async function generateProposalPDFClient(
     oneTimeTotal,
   );
   const showDpBreakdown = dpBreakdown.active && dpBreakdown.hasAdjustment;
-  const effectiveOneTimeForTotal = dpBreakdown.active
-    ? dpBreakdown.current
-    : oneTimeWithDiscount;
+  const effectiveOneTimeBase = dpBreakdown.active ? dpBreakdown.current : oneTimeTotal;
+  const paymentDiscountAmount = effectiveOneTimeBase * (paymentDiscountPercent / 100);
+  const oneTimeWithDiscount = effectiveOneTimeBase - paymentDiscountAmount;
+  const effectiveOneTimeForTotal = oneTimeWithDiscount;
 
   // Calculate grand total with discount applied
   const recurringContractTotal = recurringPayment?.contract_total || recurringMRR * (recurringPayment?.contract_months || 12);
