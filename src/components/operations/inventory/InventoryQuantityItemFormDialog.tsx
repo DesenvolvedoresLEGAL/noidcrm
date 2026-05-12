@@ -25,6 +25,7 @@ import {
 import {
   ITEM_STATUS_OPTIONS,
   UNIT_OF_MEASURE_OPTIONS,
+  categoryAcceptsKind,
   type InventoryItemStatus,
 } from '@/lib/operations/inventoryLabels';
 import {
