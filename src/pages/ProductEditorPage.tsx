@@ -328,7 +328,7 @@ export default function ProductEditorPage() {
 
           <div className="w-full px-4 md:px-8 py-6 grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-6">
             {/* Coluna esquerda: conteúdo principal */}
-            <div className="lg:col-span-2 space-y-6">
+            <div className="space-y-6 min-w-0">
               {/* Identidade */}
               <Card>
                 <CardHeader>
