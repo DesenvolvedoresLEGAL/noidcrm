@@ -13475,6 +13475,7 @@ export type Database = {
       inventory_categories: {
         Row: {
           color: string | null
+          control_mode: Database["public"]["Enums"]["inventory_category_control_mode"]
           created_at: string
           created_by: string | null
           description: string | null
@@ -13492,6 +13493,7 @@ export type Database = {
         }
         Insert: {
           color?: string | null
+          control_mode?: Database["public"]["Enums"]["inventory_category_control_mode"]
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -13509,6 +13511,7 @@ export type Database = {
         }
         Update: {
           color?: string | null
+          control_mode?: Database["public"]["Enums"]["inventory_category_control_mode"]
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -13534,6 +13537,7 @@ export type Database = {
           description: string | null
           id: string
           is_active: boolean
+          item_kind: Database["public"]["Enums"]["inventory_item_kind"]
           name: string
           organization_id: string
           slug: string
@@ -13548,6 +13552,7 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean
+          item_kind?: Database["public"]["Enums"]["inventory_item_kind"]
           name: string
           organization_id: string
           slug: string
@@ -13562,6 +13567,7 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean
+          item_kind?: Database["public"]["Enums"]["inventory_item_kind"]
           name?: string
           organization_id?: string
           slug?: string
@@ -34890,6 +34896,7 @@ export type Database = {
         | "note_added"
         | "task_completed"
         | "other"
+      inventory_category_control_mode: "serialized" | "quantity" | "mixed"
       inventory_item_kind: "serialized" | "quantity"
       inventory_item_status:
         | "available"
@@ -35216,6 +35223,7 @@ export const Constants = {
         "task_completed",
         "other",
       ],
+      inventory_category_control_mode: ["serialized", "quantity", "mixed"],
       inventory_item_kind: ["serialized", "quantity"],
       inventory_item_status: [
         "available",
