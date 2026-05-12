@@ -787,27 +787,58 @@ export async function markOpportunityAsLost(
       const now = new Date();
       const salesCycleDays = Math.floor((now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
 
-      const { data: insertedRecord } = await supabase
+      // Check if a record already exists (e.g. opportunity reopened from won
+      // and now being lost). If so, convert it to 'lost' instead of inserting
+      // a duplicate row that would be double-counted by reporting views.
+      const { data: existingRecord } = await supabase
         .from('win_loss_records')
-        .insert({
-          organization_id: orgMembership,
-          opportunity_id: id,
-          outcome: 'lost',
-          reason_id: details.lossReasonId,
-          reason_seller: details.comment || null,
-          competitor: details.competitor || null,
-          price_factor: details.priceFactor || false,
-          timing_factor: details.timingFactor || false,
-          feature_factor: details.featureFactor || false,
-          relationship_factor: details.relationshipFactor || false,
-          loss_accountability: details.lossAccountability || null,
-          is_recoverable: details.isRecoverable || null,
-          final_value: data.valor_previsto,
-          sales_cycle_days: salesCycleDays,
-          recorded_by: userData?.user?.id
-        })
         .select('id')
-        .single();
+        .eq('opportunity_id', id)
+        .maybeSingle();
+
+      const lostPayload = {
+        outcome: 'lost' as const,
+        reason_id: details.lossReasonId,
+        reason_seller: details.comment || null,
+        competitor: details.competitor || null,
+        price_factor: details.priceFactor || false,
+        timing_factor: details.timingFactor || false,
+        feature_factor: details.featureFactor || false,
+        relationship_factor: details.relationshipFactor || false,
+        loss_accountability: details.lossAccountability || null,
+        is_recoverable: details.isRecoverable || null,
+        final_value: data.valor_previsto,
+        sales_cycle_days: salesCycleDays,
+        recorded_by: userData?.user?.id,
+        // Clear win-only fields in case this row was previously a 'won' record.
+        win_reason_id: null,
+        discount_percent: null,
+        key_differentiator: null,
+        customer_feedback: null,
+      };
+
+      let insertedRecord: { id: string } | null = null;
+
+      if (existingRecord) {
+        const { data: updated } = await supabase
+          .from('win_loss_records')
+          .update(lostPayload)
+          .eq('id', existingRecord.id)
+          .select('id')
+          .single();
+        insertedRecord = updated ?? { id: existingRecord.id };
+      } else {
+        const { data: inserted } = await supabase
+          .from('win_loss_records')
+          .insert({
+            organization_id: orgMembership,
+            opportunity_id: id,
+            ...lostPayload,
+          })
+          .select('id')
+          .single();
+        insertedRecord = inserted ?? null;
+      }
 
       // Trigger automatic memory extraction
       if (insertedRecord?.id) {
