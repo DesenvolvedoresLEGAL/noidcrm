@@ -42,7 +42,16 @@ const proposalSchema = z.object({
   notes: z.string().optional().nullable(),
   layout_id: z.string().uuid().or(z.literal('')).optional().nullable().transform(val => val === '' ? null : val),
   currency: z.enum(['BRL', 'USD', 'EUR']).optional().nullable(),
+  event_start_date: z.string().optional().nullable(),
+  event_end_date: z.string().optional().nullable(),
+  event_location: z.string().optional().nullable(),
 }).passthrough();
+
+function normalizeEventDate(value?: string | null): string | null {
+  if (value === undefined || value === null || value === '') return null;
+  const dateOnly = String(value).split('T')[0];
+  return dateOnly || null;
+}
 
 const TERMINAL_PROPOSAL_STATUSES = new Set(['accepted', 'rejected']);
 
@@ -246,6 +255,11 @@ export async function createProposal(dto: unknown): Promise<Proposal> {
   if (validated.layout_id) insertData.layout_id = validated.layout_id;
   if (validated.currency) insertData.currency = validated.currency;
   if (validated.pdf_url) insertData.pdf_url = validated.pdf_url;
+  if (validated.event_start_date !== undefined) insertData.event_start_date = normalizeEventDate(validated.event_start_date);
+  if (validated.event_end_date !== undefined) insertData.event_end_date = normalizeEventDate(validated.event_end_date);
+  if (validated.event_location !== undefined) {
+    insertData.event_location = validated.event_location === '' ? null : validated.event_location;
+  }
 
   const { data, error } = await supabase
     .from('proposals')
@@ -377,6 +391,11 @@ export async function updateProposal(id: string, dto: unknown): Promise<Proposal
     }
   }
   if (validated.pdf_url !== undefined) updateData.pdf_url = validated.pdf_url;
+  if (validated.event_start_date !== undefined) updateData.event_start_date = normalizeEventDate(validated.event_start_date);
+  if (validated.event_end_date !== undefined) updateData.event_end_date = normalizeEventDate(validated.event_end_date);
+  if (validated.event_location !== undefined) {
+    updateData.event_location = validated.event_location === '' ? null : validated.event_location;
+  }
 
   const { data, error } = await supabase
     .from('proposals')
