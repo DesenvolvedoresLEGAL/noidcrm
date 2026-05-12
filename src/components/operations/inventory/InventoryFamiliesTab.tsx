@@ -39,6 +39,7 @@ import {
 } from '@/hooks/operations/useInventoryFamilies';
 import type { InventoryFamily } from '@/services/operations/inventoryFamilies';
 import { InventoryFamilyFormDialog } from './InventoryFamilyFormDialog';
+import { ITEM_KIND_LABEL } from '@/lib/operations/inventoryLabels';
 
 export function InventoryFamiliesTab() {
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
