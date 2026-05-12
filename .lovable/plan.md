@@ -1,121 +1,54 @@
-# PRICE UX 1.0.4 — Data de referência comercial na tabela dinâmica
+# Fix — Quick View e PDF mostram valor errado após recalcular tabela dinâmica
 
-Hoje a tabela dinâmica calcula sempre com `now()`. Esta sprint permite que a **condição de pagamento** defina qual data ancora a faixa vigente (à vista, vencimento, customizada ou aprovação congelada).
+## Causa raiz
 
-## 1. Banco de dados
+`apply_dynamic_price_to_proposal` (botão "Recalcular e sincronizar agora") grava corretamente o valor R$ 1.477,50 (referência custom_date 17/06, pós-evento +50%) em `proposals.dynamic_pricing_snapshot`/`dynamic_pricing_current_amount`/`payment_expected_amount`.
 
-**Migration A — `proposal_payment_terms`**
-- `dynamic_pricing_reference_type text not null default 'current_date'`
-  - check: `('current_date','payment_due_date','custom_date','approval_date')`
-- `dynamic_pricing_reference_date date null`
-- `freeze_price_on_approval boolean not null default false`
-- `requires_commercial_approval boolean not null default false`
-- Estender check `payment_condition` para incluir `net_7`, `net_15`, `net_30`, `net_35`, `invoiced`.
+Porém, `orchestrate_proposal_financials` (chamada em todo "Salvar proposta" e via trigger de `proposal_items`) imediatamente sobrescreve o snapshot:
 
-**Migration B — `proposals` (snapshot)**
-- `dynamic_pricing_reference_type text null`
-- `dynamic_pricing_reference_date timestamptz null`
-- `price_frozen_on_approval boolean not null default false`
-- `price_frozen_at timestamptz null`
+```
+-- linha 158 do migration 20260508232217
+v_snapshot := public.calculate_proposal_dynamic_price(p_proposal_id, now());
+...
+-- linhas 167-175
+UPDATE proposals SET
+   dynamic_pricing_snapshot = v_snapshot,
+   dynamic_pricing_current_amount = v_current_amount,
+   payment_expected_amount = v_current_amount
+```
 
-## 2. Funções SQL
+`now()` é forçado em vez do `reference_at` resolvido, então o snapshot volta para a faixa "vigente hoje" (R$ 1.280,50, +30%). A view pública e o PDF leem tudo de `dynamic_pricing_snapshot.current_amount` (linhas 1030-1036 de `ProposalPublicView.tsx`), por isso exibem o valor antigo no header, no bloco "Condição Comercial Vigente" e nas Condições de Pagamento.
 
-**Nova:** `resolve_dynamic_pricing_reference_date(p_proposal_id uuid) returns table(reference_type text, reference_at timestamptz)`
-- Lê `proposal_payment_terms` + proposta.
-- Defaults por `payment_condition`:
-  - `upfront` → `current_date` → `now()`
-  - `split_50_50` + `freeze_price_on_approval` → `approval_date` → `coalesce(approved_at, now())`
-  - `net_7|net_15|net_30|net_35|invoiced|installments` → `payment_due_date` → primeira data do cronograma (`first_payment_date`, `entry_date + payment_due_days`, ou `now() + interval`)
-  - `custom_date` → `dynamic_pricing_reference_date`
-- Tipo explícito em `dynamic_pricing_reference_type` sempre prevalece sobre o default por condição.
+## O que vai ser feito
 
-**Alterar:** `calculate_proposal_dynamic_price(p_proposal_id uuid, p_reference_at timestamptz default null)`
-- Se `p_reference_at` nulo → chama `resolve_dynamic_pricing_reference_date`.
-- Compara faixas usando essa referência.
-- Snapshot de retorno carrega `reference_type`, `reference_date`.
+### 1. Migration `fix_orchestrator_dynamic_pricing_reference`
 
-**Alterar:** `apply_dynamic_price_to_proposal(p_proposal_id, p_reference_at default null)`
-- Persiste em `proposals`: `current_amount`, `current_tier_*`, `dynamic_pricing_reference_type`, `dynamic_pricing_reference_date`.
-- Se condição é `split_50_50` + `freeze_price_on_approval` e proposta foi aceita: marca `price_frozen_on_approval=true` e `price_frozen_at=now()`. Após congelado, recálculos são no-op para o saldo.
+Recriar `orchestrate_proposal_financials`:
 
-**Alterar:** `generate_event_antecedence_pricing_for_proposal`
-- Mantém geração de faixas pela validade.
-- Marca a faixa "vigente" usando referência resolvida (não `now()`).
+- **Resolver referência via helper**: chamar `resolve_dynamic_pricing_reference_date(p_proposal_id)` em vez de hard-coded `now()`.
+- **Calcular com a referência correta**: `calculate_proposal_dynamic_price(p_proposal_id, v_ref_at)`.
+- **Persistir referência junto com snapshot**: incluir `dynamic_pricing_reference_type = v_ref_type` e `dynamic_pricing_reference_date = v_ref_at` no UPDATE, e mergir essas chaves dentro do JSON `dynamic_pricing_snapshot` (igual ao apply faz).
+- **Respeitar freeze**: se `price_frozen_on_approval = true`, pular o bloco que sobrescreve `dynamic_pricing_snapshot`/`current_amount`/`payment_expected_amount` (mantém o valor congelado).
+- **Não regenerar tiers desnecessariamente**: manter `generate_event_antecedence_pricing_for_proposal(..., true)` apenas quando os tiers ainda não existem ou houve mudança real de validade — não destruir tiers já gerados (mantém comportamento atual de `can_auto_generate_dynamic_pricing`).
 
-**Alterar:** `create_proposal_payment_intent`
-- Quando `reference_type = payment_due_date`, usa data de vencimento da cobrança como referência e `expected_amount` = valor calculado nessa data.
+### 2. Validar consumo no front
 
-**Alterar:** `orchestrate_proposal_financials` para passar referência resolvida em todas as etapas.
+Sem mudanças necessárias: `ProposalPublicView` (header, bloco "Condição Comercial Vigente", "Condições de Pagamento", instalments) e `proposalPdfGenerator` já leem `dynamic_pricing_snapshot.current_amount` / `current_ends_at`. Uma vez que o snapshot deixar de ser sobrescrito, ambas surfaces refletem o valor correto.
 
-## 3. Backend (TS)
+### 3. Aceite
 
-`src/services/proposals/proposalDynamicPricing.ts`
-- `calculateDynamicPrice(proposalId, referenceAt?)` aceita override opcional.
-- Novo helper `resolveDynamicPricingReference(proposalId)` (RPC wrapper).
+- Definir referência custom_date 17/06 → clicar "Recalcular e sincronizar agora" → `current_amount = R$ 1.477,50` no editor.
+- Salvar a proposta novamente → snapshot continua R$ 1.477,50 (orquestrador respeita referência).
+- Abrir Visualização Rápida → header, "Condição Comercial Vigente" e "Condições de Pagamento" mostram R$ 1.477,50 e indicam que a precificação foi calculada por data personalizada (17/06).
+- PDF: mesmo valor + cláusula de referência personalizada (já implementada na 1.0.4).
+- Proposta `upfront` sem reference_type override continua funcionando como hoje (resolve_helper devolve `current_date` → `now()`).
+- Proposta `split_50_50 + freeze` aprovada: orquestrador não sobrescreve snapshot.
 
-`src/services/supabase/proposal-payment-terms.ts`
-- Schema Zod ganha os 4 campos novos; persistência em create/update.
+## Arquivos
 
-## 4. Frontend
-
-**`ProposalPaymentTerms.tsx`** (bloco de pagamento)
-- Novo combobox **"Precificação baseada em"**:
-  - Pagamento imediato (`current_date`)
-  - Vencimento da cobrança (`payment_due_date`)
-  - Data personalizada (`custom_date` + date picker)
-  - Condição especial aprovada (`approval_date` + toggle `freeze_price_on_approval`)
-- Defaults automáticos por `payment_condition` (regra do item 13).
-- Nova condição **"Faturado em 35 dias"** (`net_35`, `payment_due_days=35`, ref=`payment_due_date`).
-- Toggle `requires_commercial_approval` quando aplicável.
-
-**`ProposalDynamicPricingPanel.tsx`**
-- Mostrar cabeçalho com: data de referência, tipo, faixa aplicada, ajuste, valor calculado.
-- Recalcular ao trocar condição/ref-date.
-
-**`PublicProposalDynamicPricingBanner.tsx` + `PublicProposalPaymentBlock.tsx`**
-- Quando `reference_type ≠ current_date`: exibir aviso "Esta condição foi calculada com base na data prevista de pagamento" + data + faixa + ajuste.
-
-**Cronograma (`PublicProposalPaymentBlock` / `ProposalDynamicPaymentPanel`)**
-- Linha "Pagamento faturado — Vencimento: dd/mm/aaaa — Valor: R$ X".
-- Para `split_50_50` congelado: mostrar "Valor aprovado congelado na aprovação" + entrada/saldo, sem recálculo no saldo.
-
-**`PublicProposalApprovedScreen.tsx`**
-- Exibir reference_type, reference_date, condição aprovada, congelamento sim/não.
-
-**`PdfDynamicPricingSection.tsx` / preview PDF**
-- Bloco financeiro: data de referência, faixa, critério usado + parágrafo legal do item 20.
-
-## 5. Aceite
-
-- À vista usa `now()`; net_35 usa hoje+35d; faixa pós-validade aplicada quando vencimento ultrapassa `valid_until`.
-- Cronograma, link público, PDF e tela pós-aprovação refletem a data de referência.
-- `split_50_50` + freeze trava preço; saldo não é recalculado.
-- `payment_intent.expected_amount` igual ao valor da faixa na referência.
-- Tabela dinâmica atual (sem novos campos) continua funcionando: defaults retrocompatíveis (`current_date`, freeze=false).
-- Build + typecheck passam.
+- `supabase/migrations/<nova migration>.sql` — recria `orchestrate_proposal_financials`.
 
 ## Riscos
 
-- Funções SQL são compartilhadas com orquestrador e ERP bridge — manter assinatura com default null garante retrocompatibilidade.
-- Snapshot na proposta cresce; cuidado com triggers que reescrevem `current_amount`.
-- Public link: RLS já permite leitura via token; novos campos seguem a mesma policy.
-
-## Arquivos impactados
-
-```
-supabase/migrations/<novas 2 migrations>
-src/services/proposals/proposalDynamicPricing.ts
-src/services/proposals/proposalOrchestrator.ts
-src/services/supabase/proposal-payment-terms.ts
-src/lib/proposals/dynamicPricing.ts
-src/lib/proposals/proposalPayments.ts
-src/components/proposals/ProposalPaymentTerms.tsx
-src/components/proposals/ProposalDynamicPricingPanel.tsx
-src/components/proposals/ProposalDynamicPaymentPanel.tsx
-src/components/proposals/PublicProposalDynamicPricingBanner.tsx
-src/components/proposals/PublicProposalPaymentBlock.tsx
-src/components/proposals/PublicProposalApprovedScreen.tsx
-src/components/proposals/PdfDynamicPricingSection.tsx
-src/hooks/proposals/useProposalDynamicPricing.ts
-src/integrations/supabase/types.ts (auto)
-```
+- A função é chamada por triggers em `proposal_items` e por `Save Items → Save Payment → Totals`. Manter mesma assinatura `(uuid, text)` e mesmo retorno JSONB. Apenas a lógica interna muda.
+- `can_auto_generate_dynamic_pricing` continua governando regeneração de tiers; sem alteração nesse caminho.
