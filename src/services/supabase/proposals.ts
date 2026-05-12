@@ -42,7 +42,16 @@ const proposalSchema = z.object({
   notes: z.string().optional().nullable(),
   layout_id: z.string().uuid().or(z.literal('')).optional().nullable().transform(val => val === '' ? null : val),
   currency: z.enum(['BRL', 'USD', 'EUR']).optional().nullable(),
+  event_start_date: z.string().optional().nullable(),
+  event_end_date: z.string().optional().nullable(),
+  event_location: z.string().optional().nullable(),
 }).passthrough();
+
+function normalizeEventDate(value?: string | null): string | null {
+  if (value === undefined || value === null || value === '') return null;
+  const dateOnly = String(value).split('T')[0];
+  return dateOnly || null;
+}
 
 const TERMINAL_PROPOSAL_STATUSES = new Set(['accepted', 'rejected']);
 
