@@ -176,6 +176,9 @@ export function InventoryFamiliesTab() {
                         <TableCell className="text-muted-foreground">
                           {categoryById.get(f.category_id) ?? '—'}
                         </TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {ITEM_KIND_LABEL[(f as any).item_kind ?? 'serialized'] ?? '—'}
+                        </TableCell>
                         <TableCell className="text-muted-foreground text-xs">{f.slug}</TableCell>
                         <TableCell>
                           <Badge variant={f.is_active ? 'default' : 'secondary'}>
