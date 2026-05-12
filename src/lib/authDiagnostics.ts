@@ -82,8 +82,7 @@ export function logAuthLoginError(error: unknown) {
 export function logAuthConfigCheck() {
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   const viteAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-  const vitePublishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-  const anonKey = viteAnonKey || vitePublishableKey;
+  const anonKey = viteAnonKey;
 
   let supabaseHost: string | null = null;
   try {
@@ -104,7 +103,7 @@ export function logAuthConfigCheck() {
     mode: import.meta.env.MODE,
     envKeyMap: {
       VITE_SUPABASE_ANON_KEY: Boolean(viteAnonKey),
-      VITE_SUPABASE_PUBLISHABLE_KEY: Boolean(vitePublishableKey),
+      VITE_SUPABASE_PUBLISHABLE_KEY: Boolean(import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY),
       SUPABASE_ANON_KEY: false,
       NEXT_PUBLIC_SUPABASE_ANON_KEY: false,
       REACT_APP_SUPABASE_ANON_KEY: false,

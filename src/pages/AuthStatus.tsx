@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, supabaseClientSingleton } from '@/integrations/supabase/client';
 import { getLastAuthAuditWarning } from '@/lib/authDiagnostics';
 
 type AuthStatusState = {
@@ -20,8 +20,7 @@ export default function AuthStatus() {
 
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
   const viteAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-  const vitePublishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '';
-  const anonKey = viteAnonKey || vitePublishableKey;
+  const anonKey = viteAnonKey;
   const anonKeyPrefix = anonKey ? anonKey.slice(0, 8) : 'n/a';
   const anonKeyLooksLikeJwt = anonKey.split('.').length === 3;
   const supabaseUrlHost = supabaseUrl ? (() => {
@@ -90,17 +89,18 @@ export default function AuthStatus() {
           <li><strong>hasAnonKey:</strong> {String(Boolean(anonKey))}</li>
           <li><strong>anonKeyPrefix:</strong> {anonKeyPrefix}</li>
           <li><strong>anonKeyLooksLikeJwt:</strong> {String(anonKeyLooksLikeJwt)}</li>
-          <li><strong>clientSingleton:</strong> true</li>
+          <li><strong>clientSingleton:</strong> {String(Boolean(supabaseClientSingleton))}</li>
           <li><strong>origin:</strong> {typeof window !== 'undefined' ? window.location.origin : 'n/a'}</li>
-          <li><strong>env key source:</strong> {viteAnonKey ? 'VITE_SUPABASE_ANON_KEY' : vitePublishableKey ? 'VITE_SUPABASE_PUBLISHABLE_KEY (fallback)' : 'missing'}</li>
+          <li><strong>mode:</strong> {import.meta.env.MODE}</li>
+          <li><strong>env key source:</strong> {viteAnonKey ? 'VITE_SUPABASE_ANON_KEY' : 'missing'}</li>
           <li><strong>VITE_SUPABASE_ANON_KEY:</strong> {String(Boolean(viteAnonKey))}</li>
-          <li><strong>VITE_SUPABASE_PUBLISHABLE_KEY:</strong> {String(Boolean(vitePublishableKey))}</li>
+          <li><strong>VITE_SUPABASE_PUBLISHABLE_KEY:</strong> {String(Boolean(import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || ''))} (not used by auth client)</li>
           <li><strong>SUPABASE_ANON_KEY:</strong> false (não exposta no Vite client)</li>
           <li><strong>NEXT_PUBLIC_SUPABASE_ANON_KEY:</strong> false (não exposta no Vite client)</li>
           <li><strong>REACT_APP_SUPABASE_ANON_KEY:</strong> false (não exposta no Vite client)</li>
           <li><strong>auth client ok:</strong> {String(Boolean(state.authClientOk))}</li>
           <li><strong>auth audit best effort mode:</strong> {String(Boolean(state.bestEffortModeActive))}</li>
-          <li><strong>environment:</strong> {import.meta.env.MODE}</li>
+          <li><strong>build timestamp:</strong> {import.meta.env.VITE_BUILD_TIMESTAMP || 'n/a'}</li>
           <li><strong>expected auth headers:</strong> apikey + Authorization Bearer + Content-Type application/json</li>
           <li><strong>build version:</strong> {import.meta.env.VITE_APP_VERSION || 'n/a'}</li>
           <li><strong>auth health:</strong> {state.authHealth} {state.authStatusCode ? `(${state.authStatusCode})` : ''}</li>
