@@ -1022,17 +1022,23 @@ export default function ProposalPublicView() {
   const oneTimeTerm = paymentTerms.find(t => t.payment_type === 'one_time');
   const recurringTerm = paymentTerms.find(t => t.payment_type === 'recurring');
   
-  // Calculate discount from payment terms
-  const paymentDiscountPercent = oneTimeTerm?.discount_percent || 0;
-  const paymentDiscountAmount = oneTimeTotal * (paymentDiscountPercent / 100);
-  const oneTimeWithDiscount = oneTimeTotal - paymentDiscountAmount;
-  const recurringContractTotal = recurringMRR * (recurringTerm?.contract_months || recurringTerm?.contract_duration_months || 12);
+  // Dynamic pricing snapshot is the single source of truth for the one-time base
+  // when active. Manual discount is then applied on top of that base — never on the
+  // raw items subtotal — so header / financial summary / installments all match.
   const dpSnapPublic: any = (proposal as any)?.dynamic_pricing_snapshot ?? null;
   const dynamicOneTimeAmount =
     (proposal as any)?.dynamic_pricing_enabled && dpSnapPublic?.current_amount != null
       ? Number(dpSnapPublic.current_amount)
       : null;
-  const effectiveOneTimeAmount = dynamicOneTimeAmount ?? oneTimeWithDiscount;
+  const effectiveOneTimeBase = dynamicOneTimeAmount ?? oneTimeTotal;
+  const dynamicAdjustment = dynamicOneTimeAmount != null ? dynamicOneTimeAmount - oneTimeTotal : 0;
+
+  // Calculate discount from payment terms (over the effective base, not the raw subtotal)
+  const paymentDiscountPercent = oneTimeTerm?.discount_percent || 0;
+  const paymentDiscountAmount = effectiveOneTimeBase * (paymentDiscountPercent / 100);
+  const oneTimeWithDiscount = effectiveOneTimeBase - paymentDiscountAmount;
+  const recurringContractTotal = recurringMRR * (recurringTerm?.contract_months || recurringTerm?.contract_duration_months || 12);
+  const effectiveOneTimeAmount = oneTimeWithDiscount;
   const totalAmount = effectiveOneTimeAmount + recurringContractTotal;
   
   // CRITICAL: Use oneTimeTotal for installments, not totalAmount (which includes MRR items)
