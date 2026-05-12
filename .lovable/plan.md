@@ -1,133 +1,121 @@
-## Sprint INV 0.7.2 — Templates de Especificações Técnicas por Família
+# PRICE UX 1.0.4 — Data de referência comercial na tabela dinâmica
 
-Objetivo: cada Família passa a definir os campos técnicos esperados dos seus itens. Ao escolher a família no cadastro de item, o formulário renderiza dinamicamente esses campos. Valores continuam salvos em `inventory_items.metadata.technical_specs`, agora com `source: 'family_template' | 'custom'`.
+Hoje a tabela dinâmica calcula sempre com `now()`. Esta sprint permite que a **condição de pagamento** defina qual data ancora a faixa vigente (à vista, vencimento, customizada ou aprovação congelada).
 
-### 1. Banco
+## 1. Banco de dados
 
-Migration única (sem tabelas novas):
+**Migration A — `proposal_payment_terms`**
+- `dynamic_pricing_reference_type text not null default 'current_date'`
+  - check: `('current_date','payment_due_date','custom_date','approval_date')`
+- `dynamic_pricing_reference_date date null`
+- `freeze_price_on_approval boolean not null default false`
+- `requires_commercial_approval boolean not null default false`
+- Estender check `payment_condition` para incluir `net_7`, `net_15`, `net_30`, `net_35`, `invoiced`.
 
-```sql
-ALTER TABLE inventory_families
-ADD COLUMN IF NOT EXISTS technical_spec_template jsonb NOT NULL DEFAULT '[]'::jsonb;
+**Migration B — `proposals` (snapshot)**
+- `dynamic_pricing_reference_type text null`
+- `dynamic_pricing_reference_date timestamptz null`
+- `price_frozen_on_approval boolean not null default false`
+- `price_frozen_at timestamptz null`
 
--- Validação leve: garantir que é um array
-ALTER TABLE inventory_families
-ADD CONSTRAINT inventory_families_template_is_array
-CHECK (jsonb_typeof(technical_spec_template) = 'array');
+## 2. Funções SQL
+
+**Nova:** `resolve_dynamic_pricing_reference_date(p_proposal_id uuid) returns table(reference_type text, reference_at timestamptz)`
+- Lê `proposal_payment_terms` + proposta.
+- Defaults por `payment_condition`:
+  - `upfront` → `current_date` → `now()`
+  - `split_50_50` + `freeze_price_on_approval` → `approval_date` → `coalesce(approved_at, now())`
+  - `net_7|net_15|net_30|net_35|invoiced|installments` → `payment_due_date` → primeira data do cronograma (`first_payment_date`, `entry_date + payment_due_days`, ou `now() + interval`)
+  - `custom_date` → `dynamic_pricing_reference_date`
+- Tipo explícito em `dynamic_pricing_reference_type` sempre prevalece sobre o default por condição.
+
+**Alterar:** `calculate_proposal_dynamic_price(p_proposal_id uuid, p_reference_at timestamptz default null)`
+- Se `p_reference_at` nulo → chama `resolve_dynamic_pricing_reference_date`.
+- Compara faixas usando essa referência.
+- Snapshot de retorno carrega `reference_type`, `reference_date`.
+
+**Alterar:** `apply_dynamic_price_to_proposal(p_proposal_id, p_reference_at default null)`
+- Persiste em `proposals`: `current_amount`, `current_tier_*`, `dynamic_pricing_reference_type`, `dynamic_pricing_reference_date`.
+- Se condição é `split_50_50` + `freeze_price_on_approval` e proposta foi aceita: marca `price_frozen_on_approval=true` e `price_frozen_at=now()`. Após congelado, recálculos são no-op para o saldo.
+
+**Alterar:** `generate_event_antecedence_pricing_for_proposal`
+- Mantém geração de faixas pela validade.
+- Marca a faixa "vigente" usando referência resolvida (não `now()`).
+
+**Alterar:** `create_proposal_payment_intent`
+- Quando `reference_type = payment_due_date`, usa data de vencimento da cobrança como referência e `expected_amount` = valor calculado nessa data.
+
+**Alterar:** `orchestrate_proposal_financials` para passar referência resolvida em todas as etapas.
+
+## 3. Backend (TS)
+
+`src/services/proposals/proposalDynamicPricing.ts`
+- `calculateDynamicPrice(proposalId, referenceAt?)` aceita override opcional.
+- Novo helper `resolveDynamicPricingReference(proposalId)` (RPC wrapper).
+
+`src/services/supabase/proposal-payment-terms.ts`
+- Schema Zod ganha os 4 campos novos; persistência em create/update.
+
+## 4. Frontend
+
+**`ProposalPaymentTerms.tsx`** (bloco de pagamento)
+- Novo combobox **"Precificação baseada em"**:
+  - Pagamento imediato (`current_date`)
+  - Vencimento da cobrança (`payment_due_date`)
+  - Data personalizada (`custom_date` + date picker)
+  - Condição especial aprovada (`approval_date` + toggle `freeze_price_on_approval`)
+- Defaults automáticos por `payment_condition` (regra do item 13).
+- Nova condição **"Faturado em 35 dias"** (`net_35`, `payment_due_days=35`, ref=`payment_due_date`).
+- Toggle `requires_commercial_approval` quando aplicável.
+
+**`ProposalDynamicPricingPanel.tsx`**
+- Mostrar cabeçalho com: data de referência, tipo, faixa aplicada, ajuste, valor calculado.
+- Recalcular ao trocar condição/ref-date.
+
+**`PublicProposalDynamicPricingBanner.tsx` + `PublicProposalPaymentBlock.tsx`**
+- Quando `reference_type ≠ current_date`: exibir aviso "Esta condição foi calculada com base na data prevista de pagamento" + data + faixa + ajuste.
+
+**Cronograma (`PublicProposalPaymentBlock` / `ProposalDynamicPaymentPanel`)**
+- Linha "Pagamento faturado — Vencimento: dd/mm/aaaa — Valor: R$ X".
+- Para `split_50_50` congelado: mostrar "Valor aprovado congelado na aprovação" + entrada/saldo, sem recálculo no saldo.
+
+**`PublicProposalApprovedScreen.tsx`**
+- Exibir reference_type, reference_date, condição aprovada, congelamento sim/não.
+
+**`PdfDynamicPricingSection.tsx` / preview PDF**
+- Bloco financeiro: data de referência, faixa, critério usado + parágrafo legal do item 20.
+
+## 5. Aceite
+
+- À vista usa `now()`; net_35 usa hoje+35d; faixa pós-validade aplicada quando vencimento ultrapassa `valid_until`.
+- Cronograma, link público, PDF e tela pós-aprovação refletem a data de referência.
+- `split_50_50` + freeze trava preço; saldo não é recalculado.
+- `payment_intent.expected_amount` igual ao valor da faixa na referência.
+- Tabela dinâmica atual (sem novos campos) continua funcionando: defaults retrocompatíveis (`current_date`, freeze=false).
+- Build + typecheck passam.
+
+## Riscos
+
+- Funções SQL são compartilhadas com orquestrador e ERP bridge — manter assinatura com default null garante retrocompatibilidade.
+- Snapshot na proposta cresce; cuidado com triggers que reescrevem `current_amount`.
+- Public link: RLS já permite leitura via token; novos campos seguem a mesma policy.
+
+## Arquivos impactados
+
 ```
-
-RLS existente das famílias é preservada (já é organization-scoped). Sem novas policies.
-
-### 2. Tipos e validação (lib)
-
-Novo arquivo `src/lib/operations/inventoryFamilyTemplate.ts`:
-
-- Tipos: `FamilySpecFieldType = 'text' | 'number' | 'date' | 'boolean' | 'url' | 'select' | 'password'`
-- `FamilySpecTemplateField` (key, label, type, required, placeholder, help_text, sort_order, is_active, options[])
-- Constantes de label PT-BR e `MAX_FAMILY_TEMPLATE_FIELDS = 50`
-- `normalizeSpecKey(label)` (reutiliza padrão já em `inventoryTechnicalSpecs.ts`)
-- `familySpecTemplateFieldSchema` (zod) e `familySpecTemplateArraySchema` com:
-  - key obrigatória, sem duplicar
-  - label 2–80 chars, sem duplicar (case-insensitive)
-  - placeholder ≤120, help_text ≤200
-  - se `type='select'`: `options.length >= 1`, cada opção ≤80, sem duplicar, sem strings vazias
-  - limite 50 campos
-- Helpers:
-  - `sanitizeFamilyTemplate(fields)` (trim, normaliza key, remove options vazias, deduplica)
-  - `getActiveTemplateFields(template)` → ordena por `sort_order`, depois `label`, filtra `is_active`
-  - `mergeItemSpecsWithTemplate(currentSpecs, template)` → retorna `{ templateSpecs, customSpecs }` separando por `source` e key
-  - `applyTemplateToSpecs({ template, existingSpecs })` para o item: cria entradas `source:'family_template'` para cada campo do template, herdando valores se a key já existir; o resto vira `custom`
-
-Atualizar `src/lib/operations/inventoryTechnicalSpecs.ts`:
-- Adicionar campo opcional `source?: 'family_template' | 'custom'` em `TechnicalSpec` e no schema.
-- `sanitizeTechnicalSpecs` preserva `source` (default `custom` quando ausente).
-
-### 3. Service de famílias
-
-`src/services/operations/inventoryFamilies.ts`:
-- Adicionar `technical_spec_template: FamilySpecTemplateField[]` em `InventoryFamily` e `InventoryFamilyInput`.
-- `createInventoryFamily` / `updateInventoryFamily`: persistir `technical_spec_template` (sanitizado) quando informado.
-- Novo helper `getInventoryFamily(id)` para o formulário de item buscar o template ao trocar de família (ou reutilizar cache do `useInventoryFamilies`).
-
-### 4. UI — Famílias
-
-`src/components/operations/inventory/InventoryFamilyFormDialog.tsx`:
-- Nova seção "Campos técnicos da família" abaixo dos campos atuais (mantém o dialog; apenas mais alta).
-- Subcomponente novo `FamilyTechnicalTemplateEditor.tsx`:
-  - Lista ordenável (sort_order numérico, sem drag-and-drop nesta sprint)
-  - Para cada campo: Label, Tipo (select PT-BR), Obrigatório (switch), Placeholder, Texto auxiliar, Opções (input separado por vírgula, só se `type='select'`), Ordem, Ativo (switch)
-  - Botão "Adicionar campo técnico"; estado vazio com copy do brief
-  - Geração automática de `key` a partir do label
-  - Validação inline via zod array schema
-  - Limite 50
-
-`InventoryFamiliesTab.tsx`: adicionar contador discreto "N campos técnicos" na coluna existente Tipo ou nova mini-coluna "Template" (preferência: pequena badge na coluna Nome). Manter colunas atuais sem quebrar layout.
-
-### 5. UI — Itens (Serializados e Quantidade)
-
-`InventoryItemFormDialog.tsx` e `InventoryQuantityItemFormDialog.tsx`:
-
-- Substituir a `TechnicalSpecsSection` única por dois blocos:
-  1. **Dados técnicos da família** — renderizado por novo componente `FamilyTemplateSpecsFields.tsx`
-  2. **Campos extras** — `TechnicalSpecsSection` reaproveitado, agora salvando com `source:'custom'`
-
-- `FamilyTemplateSpecsFields.tsx`:
-  - Recebe `template` (campos ativos ordenados) e `value` (Record<key, string>) controlado via RHF
-  - Renderiza por tipo:
-    - text/url → `<Input>`
-    - number → `<Input type="number" inputMode="decimal">`, salva como string
-    - date → `<Input type="date">` (YYYY-MM-DD)
-    - boolean → `<Select>` Sim/Não, salva "true"/"false"
-    - select → `<Select>` com options
-    - password → input com toggle olho (reusar padrão de `password-input.tsx`)
-  - Mostra `placeholder`, `help_text`, marca obrigatórios com `*`
-  - Validação `required` integrada à submissão
-
-- Comportamento ao escolher/trocar família:
-  - Carregar `technical_spec_template` (do hook `useInventoryFamilies` em cache; sem nova query)
-  - Construir specs do template usando `applyTemplateToSpecs`
-  - Specs antigas com keys que não existem mais no novo template → movidas para "Campos extras" com `source:'custom'`
-  - Mostrar toast discreto: "Alguns dados técnicos anteriores foram preservados em Campos extras porque não fazem parte da nova família." (somente quando houver migração)
-
-- Ao salvar:
-  - Validar obrigatórios do template (mensagem `Preencha o campo obrigatório: {label}`)
-  - Validar limite total de 50 specs
-  - Montar `metadata.technical_specs = [...templateSpecs, ...customSpecs]` preservando demais chaves de metadata
-
-### 6. Visualização (read-only)
-
-Onde já se exibe specs do item (lista/details), nada muda estruturalmente, pois `technical_specs` mantém o mesmo formato + `source` opcional. Tipo `password` continua armazenado em texto puro (sem criptografia nesta sprint), conforme pedido.
-
-### 7. Permissões / Segurança
-
-- Sem mudanças de role: módulo Inventário continua restrito a `owner | admin | operations | operacional`.
-- Sem service role no frontend, sem bypass de RLS.
-- Toda operação de família/item respeita `organization_id`.
-- Tipo `password` apenas mascara visualmente; sem auditoria nova.
-
-### 8. Arquivos impactados
-
-Novos:
-- `supabase/migrations/<timestamp>_inventory_family_template.sql`
-- `src/lib/operations/inventoryFamilyTemplate.ts`
-- `src/components/operations/inventory/FamilyTechnicalTemplateEditor.tsx`
-- `src/components/operations/inventory/FamilyTemplateSpecsFields.tsx`
-
-Editados:
-- `src/lib/operations/inventoryTechnicalSpecs.ts` (campo `source`)
-- `src/services/operations/inventoryFamilies.ts` (template no input/output)
-- `src/components/operations/inventory/InventoryFamilyFormDialog.tsx`
-- `src/components/operations/inventory/InventoryFamiliesTab.tsx` (contador)
-- `src/components/operations/inventory/InventoryItemFormDialog.tsx`
-- `src/components/operations/inventory/InventoryQuantityItemFormDialog.tsx`
-
-### 9. Fora de escopo (explicitamente)
-
-Tabelas novas, seeds automáticos com presets (Chip/Roteador/AP/Cabo), criptografia de senhas, kits, reservas, integração com proposta, edge functions, RPCs, QR Code, upload, transferências.
-
-### 10. Riscos e mitigação
-
-- **Compatibilidade com itens antigos**: itens sem template apenas exibem "Campos extras" com tudo que já tinham. Sem migração de dados.
-- **Troca de família destrutiva**: mitigada movendo specs incompatíveis para Campos extras + toast.
-- **Performance**: template é JSONB pequeno carregado junto da família já em cache (sem query extra).
-- **RHF + arrays dinâmicos**: usar `useFieldArray` consistente com `TechnicalSpecsSection` atual.
+supabase/migrations/<novas 2 migrations>
+src/services/proposals/proposalDynamicPricing.ts
+src/services/proposals/proposalOrchestrator.ts
+src/services/supabase/proposal-payment-terms.ts
+src/lib/proposals/dynamicPricing.ts
+src/lib/proposals/proposalPayments.ts
+src/components/proposals/ProposalPaymentTerms.tsx
+src/components/proposals/ProposalDynamicPricingPanel.tsx
+src/components/proposals/ProposalDynamicPaymentPanel.tsx
+src/components/proposals/PublicProposalDynamicPricingBanner.tsx
+src/components/proposals/PublicProposalPaymentBlock.tsx
+src/components/proposals/PublicProposalApprovedScreen.tsx
+src/components/proposals/PdfDynamicPricingSection.tsx
+src/hooks/proposals/useProposalDynamicPricing.ts
+src/integrations/supabase/types.ts (auto)
+```
