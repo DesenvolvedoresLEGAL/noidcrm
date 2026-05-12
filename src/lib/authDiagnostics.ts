@@ -71,8 +71,7 @@ export function logAuthLoginError(error: unknown) {
 
 export function logAuthConfigCheck() {
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-  const anonKey =
-    import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
   let supabaseHost: string | null = null;
   try {
@@ -87,5 +86,20 @@ export function logAuthConfigCheck() {
     hasAnonKey: Boolean(anonKey),
     anonKeyLooksJwt: typeof anonKey === 'string' && anonKey.split('.').length === 3,
     serviceRoleInFrontend: typeof anonKey === 'string' && anonKey.toLowerCase().includes('service_role'),
+  });
+}
+
+
+export function logAuthDiagnostic() {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+
+  console.info('[AUTH_DIAGNOSTIC]', {
+    origin: typeof window !== 'undefined' ? window.location.origin : null,
+    supabaseUrl,
+    hasAnonKey: Boolean(anonKey),
+    online: typeof navigator !== 'undefined' ? navigator.onLine : null,
+    timestamp: new Date().toISOString(),
+    buildMode: import.meta.env.MODE,
   });
 }

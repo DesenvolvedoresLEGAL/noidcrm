@@ -12,7 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/hooks/useTranslation';
 import { Loader2, Mail, Zap } from 'lucide-react';
 import { AuthHeroPanel } from '@/components/auth/AuthHeroPanel';
-import { getLoginErrorDescription, logAuthConfigCheck, logAuthLoginError } from '@/lib/authDiagnostics';
+import { getLoginErrorDescription, logAuthConfigCheck, logAuthDiagnostic, logAuthLoginError } from '@/lib/authDiagnostics';
 
 const cardVariants = {
   hidden: { opacity: 0, y: 30, scale: 0.95 },
@@ -45,6 +45,7 @@ export default function Login() {
 
   useEffect(() => {
     logAuthConfigCheck();
+    logAuthDiagnostic();
   }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
