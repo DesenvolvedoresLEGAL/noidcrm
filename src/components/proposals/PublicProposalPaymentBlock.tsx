@@ -1,12 +1,16 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { AlertTriangle, Copy, Loader2, QrCode } from 'lucide-react';
+import { AlertTriangle, CalendarClock, Copy, Loader2, QrCode } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { createPaymentIntent } from '@/services/proposals/proposalPaymentsService';
 import { createPixChargeFromPaymentIntent } from '@/services/proposals/erpBillingBridgeService';
 import { formatBRL, formatDateTime } from '@/lib/proposals/proposalPayments';
-import type { DynamicPricingSnapshot } from '@/lib/proposals/dynamicPricing';
+import {
+  REFERENCE_TYPE_DESCRIPTION,
+  REFERENCE_TYPE_LABEL,
+  type DynamicPricingSnapshot,
+} from '@/lib/proposals/dynamicPricing';
 
 interface Props {
   proposalId: string;
