@@ -356,6 +356,9 @@ export default function ProposalEditor() {
         notes: proposal.notes || '',
         layout_id: proposal.layout_id || '',
         currency: proposal.currency || 'BRL',
+        event_start_date: proposal.event_start_date ? String(proposal.event_start_date).split('T')[0] : '',
+        event_end_date: proposal.event_end_date ? String(proposal.event_end_date).split('T')[0] : '',
+        event_location: proposal.event_location || '',
       };
       
       reset(formData);
