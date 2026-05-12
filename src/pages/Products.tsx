@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Plus, Pencil, Trash2, Search, Settings, ImageIcon, Upload, Download, AlertCircle, Copy } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { listProducts, deleteProduct, toggleProductStatus, createProduct, type Product } from '@/services/supabase/products';
-import { ProductModal } from '@/components/products/ProductModal';
+// ProductModal removido em favor de página dedicada (/app/products/:id/edit)
 import { ImportProductsModal } from '@/components/products/ImportProductsModal';
 import { ExportProductsModal } from '@/components/products/ExportProductsModal';
 import { ProductAnalytics } from '@/components/products/ProductAnalytics';
