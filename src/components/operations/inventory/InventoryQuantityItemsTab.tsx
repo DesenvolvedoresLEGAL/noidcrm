@@ -32,6 +32,7 @@ import {
   ITEM_STATUS_LABEL,
   ITEM_STATUS_OPTIONS,
   STOCK_ALERT_LABEL,
+  categoryAcceptsKind,
   getStatusBadgeVariant,
   getStockAlert,
   getStockAlertVariant,
