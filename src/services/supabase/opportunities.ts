@@ -1080,17 +1080,17 @@ export async function reopenOpportunity(
     // Don't throw - opportunity was already reopened
   }
 
-  // 5. Preserve the original won record but annotate the reopen reason.
-  //    Do not use outcome='reopened': win_loss_records only accepts won/lost/abandoned.
+  // 5. Delete the previous win_loss_records entry. The close event is being
+  //    reverted, so dashboards/forecast/Win-Loss Hub/OTE must stop counting it.
+  //    A new record will be created when the opportunity is re-closed (won/lost).
+  //    The audit_log entry below preserves the original outcome for traceability.
   const { error: winLossError } = await supabase
     .from('win_loss_records')
-    .update({
-      reason_seller: `Reaberto: ${input.reason}`,
-    })
+    .delete()
     .eq('opportunity_id', id);
 
   if (winLossError) {
-    console.warn('Error updating win_loss_record:', winLossError);
+    console.warn('Error deleting win_loss_record on reopen:', winLossError);
   }
 
   // 6. Log audit entry
