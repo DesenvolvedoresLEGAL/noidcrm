@@ -391,6 +391,11 @@ export async function updateProposal(id: string, dto: unknown): Promise<Proposal
     }
   }
   if (validated.pdf_url !== undefined) updateData.pdf_url = validated.pdf_url;
+  if (validated.event_start_date !== undefined) updateData.event_start_date = normalizeEventDate(validated.event_start_date);
+  if (validated.event_end_date !== undefined) updateData.event_end_date = normalizeEventDate(validated.event_end_date);
+  if (validated.event_location !== undefined) {
+    updateData.event_location = validated.event_location === '' ? null : validated.event_location;
+  }
 
   const { data, error } = await supabase
     .from('proposals')
