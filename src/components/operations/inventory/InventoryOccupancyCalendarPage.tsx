@@ -35,7 +35,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
-type ViewMode = 'item' | 'category' | 'reservation';
+type ViewMode = 'month' | 'item' | 'category' | 'reservation';
 
 function formatPercent(rate: number) {
   return `${Math.round((rate ?? 0) * 100)}%`;
