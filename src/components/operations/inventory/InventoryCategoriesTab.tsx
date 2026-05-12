@@ -33,7 +33,10 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ITEM_KIND_LABEL } from '@/lib/operations/inventoryLabels';
+import {
+  CATEGORY_CONTROL_MODE_LABEL,
+  getCategoryControlMode,
+} from '@/lib/operations/inventoryLabels';
 import {
   useInventoryCategories,
   useInventoryCategoryMutations,
