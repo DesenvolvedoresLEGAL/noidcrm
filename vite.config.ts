@@ -64,21 +64,10 @@ export default defineConfig(({ mode }) => ({
         // Não cachear HTML evita mismatch entre index antigo e assets JS novos
         globPatterns: ["**/*.{js,css,ico,png,svg,woff2}"],
         runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
-            handler: "NetworkFirst",
-            options: {
-              cacheName: "supabase-cache-v2",
-              expiration: {
-                maxEntries: 100,
-                maxAgeSeconds: 60 * 5, // 5 minutes
-              },
-              cacheableResponse: {
-                statuses: [0, 200],
-              },
-              networkTimeoutSeconds: 10,
-            },
-          },
+          // IMPORTANTE: NUNCA cachear chamadas do Supabase (auth, rest, functions, realtime).
+          // Cache de /auth/v1/token serve refresh tokens velhos -> 401 + CORS + loop infinito
+          // de "Carregando perfil...". Cache de rest/functions mascara stale data.
+          // Se quiser cache de leitura, faça no React Query (in-memory), nunca no SW.
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
             handler: "CacheFirst",
