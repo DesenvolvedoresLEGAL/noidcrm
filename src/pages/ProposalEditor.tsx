@@ -80,6 +80,9 @@ const proposalSchema = z.object({
   notes: z.string().optional(),
   layout_id: z.string().optional(),
   currency: z.enum(['BRL', 'USD', 'EUR']).optional(),
+  event_start_date: z.string().optional().nullable(),
+  event_end_date: z.string().optional().nullable(),
+  event_location: z.string().optional().nullable(),
 });
 
 type ProposalFormData = z.infer<typeof proposalSchema>;
