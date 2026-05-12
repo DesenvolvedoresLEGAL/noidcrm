@@ -266,15 +266,24 @@ serve(async (req) => {
       // Calculate achievement percentage
       const achievementPercentage = goalAmount > 0 ? (totalSales / goalAmount) * 100 : 0;
 
-      // Find applicable multiplier
+      // Find applicable multiplier.
+      // IMPORTANT: configs commonly use integer max ranges (ex: 85-99, next 100-109).
+      // A real achievement like 99.21% must still fall into the 85-99 tier instead of
+      // dropping to 0 because of the decimal gap between 99 and 100.
       let oteMultiplier = 0;
-      if (multipliers) {
-        for (const mult of multipliers) {
-          if (achievementPercentage >= mult.min_percentage && achievementPercentage <= mult.max_percentage) {
-            oteMultiplier = mult.multiplier;
-            break;
-          }
-        }
+      if (multipliers?.length) {
+        const sortedMultipliers = [...multipliers].sort((a, b) => a.min_percentage - b.min_percentage);
+        const matchedMultiplier = sortedMultipliers.find((mult, index) => {
+          const nextMin = sortedMultipliers[index + 1]?.min_percentage;
+          const lowerBoundMatches = achievementPercentage >= Number(mult.min_percentage || 0);
+          const upperBoundMatches = nextMin != null
+            ? achievementPercentage < Number(nextMin)
+            : achievementPercentage <= Number(mult.max_percentage ?? Infinity);
+
+          return lowerBoundMatches && upperBoundMatches;
+        });
+
+        oteMultiplier = matchedMultiplier?.multiplier ?? 0;
       }
 
       // Calculate base variable
