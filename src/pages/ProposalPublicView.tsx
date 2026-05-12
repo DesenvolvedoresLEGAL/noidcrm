@@ -60,6 +60,7 @@ import { extractEmail, extractPhone } from '@/lib/contactFormat';
 import { useProposalEngagementTracker } from '@/hooks/useProposalEngagementTracker';
 import { PublicProposalDynamicPricingBanner } from '@/components/proposals/PublicProposalDynamicPricingBanner';
 import { getDynamicPricingBreakdown, formatDateTime as formatDpDateTime } from '@/lib/proposals/dynamicPricing';
+import { getEffectiveAmount } from '@/lib/proposals/effectiveAmount';
 
 // Fallback decline reasons (used if organization has none configured)
 const FALLBACK_DECLINE_REASONS = [
@@ -115,6 +116,11 @@ export default function ProposalPublicView() {
     proposalId: proposal?.id || '',
     enabled: !!proposal?.id,
   });
+
+  const resolveNetApprovedAmount = (proposalLike: any, fallback = 0) => {
+    const effective = getEffectiveAmount(proposalLike);
+    return effective.value > 0 ? Number(effective.value.toFixed(2)) : Number(fallback.toFixed(2));
+  };
 
   useEffect(() => {
     if (token) {
