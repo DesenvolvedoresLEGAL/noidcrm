@@ -32,6 +32,7 @@ import {
   ITEM_STATUS_LABEL,
   ITEM_STATUS_OPTIONS,
   getStatusBadgeVariant,
+  categoryAcceptsKind,
   type InventoryItemStatus,
 } from '@/lib/operations/inventoryLabels';
 import {
