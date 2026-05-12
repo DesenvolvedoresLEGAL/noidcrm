@@ -152,6 +152,14 @@ async function processJob(supabase: any, job: any) {
 
   try {
     // ===== LOAD DATA =====
+    const { error: orchestrationError } = await supabase.rpc("orchestrate_proposal_financials", {
+      p_proposal_id: proposal_id,
+      p_reason: "post_acceptance_effects_preflight",
+    });
+    if (orchestrationError) {
+      console.error("[post-acceptance-effects] Financial preflight failed:", orchestrationError);
+    }
+
     const { data: proposal, error: proposalError } = await supabase
       .from("proposals")
       .select(
