@@ -81,7 +81,9 @@ export function logAuthLoginError(error: unknown) {
 
 export function logAuthConfigCheck() {
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  const viteAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  const vitePublishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  const anonKey = viteAnonKey || vitePublishableKey;
 
   let supabaseHost: string | null = null;
   try {
@@ -91,11 +93,22 @@ export function logAuthConfigCheck() {
   }
 
   console.info('[AUTH_CONFIG_CHECK]', {
-    hasSupabaseUrl: Boolean(supabaseUrl),
-    supabaseHost,
+    supabaseUrlHost: supabaseHost,
+    hasUrl: Boolean(supabaseUrl),
     hasAnonKey: Boolean(anonKey),
-    anonKeyLooksJwt: typeof anonKey === 'string' && anonKey.split('.').length === 3,
+    anonKeyPrefix: typeof anonKey === 'string' ? anonKey.slice(0, 8) : null,
+    anonKeyLooksLikeJwt: typeof anonKey === 'string' && anonKey.split('.').length === 3,
     serviceRoleInFrontend: typeof anonKey === 'string' && anonKey.toLowerCase().includes('service_role'),
+    clientSingleton: true,
+    origin: typeof window !== 'undefined' ? window.location.origin : null,
+    mode: import.meta.env.MODE,
+    envKeyMap: {
+      VITE_SUPABASE_ANON_KEY: Boolean(viteAnonKey),
+      VITE_SUPABASE_PUBLISHABLE_KEY: Boolean(vitePublishableKey),
+      SUPABASE_ANON_KEY: false,
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: false,
+      REACT_APP_SUPABASE_ANON_KEY: false,
+    },
   });
 }
 
