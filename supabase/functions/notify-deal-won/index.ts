@@ -33,7 +33,15 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Fetch proposal
+    const { error: orchestrationError } = await supabase.rpc("orchestrate_proposal_financials", {
+      p_proposal_id: proposal_id,
+      p_reason: "notify_deal_won_preflight",
+    });
+    if (orchestrationError) {
+      console.error("[notify-deal-won] Financial preflight failed:", orchestrationError);
+    }
+
+    // Fetch proposal after preflight so ERP always receives the final NET approved amount.
     const { data: proposal, error: pError } = await supabase
       .from("proposals")
       .select(
