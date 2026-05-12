@@ -113,6 +113,9 @@ export function PdfDynamicPricingSection({ snapshot, tiers }: Props) {
       <p className="text-xs text-muted-foreground mt-2">
         {isAuto ? ANTECEDENCE_CLAUSE : CLAUSE}
       </p>
+      {showRef && (
+        <p className="text-xs text-muted-foreground mt-1">{REFERENCE_CLAUSE}</p>
+      )}
     </section>
   );
 }
