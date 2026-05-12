@@ -173,7 +173,7 @@ export function InventoryCategoriesTab() {
                     filtered.map((c) => (
                       <TableRow key={c.id}>
                         <TableCell className="font-medium">{c.name}</TableCell>
-                        <TableCell>{ITEM_KIND_LABEL[c.item_kind] ?? c.item_kind}</TableCell>
+                        <TableCell>{CATEGORY_CONTROL_MODE_LABEL[getCategoryControlMode(c)]}</TableCell>
                         <TableCell className="max-w-xs truncate text-muted-foreground">
                           {c.description || '—'}
                         </TableCell>
