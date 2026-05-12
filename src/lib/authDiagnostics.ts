@@ -7,6 +7,16 @@ type AuthLikeError = {
   name?: string;
 };
 
+export type AuthAuditWarning = {
+  status?: number;
+  message: string;
+  isHtmlResponse: boolean;
+  origin: string | null;
+  timestamp: string;
+};
+
+const AUTH_AUDIT_WARNING_KEY = 'auth_audit_last_warning';
+
 function getAuthErrorShape(error: unknown): AuthLikeError {
   if (!error || typeof error !== 'object') {
     return { message: String(error || '') };
@@ -101,5 +111,47 @@ export function logAuthDiagnostic() {
     online: typeof navigator !== 'undefined' ? navigator.onLine : null,
     timestamp: new Date().toISOString(),
     buildMode: import.meta.env.MODE,
+  });
+}
+
+export function safeMaskUserId(userId?: string | null) {
+  if (!userId) return 'unknown';
+  if (userId.length <= 8) return `${userId.slice(0, 2)}***`;
+  return `${userId.slice(0, 4)}***${userId.slice(-4)}`;
+}
+
+export function persistAuthAuditWarning(warning: AuthAuditWarning) {
+  try {
+    localStorage.setItem(AUTH_AUDIT_WARNING_KEY, JSON.stringify(warning));
+  } catch {
+    // best effort only
+  }
+}
+
+export function getLastAuthAuditWarning(): AuthAuditWarning | null {
+  try {
+    const raw = localStorage.getItem(AUTH_AUDIT_WARNING_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as AuthAuditWarning;
+  } catch {
+    return null;
+  }
+}
+
+export function logAuthAuditBestEffortFailed(payload: Omit<AuthAuditWarning, 'timestamp' | 'origin'>) {
+  const warning: AuthAuditWarning = {
+    ...payload,
+    origin: typeof window !== 'undefined' ? window.location.origin : null,
+    timestamp: new Date().toISOString(),
+  };
+
+  persistAuthAuditWarning(warning);
+  console.warn('[AUTH_AUDIT_BEST_EFFORT_FAILED]', warning);
+}
+
+export function logAuthLoginSuccessWithAuditWarning(userId?: string | null) {
+  console.info('[AUTH_LOGIN_SUCCESS_WITH_AUDIT_WARNING]', {
+    userId: safeMaskUserId(userId),
+    timestamp: new Date().toISOString(),
   });
 }

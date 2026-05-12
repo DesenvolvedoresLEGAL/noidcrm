@@ -1,5 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
-import { getLoginErrorDescription, isNetworkAuthError, logAuthLoginError } from './authDiagnostics';
+import {
+  getLastAuthAuditWarning,
+  getLoginErrorDescription,
+  isNetworkAuthError,
+  logAuthAuditBestEffortFailed,
+  logAuthLoginError,
+  safeMaskUserId,
+} from './authDiagnostics';
 
 describe('authDiagnostics', () => {
   it('classifica falhas de rede/CORS/522 sem expor credenciais', () => {
@@ -25,5 +32,27 @@ describe('authDiagnostics', () => {
       status: 0,
     });
     spy.mockRestore();
+  });
+
+  it('persiste warning de auth audit best effort para /status/auth', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    localStorage.clear();
+
+    logAuthAuditBestEffortFailed({
+      status: 522,
+      message: 'Unexpected HTML response',
+      isHtmlResponse: true,
+    });
+
+    const warning = getLastAuthAuditWarning();
+    expect(warning?.status).toBe(522);
+    expect(warning?.isHtmlResponse).toBe(true);
+    expect(warning?.message).toContain('HTML');
+    warnSpy.mockRestore();
+  });
+
+  it('mascara userId em logs sensíveis', () => {
+    expect(safeMaskUserId('12345678-90ab-cdef-1234-567890abcdef')).toContain('***');
+    expect(safeMaskUserId('')).toBe('unknown');
   });
 });
