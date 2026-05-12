@@ -302,7 +302,7 @@ export function ProposalPaymentTerms({
   const handlePresetSelect = (presetId: string) => {
     setSelectedPreset(presetId);
     const preset = PAYMENT_PRESETS.find(p => p.id === presetId);
-    
+
     if (preset?.config) {
       const baseDate = oneTimeTerm.first_installment_date || getTodayDate();
       const paymentCondition: PaymentTerm['payment_condition'] = presetId === 'a_vista'
@@ -311,20 +311,32 @@ export function ProposalPaymentTerms({
           ? 'split_50_50'
           : presetId === '30_60_90'
             ? 'installments'
-            : 'custom_schedule';
-      const newTerm = { 
-        ...oneTimeTerm, 
+            : presetId === 'net_35'
+              ? 'net_35'
+              : 'custom_schedule';
+      const freezeDefault = presetId === '50_50';
+      const refType = defaultReferenceTypeForCondition(paymentCondition, freezeDefault);
+      const newTerm = {
+        ...oneTimeTerm,
         ...preset.config,
         payment_condition: paymentCondition,
         first_installment_date: baseDate,
         // Sync entry_date with first_installment_date when entry_percent > 0
-        entry_date: preset.config.entry_percent > 0 ? baseDate : undefined,
+        entry_date: (preset.config as any).entry_percent > 0 ? baseDate : undefined,
+        // PRICE UX 1.0.4 — defaults de referência de precificação
+        dynamic_pricing_reference_type: refType,
+        freeze_price_on_approval: freezeDefault,
+        payment_due_days: (preset.config as any).payment_due_days ?? oneTimeTerm.payment_due_days ?? null,
       };
-      setOneTimeTerm(newTerm);
+      setOneTimeTerm(newTerm as any);
       setShowAdvanced(false);
       autoSave('one_time', newTerm);
     } else {
-      updateOneTime({ payment_condition: 'installments', installments: oneTimeTerm.installments || 2 });
+      updateOneTime({
+        payment_condition: 'installments',
+        installments: oneTimeTerm.installments || 2,
+        dynamic_pricing_reference_type: defaultReferenceTypeForCondition('installments', false),
+      });
       // Parcelado - show advanced options
       setShowAdvanced(true);
     }
