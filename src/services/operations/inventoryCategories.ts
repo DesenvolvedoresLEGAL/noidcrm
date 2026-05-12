@@ -47,6 +47,7 @@ export async function createInventoryCategory(
       slug,
       description: input.description ?? null,
       item_kind: input.item_kind,
+      control_mode: input.control_mode ?? (input.item_kind as any),
       color: input.color ?? null,
       icon: input.icon ?? null,
       sort_order: input.sort_order ?? 0,
