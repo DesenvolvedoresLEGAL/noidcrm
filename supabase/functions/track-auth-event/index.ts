@@ -38,15 +38,19 @@ async function getGeoIP(ip: string): Promise<GeoIPData | null> {
       return null;
     }
     
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 1500);
     const response = await fetch(
-      `http://ip-api.com/json/${ip}?fields=country,countryCode,city,regionName,isp,proxy,hosting`
+      `http://ip-api.com/json/${ip}?fields=country,countryCode,city,regionName,isp,proxy,hosting`,
+      { signal: ctrl.signal }
     );
-    
+    clearTimeout(timer);
+
     if (!response.ok) return null;
-    
+    const ct = response.headers.get('content-type') || '';
+    if (!ct.includes('application/json')) return null;
     const data = await response.json();
     if (data.status === 'fail') return null;
-    
     return data;
   } catch (error) {
     console.error('[track-auth-event] GeoIP lookup failed:', error);
