@@ -86,7 +86,7 @@ export function InventoryQuantityItemsTab() {
   const [statusItem, setStatusItem] = useState<InventoryItemWithRefs | null>(null);
 
   const quantityCategories = useMemo(
-    () => (categories ?? []).filter((c) => c.is_active && c.item_kind === 'quantity'),
+    () => (categories ?? []).filter((c) => c.is_active && categoryAcceptsKind(c, 'quantity')),
     [categories],
   );
   const activeLocations = useMemo(
@@ -94,7 +94,7 @@ export function InventoryQuantityItemsTab() {
     [locations],
   );
   const activeFamilies = useMemo(
-    () => (families ?? []).filter((f) => f.is_active),
+    () => (families ?? []).filter((f) => f.is_active && ((f as any).item_kind ?? 'serialized') === 'quantity'),
     [families],
   );
 
