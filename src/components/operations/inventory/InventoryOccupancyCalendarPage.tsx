@@ -1,5 +1,17 @@
 import { useMemo, useState } from 'react';
-import { format, addDays, startOfMonth, endOfMonth } from 'date-fns';
+import {
+  format,
+  addDays,
+  startOfMonth,
+  endOfMonth,
+  startOfWeek,
+  endOfWeek,
+  addMonths,
+  isSameMonth,
+  isSameDay,
+} from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
