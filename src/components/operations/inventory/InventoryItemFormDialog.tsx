@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -33,6 +33,10 @@ import {
   type TechnicalSpec,
 } from '@/lib/operations/inventoryTechnicalSpecs';
 import {
+  getActiveTemplateFields,
+  type FamilySpecTemplateField,
+} from '@/lib/operations/inventoryFamilyTemplate';
+import {
   type Criticality,
   type OperationalType,
 } from '@/lib/operations/inventoryClassification';
@@ -46,12 +50,14 @@ import {
   type SimCardFactory,
 } from '@/lib/operations/inventoryEquipmentProfile';
 import { TechnicalSpecsSection } from './TechnicalSpecsSection';
+import { FamilyTemplateSpecsFields } from './FamilyTemplateSpecsFields';
 import { InventoryClassificationFields } from './InventoryClassificationFields';
 import {
   RouterFactoryFields,
   SimCardFactoryFields,
 } from './EquipmentProfileFactoryFields';
 import { useInventoryCategories } from '@/hooks/operations/useInventoryCategories';
+import { useInventoryFamilies } from '@/hooks/operations/useInventoryFamilies';
 import { useInventoryLocations } from '@/hooks/operations/useInventoryLocations';
 import { useInventoryItemMutations } from '@/hooks/operations/useInventoryItems';
 import type { InventoryItemWithRefs } from '@/services/operations/inventoryItems';
@@ -128,6 +134,7 @@ export function InventoryItemFormDialog({ open, onOpenChange, item }: Props) {
   const isEdit = !!item;
   const { create, update } = useInventoryItemMutations();
   const { data: categories } = useInventoryCategories();
+  const { data: families } = useInventoryFamilies();
   const { data: locations } = useInventoryLocations();
 
   const serializedCategories = useMemo(
@@ -139,6 +146,12 @@ export function InventoryItemFormDialog({ open, onOpenChange, item }: Props) {
     () => (locations ?? []).filter((l) => l.is_active),
     [locations],
   );
+
+  // Track values for the family-template fields separately from custom extras.
+  // The form's `technical_specs` represents only the *custom* extras section.
+  const [templateValues, setTemplateValues] = useState<Record<string, string>>({});
+  const [templateErrors, setTemplateErrors] = useState<Record<string, string>>({});
+  const lastFamilyIdRef = useRef<string | null>(null);
 
   const form = useForm<FormData>({
     resolver: zodResolver(schema) as any,
@@ -165,12 +178,43 @@ export function InventoryItemFormDialog({ open, onOpenChange, item }: Props) {
 
   const [profile, setProfile] = useState<EquipmentProfile>('generic');
 
+  const familyById = useMemo(() => {
+    const m = new Map<string, any>();
+    (families ?? []).forEach((f) => m.set(f.id, f));
+    return m;
+  }, [families]);
+
+  const watchedFamilyId = form.watch('family_id');
+  const selectedFamily = watchedFamilyId ? familyById.get(watchedFamilyId) : null;
+  const familyTemplate: FamilySpecTemplateField[] = useMemo(() => {
+    const tpl = (selectedFamily as any)?.technical_spec_template;
+    return Array.isArray(tpl) ? tpl : [];
+  }, [selectedFamily]);
+  const activeTemplate = useMemo(() => getActiveTemplateFields(familyTemplate), [familyTemplate]);
+  const templateKeys = useMemo(() => new Set(activeTemplate.map((f) => f.key)), [activeTemplate]);
+
   useEffect(() => {
     if (open) {
       const initialProfile = (((item as any)?.category?.equipment_profile) ?? 'generic') as EquipmentProfile;
       setProfile(initialProfile === 'router' || initialProfile === 'sim_card' ? initialProfile : 'generic');
       const router = getRouterFactory(item?.metadata) ?? { ssid_factory: '', wifi_password_factory: '', admin_user: '', admin_password: '', imei: '' };
       const sim = getSimCardFactory(item?.metadata) ?? { iccid: '', line_number: '', carrier: '', apn: '', pin: '' };
+      const allSpecs = getTechnicalSpecs(item?.metadata) as TechnicalSpec[];
+      const fam = (item as any)?.family_id ? familyById.get((item as any).family_id) : null;
+      const tpl = Array.isArray(fam?.technical_spec_template) ? fam.technical_spec_template : [];
+      const tplKeys = new Set(getActiveTemplateFields(tpl).map((f) => f.key));
+      const tplValues: Record<string, string> = {};
+      const customSpecs: TechnicalSpec[] = [];
+      allSpecs.forEach((s) => {
+        if (s?.key && tplKeys.has(s.key)) {
+          tplValues[s.key] = s.value ?? '';
+        } else {
+          customSpecs.push({ ...s, source: 'custom' });
+        }
+      });
+      setTemplateValues(tplValues);
+      setTemplateErrors({});
+      lastFamilyIdRef.current = (item as any)?.family_id ?? null;
       form.reset({
         name: item?.name ?? '',
         description: item?.description ?? '',
@@ -185,15 +229,87 @@ export function InventoryItemFormDialog({ open, onOpenChange, item }: Props) {
         brand: item?.brand ?? '',
         model: item?.model ?? '',
         notes: item?.notes ?? '',
-        technical_specs: getTechnicalSpecs(item?.metadata) as TechnicalSpec[],
+        technical_specs: customSpecs,
         equipment_profile: initialProfile,
         router_factory: router,
         sim_card_factory: sim,
       });
     }
-  }, [open, item, form]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, item]);
+
+  // When family changes after initial load, migrate values: keep matching keys,
+  // move incompatible template values into custom extras.
+  useEffect(() => {
+    if (!open) return;
+    const prev = lastFamilyIdRef.current;
+    if (prev === watchedFamilyId) return;
+    lastFamilyIdRef.current = watchedFamilyId ?? null;
+    // skip the first run after reset (prev was set to item family above)
+    const newTplKeys = templateKeys;
+    const carriedTplValues: Record<string, string> = {};
+    const movedToCustom: TechnicalSpec[] = [];
+    Object.entries(templateValues).forEach(([k, v]) => {
+      if (newTplKeys.has(k)) carriedTplValues[k] = v;
+      else if (v) {
+        // preserve as custom extra
+        movedToCustom.push({
+          key: k,
+          label: k,
+          value: v,
+          type: 'text',
+          notes: null,
+          source: 'custom',
+        });
+      }
+    });
+    setTemplateValues(carriedTplValues);
+    setTemplateErrors({});
+    if (movedToCustom.length > 0) {
+      const current = (form.getValues('technical_specs') ?? []) as TechnicalSpec[];
+      form.setValue('technical_specs', [...current, ...movedToCustom], { shouldDirty: true });
+      toast.message(
+        'Alguns dados técnicos anteriores foram preservados em Campos extras porque não fazem parte da nova família.',
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchedFamilyId, open]);
 
   const onSubmit = async (data: FormData) => {
+    // Validate required template fields
+    const errs: Record<string, string> = {};
+    activeTemplate.forEach((f) => {
+      if (f.required && !(templateValues[f.key] ?? '').toString().trim()) {
+        errs[f.key] = `Preencha o campo obrigatório: ${f.label}`;
+      }
+    });
+    if (Object.keys(errs).length > 0) {
+      setTemplateErrors(errs);
+      toast.error(Object.values(errs)[0]);
+      return;
+    }
+    setTemplateErrors({});
+
+    const templateSpecs: TechnicalSpec[] = activeTemplate
+      .filter((f) => (templateValues[f.key] ?? '').toString().trim().length > 0)
+      .map((f) => ({
+        key: f.key,
+        label: f.label,
+        value: (templateValues[f.key] ?? '').toString().trim(),
+        type: f.type === 'password' || f.type === 'select' ? 'text' : (f.type as any),
+        notes: null,
+        source: 'family_template',
+      }));
+    const customSpecs = ((data.technical_specs ?? []) as TechnicalSpec[]).map((s) => ({
+      ...s,
+      source: 'custom' as const,
+    }));
+    const combined = [...templateSpecs, ...customSpecs];
+    if (combined.length > 50) {
+      toast.error('Limite de 50 especificações técnicas por item.');
+      return;
+    }
+
     const payload: any = {
       name: data.name,
       description: data.description || null,
@@ -208,7 +324,7 @@ export function InventoryItemFormDialog({ open, onOpenChange, item }: Props) {
       brand: data.brand || null,
       model: data.model || null,
       notes: data.notes || null,
-      technical_specs: (data.technical_specs ?? []) as TechnicalSpec[],
+      technical_specs: combined,
       router_factory: profile === 'router' ? (data.router_factory as RouterFactory) : null,
       sim_card_factory: profile === 'sim_card' ? (data.sim_card_factory as SimCardFactory) : null,
     };
@@ -481,11 +597,37 @@ export function InventoryItemFormDialog({ open, onOpenChange, item }: Props) {
             )}
           </div>
 
+          {activeTemplate.length > 0 && (
+            <FamilyTemplateSpecsFields
+              template={activeTemplate}
+              value={activeTemplate.map((f) => ({
+                key: f.key,
+                label: f.label,
+                value: templateValues[f.key] ?? '',
+                type: 'text',
+                source: 'family_template',
+              }))}
+              onChange={(next) => {
+                const map: Record<string, string> = {};
+                next.forEach((s) => {
+                  if (s?.key) map[s.key] = s.value ?? '';
+                });
+                setTemplateValues(map);
+              }}
+              errorByKey={templateErrors}
+            />
+          )}
+
           <TechnicalSpecsSection
             control={form.control}
             setValue={form.setValue}
             errors={(form.formState.errors as any)?.technical_specs}
           />
+          {activeTemplate.length > 0 && (
+            <p className="text-xs text-muted-foreground -mt-2">
+              Adicione atributos técnicos adicionais que não fazem parte do template da família.
+            </p>
+          )}
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

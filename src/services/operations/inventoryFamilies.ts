@@ -1,5 +1,9 @@
 import { supabase } from '@/integrations/supabase/client';
 import { normalizeSlug } from '@/lib/operations/inventoryClassification';
+import {
+  sanitizeFamilyTemplate,
+  type FamilySpecTemplateField,
+} from '@/lib/operations/inventoryFamilyTemplate';
 
 export type InventoryFamilyItemKind = 'serialized' | 'quantity';
 
@@ -13,6 +17,7 @@ export interface InventoryFamily {
   sort_order: number;
   is_active: boolean;
   item_kind: InventoryFamilyItemKind;
+  technical_spec_template: FamilySpecTemplateField[];
   created_at: string;
   updated_at: string;
 }
@@ -25,6 +30,7 @@ export interface InventoryFamilyInput {
   sort_order?: number;
   is_active?: boolean;
   item_kind?: InventoryFamilyItemKind;
+  technical_spec_template?: FamilySpecTemplateField[];
 }
 
 export async function listInventoryFamilies(
@@ -63,6 +69,7 @@ export async function createInventoryFamily(
       sort_order: input.sort_order ?? 0,
       is_active: input.is_active ?? true,
       item_kind: input.item_kind ?? 'serialized',
+      technical_spec_template: sanitizeFamilyTemplate(input.technical_spec_template ?? []),
       created_by: userId ?? null,
       updated_by: userId ?? null,
     })
@@ -80,6 +87,9 @@ export async function updateInventoryFamily(
   const patch: Record<string, unknown> = { ...input, updated_by: userId ?? null };
   if (input.slug !== undefined && input.slug !== null) {
     patch.slug = normalizeSlug(input.slug);
+  }
+  if (input.technical_spec_template !== undefined) {
+    patch.technical_spec_template = sanitizeFamilyTemplate(input.technical_spec_template ?? []);
   }
   const { data, error } = await (supabase as any)
     .from('inventory_families')

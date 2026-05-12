@@ -30,6 +30,12 @@ import {
   getCategoryControlMode,
   type CategoryControlMode,
 } from '@/lib/operations/inventoryLabels';
+import {
+  familySpecTemplateArraySchema,
+  sanitizeFamilyTemplate,
+  type FamilySpecTemplateField,
+} from '@/lib/operations/inventoryFamilyTemplate';
+import { FamilyTechnicalTemplateEditor } from './FamilyTechnicalTemplateEditor';
 
 const schema = z.object({
   category_id: z.string().uuid('Selecione uma categoria.'),
@@ -39,6 +45,7 @@ const schema = z.object({
     required_error: 'Selecione o tipo padrão do item.',
   }),
   sort_order: z.coerce.number().int('Apenas inteiros').min(0, 'Mínimo 0').default(0),
+  technical_spec_template: familySpecTemplateArraySchema,
 });
 
 type FormData = z.infer<typeof schema>;
@@ -57,7 +64,14 @@ export function InventoryFamilyFormDialog({ open, onOpenChange, family, defaultC
 
   const form = useForm<FormData>({
     resolver: zodResolver(schema) as any,
-    defaultValues: { category_id: '', name: '', description: '', item_kind: 'serialized', sort_order: 0 },
+    defaultValues: {
+      category_id: '',
+      name: '',
+      description: '',
+      item_kind: 'serialized',
+      sort_order: 0,
+      technical_spec_template: [],
+    },
   });
 
   useEffect(() => {
@@ -68,6 +82,7 @@ export function InventoryFamilyFormDialog({ open, onOpenChange, family, defaultC
         description: family?.description ?? '',
         item_kind: ((family as any)?.item_kind as 'serialized' | 'quantity') ?? 'serialized',
         sort_order: family?.sort_order ?? 0,
+        technical_spec_template: ((family as any)?.technical_spec_template as FamilySpecTemplateField[]) ?? [],
       });
     }
   }, [open, family, defaultCategoryId, form]);
@@ -78,8 +93,6 @@ export function InventoryFamilyFormDialog({ open, onOpenChange, family, defaultC
     ? getCategoryControlMode(selectedCategory)
     : 'mixed';
 
-  // Quando a categoria não for "mixed", o tipo da família é fixo. Forçamos
-  // o valor para evitar incoerências antes do submit.
   useEffect(() => {
     if (!selectedCategory) return;
     if (controlMode === 'serialized' && form.getValues('item_kind') !== 'serialized') {
@@ -92,6 +105,7 @@ export function InventoryFamilyFormDialog({ open, onOpenChange, family, defaultC
 
   const onSubmit = async (data: FormData) => {
     try {
+      const template = sanitizeFamilyTemplate(data.technical_spec_template ?? []);
       if (isEdit && family) {
         await update.mutateAsync({
           id: family.id,
@@ -101,6 +115,7 @@ export function InventoryFamilyFormDialog({ open, onOpenChange, family, defaultC
             description: data.description || null,
             item_kind: data.item_kind,
             sort_order: data.sort_order,
+            technical_spec_template: template,
           },
         });
         toast.success('Família atualizada com sucesso.');
@@ -111,6 +126,7 @@ export function InventoryFamilyFormDialog({ open, onOpenChange, family, defaultC
           description: data.description || null,
           item_kind: data.item_kind,
           sort_order: data.sort_order,
+          technical_spec_template: template,
         });
         toast.success('Família criada com sucesso.');
       }
@@ -129,43 +145,47 @@ export function InventoryFamilyFormDialog({ open, onOpenChange, family, defaultC
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEdit ? 'Editar família' : 'Nova família'}</DialogTitle>
           <DialogDescription>
-            Famílias são subdivisões dentro de uma categoria, ex.: Roteadores, Switches, Antenas em Conectividade.
+            Famílias são subdivisões dentro de uma categoria, ex.: Roteadores, Switches, Antenas em
+            Conectividade. Você também pode definir os campos técnicos esperados para os itens
+            dessa família.
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-          <div className="space-y-2">
-            <Label>Categoria</Label>
-            <Select
-              value={form.watch('category_id') || undefined}
-              onValueChange={(v) => form.setValue('category_id', v, { shouldValidate: true })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione uma categoria" />
-              </SelectTrigger>
-              <SelectContent>
-                {activeCategories.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {form.formState.errors.category_id && (
-              <p className="text-sm text-destructive">{form.formState.errors.category_id.message}</p>
-            )}
-          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Categoria</Label>
+              <Select
+                value={form.watch('category_id') || undefined}
+                onValueChange={(v) => form.setValue('category_id', v, { shouldValidate: true })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione uma categoria" />
+                </SelectTrigger>
+                <SelectContent>
+                  {activeCategories.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {form.formState.errors.category_id && (
+                <p className="text-sm text-destructive">{form.formState.errors.category_id.message}</p>
+              )}
+            </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="name">Nome</Label>
-            <Input id="name" placeholder="Ex: Roteadores" {...form.register('name')} />
-            {form.formState.errors.name && (
-              <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>
-            )}
+            <div className="space-y-2">
+              <Label htmlFor="name">Nome</Label>
+              <Input id="name" placeholder="Ex: Roteadores" {...form.register('name')} />
+              {form.formState.errors.name && (
+                <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>
+              )}
+            </div>
           </div>
 
           <div className="space-y-2">
@@ -173,53 +193,61 @@ export function InventoryFamilyFormDialog({ open, onOpenChange, family, defaultC
             <Textarea id="description" rows={2} {...form.register('description')} />
           </div>
 
-          <div className="space-y-2">
-            <Label>Tipo padrão do item</Label>
-            <Select
-              value={form.watch('item_kind')}
-              onValueChange={(v) =>
-                form.setValue('item_kind', v as 'serialized' | 'quantity', { shouldValidate: true })
-              }
-              disabled={!selectedCategory || controlMode !== 'mixed'}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {ITEM_KIND_OPTIONS.filter((o) => {
-                  if (controlMode === 'mixed') return true;
-                  return o.value === controlMode;
-                }).map((o) => (
-                  <SelectItem key={o.value} value={o.value}>
-                    {o.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {selectedCategory && controlMode !== 'mixed' ? (
-              <p className="text-xs text-muted-foreground">
-                O modo de controle desta categoria é fixo. Para permitir os dois tipos, edite a
-                categoria e mude para "Mista".
-              </p>
-            ) : (
-              <p className="text-xs text-muted-foreground">
-                Categorias mistas aceitam famílias serializadas e por quantidade.
-              </p>
-            )}
-            {form.formState.errors.item_kind && (
-              <p className="text-sm text-destructive">{form.formState.errors.item_kind.message}</p>
-            )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Tipo padrão do item</Label>
+              <Select
+                value={form.watch('item_kind')}
+                onValueChange={(v) =>
+                  form.setValue('item_kind', v as 'serialized' | 'quantity', { shouldValidate: true })
+                }
+                disabled={!selectedCategory || controlMode !== 'mixed'}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ITEM_KIND_OPTIONS.filter((o) => {
+                    if (controlMode === 'mixed') return true;
+                    return o.value === controlMode;
+                  }).map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {selectedCategory && controlMode !== 'mixed' ? (
+                <p className="text-xs text-muted-foreground">
+                  O modo de controle desta categoria é fixo. Para permitir os dois tipos, edite a
+                  categoria e mude para "Mista".
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Categorias mistas aceitam famílias serializadas e por quantidade.
+                </p>
+              )}
+              {form.formState.errors.item_kind && (
+                <p className="text-sm text-destructive">{form.formState.errors.item_kind.message}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="sort_order">Ordem</Label>
+              <Input
+                id="sort_order"
+                type="number"
+                min="0"
+                {...form.register('sort_order', { valueAsNumber: true })}
+              />
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="sort_order">Ordem</Label>
-            <Input
-              id="sort_order"
-              type="number"
-              min="0"
-              {...form.register('sort_order', { valueAsNumber: true })}
-            />
-          </div>
+          <FamilyTechnicalTemplateEditor
+            control={form.control}
+            setValue={form.setValue}
+            errors={(form.formState.errors as any)?.technical_spec_template}
+          />
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
