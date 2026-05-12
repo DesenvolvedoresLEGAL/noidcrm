@@ -296,15 +296,12 @@ export default function ProposalPublicView() {
       const oneTimeItems = items.filter(item => (item.billing_type || 'one_time') !== 'recurring');
       const oneTimeTotal = oneTimeItems.reduce((sum, item) => sum + item.total, 0);
       const dpSnapForPdf: any = (proposal as any)?.dynamic_pricing_snapshot ?? null;
-      const oneTimeAmountForPdf =
-        (proposal as any)?.dynamic_pricing_enabled && dpSnapForPdf?.current_amount != null
-          ? Number(dpSnapForPdf.current_amount)
-          : oneTimeTotal;
+      const oneTimeAmountForPdf = resolveNetApprovedAmount(proposal, oneTimeTotal);
       const pdfInstallments = oneTimeTerm
         ? calculateInstallments(oneTimeTerm, oneTimeAmountForPdf, {
             proposalExpiresAt: (proposal as any)?.expires_at ?? null,
             approvedAmount:
-              (proposal as any)?.status === 'accepted'
+              ((proposal as any)?.status === 'accepted' || oneTimeTerm?.discount_percent)
                 ? Number((proposal as any)?.approved_amount ?? oneTimeAmountForPdf)
                 : null,
             dynamicPricingCurrentEndsAt:
@@ -472,9 +469,7 @@ export default function ProposalPublicView() {
       const snap = (proposal?.dynamic_pricing_snapshot ?? {}) as any;
       const oneTimeItemsLocal = items.filter((it: any) => (it.billing_type || 'one_time') !== 'recurring');
       const oneTimeTotalLocal = oneTimeItemsLocal.reduce((s: number, it: any) => s + Number(it.total ?? 0), 0);
-      const approvedAmountLocal = Number(
-        snap?.current_amount ?? proposal?.dynamic_pricing_current_amount ?? oneTimeTotalLocal ?? proposal?.total_amount ?? 0
-      );
+      const approvedAmountLocal = resolveNetApprovedAmount(proposal, oneTimeTotalLocal);
       const oneTimeTermLocal = paymentTerms.find((t: any) => t.payment_type === 'one_time');
       const recurringTermLocal = paymentTerms.find((t: any) => t.payment_type === 'recurring');
       const approvedSchedule = oneTimeTermLocal
@@ -1056,7 +1051,7 @@ export default function ProposalPublicView() {
   const installments = oneTimeTerm
     ? calculateInstallments(oneTimeTerm, baseForSchedule, {
         proposalExpiresAt: proposal?.expires_at ?? null,
-        approvedAmount: proposal?.status === 'accepted' ? Number(proposal?.approved_amount ?? oneTimeTotal) : null,
+        approvedAmount: proposal?.status === 'accepted' ? Number(proposal?.approved_amount ?? effectiveOneTimeAmount) : null,
         dynamicPricingCurrentEndsAt:
           (proposal as any)?.dynamic_pricing_enabled && dpSnapPublic?.current_ends_at
             ? dpSnapPublic.current_ends_at
