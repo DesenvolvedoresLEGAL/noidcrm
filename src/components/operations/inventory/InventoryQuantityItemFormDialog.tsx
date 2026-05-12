@@ -102,6 +102,7 @@ export function InventoryQuantityItemFormDialog({ open, onOpenChange, item }: Pr
   const isEdit = !!item;
   const { create, update } = useInventoryQuantityItemMutations();
   const { data: categories } = useInventoryCategories();
+  const { data: families } = useInventoryFamilies();
   const { data: locations } = useInventoryLocations();
 
   const quantityCategories = useMemo(
@@ -112,6 +113,16 @@ export function InventoryQuantityItemFormDialog({ open, onOpenChange, item }: Pr
     () => (locations ?? []).filter((l) => l.is_active),
     [locations],
   );
+
+  const familyById = useMemo(() => {
+    const m = new Map<string, any>();
+    (families ?? []).forEach((f) => m.set(f.id, f));
+    return m;
+  }, [families]);
+
+  const [templateValues, setTemplateValues] = useState<Record<string, string>>({});
+  const [templateErrors, setTemplateErrors] = useState<Record<string, string>>({});
+  const lastFamilyIdRef = useRef<string | null>(null);
 
   const form = useForm<FormData>({
     resolver: zodResolver(schema) as any,
@@ -135,8 +146,30 @@ export function InventoryQuantityItemFormDialog({ open, onOpenChange, item }: Pr
     },
   });
 
+  const watchedFamilyId = form.watch('family_id');
+  const selectedFamily = watchedFamilyId ? familyById.get(watchedFamilyId) : null;
+  const familyTemplate: FamilySpecTemplateField[] = useMemo(() => {
+    const tpl = (selectedFamily as any)?.technical_spec_template;
+    return Array.isArray(tpl) ? tpl : [];
+  }, [selectedFamily]);
+  const activeTemplate = useMemo(() => getActiveTemplateFields(familyTemplate), [familyTemplate]);
+  const templateKeys = useMemo(() => new Set(activeTemplate.map((f) => f.key)), [activeTemplate]);
+
   useEffect(() => {
     if (open) {
+      const allSpecs = getTechnicalSpecs(item?.metadata) as TechnicalSpec[];
+      const fam = (item as any)?.family_id ? familyById.get((item as any).family_id) : null;
+      const tpl = Array.isArray(fam?.technical_spec_template) ? fam.technical_spec_template : [];
+      const tplKeys = new Set(getActiveTemplateFields(tpl).map((f) => f.key));
+      const tplValues: Record<string, string> = {};
+      const customSpecs: TechnicalSpec[] = [];
+      allSpecs.forEach((s) => {
+        if (s?.key && tplKeys.has(s.key)) tplValues[s.key] = s.value ?? '';
+        else customSpecs.push({ ...s, source: 'custom' });
+      });
+      setTemplateValues(tplValues);
+      setTemplateErrors({});
+      lastFamilyIdRef.current = (item as any)?.family_id ?? null;
       form.reset({
         name: item?.name ?? '',
         description: item?.description ?? '',
@@ -156,15 +189,72 @@ export function InventoryQuantityItemFormDialog({ open, onOpenChange, item }: Pr
         brand: item?.brand ?? '',
         model: item?.model ?? '',
         notes: item?.notes ?? '',
-        technical_specs: getTechnicalSpecs(item?.metadata) as TechnicalSpec[],
+        technical_specs: customSpecs,
       });
     }
-  }, [open, item, form]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, item]);
+
+  useEffect(() => {
+    if (!open) return;
+    const prev = lastFamilyIdRef.current;
+    if (prev === watchedFamilyId) return;
+    lastFamilyIdRef.current = watchedFamilyId ?? null;
+    const carried: Record<string, string> = {};
+    const moved: TechnicalSpec[] = [];
+    Object.entries(templateValues).forEach(([k, v]) => {
+      if (templateKeys.has(k)) carried[k] = v;
+      else if (v) moved.push({ key: k, label: k, value: v, type: 'text', notes: null, source: 'custom' });
+    });
+    setTemplateValues(carried);
+    setTemplateErrors({});
+    if (moved.length > 0) {
+      const current = (form.getValues('technical_specs') ?? []) as TechnicalSpec[];
+      form.setValue('technical_specs', [...current, ...moved], { shouldDirty: true });
+      toast.message(
+        'Alguns dados técnicos anteriores foram preservados em Campos extras porque não fazem parte da nova família.',
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchedFamilyId, open]);
 
   const status = form.watch('status') as InventoryItemStatus;
   const isUnavailable = status !== 'available';
 
   const onSubmit = async (data: FormData) => {
+    const errs: Record<string, string> = {};
+    activeTemplate.forEach((f) => {
+      if (f.required && !(templateValues[f.key] ?? '').toString().trim()) {
+        errs[f.key] = `Preencha o campo obrigatório: ${f.label}`;
+      }
+    });
+    if (Object.keys(errs).length > 0) {
+      setTemplateErrors(errs);
+      toast.error(Object.values(errs)[0]);
+      return;
+    }
+    setTemplateErrors({});
+
+    const templateSpecs: TechnicalSpec[] = activeTemplate
+      .filter((f) => (templateValues[f.key] ?? '').toString().trim().length > 0)
+      .map((f) => ({
+        key: f.key,
+        label: f.label,
+        value: (templateValues[f.key] ?? '').toString().trim(),
+        type: f.type === 'password' || f.type === 'select' ? 'text' : (f.type as any),
+        notes: null,
+        source: 'family_template',
+      }));
+    const customSpecs = (((data as any).technical_specs ?? []) as TechnicalSpec[]).map((s) => ({
+      ...s,
+      source: 'custom' as const,
+    }));
+    const combined = [...templateSpecs, ...customSpecs];
+    if (combined.length > 50) {
+      toast.error('Limite de 50 especificações técnicas por item.');
+      return;
+    }
+
     const payload = {
       name: data.name,
       description: data.description || null,
@@ -184,7 +274,7 @@ export function InventoryQuantityItemFormDialog({ open, onOpenChange, item }: Pr
       brand: data.brand || null,
       model: data.model || null,
       notes: data.notes || null,
-      technical_specs: ((data as any).technical_specs ?? []) as TechnicalSpec[],
+      technical_specs: combined,
     };
     try {
       if (isEdit && item) {
