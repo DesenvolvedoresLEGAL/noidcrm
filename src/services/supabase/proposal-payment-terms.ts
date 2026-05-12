@@ -31,9 +31,26 @@ export interface PaymentTerm {
   comments?: string;
 
   // PRICE UX 1.0.3 — payment condition
-  payment_condition?: 'upfront' | 'split_50_50' | 'split_30_70' | 'installments' | 'custom_schedule';
+  payment_condition?:
+    | 'upfront'
+    | 'split_50_50'
+    | 'split_30_70'
+    | 'installments'
+    | 'custom_schedule'
+    | 'net_7'
+    | 'net_15'
+    | 'net_30'
+    | 'net_35'
+    | 'invoiced';
   second_payment_due_strategy?: 'post_event' | 'after_valid_until' | 'manual_date' | null;
   second_payment_due_date?: string | null;
+
+  // PRICE UX 1.0.4 — Data de referência comercial
+  dynamic_pricing_reference_type?: 'current_date' | 'payment_due_date' | 'custom_date' | 'approval_date';
+  dynamic_pricing_reference_date?: string | null;
+  freeze_price_on_approval?: boolean;
+  requires_commercial_approval?: boolean;
+  payment_due_days?: number | null;
 
   created_at?: string;
   updated_at?: string;
