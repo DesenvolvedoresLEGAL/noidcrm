@@ -13,6 +13,7 @@ import {
   type Criticality,
   type OperationalType,
 } from '@/lib/operations/inventoryClassification';
+import { categoryAcceptsKind } from '@/lib/operations/inventoryLabels';
 import { useInventoryCategories } from '@/hooks/operations/useInventoryCategories';
 import { useInventoryFamilies } from '@/hooks/operations/useInventoryFamilies';
 
