@@ -3,14 +3,14 @@ import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 if (!SUPABASE_URL) {
   throw new Error('[AUTH_CONFIG_ERROR] Missing VITE_SUPABASE_URL');
 }
 
 if (!SUPABASE_ANON_KEY) {
-  throw new Error('[AUTH_CONFIG_ERROR] Missing VITE_SUPABASE_ANON_KEY');
+  throw new Error('[AUTH_CONFIG_ERROR] Missing VITE_SUPABASE_ANON_KEY (or VITE_SUPABASE_PUBLISHABLE_KEY fallback)');
 }
 
 if (SUPABASE_ANON_KEY.toLowerCase().includes('service_role')) {

@@ -19,7 +19,14 @@ export default function AuthStatus() {
   const [state, setState] = useState<AuthStatusState>({ authHealth: 'idle', restHealth: 'idle' });
 
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+  const viteAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+  const vitePublishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '';
+  const anonKey = viteAnonKey || vitePublishableKey;
+  const anonKeyPrefix = anonKey ? anonKey.slice(0, 8) : 'n/a';
+  const anonKeyLooksLikeJwt = anonKey.split('.').length === 3;
+  const supabaseUrlHost = supabaseUrl ? (() => {
+    try { return new URL(supabaseUrl).host; } catch { return 'invalid-url'; }
+  })() : 'missing';
 
   useEffect(() => {
     let active = true;
@@ -78,11 +85,23 @@ export default function AuthStatus() {
         <p className="text-sm text-muted-foreground">Rota técnica para diagnóstico seguro de autenticação.</p>
         <ul className="space-y-2 text-sm">
           <li><strong>Supabase URL:</strong> {supabaseUrl || 'missing'}</li>
+          <li><strong>supabaseUrlHost:</strong> {supabaseUrlHost}</li>
+          <li><strong>hasUrl:</strong> {String(Boolean(supabaseUrl))}</li>
           <li><strong>hasAnonKey:</strong> {String(Boolean(anonKey))}</li>
+          <li><strong>anonKeyPrefix:</strong> {anonKeyPrefix}</li>
+          <li><strong>anonKeyLooksLikeJwt:</strong> {String(anonKeyLooksLikeJwt)}</li>
+          <li><strong>clientSingleton:</strong> true</li>
           <li><strong>origin:</strong> {typeof window !== 'undefined' ? window.location.origin : 'n/a'}</li>
+          <li><strong>env key source:</strong> {viteAnonKey ? 'VITE_SUPABASE_ANON_KEY' : vitePublishableKey ? 'VITE_SUPABASE_PUBLISHABLE_KEY (fallback)' : 'missing'}</li>
+          <li><strong>VITE_SUPABASE_ANON_KEY:</strong> {String(Boolean(viteAnonKey))}</li>
+          <li><strong>VITE_SUPABASE_PUBLISHABLE_KEY:</strong> {String(Boolean(vitePublishableKey))}</li>
+          <li><strong>SUPABASE_ANON_KEY:</strong> false (não exposta no Vite client)</li>
+          <li><strong>NEXT_PUBLIC_SUPABASE_ANON_KEY:</strong> false (não exposta no Vite client)</li>
+          <li><strong>REACT_APP_SUPABASE_ANON_KEY:</strong> false (não exposta no Vite client)</li>
           <li><strong>auth client ok:</strong> {String(Boolean(state.authClientOk))}</li>
           <li><strong>auth audit best effort mode:</strong> {String(Boolean(state.bestEffortModeActive))}</li>
           <li><strong>environment:</strong> {import.meta.env.MODE}</li>
+          <li><strong>expected auth headers:</strong> apikey + Authorization Bearer + Content-Type application/json</li>
           <li><strong>build version:</strong> {import.meta.env.VITE_APP_VERSION || 'n/a'}</li>
           <li><strong>auth health:</strong> {state.authHealth} {state.authStatusCode ? `(${state.authStatusCode})` : ''}</li>
           <li><strong>rest health:</strong> {state.restHealth} {state.restStatusCode ? `(${state.restStatusCode})` : ''}</li>
