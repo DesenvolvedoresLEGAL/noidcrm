@@ -57,7 +57,7 @@ export function InventoryFamilyFormDialog({ open, onOpenChange, family, defaultC
 
   const form = useForm<FormData>({
     resolver: zodResolver(schema) as any,
-    defaultValues: { category_id: '', name: '', description: '', sort_order: 0 },
+    defaultValues: { category_id: '', name: '', description: '', item_kind: 'serialized', sort_order: 0 },
   });
 
   useEffect(() => {
@@ -66,10 +66,29 @@ export function InventoryFamilyFormDialog({ open, onOpenChange, family, defaultC
         category_id: family?.category_id ?? defaultCategoryId ?? '',
         name: family?.name ?? '',
         description: family?.description ?? '',
+        item_kind: ((family as any)?.item_kind as 'serialized' | 'quantity') ?? 'serialized',
         sort_order: family?.sort_order ?? 0,
       });
     }
   }, [open, family, defaultCategoryId, form]);
+
+  const selectedCategoryId = form.watch('category_id');
+  const selectedCategory = (categories ?? []).find((c) => c.id === selectedCategoryId);
+  const controlMode: CategoryControlMode = selectedCategory
+    ? getCategoryControlMode(selectedCategory)
+    : 'mixed';
+
+  // Quando a categoria não for "mixed", o tipo da família é fixo. Forçamos
+  // o valor para evitar incoerências antes do submit.
+  useEffect(() => {
+    if (!selectedCategory) return;
+    if (controlMode === 'serialized' && form.getValues('item_kind') !== 'serialized') {
+      form.setValue('item_kind', 'serialized', { shouldValidate: true });
+    } else if (controlMode === 'quantity' && form.getValues('item_kind') !== 'quantity') {
+      form.setValue('item_kind', 'quantity', { shouldValidate: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [controlMode, selectedCategoryId]);
 
   const onSubmit = async (data: FormData) => {
     try {
@@ -80,6 +99,7 @@ export function InventoryFamilyFormDialog({ open, onOpenChange, family, defaultC
             category_id: data.category_id,
             name: data.name,
             description: data.description || null,
+            item_kind: data.item_kind,
             sort_order: data.sort_order,
           },
         });
@@ -89,6 +109,7 @@ export function InventoryFamilyFormDialog({ open, onOpenChange, family, defaultC
           category_id: data.category_id,
           name: data.name,
           description: data.description || null,
+          item_kind: data.item_kind,
           sort_order: data.sort_order,
         });
         toast.success('Família criada com sucesso.');
