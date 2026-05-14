@@ -101,12 +101,18 @@ Deno.serve(async (req) => {
       .eq("proposal_id", proposal_id)
       .order("order_index");
 
-    // Fetch payment terms with correct column names
-    const { data: paymentTerms } = await supabase
+    // Fetch payment terms — proposal_payment_terms can have multiple rows per proposal
+    // (legacy duplicates). Always take the MOST RECENT row so the ERP receives the
+    // up-to-date payment date defined by the user.
+    const { data: paymentTermsList } = await supabase
       .from("proposal_payment_terms")
-      .select("payment_type, installments, installment_interval_days, first_installment_date, first_payment_date, contract_start_date, contract_duration_months, monthly_value, contract_total, billing_day, comments, discount_percent")
+      .select("payment_type, payment_condition, installments, installment_interval_days, first_installment_date, first_payment_date, contract_start_date, contract_duration_months, monthly_value, contract_total, billing_day, comments, discount_percent, entry_date, payment_due_days, updated_at, created_at")
       .eq("proposal_id", proposal_id)
-      .maybeSingle();
+      .order("updated_at", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(1);
+    const paymentTerms = (paymentTermsList && paymentTermsList[0]) || null;
+    console.log(`[notify-deal-won] paymentTerms resolved for ${proposal_id}:`, JSON.stringify(paymentTerms));
 
     // Compute the legacy item-based total for auditing/observability only.
     const rawTotal = (items || []).reduce((sum: number, item: Record<string, unknown>) => {
@@ -130,15 +136,19 @@ Deno.serve(async (req) => {
       `[notify-deal-won] Approved value for ${proposal_id}: ${totalAmount} (source=${approved.source}, base=${approved.base_amount}, dyn=${approved.dynamic_amount}, items_net=${itemsNetTotal})`,
     );
 
-    // Derive vencimento
+    // Derive vencimento — sempre priorizar a data definida nas condições de pagamento.
+    // Ordem de prioridade: first_installment_date (à vista / 1ª parcela one_time)
+    //  → entry_date (entrada) → first_payment_date → contract_start_date.
     let vencimento: string | null = null;
     if (paymentTerms) {
-      if (paymentTerms.payment_type === "one_time") {
-        vencimento = (paymentTerms.first_installment_date as string) || null;
-      } else {
-        vencimento = (paymentTerms.first_payment_date as string) || (paymentTerms.contract_start_date as string) || null;
-      }
+      vencimento =
+        (paymentTerms.first_installment_date as string) ||
+        (paymentTerms.entry_date as string) ||
+        (paymentTerms.first_payment_date as string) ||
+        (paymentTerms.contract_start_date as string) ||
+        null;
     }
+    console.log(`[notify-deal-won] vencimento for ${proposal_id} = ${vencimento}`);
 
     // Extract email/phone from account (JSONB format: [{value: "..."}])
     const rawEmails = account?.emails as unknown;
