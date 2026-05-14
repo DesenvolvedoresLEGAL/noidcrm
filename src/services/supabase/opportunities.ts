@@ -1077,7 +1077,6 @@ export async function reopenOpportunity(
       stage_id: targetStageId,
       updated_at: now,
       closed_at: null,
-      won_at: null,
       lost_at: null,
       loss_reason_id: null,
       loss_comment: null,
