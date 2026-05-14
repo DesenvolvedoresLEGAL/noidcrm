@@ -3,6 +3,7 @@ import {
   resolveApprovedProposalAmount,
   APPROVED_VALUE_SELECT_COLUMNS,
 } from "../_shared/approved-proposal-value.ts";
+import { resolveProposalPaymentDue } from "../_shared/proposal-payment-due.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -45,7 +46,7 @@ Deno.serve(async (req) => {
     const { data: proposal, error: pError } = await supabase
       .from("proposals")
       .select(
-        `id, opportunity_id, organization_id, status, title, client_name, client_email, created_at, accepted_at, expires_at, ${APPROVED_VALUE_SELECT_COLUMNS}`,
+        `id, opportunity_id, organization_id, status, title, client_name, client_email, created_at, accepted_at, expires_at, approved_payment_schedule, approval_snapshot, ${APPROVED_VALUE_SELECT_COLUMNS}`,
       )
       .eq("id", proposal_id)
       .single();
@@ -106,12 +107,12 @@ Deno.serve(async (req) => {
     // up-to-date payment date defined by the user.
     const { data: paymentTermsList } = await supabase
       .from("proposal_payment_terms")
-      .select("payment_type, payment_condition, installments, installment_interval_days, first_installment_date, first_payment_date, contract_start_date, contract_duration_months, monthly_value, contract_total, billing_day, comments, discount_percent, entry_date, payment_due_days, updated_at, created_at")
+      .select("id, payment_type, payment_condition, installments, installment_interval_days, first_installment_date, first_payment_date, contract_start_date, contract_duration_months, monthly_value, contract_total, billing_day, comments, discount_percent, entry_date, payment_due_days, second_payment_due_date, updated_at, created_at")
       .eq("proposal_id", proposal_id)
       .order("updated_at", { ascending: false })
-      .order("created_at", { ascending: false })
-      .limit(1);
-    const paymentTerms = (paymentTermsList && paymentTermsList[0]) || null;
+      .order("created_at", { ascending: false });
+    const dueResolution = resolveProposalPaymentDue(proposal as any, paymentTermsList as any[]);
+    const paymentTerms = dueResolution.paymentTerms;
     console.log(`[notify-deal-won] paymentTerms resolved for ${proposal_id}:`, JSON.stringify(paymentTerms));
 
     // Compute the legacy item-based total for auditing/observability only.
@@ -139,16 +140,8 @@ Deno.serve(async (req) => {
     // Derive vencimento — sempre priorizar a data definida nas condições de pagamento.
     // Ordem de prioridade: first_installment_date (à vista / 1ª parcela one_time)
     //  → entry_date (entrada) → first_payment_date → contract_start_date.
-    let vencimento: string | null = null;
-    if (paymentTerms) {
-      vencimento =
-        (paymentTerms.first_installment_date as string) ||
-        (paymentTerms.entry_date as string) ||
-        (paymentTerms.first_payment_date as string) ||
-        (paymentTerms.contract_start_date as string) ||
-        null;
-    }
-    console.log(`[notify-deal-won] vencimento for ${proposal_id} = ${vencimento}`);
+    const vencimento = dueResolution.vencimento;
+    console.log(`[notify-deal-won] vencimento for ${proposal_id} = ${vencimento} (source=${dueResolution.source})`);
 
     // Extract email/phone from account (JSONB format: [{value: "..."}])
     const rawEmails = account?.emails as unknown;

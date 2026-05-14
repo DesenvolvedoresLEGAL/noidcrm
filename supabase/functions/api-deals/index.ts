@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { resolveProposalPaymentDue } from "../_shared/proposal-payment-due.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -192,12 +193,16 @@ async function buildDeal(
     ? Number(((discountTotal / proposalSubtotal) * 100).toFixed(2))
     : 0;
 
-  // Fetch payment terms with correct column names
-  const { data: paymentTerms } = await supabase
+  // Fetch payment terms — legacy proposals can have duplicate rows.
+  // The resolver picks the same explicit due date shown in the proposal UI.
+  const { data: paymentTermsList } = await supabase
     .from("proposal_payment_terms")
-    .select("id, payment_type, installments, installment_interval_days, first_installment_date, first_payment_date, contract_start_date, contract_duration_months, monthly_value, contract_total, billing_day, comments")
+    .select("id, payment_type, payment_condition, installments, installment_interval_days, first_installment_date, entry_date, first_payment_date, contract_start_date, contract_duration_months, monthly_value, contract_total, billing_day, comments, payment_due_days, second_payment_due_date, updated_at, created_at")
     .eq("proposal_id", proposalId)
-    .maybeSingle();
+    .order("updated_at", { ascending: false })
+    .order("created_at", { ascending: false });
+  const dueResolution = resolveProposalPaymentDue(proposal as any, paymentTermsList as any[]);
+  const paymentTerms = dueResolution.paymentTerms;
 
   // Calculate total amount using correct column
   // Items gross total (sum of line item totals — pre payment-discount)
@@ -207,15 +212,7 @@ async function buildDeal(
   // Final amount = single source of truth = net total from proposal level
   const totalAmount = netTotal > 0 ? netTotal : itemsGrossTotal;
 
-  // Derive vencimento from payment terms
-  let vencimento: string | null = null;
-  if (paymentTerms) {
-    if (paymentTerms.payment_type === "one_time") {
-      vencimento = (paymentTerms.first_installment_date as string) || null;
-    } else {
-      vencimento = (paymentTerms.first_payment_date as string) || (paymentTerms.contract_start_date as string) || null;
-    }
-  }
+  const vencimento = dueResolution.vencimento;
 
   // Extract first email/phone from account (JSONB format: [{value: "..."}])
   const rawEmails = account?.emails as unknown;
@@ -374,7 +371,7 @@ async function handleList(
 
   const { data: proposals, error, count } = await supabase
     .from("proposals")
-    .select("id, opportunity_id, organization_id, status, title, client_name, client_email, value, subtotal, discount_amount, total_amount, payment_expected_amount, dynamic_pricing_current_amount, created_at, accepted_at, expires_at", { count: "exact" })
+    .select("id, opportunity_id, organization_id, status, title, client_name, client_email, value, subtotal, discount_amount, total_amount, payment_expected_amount, dynamic_pricing_current_amount, approved_payment_schedule, approval_snapshot, created_at, accepted_at, expires_at", { count: "exact" })
     .eq("organization_id", orgId)
     .in("status", proposalStatuses)
     .is("deleted_at", null)
@@ -410,7 +407,7 @@ async function handleGet(
 
   const { data: proposal, error } = await supabase
     .from("proposals")
-    .select("id, opportunity_id, organization_id, status, title, client_name, client_email, value, subtotal, discount_amount, total_amount, payment_expected_amount, dynamic_pricing_current_amount, created_at, accepted_at, expires_at")
+    .select("id, opportunity_id, organization_id, status, title, client_name, client_email, value, subtotal, discount_amount, total_amount, payment_expected_amount, dynamic_pricing_current_amount, approved_payment_schedule, approval_snapshot, created_at, accepted_at, expires_at")
     .eq("id", id)
     .eq("organization_id", orgId)
     .is("deleted_at", null)
