@@ -136,15 +136,19 @@ Deno.serve(async (req) => {
       `[notify-deal-won] Approved value for ${proposal_id}: ${totalAmount} (source=${approved.source}, base=${approved.base_amount}, dyn=${approved.dynamic_amount}, items_net=${itemsNetTotal})`,
     );
 
-    // Derive vencimento
+    // Derive vencimento — sempre priorizar a data definida nas condições de pagamento.
+    // Ordem de prioridade: first_installment_date (à vista / 1ª parcela one_time)
+    //  → entry_date (entrada) → first_payment_date → contract_start_date.
     let vencimento: string | null = null;
     if (paymentTerms) {
-      if (paymentTerms.payment_type === "one_time") {
-        vencimento = (paymentTerms.first_installment_date as string) || null;
-      } else {
-        vencimento = (paymentTerms.first_payment_date as string) || (paymentTerms.contract_start_date as string) || null;
-      }
+      vencimento =
+        (paymentTerms.first_installment_date as string) ||
+        (paymentTerms.entry_date as string) ||
+        (paymentTerms.first_payment_date as string) ||
+        (paymentTerms.contract_start_date as string) ||
+        null;
     }
+    console.log(`[notify-deal-won] vencimento for ${proposal_id} = ${vencimento}`);
 
     // Extract email/phone from account (JSONB format: [{value: "..."}])
     const rawEmails = account?.emails as unknown;
