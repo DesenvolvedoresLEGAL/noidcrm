@@ -101,12 +101,18 @@ Deno.serve(async (req) => {
       .eq("proposal_id", proposal_id)
       .order("order_index");
 
-    // Fetch payment terms with correct column names
-    const { data: paymentTerms } = await supabase
+    // Fetch payment terms — proposal_payment_terms can have multiple rows per proposal
+    // (legacy duplicates). Always take the MOST RECENT row so the ERP receives the
+    // up-to-date payment date defined by the user.
+    const { data: paymentTermsList } = await supabase
       .from("proposal_payment_terms")
-      .select("payment_type, installments, installment_interval_days, first_installment_date, first_payment_date, contract_start_date, contract_duration_months, monthly_value, contract_total, billing_day, comments, discount_percent")
+      .select("payment_type, payment_condition, installments, installment_interval_days, first_installment_date, first_payment_date, contract_start_date, contract_duration_months, monthly_value, contract_total, billing_day, comments, discount_percent, entry_date, payment_due_days, updated_at, created_at")
       .eq("proposal_id", proposal_id)
-      .maybeSingle();
+      .order("updated_at", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(1);
+    const paymentTerms = (paymentTermsList && paymentTermsList[0]) || null;
+    console.log(`[notify-deal-won] paymentTerms resolved for ${proposal_id}:`, JSON.stringify(paymentTerms));
 
     // Compute the legacy item-based total for auditing/observability only.
     const rawTotal = (items || []).reduce((sum: number, item: Record<string, unknown>) => {
