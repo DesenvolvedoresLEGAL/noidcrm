@@ -23,12 +23,20 @@ export interface AutoFillProposalData {
  * Auto-fills proposal data based on opportunity context
  * Reduces 80% of manual data entry
  */
-export async function autoFillProposal(opportunityId: string): Promise<AutoFillProposalData> {
+export async function autoFillProposal(
+  opportunityId: string,
+  preselectedTemplateId?: string,
+): Promise<AutoFillProposalData> {
   try {
+    // If a template was explicitly chosen by the user, honor it instead of the default.
+    const templatePromise = preselectedTemplateId
+      ? getTemplateById(preselectedTemplateId).catch(() => getDefaultTemplate())
+      : getDefaultTemplate();
+
     // Fetch all required data in parallel
     const [opportunity, defaultTemplate, { data: { user } }] = await Promise.all([
       getOpportunity(opportunityId),
-      getDefaultTemplate(),
+      templatePromise,
       supabase.auth.getUser(),
     ]);
 
