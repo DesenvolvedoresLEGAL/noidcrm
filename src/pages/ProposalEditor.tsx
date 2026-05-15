@@ -222,12 +222,10 @@ export default function ProposalEditor() {
 
   // Apply preselected template (from "Criar Proposta" template picker)
   const appliedPreselectedRef = useRef(false);
-  useEffect(() => {
-    if (!isNewProposal || !preselectedTemplateId || templates.length === 0) return;
-    if (appliedPreselectedRef.current) return;
+  const applyPreselectedTemplate = useCallback((silent = false) => {
+    if (!isNewProposal || !preselectedTemplateId || templates.length === 0) return false;
     const template: any = templates.find((t: any) => t.id === preselectedTemplateId);
-    if (!template) return;
-    appliedPreselectedRef.current = true;
+    if (!template) return false;
 
     if (template.layout_id) setValue('layout_id', template.layout_id);
     if (template.currency) setValue('currency', template.currency as 'BRL' | 'USD' | 'EUR');
@@ -246,8 +244,16 @@ export default function ProposalEditor() {
     if (template.notes || template.observations) {
       setValue('notes', template.notes || template.observations);
     }
-    toast.success(`📄 Template "${template.name}" aplicado!`);
+    if (!silent) toast.success(`📄 Template "${template.name}" aplicado!`);
+    return true;
   }, [preselectedTemplateId, templates, isNewProposal, setValue]);
+
+  useEffect(() => {
+    if (appliedPreselectedRef.current) return;
+    if (applyPreselectedTemplate()) {
+      appliedPreselectedRef.current = true;
+    }
+  }, [applyPreselectedTemplate]);
 
   // Load proposal data if editing
   const { data: proposalData, isLoading: isProposalLoading } = useQuery({
