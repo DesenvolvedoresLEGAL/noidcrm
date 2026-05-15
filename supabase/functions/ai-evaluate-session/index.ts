@@ -387,15 +387,15 @@ Regras do JSON:
     let evaluation: EvaluationResult | null = null;
     try {
       aiResult = await callOpenAIWithGuardrails({
-        model: 'gpt-5-nano',
+        model: 'gpt-5-mini',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
         response_format: { type: 'json_object' },
-        max_completion_tokens: 2500,
-        timeoutMs: 18000,
-        maxRetries: 1,
+        max_completion_tokens: 4000,
+        timeoutMs: 60000,
+        maxRetries: 2,
       });
     } catch (err) {
       await logAIUsage(supabase, {
@@ -532,15 +532,18 @@ Regras do JSON:
       wasFallback: evaluation._extractedViaFallback || false
     });
 
-    // Update session in database
+    const isContingency = evaluation._contingencyFallback === true;
+
+    // Update session in database. In contingency mode, mark as evaluation_error so
+    // the UI offers a "Reprocessar avaliação" button instead of pretending success.
     const { error: updateError } = await supabase
       .from('roleplay_sessions')
       .update({
-        score_overall: evaluation.overall_score,
+        score_overall: isContingency ? null : evaluation.overall_score,
         scores_json: evaluation,
-        passed: evaluation.passed,
+        passed: isContingency ? null : evaluation.passed,
         coach_notes: evaluation.summary ?? null,
-        current_phase: 'completed',
+        current_phase: isContingency ? 'evaluation_error' : 'completed',
         finished_at: new Date().toISOString()
       })
       .eq('id', sessionId);
@@ -550,12 +553,13 @@ Regras do JSON:
       throw updateError;
     }
 
-    console.log('[ai-evaluate-session] Session updated successfully');
+    console.log('[ai-evaluate-session] Session updated successfully', { isContingency });
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        evaluation,
+      JSON.stringify({
+        success: !isContingency,
+        contingency: isContingency,
+        evaluation: isContingency ? null : evaluation,
         session_id: sessionId
       }),
       {

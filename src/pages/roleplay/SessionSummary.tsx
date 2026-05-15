@@ -61,7 +61,8 @@ export default function SessionSummary() {
   });
 
   const sellerId = session?.seller_id;
-  const evaluationReady = session?.score_overall != null;
+  const sessionContingency = (session?.scores_json as any)?._contingencyFallback === true;
+  const evaluationReady = session?.score_overall != null && !sessionContingency;
   const shouldAttemptRecovery = !!session && !evaluationReady && !!sessionId;
 
   const reprocessMutation = useMutation({
@@ -233,7 +234,8 @@ export default function SessionSummary() {
 
 
   const normalizedPhase = mergedSession?.current_phase || mergedSession?.status;
-  const hasScore = mergedSession?.score_overall != null;
+  const isContingencyResult = (mergedSession?.scores_json as any)?._contingencyFallback === true;
+  const hasScore = mergedSession?.score_overall != null && !isContingencyResult;
 
   if (!session) {
     return (
@@ -252,8 +254,8 @@ export default function SessionSummary() {
     console.log('[RoleplaySummary] calling finalize function', { sessionId, source: 'state-handler' });
   }
 
-  if (!hasScore && ['evaluating', 'pending', 'in_progress', 'finished', 'evaluation_error', 'error', undefined, 'undefined', 'null', null].includes(normalizedPhase as any)) {
-    const phaseHasFailed = ['evaluation_error', 'error'].includes(String(normalizedPhase)) && !autoRecoveryPending && !reprocessMutation.isPending;
+  if (!hasScore && (isContingencyResult || ['evaluating', 'pending', 'in_progress', 'finished', 'evaluation_error', 'error', undefined, 'undefined', 'null', null].includes(normalizedPhase as any))) {
+    const phaseHasFailed = (['evaluation_error', 'error'].includes(String(normalizedPhase)) || isContingencyResult) && !autoRecoveryPending && !reprocessMutation.isPending;
     return (
       <Layout>
         <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4 p-8 text-center">

@@ -155,7 +155,20 @@ async function runRoleplayPipeline(sessionId: string, authHeader: string) {
     throw new HttpError(502, `Falha na avaliação por IA: ${evaluationErrorMessage}`);
   }
 
-  const evaluation = (aiData?.evaluation ?? null) as EvaluationPayload | null;
+  // Detect contingency fallback: ai-evaluate-session signals it via { contingency: true }
+  // or via evaluation._contingencyFallback. Treat as failure so UI offers retry.
+  const evaluation = (aiData?.evaluation ?? null) as (EvaluationPayload & { _contingencyFallback?: boolean }) | null;
+  const isContingency = aiData?.contingency === true || evaluation?._contingencyFallback === true;
+
+  if (isContingency) {
+    console.warn('[RoleplayFinalize] contingency fallback detected, marking as evaluation_error', { sessionId });
+    await adminClient
+      .from('roleplay_sessions')
+      .update({ current_phase: 'evaluation_error' })
+      .eq('id', sessionId);
+    throw new HttpError(502, 'A avaliação por IA falhou (timeout). Clique em "Reprocessar avaliação" para tentar novamente.');
+  }
+
   if (!evaluation || typeof evaluation.overall_score !== 'number') {
     console.error('[RoleplayFinalize] invalid evaluation payload', { sessionId, aiData });
     await adminClient

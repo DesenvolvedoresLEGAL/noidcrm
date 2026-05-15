@@ -1,72 +1,52 @@
-## Problema
+## Diagnóstico
 
-A proposta TELA MAGICA (`6f625243-5c77-45ea-9064-40e94132f5ed`) tem:
-- `subtotal` itens = R$ 985,00 (gross)
-- `dynamic_pricing_current_amount` = R$ 1.280,50 (vigente por antecedência)
-- `payment_expected_amount` / `approved_amount` = **R$ 1.199,83** (vigente − desconto 6,3% à vista — fonte de verdade)
+A sessão da tela (`5db6a4dc-...`) e **9 das últimas 16 sessões finalizadas (56%)** terminaram com um "fallback de contingência" — não com avaliação real da IA.
 
-O `notify-deal-won` já envia `amount = 1.199,83` corretamente. Mas o mesmo payload manda:
-- `products[].total_price` somando R$ 985 (raw dos itens, sem antecedência e sem desconto)
-- não envia `net_total`, `final_amount`, `valor_liquido`, `total_with_discount` (campos que o ERP espera, presentes no `api-deals`)
+Quando isso acontece, todas as dimensões recebem **a mesma frase genérica**:
 
-O ERP está lendo do `products[]` / `total_amount` legado e gravando R$ 985,00. Resultado: data correta, valor errado.
+> "Avaliação de contingência gerada porque a IA principal não respondeu dentro do tempo. Revise a conversa para feedback qualitativo mais profundo."
 
-A correção tem que ser feita **uma vez** no único ponto de saída para o ERP (`notify-deal-won`), espelhando o que o `api-deals` já entrega, para que qualquer campo que o ERP leia traga o valor líquido aprovado.
+…e a sessão é marcada como `current_phase = 'completed'` com uma nota inventada (média ponderada por sinais simples como "tem '?' na mensagem"). É exatamente o que aparece no print: 7.7/7.9/8.1 com texto idêntico em todas as dimensões. Não há onde acertou, onde errou, nem aderência a metodologia — porque a IA real nunca foi consultada com sucesso.
 
-## Mudanças
+### Causa raiz em `supabase/functions/ai-evaluate-session/index.ts`
 
-### 1. `supabase/functions/notify-deal-won/index.ts` — payload completo e consistente
+1. **Modelo + timeout subdimensionados**: `gpt-5-nano` com `timeoutMs: 18000` e `max_completion_tokens: 2500`. `gpt-5-nano` é modelo de raciocínio — gasta tokens em "thinking" antes de emitir JSON. Em conversas de 12-16 mensagens, dispara `AbortError: "The signal has been aborted"` (mensagem confirmada no `coach_notes` da sessão).
+2. **`maxRetries: 1`** (apenas 1 retentativa) cai rápido demais.
+3. **Fallback mascara a falha**: quando o AbortError acontece, `buildContingencyEvaluation` retorna nota plausível e `current_phase = 'completed'`. O frontend não sabe distinguir uma avaliação real de uma de contingência → não oferece "Reprocessar".
+4. **Frontend (`SessionSummary.tsx`)** já tem botão "Reprocessar avaliação" — mas só aparece em `evaluation_error`, nunca em `completed`. Logo, o usuário nunca pode pedir uma reavaliação real.
 
-a) **Selecionar mais campos da proposta** para reusar a mesma lógica do `api-deals`:
-- adicionar `subtotal`, `discount_amount`, `total_amount` ao SELECT (além dos já existentes via `APPROVED_VALUE_SELECT_COLUMNS`).
+## Plano
 
-b) **Calcular breakdown financeiro** igual ao `api-deals`:
-- `netTotal` = approved.amount (já é 1.199,83 via `payment_expected_amount`)
-- `discountTotal` = `subtotal − netTotal` (ou `discount_amount` se já preenchido)
-- `discountPercent` = `(discountTotal / subtotal) × 100`
-- `itemsGrossTotal` = soma de `proposal_items.total`
+### 1. Edge function `ai-evaluate-session`
+- Trocar modelo de `gpt-5-nano` → **`gpt-5-mini`** (segue a regra do projeto: já está no wrapper `_shared/openai-client.ts`).
+- `timeoutMs: 18000` → **`60000`** e `maxRetries: 1` → **`2`**.
+- `max_completion_tokens: 2500` → **`4000`** (gpt-5-mini precisa de mais headroom para reasoning + JSON).
+- Em `buildContingencyEvaluation`: **NÃO** marcar `current_phase = 'completed'`. Em vez disso, persistir `current_phase = 'evaluation_error'` e devolver `_contingencyFallback: true` no payload, **sem** fingir nota válida. Manter `coach_notes` com motivo técnico.
+- Garantir que o handler retorne HTTP 200 com `{ evaluation: null, contingency: true }` para o caller.
 
-c) **Adicionar campos redundantes no payload** (mesmos nomes que o `api-deals` retorna), para o ERP não ter ambiguidade:
-```
-amount: netTotal,                  // 1199.83
-net_total: netTotal,
-final_amount: netTotal,
-valor_liquido: netTotal,
-total_with_discount: netTotal,
-total_negotiated: netTotal,
-total_amount: netTotal,            // sobrescreve o legado de 985
-subtotal: subtotal,                // 985 (gross dos itens)
-gross_total: itemsGrossTotal,
-discount_total: discountTotal,
-discount_percent: discountPercent,
-contract_total: paymentTerms?.contract_total ?? netTotal,
-```
+### 2. Edge function `finalize-roleplay-session`
+- Quando `aiData.contingency === true` ou `_contingencyFallback === true`: forçar `current_phase = 'evaluation_error'` (não `'completed'`) e devolver `status: 'failed'`.
+- Manter idempotência: se já existir avaliação real válida (não-contingência), retornar como hoje.
 
-d) **Escalar cada `products[].total_price`** proporcionalmente para que `Σ products[].total_price === netTotal`. Isso evita o cenário atual onde o ERP soma os itens e ignora o total.
-- fator = `netTotal / itemsGrossTotal` (com guarda contra divisão por zero)
-- aplicar ao `total_price` (e expor `original_total_price` para auditoria)
-- **não alterar** `unit_price` nem `quantity` (preservam a apresentação original)
-- adicionar `net_total_price` por item para o ERP que prefira ler do item
+### 3. UI `src/pages/roleplay/SessionSummary.tsx`
+- Detectar `scores_json._contingencyFallback === true` e renderizar o mesmo bloco de erro/retry usado em `evaluation_error` (com botão "Reprocessar avaliação"), em vez do resultado falso.
+- Pequeno banner "Avaliação anterior falhou — clique para reavaliar com a IA real."
 
-e) **Logs explícitos** com `net_total`, `gross_total`, `items_sum_after_scale` para facilitar diagnóstico futuro.
+### 4. Backfill das 9 sessões já contaminadas
+- Script SQL one-shot: para cada sessão `WHERE scores_json->>'_contingencyFallback' = 'true'`, marcar `current_phase = 'evaluation_error'` e `score_overall = NULL`. Usuário pode então clicar "Reprocessar" para gerar avaliação real (agora com gpt-5-mini + 60s).
 
-### 2. Não mexer em mais nada
-- `api-deals` já está correto (envia `net_total`/`final_amount`/`amount` = 1.199,83) — nada a fazer.
-- `_shared/approved-proposal-value.ts` já resolve a fonte de verdade corretamente — nada a fazer.
-- RLS, multi-tenant, schema do DB: sem alterações.
-
-### 3. Reenvio da TELA MAGICA
-Após o deploy, retrigar o `notify-deal-won` para `proposal_id = 6f625243-5c77-45ea-9064-40e94132f5ed`. O ERP deve atualizar o R$ 985 → R$ 1.199,83 mantendo a data 14/05/2026.
-
-## Arquivos impactados
-- `supabase/functions/notify-deal-won/index.ts`
+### 5. Validação
+- Curl `finalize-roleplay-session` para a sessão `5db6a4dc-...` após o deploy e confirmar que volta avaliação real (não-fallback) com feedback específico por dimensão.
+- Conferir logs de `ai-evaluate-session`: zero `AbortError` em sessões de 16 mensagens.
+- Verificar no print do usuário: feedbacks distintos por dimensão (Situação ≠ Problema ≠ Implicação) com citações da conversa.
 
 ## Riscos
-- **Baixo.** O ERP hoje lê algum campo que vale 985; depois da mudança, todos os campos relacionados a valor passam a refletir 1.199,83. Se o ERP lê do `products[]`, a soma escalada também bate.
-- Itens com escala podem mostrar centavos não inteiros no ERP (ex.: R$ 985,00 vira R$ 1.199,83 quando há um único item; com vários itens, o último item recebe o ajuste de arredondamento para fechar exatamente).
-- Não afeta propostas sem desconto/antecedência (fator = 1.0).
+- **Custo**: gpt-5-mini > gpt-5-nano. Aceitável — avaliação só roda 1x por sessão e hoje 56% precisam reprocessar do zero.
+- **Latência**: usuário pode esperar até ~60s. Aceitável dado que o pipeline já é assíncrono via `EdgeRuntime.waitUntil` para tarefas pós-avaliação. A chamada principal continua bloqueante, mas sessões reais hoje rodam em ~10-25s.
+- **Backfill**: zera notas falsas. Usuário verá "reprocessar" nas sessões antigas — comportamento desejado, já que as notas atuais são placeholders.
 
-## Próximos passos
-1. Implementar e deployar `notify-deal-won`.
-2. Reenviar TELA MAGICA via `notify-deal-won` com `proposal_id` da accepted.
-3. Conferir no ERP: valor R$ 1.199,83, vencimento 14/05/2026.
+## Arquivos impactados
+- `supabase/functions/ai-evaluate-session/index.ts` (modelo, timeout, comportamento do fallback)
+- `supabase/functions/finalize-roleplay-session/index.ts` (não persistir 'completed' em contingência)
+- `src/pages/roleplay/SessionSummary.tsx` (detectar `_contingencyFallback` e mostrar retry)
+- 1 migration SQL para reset das 9 sessões em contingência
