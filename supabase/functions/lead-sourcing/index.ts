@@ -1932,6 +1932,7 @@ async function handleEventFirecrawl(
   // allExhibitors already declared at Step 0 (provider detection)
 
   const swapcardHtml = scrapedContents.find((item) => /swapcard|__NEXT_DATA__|Core_EventExhibitorListView/i.test(item.html || ""))?.html || scrapedContents[0]?.html || "";
+  let swapcardCompleted = false;
   if (swapcardHtml) {
     try {
       const swapcardExhibitors = await fetchSwapcardExhibitors(formattedEventUrl, swapcardHtml);
@@ -1946,6 +1947,21 @@ async function handleEventFirecrawl(
           extraction_method: "swapcard_graphql_cursor",
           views_diagnostics: diagnostics,
         });
+        // Provider determinístico entregou lista completa — pular AI loop e
+        // fallback HTML híbrido. Persistência avança imediatamente.
+        if (swapcardExhibitors.length >= 20) {
+          swapcardCompleted = true;
+          (metrics as any).provider = "swapcard_late";
+          (metrics as any).deterministic_skip_ai = true;
+          // Heartbeat: garante que o watchdog não mate o run nem fique zumbi.
+          await supabase.from("playbook_runs").update({
+            stats: { ...metrics },
+            last_heartbeat_at: new Date().toISOString(),
+          }).eq("id", run.id);
+          await logRunEvent(supabase, organizationId, run.id, "info",
+            "Provider determinístico (Swapcard) completo, pulando loop de IA e fallback HTML",
+            { count: swapcardExhibitors.length });
+        }
       }
     } catch (swapcardErr) {
       await logRunEvent(supabase, organizationId, run.id, "warn", "Extração Swapcard GraphQL falhou; mantendo fallback por scroll/AI", { error: String(swapcardErr) });
