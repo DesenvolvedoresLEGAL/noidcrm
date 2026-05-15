@@ -130,11 +130,25 @@ Deno.serve(async (req) => {
     }
 
     // SOURCE OF TRUTH for ERP: the approved commercial value, which already includes
-    // dynamic-pricing adjustments (event antecedence, etc.).
+    // dynamic-pricing adjustments (event antecedence, etc.) AND payment discounts.
     const approved = resolveApprovedProposalAmount(proposal as any);
     const totalAmount = approved.amount > 0 ? approved.amount : itemsNetTotal;
+
+    // Financial breakdown — same shape as api-deals so the ERP receives an
+    // unambiguous NET value across every legacy field name.
+    const proposalSubtotal = Number((proposal as any).subtotal) || 0;
+    const proposalDiscountAmount = Number((proposal as any).discount_amount) || 0;
+    const subtotalForBreakdown = proposalSubtotal > 0 ? proposalSubtotal : rawTotal;
+    const netTotal = totalAmount;
+    const discountTotal = proposalDiscountAmount > 0
+      ? proposalDiscountAmount
+      : Math.max(subtotalForBreakdown - netTotal, 0);
+    const discountPercent = subtotalForBreakdown > 0
+      ? Number(((discountTotal / subtotalForBreakdown) * 100).toFixed(2))
+      : 0;
+
     console.log(
-      `[notify-deal-won] Approved value for ${proposal_id}: ${totalAmount} (source=${approved.source}, base=${approved.base_amount}, dyn=${approved.dynamic_amount}, items_net=${itemsNetTotal})`,
+      `[notify-deal-won] Approved value for ${proposal_id}: net=${netTotal} subtotal=${subtotalForBreakdown} discount=${discountTotal} (${discountPercent}%) source=${approved.source} base=${approved.base_amount} dyn=${approved.dynamic_amount} items_gross=${rawTotal} items_net=${itemsNetTotal}`,
     );
 
     // Derive vencimento — sempre priorizar a data definida nas condições de pagamento.
@@ -142,6 +156,35 @@ Deno.serve(async (req) => {
     //  → entry_date (entrada) → first_payment_date → contract_start_date.
     const vencimento = dueResolution.vencimento;
     console.log(`[notify-deal-won] vencimento for ${proposal_id} = ${vencimento} (source=${dueResolution.source})`);
+
+    // Scale per-item totals so Σ products[].total_price === netTotal.
+    // Some ERP integrations sum line items instead of reading the deal-level
+    // amount; without scaling we'd send the gross items total (e.g. 985)
+    // even when net is 1.199,83. Unit price / quantity remain untouched
+    // for human-readable presentation.
+    const itemsArr = items || [];
+    const grossSum = itemsArr.reduce(
+      (s: number, it: Record<string, unknown>) => s + (Number(it.total) || 0),
+      0,
+    );
+    const scaleFactor = grossSum > 0 ? netTotal / grossSum : 1;
+    const scaledItems = itemsArr.map((item, idx) => {
+      const original = Number(item.total) || 0;
+      let scaled = Math.round(original * scaleFactor * 100) / 100;
+      // Force last item to absorb rounding so the sum matches netTotal exactly.
+      if (idx === itemsArr.length - 1) {
+        const sumSoFar = itemsArr
+          .slice(0, idx)
+          .reduce((s, it) => s + Math.round((Number(it.total) || 0) * scaleFactor * 100) / 100, 0);
+        scaled = Math.round((netTotal - sumSoFar) * 100) / 100;
+      }
+      return { item, original, scaled };
+    });
+    const scaledSum = scaledItems.reduce((s, x) => s + x.scaled, 0);
+    console.log(
+      `[notify-deal-won] items scaled: count=${itemsArr.length} factor=${scaleFactor} gross=${grossSum} scaled_sum=${scaledSum} net=${netTotal}`,
+    );
+
 
     // Extract email/phone from account (JSONB format: [{value: "..."}])
     const rawEmails = account?.emails as unknown;
