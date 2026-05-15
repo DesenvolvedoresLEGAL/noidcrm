@@ -2177,7 +2177,7 @@ ${chunk}`,
 
   // ── Step 4b: Hybrid HTML extraction fallback ──
   // If AI extracted few results but HTML has many repeated patterns, extract deterministically
-  if (allExhibitors.length < 50 && scrapedContents.length > 0) {
+  if (!swapcardCompleted && allExhibitors.length < 50 && scrapedContents.length > 0) {
     await logRunEvent(supabase, organizationId, run.id, "info", "AI extraiu poucos resultados, tentando extração híbrida do HTML");
     let htmlCandidates = 0;
 
