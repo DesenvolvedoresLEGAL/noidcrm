@@ -2173,6 +2173,7 @@ ${chunk}`,
   metrics.exhibitors_extracted_raw = allExhibitors.length;
   executionLog.push({ step: "ai_extraction", chunks_processed: metrics.ai_chunks_processed, exhibitors_extracted: allExhibitors.length, at: new Date().toISOString() });
   await logRunEvent(supabase, organizationId, run.id, "info", `${allExhibitors.length} expositores extraídos de ${metrics.ai_chunks_processed} chunks`);
+  } // end if (!swapcardCompleted) — closes Step 4 wrapper
 
   // ── Step 4b: Hybrid HTML extraction fallback ──
   // If AI extracted few results but HTML has many repeated patterns, extract deterministically
