@@ -992,26 +992,43 @@ export default function ProposalEditor() {
                   <div className="space-y-2">
                     <Label>Template</Label>
                     <Select 
-                      value={templates.find((t: any) => t.layout_id === watch('layout_id'))?.id || ''} 
-                      onValueChange={(templateId) => {
-                        const template = templates.find((t: any) => t.id === templateId);
-                        if (template) {
-                          // Apply all template configurations
-                          if (template.layout_id) setValue('layout_id', template.layout_id);
-                          if (template.currency) setValue('currency', template.currency as 'BRL' | 'USD' | 'EUR');
-                          if (template.validity_days) {
-                            const expiresAt = new Date();
-                            expiresAt.setDate(expiresAt.getDate() + template.validity_days);
-                            const year = expiresAt.getFullYear();
-                            const month = String(expiresAt.getMonth() + 1).padStart(2, '0');
-                            const day = String(expiresAt.getDate()).padStart(2, '0');
-                            setValue('expires_at', `${year}-${month}-${day}`);
+                      value={appliedTemplate?.id || ''} 
+                      onValueChange={async (templateId) => {
+                        const template: any = templates.find((t: any) => t.id === templateId);
+                        if (!template) return;
+                        // Apply locally for immediate UI feedback
+                        if (template.layout_id) setValue('layout_id', template.layout_id);
+                        if (template.currency) setValue('currency', template.currency as 'BRL' | 'USD' | 'EUR');
+                        if (template.name) (setValue as any)('template_name', template.name);
+                        const days = template.default_validity_days ?? template.validity_days;
+                        if (days) {
+                          const expiresAt = new Date();
+                          expiresAt.setDate(expiresAt.getDate() + Number(days));
+                          const year = expiresAt.getFullYear();
+                          const month = String(expiresAt.getMonth() + 1).padStart(2, '0');
+                          const day = String(expiresAt.getDate()).padStart(2, '0');
+                          setValue('expires_at', `${year}-${month}-${day}`);
+                        }
+                        if (template.introduction) setValue('introduction', template.introduction);
+                        if (template.terms) setValue('terms', template.terms);
+                        if (template.notes || template.observations) {
+                          setValue('notes', template.notes || template.observations);
+                        }
+
+                        // For existing proposals, persist server-side so commercial rules
+                        // (revenue_type, dynamic_pricing_*, payment_mode) and dynamic table
+                        // are recalculated. This is what makes the switch "stick" elegantly.
+                        if (!isNewProposal && proposalId) {
+                          try {
+                            await applyTemplate(proposalId, templateId);
+                            await orchestrateProposalFinancials(proposalId, 'template_switch');
+                            await invalidateProposalCaches(queryClient, proposalId);
+                            toast.success(`📄 Template "${template.name}" aplicado!`);
+                          } catch (err: any) {
+                            console.error('[template switch] failed:', err);
+                            toast.error(`Falha ao trocar template: ${err?.message ?? 'erro desconhecido'}`);
                           }
-                          if (template.introduction) setValue('introduction', template.introduction);
-                          if (template.terms) setValue('terms', template.terms);
-                          if (template.notes || template.observations) {
-                            setValue('notes', template.notes || template.observations);
-                          }
+                        } else {
                           toast.success(`📄 Template "${template.name}" aplicado!`);
                         }
                       }}
