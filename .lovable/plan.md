@@ -1,52 +1,66 @@
-## Diagnóstico
+## Diagnóstico forense — FISPAL FOOD 2026
 
-A sessão da tela (`5db6a4dc-...`) e **9 das últimas 16 sessões finalizadas (56%)** terminaram com um "fallback de contingência" — não com avaliação real da IA.
+Run `e6d2f0b4-b9f4-403e-bb1e-39761269b6d6` foi disparado em **2026-05-11 17:00:57** e está `status='running'` desde então (mais de 4 dias), `last_heartbeat_at = NULL`, `finished_at = NULL`, `retry_count = 0`, `error_summary = NULL`. **Nenhum prospect foi criado** (`prospects` = 0). É o único run da FISPAL no histórico — o usuário não conseguiu iniciar outro porque a UI ainda enxerga este como "em execução".
 
-Quando isso acontece, todas as dimensões recebem **a mesma frase genérica**:
+Linha do tempo dos `run_events` (todos em ~60 segundos):
 
-> "Avaliação de contingência gerada porque a IA principal não respondeu dentro do tempo. Revise a conversa para feedback qualitativo mais profundo."
+```
+17:00:58  Execução iniciada
+17:01:00  Mapeando URL do evento
+17:01:31  1 páginas descobertas
+17:01:34  Shell vazio de SPA detectado (react)
+17:01:38  SPA com infinite-scroll → Firecrawl 8 rodadas vazias (esperado: SPA Apollo)
+17:01:56  Swapcard GraphQL extraiu 460 expositores via cursor   ✅
+17:01:57  Parser de markdown extraiu 462 expositores antes da AI ✅
+…  (silêncio absoluto desde então)
+```
 
-…e a sessão é marcada como `current_phase = 'completed'` com uma nota inventada (média ponderada por sinais simples como "tem '?' na mensagem"). É exatamente o que aparece no print: 7.7/7.9/8.1 com texto idêntico em todas as dimensões. Não há onde acertou, onde errou, nem aderência a metodologia — porque a IA real nunca foi consultada com sucesso.
+Ou seja: o **provedor Swapcard/Informa funcionou perfeitamente** (462 expositores em mãos, batendo com os 467 do site). O run morreu **depois** disso, dentro do **Step 4 (loop de extração com IA)** — `gpt-5-mini` é chamado de novo sobre o mesmo HTML/markdown da SPA, em chunks, e a Edge Function bate o teto de wall-clock do Supabase (~150s livre / ~25min com `waitUntil`) **antes** de chegar no Step 5 (dedupe + persist). Como nada é persistido incrementalmente e nenhum heartbeat é gravado, o registro fica "running" para sempre, bloqueando a UI.
 
-### Causa raiz em `supabase/functions/ai-evaluate-session/index.ts`
+Causas combinadas:
+1. AI loop redundante mesmo quando o provedor determinístico (Informa/Swapcard, ExpoFP) já entregou a lista completa.
+2. Persistência só no fim do pipeline → tudo se perde se houver timeout.
+3. Sem `last_heartbeat_at` gravado a cada etapa → recuperador automático não consegue marcar runs zumbi.
+4. URL com `?filters=...` (segmentação UFM) é repassada como `formattedEventUrl` e usada também no Firecrawl, gerando 8 rodadas inúteis antes do GraphQL — desperdiça budget e tempo.
 
-1. **Modelo + timeout subdimensionados**: `gpt-5-nano` com `timeoutMs: 18000` e `max_completion_tokens: 2500`. `gpt-5-nano` é modelo de raciocínio — gasta tokens em "thinking" antes de emitir JSON. Em conversas de 12-16 mensagens, dispara `AbortError: "The signal has been aborted"` (mensagem confirmada no `coach_notes` da sessão).
-2. **`maxRetries: 1`** (apenas 1 retentativa) cai rápido demais.
-3. **Fallback mascara a falha**: quando o AbortError acontece, `buildContingencyEvaluation` retorna nota plausível e `current_phase = 'completed'`. O frontend não sabe distinguir uma avaliação real de uma de contingência → não oferece "Reprocessar".
-4. **Frontend (`SessionSummary.tsx`)** já tem botão "Reprocessar avaliação" — mas só aparece em `evaluation_error`, nunca em `completed`. Logo, o usuário nunca pode pedir uma reavaliação real.
+## Plano de correção
 
-## Plano
+### 1. Curto-circuitar o AI loop quando provedor determinístico funcionou
+`supabase/functions/lead-sourcing/index.ts`
+- Após o bloco Swapcard (linha ~1937–1953) e o bloco ExpoFP, setar `deterministicProviderHit = true` quando `swapcardExhibitors.length >= 20` (ou ExpoFP ok).
+- Se `deterministicProviderHit`, pular Step 4 (AI chunks) e Step 4b (HTML híbrido). Continuar direto para dedupe/persist.
+- Logar `Provider determinístico completo, AI loop pulada` para visibilidade.
 
-### 1. Edge function `ai-evaluate-session`
-- Trocar modelo de `gpt-5-nano` → **`gpt-5-mini`** (segue a regra do projeto: já está no wrapper `_shared/openai-client.ts`).
-- `timeoutMs: 18000` → **`60000`** e `maxRetries: 1` → **`2`**.
-- `max_completion_tokens: 2500` → **`4000`** (gpt-5-mini precisa de mais headroom para reasoning + JSON).
-- Em `buildContingencyEvaluation`: **NÃO** marcar `current_phase = 'completed'`. Em vez disso, persistir `current_phase = 'evaluation_error'` e devolver `_contingencyFallback: true` no payload, **sem** fingir nota válida. Manter `coach_notes` com motivo técnico.
-- Garantir que o handler retorne HTTP 200 com `{ evaluation: null, contingency: true }` para o caller.
+### 2. Persistência incremental + heartbeat
+- Logo depois de Swapcard/ExpoFP devolverem N expositores, executar dedupe + insert em lotes de 25 e atualizar `playbook_runs.last_heartbeat_at = now()` + `stats.persisted_prospects` a cada lote.
+- Garante que mesmo se algo falhar adiante o usuário tem 462 prospects no Caramelo.
 
-### 2. Edge function `finalize-roleplay-session`
-- Quando `aiData.contingency === true` ou `_contingencyFallback === true`: forçar `current_phase = 'evaluation_error'` (não `'completed'`) e devolver `status: 'failed'`.
-- Manter idempotência: se já existir avaliação real válida (não-contingência), retornar como hoje.
+### 3. Recuperação de runs zumbi
+- Acrescentar update de `last_heartbeat_at` em **todos** os `logRunEvent` críticos (já temos índice `idx_playbook_runs_heartbeat`).
+- Criar (ou reusar) função SQL `mark_stale_playbook_runs_failed()` que marca como `failed` runs `running` com `last_heartbeat_at < now() - interval '15 min'` (ou `started_at` se heartbeat null). Disparar via cron `pg_cron` a cada 5 min. Mensagem: "Execução interrompida por timeout — reabrir busca para tentar novamente".
 
-### 3. UI `src/pages/roleplay/SessionSummary.tsx`
-- Detectar `scores_json._contingencyFallback === true` e renderizar o mesmo bloco de erro/retry usado em `evaluation_error` (com botão "Reprocessar avaliação"), em vez do resultado falso.
-- Pequeno banner "Avaliação anterior falhou — clique para reavaliar com a IA real."
+### 4. Não desperdiçar Firecrawl em SPA conhecida
+- Quando `detectInformaMarkets(eventUrl)` ou `detectExpoFP(eventUrl)` retornarem positivo, **pular** o bloco Firecrawl/scroll resiliente inteiro e ir direto para o provedor nativo. Hoje gastamos 8 rodadas Firecrawl mesmo sabendo que a página é Apollo SPA.
+- Sanitizar `formattedEventUrl` removendo `?filters=...` antes de logar/comparar identidade do evento (a paridade GraphQL já ignora filters).
 
-### 4. Backfill das 9 sessões já contaminadas
-- Script SQL one-shot: para cada sessão `WHERE scores_json->>'_contingencyFallback' = 'true'`, marcar `current_phase = 'evaluation_error'` e `score_overall = NULL`. Usuário pode então clicar "Reprocessar" para gerar avaliação real (agora com gpt-5-mini + 60s).
+### 5. Recuperar o run da FISPAL
+- Migration única que marca o run `e6d2f0b4-b9f4-403e-bb1e-39761269b6d6` como `failed` com `error_summary = 'Recuperado: timeout silencioso após Swapcard extrair 462 expositores; pipeline corrigido — abrir nova busca'` para liberar a UI.
 
-### 5. Validação
-- Curl `finalize-roleplay-session` para a sessão `5db6a4dc-...` após o deploy e confirmar que volta avaliação real (não-fallback) com feedback específico por dimensão.
-- Conferir logs de `ai-evaluate-session`: zero `AbortError` em sessões de 16 mensagens.
-- Verificar no print do usuário: feedbacks distintos por dimensão (Situação ≠ Problema ≠ Implicação) com citações da conversa.
-
-## Riscos
-- **Custo**: gpt-5-mini > gpt-5-nano. Aceitável — avaliação só roda 1x por sessão e hoje 56% precisam reprocessar do zero.
-- **Latência**: usuário pode esperar até ~60s. Aceitável dado que o pipeline já é assíncrono via `EdgeRuntime.waitUntil` para tarefas pós-avaliação. A chamada principal continua bloqueante, mas sessões reais hoje rodam em ~10-25s.
-- **Backfill**: zera notas falsas. Usuário verá "reprocessar" nas sessões antigas — comportamento desejado, já que as notas atuais são placeholders.
+### 6. Validação
+- Rodar `supabase--curl_edge_functions` chamando `lead-sourcing` com a URL exata da FISPAL após deploy.
+- Conferir em `playbook_runs` / `prospects` que finalizou em < 60s com 462 linhas e `status = completed`.
+- Conferir que o ExpoFP do APAS continua funcionando (regressão).
 
 ## Arquivos impactados
-- `supabase/functions/ai-evaluate-session/index.ts` (modelo, timeout, comportamento do fallback)
-- `supabase/functions/finalize-roleplay-session/index.ts` (não persistir 'completed' em contingência)
-- `src/pages/roleplay/SessionSummary.tsx` (detectar `_contingencyFallback` e mostrar retry)
-- 1 migration SQL para reset das 9 sessões em contingência
+
+```text
+supabase/functions/lead-sourcing/index.ts        (curto-circuito + heartbeat + persist incremental + skip Firecrawl em SPA)
+supabase/functions/lead-sourcing/providers/informa-markets.ts   (sanitizar query string ?filters=)
+supabase/migrations/<timestamp>_*.sql            (mark_stale_playbook_runs_failed + cron + reset run FISPAL)
+```
+
+Sem alterações em UI / serviços frontend — a página `KairosHub` segue lendo `playbook_runs` normalmente.
+
+## Riscos
+- Pular AI loop em outros eventos não-Informa/ExpoFP por engano: protegido pela flag `deterministicProviderHit` (só liga quando o provider devolveu >= 20).
+- Cron marcando como failed um run legitimamente longo (>15min): hoje nenhum run saudável passa de 4min; se necessário aumentar para 25min.

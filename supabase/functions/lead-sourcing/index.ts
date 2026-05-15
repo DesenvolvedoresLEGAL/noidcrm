@@ -1932,6 +1932,7 @@ async function handleEventFirecrawl(
   // allExhibitors already declared at Step 0 (provider detection)
 
   const swapcardHtml = scrapedContents.find((item) => /swapcard|__NEXT_DATA__|Core_EventExhibitorListView/i.test(item.html || ""))?.html || scrapedContents[0]?.html || "";
+  let swapcardCompleted = false;
   if (swapcardHtml) {
     try {
       const swapcardExhibitors = await fetchSwapcardExhibitors(formattedEventUrl, swapcardHtml);
@@ -1946,6 +1947,21 @@ async function handleEventFirecrawl(
           extraction_method: "swapcard_graphql_cursor",
           views_diagnostics: diagnostics,
         });
+        // Provider determinístico entregou lista completa — pular AI loop e
+        // fallback HTML híbrido. Persistência avança imediatamente.
+        if (swapcardExhibitors.length >= 20) {
+          swapcardCompleted = true;
+          (metrics as any).provider = "swapcard_late";
+          (metrics as any).deterministic_skip_ai = true;
+          // Heartbeat: garante que o watchdog não mate o run nem fique zumbi.
+          await supabase.from("playbook_runs").update({
+            stats: { ...metrics },
+            last_heartbeat_at: new Date().toISOString(),
+          }).eq("id", run.id);
+          await logRunEvent(supabase, organizationId, run.id, "info",
+            "Provider determinístico (Swapcard) completo, pulando loop de IA e fallback HTML",
+            { count: swapcardExhibitors.length });
+        }
       }
     } catch (swapcardErr) {
       await logRunEvent(supabase, organizationId, run.id, "warn", "Extração Swapcard GraphQL falhou; mantendo fallback por scroll/AI", { error: String(swapcardErr) });
@@ -2012,10 +2028,17 @@ async function handleEventFirecrawl(
   // WATCHDOG: timeout global de 6min no loop completo de IA. Se estourar,
   // continua com o que já foi extraído (parser markdown + html híbrido + fallback Step 4b).
   // Evita travas como a da Feimec (13min sem resposta exigindo Force Complete).
+  // SKIP: se o provider determinístico (Swapcard) entregou >= 20 expositores,
+  // o loop de IA é redundante e responsável por timeouts silenciosos (FISPAL).
   const CHUNK_SIZE = 40000;
   const AI_PHASE_TIMEOUT_MS = 6 * 60 * 1000;
   let aiPhaseTimedOut = false;
   const aiPhaseStart = Date.now();
+
+  if (swapcardCompleted) {
+    await logRunEvent(supabase, organizationId, run.id, "info",
+      `AI loop pulado: provider determinístico já entregou ${allExhibitors.length} expositores`);
+  } else {
 
   const aiLoop = (async () => {
   for (const scraped of scrapedContents) {
@@ -2150,10 +2173,11 @@ ${chunk}`,
   metrics.exhibitors_extracted_raw = allExhibitors.length;
   executionLog.push({ step: "ai_extraction", chunks_processed: metrics.ai_chunks_processed, exhibitors_extracted: allExhibitors.length, at: new Date().toISOString() });
   await logRunEvent(supabase, organizationId, run.id, "info", `${allExhibitors.length} expositores extraídos de ${metrics.ai_chunks_processed} chunks`);
+  } // end if (!swapcardCompleted) — closes Step 4 wrapper
 
   // ── Step 4b: Hybrid HTML extraction fallback ──
   // If AI extracted few results but HTML has many repeated patterns, extract deterministically
-  if (allExhibitors.length < 50 && scrapedContents.length > 0) {
+  if (!swapcardCompleted && allExhibitors.length < 50 && scrapedContents.length > 0) {
     await logRunEvent(supabase, organizationId, run.id, "info", "AI extraiu poucos resultados, tentando extração híbrida do HTML");
     let htmlCandidates = 0;
 
