@@ -242,7 +242,9 @@ export async function tryInformaMarketsFromUrl(eventUrl: string): Promise<{
   // Try to enrich detection with eventId from SSR (avoids server-side errors when GraphQL needs it).
   if (!detection.eventId) {
     try {
-      const ssrUrl = `${detection.origin}/event/${detection.eventSlug}/exhibitors/${encodeURIComponent(detection.viewId)}`;
+      // viewId is base64 (e.g. "RXZlbnRWaWV3XzEyNDY3NDA=") — keep "=" literal in the path,
+      // encodeURIComponent would turn it into "%3D" and Informa returns 404 for the SSR.
+      const ssrUrl = `${detection.origin}/event/${detection.eventSlug}/exhibitors/${detection.viewId}`;
       const resp = await fetch(ssrUrl, {
         headers: { "User-Agent": BROWSER_UA, "Accept": "text/html,*/*" },
         signal: AbortSignal.timeout(15_000),
