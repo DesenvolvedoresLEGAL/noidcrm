@@ -181,9 +181,20 @@ export function calculateInstallments(
     // não foi aprovada (sem approvedAmount frozen), o vencimento do à vista
     // segue a data-limite da faixa vigente. Se a proposta já foi aprovada,
     // mantemos o que foi congelado em first_installment_date.
+    // PRICE UX 1.0.5 — quando o usuário escolhe "Data personalizada" como
+    // âncora de precificação, esta data passa a ser também o vencimento do
+    // à vista (refletindo no Cronograma e na proposta pública).
     const dynEnd = options?.dynamicPricingCurrentEndsAt;
     const isFrozen = options?.approvedAmount != null;
-    const dueDate = !isFrozen && dynEnd
+    const refType = (term as any).dynamic_pricing_reference_type;
+    const refDate = (term as any).dynamic_pricing_reference_date;
+    const customAnchor =
+      !isFrozen && refType === 'custom_date' && refDate
+        ? String(refDate).slice(0, 10)
+        : null;
+    const dueDate = customAnchor
+      ? customAnchor
+      : !isFrozen && dynEnd
       ? dynEnd.slice(0, 10)
       : term.first_installment_date || term.entry_date || formatLocalDate(new Date());
     return [
