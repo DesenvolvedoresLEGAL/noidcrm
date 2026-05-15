@@ -2,7 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { getOpportunity } from './opportunities';
 import { getAccount } from './accounts';
 import { getContact } from './contacts';
-import { getDefaultTemplate } from './proposal-templates';
+import { getDefaultTemplate, getTemplateById } from './proposal-templates';
 import { replaceVariables, VariableContext } from '@/lib/proposalVariables';
 
 export interface AutoFillProposalData {
