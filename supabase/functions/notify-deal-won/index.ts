@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
     const { data: proposal, error: pError } = await supabase
       .from("proposals")
       .select(
-        `id, opportunity_id, organization_id, status, title, client_name, client_email, created_at, accepted_at, expires_at, approved_payment_schedule, approval_snapshot, ${APPROVED_VALUE_SELECT_COLUMNS}`,
+        `id, opportunity_id, organization_id, status, title, client_name, client_email, created_at, accepted_at, expires_at, subtotal, discount_amount, approved_payment_schedule, approval_snapshot, ${APPROVED_VALUE_SELECT_COLUMNS}`,
       )
       .eq("id", proposal_id)
       .single();
@@ -130,11 +130,25 @@ Deno.serve(async (req) => {
     }
 
     // SOURCE OF TRUTH for ERP: the approved commercial value, which already includes
-    // dynamic-pricing adjustments (event antecedence, etc.).
+    // dynamic-pricing adjustments (event antecedence, etc.) AND payment discounts.
     const approved = resolveApprovedProposalAmount(proposal as any);
     const totalAmount = approved.amount > 0 ? approved.amount : itemsNetTotal;
+
+    // Financial breakdown — same shape as api-deals so the ERP receives an
+    // unambiguous NET value across every legacy field name.
+    const proposalSubtotal = Number((proposal as any).subtotal) || 0;
+    const proposalDiscountAmount = Number((proposal as any).discount_amount) || 0;
+    const subtotalForBreakdown = proposalSubtotal > 0 ? proposalSubtotal : rawTotal;
+    const netTotal = totalAmount;
+    const discountTotal = proposalDiscountAmount > 0
+      ? proposalDiscountAmount
+      : Math.max(subtotalForBreakdown - netTotal, 0);
+    const discountPercent = subtotalForBreakdown > 0
+      ? Number(((discountTotal / subtotalForBreakdown) * 100).toFixed(2))
+      : 0;
+
     console.log(
-      `[notify-deal-won] Approved value for ${proposal_id}: ${totalAmount} (source=${approved.source}, base=${approved.base_amount}, dyn=${approved.dynamic_amount}, items_net=${itemsNetTotal})`,
+      `[notify-deal-won] Approved value for ${proposal_id}: net=${netTotal} subtotal=${subtotalForBreakdown} discount=${discountTotal} (${discountPercent}%) source=${approved.source} base=${approved.base_amount} dyn=${approved.dynamic_amount} items_gross=${rawTotal} items_net=${itemsNetTotal}`,
     );
 
     // Derive vencimento — sempre priorizar a data definida nas condições de pagamento.
@@ -142,6 +156,35 @@ Deno.serve(async (req) => {
     //  → entry_date (entrada) → first_payment_date → contract_start_date.
     const vencimento = dueResolution.vencimento;
     console.log(`[notify-deal-won] vencimento for ${proposal_id} = ${vencimento} (source=${dueResolution.source})`);
+
+    // Scale per-item totals so Σ products[].total_price === netTotal.
+    // Some ERP integrations sum line items instead of reading the deal-level
+    // amount; without scaling we'd send the gross items total (e.g. 985)
+    // even when net is 1.199,83. Unit price / quantity remain untouched
+    // for human-readable presentation.
+    const itemsArr = items || [];
+    const grossSum = itemsArr.reduce(
+      (s: number, it: Record<string, unknown>) => s + (Number(it.total) || 0),
+      0,
+    );
+    const scaleFactor = grossSum > 0 ? netTotal / grossSum : 1;
+    const scaledItems = itemsArr.map((item, idx) => {
+      const original = Number(item.total) || 0;
+      let scaled = Math.round(original * scaleFactor * 100) / 100;
+      // Force last item to absorb rounding so the sum matches netTotal exactly.
+      if (idx === itemsArr.length - 1) {
+        const sumSoFar = itemsArr
+          .slice(0, idx)
+          .reduce((s, it) => s + Math.round((Number(it.total) || 0) * scaleFactor * 100) / 100, 0);
+        scaled = Math.round((netTotal - sumSoFar) * 100) / 100;
+      }
+      return { item, original, scaled };
+    });
+    const scaledSum = scaledItems.reduce((s, x) => s + x.scaled, 0);
+    console.log(
+      `[notify-deal-won] items scaled: count=${itemsArr.length} factor=${scaleFactor} gross=${grossSum} scaled_sum=${scaledSum} net=${netTotal}`,
+    );
+
 
     // Extract email/phone from account (JSONB format: [{value: "..."}])
     const rawEmails = account?.emails as unknown;
@@ -158,11 +201,24 @@ Deno.serve(async (req) => {
       companyPhone = typeof first === "string" ? first : (first as Record<string, unknown>)?.numero as string || (first as Record<string, unknown>)?.value as string || null;
     }
 
-    // Build deal payload for ERP
+    // Build deal payload for ERP — every monetary field carries the NET
+    // approved value so the ERP cannot accidentally pick a gross/legacy field.
     const dealPayload = {
       id: proposal.id,
       title: (opportunity?.title as string) || proposal.title || "Sem título",
-      amount: totalAmount,
+      // Primary fields (NET — already includes dynamic pricing + discount)
+      amount: netTotal,
+      net_total: netTotal,
+      final_amount: netTotal,
+      valor_liquido: netTotal,
+      total_with_discount: netTotal,
+      total_negotiated: netTotal,
+      total_amount: netTotal,
+      // Breakdown for transparency
+      subtotal: subtotalForBreakdown,
+      gross_total: grossSum,
+      discount_total: discountTotal,
+      discount_percent: discountPercent,
       base_amount: approved.base_amount || itemsNetTotal,
       approved_amount: approved.amount || null,
       amount_source: approved.source,
@@ -197,7 +253,9 @@ Deno.serve(async (req) => {
             : ((contact.telefones[0] as Record<string, unknown>)?.numero || (contact.telefones[0] as Record<string, unknown>)?.value))
         : null) as string | null,
       contact_position: (contact?.cargo as string) || null,
-      products: (items || []).map((item: Record<string, unknown>) => ({
+      // Products: total_price scaled so Σ === netTotal. unit_price/quantity preserved
+      // for human reading; original_total_price kept for auditing.
+      products: scaledItems.map(({ item, original, scaled }) => ({
         id: item.id,
         product_id: item.product_id,
         name: item.name,
@@ -205,7 +263,9 @@ Deno.serve(async (req) => {
         price: Number(item.unit_price) || 0,
         quantity: Number(item.quantity) || 1,
         discount_percent: Number(item.discount_percent) || 0,
-        total_price: Number(item.total) || 0,
+        total_price: scaled,
+        net_total_price: scaled,
+        original_total_price: original,
         billing_type: item.billing_type || "one_time",
         minimum_contract_months: item.minimum_contract_months ? Number(item.minimum_contract_months) : null,
       })),
@@ -219,7 +279,7 @@ Deno.serve(async (req) => {
             contract_start_date: paymentTerms.contract_start_date,
             contract_duration_months: paymentTerms.contract_duration_months,
             monthly_value: paymentTerms.monthly_value ? Number(paymentTerms.monthly_value) : null,
-            contract_total: paymentTerms.contract_total ? Number(paymentTerms.contract_total) : null,
+            contract_total: paymentTerms.contract_total ? Number(paymentTerms.contract_total) : netTotal,
             billing_day: paymentTerms.billing_day,
             comments: paymentTerms.comments,
             vencimento,
