@@ -61,7 +61,8 @@ export default function SessionSummary() {
   });
 
   const sellerId = session?.seller_id;
-  const evaluationReady = session?.score_overall != null;
+  const sessionContingency = (session?.scores_json as any)?._contingencyFallback === true;
+  const evaluationReady = session?.score_overall != null && !sessionContingency;
   const shouldAttemptRecovery = !!session && !evaluationReady && !!sessionId;
 
   const reprocessMutation = useMutation({
