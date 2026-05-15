@@ -2028,10 +2028,17 @@ async function handleEventFirecrawl(
   // WATCHDOG: timeout global de 6min no loop completo de IA. Se estourar,
   // continua com o que já foi extraído (parser markdown + html híbrido + fallback Step 4b).
   // Evita travas como a da Feimec (13min sem resposta exigindo Force Complete).
+  // SKIP: se o provider determinístico (Swapcard) entregou >= 20 expositores,
+  // o loop de IA é redundante e responsável por timeouts silenciosos (FISPAL).
   const CHUNK_SIZE = 40000;
   const AI_PHASE_TIMEOUT_MS = 6 * 60 * 1000;
   let aiPhaseTimedOut = false;
   const aiPhaseStart = Date.now();
+
+  if (swapcardCompleted) {
+    await logRunEvent(supabase, organizationId, run.id, "info",
+      `AI loop pulado: provider determinístico já entregou ${allExhibitors.length} expositores`);
+  } else {
 
   const aiLoop = (async () => {
   for (const scraped of scrapedContents) {
