@@ -320,10 +320,11 @@ export default function ProposalEditor() {
           layout_id: data.layout_id,
           currency: data.currency || (organization as any)?.default_currency || 'BRL',
         });
-        // If user picked a template explicitly, allow the preselected effect to
-        // re-apply it on top of the reset (avoids race where reset wipes setValue).
+        // Re-apply preselected template AFTER reset to win the race and
+        // guarantee the user's chosen template (e.g. Assinatura) sticks.
         if (preselectedTemplateId) {
-          appliedPreselectedRef.current = false;
+          // Defer so reset() flushes first
+          setTimeout(() => applyPreselectedTemplate(true), 0);
         }
         toast.success('✨ Proposta preenchida automaticamente!');
       }).catch(console.error);
