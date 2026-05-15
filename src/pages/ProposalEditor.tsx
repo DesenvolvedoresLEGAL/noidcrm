@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -222,12 +222,10 @@ export default function ProposalEditor() {
 
   // Apply preselected template (from "Criar Proposta" template picker)
   const appliedPreselectedRef = useRef(false);
-  useEffect(() => {
-    if (!isNewProposal || !preselectedTemplateId || templates.length === 0) return;
-    if (appliedPreselectedRef.current) return;
+  const applyPreselectedTemplate = useCallback((silent = false) => {
+    if (!isNewProposal || !preselectedTemplateId || templates.length === 0) return false;
     const template: any = templates.find((t: any) => t.id === preselectedTemplateId);
-    if (!template) return;
-    appliedPreselectedRef.current = true;
+    if (!template) return false;
 
     if (template.layout_id) setValue('layout_id', template.layout_id);
     if (template.currency) setValue('currency', template.currency as 'BRL' | 'USD' | 'EUR');
@@ -246,8 +244,16 @@ export default function ProposalEditor() {
     if (template.notes || template.observations) {
       setValue('notes', template.notes || template.observations);
     }
-    toast.success(`📄 Template "${template.name}" aplicado!`);
+    if (!silent) toast.success(`📄 Template "${template.name}" aplicado!`);
+    return true;
   }, [preselectedTemplateId, templates, isNewProposal, setValue]);
+
+  useEffect(() => {
+    if (appliedPreselectedRef.current) return;
+    if (applyPreselectedTemplate()) {
+      appliedPreselectedRef.current = true;
+    }
+  }, [applyPreselectedTemplate]);
 
   // Load proposal data if editing
   const { data: proposalData, isLoading: isProposalLoading } = useQuery({
@@ -304,7 +310,7 @@ export default function ProposalEditor() {
   // Auto-fill when creating from opportunity (only if no draft restored)
   useEffect(() => {
     if (isNewProposal && opportunityId && !hasRestoredFromStorageRef.current) {
-      autoFillProposal(opportunityId).then((data) => {
+      autoFillProposal(opportunityId, preselectedTemplateId).then((data) => {
         reset({
           title: data.title,
           introduction: data.introduction,
@@ -314,6 +320,12 @@ export default function ProposalEditor() {
           layout_id: data.layout_id,
           currency: data.currency || (organization as any)?.default_currency || 'BRL',
         });
+        // Re-apply preselected template AFTER reset to win the race and
+        // guarantee the user's chosen template (e.g. Assinatura) sticks.
+        if (preselectedTemplateId) {
+          // Defer so reset() flushes first
+          setTimeout(() => applyPreselectedTemplate(true), 0);
+        }
         toast.success('✨ Proposta preenchida automaticamente!');
       }).catch(console.error);
 
@@ -326,7 +338,7 @@ export default function ProposalEditor() {
         }
       }).catch(console.error);
     }
-  }, [isNewProposal, opportunityId, reset, organization]);
+  }, [isNewProposal, opportunityId, preselectedTemplateId, reset, organization, applyPreselectedTemplate]);
 
   // Fetch preview of next proposal number for new proposals
   useEffect(() => {
