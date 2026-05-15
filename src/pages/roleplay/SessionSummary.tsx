@@ -255,7 +255,7 @@ export default function SessionSummary() {
   }
 
   if (!hasScore && ['evaluating', 'pending', 'in_progress', 'finished', 'evaluation_error', 'error', undefined, 'undefined', 'null', null].includes(normalizedPhase as any)) {
-    const phaseHasFailed = ['evaluation_error', 'error'].includes(String(normalizedPhase)) && !autoRecoveryPending && !reprocessMutation.isPending;
+    const phaseHasFailed = (['evaluation_error', 'error'].includes(String(normalizedPhase)) || isContingencyResult) && !autoRecoveryPending && !reprocessMutation.isPending;
     return (
       <Layout>
         <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4 p-8 text-center">
