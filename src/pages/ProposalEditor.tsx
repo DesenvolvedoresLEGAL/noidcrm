@@ -304,7 +304,7 @@ export default function ProposalEditor() {
   // Auto-fill when creating from opportunity (only if no draft restored)
   useEffect(() => {
     if (isNewProposal && opportunityId && !hasRestoredFromStorageRef.current) {
-      autoFillProposal(opportunityId).then((data) => {
+      autoFillProposal(opportunityId, preselectedTemplateId).then((data) => {
         reset({
           title: data.title,
           introduction: data.introduction,
@@ -314,6 +314,11 @@ export default function ProposalEditor() {
           layout_id: data.layout_id,
           currency: data.currency || (organization as any)?.default_currency || 'BRL',
         });
+        // If user picked a template explicitly, allow the preselected effect to
+        // re-apply it on top of the reset (avoids race where reset wipes setValue).
+        if (preselectedTemplateId) {
+          appliedPreselectedRef.current = false;
+        }
         toast.success('✨ Proposta preenchida automaticamente!');
       }).catch(console.error);
 
@@ -326,7 +331,7 @@ export default function ProposalEditor() {
         }
       }).catch(console.error);
     }
-  }, [isNewProposal, opportunityId, reset, organization]);
+  }, [isNewProposal, opportunityId, preselectedTemplateId, reset, organization]);
 
   // Fetch preview of next proposal number for new proposals
   useEffect(() => {
