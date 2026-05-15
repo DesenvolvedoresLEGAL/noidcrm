@@ -254,7 +254,7 @@ export default function SessionSummary() {
     console.log('[RoleplaySummary] calling finalize function', { sessionId, source: 'state-handler' });
   }
 
-  if (!hasScore && ['evaluating', 'pending', 'in_progress', 'finished', 'evaluation_error', 'error', undefined, 'undefined', 'null', null].includes(normalizedPhase as any)) {
+  if (!hasScore && (isContingencyResult || ['evaluating', 'pending', 'in_progress', 'finished', 'evaluation_error', 'error', undefined, 'undefined', 'null', null].includes(normalizedPhase as any))) {
     const phaseHasFailed = (['evaluation_error', 'error'].includes(String(normalizedPhase)) || isContingencyResult) && !autoRecoveryPending && !reprocessMutation.isPending;
     return (
       <Layout>
