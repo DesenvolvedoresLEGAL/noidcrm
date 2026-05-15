@@ -201,11 +201,24 @@ Deno.serve(async (req) => {
       companyPhone = typeof first === "string" ? first : (first as Record<string, unknown>)?.numero as string || (first as Record<string, unknown>)?.value as string || null;
     }
 
-    // Build deal payload for ERP
+    // Build deal payload for ERP — every monetary field carries the NET
+    // approved value so the ERP cannot accidentally pick a gross/legacy field.
     const dealPayload = {
       id: proposal.id,
       title: (opportunity?.title as string) || proposal.title || "Sem título",
-      amount: totalAmount,
+      // Primary fields (NET — already includes dynamic pricing + discount)
+      amount: netTotal,
+      net_total: netTotal,
+      final_amount: netTotal,
+      valor_liquido: netTotal,
+      total_with_discount: netTotal,
+      total_negotiated: netTotal,
+      total_amount: netTotal,
+      // Breakdown for transparency
+      subtotal: subtotalForBreakdown,
+      gross_total: grossSum,
+      discount_total: discountTotal,
+      discount_percent: discountPercent,
       base_amount: approved.base_amount || itemsNetTotal,
       approved_amount: approved.amount || null,
       amount_source: approved.source,
@@ -240,7 +253,9 @@ Deno.serve(async (req) => {
             : ((contact.telefones[0] as Record<string, unknown>)?.numero || (contact.telefones[0] as Record<string, unknown>)?.value))
         : null) as string | null,
       contact_position: (contact?.cargo as string) || null,
-      products: (items || []).map((item: Record<string, unknown>) => ({
+      // Products: total_price scaled so Σ === netTotal. unit_price/quantity preserved
+      // for human reading; original_total_price kept for auditing.
+      products: scaledItems.map(({ item, original, scaled }) => ({
         id: item.id,
         product_id: item.product_id,
         name: item.name,
@@ -248,7 +263,9 @@ Deno.serve(async (req) => {
         price: Number(item.unit_price) || 0,
         quantity: Number(item.quantity) || 1,
         discount_percent: Number(item.discount_percent) || 0,
-        total_price: Number(item.total) || 0,
+        total_price: scaled,
+        net_total_price: scaled,
+        original_total_price: original,
         billing_type: item.billing_type || "one_time",
         minimum_contract_months: item.minimum_contract_months ? Number(item.minimum_contract_months) : null,
       })),
