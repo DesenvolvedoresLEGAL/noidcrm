@@ -55,10 +55,10 @@ export function extractDrtsExhibitors(html: string, pageUrl: string): DrtsExhibi
   // Fields (Rua, Estande, ...) live as siblings inside the same card container,
   // before the next card title. We split on the title anchor and parse each
   // chunk independently — robust to plugin theme tweaks.
-  // Each card has a title anchor with class `drts-entity-permalink`.
-  // Attribute order varies by theme (href can come before or after class), so
-  // we match the opening tag first and then pull href from inside it.
-  const titleRe = /<a\b([^>]*\bdrts-entity-permalink\b[^>]*)>([^<]+)<\/a>/gi;
+  // Anchor inner content can be plain text OR contain children (e.g. featured
+  // cards render `<img/><span>NAME</span>`). We capture everything between
+  // <a ...> and </a> and strip tags after.
+  const titleRe = /<a\b([^>]*\bdrts-entity-permalink\b[^>]*)>([\s\S]*?)<\/a>/gi;
 
   const matches: { href: string; name: string; index: number }[] = [];
   let m: RegExpExecArray | null;
@@ -66,7 +66,10 @@ export function extractDrtsExhibitors(html: string, pageUrl: string): DrtsExhibi
     const attrs = m[1];
     const hrefMatch = attrs.match(/\bhref\s*=\s*"([^"]+)"/i);
     if (!hrefMatch) continue;
-    matches.push({ href: hrefMatch[1], name: decodeEntities(m[2]).trim(), index: m.index });
+    const titleAttr = attrs.match(/\btitle\s*=\s*"([^"]+)"/i);
+    const innerText = m[2].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    const name = decodeEntities(titleAttr?.[1] || innerText).trim();
+    matches.push({ href: hrefMatch[1], name, index: m.index });
   }
 
   for (let i = 0; i < matches.length; i++) {
