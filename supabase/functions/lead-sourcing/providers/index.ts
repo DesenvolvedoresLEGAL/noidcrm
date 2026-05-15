@@ -19,3 +19,6 @@ export type {
 
 export { detectSpa, extractFromHydratedPayload, tryGenericSpaFromUrl } from "./spa-nextjs.ts";
 export type { SpaDetection, SpaExhibitor, SpaFetchResult } from "./spa-nextjs.ts";
+
+export { fetchNmBrasilExhibitors, tryNmBrasilFromUrl } from "./nm-brasil.ts";
+export type { NmBrasilDetection, NmBrasilExhibitor, NmBrasilFetchResult } from "./nm-brasil.ts";
