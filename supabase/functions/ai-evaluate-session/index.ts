@@ -387,15 +387,15 @@ Regras do JSON:
     let evaluation: EvaluationResult | null = null;
     try {
       aiResult = await callOpenAIWithGuardrails({
-        model: 'gpt-5-nano',
+        model: 'gpt-5-mini',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
         response_format: { type: 'json_object' },
-        max_completion_tokens: 2500,
-        timeoutMs: 18000,
-        maxRetries: 1,
+        max_completion_tokens: 4000,
+        timeoutMs: 60000,
+        maxRetries: 2,
       });
     } catch (err) {
       await logAIUsage(supabase, {
