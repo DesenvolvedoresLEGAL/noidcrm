@@ -279,7 +279,7 @@ Deno.serve(async (req) => {
             contract_start_date: paymentTerms.contract_start_date,
             contract_duration_months: paymentTerms.contract_duration_months,
             monthly_value: paymentTerms.monthly_value ? Number(paymentTerms.monthly_value) : null,
-            contract_total: paymentTerms.contract_total ? Number(paymentTerms.contract_total) : null,
+            contract_total: paymentTerms.contract_total ? Number(paymentTerms.contract_total) : netTotal,
             billing_day: paymentTerms.billing_day,
             comments: paymentTerms.comments,
             vencimento,
