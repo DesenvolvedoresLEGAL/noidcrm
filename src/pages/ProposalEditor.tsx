@@ -338,7 +338,7 @@ export default function ProposalEditor() {
         }
       }).catch(console.error);
     }
-  }, [isNewProposal, opportunityId, preselectedTemplateId, reset, organization]);
+  }, [isNewProposal, opportunityId, preselectedTemplateId, reset, organization, applyPreselectedTemplate]);
 
   // Fetch preview of next proposal number for new proposals
   useEffect(() => {
