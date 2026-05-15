@@ -1271,7 +1271,66 @@ async function handleEventFirecrawl(
     }
   }
 
-  // ── Step 0c: Generic SPA (Next.js / Nuxt / React) provider ──
+  // ── Step 0d: WordPress DRTS (Directories Pro) provider ──
+  // Sites como exposec.tmp.br/directory-2026/ renderizam todos os expositores
+  // server-side em uma única página HTML. Um fetch só resolve 100% — sem SPA,
+  // sem detail crawl, sem Firecrawl.
+  if (allExhibitors.length === 0) {
+    try {
+      const { tryDrtsFromUrl } = await import("./providers/index.ts");
+      const drts = await tryDrtsFromUrl(eventUrl);
+      if (drts.detection) {
+        await logRunEvent(supabase, organizationId, run.id, "info", "DRTS (WordPress Directories Pro) detectado", {
+          origin: drts.detection.origin,
+          extracted: drts.result?.exhibitors.length ?? 0,
+        });
+        if (drts.result && drts.result.exhibitors.length > 0) {
+          for (const ex of drts.result.exhibitors) {
+            allExhibitors.push({
+              company_name: ex.name,
+              website: null,
+              category: null,
+              description: null,
+              booth: ex.estande,
+              country: null,
+              city: ex.rua,
+              exhibitor_profile_url: ex.source_url,
+              signals: [
+                "drts_directory_official",
+                "listed_in_official_directory",
+                ex.estande ? "has_booth" : null,
+              ].filter(Boolean) as string[],
+              confidence: 94,
+              _source_url: ex.source_url || eventUrl,
+              _page_type: "exhibitors_list",
+              _extraction_method: "drts_directory_html",
+            });
+          }
+          providerUsed = "drts-directory";
+          metrics.exhibitors_extracted_raw = allExhibitors.length;
+          metrics.html_hybrid_extracted = allExhibitors.length;
+          (metrics as any).provider = "drts-directory";
+          (metrics as any).drts_total_count = drts.result.total_count;
+          await logRunEvent(supabase, organizationId, run.id, "info",
+            `DRTS forneceu ${drts.result.exhibitors.length} expositores em uma única página — pulando Firecrawl`,
+            { provider: "drts-directory", count: drts.result.exhibitors.length }
+          );
+        } else if (drts.error) {
+          await logRunEvent(supabase, organizationId, run.id, "warn",
+            "DRTS detectado mas extração falhou — caindo para SPA/Firecrawl",
+            { error: drts.error }
+          );
+        }
+      }
+    } catch (providerErr) {
+      await logRunEvent(supabase, organizationId, run.id, "warn",
+        "Erro ao tentar provider DRTS — seguindo com SPA/Firecrawl",
+        { error: String(providerErr) }
+      );
+    }
+  }
+
+  // ── Step 0e: Generic SPA (Next.js / Nuxt / React) provider ──
   // For sites where the initial HTML is an empty shell + spinner (e.g. vitrine.fcecosmetique.com.br).
   // Tries hydrated payload (__NEXT_DATA__, RSC) first, then internal API sniffing.
   // Only runs when no deterministic provider above matched.
