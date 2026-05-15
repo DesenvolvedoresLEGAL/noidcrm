@@ -34473,6 +34473,7 @@ export type Database = {
         Args: { _payload: Json; _rec_id: string; _user_id: string }
         Returns: string
       }
+      mark_stale_playbook_runs_failed: { Args: never; Returns: number }
       mask_document: { Args: { doc: string }; Returns: string }
       match_email_knowledge:
         | {
