@@ -233,7 +233,8 @@ export default function SessionSummary() {
 
 
   const normalizedPhase = mergedSession?.current_phase || mergedSession?.status;
-  const hasScore = mergedSession?.score_overall != null;
+  const isContingencyResult = (mergedSession?.scores_json as any)?._contingencyFallback === true;
+  const hasScore = mergedSession?.score_overall != null && !isContingencyResult;
 
   if (!session) {
     return (
