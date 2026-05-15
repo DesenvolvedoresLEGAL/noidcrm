@@ -1,67 +1,72 @@
-## Objetivo
-Restaurar o CRM sem quebrar o que já foi corrigido: salvar proposta, visualização rápida/link público, autenticação e reconciliação de oportunidades reabertas/perdidas para parar de contar venda cancelada em forecast/dashboard/relatórios.
+## Problema
 
-## Diagnóstico inicial
-- O backend hospedado está respondendo, mas consultas de metadados/logs tiveram timeout intermitente, então a correção precisa ser conservadora e com validação por sinais reais.
-- A migração de backfill pendente existe em `supabase/migrations/20260512184458_38d80755-0b30-4bfd-bd85-57b1d9d1c9e2.sql` e reprocessa todas as propostas não recorrentes chamando `orchestrate_proposal_financials`.
-- O console enviado mostra erros de CORS/522 em chamadas diretas para Auth/REST. Isso tende a ser consequência de falha temporária de sessão/rede, mas o app também tem pontos que podem agravar o problema com refresh/signOut e chamadas de tracking.
-- O save da proposta depende desta ordem: proposta -> itens -> termos de pagamento -> totais -> sync da oportunidade -> orquestração. Vou manter essa regra.
-- A visualização rápida depende de gerar `public_token`, marcar proposta como `sent` quando não terminal e abrir `/proposta/<token>` via RPC `get_proposal_by_public_token`.
+A proposta TELA MAGICA (`6f625243-5c77-45ea-9064-40e94132f5ed`) tem:
+- `subtotal` itens = R$ 985,00 (gross)
+- `dynamic_pricing_current_amount` = R$ 1.280,50 (vigente por antecedência)
+- `payment_expected_amount` / `approved_amount` = **R$ 1.199,83** (vigente − desconto 6,3% à vista — fonte de verdade)
 
-## Plano de implementação
+O `notify-deal-won` já envia `amount = 1.199,83` corretamente. Mas o mesmo payload manda:
+- `products[].total_price` somando R$ 985 (raw dos itens, sem antecedência e sem desconto)
+- não envia `net_total`, `final_amount`, `valor_liquido`, `total_with_discount` (campos que o ERP espera, presentes no `api-deals`)
 
-### 1. Rodar o backfill de reconciliação com segurança
-- Aplicar novamente a migração/backfill solicitada, mas de forma segura para produção:
-  - Reconciliar propostas não recorrentes sem alterar lógica de recorrência.
-  - Garantir que `payment_expected_amount` continue sendo o valor líquido com desconto manual.
-  - Garantir que `opportunities.valor_previsto` receba o mesmo valor líquido aprovado/esperado.
-- Validar especificamente casos recentes como MOTOPPAR/IFood/ONFLY/Agro Summit se os dados forem localizáveis por query.
+O ERP está lendo do `products[]` / `total_amount` legado e gravando R$ 985,00. Resultado: data correta, valor errado.
 
-### 2. Corrigir a venda cancelada que continua entrando em métricas
-- Criar uma reconciliação de dados para oportunidades com status atual `lost` que ainda têm registros antigos como `won` em `win_loss_records`.
-- Para oportunidades `open`, remover registro ativo de `win_loss_records` ligado ao fechamento revertido.
-- Para oportunidades `lost`, converter/upsertar `win_loss_records.outcome = 'lost'` e limpar campos exclusivos de ganho.
-- Preservar `closed_at` somente como data real do último fechamento atual; não restaurar fechamento antigo cancelado.
+A correção tem que ser feita **uma vez** no único ponto de saída para o ERP (`notify-deal-won`), espelhando o que o `api-deals` já entrega, para que qualquer campo que o ERP leia traga o valor líquido aprovado.
 
-### 3. Estabilizar autenticação sem deslogar usuários por erro transitório
-- Ajustar o fluxo para não fazer `signOut()` automático quando `refreshSession`/`get-current-user` falhar por erro transitório, 5xx, timeout, CORS/522 ou queda momentânea.
-- Manter logout apenas quando o usuário explicitamente sair ou quando a sessão estiver comprovadamente ausente/inválida.
-- Tornar o tracking `track-auth-event` ainda mais isolado: falha de audit não pode afetar login, refresh, save ou navegação.
+## Mudanças
 
-### 4. Corrigir save de proposta e visualização rápida
-- Revisar e ajustar os pontos de save para tratar sessão temporariamente indisponível sem bloquear indevidamente o salvamento quando a sessão local ainda existe.
-- Garantir que erro de orquestração financeira continue não bloqueando o save quando a proposta principal, itens e termos foram salvos.
-- Garantir que gerar link rápido só dependa do update mínimo em `proposals.public_token/status` e que falha apresente erro real em log/toast.
-- Se a RPC pública estiver falhando, corrigir permissões/`SECURITY DEFINER`/`search_path`/resiliência da função sem abrir dados sensíveis.
+### 1. `supabase/functions/notify-deal-won/index.ts` — payload completo e consistente
 
-### 5. Validação objetiva
-- Testar por query os invariantes críticos:
-  - propostas com desconto manual: `payment_expected_amount = total líquido`;
-  - oportunidades perdidas não aparecem como ganhas em `win_loss_records`;
-  - oportunidades abertas não mantêm fechamento ativo;
-  - propostas públicas com token carregam via RPC.
-- Validar no código que o editor não apaga itens/termos antes de falhar por sessão/transiente.
-- Verificar logs de funções implicadas: `track-auth-event`, `get-current-user`, `post-acceptance-effects`, `generate-proposal-pdf` se necessário.
+a) **Selecionar mais campos da proposta** para reusar a mesma lógica do `api-deals`:
+- adicionar `subtotal`, `discount_amount`, `total_amount` ao SELECT (além dos já existentes via `APPROVED_VALUE_SELECT_COLUMNS`).
 
-### 6. Análise forense após estabilizar
-Entregar um relatório curto com:
-- Causa raiz provável por área: valores, reabertura/perda, ERP, forecast/dashboard, autenticação, save de proposta e link público.
-- Arquivos/funções envolvidos.
-- Riscos restantes.
-- Correções aplicadas.
-- Próximos checks recomendados sem mexer em funcionalidades já estáveis.
+b) **Calcular breakdown financeiro** igual ao `api-deals`:
+- `netTotal` = approved.amount (já é 1.199,83 via `payment_expected_amount`)
+- `discountTotal` = `subtotal − netTotal` (ou `discount_amount` se já preenchido)
+- `discountPercent` = `(discountTotal / subtotal) × 100`
+- `itemsGrossTotal` = soma de `proposal_items.total`
 
-## Arquivos/áreas impactadas esperadas
-- `src/hooks/useCurrentUser.ts`
-- `src/hooks/useSupabaseAuth.ts`
-- `src/pages/ProposalEditor.tsx`
-- `src/components/proposals/ProposalEditorHeader.tsx`
-- `src/services/supabase/proposals.ts`
-- `src/services/supabase/opportunities.ts`
-- `supabase/functions/track-auth-event/index.ts`
-- Migração SQL de reconciliação/backfill em `supabase/migrations/...`
+c) **Adicionar campos redundantes no payload** (mesmos nomes que o `api-deals` retorna), para o ERP não ter ambiguidade:
+```
+amount: netTotal,                  // 1199.83
+net_total: netTotal,
+final_amount: netTotal,
+valor_liquido: netTotal,
+total_with_discount: netTotal,
+total_negotiated: netTotal,
+total_amount: netTotal,            // sobrescreve o legado de 985
+subtotal: subtotal,                // 985 (gross dos itens)
+gross_total: itemsGrossTotal,
+discount_total: discountTotal,
+discount_percent: discountPercent,
+contract_total: paymentTerms?.contract_total ?? netTotal,
+```
+
+d) **Escalar cada `products[].total_price`** proporcionalmente para que `Σ products[].total_price === netTotal`. Isso evita o cenário atual onde o ERP soma os itens e ignora o total.
+- fator = `netTotal / itemsGrossTotal` (com guarda contra divisão por zero)
+- aplicar ao `total_price` (e expor `original_total_price` para auditoria)
+- **não alterar** `unit_price` nem `quantity` (preservam a apresentação original)
+- adicionar `net_total_price` por item para o ERP que prefira ler do item
+
+e) **Logs explícitos** com `net_total`, `gross_total`, `items_sum_after_scale` para facilitar diagnóstico futuro.
+
+### 2. Não mexer em mais nada
+- `api-deals` já está correto (envia `net_total`/`final_amount`/`amount` = 1.199,83) — nada a fazer.
+- `_shared/approved-proposal-value.ts` já resolve a fonte de verdade corretamente — nada a fazer.
+- RLS, multi-tenant, schema do DB: sem alterações.
+
+### 3. Reenvio da TELA MAGICA
+Após o deploy, retrigar o `notify-deal-won` para `proposal_id = 6f625243-5c77-45ea-9064-40e94132f5ed`. O ERP deve atualizar o R$ 985 → R$ 1.199,83 mantendo a data 14/05/2026.
+
+## Arquivos impactados
+- `supabase/functions/notify-deal-won/index.ts`
 
 ## Riscos
-- O backfill pode demorar se rodar em todas as propostas; vou limitar a lógica para ser idempotente e segura.
-- Se houver instabilidade externa de Auth/REST, o app deve degradar sem derrubar a sessão, mas não dá para impedir falha de infraestrutura externa.
-- Não vou alterar cálculos já corrigidos de desconto manual, ERP e comissão; só vou preservar e reconciliar as inconsistências atuais.
+- **Baixo.** O ERP hoje lê algum campo que vale 985; depois da mudança, todos os campos relacionados a valor passam a refletir 1.199,83. Se o ERP lê do `products[]`, a soma escalada também bate.
+- Itens com escala podem mostrar centavos não inteiros no ERP (ex.: R$ 985,00 vira R$ 1.199,83 quando há um único item; com vários itens, o último item recebe o ajuste de arredondamento para fechar exatamente).
+- Não afeta propostas sem desconto/antecedência (fator = 1.0).
+
+## Próximos passos
+1. Implementar e deployar `notify-deal-won`.
+2. Reenviar TELA MAGICA via `notify-deal-won` com `proposal_id` da accepted.
+3. Conferir no ERP: valor R$ 1.199,83, vencimento 14/05/2026.
