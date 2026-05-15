@@ -22,3 +22,6 @@ export type { SpaDetection, SpaExhibitor, SpaFetchResult } from "./spa-nextjs.ts
 
 export { fetchNmBrasilExhibitors, tryNmBrasilFromUrl } from "./nm-brasil.ts";
 export type { NmBrasilDetection, NmBrasilExhibitor, NmBrasilFetchResult } from "./nm-brasil.ts";
+
+export { detectDrts, extractDrtsExhibitors, fetchDrtsExhibitors, tryDrtsFromUrl } from "./drts-directory.ts";
+export type { DrtsDetection, DrtsExhibitor, DrtsFetchResult } from "./drts-directory.ts";
