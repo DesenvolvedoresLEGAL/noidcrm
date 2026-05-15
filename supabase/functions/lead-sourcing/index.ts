@@ -1203,6 +1203,74 @@ async function handleEventFirecrawl(
     }
   }
 
+  // ── Step 0c: NürnbergMesse Brasil Vitrine provider ──
+  // FCE Cosmetique/Pharma and similar vitrine.* catalogues are Next.js shells backed by
+  // api-one.nm-brasil.com.br. Use their public catalogue API directly instead of AI/Firecrawl.
+  if (allExhibitors.length === 0) {
+    try {
+      const { tryNmBrasilFromUrl } = await import("./providers/index.ts");
+      const nmBrasil = await tryNmBrasilFromUrl(eventUrl);
+      if (nmBrasil.detection) {
+        await logRunEvent(supabase, organizationId, run.id, "info", "NürnbergMesse Brasil Vitrine detectado", {
+          layout: nmBrasil.detection.layout,
+          fair_ids: nmBrasil.detection.fair_ids,
+        });
+        if (nmBrasil.result && nmBrasil.result.exhibitors.length > 0) {
+          for (const ex of nmBrasil.result.exhibitors) {
+            allExhibitors.push({
+              company_name: ex.name,
+              website: ex.website,
+              category: ex.category,
+              description: ex.description,
+              booth: ex.booth,
+              country: null,
+              city: null,
+              exhibitor_profile_url: ex.source_url,
+              signals: [
+                "nm_brasil_official",
+                "listed_in_official_directory",
+                ex.booth ? "has_booth" : null,
+                ex.website ? "has_website" : null,
+                ex.category ? "has_category" : null,
+              ].filter(Boolean) as string[],
+              confidence: 96,
+              _source_url: ex.source_url,
+              _page_type: "exhibitors_list",
+              _extraction_method: "nm_brasil_public_api",
+              _logo_url: ex.logo_url,
+              _nm_brasil_external_id: ex.external_id,
+              _nm_brasil_fair_id: ex.fair_id,
+              _nm_brasil_fair_name: ex.fair_name,
+              _nm_brasil_categories: ex.categories,
+            });
+          }
+          providerUsed = "nm-brasil";
+          metrics.exhibitors_extracted_raw = allExhibitors.length;
+          metrics.html_hybrid_extracted = allExhibitors.length;
+          (metrics as any).provider = "nm-brasil";
+          (metrics as any).nm_brasil_layout = nmBrasil.result.layout;
+          (metrics as any).nm_brasil_total_count = nmBrasil.result.total_count;
+          (metrics as any).nm_brasil_active_count = nmBrasil.result.active_count;
+          (metrics as any).nm_brasil_pages_fetched = nmBrasil.result.pages_fetched;
+          await logRunEvent(supabase, organizationId, run.id, "info",
+            `NürnbergMesse Brasil forneceu ${nmBrasil.result.active_count}/${nmBrasil.result.total_count} expositores ativos — pulando Firecrawl`,
+            { provider: "nm-brasil", count: nmBrasil.result.active_count, total: nmBrasil.result.total_count }
+          );
+        } else if (nmBrasil.error) {
+          await logRunEvent(supabase, organizationId, run.id, "warn",
+            "NürnbergMesse Brasil detectado mas API falhou — caindo para SPA/Firecrawl",
+            { error: nmBrasil.error }
+          );
+        }
+      }
+    } catch (providerErr) {
+      await logRunEvent(supabase, organizationId, run.id, "warn",
+        "Erro ao tentar provider NürnbergMesse Brasil — seguindo com SPA/Firecrawl",
+        { error: String(providerErr) }
+      );
+    }
+  }
+
   // ── Step 0c: Generic SPA (Next.js / Nuxt / React) provider ──
   // For sites where the initial HTML is an empty shell + spinner (e.g. vitrine.fcecosmetique.com.br).
   // Tries hydrated payload (__NEXT_DATA__, RSC) first, then internal API sniffing.
