@@ -16,3 +16,6 @@ export type {
   InformaMarketsExhibitor,
   InformaMarketsFetchResult,
 } from "./informa-markets.ts";
+
+export { detectSpa, extractFromHydratedPayload, tryGenericSpaFromUrl } from "./spa-nextjs.ts";
+export type { SpaDetection, SpaExhibitor, SpaFetchResult } from "./spa-nextjs.ts";

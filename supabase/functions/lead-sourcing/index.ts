@@ -1203,6 +1203,73 @@ async function handleEventFirecrawl(
     }
   }
 
+  // ── Step 0c: Generic SPA (Next.js / Nuxt / React) provider ──
+  // For sites where the initial HTML is an empty shell + spinner (e.g. vitrine.fcecosmetique.com.br).
+  // Tries hydrated payload (__NEXT_DATA__, RSC) first, then internal API sniffing.
+  // Only runs when no deterministic provider above matched.
+  if (allExhibitors.length === 0) {
+    try {
+      const { tryGenericSpaFromUrl } = await import("./providers/index.ts");
+      const spa = await tryGenericSpaFromUrl(eventUrl);
+      if (spa.detection) {
+        await logRunEvent(supabase, organizationId, run.id, "info", "SPA detectado (Next.js/Nuxt/React)", {
+          framework: spa.detection.framework,
+          layer: spa.layer,
+          endpoints_probed: spa.endpoints_probed?.length ?? 0,
+          extracted: spa.exhibitors.length,
+        });
+        if (spa.exhibitors.length >= 20 && (spa.layer === 2 || spa.layer === 3)) {
+          for (const ex of spa.exhibitors) {
+            allExhibitors.push({
+              company_name: ex.name,
+              website: ex.website,
+              category: ex.category,
+              description: ex.description,
+              booth: ex.booth,
+              country: ex.country,
+              city: ex.city,
+              exhibitor_profile_url: ex.source_url,
+              signals: [
+                "spa_hydrated_payload",
+                ex.country ? "has_country" : null,
+                ex.category ? "has_category" : null,
+                ex.website ? "has_website" : null,
+              ].filter(Boolean) as string[],
+              confidence: spa.layer === 2 ? 92 : 88,
+              _source_url: ex.source_url,
+              _page_type: "spa_payload",
+              _extraction_method: spa.layer === 2 ? "spa_hydrated_payload" : "spa_internal_api",
+              _logo_url: ex.logo_url,
+              _spa_external_id: ex.external_id,
+              _spa_framework: spa.detection.framework,
+            });
+          }
+          providerUsed = "spa-nextjs";
+          metrics.exhibitors_extracted_raw = allExhibitors.length;
+          metrics.html_hybrid_extracted = allExhibitors.length;
+          (metrics as any).provider = "spa-nextjs";
+          (metrics as any).spa_framework = spa.detection.framework;
+          (metrics as any).spa_extraction_layer = spa.layer;
+          (metrics as any).spa_endpoints_probed = spa.endpoints_probed?.length ?? 0;
+          await logRunEvent(supabase, organizationId, run.id, "info",
+            `SPA provider extraiu ${spa.exhibitors.length} expositores (camada ${spa.layer}) — pulando Firecrawl`,
+            { provider: "spa-nextjs", framework: spa.detection.framework, count: spa.exhibitors.length }
+          );
+        } else {
+          await logRunEvent(supabase, organizationId, run.id, "warn",
+            "SPA detectado mas extração determinística não atingiu o threshold — caindo para Firecrawl",
+            { framework: spa.detection.framework, extracted: spa.exhibitors.length, error: spa.error }
+          );
+        }
+      }
+    } catch (providerErr) {
+      await logRunEvent(supabase, organizationId, run.id, "warn",
+        "Erro ao tentar provider SPA — seguindo com Firecrawl",
+        { error: String(providerErr) }
+      );
+    }
+  }
+
   (metrics as any).provider = providerUsed;
   const providerHandled = allExhibitors.length > 0;
   const expofpHandled = providerHandled; // legacy var name used downstream
