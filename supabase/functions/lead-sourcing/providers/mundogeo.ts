@@ -10,9 +10,19 @@ const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36";
 
 // Booth – <b>NAME</b> [– <a ...>site</a>]
+// O HTML real entrega o en-dash como entidade &#8211; (ou &ndash;), não como
+// caractere literal. Normalizamos antes de aplicar a regex.
 // Capturas: 1=booth, 2=name, 3=url (opcional)
 const ROW_REGEX =
   /(\d{1,4}[A-Z]?)\s*[–-]\s*<b>\s*([^<]{2,200}?)\s*<\/b>(?:[^<]*<a[^>]*href=["']([^"']+)["'][^>]*>\s*site\s*<\/a>)?/gi;
+
+function decodeDashes(html: string): string {
+  return html
+    .replace(/&#8211;/g, "–")
+    .replace(/&#8212;/g, "—")
+    .replace(/&ndash;/gi, "–")
+    .replace(/&mdash;/gi, "—");
+}
 
 const MUNDOGEO_HOSTS = [
   "mundogeo.com",
