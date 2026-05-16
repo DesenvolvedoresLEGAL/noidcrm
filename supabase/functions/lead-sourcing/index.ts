@@ -1397,6 +1397,68 @@ async function handleEventFirecrawl(
     }
   }
 
+  // ── Step 0e2: InfraFM / IEG Brasil provider ──
+  // Páginas infrafm.com.br carregam expositores via fetch() a um JSON estático
+  // em images.infrafm.com.br/arquivos/exhibitors_<hash>.json. HTML inicial é
+  // só um <div id="exhibitors_logotypes"></div> vazio — markdown/Firecrawl
+  // captura menu/CTA/banners como "leads".
+  if (allExhibitors.length === 0) {
+    try {
+      const { tryInfraFmFromUrl } = await import("./providers/index.ts");
+      const infrafm = await tryInfraFmFromUrl(eventUrl);
+      if (infrafm.detection) {
+        await logRunEvent(supabase, organizationId, run.id, "info", "InfraFM detectado", {
+          json_url: infrafm.detection.json_url,
+          extracted: infrafm.result?.exhibitors.length ?? 0,
+        });
+        if (infrafm.result && infrafm.result.exhibitors.length > 0) {
+          for (const ex of infrafm.result.exhibitors) {
+            allExhibitors.push({
+              company_name: ex.name,
+              website: null,
+              category: null,
+              description: ex.description,
+              booth: null,
+              country: null,
+              city: null,
+              exhibitor_profile_url: ex.profile_url,
+              signals: [
+                "infrafm_official",
+                "listed_in_official_directory",
+                ex.logo ? "has_logo" : null,
+                ex.profile_url ? "has_profile_url" : null,
+              ].filter(Boolean) as string[],
+              confidence: 96,
+              _source_url: eventUrl,
+              _page_type: "exhibitors_list",
+              _extraction_method: "infrafm_json",
+            });
+          }
+          providerUsed = "infrafm";
+          metrics.exhibitors_extracted_raw = allExhibitors.length;
+          metrics.html_hybrid_extracted = allExhibitors.length;
+          (metrics as any).provider = "infrafm";
+          (metrics as any).infrafm_json_url = infrafm.result.json_url;
+          (metrics as any).infrafm_total_count = infrafm.result.total_count;
+          await logRunEvent(supabase, organizationId, run.id, "info",
+            `InfraFM forneceu ${infrafm.result.exhibitors.length} expositores — pulando Firecrawl`,
+            { provider: "infrafm", count: infrafm.result.exhibitors.length },
+          );
+        } else if (infrafm.error) {
+          await logRunEvent(supabase, organizationId, run.id, "warn",
+            "InfraFM detectado mas fetch do JSON falhou — conteúdo não está no HTML, fallbacks tendem a retornar lixo",
+            { error: infrafm.error, json_url: infrafm.detection.json_url },
+          );
+        }
+      }
+    } catch (providerErr) {
+      await logRunEvent(supabase, organizationId, run.id, "warn",
+        "Erro ao tentar provider InfraFM — seguindo com SPA/Firecrawl",
+        { error: String(providerErr) },
+      );
+    }
+  }
+
   // ── Step 0f: Generic SPA (Next.js / Nuxt / React) provider ──
   // For sites where the initial HTML is an empty shell + spinner (e.g. vitrine.fcecosmetique.com.br).
   // Tries hydrated payload (__NEXT_DATA__, RSC) first, then internal API sniffing.
