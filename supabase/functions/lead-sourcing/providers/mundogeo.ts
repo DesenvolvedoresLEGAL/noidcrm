@@ -65,7 +65,8 @@ export function detectMundoGeo(html: string, pageUrl: string): MundoGeoDetection
   if (!hostMatch) return null;
 
   // Confirmação estrutural: pelo menos 5 linhas no padrão "N – <b>X</b>"
-  const probe = html.match(/\d{1,4}[A-Z]?\s*[–-]\s*<b>[^<]+<\/b>/gi);
+  const normalized = decodeDashes(html);
+  const probe = normalized.match(/\d{1,4}[A-Z]?\s*[–-]\s*<b>[^<]+<\/b>/gi);
   if (!probe || probe.length < 5) return null;
 
   return { origin: "mundogeo", host };
