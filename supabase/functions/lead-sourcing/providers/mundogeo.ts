@@ -78,7 +78,7 @@ export function extractMundoGeoExhibitors(html: string): MundoGeoExhibitor[] {
   const normalized = decodeDashes(html);
   ROW_REGEX.lastIndex = 0;
   let m: RegExpExecArray | null;
-  while ((m = ROW_REGEX.exec(html)) !== null) {
+  while ((m = ROW_REGEX.exec(normalized)) !== null) {
     const booth = normalize(m[1] || "") || null;
     const name = normalize(m[2] || "");
     const website = m[3]?.trim() || null;
