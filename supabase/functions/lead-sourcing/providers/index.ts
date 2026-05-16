@@ -25,3 +25,6 @@ export type { NmBrasilDetection, NmBrasilExhibitor, NmBrasilFetchResult } from "
 
 export { detectDrts, extractDrtsExhibitors, fetchDrtsExhibitors, tryDrtsFromUrl } from "./drts-directory.ts";
 export type { DrtsDetection, DrtsExhibitor, DrtsFetchResult } from "./drts-directory.ts";
+
+export { detectFrancalTotvs, fetchFrancalExhibitors, tryFrancalTotvsFromUrl } from "./francal-totvs.ts";
+export type { FrancalDetection, FrancalExhibitor, FrancalFetchResult } from "./francal-totvs.ts";
