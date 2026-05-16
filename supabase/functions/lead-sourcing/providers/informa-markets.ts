@@ -17,8 +17,10 @@ const PERSISTED_QUERY_HASH =
 const CLIENT_VERSION = "2.310.75";
 
 const HOST_RE = /(?:^|\.)informamarkets\.com(?:\.br)?$/i;
-// /event/<slug>/exhibitors/<base64ViewId>
-const URL_RE = /\/event\/([^/]+)\/exhibitors\/([^/?#]+)/i;
+// /event/<slug>/exhibitors/<base64ViewId>  OR  /widget/event/<slug>/exhibitors/<base64ViewId>
+// Marketing sites (ex.: fispaltecnologia.com.br) embedam o iframe `/widget/event/...`,
+// que é o mesmo Next.js shell SSRed pela Informa — só muda o prefixo da rota.
+const URL_RE = /\/(?:widget\/)?event\/([^/]+)\/exhibitors\/([^/?#]+)/i;
 
 export interface InformaMarketsDetection {
   origin: string;            // e.g. "https://app.informamarkets.com.br"
@@ -76,9 +78,13 @@ export function detectInformaMarkets(eventUrl: string): InformaMarketsDetection 
  * the first link that matches `/event/.../exhibitors/...` on an Informa host.
  */
 export function findInformaMarketsLinkInHtml(html: string): string | null {
-  const re = /https?:\/\/[a-z0-9.-]*informamarkets\.com(?:\.br)?\/event\/[^"'\s<>]+\/exhibitors\/[^"'\s<>]+/gi;
-  const m = html.match(re);
-  return m && m.length > 0 ? m[0] : null;
+  // Aceita tanto /event/... quanto /widget/event/... (iframe embed em sites de marketing).
+  const re = /https?:\/\/[a-z0-9.-]*informamarkets\.com(?:\.br)?\/(?:widget\/)?event\/[^"'\s<>]+\/exhibitors\/[^"'\s<>]+/gi;
+  const matches = html.match(re);
+  if (!matches || matches.length === 0) return null;
+  // Prioriza o link "canônico" (sem /widget) se existir; senão usa o primeiro (widget serve igual).
+  const canonical = matches.find((m) => !/\/widget\//i.test(m));
+  return canonical ?? matches[0];
 }
 
 /** Extract eventId from the SSR'd HTML (looks for `RXZlbnRf...` near our viewId). */
@@ -241,19 +247,25 @@ export async function tryInformaMarketsFromUrl(eventUrl: string): Promise<{
 
   // Try to enrich detection with eventId from SSR (avoids server-side errors when GraphQL needs it).
   if (!detection.eventId) {
-    try {
-      // viewId is base64 (e.g. "RXZlbnRWaWV3XzEyNDY3NDA=") — keep "=" literal in the path,
-      // encodeURIComponent would turn it into "%3D" and Informa returns 404 for the SSR.
-      const ssrUrl = `${detection.origin}/event/${detection.eventSlug}/exhibitors/${detection.viewId}`;
-      const resp = await fetch(ssrUrl, {
-        headers: { "User-Agent": BROWSER_UA, "Accept": "text/html,*/*" },
-        signal: AbortSignal.timeout(15_000),
-      });
-      if (resp.ok) {
-        const html = await resp.text();
-        detection.eventId = extractEventIdFromHtml(html);
-      }
-    } catch { /* eventId is best-effort */ }
+    // Tenta /event/... primeiro (canônico); se 404, tenta /widget/event/... (alguns
+    // eventos só expõem via widget — caso Fispal Tecnologia).
+    const ssrCandidates = [
+      `${detection.origin}/event/${detection.eventSlug}/exhibitors/${detection.viewId}`,
+      `${detection.origin}/widget/event/${detection.eventSlug}/exhibitors/${detection.viewId}`,
+    ];
+    for (const ssrUrl of ssrCandidates) {
+      try {
+        const resp = await fetch(ssrUrl, {
+          headers: { "User-Agent": BROWSER_UA, "Accept": "text/html,*/*" },
+          signal: AbortSignal.timeout(15_000),
+        });
+        if (resp.ok) {
+          const html = await resp.text();
+          const id = extractEventIdFromHtml(html);
+          if (id) { detection.eventId = id; break; }
+        }
+      } catch { /* tenta próximo */ }
+    }
   }
 
   try {
