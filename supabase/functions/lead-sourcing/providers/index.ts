@@ -31,3 +31,15 @@ export type { FrancalDetection, FrancalExhibitor, FrancalFetchResult } from "./f
 
 export { detectInfraFm, fetchInfraFmExhibitors, tryInfraFmFromUrl } from "./infrafm.ts";
 export type { InfraFmDetection, InfraFmExhibitor, InfraFmFetchResult } from "./infrafm.ts";
+
+export {
+  detectMundoGeo,
+  extractMundoGeoExhibitors,
+  fetchMundoGeoExhibitors,
+  tryMundoGeoFromUrl,
+} from "./mundogeo.ts";
+export type {
+  MundoGeoDetection,
+  MundoGeoExhibitor,
+  MundoGeoFetchResult,
+} from "./mundogeo.ts";

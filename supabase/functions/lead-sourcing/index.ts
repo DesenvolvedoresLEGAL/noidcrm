@@ -1459,6 +1459,68 @@ async function handleEventFirecrawl(
     }
   }
 
+  // ── Step 0e3: MundoGEO / DroneShow / SpaceBR / Expo eVTOL provider ──
+  // mundogeo.com/feiras2026/ (e variantes anuais) lista expositores como HTML
+  // estático puro no padrão "<BOOTH> – <b>NAME</b> – <a href=...>site</a><br>".
+  // Firecrawl+IA quebra esse padrão tratando "site" como texto solto. Regex
+  // determinístico extrai 100% em uma requisição.
+  if (allExhibitors.length === 0) {
+    try {
+      const { tryMundoGeoFromUrl } = await import("./providers/index.ts");
+      const mg = await tryMundoGeoFromUrl(eventUrl);
+      if (mg.detection) {
+        await logRunEvent(supabase, organizationId, run.id, "info", "MundoGEO/DroneShow detectado", {
+          host: mg.detection.host,
+          extracted: mg.result?.exhibitors.length ?? 0,
+        });
+        if (mg.result && mg.result.exhibitors.length > 0) {
+          for (const ex of mg.result.exhibitors) {
+            allExhibitors.push({
+              company_name: ex.name,
+              website: ex.website,
+              category: null,
+              description: null,
+              booth: ex.booth,
+              country: null,
+              city: null,
+              exhibitor_profile_url: null,
+              signals: [
+                "mundogeo_official",
+                "listed_in_official_directory",
+                ex.booth ? "has_booth" : null,
+                ex.website ? "has_website" : null,
+              ].filter(Boolean) as string[],
+              confidence: 96,
+              _source_url: eventUrl,
+              _page_type: "exhibitors_list",
+              _extraction_method: "mundogeo_html_regex",
+            });
+          }
+          providerUsed = "mundogeo";
+          metrics.exhibitors_extracted_raw = allExhibitors.length;
+          metrics.html_hybrid_extracted = allExhibitors.length;
+          (metrics as any).provider = "mundogeo";
+          (metrics as any).mundogeo_host = mg.detection.host;
+          (metrics as any).mundogeo_total_count = mg.result.total_count;
+          await logRunEvent(supabase, organizationId, run.id, "info",
+            `MundoGEO forneceu ${mg.result.exhibitors.length} expositores — pulando Firecrawl`,
+            { provider: "mundogeo", count: mg.result.exhibitors.length },
+          );
+        } else if (mg.error) {
+          await logRunEvent(supabase, organizationId, run.id, "warn",
+            "MundoGEO detectado mas extração não retornou resultados",
+            { error: mg.error },
+          );
+        }
+      }
+    } catch (providerErr) {
+      await logRunEvent(supabase, organizationId, run.id, "warn",
+        "Erro ao tentar provider MundoGEO — seguindo com SPA/Firecrawl",
+        { error: String(providerErr) },
+      );
+    }
+  }
+
   // ── Step 0f: Generic SPA (Next.js / Nuxt / React) provider ──
   // For sites where the initial HTML is an empty shell + spinner (e.g. vitrine.fcecosmetique.com.br).
   // Tries hydrated payload (__NEXT_DATA__, RSC) first, then internal API sniffing.
