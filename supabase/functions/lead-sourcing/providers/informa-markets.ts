@@ -247,19 +247,25 @@ export async function tryInformaMarketsFromUrl(eventUrl: string): Promise<{
 
   // Try to enrich detection with eventId from SSR (avoids server-side errors when GraphQL needs it).
   if (!detection.eventId) {
-    try {
-      // viewId is base64 (e.g. "RXZlbnRWaWV3XzEyNDY3NDA=") — keep "=" literal in the path,
-      // encodeURIComponent would turn it into "%3D" and Informa returns 404 for the SSR.
-      const ssrUrl = `${detection.origin}/event/${detection.eventSlug}/exhibitors/${detection.viewId}`;
-      const resp = await fetch(ssrUrl, {
-        headers: { "User-Agent": BROWSER_UA, "Accept": "text/html,*/*" },
-        signal: AbortSignal.timeout(15_000),
-      });
-      if (resp.ok) {
-        const html = await resp.text();
-        detection.eventId = extractEventIdFromHtml(html);
-      }
-    } catch { /* eventId is best-effort */ }
+    // Tenta /event/... primeiro (canônico); se 404, tenta /widget/event/... (alguns
+    // eventos só expõem via widget — caso Fispal Tecnologia).
+    const ssrCandidates = [
+      `${detection.origin}/event/${detection.eventSlug}/exhibitors/${detection.viewId}`,
+      `${detection.origin}/widget/event/${detection.eventSlug}/exhibitors/${detection.viewId}`,
+    ];
+    for (const ssrUrl of ssrCandidates) {
+      try {
+        const resp = await fetch(ssrUrl, {
+          headers: { "User-Agent": BROWSER_UA, "Accept": "text/html,*/*" },
+          signal: AbortSignal.timeout(15_000),
+        });
+        if (resp.ok) {
+          const html = await resp.text();
+          const id = extractEventIdFromHtml(html);
+          if (id) { detection.eventId = id; break; }
+        }
+      } catch { /* tenta próximo */ }
+    }
   }
 
   try {
