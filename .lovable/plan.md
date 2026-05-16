@@ -1,70 +1,97 @@
-# Plano: Handler genérico para SPAs Next.js/React no Kairós
 
-## Objetivo
-Fazer o Kairós extrair expositores de sites SPA (Next.js / React / Vue) onde o HTML inicial vem vazio (`<div>Carregando...</div>`) — caso da **FCE COSMETIQUE** (vitrine.fcecosmetique.com.br retornou 1 lead de 220) — **sem alterar nenhum provider existente** (Swapcard, Informa Markets, ExpoFP) e sem regredir os 5 eventos que funcionam hoje.
+## Diagnóstico
 
-## Garantia de não-regressão
-O novo handler só roda **depois** de todos os providers determinísticos atuais falharem. A ordem fica:
+A página `https://naturaltech.com.br/lista-de-expositores/` **não usa nenhum dos padrões já cobertos** (DRTS, ExpoFP, Informa, NM Brasil, SPA Next.js, Jet Engine, etc.). 
 
-```text
-1. ExpoFP        → se hit, retorna e sai
-2. Informa/Swapcard → se hit, retorna e sai
-3. [NOVO] SPA Next.js/React → se hit, retorna e sai
-4. Firecrawl + IA chunking (fluxo atual) → fallback final
+O HTML inicial vem **vazio** — só tem uma `<table id="dados">` com `<tbody class="resultApi">` vazio. Um script inline em jQuery faz **uma única chamada AJAX** direto para o ERP **TOTVS RM Cloud da Francal** (organizadora do evento):
+
+```
+GET https://francalfeiras152909.rm.cloudtotvs.com.br:8051/api/framework/v1/consultaSQLServer/RealizaConsulta/FRA_000000/1/T?parameters=CODIGO_FEIRA=1.06.2026.01
+Header: Authorization: Basic aW50ZWdyYWNhbzpGckBAMjAyMg==   (integracao:Fr@@2022)
 ```
 
-Os guards `expofpHandled` e `swapcardCompleted` continuam intactos. Zero mudança nos arquivos `providers/expofp.ts`, `providers/informa-markets.ts`, `providers/index.ts` ou no fluxo Firecrawl/IA.
+Retorna um array JSON com todos os 24×~20 expositores de uma só vez, com os campos:
+- `NOME DIVULGACAO`
+- `MARCA DIVULGACAO`
+- `PRODUTO DIVULGACAO`
+- `LOCALIZAÇÃO DO ESTANDE`
+- `SITE DIVULGACAO`
+
+As 24 páginas que aparecem no site são **paginação client-side** (`tamanhoPagina = 20` no JS). Não existem URLs `/page/2/` reais — todo o dataset chega numa única request. Por isso o Firecrawl/AI atual capturou "coisas aleatórias da página" (header, menu, footer), porque o conteúdo dos expositores nunca está no HTML servido.
+
+Isso vale para **toda a família Francal**: Naturaltech, Fispal Food, Fispal Café, Bio Brazil Fair, Hospitalar (parcialmente), entre outras — todas usam o mesmo backend TOTVS RM com hostname `francalfeiras152909.rm.cloudtotvs.com.br`, mudando apenas o `CODIGO_FEIRA`.
+
+---
+
+## Plano
+
+### 1. Novo provider `francal-totvs`
+
+Criar `supabase/functions/lead-sourcing/providers/francal-totvs.ts`:
+
+- **Detecção (`canHandle`)**: durante a fase 0 do `index.ts`, baixar o HTML da página alvo (já feito hoje) e procurar a string `francalfeiras152909.rm.cloudtotvs.com.br` OU `CODIGO_FEIRA=` no HTML. Se achar, extrair o `CODIGO_FEIRA` via regex `/CODIGO_FEIRA=([0-9.]+)/` e o header `Authorization: Basic ...` do próprio script (não hardcode — pegar do site para sobreviver a rotações de senha).
+- **Fallback de detecção por domínio**: lista whitelist de domínios Francal conhecidos (`naturaltech.com.br`, `fispalfood.com.br`, `fispalcafe.com.br`, `biobrazilfair.com.br`, etc.) com o `CODIGO_FEIRA` mapeado caso o HTML mude.
+- **Fetch**: uma única chamada GET ao endpoint TOTVS com timeout de 30s e User-Agent comum. Aceita certificado self-signed se necessário (Deno fetch já lida).
+- **Parsing**: response é `Array<Record<string,string>>`. Descartar a primeira linha se vier como cabeçalho (script faz `shift()` quando `NOME DIVULGACAO` não está presente).
+- **Mapeamento p/ `LeadSearchResult`**:
+  - `company_name` → `MARCA DIVULGACAO` (fallback `NOME DIVULGACAO`)
+  - `signals.booth` → `LOCALIZAÇÃO DO ESTANDE`
+  - `signals.product` → `PRODUTO DIVULGACAO`
+  - `signals.website` → `SITE DIVULGACAO` normalizado (adicionar `https://` se faltar)
+  - `signals.source_provider` = `francal-totvs`
+  - `reason` = `"Expositor oficial da feira X (Francal/TOTVS)"`
+- **Deduplicação**: trimmar + UPPER no `company_name`; chave única por `MARCA + ESTANDE` para evitar duplicar marcas que aparecem em múltiplos produtos.
+
+### 2. Integração no orchestrator
+
+Em `supabase/functions/lead-sourcing/index.ts`, adicionar **Step 0e** (antes do DRTS e SPA Next.js):
+
+```text
+detectFrancalTotvs(html, url) → if match: run provider, persist, return
+```
+
+Ordem final dos extractors deterministicos:
+```
+0a. ExpoFP
+0b. Informa Markets
+0c. NM Brasil
+0d. DRTS (WordPress Directories Pro)
+0e. Francal/TOTVS   ← NOVO
+0f. SPA Next.js
+Fallback: Firecrawl + AI
+```
+
+### 3. Registro no `providers/index.ts`
+
+Exportar `francalTotvsProvider` e incluir no array de providers determinísticos.
+
+### 4. Hardening
+
+- Se a API TOTVS retornar 401/timeout, **não cair para Firecrawl** (gastaria créditos e o conteúdo nunca chega via HTML). Em vez disso, marcar o run como `failed` com `error_summary` claro: `"API Francal/TOTVS indisponível (CODIGO_FEIRA=X). Tente novamente em alguns minutos."`
+- Logar `[francal-totvs] CODIGO_FEIRA=... → N expositores extraídos` para auditoria.
+- Watchdog continua válido (não precisa de mudança).
+
+### 5. Release notes
+
+Adicionar entrada em `release_notes` (próxima versão patch) descrevendo o novo provider Francal/TOTVS e listando as feiras suportadas.
+
+---
+
+## Validação
+
+1. Após deploy, o usuário apaga o run preso do Naturaltech e roda **Nova Busca** com a mesma URL.
+2. Resultado esperado: ~480 expositores (24 páginas × 20 = 480) na primeira execução, em poucos segundos, com nome de marca, estande, produto e site preenchidos.
+3. Testar também com Fispal Food (`https://fispalfood.com.br/lista-de-expositores/`) para confirmar generalização.
+
+## Riscos
+
+- **Credenciais hardcoded no JS do site**: Francal pode rotacionar. Mitigação: extrair o header `Authorization` direto do HTML da página alvo a cada execução (não hardcode no provider). Whitelist de `CODIGO_FEIRA` é só fallback.
+- **IP allow-list no TOTVS**: o endpoint pode bloquear IPs fora do Brasil. Edge Functions Supabase rodam em região configurada; se bloquear, fallback é orientar o usuário ou usar proxy. (Do sandbox aqui o endpoint deu timeout, mas isso é comum em IP de datacenter exótico — Supabase Edge tipicamente passa.)
+- **Mudança de schema do JSON**: campos mapeados por nome exato; se a Francal renomear, provider precisa atualizar. Mitigação: logar payload bruto da primeira linha em caso de 0 leads extraídos.
 
 ## Arquivos impactados
 
-| Arquivo | Tipo | Mudança |
-|---|---|---|
-| `supabase/functions/lead-sourcing/providers/spa-nextjs.ts` | **novo** | Detector + extrator SPA |
-| `supabase/functions/lead-sourcing/providers/index.ts` | edit | Exportar `tryGenericSpaFromUrl` |
-| `supabase/functions/lead-sourcing/index.ts` | edit | Inserir Step 0c entre Informa e Firecrawl (~10 linhas) |
-
-## Como o novo provider funciona
-
-### Camada 1 — Detecção de SPA (sem custo)
-Faz `fetch` simples ao HTML raiz. Considera SPA se:
-- `<body>` contém apenas spinner/loader (`Carregando…`, `Loading…`, body < 5KB de texto visível)
-- E houver um destes marcadores: `__next_f`, `__NEXT_DATA__`, `window.__NUXT__`, `ng-version`, `id="root"` vazio, `id="__nuxt"`, `id="app"` vazio.
-
-Se não bate, **retorna `{ detection: null }` imediatamente** — fluxo segue para Firecrawl normal.
-
-### Camada 2 — Extração do payload hidratado (determinística, sem IA)
-Tenta nesta ordem:
-
-1. **`__NEXT_DATA__`** (Next.js Pages Router) — `<script id="__NEXT_DATA__">{...}</script>`. Faz `JSON.parse` e percorre `props.pageProps` procurando arrays de objetos com chaves típicas (`name|nome|companyName|razaoSocial|exhibitor`).
-2. **RSC payload** (Next.js App Router) — varre `self.__next_f.push([1, "..."])`, concatena os chunks, parseia cada linha JSON e procura arrays de objetos-empresa (mesmas heurísticas do passo 1).
-3. **Nuxt** (`window.__NUXT__ = ...`) e **Apollo state** (`window.__APOLLO_STATE__`) — mesma heurística aplicada ao objeto.
-
-Heurística de "array de empresas": ≥10 itens, ≥60% com chave name-like, opcionalmente `logo|logoUrl|website|stand|booth|country|city|categoria|category`.
-
-### Camada 3 — Sniffing de API interna (fallback determinístico)
-Se camada 2 não achou ≥20 empresas:
-- Faz **1 scrape Firecrawl** com `formats: ['rawHtml','links']` + `waitFor: 4000` para capturar HTML hidratado.
-- Procura no HTML/JS bundles padrões de fetch: `fetch("/api/...")`, `axios.get("/...")`, URLs absolutas para `*.supabase.co`, `*.cloudfront.net/api`, `cdn.contentful.com`, etc.
-- Para cada endpoint candidato, tenta `GET` direto (com `Origin` e `Referer` do site) e aplica a mesma heurística "array de empresas".
-
-### Camada 4 — Firecrawl com `waitFor` longo (último recurso do provider)
-Se camadas 2 e 3 falharem, faz **1 scrape** com `waitFor: 8000` + `onlyMainContent: false` e devolve o HTML renderizado para o pipeline Firecrawl/IA atual seguir — **mas marca `_extraction_method = "spa_hydrated_html"`** para a IA receber HTML útil em vez de bundle JS de 400KB (raiz da bug original do FCE).
-
-## Telemetria
-- `metrics.provider = "spa-nextjs"` quando hit
-- `metrics.spa_framework = "nextjs-app" | "nextjs-pages" | "nuxt" | "react-spa"`
-- `metrics.spa_extraction_layer = 2 | 3 | 4`
-- Log `executionLog.push({ step: "spa_detection", framework, layer, count })`
-
-## Validação
-1. Rodar nova busca para `https://vitrine.fcecosmetique.com.br/` → esperado ≥150 expositores via camada 2 (Next.js RSC).
-2. Re-rodar uma busca **APAS SHOW** (Swapcard) → confirmar que continua passando pelo provider Swapcard, não pelo SPA handler (`metrics.provider = "informa-markets"` ou `"swapcard"`).
-3. Re-rodar **APAS** que usa ExpoFP → confirmar `metrics.provider = "expofp"`.
-4. Verificar logs `system_events` para `spa_detection` e métrica `spa_extraction_layer`.
-
-## Risco
-**Baixo.** Provider novo é puramente aditivo, com short-circuit de detecção (custo ~1 fetch + regex se não for SPA). Os 5 eventos que funcionam hoje **não passam pela detecção SPA** porque já são interceptados antes pelos providers atuais.
-
-## Próximos passos pós-merge
-- Memória `architectural-decision/intelligence/spa-nextjs-provider` documentando padrões de extração.
-- Adicionar à doc do Kairós a lista atualizada dos **6 handlers**.
+- `supabase/functions/lead-sourcing/providers/francal-totvs.ts` (novo)
+- `supabase/functions/lead-sourcing/providers/index.ts` (registro)
+- `supabase/functions/lead-sourcing/index.ts` (Step 0e + tratamento de erro sem fallback p/ Firecrawl)
+- `release_notes` (insert SQL)
