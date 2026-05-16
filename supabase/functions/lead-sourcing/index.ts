@@ -1330,7 +1330,74 @@ async function handleEventFirecrawl(
     }
   }
 
-  // ── Step 0e: Generic SPA (Next.js / Nuxt / React) provider ──
+  // ── Step 0e: Francal / TOTVS RM Cloud provider ──
+  // Sites do grupo Francal (Naturaltech, Fispal Food, Bio Brazil Fair, etc.)
+  // populam a tabela de expositores via uma única chamada AJAX a um endpoint
+  // TOTVS RM público. O HTML inicial vem vazio — qualquer scrape de markdown
+  // captura lixo (menu, footer). Um fetch direto ao TOTVS resolve 100%.
+  if (allExhibitors.length === 0) {
+    try {
+      const { tryFrancalTotvsFromUrl } = await import("./providers/index.ts");
+      const francal = await tryFrancalTotvsFromUrl(eventUrl);
+      if (francal.detection) {
+        await logRunEvent(supabase, organizationId, run.id, "info", "Francal/TOTVS detectado", {
+          codigo_feira: francal.detection.codigo_feira,
+          detection_source: francal.detection.source,
+          extracted: francal.result?.exhibitors.length ?? 0,
+        });
+        if (francal.result && francal.result.exhibitors.length > 0) {
+          for (const ex of francal.result.exhibitors) {
+            allExhibitors.push({
+              company_name: ex.name,
+              website: ex.website,
+              category: null,
+              description: ex.product,
+              booth: ex.booth,
+              country: null,
+              city: null,
+              exhibitor_profile_url: null,
+              signals: [
+                "francal_totvs_official",
+                "listed_in_official_directory",
+                ex.booth ? "has_booth" : null,
+                ex.website ? "has_website" : null,
+              ].filter(Boolean) as string[],
+              confidence: 96,
+              _source_url: eventUrl,
+              _page_type: "exhibitors_list",
+              _extraction_method: "francal_totvs_api",
+            });
+          }
+          providerUsed = "francal-totvs";
+          metrics.exhibitors_extracted_raw = allExhibitors.length;
+          metrics.html_hybrid_extracted = allExhibitors.length;
+          (metrics as any).provider = "francal-totvs";
+          (metrics as any).francal_codigo_feira = francal.result.codigo_feira;
+          (metrics as any).francal_total_count = francal.result.total_count;
+          await logRunEvent(supabase, organizationId, run.id, "info",
+            `Francal/TOTVS forneceu ${francal.result.exhibitors.length} expositores (CODIGO_FEIRA=${francal.result.codigo_feira}) — pulando Firecrawl`,
+            { provider: "francal-totvs", count: francal.result.exhibitors.length },
+          );
+        } else if (francal.error) {
+          // API Francal indisponível: NÃO cai para Firecrawl (o conteúdo nunca
+          // chega via HTML — gastaria créditos à toa). Loga warn e segue; o
+          // Step 0f/Firecrawl genérico ainda pode salvar via outros padrões,
+          // mas o esperado é falhar limpo com 0 leads.
+          await logRunEvent(supabase, organizationId, run.id, "warn",
+            "Francal/TOTVS detectado mas API falhou — conteúdo não está no HTML, fallbacks tendem a retornar lixo",
+            { error: francal.error, codigo_feira: francal.detection.codigo_feira },
+          );
+        }
+      }
+    } catch (providerErr) {
+      await logRunEvent(supabase, organizationId, run.id, "warn",
+        "Erro ao tentar provider Francal/TOTVS — seguindo com SPA/Firecrawl",
+        { error: String(providerErr) },
+      );
+    }
+  }
+
+  // ── Step 0f: Generic SPA (Next.js / Nuxt / React) provider ──
   // For sites where the initial HTML is an empty shell + spinner (e.g. vitrine.fcecosmetique.com.br).
   // Tries hydrated payload (__NEXT_DATA__, RSC) first, then internal API sniffing.
   // Only runs when no deterministic provider above matched.
