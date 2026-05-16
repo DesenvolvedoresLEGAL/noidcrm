@@ -1521,6 +1521,7 @@ async function handleEventFirecrawl(
     }
   }
 
+  // ── Step 0f: Generic SPA (Next.js / Nuxt / React) provider ──
   // For sites where the initial HTML is an empty shell + spinner (e.g. vitrine.fcecosmetique.com.br).
   // Tries hydrated payload (__NEXT_DATA__, RSC) first, then internal API sniffing.
   // Only runs when no deterministic provider above matched.
