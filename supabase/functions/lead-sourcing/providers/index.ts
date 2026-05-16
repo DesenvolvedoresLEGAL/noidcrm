@@ -28,3 +28,6 @@ export type { DrtsDetection, DrtsExhibitor, DrtsFetchResult } from "./drts-direc
 
 export { detectFrancalTotvs, fetchFrancalExhibitors, tryFrancalTotvsFromUrl } from "./francal-totvs.ts";
 export type { FrancalDetection, FrancalExhibitor, FrancalFetchResult } from "./francal-totvs.ts";
+
+export { detectInfraFm, fetchInfraFmExhibitors, tryInfraFmFromUrl } from "./infrafm.ts";
+export type { InfraFmDetection, InfraFmExhibitor, InfraFmFetchResult } from "./infrafm.ts";
