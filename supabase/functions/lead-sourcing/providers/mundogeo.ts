@@ -75,6 +75,7 @@ export function detectMundoGeo(html: string, pageUrl: string): MundoGeoDetection
 export function extractMundoGeoExhibitors(html: string): MundoGeoExhibitor[] {
   const seen = new Set<string>();
   const out: MundoGeoExhibitor[] = [];
+  const normalized = decodeDashes(html);
   ROW_REGEX.lastIndex = 0;
   let m: RegExpExecArray | null;
   while ((m = ROW_REGEX.exec(html)) !== null) {
