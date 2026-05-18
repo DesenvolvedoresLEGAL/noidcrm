@@ -526,18 +526,24 @@ export default function ProposalEditor() {
     }
   };
 
-  // Save payment terms to database
+  // Save payment terms to database (canonical: 1 row per payment_type max)
   const savePaymentTermsToDb = async (proposalId: string) => {
-    // First, delete existing terms
+    // Deduplicate by payment_type: keep the last one set in state for each type
+    const byType = new Map<string, typeof paymentTerms[number]>();
+    for (const term of paymentTerms) {
+      byType.set(term.payment_type, term);
+    }
+
+    // Delete ALL existing terms (avoids leaving a stale row of the opposite type)
     const existingTerms = await getPaymentTerms(proposalId);
     for (const term of existingTerms) {
       if (term.id) {
         await deletePaymentTerm(term.id);
       }
     }
-    
-    // Then create new terms
-    for (const term of paymentTerms) {
+
+    // Insert the deduplicated, normalized terms (max 1 per type)
+    for (const term of byType.values()) {
       await createPaymentTerm({
         ...term,
         proposal_id: proposalId,
