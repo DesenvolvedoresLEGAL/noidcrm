@@ -73,6 +73,9 @@ export function useImportProspect() {
 
   return useMutation({
     mutationFn: async (prospect: Prospect) => {
+      if (prospect.relationship_status === 'customer') {
+        throw new Error('Esta empresa já é cliente — abra a conta existente em vez de importar.');
+      }
       if (!hasMinimumIdentity(prospect)) {
         throw new Error('Prospect sem identidade mínima (CNPJ ou domínio). Enriqueça antes de importar.');
       }
