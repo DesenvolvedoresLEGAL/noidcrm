@@ -256,6 +256,26 @@ export function calculateInstallments(
     ];
   }
 
+  // ----- Cronograma Manual -----
+  if (condition === 'custom_schedule' && Array.isArray(term.manual_schedule) && term.manual_schedule.length > 0) {
+    const entries = [...term.manual_schedule].sort((a, b) =>
+      (a.due_date || '').localeCompare(b.due_date || ''),
+    );
+    return entries.map((entry, idx) => {
+      const amount =
+        typeof entry.percent === 'number'
+          ? (discountedTotal * entry.percent) / 100
+          : Number(entry.amount || 0);
+      return {
+        number: idx + 1,
+        dueDate: entry.due_date,
+        amount: Number(amount.toFixed(2)),
+        type: 'installment',
+        label: entry.label || `Parcela ${idx + 1}${typeof entry.percent === 'number' ? ` (${entry.percent}%)` : ''}`,
+      } as Installment;
+    });
+  }
+
   // ----- Parcelado tradicional (legado) -----
   const installments: Installment[] = [];
   const intervalDays = term.installment_interval_days || 30;
