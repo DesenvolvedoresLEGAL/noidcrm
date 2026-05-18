@@ -352,6 +352,14 @@ export function LeadResultsTable({
                     <TableCell>
                       <DedupeBadgeSmall status={prospect.dedupe_status || 'unchecked'} />
                     </TableCell>
+                    <TableCell>
+                      <RelationshipBadge
+                        status={prospect.relationship_status}
+                        confidence={(prospect as any).match_confidence ?? null}
+                        reason={(prospect as any).match_reason ?? null}
+                        compact
+                      />
+                    </TableCell>
                     <TableCell className="max-w-[160px]">
                       <div className="flex flex-wrap gap-1">
                         {signals.length > 0 ? signals.slice(0, 3).map(s => (
