@@ -82,7 +82,7 @@ export async function getPaymentTerms(proposalId: string): Promise<PaymentTerm[]
     .eq('proposal_id', proposalId);
 
   if (error) throw error;
-  return data as PaymentTerm[];
+  return data as unknown as PaymentTerm[];
 }
 
 export async function createPaymentTerm(term: Omit<PaymentTerm, 'id' | 'created_at' | 'updated_at'>): Promise<PaymentTerm> {
@@ -100,12 +100,12 @@ export async function createPaymentTerm(term: Omit<PaymentTerm, 'id' | 'created_
     .insert({
       ...term,
       organization_id: orgId,
-    })
+    } as any)
     .select()
     .single();
 
   if (error) throw error;
-  return data as PaymentTerm;
+  return data as unknown as PaymentTerm;
 }
 
 export async function updatePaymentTerm(
@@ -114,13 +114,13 @@ export async function updatePaymentTerm(
 ): Promise<PaymentTerm> {
   const { data, error } = await supabase
     .from('proposal_payment_terms')
-    .update(updates)
+    .update(updates as any)
     .eq('id', termId)
     .select()
     .single();
 
   if (error) throw error;
-  return data as PaymentTerm;
+  return data as unknown as PaymentTerm;
 }
 
 export async function deletePaymentTerm(termId: string): Promise<void> {
