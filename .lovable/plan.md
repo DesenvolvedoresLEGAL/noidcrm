@@ -1,108 +1,179 @@
-## Objetivo
+## Diagnóstico encontrado
 
-Toda empresa capturada no Kairós passa por um classificador que decide se ela é `customer`, `opportunity_existing`, `account_existing` ou `new_prospect`. O resultado vira badge no card, coluna filtrável na lista e bloqueio/aviso no botão Importar — sem nunca duplicar conta.
+A divergência não é só visual. A cadeia financeira da proposta está usando fontes diferentes em momentos diferentes:
 
-## 1. Edge function: `kairos-match-company`
+- **Itens/base da proposta:** `proposal_items` soma R$ 1.994,00 no caso Lactalis.
+- **Tabela dinâmica:** aplica faixa e chega a R$ 2.991,00 ou R$ 2.592,20 dependendo da data/faixa.
+- **Desconto comercial:** existe em `proposal_payment_terms.discount_percent`, mas há múltiplas linhas duplicadas para a mesma proposta, algumas com `15%` e outras com `0%`.
+- **Orquestração atual:** em alguns pontos pega uma única condição de pagamento por `updated_at/created_at`; quando a linha “errada” é a mais recente, o desconto some.
+- **Slack/ERP:** já tentam usar um resolver central, mas esse resolver confia em `approved_amount`/`payment_expected_amount`; se esses campos já foram gravados errados, a notificação e o ERP herdam o erro.
+- **Aceite/contrato legado:** ainda há trigger antigo usando `NEW.value`, que pode criar contrato com valor bruto/antigo.
 
-Nova função em `supabase/functions/kairos-match-company/index.ts`.
+Exemplo Lactalis:
+- Base dos itens: **R$ 1.994,00**
+- Faixa correta pós-evento: **R$ 2.991,00**
+- Desconto comercial: **15%**
+- Valor final correto: **R$ 2.542,35**
 
-**Input** (validado com Zod):
-```ts
-{
-  prospect_id?: string,           // se vier, lê company_name/cnpj/domain do banco
-  company_name?: string,
-  cnpj?: string,
-  domain?: string                  // normalizado (sem www, lowercase)
-}
+## Regra canônica proposta
+
+Criar uma única regra de verdade para qualquer saída humana ou integração:
+
+```text
+commercial_gross_amount = valor vigente da tabela dinâmica, se aplicável;
+                         senão, valor do header/itens.
+
+payment_discount_percent = desconto definido na condição de pagamento avulsa ativa.
+
+approved_net_amount = commercial_gross_amount - desconto comercial.
 ```
 
-**Pipeline de matching** (curto-circuita na primeira regra que casa):
+Prioridade de leitura:
 
-1. **CNPJ exato** → busca em `accounts.cnpj` (limpo, só dígitos). Match exato → `confidence: 100`.
-2. **Domínio igual** → normaliza e bate contra `accounts.website` / `accounts.normalized_domain` (se existir; caso contrário, derivado em SQL). Match → `confidence: 90`.
-3. **Nome similar** via `find_similar_accounts` RPC (já existe, usa `pg_trgm`, threshold 0.7). Pega o top match; se `similarity >= 0.85` → `confidence: round(similarity * 100)`.
-4. Sem candidato → `new_prospect`, `confidence: 100`.
+1. **Forma e prazo de pagamento ativa** para método, parcelas, datas e desconto.
+2. **Tabela dinâmica vigente** para o valor bruto comercial quando a proposta usa precificação automática.
+3. **Header da proposta** apenas como fallback quando não houver tabela dinâmica.
+4. **Valor líquido final** sempre gravado em `payment_expected_amount` e, no aceite, congelado em `approved_amount`.
 
-**Classificação do candidato encontrado** (em ordem):
-- Tem registro em `customers` ou `slg_active_organizations` referenciando essa `account_id`? → `customer`.
-- Tem `opportunities` ativas (não soft-deleted) ligadas a essa account? → `opportunity_existing`.
-- Caso contrário → `account_existing`.
-- Regra de segurança: se houver match mas com dúvida (`70 ≤ similaridade < 85`), retornar `account_existing` com `confidence` baixa e `reason` indicando "match provável por nome".
+## Plano de implementação seguro
 
-**Tudo escopado por `organization_id`** via JWT (`get_user_organization_id`) — nunca cruzar tenants.
+### 1. Corrigir duplicidade de condições de pagamento
 
-**Output** (estrito):
+- Criar uma função/rotina canônica para selecionar a condição avulsa ativa da proposta.
+- Não escolher a linha só por `updated_at` quando existem duplicadas conflitantes.
+- Consolidar a regra: se houver condição com desconto/manual_schedule/custom_date, ela deve prevalecer sobre linhas padrão criadas automaticamente.
+- Ajustar `savePaymentTermsToDb` para sempre substituir corretamente as condições antigas e impedir duplicação de linhas de `one_time` no fluxo normal.
+
+Arquivos impactados:
+- `src/pages/ProposalEditor.tsx`
+- `src/components/proposals/ProposalEditorModal.tsx` se ainda for usado
+- `src/services/supabase/proposal-payment-terms.ts`
+
+### 2. Criar resolver financeiro único no banco
+
+Criar/atualizar uma função SQL canônica, por exemplo:
+
+```text
+public.resolve_proposal_commercial_amount(p_proposal_id)
+```
+
+Ela retorna:
+
 ```json
 {
-  "relationship_status": "customer | opportunity_existing | account_existing | new_prospect",
-  "matched_account_id": "uuid | null",
-  "matched_opportunity_id": "uuid | null",
-  "confidence": 0-100,
-  "reason": "string curta"
+  "gross_amount": 2991,
+  "discount_percent": 15,
+  "discount_amount": 448.65,
+  "net_amount": 2542.35,
+  "amount_source": "dynamic_pricing",
+  "payment_term_id": "...",
+  "pricing_tier_id": "..."
 }
 ```
 
-Quando `prospect_id` for fornecido, a função também **persiste** o resultado em `prospects`:
-- `matched_account_id` (já existe)
-- novo campo `relationship_status` (text)
-- atualiza `dedupe_status` para `matched | clean`
+Essa função será usada por:
+- orquestração financeira;
+- geração de cobrança;
+- aceite;
+- Slack;
+- ERP;
+- sincronização com oportunidade;
+- preview/PDF quando precisar exibir total final.
 
-## 2. Migration
+### 3. Ajustar `orchestrate_proposal_financials`
 
-Adicionar coluna em `prospects`:
-- `relationship_status text` (nullable, default null)
-- índice `(organization_id, relationship_status)` para filtro rápido
+- Parar de calcular desconto manualmente com uma linha aleatória de `proposal_payment_terms`.
+- Usar o resolver único.
+- Atualizar sempre:
+  - `dynamic_pricing_current_amount` = bruto vigente da tabela;
+  - `payment_expected_amount` = líquido final;
+  - `discount_amount` = desconto monetário real sobre o valor vigente;
+  - `opportunities.valor_previsto` = líquido final.
 
-Sem mexer em RLS existente (já é por organização).
+### 4. Congelar valor correto no aceite
 
-## 3. Integração no fluxo de sourcing
+No momento em que a proposta for aceita:
 
-Em `useLeadSourcingV2` / `LeadSourcingEngine`, após cada batch de prospects criado, chamar `kairos-match-company` em lote (uma chamada por prospect, paralelizada em grupos de 5 — mesmo padrão de `ingestLeadsBulk`). O resultado já chega no próximo refetch porque é gravado no banco.
+- recalcular via resolver financeiro único;
+- gravar `approved_amount = net_amount`;
+- gravar snapshot de auditoria com bruto, desconto, líquido, parcelas e datas;
+- impedir que recalculações futuras alterem o que foi aprovado pelo cliente.
 
-Não alterar nada que já está funcionando no scrape — apenas adicionar uma etapa pós-criação.
+Isso evita Slack/ERP receberem valor alterado depois do aceite.
 
-## 4. UI
+### 5. Ajustar Slack e ERP para ler somente o valor líquido aprovado
 
-### a) Badge no card do prospect
-Em `LeadResultsTable.tsx` (e onde renderiza card), novo componente `RelationshipBadge`:
-- `customer` → verde "Cliente"
-- `opportunity_existing` → âmbar "Em oportunidade"
-- `account_existing` → azul "Já é conta"
-- `new_prospect` → cinza "Novo"
-- Tooltip mostra `reason` + `confidence`
+- Atualizar `approved-proposal-value.ts` para não cair em `dynamic_pricing_current_amount` bruto quando existir desconto comercial.
+- Garantir que `post-acceptance-effects` usa `approved_amount/payment_expected_amount` líquido.
+- Garantir que `notify-deal-won` envia ao ERP:
+  - `amount`, `net_total`, `final_amount`, `total_amount`, `valor_liquido` = líquido final;
+  - `gross_total` = bruto vigente;
+  - `discount_total` e `discount_percent` corretos;
+  - parcelas/datas vindas da condição de pagamento.
 
-### b) Coluna "Status na base" filtrável
-Adicionar coluna em `LeadResultsTable` lendo `prospect.relationship_status`. Filtro multi-select no topo da tabela.
+Arquivos impactados:
+- `supabase/functions/_shared/approved-proposal-value.ts`
+- `supabase/functions/post-acceptance-effects/index.ts`
+- `supabase/functions/notify-deal-won/index.ts`
 
-### c) Bloqueio/aviso no botão Importar
-Em `useImportProspect`/`useBulkImportProspects`:
-- Se `relationship_status === 'customer'` → botão desabilitado, tooltip "Já é cliente — abrir conta existente".
-- Se `opportunity_existing` ou `account_existing` → confirm dialog "Já existe X. Importar mesmo assim ou abrir existente?". Abrir leva a `/crm/accounts/:matched_account_id`.
-- Se `new_prospect` → fluxo atual normal.
+### 6. Corrigir cobrança/payment intent
 
-## 5. Arquivos tocados
+- `create_proposal_payment_intent` deve cobrar o líquido final do resolver.
+- Se for cronograma manual/parcelas, cada parcela deve usar o líquido final como base e respeitar datas manuais.
+- Nada deve cobrar somente o bruto da tabela dinâmica.
 
-**Novos**
-- `supabase/functions/kairos-match-company/index.ts`
-- `src/components/playbook/RelationshipBadge.tsx`
-- Migration: `add_relationship_status_to_prospects.sql`
+### 7. Ajustar exibição da proposta/PDF
 
-**Editados (mínimo)**
-- `src/hooks/useLeadSourcingV2.ts` — disparar matching após criar prospects
-- `src/components/playbook/LeadResultsTable.tsx` — coluna + badge + filtro
-- `src/hooks/useProspectImport.ts` — checar status antes de importar
+A UI deve separar claramente:
 
-**Não tocar**: providers de scraping (mundogeo, fispal, informa-markets, expofp etc.), `import_prospect_to_pipeline`, Apollo, lead-sourcing principal.
+```text
+Subtotal dos itens: R$ 1.994,00
+Ajuste por antecedência/pós-evento: +R$ 997,00
+Valor vigente bruto: R$ 2.991,00
+Desconto comercial (15%): -R$ 448,65
+Total aprovado: R$ 2.542,35
+```
+
+E as parcelas devem somar exatamente o total aprovado.
+
+Arquivos prováveis:
+- `src/components/proposals/ProposalPaymentTerms.tsx`
+- componentes de preview/PDF de proposta
+- banners de tabela dinâmica, se estiverem mostrando bruto como se fosse final
+
+### 8. Correção pontual dos dados já afetados
+
+Após a regra estar corrigida, rodar uma correção controlada para propostas recentes afetadas, incluindo Lactalis/OGGI/NETSEEDS:
+
+- recalcular `payment_expected_amount`;
+- corrigir `approved_amount` quando aceito;
+- corrigir `opportunities.valor_previsto`;
+- não reenviar automaticamente Slack/ERP sem confirmação explícita.
+
+### 9. Testes de regressão obrigatórios
+
+Criar testes cobrindo estes cenários:
+
+- `R$ 2.991,00 - 15% = R$ 2.542,35`.
+- Parcela após início do evento usa faixa pós-evento.
+- À vista com desconto usa líquido.
+- 50/50 com datas manuais soma exatamente o líquido.
+- Cronograma manual com datas arbitrárias soma exatamente o líquido.
+- Slack e ERP recebem o mesmo líquido.
+- Duplicatas em `proposal_payment_terms` não fazem o desconto sumir.
 
 ## Riscos
 
-- Custo de chamadas: 1 RPC + 1-3 queries por prospect. Sem LLM, então rápido e barato.
-- Falsos positivos em nomes genéricos ("Tecnologia LTDA"): mitigado pelo threshold 0.85 e fallback para `account_existing` na faixa 0.70-0.85.
-- Concorrência: matching em lote roda em paralelo de 5 — não satura o banco.
+- Existem dados históricos já gravados com campos conflitantes; vou tratar correção histórica separada da regra nova.
+- Slack/ERP podem já ter recebido valores errados; não vou reenviar sem sua confirmação.
+- O trigger legado de contrato precisa ser ajustado com cuidado para não duplicar contratos nem reabrir aceite antigo.
 
-## Próximos passos pós-aprovação
+## Resultado esperado
 
-1. Migration `relationship_status`
-2. Edge function + deploy + teste com prospects já existentes do DRONE SHOW
-3. UI (badge, coluna, bloqueio)
-4. Validar com um run real do Kairós
+Depois da correção, todo o sistema passa a falar uma língua só:
+
+```text
+Valor aprovado = valor vigente bruto da condição comercial - desconto da forma/prazo de pagamento.
+```
+
+Para Lactalis, o valor final exibido, salvo, notificado e enviado ao ERP será **R$ 2.542,35**.
