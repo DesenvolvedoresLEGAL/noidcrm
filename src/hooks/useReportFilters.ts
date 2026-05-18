@@ -164,6 +164,7 @@ export function useReportFilters(initialFilters?: Partial<ReportFilters>) {
     try {
       // Invalidate all report queries to force refetch with new filters
       await queryClient.invalidateQueries({ queryKey: ['reports'] });
+      await queryClient.invalidateQueries({ queryKey: ['products-report'] });
       toast.success('Relatório atualizado com sucesso!');
     } catch (error) {
       toast.error('Erro ao gerar relatório');
