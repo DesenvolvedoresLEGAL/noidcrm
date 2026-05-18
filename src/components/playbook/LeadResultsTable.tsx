@@ -41,6 +41,10 @@ const FILTERS: { key: FilterKey; label: string; tooltip?: string }[] = [
   { key: 'tier_b', label: `Tier B (${TIER_B_MIN}–${TIER_A_MIN - 1})`, tooltip: 'Prioridade média — trabalhar após Tier S/A ou enriquecer para subir de tier.' },
   { key: 'tier_c', label: `Tier C (<${TIER_B_MIN})`, tooltip: 'Baixa prioridade — ICP fraco ou poucos sinais. Considerar descarte ou enrichment manual.' },
   { key: 'no_domain', label: 'Sem Domínio' },
+  { key: 'rel_customer', label: 'Já é cliente', tooltip: 'Empresa já é cliente ativo no CRM.' },
+  { key: 'rel_opportunity', label: 'Em oportunidade', tooltip: 'Já existe oportunidade aberta para esta conta.' },
+  { key: 'rel_account', label: 'Já é conta', tooltip: 'Conta já cadastrada, sem oportunidade ativa.' },
+  { key: 'rel_new', label: 'Novo na base', tooltip: 'Empresa não encontrada na base — prospect novo.' },
 ];
 
 interface LeadResultsTableProps {
