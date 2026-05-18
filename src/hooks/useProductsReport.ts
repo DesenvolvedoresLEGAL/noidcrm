@@ -37,10 +37,11 @@ export interface ProductCrossRow {
 
 function buildArgs(filters: ReturnType<typeof useReportFiltersContext>) {
   const { effectiveDates, filters: f } = filters;
+  const pipelines = f.pipelines.filter(Boolean);
   return {
     p_start: effectiveDates.startDate,
     p_end: effectiveDates.endDate,
-    p_pipelines: f.pipelines && f.pipelines.length > 0 ? f.pipelines : null,
+    p_pipelines: pipelines.length > 0 ? pipelines : null,
     p_users: f.users && f.users !== 'all' ? [f.users] : null,
   };
 }
