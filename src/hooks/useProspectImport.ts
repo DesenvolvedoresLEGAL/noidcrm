@@ -117,9 +117,14 @@ export function useBulkImportProspects() {
       let emailsSent = 0;
       let emailsDrafted = 0;
       let skippedNoIdentity = 0;
+      let skippedCustomers = 0;
       let errors = 0;
 
       for (const prospect of prospects) {
+        if (prospect.relationship_status === 'customer') {
+          skippedCustomers++;
+          continue;
+        }
         if (!hasMinimumIdentity(prospect)) {
           skippedNoIdentity++;
           continue;
