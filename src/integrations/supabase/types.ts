@@ -34685,119 +34685,61 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      report_products_cross:
-        | {
-            Args: {
-              p_end: string
-              p_pipelines?: string[]
-              p_start: string
-              p_users?: string[]
-            }
-            Returns: {
-              dimension: string
-              entity_id: string
-              entity_name: string
-              product_key: string
-              product_name: string
-              sales_count: number
-              total_revenue: number
-            }[]
-          }
-        | {
-            Args: {
-              p_end: string
-              p_pipelines?: string[]
-              p_start: string
-              p_users?: string[]
-            }
-            Returns: {
-              dimension: string
-              entity_id: string
-              entity_name: string
-              product_key: string
-              product_name: string
-              sales_count: number
-              total_revenue: number
-            }[]
-          }
-      report_products_monthly:
-        | {
-            Args: {
-              p_end: string
-              p_pipelines?: string[]
-              p_start: string
-              p_top_n?: number
-              p_users?: string[]
-            }
-            Returns: {
-              month: string
-              name: string
-              product_key: string
-              sales_count: number
-              total_revenue: number
-            }[]
-          }
-        | {
-            Args: {
-              p_end: string
-              p_pipelines?: string[]
-              p_start: string
-              p_top_n?: number
-              p_users?: string[]
-            }
-            Returns: {
-              month: string
-              name: string
-              product_key: string
-              sales_count: number
-              total_revenue: number
-            }[]
-          }
-      report_products_sold:
-        | {
-            Args: {
-              p_end: string
-              p_pipelines?: string[]
-              p_start: string
-              p_users?: string[]
-            }
-            Returns: {
-              avg_ticket: number
-              billing_type: string
-              first_sold: string
-              last_sold: string
-              name: string
-              product_id: string
-              product_key: string
-              proposals_count: number
-              sales_count: number
-              share_pct: number
-              total_quantity: number
-              total_revenue: number
-            }[]
-          }
-        | {
-            Args: {
-              p_end: string
-              p_pipelines?: string[]
-              p_start: string
-              p_users?: string[]
-            }
-            Returns: {
-              avg_ticket: number
-              billing_type: string
-              first_sold: string
-              last_sold: string
-              name: string
-              product_id: string
-              product_key: string
-              proposals_count: number
-              sales_count: number
-              share_pct: number
-              total_quantity: number
-              total_revenue: number
-            }[]
-          }
+      report_products_cross: {
+        Args: {
+          p_end: string
+          p_pipelines?: string[]
+          p_start: string
+          p_users?: string[]
+        }
+        Returns: {
+          dimension: string
+          entity_id: string
+          entity_name: string
+          product_key: string
+          product_name: string
+          sales_count: number
+          total_revenue: number
+        }[]
+      }
+      report_products_monthly: {
+        Args: {
+          p_end: string
+          p_pipelines?: string[]
+          p_start: string
+          p_top_n?: number
+          p_users?: string[]
+        }
+        Returns: {
+          month: string
+          name: string
+          product_key: string
+          sales_count: number
+          total_revenue: number
+        }[]
+      }
+      report_products_sold: {
+        Args: {
+          p_end: string
+          p_pipelines?: string[]
+          p_start: string
+          p_users?: string[]
+        }
+        Returns: {
+          avg_ticket: number
+          billing_type: string
+          first_sold: string
+          last_sold: string
+          name: string
+          product_id: string
+          product_key: string
+          proposals_count: number
+          sales_count: number
+          share_pct: number
+          total_quantity: number
+          total_revenue: number
+        }[]
+      }
       request_approval: {
         Args: {
           p_action_key: string
