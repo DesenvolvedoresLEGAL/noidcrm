@@ -307,6 +307,7 @@ export function LeadResultsTable({
                   </button>
                 </TableHead>
                 <TableHead>Duplicidade</TableHead>
+                <TableHead>Status na base</TableHead>
                 <TableHead>Sinais</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
