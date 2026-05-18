@@ -52,8 +52,18 @@ export interface PaymentTerm {
   requires_commercial_approval?: boolean;
   payment_due_days?: number | null;
 
+  // Cronograma manual quando payment_condition='custom_schedule'
+  manual_schedule?: ManualScheduleEntry[] | null;
+
   created_at?: string;
   updated_at?: string;
+}
+
+export interface ManualScheduleEntry {
+  due_date: string; // YYYY-MM-DD
+  percent?: number; // 0-100; tem precedência sobre amount se ambos vierem
+  amount?: number;  // valor em moeda
+  label?: string;
 }
 
 export interface Installment {
@@ -72,7 +82,7 @@ export async function getPaymentTerms(proposalId: string): Promise<PaymentTerm[]
     .eq('proposal_id', proposalId);
 
   if (error) throw error;
-  return data as PaymentTerm[];
+  return data as unknown as PaymentTerm[];
 }
 
 export async function createPaymentTerm(term: Omit<PaymentTerm, 'id' | 'created_at' | 'updated_at'>): Promise<PaymentTerm> {
@@ -90,12 +100,12 @@ export async function createPaymentTerm(term: Omit<PaymentTerm, 'id' | 'created_
     .insert({
       ...term,
       organization_id: orgId,
-    })
+    } as any)
     .select()
     .single();
 
   if (error) throw error;
-  return data as PaymentTerm;
+  return data as unknown as PaymentTerm;
 }
 
 export async function updatePaymentTerm(
@@ -104,13 +114,13 @@ export async function updatePaymentTerm(
 ): Promise<PaymentTerm> {
   const { data, error } = await supabase
     .from('proposal_payment_terms')
-    .update(updates)
+    .update(updates as any)
     .eq('id', termId)
     .select()
     .single();
 
   if (error) throw error;
-  return data as PaymentTerm;
+  return data as unknown as PaymentTerm;
 }
 
 export async function deletePaymentTerm(termId: string): Promise<void> {
@@ -244,6 +254,26 @@ export function calculateInstallments(
         label: `Saldo (${secondPct}%)`,
       },
     ];
+  }
+
+  // ----- Cronograma Manual -----
+  if (condition === 'custom_schedule' && Array.isArray(term.manual_schedule) && term.manual_schedule.length > 0) {
+    const entries = [...term.manual_schedule].sort((a, b) =>
+      (a.due_date || '').localeCompare(b.due_date || ''),
+    );
+    return entries.map((entry, idx) => {
+      const amount =
+        typeof entry.percent === 'number'
+          ? (discountedTotal * entry.percent) / 100
+          : Number(entry.amount || 0);
+      return {
+        number: idx + 1,
+        dueDate: entry.due_date,
+        amount: Number(amount.toFixed(2)),
+        type: 'installment',
+        label: entry.label || `Parcela ${idx + 1}${typeof entry.percent === 'number' ? ` (${entry.percent}%)` : ''}`,
+      } as Installment;
+    });
   }
 
   // ----- Parcelado tradicional (legado) -----
