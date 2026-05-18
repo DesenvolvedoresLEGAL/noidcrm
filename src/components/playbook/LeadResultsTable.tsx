@@ -397,15 +397,49 @@ export function LeadResultsTable({
                         </div>
                       )}
                       {(prospect.status === 'approved' || prospect.approval_status === 'approved') && !isImported && (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => onImport(prospect)} disabled={isImporting}>
-                              <Download className="h-3 w-3 mr-1" />
-                              Importar
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Importar no CRM (conta + oportunidade)</TooltipContent>
-                        </Tooltip>
+                        prospect.relationship_status === 'customer' ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span>
+                                <Button size="sm" variant="outline" className="h-7 text-xs" disabled>
+                                  <Download className="h-3 w-3 mr-1" />
+                                  Importar
+                                </Button>
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent>Já é cliente — abra a conta existente em vez de importar.</TooltipContent>
+                          </Tooltip>
+                        ) : (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs"
+                                onClick={() => {
+                                  if (
+                                    prospect.relationship_status === 'opportunity_existing' ||
+                                    prospect.relationship_status === 'account_existing'
+                                  ) {
+                                    const label =
+                                      prospect.relationship_status === 'opportunity_existing'
+                                        ? 'já existe uma oportunidade aberta'
+                                        : 'já existe uma conta cadastrada';
+                                    if (!window.confirm(`Atenção: ${label} para esta empresa. Importar mesmo assim?`)) {
+                                      return;
+                                    }
+                                  }
+                                  onImport(prospect);
+                                }}
+                                disabled={isImporting}
+                              >
+                                <Download className="h-3 w-3 mr-1" />
+                                Importar
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Importar no CRM (conta + oportunidade)</TooltipContent>
+                          </Tooltip>
+                        )
                       )}
                       {isImported && (
                         <Badge variant="outline" className="text-xs bg-primary/5 text-primary border-primary/20">
