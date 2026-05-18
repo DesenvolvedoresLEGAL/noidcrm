@@ -143,7 +143,7 @@ export function useBulkImportProspects() {
         }
       }
 
-      return { accountsCreated, opportunitiesCreated, emailsSent, emailsDrafted, skippedNoIdentity, errors, total: prospects.length };
+      return { accountsCreated, opportunitiesCreated, emailsSent, emailsDrafted, skippedNoIdentity, skippedCustomers, errors, total: prospects.length };
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['prospects'] });
@@ -155,6 +155,7 @@ export function useBulkImportProspects() {
       if (result.accountsCreated > 0) parts.push(`${result.accountsCreated} contas criadas`);
       if (result.emailsSent > 0) parts.push(`${result.emailsSent} e-mails enviados`);
       if (result.emailsDrafted > 0) parts.push(`${result.emailsDrafted} rascunhos`);
+      if (result.skippedCustomers > 0) parts.push(`${result.skippedCustomers} já são clientes`);
       if (result.skippedNoIdentity > 0) parts.push(`${result.skippedNoIdentity} sem identidade`);
       if (result.errors > 0) parts.push(`${result.errors} erros`);
       toast.success(parts.join(' · '));
