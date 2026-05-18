@@ -255,7 +255,7 @@ export function useProspects(runId: string | null) {
     return () => { supabase.removeChannel(channel); };
   }, [runId, queryClient]);
 
-  return useQuery({
+  const query = useQuery({
     queryKey: ['prospects', runId],
     queryFn: async () => {
       if (!runId) return [];
@@ -270,7 +270,39 @@ export function useProspects(runId: string | null) {
     enabled: !!runId,
     refetchInterval: 60000,
   });
+
+  // Background: classifica relationship_status de prospects ainda não verificados
+  useEffect(() => {
+    const list = query.data;
+    if (!list || list.length === 0) return;
+    const unverified = list.filter((p) => !p.relationship_status).map((p) => p.id);
+    if (unverified.length === 0) return;
+
+    let cancelled = false;
+    (async () => {
+      const BATCH = 5;
+      for (let i = 0; i < unverified.length && !cancelled; i += BATCH) {
+        const chunk = unverified.slice(i, i + BATCH);
+        await Promise.all(
+          chunk.map((prospect_id) =>
+            supabase.functions
+              .invoke('kairos-match-company', { body: { prospect_id } })
+              .catch((err) => console.warn('[kairos-match] failed', prospect_id, err)),
+          ),
+        );
+      }
+      if (!cancelled) {
+        queryClient.invalidateQueries({ queryKey: ['prospects', runId] });
+      }
+    })();
+
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query.data, runId]);
+
+  return query;
 }
+
 
 export function useCreatePlaybookRun() {
   const queryClient = useQueryClient();
