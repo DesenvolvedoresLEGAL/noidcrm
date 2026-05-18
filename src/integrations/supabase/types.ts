@@ -34712,6 +34712,10 @@ export type Database = {
         Args: { p_contact_id: string; p_prospect_id: string }
         Returns: string
       }
+      resolve_proposal_commercial_amount: {
+        Args: { p_proposal_id: string }
+        Returns: Json
+      }
       restore_from_snapshot: {
         Args: { p_snapshot_id: string; p_user_id?: string }
         Returns: Json
