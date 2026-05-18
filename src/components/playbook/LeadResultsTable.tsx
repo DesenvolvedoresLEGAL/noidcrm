@@ -13,6 +13,7 @@ import { Check, X, AlertTriangle, Download, PackageCheck, ArrowUp, ArrowDown, Ar
 import { cn } from '@/lib/utils';
 import type { Prospect } from '@/hooks/useLeadSourcingV2';
 import { DecisionBadge } from '@/components/decision-engine/DecisionBadge';
+import { RelationshipBadge } from './RelationshipBadge';
 
 type FilterKey = 'all' | 'pending' | 'approved' | 'rejected' | 'imported' | 'duplicate' | 'tier_s' | 'tier_a' | 'tier_b' | 'tier_c' | 'high_score' | 'no_domain';
 
