@@ -23127,6 +23127,7 @@ export type Database = {
           id: string
           installment_interval_days: number | null
           installments: number | null
+          manual_schedule: Json | null
           monthly_value: number | null
           organization_id: string
           payment_condition: string
@@ -23160,6 +23161,7 @@ export type Database = {
           id?: string
           installment_interval_days?: number | null
           installments?: number | null
+          manual_schedule?: Json | null
           monthly_value?: number | null
           organization_id: string
           payment_condition?: string
@@ -23193,6 +23195,7 @@ export type Database = {
           id?: string
           installment_interval_days?: number | null
           installments?: number | null
+          manual_schedule?: Json | null
           monthly_value?: number | null
           organization_id?: string
           payment_condition?: string
