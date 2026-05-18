@@ -145,6 +145,10 @@ export function LeadResultsTable({
         case 'tier_c': return s && priority < TIER_B_MIN;
         case 'high_score': return s && priority >= HIGH_SCORE_MIN;
         case 'no_domain': return !p.normalized_domain;
+        case 'rel_customer': return p.relationship_status === 'customer';
+        case 'rel_opportunity': return p.relationship_status === 'opportunity_existing';
+        case 'rel_account': return p.relationship_status === 'account_existing';
+        case 'rel_new': return p.relationship_status === 'new_prospect';
         default: return true;
       }
     });
