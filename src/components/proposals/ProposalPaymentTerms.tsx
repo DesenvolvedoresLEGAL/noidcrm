@@ -340,6 +340,32 @@ export function ProposalPaymentTerms({
       setOneTimeTerm(newTerm as any);
       setShowAdvanced(false);
       autoSave('one_time', newTerm);
+    } else if (presetId === 'manual') {
+      // Inicializa cronograma manual com 2 parcelas de 50% (hoje + 30 dias)
+      const today = getTodayDate();
+      const d30 = new Date();
+      d30.setDate(d30.getDate() + 30);
+      const in30 = d30.toISOString().split('T')[0];
+      const existing = Array.isArray((oneTimeTerm as any).manual_schedule)
+        ? (oneTimeTerm as any).manual_schedule
+        : null;
+      const initialSchedule = existing && existing.length > 0
+        ? existing
+        : [
+            { due_date: today, percent: 50 },
+            { due_date: in30, percent: 50 },
+          ];
+      const newTerm = {
+        ...oneTimeTerm,
+        payment_condition: 'custom_schedule' as PaymentTerm['payment_condition'],
+        manual_schedule: initialSchedule,
+        dynamic_pricing_reference_type: 'payment_due_date' as PaymentTerm['dynamic_pricing_reference_type'],
+        installments: initialSchedule.length,
+        entry_percent: 0,
+      };
+      setOneTimeTerm(newTerm as any);
+      setShowAdvanced(false);
+      autoSave('one_time', newTerm);
     } else {
       updateOneTime({
         payment_condition: 'installments',
