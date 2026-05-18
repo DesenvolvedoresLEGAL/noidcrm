@@ -88,6 +88,7 @@ export interface Prospect {
   cep: string | null;
   identity_enriched_at: string | null;
   created_at: string;
+  relationship_status?: 'customer' | 'opportunity_existing' | 'account_existing' | 'new_prospect' | null;
   prospect_scores: ProspectScore[] | null;
 }
 
