@@ -13,8 +13,9 @@ import { Check, X, AlertTriangle, Download, PackageCheck, ArrowUp, ArrowDown, Ar
 import { cn } from '@/lib/utils';
 import type { Prospect } from '@/hooks/useLeadSourcingV2';
 import { DecisionBadge } from '@/components/decision-engine/DecisionBadge';
+import { RelationshipBadge } from './RelationshipBadge';
 
-type FilterKey = 'all' | 'pending' | 'approved' | 'rejected' | 'imported' | 'duplicate' | 'tier_s' | 'tier_a' | 'tier_b' | 'tier_c' | 'high_score' | 'no_domain';
+type FilterKey = 'all' | 'pending' | 'approved' | 'rejected' | 'imported' | 'duplicate' | 'tier_s' | 'tier_a' | 'tier_b' | 'tier_c' | 'high_score' | 'no_domain' | 'rel_customer' | 'rel_opportunity' | 'rel_account' | 'rel_new';
 
 // Tier thresholds — calibrados sobre dados reais (priority_score range observado: 141–316)
 // Tier S: alta prioridade absoluta (top 30%)
@@ -40,6 +41,10 @@ const FILTERS: { key: FilterKey; label: string; tooltip?: string }[] = [
   { key: 'tier_b', label: `Tier B (${TIER_B_MIN}–${TIER_A_MIN - 1})`, tooltip: 'Prioridade média — trabalhar após Tier S/A ou enriquecer para subir de tier.' },
   { key: 'tier_c', label: `Tier C (<${TIER_B_MIN})`, tooltip: 'Baixa prioridade — ICP fraco ou poucos sinais. Considerar descarte ou enrichment manual.' },
   { key: 'no_domain', label: 'Sem Domínio' },
+  { key: 'rel_customer', label: 'Já é cliente', tooltip: 'Empresa já é cliente ativo no CRM.' },
+  { key: 'rel_opportunity', label: 'Em oportunidade', tooltip: 'Já existe oportunidade aberta para esta conta.' },
+  { key: 'rel_account', label: 'Já é conta', tooltip: 'Conta já cadastrada, sem oportunidade ativa.' },
+  { key: 'rel_new', label: 'Novo na base', tooltip: 'Empresa não encontrada na base — prospect novo.' },
 ];
 
 interface LeadResultsTableProps {
@@ -140,6 +145,10 @@ export function LeadResultsTable({
         case 'tier_c': return s && priority < TIER_B_MIN;
         case 'high_score': return s && priority >= HIGH_SCORE_MIN;
         case 'no_domain': return !p.normalized_domain;
+        case 'rel_customer': return p.relationship_status === 'customer';
+        case 'rel_opportunity': return p.relationship_status === 'opportunity_existing';
+        case 'rel_account': return p.relationship_status === 'account_existing';
+        case 'rel_new': return p.relationship_status === 'new_prospect';
         default: return true;
       }
     });
@@ -298,6 +307,7 @@ export function LeadResultsTable({
                   </button>
                 </TableHead>
                 <TableHead>Duplicidade</TableHead>
+                <TableHead>Status na base</TableHead>
                 <TableHead>Sinais</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
@@ -342,6 +352,14 @@ export function LeadResultsTable({
                     <TableCell>
                       <DedupeBadgeSmall status={prospect.dedupe_status || 'unchecked'} />
                     </TableCell>
+                    <TableCell>
+                      <RelationshipBadge
+                        status={prospect.relationship_status}
+                        confidence={(prospect as any).match_confidence ?? null}
+                        reason={(prospect as any).match_reason ?? null}
+                        compact
+                      />
+                    </TableCell>
                     <TableCell className="max-w-[160px]">
                       <div className="flex flex-wrap gap-1">
                         {signals.length > 0 ? signals.slice(0, 3).map(s => (
@@ -379,15 +397,49 @@ export function LeadResultsTable({
                         </div>
                       )}
                       {(prospect.status === 'approved' || prospect.approval_status === 'approved') && !isImported && (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => onImport(prospect)} disabled={isImporting}>
-                              <Download className="h-3 w-3 mr-1" />
-                              Importar
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Importar no CRM (conta + oportunidade)</TooltipContent>
-                        </Tooltip>
+                        prospect.relationship_status === 'customer' ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span>
+                                <Button size="sm" variant="outline" className="h-7 text-xs" disabled>
+                                  <Download className="h-3 w-3 mr-1" />
+                                  Importar
+                                </Button>
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent>Já é cliente — abra a conta existente em vez de importar.</TooltipContent>
+                          </Tooltip>
+                        ) : (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs"
+                                onClick={() => {
+                                  if (
+                                    prospect.relationship_status === 'opportunity_existing' ||
+                                    prospect.relationship_status === 'account_existing'
+                                  ) {
+                                    const label =
+                                      prospect.relationship_status === 'opportunity_existing'
+                                        ? 'já existe uma oportunidade aberta'
+                                        : 'já existe uma conta cadastrada';
+                                    if (!window.confirm(`Atenção: ${label} para esta empresa. Importar mesmo assim?`)) {
+                                      return;
+                                    }
+                                  }
+                                  onImport(prospect);
+                                }}
+                                disabled={isImporting}
+                              >
+                                <Download className="h-3 w-3 mr-1" />
+                                Importar
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Importar no CRM (conta + oportunidade)</TooltipContent>
+                          </Tooltip>
+                        )
                       )}
                       {isImported && (
                         <Badge variant="outline" className="text-xs bg-primary/5 text-primary border-primary/20">

@@ -73,6 +73,9 @@ export function useImportProspect() {
 
   return useMutation({
     mutationFn: async (prospect: Prospect) => {
+      if (prospect.relationship_status === 'customer') {
+        throw new Error('Esta empresa já é cliente — abra a conta existente em vez de importar.');
+      }
       if (!hasMinimumIdentity(prospect)) {
         throw new Error('Prospect sem identidade mínima (CNPJ ou domínio). Enriqueça antes de importar.');
       }
@@ -114,9 +117,14 @@ export function useBulkImportProspects() {
       let emailsSent = 0;
       let emailsDrafted = 0;
       let skippedNoIdentity = 0;
+      let skippedCustomers = 0;
       let errors = 0;
 
       for (const prospect of prospects) {
+        if (prospect.relationship_status === 'customer') {
+          skippedCustomers++;
+          continue;
+        }
         if (!hasMinimumIdentity(prospect)) {
           skippedNoIdentity++;
           continue;
@@ -135,7 +143,7 @@ export function useBulkImportProspects() {
         }
       }
 
-      return { accountsCreated, opportunitiesCreated, emailsSent, emailsDrafted, skippedNoIdentity, errors, total: prospects.length };
+      return { accountsCreated, opportunitiesCreated, emailsSent, emailsDrafted, skippedNoIdentity, skippedCustomers, errors, total: prospects.length };
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['prospects'] });
@@ -147,6 +155,7 @@ export function useBulkImportProspects() {
       if (result.accountsCreated > 0) parts.push(`${result.accountsCreated} contas criadas`);
       if (result.emailsSent > 0) parts.push(`${result.emailsSent} e-mails enviados`);
       if (result.emailsDrafted > 0) parts.push(`${result.emailsDrafted} rascunhos`);
+      if (result.skippedCustomers > 0) parts.push(`${result.skippedCustomers} já são clientes`);
       if (result.skippedNoIdentity > 0) parts.push(`${result.skippedNoIdentity} sem identidade`);
       if (result.errors > 0) parts.push(`${result.errors} erros`);
       toast.success(parts.join(' · '));

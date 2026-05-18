@@ -24280,6 +24280,7 @@ export type Database = {
           recommended_next_action: string | null
           rejected_at: string | null
           rejected_by: string | null
+          relationship_status: string | null
           review_needed: boolean | null
           source_id: string | null
           source_label: string | null
@@ -24337,6 +24338,7 @@ export type Database = {
           recommended_next_action?: string | null
           rejected_at?: string | null
           rejected_by?: string | null
+          relationship_status?: string | null
           review_needed?: boolean | null
           source_id?: string | null
           source_label?: string | null
@@ -24394,6 +24396,7 @@ export type Database = {
           recommended_next_action?: string | null
           rejected_at?: string | null
           rejected_by?: string | null
+          relationship_status?: string | null
           review_needed?: boolean | null
           source_id?: string | null
           source_label?: string | null
