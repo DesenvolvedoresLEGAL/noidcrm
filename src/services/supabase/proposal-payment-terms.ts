@@ -52,8 +52,18 @@ export interface PaymentTerm {
   requires_commercial_approval?: boolean;
   payment_due_days?: number | null;
 
+  // Cronograma manual quando payment_condition='custom_schedule'
+  manual_schedule?: ManualScheduleEntry[] | null;
+
   created_at?: string;
   updated_at?: string;
+}
+
+export interface ManualScheduleEntry {
+  due_date: string; // YYYY-MM-DD
+  percent?: number; // 0-100; tem precedência sobre amount se ambos vierem
+  amount?: number;  // valor em moeda
+  label?: string;
 }
 
 export interface Installment {
