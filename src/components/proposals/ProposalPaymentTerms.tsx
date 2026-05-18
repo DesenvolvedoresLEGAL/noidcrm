@@ -76,11 +76,6 @@ const PAYMENT_PRESETS = [
     config: { entry_percent: 0, installments: 3, installment_interval_days: 30 }
   },
   {
-    id: 'net_35',
-    label: 'Faturado 35d',
-    config: { entry_percent: 0, installments: 1, installment_interval_days: 35, payment_due_days: 35 }
-  },
-  {
     id: 'parcelado',
     label: 'Parcelado',
     config: null // Opens custom config
