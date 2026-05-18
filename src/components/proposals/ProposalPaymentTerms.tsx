@@ -902,6 +902,130 @@ export function ProposalPaymentTerms({
                   </Collapsible>
                 )}
 
+                {/* Manual Schedule Editor */}
+                {selectedPreset === 'manual' && (() => {
+                  const schedule: Array<{ due_date: string; percent?: number; amount?: number }> =
+                    Array.isArray((oneTimeTerm as any).manual_schedule)
+                      ? (oneTimeTerm as any).manual_schedule
+                      : [];
+                  const sumPercent = schedule.reduce((acc, s) => acc + (Number(s.percent) || 0), 0);
+                  const target = totalWithDiscount;
+                  const isValid = Math.abs(sumPercent - 100) < 0.01;
+
+                  const updateSchedule = (next: typeof schedule) => {
+                    updateOneTime({
+                      // @ts-ignore manual_schedule existe no tipo PaymentTerm
+                      manual_schedule: next,
+                      installments: next.length,
+                    });
+                  };
+
+                  return (
+                    <div className="border rounded-lg p-3 space-y-3 bg-muted/20">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs font-semibold uppercase tracking-wide flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          Cronograma Manual
+                        </Label>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs"
+                          onClick={() => {
+                            const d = new Date();
+                            d.setDate(d.getDate() + 30 * (schedule.length || 1));
+                            updateSchedule([...schedule, { due_date: d.toISOString().split('T')[0], percent: 0 }]);
+                          }}
+                        >
+                          + Adicionar parcela
+                        </Button>
+                      </div>
+
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-muted/40">
+                            <TableHead className="text-xs h-8">#</TableHead>
+                            <TableHead className="text-xs h-8">Vencimento</TableHead>
+                            <TableHead className="text-xs h-8">%</TableHead>
+                            <TableHead className="text-xs h-8 text-right">Valor</TableHead>
+                            <TableHead className="text-xs h-8 w-10"></TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {schedule.map((row, idx) => {
+                            const amt = (target * (Number(row.percent) || 0)) / 100;
+                            return (
+                              <TableRow key={idx}>
+                                <TableCell className="text-xs py-1.5">{idx + 1}</TableCell>
+                                <TableCell className="py-1.5">
+                                  <Input
+                                    type="date"
+                                    value={row.due_date}
+                                    onChange={(e) => {
+                                      const next = [...schedule];
+                                      next[idx] = { ...row, due_date: e.target.value };
+                                      updateSchedule(next);
+                                    }}
+                                    className="h-7 text-xs"
+                                  />
+                                </TableCell>
+                                <TableCell className="py-1.5">
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    step="0.01"
+                                    defaultValue={row.percent ?? 0}
+                                    key={`pct-${idx}-${row.percent}`}
+                                    onBlur={(e) => {
+                                      const val = parseFloat(e.target.value);
+                                      const next = [...schedule];
+                                      next[idx] = { ...row, percent: isNaN(val) ? 0 : val, amount: undefined };
+                                      updateSchedule(next);
+                                    }}
+                                    className="h-7 text-xs w-20"
+                                  />
+                                </TableCell>
+                                <TableCell className="py-1.5 text-right text-xs font-medium">
+                                  {formatCurrency(amt)}
+                                </TableCell>
+                                <TableCell className="py-1.5 text-right">
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-6 w-6 p-0 text-destructive"
+                                    onClick={() => updateSchedule(schedule.filter((_, i) => i !== idx))}
+                                    disabled={schedule.length <= 1}
+                                  >
+                                    ×
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+
+                      <div className={cn(
+                        "text-xs flex items-center justify-between p-2 rounded",
+                        isValid
+                          ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400"
+                          : "bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400"
+                      )}>
+                        <span>Soma: {sumPercent.toFixed(2)}% ({formatCurrency(target * sumPercent / 100)})</span>
+                        <span className="font-semibold">
+                          {isValid ? '✓ Total OK' : `Deve somar 100% (faltam ${(100 - sumPercent).toFixed(2)}%)`}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">
+                        Dica: se alguma parcela vencer após o início do evento, o sistema aplica automaticamente a faixa "Após o início do evento" da tabela dinâmica.
+                      </p>
+                    </div>
+                  );
+                })()}
+
                 {/* Installments Schedule - Collapsible */}
                 {installments.length > 0 && effectiveOneTimeTotal > 0 && (
                   <Collapsible open={showSchedule} onOpenChange={setShowSchedule}>
