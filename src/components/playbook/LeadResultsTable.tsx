@@ -15,7 +15,7 @@ import type { Prospect } from '@/hooks/useLeadSourcingV2';
 import { DecisionBadge } from '@/components/decision-engine/DecisionBadge';
 import { RelationshipBadge } from './RelationshipBadge';
 
-type FilterKey = 'all' | 'pending' | 'approved' | 'rejected' | 'imported' | 'duplicate' | 'tier_s' | 'tier_a' | 'tier_b' | 'tier_c' | 'high_score' | 'no_domain';
+type FilterKey = 'all' | 'pending' | 'approved' | 'rejected' | 'imported' | 'duplicate' | 'tier_s' | 'tier_a' | 'tier_b' | 'tier_c' | 'high_score' | 'no_domain' | 'rel_customer' | 'rel_opportunity' | 'rel_account' | 'rel_new';
 
 // Tier thresholds — calibrados sobre dados reais (priority_score range observado: 141–316)
 // Tier S: alta prioridade absoluta (top 30%)
