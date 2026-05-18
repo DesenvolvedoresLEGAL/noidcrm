@@ -85,6 +85,11 @@ const PAYMENT_PRESETS = [
     label: 'Parcelado',
     config: null // Opens custom config
   },
+  {
+    id: 'manual',
+    label: 'Manual',
+    config: null // Opens manual schedule editor
+  },
 ];
 
 // PRICE UX 1.0.4 — opções de data de referência da tabela dinâmica
