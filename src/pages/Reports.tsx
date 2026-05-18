@@ -18,6 +18,7 @@ import { AIInsightsPanel } from '@/components/reports/AIInsightsPanel';
 import { TeamPerformanceWrapper } from '@/components/reports/wrappers/TeamPerformanceWrapper';
 import { OriginReportWrapper } from '@/components/reports/wrappers/OriginReportWrapper';
 import { EnrichedDecisionMakersWrapper } from '@/components/reports/wrappers/EnrichedDecisionMakersWrapper';
+import { ProductsReport } from '@/components/reports/ProductsReport';
 import { useOrganizationPipelines } from '@/hooks/useOrganizationPipelines';
 import { useOrganizationUsers } from '@/hooks/useOrganizationUsers';
 import { ReportFiltersProvider, useReportFiltersContext } from '@/contexts/ReportFiltersContext';
@@ -73,6 +74,8 @@ function ReportsContent() {
         return <HandoffWrapper />;
       case 'enriched-decision-makers':
         return <EnrichedDecisionMakersWrapper />;
+      case 'products':
+        return <ProductsReport />;
       default:
         return <GeneralOverviewWrapper />;
     }

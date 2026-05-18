@@ -14,7 +14,8 @@ import {
   Handshake,
   Brain,
   Compass,
-  UserSearch
+  UserSearch,
+  Package
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -39,6 +40,7 @@ const reportTabs = [
   { id: 'closer-performance', label: 'Closer', icon: Award, category: 'performance' },
   { id: 'handoff', label: 'Handoff', icon: Handshake, category: 'performance' },
   { id: 'enriched-decision-makers', label: 'Decisores Enriquecidos', icon: UserSearch, category: 'intelligence' },
+  { id: 'products', label: 'Produtos', icon: Package, category: 'catalog' },
 ];
 
 const categoryLabels = {
@@ -47,10 +49,11 @@ const categoryLabels = {
   funnel: 'Funil',
   performance: 'Desempenho',
   intelligence: 'Inteligência',
+  catalog: 'Catálogo',
 };
 
 export function ReportTabs({ activeReport, onSelectReport }: ReportTabsProps) {
-  const categories = ['overview', 'opportunities', 'funnel', 'performance', 'intelligence'] as const;
+  const categories = ['overview', 'opportunities', 'funnel', 'performance', 'intelligence', 'catalog'] as const;
 
   return (
     <div className="border-b bg-card shadow-sm">
