@@ -95,12 +95,19 @@ export async function createPaymentTerm(term: Omit<PaymentTerm, 'id' | 'created_
     throw new Error('User must belong to an organization');
   }
 
+  // Use upsert on (proposal_id, payment_type) — a DB trigger
+  // (trg_proposal_auto_dynamic_pricing) may have already seeded a default
+  // "one_time" row for Evento proposals, which would cause a 409 conflict
+  // on plain INSERT. Upsert keeps the user's values authoritative.
   const { data, error } = await supabase
     .from('proposal_payment_terms')
-    .insert({
-      ...term,
-      organization_id: orgId,
-    } as any)
+    .upsert(
+      {
+        ...term,
+        organization_id: orgId,
+      } as any,
+      { onConflict: 'proposal_id,payment_type' },
+    )
     .select()
     .single();
 
