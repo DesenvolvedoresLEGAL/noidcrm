@@ -1,5 +1,9 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { resolveProposalPaymentDue } from "../_shared/proposal-payment-due.ts";
+import {
+  resolveApprovedProposalAmount,
+  APPROVED_VALUE_SELECT_COLUMNS,
+} from "../_shared/approved-proposal-value.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -167,30 +171,30 @@ async function buildDeal(
     .eq("proposal_id", proposalId)
     .order("order_index");
 
-  // Proposal-level financials — SINGLE SOURCE OF TRUTH for ERP.
-  // Priority for the NET amount actually charged to the client:
-  //   1) payment_expected_amount  → NET after dynamic pricing AND manual discount (set by orchestrate_proposal_financials)
-  //   2) dynamic_pricing_current_amount → gross vigente (dynamic pricing only)
-  //   3) total_amount → sum of items (no dynamic pricing, no manual discount)
-  //   4) subtotal - discount_amount
+  // SOURCE OF TRUTH for the APPROVED NET amount — matches notify-deal-won.
+  // Priority: approved_amount → payment_expected_amount → dynamic vigente → total_amount → value.
+  const approved = resolveApprovedProposalAmount(proposal as any);
+
   const proposalSubtotal = Number(proposal.subtotal) || 0;
   const proposalDiscountAmount = Number(proposal.discount_amount) || 0;
   const proposalTotalAmount = Number(proposal.total_amount) || 0;
-  const proposalPaymentExpected = Number((proposal as any).payment_expected_amount) || 0;
-  const proposalDynamicCurrent = Number((proposal as any).dynamic_pricing_current_amount) || 0;
 
-  const netTotal = proposalPaymentExpected > 0
-    ? proposalPaymentExpected
-    : proposalDynamicCurrent > 0
-      ? proposalDynamicCurrent
-      : proposalTotalAmount > 0
-        ? proposalTotalAmount
-        : Math.max(proposalSubtotal - proposalDiscountAmount, 0);
+  const itemsGrossTotal = (items || []).reduce((sum: number, item: Record<string, unknown>) => {
+    return sum + (Number(item.total) || 0);
+  }, 0);
+
+  const netTotal = approved.amount > 0
+    ? approved.amount
+    : proposalTotalAmount > 0
+      ? proposalTotalAmount
+      : Math.max(proposalSubtotal - proposalDiscountAmount, itemsGrossTotal);
+
+  const subtotalForBreakdown = proposalSubtotal > 0 ? proposalSubtotal : itemsGrossTotal;
   const discountTotal = proposalDiscountAmount > 0
     ? proposalDiscountAmount
-    : Math.max(proposalSubtotal - netTotal, 0);
-  const discountPercent = proposalSubtotal > 0
-    ? Number(((discountTotal / proposalSubtotal) * 100).toFixed(2))
+    : Math.max(subtotalForBreakdown - netTotal, 0);
+  const discountPercent = subtotalForBreakdown > 0
+    ? Number(((discountTotal / subtotalForBreakdown) * 100).toFixed(2))
     : 0;
 
   // Fetch payment terms — legacy proposals can have duplicate rows.
@@ -204,13 +208,30 @@ async function buildDeal(
   const dueResolution = resolveProposalPaymentDue(proposal as any, paymentTermsList as any[]);
   const paymentTerms = dueResolution.paymentTerms;
 
-  // Calculate total amount using correct column
-  // Items gross total (sum of line item totals — pre payment-discount)
-  const itemsGrossTotal = (items || []).reduce((sum: number, item: Record<string, unknown>) => {
-    return sum + (Number(item.total) || 0);
-  }, 0);
-  // Final amount = single source of truth = net total from proposal level
-  const totalAmount = netTotal > 0 ? netTotal : itemsGrossTotal;
+  // Final amount = single source of truth = net approved amount
+  const totalAmount = netTotal;
+
+  // Scale per-item totals so Σ products[].total_price === netTotal.
+  // Some ERP integrations sum line items instead of reading the deal-level
+  // amount; without scaling we'd send the gross items total (e.g. 1297)
+  // even when net is 1.686,10. unit_price / quantity remain untouched.
+  const itemsArr = (items || []) as Array<Record<string, unknown>>;
+  const scaleFactor = itemsGrossTotal > 0 ? netTotal / itemsGrossTotal : 1;
+  const scaledItems = itemsArr.map((item, idx) => {
+    const original = Number(item.total) || 0;
+    let scaled = Math.round(original * scaleFactor * 100) / 100;
+    if (idx === itemsArr.length - 1 && itemsArr.length > 0) {
+      const sumSoFar = itemsArr
+        .slice(0, idx)
+        .reduce((s, it) => s + Math.round((Number(it.total) || 0) * scaleFactor * 100) / 100, 0);
+      scaled = Math.round((netTotal - sumSoFar) * 100) / 100;
+    }
+    return { item, original, scaled };
+  });
+
+  console.log(
+    `[api-deals] proposal=${proposalId} net=${netTotal} gross=${itemsGrossTotal} source=${approved.source} approved=${approved.amount} expected=${(proposal as any).payment_expected_amount} dyn=${(proposal as any).dynamic_pricing_current_amount} total_amount=${proposalTotalAmount}`,
+  );
 
   const vencimento = dueResolution.vencimento;
 
@@ -232,18 +253,29 @@ async function buildDeal(
   return {
     id: proposalId,
     title: (opportunity?.title as string) || (proposal.title as string) || "Sem título",
+    // Every monetary top-level field carries the NET approved value so the ERP
+    // cannot accidentally pick a gross/legacy field.
     amount: totalAmount,
-    // Financial breakdown — single source of truth (net = total - discount)
     net_total: netTotal,
     discount_total: discountTotal,
     discount_percent: discountPercent,
-    subtotal: proposalSubtotal,
+    subtotal: subtotalForBreakdown,
     gross_total: itemsGrossTotal,
+    base_amount: approved.base_amount || itemsGrossTotal,
+    total_amount: netTotal,
     total_with_discount: netTotal,
     valor_liquido: netTotal,
     final_amount: netTotal,
     total_negotiated: netTotal,
-    contract_total: paymentTerms?.contract_total ? Number(paymentTerms.contract_total) : netTotal,
+    contract_total: paymentTerms?.contract_total && Number(paymentTerms.contract_total) > 0
+      ? Number(paymentTerms.contract_total)
+      : netTotal,
+    approved_amount: approved.amount || null,
+    amount_source: approved.source,
+    dynamic_pricing_enabled: approved.dynamic_enabled,
+    dynamic_pricing_status: approved.dynamic_status,
+    dynamic_pricing_current_amount: approved.dynamic_amount,
+    dynamic_pricing_snapshot: approved.snapshot,
     status: "won",
     won_date: (proposal.accepted_at as string) || null,
     created_at: proposal.created_at as string,
@@ -279,8 +311,9 @@ async function buildDeal(
       : null) as string | null,
     contact_position: (contact?.cargo as string) || null,
 
-    // Products
-    products: (items || []).map((item: Record<string, unknown>) => ({
+    // Products: total_price scaled so Σ === netTotal. unit_price/quantity preserved
+    // for human reading; original_total_price kept for auditing.
+    products: scaledItems.map(({ item, original, scaled }) => ({
       id: item.id,
       product_id: item.product_id,
       name: item.name,
@@ -288,7 +321,9 @@ async function buildDeal(
       price: Number(item.unit_price) || 0,
       quantity: Number(item.quantity) || 1,
       discount_percent: Number(item.discount_percent) || 0,
-      total_price: Number(item.total) || 0,
+      total_price: scaled,
+      net_total_price: scaled,
+      original_total_price: original,
       billing_type: item.billing_type || "one_time",
       minimum_contract_months: item.minimum_contract_months ? Number(item.minimum_contract_months) : null,
     })),
@@ -304,7 +339,9 @@ async function buildDeal(
           contract_start_date: paymentTerms.contract_start_date,
           contract_duration_months: paymentTerms.contract_duration_months,
           monthly_value: paymentTerms.monthly_value ? Number(paymentTerms.monthly_value) : null,
-          contract_total: paymentTerms.contract_total ? Number(paymentTerms.contract_total) : null,
+          contract_total: paymentTerms.contract_total && Number(paymentTerms.contract_total) > 0
+            ? Number(paymentTerms.contract_total)
+            : netTotal,
           billing_day: paymentTerms.billing_day,
           comments: paymentTerms.comments,
           vencimento,
