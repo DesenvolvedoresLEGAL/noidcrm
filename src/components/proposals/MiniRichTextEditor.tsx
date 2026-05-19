@@ -31,12 +31,15 @@ export function MiniRichTextEditor({ value, onChange, placeholder, className }: 
 
   const editor = useEditor({
     extensions: [
+      // StarterKit v3 already includes Underline — disable to avoid duplicate
+      // extension registration (silently breaks chain commands like setColor).
       StarterKit.configure({
         heading: false,
         blockquote: false,
         codeBlock: false,
         horizontalRule: false,
-      }),
+        underline: false,
+      } as any),
       Underline,
       TextStyle,
       Color,
@@ -44,7 +47,8 @@ export function MiniRichTextEditor({ value, onChange, placeholder, className }: 
     content: value || '',
     editorProps: {
       attributes: {
-        class: 'prose prose-sm max-w-none focus:outline-none min-h-[40px] px-2 py-1 text-sm [&_ul]:list-disc [&_ul]:ml-4 [&_ol]:list-decimal [&_ol]:ml-4 [&_li]:my-0.5 [&_p]:my-1 [&_strong]:font-bold [&_em]:italic [&_u]:underline',
+        // Force prose color rules to inherit so inline color from <span style="color:..."> wins.
+        class: 'prose prose-sm max-w-none focus:outline-none min-h-[40px] px-2 py-1 text-sm prose-p:text-inherit prose-strong:text-inherit prose-em:text-inherit prose-li:text-inherit prose-a:text-inherit [&_ul]:list-disc [&_ul]:ml-4 [&_ol]:list-decimal [&_ol]:ml-4 [&_li]:my-0.5 [&_p]:my-1 [&_strong]:font-bold [&_em]:italic [&_u]:underline',
       },
     },
     onUpdate: handleUpdate,
