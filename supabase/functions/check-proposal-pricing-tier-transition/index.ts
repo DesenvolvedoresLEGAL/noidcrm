@@ -214,12 +214,25 @@ Deno.serve(async (req) => {
       }
 
       // 5) Destinatários: dono da oportunidade + manager
+      // Importante: só notificamos se o deal ainda estiver no funil de VENDAS
+      // e em status aberto. Deals movidos para Operacional/Onboarding/Renewal
+      // ou já marcados como won/lost não devem mais receber alerta de virada
+      // de tabela dinâmica (a negociação já foi encerrada).
       const { data: opp } = await supabase
         .from("opportunities")
-        .select("owner_user_id")
+        .select("owner_user_id, status, pipeline_id, deleted_at, pipelines:pipeline_id(pipeline_type)")
         .eq("id", proposal.opportunity_id)
-        .single();
+        .maybeSingle() as { data: any };
       if (!opp?.owner_user_id) continue;
+      if (opp.deleted_at) continue;
+      if (opp.status && !["new", "in_progress", "open"].includes(String(opp.status))) continue;
+      const pipelineType = opp?.pipelines?.pipeline_type ?? null;
+      if (pipelineType && pipelineType !== "sales") {
+        console.log(
+          `[tier-transition] skip ${proposal.id} — opportunity in pipeline_type=${pipelineType}`,
+        );
+        continue;
+      }
 
       const { data: seller } = await supabase
         .from("sellers")
