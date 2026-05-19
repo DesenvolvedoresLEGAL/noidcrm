@@ -408,7 +408,7 @@ async function handleList(
 
   const { data: proposals, error, count } = await supabase
     .from("proposals")
-    .select("id, opportunity_id, organization_id, status, title, client_name, client_email, value, subtotal, discount_amount, total_amount, payment_expected_amount, dynamic_pricing_current_amount, approved_payment_schedule, approval_snapshot, created_at, accepted_at, expires_at", { count: "exact" })
+    .select(`id, opportunity_id, organization_id, status, title, client_name, client_email, subtotal, discount_amount, approved_payment_schedule, approval_snapshot, created_at, accepted_at, expires_at, ${APPROVED_VALUE_SELECT_COLUMNS}`, { count: "exact" })
     .eq("organization_id", orgId)
     .in("status", proposalStatuses)
     .is("deleted_at", null)
@@ -417,8 +417,35 @@ async function handleList(
 
   if (error) throw error;
 
+  // Preflight: re-orchestrate financials for each proposal so the response
+  // always carries the canonical NET. Best-effort, non-blocking on individual errors.
+  for (const p of proposals || []) {
+    try {
+      await supabase.rpc("orchestrate_proposal_financials", {
+        p_proposal_id: (p as any).id,
+        p_reason: "api_deals_list_preflight",
+      });
+    } catch (e) {
+      console.error("[api-deals] orchestration preflight failed for", (p as any).id, e);
+    }
+  }
+
+  // Re-fetch the rows after orchestration so net fields reflect the canonical state.
+  const ids = (proposals || []).map((p: any) => p.id);
+  const refreshed = ids.length
+    ? (await supabase
+        .from("proposals")
+        .select(`id, opportunity_id, organization_id, status, title, client_name, client_email, subtotal, discount_amount, approved_payment_schedule, approval_snapshot, created_at, accepted_at, expires_at, ${APPROVED_VALUE_SELECT_COLUMNS}`)
+        .in("id", ids)).data || proposals
+    : proposals;
+
+  const orderById = new Map((proposals || []).map((p: any, i: number) => [p.id, i]));
+  const ordered = [...(refreshed || [])].sort(
+    (a: any, b: any) => (orderById.get(a.id) ?? 0) - (orderById.get(b.id) ?? 0),
+  );
+
   const deals = [];
-  for (const proposal of proposals || []) {
+  for (const proposal of ordered) {
     deals.push(await buildDeal(supabase, proposal));
   }
 
@@ -442,9 +469,19 @@ async function handleGet(
     return jsonResponse({ success: false, error: "Provide id parameter" }, 400);
   }
 
+  // Preflight: re-orchestrate financials so the response always carries the canonical NET.
+  try {
+    await supabase.rpc("orchestrate_proposal_financials", {
+      p_proposal_id: id,
+      p_reason: "api_deals_get_preflight",
+    });
+  } catch (e) {
+    console.error("[api-deals] orchestration preflight failed for", id, e);
+  }
+
   const { data: proposal, error } = await supabase
     .from("proposals")
-    .select("id, opportunity_id, organization_id, status, title, client_name, client_email, value, subtotal, discount_amount, total_amount, payment_expected_amount, dynamic_pricing_current_amount, approved_payment_schedule, approval_snapshot, created_at, accepted_at, expires_at")
+    .select(`id, opportunity_id, organization_id, status, title, client_name, client_email, subtotal, discount_amount, approved_payment_schedule, approval_snapshot, created_at, accepted_at, expires_at, ${APPROVED_VALUE_SELECT_COLUMNS}`)
     .eq("id", id)
     .eq("organization_id", orgId)
     .is("deleted_at", null)
