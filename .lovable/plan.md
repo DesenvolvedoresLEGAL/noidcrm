@@ -1,49 +1,62 @@
-# Fix: Exclusão de atividades bloqueada por RLS
+## Objetivo
+Garantir que qualquer envio para ERP/API/fatura use sempre o valor aprovado vigente da proposta (`R$ 1.686,10` no caso CONNECT FUN), nunca o total bruto/base dos itens (`R$ 1.297,00`).
 
-## Causa raiz
+## Diagnóstico
+- A proposta aceita correta está gravada com:
+  - `approved_amount = 1686.10`
+  - `payment_expected_amount = 1686.10`
+  - `dynamic_pricing_current_amount = 1686.10`
+  - `total_amount = 1297.00` (base dos itens, legado)
+- O envio direto `notify-deal-won` já tem proteção parcial: manda campos de topo com valor líquido e escala os produtos.
+- A API `api-deals`, usada por integrações/ERP para buscar deals, ainda retorna `products[].total_price` com o valor bruto dos itens e não inclui `approved_amount` / `amount_source`. Se o ERP soma produtos ou lê campo legado, ele recebe `1297`.
 
-A tabela `public.activities` tem hoje **uma única policy de DELETE**, restrita a admins:
+## Plano de correção segura
+1. **Unificar o resolvedor de valor aprovado na API de deals**
+   - Importar e usar `resolveApprovedProposalAmount` em `supabase/functions/api-deals/index.ts`.
+   - Incluir no select da proposta os campos necessários: `approved_amount`, `dynamic_pricing_enabled`, `dynamic_pricing_status`, `dynamic_pricing_snapshot`.
+   - Prioridade final: `approved_amount` → `payment_expected_amount` → dinâmica vigente → `total_amount` → `value`.
 
-```
-Admins delete activities
-USING: (organization_id = get_user_organization_id()) AND can_view_all(auth.uid())
-```
+2. **Blindar todos os campos monetários enviados ao ERP**
+   - Em `api-deals`, preencher os campos principais com o valor líquido aprovado:
+     - `amount`
+     - `net_total`
+     - `final_amount`
+     - `valor_liquido`
+     - `total_with_discount`
+     - `total_negotiated`
+     - `contract_total`
+   - Adicionar metadados claros:
+     - `approved_amount`
+     - `amount_source`
+     - `base_amount`
+     - `dynamic_pricing_*`
 
-Qualquer usuário que não seja admin/manager com `can_view_all=true` bate em RLS, o `.delete()` retorna 0 linhas afetadas sem erro, e a UI mostra "Atividade excluída com sucesso" — mas o registro continua no banco. É exatamente o sintoma do print.
+3. **Corrigir o array de produtos para não induzir o ERP ao erro**
+   - Escalar `products[].total_price` para que a soma dos produtos bata exatamente com o valor aprovado líquido.
+   - Preservar auditoria com `original_total_price` e `net_total_price`, sem alterar `unit_price`/`quantity`.
+   - Esse padrão já existe no `notify-deal-won`; vou replicar na `api-deals` para consistência.
 
-Os erros 400 em `contacts` no console são de outra query (filtro com `contact_id IS NULL`) e não têm relação com a exclusão.
+4. **Corrigir o contrato/fatura/termos quando campo legado vier zerado**
+   - Ajustar `contract_total` dentro de `payment_terms` para cair no valor líquido aprovado quando o termo estiver `0`/nulo.
+   - Evita ERP ler `contract_total = 0` ou voltar para item bruto.
 
-## Mudança
+5. **Criar uma proteção no banco para propostas aceitas**
+   - Migration pequena para reforçar a função `orchestrate_proposal_financials`: proposta aceita mantém `approved_amount` realinhado ao valor comercial canônico.
+   - Backfill específico para propostas aceitas/dinâmicas garantindo `approved_amount`, `payment_expected_amount` e `opportunities.valor_previsto` consistentes.
+   - Sem mexer em RLS, sem abrir dados entre organizações.
 
-Substituir a policy `Admins delete activities` por uma que permita exclusão a **qualquer membro autenticado da mesma organização**, mantendo o isolamento multi-tenant.
+6. **Validar antes de concluir**
+   - Reconsultar a proposta CONNECT FUN e confirmar valor aprovado `1686.10`.
+   - Testar/inspecionar payload da `api-deals` para confirmar:
+     - `amount = 1686.10`
+     - `products[].total_price` somando `1686.10`
+     - nenhum campo monetário principal retornando `1297` como valor final.
 
-### Migration SQL
-
-```sql
-DROP POLICY IF EXISTS "Admins delete activities" ON public.activities;
-
-CREATE POLICY "Org members delete activities"
-ON public.activities
-FOR DELETE
-TO authenticated
-USING (
-  organization_id IS NOT NULL
-  AND organization_id = public.get_user_organization_id()
-);
-```
-
-## O que NÃO muda
-
-- Frontend (`deleteActivity` em `src/services/supabase/activities.ts`) já chama `.delete().eq('id', id)` corretamente — nada a alterar.
-- Policies de SELECT/INSERT/UPDATE permanecem como estão (visibilidade por owner/team continua intacta).
-- Isolamento multi-tenant preservado (mantém `organization_id = get_user_organization_id()`).
-- Sem impacto em soft-delete, triggers de snapshot ou `deletion_alerts` (continuam disparando normalmente via triggers existentes).
+## Arquivos impactados
+- `supabase/functions/api-deals/index.ts`
+- Nova migration em `supabase/migrations/...sql`
 
 ## Riscos
-
-- **Baixo**: qualquer membro da org passa a poder excluir atividades de colegas. É exatamente o comportamento pedido ("habilitar pra qualquer tipo de usuário"). O sistema de `entity_snapshots` + `deletion_alerts` + lixeira já cobre auditoria e restauração.
-
-## Próximos passos
-
-1. Aplicar a migration.
-2. QA: logar como Sales (não-admin), excluir uma atividade antiga, confirmar que some da lista e aparece em Lixeira.
+- Baixo risco: a mudança é localizada na saída de integração e em função financeira já existente.
+- Não altera RLS, autenticação, UI de propostas nem criação de itens.
+- A única mudança comportamental intencional é impedir que integrações usem o valor bruto/base como valor final aprovado.
