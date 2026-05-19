@@ -369,9 +369,14 @@ export function RichTextEditor({
 
   const editor = useEditor({
     extensions: [
+      // StarterKit v3 already ships Link and Underline; disable them here
+      // and re-register with custom config to avoid duplicate extension warnings
+      // (duplicates silently drop commands like setColor/setLink in the chain).
       StarterKit.configure({
         heading: false,
-      }),
+        link: false,
+        underline: false,
+      } as any),
       Underline,
       Link.configure({
         openOnClick: false,
@@ -396,6 +401,12 @@ export function RichTextEditor({
           'prose-p:my-1 prose-ul:my-1 prose-ol:my-1',
           '[&_ul]:list-disc [&_ul]:pl-6',
           '[&_ol]:list-decimal [&_ol]:pl-6',
+          // CRITICAL: Tailwind Typography forces explicit `color` on p/strong/a/li/h*/blockquote/code,
+          // which overrides the inline `color` that TipTap's Color extension injects on <span>.
+          // Force them to inherit so the user-picked color actually shows in the editor.
+          'prose-p:text-inherit prose-headings:text-inherit prose-strong:text-inherit',
+          'prose-em:text-inherit prose-a:text-inherit prose-li:text-inherit',
+          'prose-blockquote:text-inherit prose-code:text-inherit',
         ),
         style: `min-height: ${minHeight}`,
       },
