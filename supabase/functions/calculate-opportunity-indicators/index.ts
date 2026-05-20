@@ -70,7 +70,7 @@ Deno.serve(async (req) => {
     const now = new Date();
 
     // ---- Fetch related signals
-    const [activitiesRes, accountRes, proposalsRes, emailsRes, contactsRes] = await Promise.all([
+    const [activitiesRes, accountRes, proposalsRes, emailsRes, contactsRes, oppNodeRes, dealParticipantsRes] = await Promise.all([
       supabase.from('activities')
         .select('id, status, type, completed_at, scheduled_date, created_at, deleted_at')
         .eq('opportunity_id', opp.id)
@@ -98,6 +98,17 @@ Deno.serve(async (req) => {
             .eq('account_id', opp.account_id)
             .is('deleted_at', null)
         : Promise.resolve({ data: [], error: null } as any),
+      supabase.from('graph_nodes')
+        .select('id')
+        .eq('organization_id', orgId)
+        .eq('entity_id', opp.id)
+        .eq('node_type', 'opportunity')
+        .maybeSingle(),
+      supabase.from('deal_participants')
+        .select('id')
+        .eq('opportunity_id', opp.id)
+        .eq('role', 'decision_maker')
+        .limit(1),
     ]);
 
     const activities = activitiesRes.data ?? [];
@@ -124,10 +135,25 @@ Deno.serve(async (req) => {
       ? daysBetween(now, new Date(lastCompleted.completed_at))
       : 999;
 
+    const oppNodeId = (oppNodeRes.data as any)?.id;
+    let hasExplicitDecisionMaker = false;
+    if (oppNodeId) {
+      const { data: dmEdge, error: dmEdgeErr } = await supabase.from('graph_edges')
+        .select('id')
+        .eq('organization_id', orgId)
+        .eq('target_node_id', oppNodeId)
+        .eq('edge_type', 'decision_maker')
+        .limit(1)
+        .maybeSingle();
+      if (dmEdgeErr) console.warn('decision_maker edge query failed:', dmEdgeErr.message);
+      hasExplicitDecisionMaker = !!dmEdge;
+    }
+
     const primaryContact = contacts[0] || null;
-    const hasDecisor = contacts.some((c: any) =>
+    const hasDecisorByCargo = contacts.some((c: any) =>
       typeof c.cargo === 'string' && /diretor|ceo|gerente|head|c-?level|presidente|s[oó]cio|owner|founder/i.test(c.cargo)
     );
+    const hasDecisor = hasExplicitDecisionMaker || ((dealParticipantsRes.data as any[]) ?? []).length > 0 || hasDecisorByCargo;
 
     const acceptedProposal = proposals.find((p: any) => p.status === 'accepted');
     const sentProposal = proposals.find((p: any) => p.sent_at);
