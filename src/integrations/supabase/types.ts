@@ -33760,6 +33760,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      ensure_proposal_pricing_ready: {
+        Args: { p_proposal_id: string }
+        Returns: Json
+      }
       expire_old_payment_intents: { Args: never; Returns: number }
       find_inventory_allocation_candidates: {
         Args: { p_pre_reservation_item_id: string }
@@ -33821,6 +33825,14 @@ export type Database = {
           id: string
           razao_social: string
         }[]
+      }
+      freeze_proposal_approval: {
+        Args: {
+          p_acceptor_document?: string
+          p_acceptor_name?: string
+          p_proposal_id: string
+        }
+        Returns: Json
       }
       generate_acceptance_hash: {
         Args: {
