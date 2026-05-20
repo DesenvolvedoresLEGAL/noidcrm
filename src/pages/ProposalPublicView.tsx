@@ -1126,7 +1126,7 @@ export default function ProposalPublicView() {
         className="bg-white border-b-4 shadow-sm"
         style={{ borderBottomColor: organization?.primary_color || '#6366f1' }}
       >
-        <div className="max-w-5xl mx-auto px-3 py-4 md:px-4 md:py-6">
+        <div className="max-w-7xl mx-auto px-3 py-4 md:px-4 md:py-6">
           <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
             {/* Left: Logo + Company Info */}
             <div className="flex items-start gap-3 md:gap-4">
@@ -1189,7 +1189,7 @@ export default function ProposalPublicView() {
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-3 py-4 md:px-4 md:py-8 space-y-4 md:space-y-6">
+      <main className="max-w-7xl mx-auto px-3 py-4 md:px-4 md:py-8 space-y-4 md:space-y-6">
         {/* Status Banner — PRICE UX 1.0.3: tela completa pós-aprovação quando aceita */}
         {isAccepted && (
           <PublicProposalApprovedScreen
@@ -1352,7 +1352,7 @@ export default function ProposalPublicView() {
             </CardHeader>
             <CardContent>
               <div 
-                className="prose prose-sm max-w-none"
+                className="prose prose-sm max-w-4xl mx-auto"
                 dangerouslySetInnerHTML={{ __html: sanitizeHtml(proposal.introduction) }}
               />
             </CardContent>
@@ -1406,13 +1406,26 @@ export default function ProposalPublicView() {
                           {oneTimeItems.map(item => (
                             <tr key={item.id} className="border-b hover:bg-muted/30 transition-colors">
                               <td className="py-3 px-2 md:py-4 md:px-4">
-                                <div className="font-medium text-sm md:text-base">{item.name}</div>
-                                {item.description && (
-                                  <div 
-                                    className="text-xs md:text-sm text-muted-foreground prose prose-sm max-w-none mt-1"
-                                    dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.description) }}
-                                  />
-                                )}
+                                <div className="flex items-start gap-3">
+                                  {(item as any).image_url && (
+                                    <img
+                                      src={(item as any).image_url}
+                                      alt={item.name}
+                                      loading="lazy"
+                                      className="h-10 w-10 md:h-14 md:w-14 rounded-md border object-cover flex-shrink-0 bg-muted"
+                                      onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                                    />
+                                  )}
+                                  <div className="min-w-0 flex-1">
+                                    <div className="font-medium text-sm md:text-base">{item.name}</div>
+                                    {item.description && (
+                                      <div 
+                                        className="text-xs md:text-sm text-muted-foreground prose prose-sm max-w-none mt-1"
+                                        dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.description) }}
+                                      />
+                                    )}
+                                  </div>
+                                </div>
                               </td>
                               <td className="text-center py-3 px-2 md:py-4 md:px-4 text-sm">
                                 {(item as any).billing_type === 'point_day' && (item as any).quantity_points && (item as any).billing_days ? (
@@ -1541,13 +1554,26 @@ export default function ProposalPublicView() {
                           {recurringItems.map(item => (
                             <tr key={item.id} className="border-b hover:bg-muted/30 transition-colors">
                               <td className="py-3 px-2 md:py-4 md:px-4">
-                                <div className="font-medium text-sm md:text-base">{item.name}</div>
-                                {item.description && (
-                                  <div 
-                                    className="text-xs md:text-sm text-muted-foreground prose prose-sm max-w-none mt-1"
-                                    dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.description) }}
-                                  />
-                                )}
+                                <div className="flex items-start gap-3">
+                                  {(item as any).image_url && (
+                                    <img
+                                      src={(item as any).image_url}
+                                      alt={item.name}
+                                      loading="lazy"
+                                      className="h-10 w-10 md:h-14 md:w-14 rounded-md border object-cover flex-shrink-0 bg-muted"
+                                      onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                                    />
+                                  )}
+                                  <div className="min-w-0 flex-1">
+                                    <div className="font-medium text-sm md:text-base">{item.name}</div>
+                                    {item.description && (
+                                      <div 
+                                        className="text-xs md:text-sm text-muted-foreground prose prose-sm max-w-none mt-1"
+                                        dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.description) }}
+                                      />
+                                    )}
+                                  </div>
+                                </div>
                               </td>
                               <td className="text-center py-3 px-2 md:py-4 md:px-4 text-sm">{item.quantity}</td>
                               <td className="text-right py-3 px-2 md:py-4 md:px-4 text-sm hidden sm:table-cell">{formatCurrency(item.unit_price)}/mês</td>
@@ -1945,7 +1971,7 @@ export default function ProposalPublicView() {
             </CardHeader>
             <CardContent>
               <div 
-                className="prose prose-sm max-w-none"
+                className="prose prose-sm max-w-4xl mx-auto"
                 dangerouslySetInnerHTML={{ __html: sanitizeHtml(proposal.terms) }}
               />
             </CardContent>
@@ -1960,7 +1986,7 @@ export default function ProposalPublicView() {
             </CardHeader>
             <CardContent>
               <div 
-                className="prose prose-sm max-w-none"
+                className="prose prose-sm max-w-4xl mx-auto"
                 dangerouslySetInnerHTML={{ __html: sanitizeHtml(proposal.notes) }}
               />
             </CardContent>

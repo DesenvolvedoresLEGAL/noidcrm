@@ -343,17 +343,30 @@ export function ProposalPreview({
                     return (
                     <tr key={item.id || idx} className="border-b border-border/50">
                       <td className="py-3">
-                        <div className="font-medium">{item.name}</div>
-                        {isPointDay && points && days && (
-                          <div className="text-xs text-muted-foreground mt-0.5">
-                            {points} {points === 1 ? 'ponto' : 'pontos'} × {days} {days === 1 ? 'diária' : 'diárias'}
+                        <div className="flex items-start gap-3">
+                          {(item as any).image_url && (
+                            <img
+                              src={(item as any).image_url}
+                              alt={item.name}
+                              loading="lazy"
+                              className="h-12 w-12 rounded-md border object-cover flex-shrink-0 bg-muted"
+                              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                            />
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <div className="font-medium">{item.name}</div>
+                            {isPointDay && points && days && (
+                              <div className="text-xs text-muted-foreground mt-0.5">
+                                {points} {points === 1 ? 'ponto' : 'pontos'} × {days} {days === 1 ? 'diária' : 'diárias'}
+                              </div>
+                            )}
+                            {item.description && (
+                              <div className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
+                                {stripHtml(item.description)}
+                              </div>
+                            )}
                           </div>
-                        )}
-                        {item.description && (
-                          <div className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
-                            {stripHtml(item.description)}
-                          </div>
-                        )}
+                        </div>
                       </td>
                       <td className="text-center py-3">
                         {isPointDay && points && days ? `${points}×${days}` : item.quantity}
