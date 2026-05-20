@@ -43,3 +43,14 @@ export type {
   MundoGeoExhibitor,
   MundoGeoFetchResult,
 } from "./mundogeo.ts";
+
+export {
+  detectInformaConnect,
+  fetchInformaConnectExhibitors,
+  tryInformaConnectFromUrl,
+} from "./informa-connect.ts";
+export type {
+  InformaConnectDetection,
+  InformaConnectExhibitor,
+  InformaConnectFetchResult,
+} from "./informa-connect.ts";
