@@ -509,11 +509,11 @@ function generateProposalHTML(proposal: any, items: any[], paymentTerms: any[], 
       <table class="items-table">
         <thead>
           <tr>
-            <th style="width: 45%;">Item</th>
+            <th style="width: 48%;">Item</th>
             <th class="text-center" style="width: 8%;">Qtd</th>
             <th class="text-right" style="width: 15%;">Preço Unit.</th>
             <th class="text-right" style="width: 12%;">Desconto</th>
-            <th class="text-right" style="width: 20%;">Total</th>
+            <th class="text-right" style="width: 17%;">Total</th>
           </tr>
         </thead>
         <tbody>
@@ -528,11 +528,19 @@ function generateProposalHTML(proposal: any, items: any[], paymentTerms: any[], 
             const priceCell = isPointDay && ppd != null
               ? `R$ ${Number(ppd).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} <span style="font-size:0.75em;color:#666;">/ ponto-dia</span>`
               : `R$ ${item.unit_price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+            const thumb = item.image_url
+              ? `<img src="${item.image_url}" alt="" style="width:48px;height:48px;object-fit:cover;border-radius:6px;border:1px solid #e5e7eb;flex-shrink:0;" onerror="this.style.display='none'" />`
+              : '';
             return `
             <tr>
               <td>
-                <div class="item-name">${item.name}</div>
-                ${item.description ? `<div class="item-desc">${item.description}</div>` : ''}
+                <div style="display:flex;align-items:flex-start;gap:12px;">
+                  ${thumb}
+                  <div style="min-width:0;flex:1;">
+                    <div class="item-name">${item.name}</div>
+                    ${item.description ? `<div class="item-desc">${item.description}</div>` : ''}
+                  </div>
+                </div>
               </td>
               <td class="text-center">${qtyCell}</td>
               <td class="text-right">${priceCell}</td>
