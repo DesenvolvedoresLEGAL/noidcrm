@@ -463,34 +463,34 @@ function SortableRow({ item, index, totalItems, measurementUnits, onUpdate, onDe
           </div>
         </div>
       </TableCell>
-      <TableCell>
-        <div className="flex items-start gap-3">
-          {item.image_url ? (
-            <img
-              src={item.image_url}
-              alt={item.name}
-              loading="lazy"
-              className="h-10 w-10 rounded-md border object-cover flex-shrink-0 bg-muted mt-0.5"
-              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
-            />
-          ) : (
-            <div className="h-10 w-10 rounded-md border bg-muted flex items-center justify-center flex-shrink-0 mt-0.5" aria-hidden>
-              <ImageIcon className="h-4 w-4 text-muted-foreground/50" />
-            </div>
-          )}
-          <div className="space-y-2 flex-1 min-w-0">
-            <Input
-              value={item.name}
-              onChange={(e) => onUpdate(item.id!, { name: e.target.value })}
-              className="h-8 text-sm font-medium"
-              placeholder="Nome do item"
-            />
-            <MiniRichTextEditor
-              value={item.description || ''}
-              onChange={(value) => onUpdate(item.id!, { description: value })}
-              placeholder="Descrição do item..."
-            />
+      <TableCell className="pt-3">
+        {item.image_url ? (
+          <img
+            src={item.image_url}
+            alt={item.name}
+            loading="lazy"
+            className="h-16 w-16 rounded-md border object-cover bg-muted"
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+          />
+        ) : (
+          <div className="h-16 w-16 rounded-md border bg-muted flex items-center justify-center" aria-hidden>
+            <ImageIcon className="h-5 w-5 text-muted-foreground/50" />
           </div>
+        )}
+      </TableCell>
+      <TableCell>
+        <div className="space-y-2 flex-1 min-w-0">
+          <Input
+            value={item.name}
+            onChange={(e) => onUpdate(item.id!, { name: e.target.value })}
+            className="h-8 text-sm font-medium"
+            placeholder="Nome do item"
+          />
+          <MiniRichTextEditor
+            value={item.description || ''}
+            onChange={(value) => onUpdate(item.id!, { description: value })}
+            placeholder="Descrição do item..."
+          />
         </div>
       </TableCell>
       <TableCell className="pt-3">
