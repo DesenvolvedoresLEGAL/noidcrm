@@ -22555,6 +22555,85 @@ export type Database = {
           },
         ]
       }
+      proposal_erp_sync_logs: {
+        Row: {
+          attempt: number
+          created_at: string
+          created_by: string | null
+          error_code: string | null
+          error_message: string | null
+          http_status: number | null
+          id: string
+          latency_ms: number | null
+          operation: string
+          organization_id: string
+          payment_intent_id: string | null
+          proposal_id: string
+          provider: string
+          request_payload: Json
+          response_payload: Json
+          status: string
+        }
+        Insert: {
+          attempt?: number
+          created_at?: string
+          created_by?: string | null
+          error_code?: string | null
+          error_message?: string | null
+          http_status?: number | null
+          id?: string
+          latency_ms?: number | null
+          operation: string
+          organization_id: string
+          payment_intent_id?: string | null
+          proposal_id: string
+          provider?: string
+          request_payload?: Json
+          response_payload?: Json
+          status: string
+        }
+        Update: {
+          attempt?: number
+          created_at?: string
+          created_by?: string | null
+          error_code?: string | null
+          error_message?: string | null
+          http_status?: number | null
+          id?: string
+          latency_ms?: number | null
+          operation?: string
+          organization_id?: string
+          payment_intent_id?: string | null
+          proposal_id?: string
+          provider?: string
+          request_payload?: Json
+          response_payload?: Json
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposal_erp_sync_logs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_erp_sync_logs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_report_legacy_retirement_readiness_v2"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "proposal_erp_sync_logs_payment_intent_id_fkey"
+            columns: ["payment_intent_id"]
+            isOneToOne: false
+            referencedRelation: "proposal_payment_intents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       proposal_items: {
         Row: {
           billing_days: number | null
