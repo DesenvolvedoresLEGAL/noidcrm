@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -29,15 +30,35 @@ import {
 } from '@/hooks/proposals/useProposalPayments';
 import { useProposalDynamicPricingSnapshot } from '@/hooks/proposals/useProposalDynamicPricing';
 import { ManualPaymentValidationDialog } from './ManualPaymentValidationDialog';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Props {
   proposalId: string;
 }
 
+const DIVERGENCE_TOOLTIP =
+  'Existem valores divergentes nesta proposta. Recalcule antes de continuar.';
+
 export function ProposalDynamicPaymentPanel({ proposalId }: Props) {
   const { data: snapshot } = useProposalDynamicPricingSnapshot(proposalId);
   const { data: latest, isLoading } = useLatestPaymentIntent(proposalId);
   const { data: events = [] } = useProposalPaymentEvents(proposalId);
+
+  // PRICE CORE 2.0C — observe divergence so all critical buttons can lock.
+  const { data: divergenceFlag } = useQuery({
+    queryKey: ['proposal-pricing-divergence', proposalId],
+    queryFn: async () => {
+      const { data } = await (supabase as any)
+        .from('proposals')
+        .select('pricing_has_divergence')
+        .eq('id', proposalId)
+        .maybeSingle();
+      return !!data?.pricing_has_divergence;
+    },
+    enabled: !!proposalId,
+    staleTime: 10_000,
+  });
+  const hasDivergence = !!divergenceFlag;
 
   const createIntent = useCreatePaymentIntent(proposalId);
   const genPix = useGeneratePixCharge(proposalId);
@@ -53,6 +74,7 @@ export function ProposalDynamicPaymentPanel({ proposalId }: Props) {
   const currentAmount = snapshot?.current_amount ?? null;
 
   if (!dynamicEnabled) return null;
+
 
   return (
     <>
