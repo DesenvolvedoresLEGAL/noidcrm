@@ -48,6 +48,8 @@ import {
   Image as ImageIcon
 } from 'lucide-react';
 import { getProposalByToken, declineProposal, trackView } from '@/services/crm/proposals';
+import { getProposalPricingSummary } from '@/lib/proposals/pricingLedger';
+import { ProposalPricingBreakdown } from '@/components/proposals/ProposalPricingBreakdown';
 import { listProposalItems } from '@/services/crm/proposal-items';
 import { getPaymentTerms, calculateInstallments } from '@/services/crm/proposal-payment-terms';
 import { PublicProposalApprovedScreen } from '@/components/proposals/PublicProposalApprovedScreen';
@@ -1041,16 +1043,32 @@ export default function ProposalPublicView() {
     (proposal as any)?.dynamic_pricing_enabled && dpSnapPublic?.current_amount != null
       ? Number(dpSnapPublic.current_amount)
       : null;
-  const effectiveOneTimeBase = dynamicOneTimeAmount ?? oneTimeTotal;
+  const legacyEffectiveOneTimeBase = dynamicOneTimeAmount ?? oneTimeTotal;
   const dynamicAdjustment = dynamicOneTimeAmount != null ? dynamicOneTimeAmount - oneTimeTotal : 0;
 
   // Calculate discount from payment terms (over the effective base, not the raw subtotal)
   const paymentDiscountPercent = oneTimeTerm?.discount_percent || 0;
-  const paymentDiscountAmount = effectiveOneTimeBase * (paymentDiscountPercent / 100);
-  const oneTimeWithDiscount = effectiveOneTimeBase - paymentDiscountAmount;
+  const legacyPaymentDiscountAmount = legacyEffectiveOneTimeBase * (paymentDiscountPercent / 100);
+  const legacyOneTimeWithDiscount = legacyEffectiveOneTimeBase - legacyPaymentDiscountAmount;
   const recurringContractTotal = recurringMRR * (recurringTerm?.contract_months || recurringTerm?.contract_duration_months || 12);
+  const legacyEffectiveOneTimeAmount = legacyOneTimeWithDiscount;
+  const legacyTotalAmount = legacyEffectiveOneTimeAmount + recurringContractTotal;
+
+  // PRICE CORE 2.0 — Phase B: prefer ledger snapshot when available.
+  const pricingSummary = getProposalPricingSummary(proposal);
+  const effectiveOneTimeBase = pricingSummary
+    ? pricingSummary.subtotalItems + pricingSummary.dynamicAdjustment.amount
+    : legacyEffectiveOneTimeBase;
+  const paymentDiscountAmount = pricingSummary
+    ? pricingSummary.manualDiscount.amount
+    : legacyPaymentDiscountAmount;
+  const oneTimeWithDiscount = pricingSummary
+    ? pricingSummary.baseAmount + pricingSummary.dynamicAdjustment.amount
+    : legacyOneTimeWithDiscount;
   const effectiveOneTimeAmount = oneTimeWithDiscount;
-  const totalAmount = effectiveOneTimeAmount + recurringContractTotal;
+  const totalAmount = pricingSummary
+    ? pricingSummary.effectiveAmount + recurringContractTotal
+    : legacyTotalAmount;
   
   // CRITICAL: Use oneTimeTotal for installments, not totalAmount (which includes MRR items)
   // PRICE UX 1.0.3 — usar approved_amount quando proposta já foi aprovada (congela o split)
@@ -1321,7 +1339,7 @@ export default function ProposalPublicView() {
                 Criada em {formatDateBR(proposal.created_at)}
               </p>
               <div className="pt-2 border-t space-y-1">
-                {paymentDiscountPercent > 0 && (
+                {(paymentDiscountAmount > 0) && (
                   <>
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">
@@ -1330,7 +1348,13 @@ export default function ProposalPublicView() {
                       <span>{formatCurrency(effectiveOneTimeBase + recurringContractTotal)}</span>
                     </div>
                     <div className="flex justify-between text-sm text-red-600">
-                      <span>Desconto ({paymentDiscountPercent}%):</span>
+                      <span>
+                        Desconto{pricingSummary?.manualDiscount.percent
+                          ? ` (${pricingSummary.manualDiscount.percent}%)`
+                          : paymentDiscountPercent > 0
+                          ? ` (${paymentDiscountPercent}%)`
+                          : ''}:
+                      </span>
                       <span>- {formatCurrency(paymentDiscountAmount)}</span>
                     </div>
                   </>
@@ -1681,40 +1705,56 @@ export default function ProposalPublicView() {
                     </div>
                   )}
 
-                  {/* Financial Summary with Discount */}
-                  {paymentDiscountPercent > 0 && (
-                    <div className="bg-amber-50 dark:bg-amber-950/30 rounded-lg p-4 border border-amber-200 dark:border-amber-800">
-                      <p className="text-sm font-semibold mb-3">Resumo Financeiro</p>
-                      <div className="space-y-2">
-                        {dynamicAdjustment !== 0 && (
-                          <div className="flex justify-between text-xs text-muted-foreground">
-                            <span>Subtotal dos itens:</span>
-                            <span>{formatCurrency(oneTimeTotal)}</span>
+                  {/* Financial Summary — PRICE CORE 2.0 ledger-driven when available */}
+                  {pricingSummary ? (
+                    (pricingSummary.manualDiscount.amount > 0 ||
+                      pricingSummary.dynamicAdjustment.amount !== 0 ||
+                      pricingSummary.inventoryAdjustmentAmount !== 0) && (
+                      <div className="bg-amber-50 dark:bg-amber-950/30 rounded-lg p-4 border border-amber-200 dark:border-amber-800">
+                        <p className="text-sm font-semibold mb-3">Resumo Financeiro</p>
+                        <ProposalPricingBreakdown
+                          proposal={proposal}
+                          summary={pricingSummary}
+                          audience="public"
+                          bare
+                        />
+                      </div>
+                    )
+                  ) : (
+                    paymentDiscountPercent > 0 && (
+                      <div className="bg-amber-50 dark:bg-amber-950/30 rounded-lg p-4 border border-amber-200 dark:border-amber-800">
+                        <p className="text-sm font-semibold mb-3">Resumo Financeiro</p>
+                        <div className="space-y-2">
+                          {dynamicAdjustment !== 0 && (
+                            <div className="flex justify-between text-xs text-muted-foreground">
+                              <span>Subtotal dos itens:</span>
+                              <span>{formatCurrency(oneTimeTotal)}</span>
+                            </div>
+                          )}
+                          {dynamicAdjustment !== 0 && (
+                            <div className="flex justify-between text-xs text-muted-foreground">
+                              <span>Ajuste por antecedência:</span>
+                              <span>{dynamicAdjustment >= 0 ? '+ ' : '- '}{formatCurrency(Math.abs(dynamicAdjustment))}</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">
+                              {dynamicAdjustment !== 0 ? 'Subtotal vigente:' : 'Subtotal Avulso:'}
+                            </span>
+                            <span>{formatCurrency(effectiveOneTimeBase)}</span>
                           </div>
-                        )}
-                        {dynamicAdjustment !== 0 && (
-                          <div className="flex justify-between text-xs text-muted-foreground">
-                            <span>Ajuste por antecedência:</span>
-                            <span>{dynamicAdjustment >= 0 ? '+ ' : '- '}{formatCurrency(Math.abs(dynamicAdjustment))}</span>
+                          <div className="flex justify-between text-sm text-red-600 font-medium">
+                            <span>Desconto ({paymentDiscountPercent}%):</span>
+                            <span>- {formatCurrency(paymentDiscountAmount)}</span>
                           </div>
-                        )}
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">
-                            {dynamicAdjustment !== 0 ? 'Subtotal vigente:' : 'Subtotal Avulso:'}
-                          </span>
-                          <span>{formatCurrency(effectiveOneTimeBase)}</span>
-                        </div>
-                        <div className="flex justify-between text-sm text-red-600 font-medium">
-                          <span>Desconto ({paymentDiscountPercent}%):</span>
-                          <span>- {formatCurrency(paymentDiscountAmount)}</span>
-                        </div>
-                        <Separator />
-                        <div className="flex justify-between font-bold text-base">
-                          <span>Total com Desconto:</span>
-                          <span className="text-primary">{formatCurrency(oneTimeWithDiscount)}</span>
+                          <Separator />
+                          <div className="flex justify-between font-bold text-base">
+                            <span>Total com Desconto:</span>
+                            <span className="text-primary">{formatCurrency(oneTimeWithDiscount)}</span>
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    )
                   )}
                   
                   {installments.length > 0 && (

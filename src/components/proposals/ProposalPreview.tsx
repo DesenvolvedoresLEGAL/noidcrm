@@ -11,6 +11,7 @@ import { PaymentTerm, calculateInstallments } from '@/services/crm/proposal-paym
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { PublicProposalDynamicPricingBanner } from './PublicProposalDynamicPricingBanner';
+import { getProposalPricingSummary } from '@/lib/proposals/pricingLedger';
 
 interface ProposalPreviewProps {
   proposalId?: string;
@@ -204,13 +205,13 @@ export function ProposalPreview({
     enabled: !!proposalId && paymentTerms.length === 0,
   });
 
-  // Load dynamic pricing snapshot for current commercial condition card
+  // Load dynamic pricing snapshot + ledger snapshot for the preview
   const { data: dynamicPricing } = useQuery({
     queryKey: ['proposal-dynamic-pricing-preview', proposalId],
     queryFn: async () => {
       const { data } = await supabase
         .from('proposals')
-        .select('dynamic_pricing_enabled, dynamic_pricing_snapshot')
+        .select('dynamic_pricing_enabled, dynamic_pricing_snapshot, pricing_breakdown_snapshot, pricing_effective_amount, pricing_base_amount, pricing_manual_discount_amount, pricing_manual_discount_percent')
         .eq('id', proposalId!)
         .maybeSingle();
       return data;
@@ -236,21 +237,29 @@ export function ProposalPreview({
     dpEnabledPreview && dpSnapPreview?.current_amount != null
       ? Number(dpSnapPreview.current_amount)
       : null;
-  const effectiveOneTimeBase = dynamicOneTimeAmount ?? oneTimeTotal;
+  const legacyEffectiveOneTimeBase = dynamicOneTimeAmount ?? oneTimeTotal;
 
-  // Subtotal exibido = soma dos itens (vigente quando dinâmica ativa)
+  // PRICE CORE 2.0 — Phase B: prefer ledger snapshot when available
+  const pricingSummary = getProposalPricingSummary(dynamicPricing);
+  const effectiveOneTimeBase = pricingSummary
+    ? pricingSummary.subtotalItems + pricingSummary.dynamicAdjustment.amount
+    : legacyEffectiveOneTimeBase;
+
   const calculatedSubtotal = effectiveOneTimeBase + recurringTotal;
 
-  // Apply payment discount to the effective one-time base
-  const paymentDiscountAmount = effectiveOneTimeBase * (paymentDiscountPercent / 100);
-  const oneTimeWithDiscount = effectiveOneTimeBase - paymentDiscountAmount;
+  const paymentDiscountAmount = pricingSummary
+    ? pricingSummary.manualDiscount.amount
+    : effectiveOneTimeBase * (paymentDiscountPercent / 100);
+  const oneTimeWithDiscount = pricingSummary
+    ? pricingSummary.baseAmount + pricingSummary.dynamicAdjustment.amount
+    : effectiveOneTimeBase - paymentDiscountAmount;
 
-  // Calculate contract total for recurring (assume 12 months)
   const contractMonths = 12;
   const recurringContractTotal = recurringTotal * contractMonths;
 
-  // Grand total with discount applied
-  const calculatedTotal = oneTimeWithDiscount + recurringContractTotal;
+  const calculatedTotal = pricingSummary
+    ? pricingSummary.effectiveAmount + recurringContractTotal
+    : oneTimeWithDiscount + recurringContractTotal;
   const displayTotal = totalValue || calculatedTotal;
 
   const processedContent = context ? {
