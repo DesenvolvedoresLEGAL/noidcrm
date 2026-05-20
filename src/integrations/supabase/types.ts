@@ -23781,6 +23781,23 @@ export type Database = {
           pdf_url: string | null
           price_frozen_at: string | null
           price_frozen_on_approval: boolean
+          pricing_approval_amount: number
+          pricing_base_amount: number
+          pricing_breakdown_snapshot: Json
+          pricing_divergence_details: Json
+          pricing_dynamic_adjustment_amount: number
+          pricing_dynamic_adjustment_percent: number
+          pricing_effective_amount: number
+          pricing_erp_amount: number
+          pricing_has_divergence: boolean
+          pricing_inventory_adjustment_amount: number
+          pricing_last_calculated_at: string | null
+          pricing_manual_discount_amount: number
+          pricing_manual_discount_percent: number
+          pricing_needs_recalculation: boolean
+          pricing_payment_schedule_total: number
+          pricing_recurring_subtotal: number
+          pricing_subtotal_items: number
           proposal_number: string | null
           proposal_version: number | null
           public_payment_enabled: boolean | null
@@ -23861,6 +23878,23 @@ export type Database = {
           pdf_url?: string | null
           price_frozen_at?: string | null
           price_frozen_on_approval?: boolean
+          pricing_approval_amount?: number
+          pricing_base_amount?: number
+          pricing_breakdown_snapshot?: Json
+          pricing_divergence_details?: Json
+          pricing_dynamic_adjustment_amount?: number
+          pricing_dynamic_adjustment_percent?: number
+          pricing_effective_amount?: number
+          pricing_erp_amount?: number
+          pricing_has_divergence?: boolean
+          pricing_inventory_adjustment_amount?: number
+          pricing_last_calculated_at?: string | null
+          pricing_manual_discount_amount?: number
+          pricing_manual_discount_percent?: number
+          pricing_needs_recalculation?: boolean
+          pricing_payment_schedule_total?: number
+          pricing_recurring_subtotal?: number
+          pricing_subtotal_items?: number
           proposal_number?: string | null
           proposal_version?: number | null
           public_payment_enabled?: boolean | null
@@ -23941,6 +23975,23 @@ export type Database = {
           pdf_url?: string | null
           price_frozen_at?: string | null
           price_frozen_on_approval?: boolean
+          pricing_approval_amount?: number
+          pricing_base_amount?: number
+          pricing_breakdown_snapshot?: Json
+          pricing_divergence_details?: Json
+          pricing_dynamic_adjustment_amount?: number
+          pricing_dynamic_adjustment_percent?: number
+          pricing_effective_amount?: number
+          pricing_erp_amount?: number
+          pricing_has_divergence?: boolean
+          pricing_inventory_adjustment_amount?: number
+          pricing_last_calculated_at?: string | null
+          pricing_manual_discount_amount?: number
+          pricing_manual_discount_percent?: number
+          pricing_needs_recalculation?: boolean
+          pricing_payment_schedule_total?: number
+          pricing_recurring_subtotal?: number
+          pricing_subtotal_items?: number
           proposal_number?: string | null
           proposal_version?: number | null
           public_payment_enabled?: boolean | null
@@ -34475,6 +34526,10 @@ export type Database = {
         }
         Returns: string
       }
+      mark_proposal_pricing_dirty: {
+        Args: { p_proposal_id: string }
+        Returns: undefined
+      }
       mark_recommendation_rolled_back: {
         Args: { _payload: Json; _rec_id: string; _user_id: string }
         Returns: string
@@ -34631,6 +34686,10 @@ export type Database = {
         Args: { p_pre_reservation_item_id: string }
         Returns: Json
       }
+      recalculate_proposal_pricing_ledger: {
+        Args: { p_proposal_id: string }
+        Returns: Json
+      }
       record_memory_read: {
         Args: {
           p_ai_function?: string
@@ -34758,6 +34817,10 @@ export type Database = {
           reference_at: string
           reference_type: string
         }[]
+      }
+      resolve_manual_discount: {
+        Args: { p_proposal_id: string; p_subtotal_one_time: number }
+        Returns: Json
       }
       resolve_primary_contact: {
         Args: { p_prospect_id: string }
