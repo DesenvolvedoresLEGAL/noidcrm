@@ -204,13 +204,13 @@ export function ProposalPreview({
     enabled: !!proposalId && paymentTerms.length === 0,
   });
 
-  // Load dynamic pricing snapshot for current commercial condition card
+  // Load dynamic pricing snapshot + ledger snapshot for the preview
   const { data: dynamicPricing } = useQuery({
     queryKey: ['proposal-dynamic-pricing-preview', proposalId],
     queryFn: async () => {
       const { data } = await supabase
         .from('proposals')
-        .select('dynamic_pricing_enabled, dynamic_pricing_snapshot')
+        .select('dynamic_pricing_enabled, dynamic_pricing_snapshot, pricing_breakdown_snapshot, pricing_effective_amount, pricing_base_amount, pricing_manual_discount_amount, pricing_manual_discount_percent')
         .eq('id', proposalId!)
         .maybeSingle();
       return data;
