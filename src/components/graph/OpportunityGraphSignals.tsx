@@ -529,6 +529,7 @@ export function OpportunityGraphSignals({ opportunityId }: OpportunityGraphSigna
                   const isChampion = analysis.championContactId === contact.entity_id;
                   const isDecisionMaker = analysis.decisionMakerContactId === contact.entity_id;
                   const isSettingThis = settingChampion === contact.entity_id;
+                  const isSettingDMThis = settingDecisionMaker === contact.entity_id;
                   
                   const handleSetChampion = async () => {
                     setSettingChampion(contact.entity_id);
@@ -540,13 +541,31 @@ export function OpportunityGraphSignals({ opportunityId }: OpportunityGraphSigna
                         await setOpportunityChampion(opportunityId, contact.entity_id);
                         toast.success('Champion definido com sucesso');
                       }
-                      await refetchGraph();
-                      queryClient.invalidateQueries({ queryKey: ['opportunity-network-summary', opportunityId] });
+                      await refreshAfterStakeholderChange(opportunity?.organization_id);
                     } catch (error) {
                       console.error('Error setting champion:', error);
                       toast.error('Erro ao definir champion');
                     } finally {
                       setSettingChampion(null);
+                    }
+                  };
+
+                  const handleSetDecisionMaker = async () => {
+                    setSettingDecisionMaker(contact.entity_id);
+                    try {
+                      if (isDecisionMaker) {
+                        await removeOpportunityDecisionMaker(opportunityId);
+                        toast.success('Decisor removido');
+                      } else {
+                        await setOpportunityDecisionMaker(opportunityId, contact.entity_id);
+                        toast.success('Decisor definido com sucesso');
+                      }
+                      await refreshAfterStakeholderChange(opportunity?.organization_id);
+                    } catch (error) {
+                      console.error('Error setting decision maker:', error);
+                      toast.error('Erro ao definir decisor');
+                    } finally {
+                      setSettingDecisionMaker(null);
                     }
                   };
                   
