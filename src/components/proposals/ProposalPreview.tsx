@@ -12,6 +12,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { PublicProposalDynamicPricingBanner } from './PublicProposalDynamicPricingBanner';
 import { getProposalPricingSummary } from '@/lib/proposals/pricingLedger';
+import { ProposalPricingDivergenceAlert } from '@/components/proposals/ProposalPricingDivergenceAlert';
 
 interface ProposalPreviewProps {
   proposalId?: string;
