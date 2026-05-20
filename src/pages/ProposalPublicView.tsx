@@ -1945,7 +1945,7 @@ export default function ProposalPublicView() {
             </CardHeader>
             <CardContent>
               <div 
-                className="prose prose-sm max-w-none"
+                className="prose prose-sm max-w-4xl mx-auto"
                 dangerouslySetInnerHTML={{ __html: sanitizeHtml(proposal.terms) }}
               />
             </CardContent>
