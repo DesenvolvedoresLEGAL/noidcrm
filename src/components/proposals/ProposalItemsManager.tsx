@@ -282,6 +282,7 @@ export function ProposalItemsManager({ items, onChange, paymentDiscountPercent =
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-16">Ordem</TableHead>
+                      <TableHead className="w-20">Foto</TableHead>
                       <TableHead className="min-w-[200px]">Item</TableHead>
                       <TableHead className="w-24">Tipo</TableHead>
                       <TableHead className="w-20">Qtd</TableHead>
