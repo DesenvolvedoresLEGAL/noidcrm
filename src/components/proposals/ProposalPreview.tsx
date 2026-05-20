@@ -11,6 +11,7 @@ import { PaymentTerm, calculateInstallments } from '@/services/crm/proposal-paym
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { PublicProposalDynamicPricingBanner } from './PublicProposalDynamicPricingBanner';
+import { getProposalPricingSummary } from '@/lib/proposals/pricingLedger';
 
 interface ProposalPreviewProps {
   proposalId?: string;
