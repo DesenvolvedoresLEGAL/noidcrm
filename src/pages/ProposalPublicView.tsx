@@ -1043,16 +1043,32 @@ export default function ProposalPublicView() {
     (proposal as any)?.dynamic_pricing_enabled && dpSnapPublic?.current_amount != null
       ? Number(dpSnapPublic.current_amount)
       : null;
-  const effectiveOneTimeBase = dynamicOneTimeAmount ?? oneTimeTotal;
+  const legacyEffectiveOneTimeBase = dynamicOneTimeAmount ?? oneTimeTotal;
   const dynamicAdjustment = dynamicOneTimeAmount != null ? dynamicOneTimeAmount - oneTimeTotal : 0;
 
   // Calculate discount from payment terms (over the effective base, not the raw subtotal)
   const paymentDiscountPercent = oneTimeTerm?.discount_percent || 0;
-  const paymentDiscountAmount = effectiveOneTimeBase * (paymentDiscountPercent / 100);
-  const oneTimeWithDiscount = effectiveOneTimeBase - paymentDiscountAmount;
+  const legacyPaymentDiscountAmount = legacyEffectiveOneTimeBase * (paymentDiscountPercent / 100);
+  const legacyOneTimeWithDiscount = legacyEffectiveOneTimeBase - legacyPaymentDiscountAmount;
   const recurringContractTotal = recurringMRR * (recurringTerm?.contract_months || recurringTerm?.contract_duration_months || 12);
+  const legacyEffectiveOneTimeAmount = legacyOneTimeWithDiscount;
+  const legacyTotalAmount = legacyEffectiveOneTimeAmount + recurringContractTotal;
+
+  // PRICE CORE 2.0 — Phase B: prefer ledger snapshot when available.
+  const pricingSummary = getProposalPricingSummary(proposal);
+  const effectiveOneTimeBase = pricingSummary
+    ? pricingSummary.subtotalItems + pricingSummary.dynamicAdjustment.amount
+    : legacyEffectiveOneTimeBase;
+  const paymentDiscountAmount = pricingSummary
+    ? pricingSummary.manualDiscount.amount
+    : legacyPaymentDiscountAmount;
+  const oneTimeWithDiscount = pricingSummary
+    ? pricingSummary.baseAmount + pricingSummary.dynamicAdjustment.amount
+    : legacyOneTimeWithDiscount;
   const effectiveOneTimeAmount = oneTimeWithDiscount;
-  const totalAmount = effectiveOneTimeAmount + recurringContractTotal;
+  const totalAmount = pricingSummary
+    ? pricingSummary.effectiveAmount + recurringContractTotal
+    : legacyTotalAmount;
   
   // CRITICAL: Use oneTimeTotal for installments, not totalAmount (which includes MRR items)
   // PRICE UX 1.0.3 — usar approved_amount quando proposta já foi aprovada (congela o split)
