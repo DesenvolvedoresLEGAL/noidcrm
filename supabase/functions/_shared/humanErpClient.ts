@@ -21,9 +21,13 @@ export type ErpChargeInput = {
   metadata?: Record<string, unknown>;
 };
 
+export type ErpProvider = 'human_erp' | 'pending_provider';
+
 export type ErpChargeResult = {
   ok: boolean;
-  provider: 'human_erp' | 'mock';
+  provider: ErpProvider;
+  /** true quando os secrets do Human ERP não estão configurados — sem Pix, sem chamada externa */
+  pending_provider?: boolean;
   erp_charge_id?: string;
   erp_invoice_id?: string;
   pix_qr_code?: string;
@@ -87,19 +91,17 @@ export async function createErpCharge(input: ErpChargeInput): Promise<ErpChargeR
   };
 
   if (!base || !key) {
-    // Mock fallback determinístico — mantém UX enquanto secrets não chegam.
-    const mockCode = `PIX|PROP:${input.proposal_id}|VAL:${input.amount}|TS:${Date.now()}`;
+    // Sem provider configurado: NÃO chamamos endpoint externo, NÃO geramos Pix.
+    // Devolvemos um resultado controlado para o caller registrar a cobrança como
+    // pending_provider (status interno) e o payload financeiro completo.
     return {
       ok: true,
-      provider: 'mock',
-      erp_charge_id: `mock_charge_${input.payment_intent_id}`,
-      erp_invoice_id: `mock_invoice_${input.payment_intent_id}`,
-      pix_qr_code: mockCode,
-      pix_copy_paste: mockCode,
+      provider: 'pending_provider',
+      pending_provider: true,
+      status: 'pending_provider',
       due_date: input.due_date ?? null,
-      status: 'pending',
       raw_request: payload,
-      raw_response: { mock: true },
+      raw_response: { pending_provider: true, reason: 'HUMAN_ERP secrets not configured' },
       latency_ms: Date.now() - start,
     };
   }
@@ -148,7 +150,8 @@ export async function createErpCharge(input: ErpChargeInput): Promise<ErpChargeR
 
 export type ErpStatusResult = {
   ok: boolean;
-  provider: 'human_erp' | 'mock';
+  provider: ErpProvider;
+  pending_provider?: boolean;
   status?: string;
   paid_amount?: number;
   paid_at?: string | null;
@@ -165,9 +168,14 @@ export async function getErpChargeStatus(erpChargeId: string): Promise<ErpStatus
   const base = normalizeBaseUrl(Deno.env.get('HUMAN_ERP_BASE_URL'));
   const key = normalizeKey(Deno.env.get('HUMAN_ERP_API_KEY'));
   if (!base || !key) {
+    // Sem provider: NUNCA simula baixa. Devolve pending_provider sem paid_amount.
     return {
-      ok: true, provider: 'mock', status: 'pending',
-      raw_response: { mock: true }, latency_ms: Date.now() - start,
+      ok: true,
+      provider: 'pending_provider',
+      pending_provider: true,
+      status: 'pending_provider',
+      raw_response: { pending_provider: true, reason: 'HUMAN_ERP secrets not configured' },
+      latency_ms: Date.now() - start,
     };
   }
   try {
@@ -206,10 +214,8 @@ export async function getErpChargeStatus(erpChargeId: string): Promise<ErpStatus
 /** HMAC-SHA256 sobre o corpo bruto do webhook usando HUMAN_ERP_WEBHOOK_SECRET. */
 export async function verifyWebhookSignature(rawBody: string, signature: string | null): Promise<boolean> {
   const secret = normalizeKey(Deno.env.get('HUMAN_ERP_WEBHOOK_SECRET'));
-  if (!secret) {
-    // Sem secret configurado: aceita mas marca como mock (logs deixam claro).
-    return true;
-  }
+  // Sem secret configurado o webhook fica fechado — não aceitamos baixa sem assinatura válida.
+  if (!secret) return false;
   if (!signature) return false;
   const enc = new TextEncoder();
   const key = await crypto.subtle.importKey(

@@ -40,11 +40,12 @@ export async function createPixChargeFromPaymentIntent(
   return {
     ok: true,
     provider: data.provider,
-    pix_qr_code: data.pix_qr_code,
-    pix_copy_paste: data.pix_copy_paste,
-    message: data.provider === 'mock'
-      ? 'Cobrança gerada (mock — Human ERP não configurado).'
-      : 'Cobrança gerada no Human ERP.',
+    pix_qr_code: data.pending_provider ? undefined : data.pix_qr_code,
+    pix_copy_paste: data.pending_provider ? undefined : data.pix_copy_paste,
+    message: data.message
+      ?? (data.pending_provider
+        ? 'Cobrança registrada. Provider financeiro pendente de configuração.'
+        : 'Cobrança gerada no Human ERP.'),
   };
 }
 
