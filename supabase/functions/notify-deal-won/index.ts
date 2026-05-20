@@ -42,11 +42,35 @@ Deno.serve(async (req) => {
       console.error("[notify-deal-won] Financial preflight failed:", orchestrationError);
     }
 
+    // PRICE CORE 2.0C — central pricing guard. Recalculates the ledger and
+    // blocks ERP delivery when the proposal has any divergence.
+    const { data: readiness, error: readinessError } = await supabase.rpc(
+      "ensure_proposal_pricing_ready",
+      { p_proposal_id: proposal_id },
+    );
+    if (readinessError) {
+      console.error("[notify-deal-won] ensure_proposal_pricing_ready failed:", readinessError);
+      return jsonResponse({
+        error: "Não foi possível enviar ao ERP. Falha ao validar valores da proposta.",
+        reason: "pricing_guard_error",
+      }, 500);
+    }
+    if (!readiness || readiness.ok === false || readiness.blocked === true) {
+      const message = readiness?.message ||
+        "Não foi possível enviar ao ERP. Existem valores divergentes na proposta. Recalcule a proposta antes de continuar.";
+      console.error("[notify-deal-won] BLOCKED by pricing guard:", JSON.stringify(readiness));
+      return jsonResponse({
+        error: message,
+        reason: readiness?.reason || "ledger_divergence",
+        readiness,
+      }, 409);
+    }
+
     // Fetch proposal after preflight so ERP always receives the final NET approved amount.
     const { data: proposal, error: pError } = await supabase
       .from("proposals")
       .select(
-        `id, opportunity_id, organization_id, status, title, client_name, client_email, created_at, accepted_at, expires_at, subtotal, discount_amount, approved_payment_schedule, approval_snapshot, ${APPROVED_VALUE_SELECT_COLUMNS}`,
+        `id, opportunity_id, organization_id, status, title, client_name, client_email, created_at, accepted_at, expires_at, subtotal, discount_amount, approved_payment_schedule, approval_snapshot, pricing_erp_amount, pricing_effective_amount, pricing_breakdown_snapshot, pricing_has_divergence, ${APPROVED_VALUE_SELECT_COLUMNS}`,
       )
       .eq("id", proposal_id)
       .single();
@@ -55,6 +79,7 @@ Deno.serve(async (req) => {
       console.error("Proposal not found:", proposal_id, pError);
       return jsonResponse({ error: "Proposal not found" }, 404);
     }
+
 
     if (proposal.status !== "accepted") {
       return jsonResponse({ error: "Proposal is not accepted", status: proposal.status }, 400);
