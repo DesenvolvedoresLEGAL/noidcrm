@@ -372,7 +372,7 @@ serve(async (req) => {
     }
 
     // Stage (text id), Pipeline (text id), Account, Activities, Contacts — todos blindados
-    const [stageRes, accountRes, contactsRes, pipelineRes] = await Promise.all([
+    const [stageRes, accountRes, contactsRes, pipelineRes, oppNodeRes, dealParticipantsRes] = await Promise.all([
       opportunity.stage_id
         ? supabase.from('stages').select('id, name').eq('id', opportunity.stage_id).maybeSingle()
         : Promise.resolve({ data: null }),
@@ -385,7 +385,35 @@ serve(async (req) => {
       opportunity.pipeline_id
         ? supabase.from('pipelines').select('id, pipeline_type').eq('id', opportunity.pipeline_id).maybeSingle()
         : Promise.resolve({ data: null }),
+      supabase
+        .from('graph_nodes')
+        .select('id')
+        .eq('organization_id', opportunity.organization_id)
+        .eq('entity_id', opportunityId)
+        .eq('node_type', 'opportunity')
+        .maybeSingle(),
+      supabase
+        .from('deal_participants')
+        .select('id')
+        .eq('opportunity_id', opportunityId)
+        .eq('role', 'decision_maker')
+        .limit(1),
     ]);
+
+    let hasExplicitDecisionMaker = false;
+    const oppNodeId = (oppNodeRes.data as any)?.id;
+    if (oppNodeId) {
+      const { data: dmEdge, error: dmEdgeErr } = await supabase
+        .from('graph_edges')
+        .select('id')
+        .eq('organization_id', opportunity.organization_id)
+        .eq('target_node_id', oppNodeId)
+        .eq('edge_type', 'decision_maker')
+        .limit(1)
+        .maybeSingle();
+      if (dmEdgeErr) console.warn('[calculate-nrhs] decision_maker edge query failed:', dmEdgeErr.message);
+      hasExplicitDecisionMaker = !!dmEdge;
+    }
 
     // Activities — blindado: erro vira fallback, NUNCA derruba o pilar.
     let activities: any[] | null = null;
@@ -414,7 +442,10 @@ serve(async (req) => {
 
     const integrity = pillarIntegrity(opportunity);
     const cadence = pillarCadence(opportunity, activities, now, activitiesError);
-    const stk = pillarStakeholders(contacts, opportunity, stageName);
+    const stk = pillarStakeholders(contacts, opportunity, stageName, {
+      hasExplicitDecisionMaker,
+      hasDealParticipantDecisionMaker: ((dealParticipantsRes.data as any[]) ?? []).length > 0,
+    });
     const stakeholders = stk.pillar;
     const winLossRes = pillarWinLoss(opportunity);
     const winLoss = winLossRes.pillar;
