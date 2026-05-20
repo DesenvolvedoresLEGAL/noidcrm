@@ -21,9 +21,13 @@ export type ErpChargeInput = {
   metadata?: Record<string, unknown>;
 };
 
+export type ErpProvider = 'human_erp' | 'pending_provider';
+
 export type ErpChargeResult = {
   ok: boolean;
-  provider: 'human_erp' | 'mock';
+  provider: ErpProvider;
+  /** true quando os secrets do Human ERP não estão configurados — sem Pix, sem chamada externa */
+  pending_provider?: boolean;
   erp_charge_id?: string;
   erp_invoice_id?: string;
   pix_qr_code?: string;
