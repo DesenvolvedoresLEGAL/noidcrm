@@ -1608,20 +1608,20 @@ export default function ProposalPublicView() {
                           {hasRecurringItemDiscounts && (
                             <>
                               <tr className="bg-muted/30">
-                                <td colSpan={2} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm text-muted-foreground sm:hidden">Subtotal Bruto</td>
-                                <td colSpan={hasRecurringItemDiscounts ? 4 : 3} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm text-muted-foreground hidden sm:table-cell">Subtotal Bruto</td>
+                                <td colSpan={3} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm text-muted-foreground sm:hidden">Subtotal Bruto</td>
+                                <td colSpan={hasRecurringItemDiscounts ? 5 : 4} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm text-muted-foreground hidden sm:table-cell">Subtotal Bruto</td>
                                 <td className="text-right py-2 px-2 md:py-3 md:px-4 text-sm">{formatCurrency(recurringSubtotal)}/mês</td>
                               </tr>
                               <tr className="bg-muted/30">
-                                <td colSpan={2} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm text-red-600 sm:hidden">Descontos dos Itens</td>
-                                <td colSpan={hasRecurringItemDiscounts ? 4 : 3} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm text-red-600 hidden sm:table-cell">Descontos dos Itens</td>
+                                <td colSpan={3} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm text-red-600 sm:hidden">Descontos dos Itens</td>
+                                <td colSpan={hasRecurringItemDiscounts ? 5 : 4} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm text-red-600 hidden sm:table-cell">Descontos dos Itens</td>
                                 <td className="text-right py-2 px-2 md:py-3 md:px-4 text-sm text-red-600 font-medium">- {formatCurrency(recurringItemDiscount)}/mês</td>
                               </tr>
                             </>
                           )}
                           <tr className="bg-emerald-50 dark:bg-emerald-950/30">
-                            <td colSpan={2} className="text-right py-3 px-2 md:py-4 md:px-4 font-bold text-sm md:text-base sm:hidden">MRR Total</td>
-                            <td colSpan={hasRecurringItemDiscounts ? 4 : 3} className="text-right py-3 px-2 md:py-4 md:px-4 font-bold text-sm md:text-base hidden sm:table-cell">MRR Total</td>
+                            <td colSpan={3} className="text-right py-3 px-2 md:py-4 md:px-4 font-bold text-sm md:text-base sm:hidden">MRR Total</td>
+                            <td colSpan={hasRecurringItemDiscounts ? 5 : 4} className="text-right py-3 px-2 md:py-4 md:px-4 font-bold text-sm md:text-base hidden sm:table-cell">MRR Total</td>
                             <td className="text-right py-3 px-2 md:py-4 md:px-4 font-bold text-base md:text-lg text-emerald-600">{formatCurrency(recurringMRR)}/mês</td>
                           </tr>
                         </tfoot>
