@@ -608,25 +608,60 @@ function generateProposalHTML(proposal: any, items: any[], paymentTerms: any[], 
 
       <div class="totals-section">
         <div class="totals-box">
-          ${hasBothTypes ? `
+          ${ledger ? `
             <div class="total-row">
-              <span>Subtotal Avulso:</span>
-              <span>R$ ${oneTimeTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+              <span>Subtotal dos itens:</span>
+              <span>${fmtBRL(ledger.subtotalItems)}</span>
             </div>
-            <div class="total-row">
-              <span>Subtotal Recorrente:</span>
-              <span>R$ ${recurringTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+            ${ledger.manualDiscountAmount > 0 ? `
+              <div class="total-row" style="color:#dc2626;">
+                <span>Desconto comercial${ledger.manualDiscountPercent > 0 ? ` (${ledger.manualDiscountPercent}%)` : ''}:</span>
+                <span>- ${fmtBRL(ledger.manualDiscountAmount)}</span>
+              </div>
+            ` : ''}
+            ${ledger.inventoryAdjustmentAmount !== 0 ? `
+              <div class="total-row">
+                <span>Ajuste de estoque:</span>
+                <span>${ledger.inventoryAdjustmentAmount >= 0 ? '+ ' : '- '}${fmtBRL(Math.abs(ledger.inventoryAdjustmentAmount))}</span>
+              </div>
+            ` : ''}
+            ${(ledger.manualDiscountAmount > 0 || ledger.inventoryAdjustmentAmount !== 0) ? `
+              <div class="total-row">
+                <span><strong>Base comercial:</strong></span>
+                <span><strong>${fmtBRL(ledger.baseAmount)}</strong></span>
+              </div>
+            ` : ''}
+            ${ledger.dynamicEnabled && ledger.dynamicAmount !== 0 ? `
+              <div class="total-row" style="color:#b45309;">
+                <span>Ajuste por antecedência${ledger.dynamicPercent !== 0 ? ` (${ledger.dynamicPercent >= 0 ? '+' : ''}${ledger.dynamicPercent}%)` : ''}${ledger.dynamicTierLabel ? ` — ${ledger.dynamicTierLabel}` : ''}:</span>
+                <span>${ledger.dynamicAmount >= 0 ? '+ ' : '- '}${fmtBRL(Math.abs(ledger.dynamicAmount))}</span>
+              </div>
+            ` : ''}
+            <div class="total-row grand">
+              <span>${ledger.frozen ? 'Total aprovado' : 'Total vigente'}:</span>
+              <span>${fmtBRL(ledger.effectiveAmount)}</span>
             </div>
-          ` : (subtotal !== total ? `
-            <div class="total-row">
-              <span>Subtotal:</span>
-              <span>R$ ${subtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+          ` : `
+            ${hasBothTypes ? `
+              <div class="total-row">
+                <span>Subtotal Avulso:</span>
+                <span>${fmtBRL(oneTimeTotal)}</span>
+              </div>
+              <div class="total-row">
+                <span>Subtotal Recorrente:</span>
+                <span>${fmtBRL(recurringTotal)}</span>
+              </div>
+            ` : (subtotal !== total ? `
+              <div class="total-row">
+                <span>Subtotal:</span>
+                <span>${fmtBRL(subtotal)}</span>
+              </div>
+            ` : '')}
+            <div class="total-row grand">
+              <span>Total:</span>
+              <span>${fmtBRL(total)}</span>
             </div>
-          ` : '')}
-          <div class="total-row grand">
-            <span>Total:</span>
-            <span>R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-          </div>
+          `}
         </div>
       </div>
     </div>
