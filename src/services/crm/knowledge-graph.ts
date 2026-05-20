@@ -499,6 +499,15 @@ export async function setOpportunityDecisionMaker(
     });
 
   if (error) throw error;
+
+  await supabase
+    .from('graph_insights')
+    .update({ status: 'resolved', resolved_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .eq('organization_id', orgId)
+    .eq('entity_type', 'opportunity')
+    .eq('entity_id', opportunityId)
+    .eq('insight_type', 'missing_decision_maker')
+    .eq('status', 'active');
   
   // Log to timeline
   const { data: contact } = await supabase

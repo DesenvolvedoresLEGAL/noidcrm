@@ -70,7 +70,7 @@ Deno.serve(async (req) => {
     const now = new Date();
 
     // ---- Fetch related signals
-    const [activitiesRes, accountRes, proposalsRes, emailsRes, contactsRes] = await Promise.all([
+    const [activitiesRes, accountRes, proposalsRes, emailsRes, contactsRes, oppNodeRes, dealParticipantsRes] = await Promise.all([
       supabase.from('activities')
         .select('id, status, type, completed_at, scheduled_date, created_at, deleted_at')
         .eq('opportunity_id', opp.id)
@@ -98,6 +98,17 @@ Deno.serve(async (req) => {
             .eq('account_id', opp.account_id)
             .is('deleted_at', null)
         : Promise.resolve({ data: [], error: null } as any),
+      supabase.from('graph_nodes')
+        .select('id')
+        .eq('organization_id', orgId)
+        .eq('entity_id', opp.id)
+        .eq('node_type', 'opportunity')
+        .maybeSingle(),
+      supabase.from('deal_participants')
+        .select('id')
+        .eq('opportunity_id', opp.id)
+        .eq('role', 'decision_maker')
+        .limit(1),
     ]);
 
     const activities = activitiesRes.data ?? [];
@@ -124,10 +135,25 @@ Deno.serve(async (req) => {
       ? daysBetween(now, new Date(lastCompleted.completed_at))
       : 999;
 
+    const oppNodeId = (oppNodeRes.data as any)?.id;
+    let hasExplicitDecisionMaker = false;
+    if (oppNodeId) {
+      const { data: dmEdge, error: dmEdgeErr } = await supabase.from('graph_edges')
+        .select('id')
+        .eq('organization_id', orgId)
+        .eq('target_node_id', oppNodeId)
+        .eq('edge_type', 'decision_maker')
+        .limit(1)
+        .maybeSingle();
+      if (dmEdgeErr) console.warn('decision_maker edge query failed:', dmEdgeErr.message);
+      hasExplicitDecisionMaker = !!dmEdge;
+    }
+
     const primaryContact = contacts[0] || null;
-    const hasDecisor = contacts.some((c: any) =>
+    const hasDecisorByCargo = contacts.some((c: any) =>
       typeof c.cargo === 'string' && /diretor|ceo|gerente|head|c-?level|presidente|s[oó]cio|owner|founder/i.test(c.cargo)
     );
+    const hasDecisor = hasExplicitDecisionMaker || ((dealParticipantsRes.data as any[]) ?? []).length > 0 || hasDecisorByCargo;
 
     const acceptedProposal = proposals.find((p: any) => p.status === 'accepted');
     const sentProposal = proposals.find((p: any) => p.sent_at);
@@ -375,19 +401,6 @@ Deno.serve(async (req) => {
       risk_level: riskLevel,
       risk_updated_at: now.toISOString(),
       risk_metadata: { events: riskEvents, formula_version: FORMULA_VERSION },
-      nrhs_score: nrhs,
-      nrhs_tier: nrhsTier,
-      nrhs_blockers: blockers,
-      nrhs_breakdown: {
-        data_completeness: dataCompleteness,
-        contact_quality: contactQuality,
-        deal_hygiene: dealHygiene,
-        activity_hygiene: activityHygiene,
-        timeline_hygiene: timelineHygiene,
-        blocker_penalty: blockers.length * 3,
-        formula_version: FORMULA_VERSION,
-      },
-      nrhs_last_calculated_at: now.toISOString(),
       deal_health: dealHealth,
       deal_health_score: dealHealthScore,
       deal_health_updated_at: now.toISOString(),
@@ -408,7 +421,6 @@ Deno.serve(async (req) => {
     try {
       await supabase.from('score_history').insert([
         { organization_id: orgId, entity_type: 'opportunity', entity_id: opp.id, score_type: 'ai_win', score_value: aiWin, metadata: aiWinMetadata },
-        { organization_id: orgId, entity_type: 'opportunity', entity_id: opp.id, score_type: 'nrhs', score_value: nrhs, metadata: { tier: nrhsTier, blockers } },
         { organization_id: orgId, entity_type: 'opportunity', entity_id: opp.id, score_type: 'engagement', score_value: engagement, metadata: { events: engagementEvents } },
         { organization_id: orgId, entity_type: 'opportunity', entity_id: opp.id, score_type: 'velocity', score_value: velocity, metadata: { events: velocityEvents } },
         { organization_id: orgId, entity_type: 'opportunity', entity_id: opp.id, score_type: 'risk', score_value: risk, metadata: { level: riskLevel, events: riskEvents } },

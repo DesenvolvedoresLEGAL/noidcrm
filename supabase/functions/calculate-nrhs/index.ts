@@ -133,7 +133,17 @@ function pillarCadence(opp: any, activities: any[] | null, now: Date, activities
   return p;
 }
 
-function pillarStakeholders(contacts: any[], opp: any, stageName: string): { pillar: Pillar; advancedNoDecisor: boolean; missingDecisorSignal: boolean } {
+interface StakeholderSignals {
+  hasExplicitDecisionMaker: boolean;
+  hasDealParticipantDecisionMaker: boolean;
+}
+
+function pillarStakeholders(
+  contacts: any[],
+  opp: any,
+  stageName: string,
+  signals: StakeholderSignals,
+): { pillar: Pillar; advancedNoDecisor: boolean; missingDecisorSignal: boolean } {
   const p: Pillar = { score: 0, max: 20, items: [], passed: [], issues: [] };
   const primary = contacts.find((c) => c.id === opp.contact_id) ?? contacts[0];
 
@@ -143,19 +153,20 @@ function pillarStakeholders(contacts: any[], opp: any, stageName: string): { pil
     (Array.isArray(primary.telefones) && primary.telefones.length > 0) ||
     !!primary.email || !!primary.phone
   );
-  const decisor = contacts.find((c) => {
+  const cargoDecisor = contacts.find((c) => {
     const cargo = (c.cargo || '').toLowerCase();
     return /diretor|ceo|cfo|coo|cto|presidente|s[oó]cio|founder|owner|chefe|head|decis/.test(cargo);
   });
+  const hasDecisor = signals.hasExplicitDecisionMaker || signals.hasDealParticipantDecisionMaker || !!cargoDecisor;
 
   add(p, 'has_contact', 'Contato vinculado', 5, hasContact);
   add(p, 'contact_info', 'Contato com email/telefone', 5, !!hasContactInfo);
-  add(p, 'decisor', 'Decisor identificado', 7, !!decisor);
+  add(p, 'decisor', 'Decisor identificado', 7, hasDecisor);
   add(p, 'multiple_stakeholders', 'Mais de um stakeholder', 3, contacts.length >= 2);
 
   p.score = clamp(p.score, 0, 20);
   const advanced = isAdvancedStage(stageName);
-  return { pillar: p, advancedNoDecisor: advanced && !decisor, missingDecisorSignal: !decisor };
+  return { pillar: p, advancedNoDecisor: advanced && !hasDecisor, missingDecisorSignal: !hasDecisor };
 }
 
 function pillarWinLoss(opp: any): { pillar: Pillar; winLossGapCodes: string[] } {
@@ -361,7 +372,7 @@ serve(async (req) => {
     }
 
     // Stage (text id), Pipeline (text id), Account, Activities, Contacts — todos blindados
-    const [stageRes, accountRes, contactsRes, pipelineRes] = await Promise.all([
+    const [stageRes, accountRes, contactsRes, pipelineRes, oppNodeRes, dealParticipantsRes] = await Promise.all([
       opportunity.stage_id
         ? supabase.from('stages').select('id, name').eq('id', opportunity.stage_id).maybeSingle()
         : Promise.resolve({ data: null }),
@@ -374,7 +385,35 @@ serve(async (req) => {
       opportunity.pipeline_id
         ? supabase.from('pipelines').select('id, pipeline_type').eq('id', opportunity.pipeline_id).maybeSingle()
         : Promise.resolve({ data: null }),
+      supabase
+        .from('graph_nodes')
+        .select('id')
+        .eq('organization_id', opportunity.organization_id)
+        .eq('entity_id', opportunityId)
+        .eq('node_type', 'opportunity')
+        .maybeSingle(),
+      supabase
+        .from('deal_participants')
+        .select('id')
+        .eq('opportunity_id', opportunityId)
+        .eq('role', 'decision_maker')
+        .limit(1),
     ]);
+
+    let hasExplicitDecisionMaker = false;
+    const oppNodeId = (oppNodeRes.data as any)?.id;
+    if (oppNodeId) {
+      const { data: dmEdge, error: dmEdgeErr } = await supabase
+        .from('graph_edges')
+        .select('id')
+        .eq('organization_id', opportunity.organization_id)
+        .eq('target_node_id', oppNodeId)
+        .eq('edge_type', 'decision_maker')
+        .limit(1)
+        .maybeSingle();
+      if (dmEdgeErr) console.warn('[calculate-nrhs] decision_maker edge query failed:', dmEdgeErr.message);
+      hasExplicitDecisionMaker = !!dmEdge;
+    }
 
     // Activities — blindado: erro vira fallback, NUNCA derruba o pilar.
     let activities: any[] | null = null;
@@ -403,7 +442,10 @@ serve(async (req) => {
 
     const integrity = pillarIntegrity(opportunity);
     const cadence = pillarCadence(opportunity, activities, now, activitiesError);
-    const stk = pillarStakeholders(contacts, opportunity, stageName);
+    const stk = pillarStakeholders(contacts, opportunity, stageName, {
+      hasExplicitDecisionMaker,
+      hasDealParticipantDecisionMaker: ((dealParticipantsRes.data as any[]) ?? []).length > 0,
+    });
     const stakeholders = stk.pillar;
     const winLossRes = pillarWinLoss(opportunity);
     const winLoss = winLossRes.pillar;
