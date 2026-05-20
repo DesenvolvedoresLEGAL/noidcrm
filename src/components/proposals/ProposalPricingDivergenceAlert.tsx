@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { AlertTriangle, RefreshCw, Loader2 } from 'lucide-react';
 import { getProposalPricingSummary } from '@/lib/proposals/pricingLedger';
 import { recalculateProposalLedger } from '@/services/proposals/proposalPricingGuard';
-import { proposalKeys } from '@/services/crm/proposals';
+import { proposalKeys } from '@/lib/query-keys';
 
 interface Props {
   proposal: any;
