@@ -1339,7 +1339,7 @@ export default function ProposalPublicView() {
                 Criada em {formatDateBR(proposal.created_at)}
               </p>
               <div className="pt-2 border-t space-y-1">
-                {paymentDiscountPercent > 0 && (
+                {(paymentDiscountAmount > 0) && (
                   <>
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">
@@ -1348,7 +1348,13 @@ export default function ProposalPublicView() {
                       <span>{formatCurrency(effectiveOneTimeBase + recurringContractTotal)}</span>
                     </div>
                     <div className="flex justify-between text-sm text-red-600">
-                      <span>Desconto ({paymentDiscountPercent}%):</span>
+                      <span>
+                        Desconto{pricingSummary?.manualDiscount.percent
+                          ? ` (${pricingSummary.manualDiscount.percent}%)`
+                          : paymentDiscountPercent > 0
+                          ? ` (${paymentDiscountPercent}%)`
+                          : ''}:
+                      </span>
                       <span>- {formatCurrency(paymentDiscountAmount)}</span>
                     </div>
                   </>
