@@ -50,13 +50,15 @@ Deno.serve(async (req) => {
 
   const result = await getErpChargeStatus(erpChargeId);
 
+  const isPending = result.provider === 'pending_provider' || result.pending_provider === true;
+
   await admin.from('proposal_erp_sync_logs').insert({
     organization_id: intent.organization_id,
     proposal_id: intent.proposal_id,
     payment_intent_id: intentId,
     provider: result.provider,
     operation: 'sync_status',
-    status: result.ok ? (result.provider === 'mock' ? 'mock' : 'success') : 'error',
+    status: result.ok ? (isPending ? 'pending_provider' : 'success') : 'error',
     response_payload: (result.raw_response as any) ?? {},
     http_status: result.http_status ?? null,
     error_code: result.error_code ?? null,
@@ -64,9 +66,10 @@ Deno.serve(async (req) => {
     latency_ms: result.latency_ms ?? null,
   });
 
-  // Se o ERP reporta pagamento, aplicar a regra de validação.
+  // Aplica validação SOMENTE quando o ERP real reporta pagamento. NUNCA simula baixa em pending_provider.
   let validation: any = null;
   if (
+    !isPending &&
     result.ok &&
     typeof result.paid_amount === 'number' &&
     result.paid_amount > 0 &&
@@ -85,8 +88,12 @@ Deno.serve(async (req) => {
     ok: result.ok,
     configured: isHumanErpConfigured(),
     provider: result.provider,
-    erp_status: result.status,
-    paid_amount: result.paid_amount,
+    pending_provider: isPending,
+    erp_status: isPending ? 'pending_provider' : result.status,
+    paid_amount: isPending ? null : result.paid_amount,
     validation,
+    message: isPending
+      ? 'Sincronização indisponível. Provider financeiro pendente de configuração.'
+      : undefined,
   }, result.ok ? 200 : 502);
 });
