@@ -401,19 +401,6 @@ Deno.serve(async (req) => {
       risk_level: riskLevel,
       risk_updated_at: now.toISOString(),
       risk_metadata: { events: riskEvents, formula_version: FORMULA_VERSION },
-      nrhs_score: nrhs,
-      nrhs_tier: nrhsTier,
-      nrhs_blockers: blockers,
-      nrhs_breakdown: {
-        data_completeness: dataCompleteness,
-        contact_quality: contactQuality,
-        deal_hygiene: dealHygiene,
-        activity_hygiene: activityHygiene,
-        timeline_hygiene: timelineHygiene,
-        blocker_penalty: blockers.length * 3,
-        formula_version: FORMULA_VERSION,
-      },
-      nrhs_last_calculated_at: now.toISOString(),
       deal_health: dealHealth,
       deal_health_score: dealHealthScore,
       deal_health_updated_at: now.toISOString(),
@@ -434,7 +421,6 @@ Deno.serve(async (req) => {
     try {
       await supabase.from('score_history').insert([
         { organization_id: orgId, entity_type: 'opportunity', entity_id: opp.id, score_type: 'ai_win', score_value: aiWin, metadata: aiWinMetadata },
-        { organization_id: orgId, entity_type: 'opportunity', entity_id: opp.id, score_type: 'nrhs', score_value: nrhs, metadata: { tier: nrhsTier, blockers } },
         { organization_id: orgId, entity_type: 'opportunity', entity_id: opp.id, score_type: 'engagement', score_value: engagement, metadata: { events: engagementEvents } },
         { organization_id: orgId, entity_type: 'opportunity', entity_id: opp.id, score_type: 'velocity', score_value: velocity, metadata: { events: velocityEvents } },
         { organization_id: orgId, entity_type: 'opportunity', entity_id: opp.id, score_type: 'risk', score_value: risk, metadata: { level: riskLevel, events: riskEvents } },
