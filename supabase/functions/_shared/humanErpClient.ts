@@ -91,19 +91,17 @@ export async function createErpCharge(input: ErpChargeInput): Promise<ErpChargeR
   };
 
   if (!base || !key) {
-    // Mock fallback determinístico — mantém UX enquanto secrets não chegam.
-    const mockCode = `PIX|PROP:${input.proposal_id}|VAL:${input.amount}|TS:${Date.now()}`;
+    // Sem provider configurado: NÃO chamamos endpoint externo, NÃO geramos Pix.
+    // Devolvemos um resultado controlado para o caller registrar a cobrança como
+    // pending_provider (status interno) e o payload financeiro completo.
     return {
       ok: true,
-      provider: 'mock',
-      erp_charge_id: `mock_charge_${input.payment_intent_id}`,
-      erp_invoice_id: `mock_invoice_${input.payment_intent_id}`,
-      pix_qr_code: mockCode,
-      pix_copy_paste: mockCode,
+      provider: 'pending_provider',
+      pending_provider: true,
+      status: 'pending_provider',
       due_date: input.due_date ?? null,
-      status: 'pending',
       raw_request: payload,
-      raw_response: { mock: true },
+      raw_response: { pending_provider: true, reason: 'HUMAN_ERP secrets not configured' },
       latency_ms: Date.now() - start,
     };
   }
