@@ -236,21 +236,29 @@ export function ProposalPreview({
     dpEnabledPreview && dpSnapPreview?.current_amount != null
       ? Number(dpSnapPreview.current_amount)
       : null;
-  const effectiveOneTimeBase = dynamicOneTimeAmount ?? oneTimeTotal;
+  const legacyEffectiveOneTimeBase = dynamicOneTimeAmount ?? oneTimeTotal;
 
-  // Subtotal exibido = soma dos itens (vigente quando dinâmica ativa)
+  // PRICE CORE 2.0 — Phase B: prefer ledger snapshot when available
+  const pricingSummary = getProposalPricingSummary(dynamicPricing);
+  const effectiveOneTimeBase = pricingSummary
+    ? pricingSummary.subtotalItems + pricingSummary.dynamicAdjustment.amount
+    : legacyEffectiveOneTimeBase;
+
   const calculatedSubtotal = effectiveOneTimeBase + recurringTotal;
 
-  // Apply payment discount to the effective one-time base
-  const paymentDiscountAmount = effectiveOneTimeBase * (paymentDiscountPercent / 100);
-  const oneTimeWithDiscount = effectiveOneTimeBase - paymentDiscountAmount;
+  const paymentDiscountAmount = pricingSummary
+    ? pricingSummary.manualDiscount.amount
+    : effectiveOneTimeBase * (paymentDiscountPercent / 100);
+  const oneTimeWithDiscount = pricingSummary
+    ? pricingSummary.baseAmount + pricingSummary.dynamicAdjustment.amount
+    : effectiveOneTimeBase - paymentDiscountAmount;
 
-  // Calculate contract total for recurring (assume 12 months)
   const contractMonths = 12;
   const recurringContractTotal = recurringTotal * contractMonths;
 
-  // Grand total with discount applied
-  const calculatedTotal = oneTimeWithDiscount + recurringContractTotal;
+  const calculatedTotal = pricingSummary
+    ? pricingSummary.effectiveAmount + recurringContractTotal
+    : oneTimeWithDiscount + recurringContractTotal;
   const displayTotal = totalValue || calculatedTotal;
 
   const processedContent = context ? {
