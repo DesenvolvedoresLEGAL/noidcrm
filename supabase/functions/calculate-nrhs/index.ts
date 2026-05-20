@@ -133,7 +133,17 @@ function pillarCadence(opp: any, activities: any[] | null, now: Date, activities
   return p;
 }
 
-function pillarStakeholders(contacts: any[], opp: any, stageName: string): { pillar: Pillar; advancedNoDecisor: boolean; missingDecisorSignal: boolean } {
+interface StakeholderSignals {
+  hasExplicitDecisionMaker: boolean;
+  hasDealParticipantDecisionMaker: boolean;
+}
+
+function pillarStakeholders(
+  contacts: any[],
+  opp: any,
+  stageName: string,
+  signals: StakeholderSignals,
+): { pillar: Pillar; advancedNoDecisor: boolean; missingDecisorSignal: boolean } {
   const p: Pillar = { score: 0, max: 20, items: [], passed: [], issues: [] };
   const primary = contacts.find((c) => c.id === opp.contact_id) ?? contacts[0];
 
@@ -143,19 +153,20 @@ function pillarStakeholders(contacts: any[], opp: any, stageName: string): { pil
     (Array.isArray(primary.telefones) && primary.telefones.length > 0) ||
     !!primary.email || !!primary.phone
   );
-  const decisor = contacts.find((c) => {
+  const cargoDecisor = contacts.find((c) => {
     const cargo = (c.cargo || '').toLowerCase();
     return /diretor|ceo|cfo|coo|cto|presidente|s[oó]cio|founder|owner|chefe|head|decis/.test(cargo);
   });
+  const hasDecisor = signals.hasExplicitDecisionMaker || signals.hasDealParticipantDecisionMaker || !!cargoDecisor;
 
   add(p, 'has_contact', 'Contato vinculado', 5, hasContact);
   add(p, 'contact_info', 'Contato com email/telefone', 5, !!hasContactInfo);
-  add(p, 'decisor', 'Decisor identificado', 7, !!decisor);
+  add(p, 'decisor', 'Decisor identificado', 7, hasDecisor);
   add(p, 'multiple_stakeholders', 'Mais de um stakeholder', 3, contacts.length >= 2);
 
   p.score = clamp(p.score, 0, 20);
   const advanced = isAdvancedStage(stageName);
-  return { pillar: p, advancedNoDecisor: advanced && !decisor, missingDecisorSignal: !decisor };
+  return { pillar: p, advancedNoDecisor: advanced && !hasDecisor, missingDecisorSignal: !hasDecisor };
 }
 
 function pillarWinLoss(opp: any): { pillar: Pillar; winLossGapCodes: string[] } {
