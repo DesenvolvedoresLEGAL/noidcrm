@@ -154,10 +154,15 @@ Deno.serve(async (req) => {
       itemsNetTotal = rawTotal - discountAmount;
     }
 
-    // SOURCE OF TRUTH for ERP: the approved commercial value, which already includes
-    // dynamic-pricing adjustments (event antecedence, etc.) AND payment discounts.
+    // PRICE CORE 2.0C — pricing_erp_amount is the canonical ERP figure.
+    // It already includes manual discount, inventory adjustment, dynamic
+    // pricing, payment discount and is frozen by approval_snapshot when the
+    // proposal is accepted.
+    const pricingErpAmount = Number((proposal as any).pricing_erp_amount) || 0;
     const approved = resolveApprovedProposalAmount(proposal as any);
-    const totalAmount = approved.amount > 0 ? approved.amount : itemsNetTotal;
+    const totalAmount = pricingErpAmount > 0
+      ? pricingErpAmount
+      : (approved.amount > 0 ? approved.amount : itemsNetTotal);
 
     // Financial breakdown — same shape as api-deals so the ERP receives an
     // unambiguous NET value across every legacy field name.
@@ -173,8 +178,9 @@ Deno.serve(async (req) => {
       : 0;
 
     console.log(
-      `[notify-deal-won] Approved value for ${proposal_id}: net=${netTotal} subtotal=${subtotalForBreakdown} discount=${discountTotal} (${discountPercent}%) source=${approved.source} base=${approved.base_amount} dyn=${approved.dynamic_amount} items_gross=${rawTotal} items_net=${itemsNetTotal}`,
+      `[notify-deal-won] ERP value for ${proposal_id}: net=${netTotal} pricing_erp_amount=${pricingErpAmount} subtotal=${subtotalForBreakdown} discount=${discountTotal} (${discountPercent}%) source=${approved.source} base=${approved.base_amount} dyn=${approved.dynamic_amount} items_gross=${rawTotal} items_net=${itemsNetTotal}`,
     );
+
 
     // Derive vencimento — sempre priorizar a data definida nas condições de pagamento.
     // Ordem de prioridade: first_installment_date (à vista / 1ª parcela one_time)
