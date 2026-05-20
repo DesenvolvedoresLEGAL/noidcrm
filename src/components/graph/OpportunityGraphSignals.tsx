@@ -85,7 +85,7 @@ export function OpportunityGraphSignals({ opportunityId }: OpportunityGraphSigna
     queryFn: async () => {
       const { data, error } = await supabase
         .from('opportunities')
-        .select('id, account_id')
+        .select('id, account_id, organization_id')
         .eq('id', opportunityId)
         .single();
       if (error) throw error;
