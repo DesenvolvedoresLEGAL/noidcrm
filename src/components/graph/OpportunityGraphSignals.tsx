@@ -53,6 +53,31 @@ export function OpportunityGraphSignals({ opportunityId }: OpportunityGraphSigna
   const { createActivityFromInsight } = useCreateActivityFromInsight();
   const queryClient = useQueryClient();
   const [settingChampion, setSettingChampion] = useState<string | null>(null);
+  const [settingDecisionMaker, setSettingDecisionMaker] = useState<string | null>(null);
+
+  // Helper: invalidate NRHS + network caches and fire recalc edge function.
+  const refreshAfterStakeholderChange = async (organizationId?: string | null) => {
+    await refetchGraph();
+    queryClient.invalidateQueries({ queryKey: ['opportunity-network-summary', opportunityId] });
+    queryClient.invalidateQueries({ queryKey: ['nrhs'] });
+    queryClient.invalidateQueries({ queryKey: ['nrhs-analytics'] });
+    queryClient.invalidateQueries({ queryKey: ['opportunity', opportunityId] });
+    queryClient.invalidateQueries({ queryKey: ['opportunity-detail', opportunityId] });
+    // Fire-and-forget NRHS recalc so the pillar updates immediately.
+    try {
+      await supabase.functions.invoke('calculate-nrhs', {
+        body: {
+          opportunity_id: opportunityId,
+          organization_id: organizationId ?? undefined,
+          trigger_source: 'opportunity_network_tab',
+          trigger_action: 'stakeholder_role_change',
+        },
+      });
+      queryClient.invalidateQueries({ queryKey: ['nrhs'] });
+    } catch (err) {
+      console.warn('[OpportunityGraphSignals] NRHS recalc fallback:', err);
+    }
+  };
 
   // Fetch opportunity to get account_id
   const { data: opportunity } = useQuery({
