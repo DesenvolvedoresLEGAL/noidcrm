@@ -518,6 +518,16 @@ export function OpportunityGraphSignals({ opportunityId }: OpportunityGraphSigna
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-sm">Stakeholders Mapeados</CardTitle>
+          <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-3 flex-wrap">
+            <span className="inline-flex items-center gap-1">
+              <Star className="h-3 w-3 text-yellow-600 fill-current" />
+              <strong>Champion:</strong> defensor interno do negócio
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <Target className="h-3 w-3 text-blue-600" />
+              <strong>Decisor:</strong> quem aprova a compra
+            </span>
+          </p>
         </CardHeader>
         <CardContent>
           <ScrollArea className="max-h-[250px]">
