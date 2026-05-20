@@ -57,12 +57,13 @@ serve(async (req) => {
       ownerProfile = profile;
     }
 
-    // Fetch proposal items with measurement unit
+    // Fetch proposal items with measurement unit and product image fallback
     const { data: items } = await supabaseClient
       .from('proposal_items')
       .select(`
         *,
-        measurement_unit:measurement_units(id, name, abbreviation)
+        measurement_unit:measurement_units(id, name, abbreviation),
+        product:products(image_url)
       `)
       .eq('proposal_id', proposalId)
       .order('order_index', { ascending: true });
