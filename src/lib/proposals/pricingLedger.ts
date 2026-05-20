@@ -106,3 +106,25 @@ export function formatLedgerBRL(value: number | null | undefined): string {
     currency: 'BRL',
   }).format(Number(value));
 }
+
+const _warnedProposals = new Set<string>();
+
+/**
+ * In DEV, logs a one-time warning when an active (non-cancelled) proposal
+ * does not have a usable pricing_breakdown_snapshot. Helps detect legacy
+ * proposals still reading from total_amount instead of the ledger.
+ */
+export function warnIfLedgerMissing(proposal: any, where: string): void {
+  if (!proposal || typeof proposal !== 'object') return;
+  if (!(import.meta as any).env?.DEV) return;
+  const status = proposal.status;
+  if (status === 'cancelled' || status === 'declined') return;
+  if (getProposalPricingSummary(proposal)) return;
+  const key = `${proposal.id}:${where}`;
+  if (_warnedProposals.has(key)) return;
+  _warnedProposals.add(key);
+  // eslint-disable-next-line no-console
+  console.warn(
+    `[PRICE CORE 2.0B] Proposta ${proposal.id} (${status}) sem pricing_breakdown_snapshot em ${where}. Recalcule o ledger.`,
+  );
+}

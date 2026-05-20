@@ -157,23 +157,78 @@ serve(async (req) => {
   }
 });
 
+// PRICE CORE 2.0B — Ledger reader (mirrors src/lib/proposals/pricingLedger.ts)
+// When the proposal has a usable pricing_breakdown_snapshot, the PDF totals and
+// payment schedule MUST come from the ledger instead of summing items locally.
+// For accepted proposals with approved_amount, the approved snapshot wins.
+function getPdfPricingView(proposal: any) {
+  const status = proposal?.status;
+  const approvedAmount = proposal?.approved_amount;
+  const approvedSchedule = Array.isArray(proposal?.approved_payment_schedule)
+    ? proposal.approved_payment_schedule
+    : null;
+  const snap = proposal?.pricing_breakdown_snapshot;
+  const hasSnap = snap && typeof snap === 'object' && snap.version && snap.effective_amount != null;
+
+  if (!hasSnap) {
+    console.warn('[PRICE CORE 2.0B] PDF rendering without pricing_breakdown_snapshot, proposal', proposal?.id, 'status', status);
+    return null;
+  }
+
+  const md = snap.manual_discount ?? {};
+  const dyn = snap.dynamic_adjustment ?? {};
+  const num = (v: any, f = 0) => {
+    const n = typeof v === 'number' ? v : Number(v);
+    return Number.isFinite(n) ? n : f;
+  };
+
+  const isAcceptedFrozen = status === 'accepted' && approvedAmount != null;
+  const effectiveAmount = isAcceptedFrozen ? num(approvedAmount) : num(snap.effective_amount);
+  const paymentSchedule = isAcceptedFrozen && approvedSchedule && approvedSchedule.length
+    ? approvedSchedule
+    : (Array.isArray(snap.payment_schedule) ? snap.payment_schedule : []);
+
+  return {
+    subtotalItems: num(snap.subtotal_items),
+    recurringSubtotal: num(snap.recurring_subtotal),
+    manualDiscountPercent: num(md.percent),
+    manualDiscountAmount: num(md.amount),
+    inventoryAdjustmentAmount: num(snap.inventory_adjustment_amount),
+    baseAmount: num(snap.base_amount),
+    dynamicEnabled: !!dyn.enabled,
+    dynamicPercent: num(dyn.percent),
+    dynamicAmount: num(dyn.amount),
+    dynamicTierLabel: dyn.tier_label ?? null,
+    effectiveAmount,
+    paymentScheduleTotal: num(snap.payment_schedule_total),
+    paymentSchedule,
+    hasDivergence: !!snap.has_divergence,
+    frozen: isAcceptedFrozen,
+  };
+}
+
 function generateProposalHTML(proposal: any, items: any[], paymentTerms: any[], layoutPages: any[] = []): string {
   const org = proposal.organization;
   const opp = proposal.opportunity;
   const account = opp?.account;
   const contact = opp?.contact;
-  
-  // Separate items by billing_type
+
+  // PRICE CORE 2.0B — pricing ledger as primary source for totals + payment schedule
+  const ledger = getPdfPricingView(proposal);
+
+  // Separate items by billing_type (still needed to render the items table)
   const oneTimeItems = items.filter(item => item.billing_type !== 'recurring');
   const recurringItems = items.filter(item => item.billing_type === 'recurring');
   const oneTimeTotal = oneTimeItems.reduce((sum, item) => sum + (item.total || 0), 0);
   const recurringTotal = recurringItems.reduce((sum, item) => sum + (item.total || 0), 0);
-  
-  // Calculate totals
+
+  // Legacy totals (fallback only)
   const subtotal = items.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
-  const total = items.reduce((sum, item) => sum + item.total, 0);
+  const legacyTotal = items.reduce((sum, item) => sum + item.total, 0);
+  const total = ledger ? ledger.effectiveAmount : legacyTotal;
   const hasDiscount = items.some(item => item.discount_percent > 0);
   const hasBothTypes = oneTimeTotal > 0 && recurringTotal > 0;
+  const fmtBRL = (v: number) => `R$ ${Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   
   // Format rich text
   const formatRichText = (text: string) => {
@@ -553,33 +608,99 @@ function generateProposalHTML(proposal: any, items: any[], paymentTerms: any[], 
 
       <div class="totals-section">
         <div class="totals-box">
-          ${hasBothTypes ? `
+          ${ledger ? `
             <div class="total-row">
-              <span>Subtotal Avulso:</span>
-              <span>R$ ${oneTimeTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+              <span>Subtotal dos itens:</span>
+              <span>${fmtBRL(ledger.subtotalItems)}</span>
             </div>
-            <div class="total-row">
-              <span>Subtotal Recorrente:</span>
-              <span>R$ ${recurringTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+            ${ledger.manualDiscountAmount > 0 ? `
+              <div class="total-row" style="color:#dc2626;">
+                <span>Desconto comercial${ledger.manualDiscountPercent > 0 ? ` (${ledger.manualDiscountPercent}%)` : ''}:</span>
+                <span>- ${fmtBRL(ledger.manualDiscountAmount)}</span>
+              </div>
+            ` : ''}
+            ${ledger.inventoryAdjustmentAmount !== 0 ? `
+              <div class="total-row">
+                <span>Ajuste de estoque:</span>
+                <span>${ledger.inventoryAdjustmentAmount >= 0 ? '+ ' : '- '}${fmtBRL(Math.abs(ledger.inventoryAdjustmentAmount))}</span>
+              </div>
+            ` : ''}
+            ${(ledger.manualDiscountAmount > 0 || ledger.inventoryAdjustmentAmount !== 0) ? `
+              <div class="total-row">
+                <span><strong>Base comercial:</strong></span>
+                <span><strong>${fmtBRL(ledger.baseAmount)}</strong></span>
+              </div>
+            ` : ''}
+            ${ledger.dynamicEnabled && ledger.dynamicAmount !== 0 ? `
+              <div class="total-row" style="color:#b45309;">
+                <span>Ajuste por antecedência${ledger.dynamicPercent !== 0 ? ` (${ledger.dynamicPercent >= 0 ? '+' : ''}${ledger.dynamicPercent}%)` : ''}${ledger.dynamicTierLabel ? ` — ${ledger.dynamicTierLabel}` : ''}:</span>
+                <span>${ledger.dynamicAmount >= 0 ? '+ ' : '- '}${fmtBRL(Math.abs(ledger.dynamicAmount))}</span>
+              </div>
+            ` : ''}
+            <div class="total-row grand">
+              <span>${ledger.frozen ? 'Total aprovado' : 'Total vigente'}:</span>
+              <span>${fmtBRL(ledger.effectiveAmount)}</span>
             </div>
-          ` : (subtotal !== total ? `
-            <div class="total-row">
-              <span>Subtotal:</span>
-              <span>R$ ${subtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+          ` : `
+            ${hasBothTypes ? `
+              <div class="total-row">
+                <span>Subtotal Avulso:</span>
+                <span>${fmtBRL(oneTimeTotal)}</span>
+              </div>
+              <div class="total-row">
+                <span>Subtotal Recorrente:</span>
+                <span>${fmtBRL(recurringTotal)}</span>
+              </div>
+            ` : (subtotal !== total ? `
+              <div class="total-row">
+                <span>Subtotal:</span>
+                <span>${fmtBRL(subtotal)}</span>
+              </div>
+            ` : '')}
+            <div class="total-row grand">
+              <span>Total:</span>
+              <span>${fmtBRL(total)}</span>
             </div>
-          ` : '')}
-          <div class="total-row grand">
-            <span>Total:</span>
-            <span>R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-          </div>
+          `}
         </div>
       </div>
     </div>
   ` : ''}
 
-  ${paymentTerms.length > 0 ? `
+  ${(ledger && ledger.paymentSchedule && ledger.paymentSchedule.length > 0) ? `
     <div class="section">
       <h2 class="section-title">Condições de Pagamento</h2>
+      <div class="payment-section">
+        <div class="payment-header">
+          <div class="payment-icon payment-icon-onetime">💳</div>
+          <div>
+            <div style="font-size: 18px; font-weight: 700; color: #1f2937;">${ledger.frozen ? 'Cronograma Aprovado' : 'Cronograma Vigente'}</div>
+            <div style="margin-top: 6px; color:#6b7280; font-size: 13px;">
+              Total: <strong>${fmtBRL(ledger.paymentScheduleTotal || ledger.effectiveAmount)}</strong>
+              ${ledger.hasDivergence ? ` <span style="color:#dc2626; margin-left:8px;">⚠ divergência detectada</span>` : ''}
+            </div>
+          </div>
+        </div>
+        <div class="payment-body">
+          <table class="payment-table onetime-table" style="border-collapse: collapse; width: 100%;">
+            <thead><tr><th>Parcela</th><th>Vencimento</th><th class="text-right">Valor</th></tr></thead>
+            <tbody>
+              ${ledger.paymentSchedule.map((p: any) => `
+                <tr>
+                  <td><strong>${p.label || `Parcela ${p.index ?? ''}`}</strong></td>
+                  <td>${p.due_date ? new Date(p.due_date + 'T12:00:00').toLocaleDateString('pt-BR') : '—'}</td>
+                  <td class="text-right"><strong>${fmtBRL(Number(p.amount))}</strong></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  ` : (paymentTerms.length > 0 ? `
+    <div class="section">
+      <h2 class="section-title">Condições de Pagamento</h2>
+      
       
       ${(() => {
         const oneTimeTerm = paymentTerms.find(t => t.payment_type === 'one_time');
@@ -696,7 +817,7 @@ function generateProposalHTML(proposal: any, items: any[], paymentTerms: any[], 
         return html;
       })()}
     </div>
-  ` : ''}
+  ` : '')}
 
   ${proposal.terms ? `
     <div class="section">

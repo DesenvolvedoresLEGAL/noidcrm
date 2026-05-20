@@ -16,6 +16,9 @@ import { ProposalVisualizarTab } from '@/components/proposals/ProposalVisualizar
 import { ProposalParticipantsManager } from '@/components/proposals/ProposalParticipantsManager';
 import { ProposalInventoryPanel } from '@/components/proposals/ProposalInventoryPanel';
 import { ProposalDynamicPricingPanel } from '@/components/proposals/ProposalDynamicPricingPanel';
+import { ProposalPricingBreakdown } from '@/components/proposals/ProposalPricingBreakdown';
+import { ProposalPricingDivergenceAlert } from '@/components/proposals/ProposalPricingDivergenceAlert';
+import { warnIfLedgerMissing } from '@/lib/proposals/pricingLedger';
 import { DynamicPricingMismatchAlert } from '@/components/proposals/DynamicPricingMismatchAlert';
 
 // Analytics moved to OpportunityAnalyticsTab
@@ -1302,6 +1305,17 @@ export default function ProposalEditor() {
                     <AlertTriangle className="h-4 w-4" />
                     <AlertDescription>{paymentTermsError}</AlertDescription>
                   </Alert>
+                )}
+                {proposalData && (
+                  <>
+                    <ProposalPricingDivergenceAlert proposal={proposalData} />
+                    {(() => { warnIfLedgerMissing(proposalData, 'ProposalEditor:payment-terms'); return null; })()}
+                    <ProposalPricingBreakdown
+                      proposal={proposalData}
+                      audience="internal"
+                      className="rounded-md border bg-card p-4"
+                    />
+                  </>
                 )}
                 {currentProposalId && (() => {
                   const p: any = proposalData ?? {};

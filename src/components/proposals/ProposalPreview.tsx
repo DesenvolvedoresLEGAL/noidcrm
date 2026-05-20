@@ -12,6 +12,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { PublicProposalDynamicPricingBanner } from './PublicProposalDynamicPricingBanner';
 import { getProposalPricingSummary } from '@/lib/proposals/pricingLedger';
+import { ProposalPricingDivergenceAlert } from '@/components/proposals/ProposalPricingDivergenceAlert';
 
 interface ProposalPreviewProps {
   proposalId?: string;
@@ -295,6 +296,9 @@ export function ProposalPreview({
 
   return (
     <div className="space-y-6">
+      {/* PRICE CORE 2.0B — divergence alert (visual only, does not block) */}
+      <ProposalPricingDivergenceAlert proposal={dynamicPricing} />
+
       {/* Header */}
       <Card>
         <CardHeader className="pb-3">
