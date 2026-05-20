@@ -22634,6 +22634,256 @@ export type Database = {
           },
         ]
       }
+      proposal_financial_audit_items: {
+        Row: {
+          account_name: string | null
+          applied_at: string | null
+          applied_by: string | null
+          applied_mode: string | null
+          approval_snapshot_amount: number | null
+          approved_amount: number | null
+          approved_at: string | null
+          audit_run_id: string
+          audit_status: string
+          canonical_amount: number | null
+          canonical_source: string | null
+          created_at: string
+          deal_amount: number | null
+          divergence_types: string[]
+          erp_sent_amount: number | null
+          id: string
+          ledger_effective_amount: number | null
+          ledger_erp_amount: number | null
+          max_delta: number
+          notes: string | null
+          opportunity_id: string | null
+          opportunity_status: string | null
+          organization_id: string
+          payment_intent_expected_amount: number | null
+          payment_schedule_total: number | null
+          proposal_id: string
+          proposal_number: string | null
+          proposal_status: string | null
+          proposal_total_amount: number | null
+          raw_values: Json
+          recommended_action: string | null
+          reconstructed_ledger_amount: number | null
+          seller_name: string | null
+          slack_amount: number | null
+          updated_at: string
+        }
+        Insert: {
+          account_name?: string | null
+          applied_at?: string | null
+          applied_by?: string | null
+          applied_mode?: string | null
+          approval_snapshot_amount?: number | null
+          approved_amount?: number | null
+          approved_at?: string | null
+          audit_run_id: string
+          audit_status?: string
+          canonical_amount?: number | null
+          canonical_source?: string | null
+          created_at?: string
+          deal_amount?: number | null
+          divergence_types?: string[]
+          erp_sent_amount?: number | null
+          id?: string
+          ledger_effective_amount?: number | null
+          ledger_erp_amount?: number | null
+          max_delta?: number
+          notes?: string | null
+          opportunity_id?: string | null
+          opportunity_status?: string | null
+          organization_id: string
+          payment_intent_expected_amount?: number | null
+          payment_schedule_total?: number | null
+          proposal_id: string
+          proposal_number?: string | null
+          proposal_status?: string | null
+          proposal_total_amount?: number | null
+          raw_values?: Json
+          recommended_action?: string | null
+          reconstructed_ledger_amount?: number | null
+          seller_name?: string | null
+          slack_amount?: number | null
+          updated_at?: string
+        }
+        Update: {
+          account_name?: string | null
+          applied_at?: string | null
+          applied_by?: string | null
+          applied_mode?: string | null
+          approval_snapshot_amount?: number | null
+          approved_amount?: number | null
+          approved_at?: string | null
+          audit_run_id?: string
+          audit_status?: string
+          canonical_amount?: number | null
+          canonical_source?: string | null
+          created_at?: string
+          deal_amount?: number | null
+          divergence_types?: string[]
+          erp_sent_amount?: number | null
+          id?: string
+          ledger_effective_amount?: number | null
+          ledger_erp_amount?: number | null
+          max_delta?: number
+          notes?: string | null
+          opportunity_id?: string | null
+          opportunity_status?: string | null
+          organization_id?: string
+          payment_intent_expected_amount?: number | null
+          payment_schedule_total?: number | null
+          proposal_id?: string
+          proposal_number?: string | null
+          proposal_status?: string | null
+          proposal_total_amount?: number | null
+          raw_values?: Json
+          recommended_action?: string | null
+          reconstructed_ledger_amount?: number | null
+          seller_name?: string | null
+          slack_amount?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposal_financial_audit_items_audit_run_id_fkey"
+            columns: ["audit_run_id"]
+            isOneToOne: false
+            referencedRelation: "proposal_financial_audit_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_financial_audit_items_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_financial_audit_items_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_report_legacy_retirement_readiness_v2"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "proposal_financial_audit_items_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "proposals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_financial_audit_items_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_accepted_proposal_v2"
+            referencedColumns: ["proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_financial_audit_items_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["accepted_proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_financial_audit_items_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["latest_proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_financial_audit_items_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_latest_commercial_proposal_v2"
+            referencedColumns: ["proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_financial_audit_items_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_proposals_normalized_v2"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proposal_financial_audit_runs: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          divergent_count: number
+          dry_run: boolean
+          id: string
+          metadata: Json
+          needs_review_count: number
+          ok_count: number
+          organization_id: string
+          period_end: string
+          period_start: string
+          status: string
+          total_approved_amount: number
+          total_detected_delta: number
+          total_proposals: number
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          divergent_count?: number
+          dry_run?: boolean
+          id?: string
+          metadata?: Json
+          needs_review_count?: number
+          ok_count?: number
+          organization_id: string
+          period_end: string
+          period_start: string
+          status?: string
+          total_approved_amount?: number
+          total_detected_delta?: number
+          total_proposals?: number
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          divergent_count?: number
+          dry_run?: boolean
+          id?: string
+          metadata?: Json
+          needs_review_count?: number
+          ok_count?: number
+          organization_id?: string
+          period_end?: string
+          period_start?: string
+          status?: string
+          total_approved_amount?: number
+          total_detected_delta?: number
+          total_proposals?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposal_financial_audit_runs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_financial_audit_runs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_report_legacy_retirement_readiness_v2"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
       proposal_items: {
         Row: {
           billing_days: number | null
@@ -23837,10 +24087,14 @@ export type Database = {
           dynamic_pricing_reference_type: string | null
           dynamic_pricing_snapshot: Json
           dynamic_pricing_status: string | null
+          erp_sync_needs_review: boolean
           event_end_date: string | null
           event_location: string | null
           event_start_date: string | null
           expires_at: string | null
+          financial_audit_delta: number | null
+          financial_audit_last_run_id: string | null
+          financial_audit_status: string | null
           id: string
           introduction: string | null
           key_differentiator: string | null
@@ -23885,6 +24139,7 @@ export type Database = {
           sent_at: string | null
           signature_status: string | null
           signed_at: string | null
+          slack_notification_needs_correction: boolean
           status: string
           subtotal: number | null
           template_name: string | null
@@ -23934,10 +24189,14 @@ export type Database = {
           dynamic_pricing_reference_type?: string | null
           dynamic_pricing_snapshot?: Json
           dynamic_pricing_status?: string | null
+          erp_sync_needs_review?: boolean
           event_end_date?: string | null
           event_location?: string | null
           event_start_date?: string | null
           expires_at?: string | null
+          financial_audit_delta?: number | null
+          financial_audit_last_run_id?: string | null
+          financial_audit_status?: string | null
           id?: string
           introduction?: string | null
           key_differentiator?: string | null
@@ -23982,6 +24241,7 @@ export type Database = {
           sent_at?: string | null
           signature_status?: string | null
           signed_at?: string | null
+          slack_notification_needs_correction?: boolean
           status?: string
           subtotal?: number | null
           template_name?: string | null
@@ -24031,10 +24291,14 @@ export type Database = {
           dynamic_pricing_reference_type?: string | null
           dynamic_pricing_snapshot?: Json
           dynamic_pricing_status?: string | null
+          erp_sync_needs_review?: boolean
           event_end_date?: string | null
           event_location?: string | null
           event_start_date?: string | null
           expires_at?: string | null
+          financial_audit_delta?: number | null
+          financial_audit_last_run_id?: string | null
+          financial_audit_status?: string | null
           id?: string
           introduction?: string | null
           key_differentiator?: string | null
@@ -24079,6 +24343,7 @@ export type Database = {
           sent_at?: string | null
           signature_status?: string | null
           signed_at?: string | null
+          slack_notification_needs_correction?: boolean
           status?: string
           subtotal?: number | null
           template_name?: string | null
@@ -33405,6 +33670,10 @@ export type Database = {
         Args: { p_proposal_id: string; p_reference_at?: string }
         Returns: Json
       }
+      apply_proposal_financial_audit_item: {
+        Args: { p_apply_mode?: string; p_audit_item_id: string }
+        Returns: Json
+      }
       approve_hypothesis: {
         Args: { _hypothesis_id: string }
         Returns: {
@@ -34512,6 +34781,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      ignore_proposal_financial_audit_item: {
+        Args: { p_audit_item_id: string; p_note?: string }
+        Returns: undefined
+      }
       import_prospect_to_pipeline: {
         Args: { p_prospect_id: string; p_target_pipeline_type?: string }
         Returns: Json
@@ -34616,6 +34889,10 @@ export type Database = {
           p_trace_id: string
         }
         Returns: string
+      }
+      mark_proposal_financial_audit_item_review: {
+        Args: { p_audit_item_id: string; p_note?: string }
+        Returns: undefined
       }
       mark_proposal_pricing_dirty: {
         Args: { p_proposal_id: string }
@@ -34943,6 +35220,14 @@ export type Database = {
       }
       run_headless_humanoid_test: {
         Args: { p_run_id: string; p_test_key: string }
+        Returns: Json
+      }
+      run_proposal_financial_audit: {
+        Args: {
+          p_dry_run?: boolean
+          p_period_end: string
+          p_period_start: string
+        }
         Returns: Json
       }
       seed_default_decision_rules: {

@@ -86,6 +86,7 @@ const OportunidadesCartoesSettingsPage = lazy(() => import("./pages/settings/sys
 const RelatoriosSettingsPage = lazy(() => import("./pages/settings/system/RelatoriosSettingsPage"));
 const ReportsV2FlagsSettingsPage = lazy(() => import("./pages/settings/system/ReportsV2FlagsSettingsPage"));
 const ReportsHealthAdminPage = lazy(() => import("./pages/settings/system/ReportsHealthAdminPage"));
+const PriceAuditPage = lazy(() => import("./pages/settings/system/PriceAuditPage"));
 const UsersSettings = lazy(() => import("./pages/settings/Users"));
 const EditUser = lazy(() => import("./pages/settings/EditUser"));
 const TeamsSettings = lazy(() => import("./pages/settings/Teams"));
@@ -1000,6 +1001,17 @@ const App = () => (
                   </ProtectedRoute>
                 }
               />
+              <Route
+                path="/app/settings/auditoria-financeira-propostas"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <PriceAuditPage />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+
               <Route
                 path="/app/release-notes"
                 element={
