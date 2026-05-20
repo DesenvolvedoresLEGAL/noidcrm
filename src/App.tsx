@@ -1002,6 +1002,17 @@ const App = () => (
                 }
               />
               <Route
+                path="/app/settings/auditoria-financeira-propostas"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <PriceAuditPage />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
                 path="/app/release-notes"
                 element={
                   <ProtectedRoute>
