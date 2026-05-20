@@ -1376,7 +1376,7 @@ export default function ProposalPublicView() {
           const dpSnapItems: any = (proposal as any)?.dynamic_pricing_snapshot ?? null;
           const dpBreakdown = getDynamicPricingBreakdown(dpSnapItems, oneTimeTotal);
           const showDpBreakdown = dpBreakdown.active && dpBreakdown.hasAdjustment;
-          const colSpanLabel = hasItemDiscounts ? 4 : 3;
+          const colSpanLabel = hasItemDiscounts ? 5 : 4;
 
           return (
             <>
