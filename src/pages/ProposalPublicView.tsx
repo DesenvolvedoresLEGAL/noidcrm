@@ -1406,13 +1406,26 @@ export default function ProposalPublicView() {
                           {oneTimeItems.map(item => (
                             <tr key={item.id} className="border-b hover:bg-muted/30 transition-colors">
                               <td className="py-3 px-2 md:py-4 md:px-4">
-                                <div className="font-medium text-sm md:text-base">{item.name}</div>
-                                {item.description && (
-                                  <div 
-                                    className="text-xs md:text-sm text-muted-foreground prose prose-sm max-w-none mt-1"
-                                    dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.description) }}
-                                  />
-                                )}
+                                <div className="flex items-start gap-3">
+                                  {(item as any).image_url && (
+                                    <img
+                                      src={(item as any).image_url}
+                                      alt={item.name}
+                                      loading="lazy"
+                                      className="h-10 w-10 md:h-14 md:w-14 rounded-md border object-cover flex-shrink-0 bg-muted"
+                                      onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                                    />
+                                  )}
+                                  <div className="min-w-0 flex-1">
+                                    <div className="font-medium text-sm md:text-base">{item.name}</div>
+                                    {item.description && (
+                                      <div 
+                                        className="text-xs md:text-sm text-muted-foreground prose prose-sm max-w-none mt-1"
+                                        dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.description) }}
+                                      />
+                                    )}
+                                  </div>
+                                </div>
                               </td>
                               <td className="text-center py-3 px-2 md:py-4 md:px-4 text-sm">
                                 {(item as any).billing_type === 'point_day' && (item as any).quantity_points && (item as any).billing_days ? (
