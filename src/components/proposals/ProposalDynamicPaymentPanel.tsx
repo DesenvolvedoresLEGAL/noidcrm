@@ -124,7 +124,8 @@ export function ProposalDynamicPaymentPanel({ proposalId }: Props) {
           <div className="flex flex-wrap gap-2">
             <Button
               size="sm"
-              disabled={blocked || createIntent.isPending}
+              disabled={blocked || createIntent.isPending || hasDivergence}
+              title={hasDivergence ? DIVERGENCE_TOOLTIP : undefined}
               onClick={() => createIntent.mutate('crm_manual')}
             >
               {createIntent.isPending ? (
@@ -139,7 +140,8 @@ export function ProposalDynamicPaymentPanel({ proposalId }: Props) {
               <Button
                 size="sm"
                 variant="outline"
-                disabled={genPix.isPending}
+                disabled={genPix.isPending || hasDivergence}
+                title={hasDivergence ? DIVERGENCE_TOOLTIP : undefined}
                 onClick={() => genPix.mutate(latest.id)}
               >
                 Gerar Pix QR
@@ -156,7 +158,8 @@ export function ProposalDynamicPaymentPanel({ proposalId }: Props) {
               <Button
                 size="sm"
                 variant="destructive"
-                disabled={complementary.isPending}
+                disabled={complementary.isPending || hasDivergence}
+                title={hasDivergence ? DIVERGENCE_TOOLTIP : undefined}
                 onClick={() => complementary.mutate(latest.id)}
               >
                 Gerar cobrança complementar
@@ -167,7 +170,8 @@ export function ProposalDynamicPaymentPanel({ proposalId }: Props) {
               <Button
                 size="sm"
                 variant="ghost"
-                disabled={sync.isPending}
+                disabled={sync.isPending || hasDivergence}
+                title={hasDivergence ? DIVERGENCE_TOOLTIP : undefined}
                 onClick={() => sync.mutate(latest.id)}
               >
                 <RefreshCw className="h-4 w-4 mr-1" /> Sincronizar ERP
@@ -178,6 +182,7 @@ export function ProposalDynamicPaymentPanel({ proposalId }: Props) {
               <History className="h-4 w-4 mr-1" /> Histórico
             </Button>
           </div>
+
 
           {showHistory && (
             <div className="rounded-md border divide-y text-xs max-h-64 overflow-auto">
