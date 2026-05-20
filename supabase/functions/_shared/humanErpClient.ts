@@ -214,10 +214,8 @@ export async function getErpChargeStatus(erpChargeId: string): Promise<ErpStatus
 /** HMAC-SHA256 sobre o corpo bruto do webhook usando HUMAN_ERP_WEBHOOK_SECRET. */
 export async function verifyWebhookSignature(rawBody: string, signature: string | null): Promise<boolean> {
   const secret = normalizeKey(Deno.env.get('HUMAN_ERP_WEBHOOK_SECRET'));
-  if (!secret) {
-    // Sem secret configurado: aceita mas marca como mock (logs deixam claro).
-    return true;
-  }
+  // Sem secret configurado o webhook fica fechado — não aceitamos baixa sem assinatura válida.
+  if (!secret) return false;
   if (!signature) return false;
   const enc = new TextEncoder();
   const key = await crypto.subtle.importKey(
