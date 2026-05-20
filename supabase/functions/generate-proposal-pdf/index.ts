@@ -817,7 +817,7 @@ function generateProposalHTML(proposal: any, items: any[], paymentTerms: any[], 
         return html;
       })()}
     </div>
-  ` : ''}
+  ` : '')}
 
   ${proposal.terms ? `
     <div class="section">
