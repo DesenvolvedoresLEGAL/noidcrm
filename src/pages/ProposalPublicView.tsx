@@ -1394,7 +1394,7 @@ export default function ProposalPublicView() {
                       <table className="w-full">
                         <thead>
                           <tr className="border-b bg-amber-50 dark:bg-amber-950/30">
-                            <th className="text-left py-2 px-2 md:py-3 md:px-4 font-medium text-xs md:text-sm w-20 md:w-24">Foto</th>
+                            <th className="text-left py-2 px-2 md:py-3 md:px-4 font-medium text-xs md:text-sm w-24 md:w-28">Foto</th>
                             <th className="text-left py-2 px-2 md:py-3 md:px-4 font-medium text-xs md:text-sm">Item</th>
                             <th className="text-center py-2 px-2 md:py-3 md:px-4 font-medium text-xs md:text-sm">Qtd</th>
                             <th className="text-right py-2 px-2 md:py-3 md:px-4 font-medium text-xs md:text-sm hidden sm:table-cell">Preço Un.</th>
@@ -1413,11 +1413,11 @@ export default function ProposalPublicView() {
                                     src={(item as any).image_url}
                                     alt={item.name}
                                     loading="lazy"
-                                    className="h-16 w-16 md:h-[72px] md:w-[72px] rounded-md border object-cover bg-muted"
+                                    className="h-20 w-20 md:h-24 md:w-24 rounded-md border object-cover bg-muted"
                                     onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
                                   />
                                 ) : (
-                                  <div className="h-16 w-16 md:h-[72px] md:w-[72px] rounded-md border bg-muted flex items-center justify-center" aria-hidden>
+                                  <div className="h-20 w-20 md:h-24 md:w-24 rounded-md border bg-muted flex items-center justify-center" aria-hidden>
                                     <ImageIcon className="h-5 w-5 text-muted-foreground/40" />
                                   </div>
                                 )}
@@ -1547,7 +1547,7 @@ export default function ProposalPublicView() {
                       <table className="w-full">
                         <thead>
                           <tr className="border-b bg-emerald-50 dark:bg-emerald-950/30">
-                            <th className="text-left py-2 px-2 md:py-3 md:px-4 font-medium text-xs md:text-sm w-20 md:w-24">Foto</th>
+                            <th className="text-left py-2 px-2 md:py-3 md:px-4 font-medium text-xs md:text-sm w-24 md:w-28">Foto</th>
                             <th className="text-left py-2 px-2 md:py-3 md:px-4 font-medium text-xs md:text-sm">Item</th>
                             <th className="text-center py-2 px-2 md:py-3 md:px-4 font-medium text-xs md:text-sm">Qtd</th>
                             <th className="text-right py-2 px-2 md:py-3 md:px-4 font-medium text-xs md:text-sm hidden sm:table-cell">Preço/mês</th>
@@ -1566,11 +1566,11 @@ export default function ProposalPublicView() {
                                     src={(item as any).image_url}
                                     alt={item.name}
                                     loading="lazy"
-                                    className="h-16 w-16 md:h-[72px] md:w-[72px] rounded-md border object-cover bg-muted"
+                                    className="h-20 w-20 md:h-24 md:w-24 rounded-md border object-cover bg-muted"
                                     onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
                                   />
                                 ) : (
-                                  <div className="h-16 w-16 md:h-[72px] md:w-[72px] rounded-md border bg-muted flex items-center justify-center" aria-hidden>
+                                  <div className="h-20 w-20 md:h-24 md:w-24 rounded-md border bg-muted flex items-center justify-center" aria-hidden>
                                     <ImageIcon className="h-5 w-5 text-muted-foreground/40" />
                                   </div>
                                 )}
