@@ -510,8 +510,8 @@ function generateProposalHTML(proposal: any, items: any[], paymentTerms: any[], 
       <table class="items-table">
         <thead>
           <tr>
-            <th style="width: 12%;">Foto</th>
-            <th style="width: 38%;">Item / Descrição</th>
+            <th style="width: 14%;">Foto</th>
+            <th style="width: 36%;">Item / Descrição</th>
             <th class="text-center" style="width: 8%;">Qtd</th>
             <th class="text-right" style="width: 14%;">Preço Unit.</th>
             <th class="text-right" style="width: 11%;">Desconto</th>
@@ -532,8 +532,8 @@ function generateProposalHTML(proposal: any, items: any[], paymentTerms: any[], 
               : `R$ ${item.unit_price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
             const imgSrc = item.image_url || item.product?.image_url || null;
             const thumbCell = imgSrc
-              ? `<img src="${imgSrc}" alt="" style="width:72px;height:72px;object-fit:cover;border-radius:6px;border:1px solid #e5e7eb;display:block;" onerror="this.style.visibility='hidden'" />`
-              : `<div style="width:72px;height:72px;border-radius:6px;border:1px solid #e5e7eb;background:#f3f4f6;"></div>`;
+              ? `<img src="${imgSrc}" alt="" style="width:96px;height:96px;object-fit:cover;border-radius:6px;border:1px solid #e5e7eb;display:block;" onerror="this.style.visibility='hidden'" />`
+              : `<div style="width:96px;height:96px;border-radius:6px;border:1px solid #e5e7eb;background:#f3f4f6;"></div>`;
             return `
             <tr>
               <td style="vertical-align:top;">${thumbCell}</td>
