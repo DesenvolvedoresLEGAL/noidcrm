@@ -624,12 +624,29 @@ export function OpportunityGraphSignals({ opportunityId }: OpportunityGraphSigna
                           )}
                           onClick={handleSetChampion}
                           disabled={isSettingThis}
-                          title={isChampion ? 'Remover champion' : 'Definir como champion'}
+                          title={isChampion ? 'Remover Champion (defensor interno do negócio)' : 'Marcar como Champion (defensor interno do negócio)'}
                         >
                           {isSettingThis ? (
                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
                           ) : (
                             <Star className={cn("h-3.5 w-3.5", isChampion && "fill-current")} />
+                          )}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={isDecisionMaker ? "secondary" : "ghost"}
+                          className={cn(
+                            "h-7 px-2 text-xs",
+                            isDecisionMaker && "bg-blue-500/20 hover:bg-blue-500/30 text-blue-700"
+                          )}
+                          onClick={handleSetDecisionMaker}
+                          disabled={isSettingDMThis}
+                          title={isDecisionMaker ? 'Remover Decisor (quem aprova a compra)' : 'Marcar como Decisor (quem aprova a compra)'}
+                        >
+                          {isSettingDMThis ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Target className={cn("h-3.5 w-3.5", isDecisionMaker && "fill-current")} />
                           )}
                         </Button>
                       </div>
