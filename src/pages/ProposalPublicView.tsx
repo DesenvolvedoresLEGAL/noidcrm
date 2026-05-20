@@ -471,96 +471,66 @@ export default function ProposalPublicView() {
     keyDifferentiatorsParam?: string[],
     customerFeedbackParam?: string
   ): Promise<{ success: boolean; error: any }> => {
-    console.log('[ProposalAccept] Attempting direct approval fallback...');
+    console.log('[ProposalAccept] Attempting direct approval fallback (RPC freeze)...');
     setProcessingMessage('Finalizando aprovação...');
-    
+
     try {
-      const acceptedAt = new Date().toISOString();
-
-      // PRICE UX 1.0.3 — montar snapshot da aprovação
-      const snap = (proposal?.dynamic_pricing_snapshot ?? {}) as any;
-      const oneTimeItemsLocal = items.filter((it: any) => (it.billing_type || 'one_time') !== 'recurring');
-      const oneTimeTotalLocal = oneTimeItemsLocal.reduce((s: number, it: any) => s + Number(it.total ?? 0), 0);
-      const approvedAmountLocal = resolveNetApprovedAmount(proposal, oneTimeTotalLocal);
-      const oneTimeTermLocal = pickPaymentTerm(paymentTerms, 'one_time');
-      const recurringTermLocal = pickPaymentTerm(paymentTerms, 'recurring');
-      const approvedSchedule = oneTimeTermLocal
-        ? calculateInstallments(oneTimeTermLocal as any, approvedAmountLocal, {
-            proposalExpiresAt: proposal?.expires_at ?? null,
-            approvedAmount: approvedAmountLocal,
-            dynamicPricingCurrentEndsAt:
-              proposal?.dynamic_pricing_enabled && snap?.current_ends_at
-                ? snap.current_ends_at
-                : null,
-          })
-        : [];
-
-      const approvalSnapshot = {
-        proposal_id: proposalId,
-        approved_at: acceptedAt,
-        approved_amount: approvedAmountLocal,
-        dynamic_pricing: {
-          enabled: !!proposal?.dynamic_pricing_enabled,
-          current_amount: snap?.current_amount ?? null,
-          current_tier_id: snap?.current_tier_id ?? null,
-          current_label: snap?.current_label ?? null,
-          current_adjustment: snap?.current_adjustment ?? null,
-          current_valid_until: snap?.current_ends_at ?? null,
-        },
-        proposal_valid_until: proposal?.expires_at ?? null,
-        payment_method: oneTimeTermLocal?.payment_method ?? recurringTermLocal?.payment_method ?? null,
-        payment_condition: oneTimeTermLocal?.payment_condition ?? 'upfront',
-        payment_schedule: approvedSchedule,
-        proposal_items: items,
-        consultant: {
-          name: (proposal as any)?.created_by_name ?? null,
-          email: (proposal as any)?.created_by_email ?? null,
-          phone: (proposal as any)?.created_by_phone ?? null,
-        },
-      };
-
-      // Update proposal status
-      const { error } = await supabase
-        .from('proposals')
-        .update({
-          status: 'accepted',
-          accepted_at: acceptedAt,
-          acceptor_name: acceptorName,
-          acceptor_document: acceptorDocument,
-          approved_amount: approvedAmountLocal,
-          approval_snapshot: approvalSnapshot as any,
-          approved_payment_schedule: { schedule: approvedSchedule } as any,
-          approved_dynamic_pricing_tier_id: snap?.current_tier_id ?? null,
-        })
-        .eq('id', proposalId);
-
-      if (error) {
-        console.error('[ProposalAccept] Direct update failed:', error);
-        return { success: false, error };
+      // PRICE CORE 2.0C — never compute approved_amount/approval_snapshot in
+      // the client. The freeze_proposal_approval RPC runs the ledger guard,
+      // resolves the canonical effective amount and writes the immutable
+      // approval snapshot atomically.
+      const { data: freezeRes, error: freezeErr } = await (supabase as any).rpc(
+        'freeze_proposal_approval',
+        { p_proposal_id: proposalId },
+      );
+      if (freezeErr) {
+        console.error('[ProposalAccept] freeze RPC failed:', freezeErr);
+        return { success: false, error: freezeErr };
+      }
+      if (!freezeRes?.ok) {
+        return {
+          success: false,
+          error: new Error(
+            freezeRes?.message ||
+              'Não foi possível aprovar a proposta. Existem valores divergentes. Recalcule antes de tentar novamente.',
+          ),
+        };
       }
 
-      // Also create win_loss_record (non-blocking)
+      // Acceptance metadata (acceptor identity + customer feedback) is stored
+      // outside the frozen snapshot — these fields do not affect pricing.
+      const acceptedAt = new Date().toISOString();
+      const { error: metaError } = await supabase
+        .from('proposals')
+        .update({
+          acceptor_name: acceptorName,
+          acceptor_document: acceptorDocument,
+          accepted_at: acceptedAt,
+        })
+        .eq('id', proposalId);
+      if (metaError) {
+        console.warn('[ProposalAccept] Non-blocking metadata update failed:', metaError);
+      }
+
+      // Win/loss record (non-blocking, unchanged from previous flow)
       try {
         if (proposal?.opportunity?.id) {
           const opportunityId = proposal.opportunity.id;
-          
-          // Calculate sales cycle days
+
           let salesCycleDays = null;
           if (proposal.opportunity.created_at) {
             const createdDate = new Date(proposal.opportunity.created_at);
             const diffTime = Math.abs(new Date().getTime() - createdDate.getTime());
             salesCycleDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
           }
-          
-          // Check if record already exists
+
           const { data: existingRecord } = await supabase
             .from('win_loss_records')
             .select('id')
             .eq('opportunity_id', opportunityId)
             .maybeSingle();
-          
+
           if (existingRecord) {
-            // Update existing
             await supabase
               .from('win_loss_records')
               .update({
@@ -572,9 +542,7 @@ export default function ProposalPublicView() {
                 customer_feedback: customerFeedbackParam || null,
               })
               .eq('id', existingRecord.id);
-            console.log('[ProposalAccept] Updated existing win_loss_record');
           } else {
-            // Create new
             await supabase.from('win_loss_records').insert({
               organization_id: proposal.organization_id,
               opportunity_id: opportunityId,
@@ -582,31 +550,27 @@ export default function ProposalPublicView() {
               win_reason_id: winReasonIdParam || null,
               key_differentiator: keyDifferentiatorsParam?.join(',') || null,
               customer_feedback: customerFeedbackParam || null,
-              final_value: proposal.total_amount ?? proposal.value,
+              final_value: Number(freezeRes?.approved_amount ?? 0) || null,
               sales_cycle_days: salesCycleDays,
               closed_by_proposal_id: proposalId,
               recorded_by_customer: true,
               acceptor_name: acceptorName,
               acceptor_document: acceptorDocument,
             });
-            console.log('[ProposalAccept] Created win_loss_record in fallback');
           }
         }
       } catch (winLossError) {
         console.error('[ProposalAccept] Non-critical: win_loss_record error:', winLossError);
-        // Continue - this is non-blocking
       }
 
-      console.log('[ProposalAccept] Direct approval succeeded!');
-      
-      // Fire-and-forget: trigger celebrations, notifications and Slack
-      // This ensures effects happen even when generate-acceptance-proof times out
-      console.log('[ProposalAccept] Triggering post-acceptance effects (celebrations + Slack)...');
+      console.log('[ProposalAccept] Direct approval (RPC freeze) succeeded!');
+
+      // Fire-and-forget: celebrations + Slack + notifications
       supabase.functions.invoke('post-acceptance-effects', {
-        body: { 
-          proposalId, 
-          opportunityId: proposal?.opportunity?.id || null 
-        }
+        body: {
+          proposalId,
+          opportunityId: proposal?.opportunity?.id || null,
+        },
       }).then(({ data, error: effectsError }) => {
         if (effectsError) {
           console.error('[ProposalAccept] post-acceptance-effects error (non-blocking):', effectsError);
@@ -614,13 +578,14 @@ export default function ProposalPublicView() {
           console.log('[ProposalAccept] post-acceptance-effects result:', data);
         }
       });
-      
+
       return { success: true, error: null };
     } catch (error) {
       console.error('[ProposalAccept] Direct approval exception:', error);
       return { success: false, error };
     }
   };
+
 
   // Direct fallback to update proposal status for decline when edge function fails
   const directProposalDecline = async (

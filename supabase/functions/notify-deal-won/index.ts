@@ -42,11 +42,35 @@ Deno.serve(async (req) => {
       console.error("[notify-deal-won] Financial preflight failed:", orchestrationError);
     }
 
+    // PRICE CORE 2.0C — central pricing guard. Recalculates the ledger and
+    // blocks ERP delivery when the proposal has any divergence.
+    const { data: readiness, error: readinessError } = await supabase.rpc(
+      "ensure_proposal_pricing_ready",
+      { p_proposal_id: proposal_id },
+    );
+    if (readinessError) {
+      console.error("[notify-deal-won] ensure_proposal_pricing_ready failed:", readinessError);
+      return jsonResponse({
+        error: "Não foi possível enviar ao ERP. Falha ao validar valores da proposta.",
+        reason: "pricing_guard_error",
+      }, 500);
+    }
+    if (!readiness || readiness.ok === false || readiness.blocked === true) {
+      const message = readiness?.message ||
+        "Não foi possível enviar ao ERP. Existem valores divergentes na proposta. Recalcule a proposta antes de continuar.";
+      console.error("[notify-deal-won] BLOCKED by pricing guard:", JSON.stringify(readiness));
+      return jsonResponse({
+        error: message,
+        reason: readiness?.reason || "ledger_divergence",
+        readiness,
+      }, 409);
+    }
+
     // Fetch proposal after preflight so ERP always receives the final NET approved amount.
     const { data: proposal, error: pError } = await supabase
       .from("proposals")
       .select(
-        `id, opportunity_id, organization_id, status, title, client_name, client_email, created_at, accepted_at, expires_at, subtotal, discount_amount, approved_payment_schedule, approval_snapshot, ${APPROVED_VALUE_SELECT_COLUMNS}`,
+        `id, opportunity_id, organization_id, status, title, client_name, client_email, created_at, accepted_at, expires_at, subtotal, discount_amount, approved_payment_schedule, approval_snapshot, pricing_erp_amount, pricing_effective_amount, pricing_breakdown_snapshot, pricing_has_divergence, ${APPROVED_VALUE_SELECT_COLUMNS}`,
       )
       .eq("id", proposal_id)
       .single();
@@ -55,6 +79,7 @@ Deno.serve(async (req) => {
       console.error("Proposal not found:", proposal_id, pError);
       return jsonResponse({ error: "Proposal not found" }, 404);
     }
+
 
     if (proposal.status !== "accepted") {
       return jsonResponse({ error: "Proposal is not accepted", status: proposal.status }, 400);
@@ -129,10 +154,15 @@ Deno.serve(async (req) => {
       itemsNetTotal = rawTotal - discountAmount;
     }
 
-    // SOURCE OF TRUTH for ERP: the approved commercial value, which already includes
-    // dynamic-pricing adjustments (event antecedence, etc.) AND payment discounts.
+    // PRICE CORE 2.0C — pricing_erp_amount is the canonical ERP figure.
+    // It already includes manual discount, inventory adjustment, dynamic
+    // pricing, payment discount and is frozen by approval_snapshot when the
+    // proposal is accepted.
+    const pricingErpAmount = Number((proposal as any).pricing_erp_amount) || 0;
     const approved = resolveApprovedProposalAmount(proposal as any);
-    const totalAmount = approved.amount > 0 ? approved.amount : itemsNetTotal;
+    const totalAmount = pricingErpAmount > 0
+      ? pricingErpAmount
+      : (approved.amount > 0 ? approved.amount : itemsNetTotal);
 
     // Financial breakdown — same shape as api-deals so the ERP receives an
     // unambiguous NET value across every legacy field name.
@@ -148,8 +178,9 @@ Deno.serve(async (req) => {
       : 0;
 
     console.log(
-      `[notify-deal-won] Approved value for ${proposal_id}: net=${netTotal} subtotal=${subtotalForBreakdown} discount=${discountTotal} (${discountPercent}%) source=${approved.source} base=${approved.base_amount} dyn=${approved.dynamic_amount} items_gross=${rawTotal} items_net=${itemsNetTotal}`,
+      `[notify-deal-won] ERP value for ${proposal_id}: net=${netTotal} pricing_erp_amount=${pricingErpAmount} subtotal=${subtotalForBreakdown} discount=${discountTotal} (${discountPercent}%) source=${approved.source} base=${approved.base_amount} dyn=${approved.dynamic_amount} items_gross=${rawTotal} items_net=${itemsNetTotal}`,
     );
+
 
     // Derive vencimento — sempre priorizar a data definida nas condições de pagamento.
     // Ordem de prioridade: first_installment_date (à vista / 1ª parcela one_time)
@@ -222,9 +253,14 @@ Deno.serve(async (req) => {
       base_amount: approved.base_amount || itemsNetTotal,
       approved_amount: approved.amount || null,
       amount_source: approved.source,
+      // PRICE CORE 2.0C — canonical ledger fields for auditing on ERP side.
+      pricing_erp_amount: pricingErpAmount || null,
+      pricing_breakdown_snapshot: (proposal as any).pricing_breakdown_snapshot || null,
+      approval_snapshot: (proposal as any).approval_snapshot || null,
       dynamic_pricing_enabled: approved.dynamic_enabled,
       dynamic_pricing_status: approved.dynamic_status,
       dynamic_pricing_snapshot: approved.snapshot,
+
       status: "won",
       won_date: proposal.accepted_at,
       created_at: proposal.created_at,

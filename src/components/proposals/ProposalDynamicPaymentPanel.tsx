@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -29,15 +30,35 @@ import {
 } from '@/hooks/proposals/useProposalPayments';
 import { useProposalDynamicPricingSnapshot } from '@/hooks/proposals/useProposalDynamicPricing';
 import { ManualPaymentValidationDialog } from './ManualPaymentValidationDialog';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Props {
   proposalId: string;
 }
 
+const DIVERGENCE_TOOLTIP =
+  'Existem valores divergentes nesta proposta. Recalcule antes de continuar.';
+
 export function ProposalDynamicPaymentPanel({ proposalId }: Props) {
   const { data: snapshot } = useProposalDynamicPricingSnapshot(proposalId);
   const { data: latest, isLoading } = useLatestPaymentIntent(proposalId);
   const { data: events = [] } = useProposalPaymentEvents(proposalId);
+
+  // PRICE CORE 2.0C — observe divergence so all critical buttons can lock.
+  const { data: divergenceFlag } = useQuery({
+    queryKey: ['proposal-pricing-divergence', proposalId],
+    queryFn: async () => {
+      const { data } = await (supabase as any)
+        .from('proposals')
+        .select('pricing_has_divergence')
+        .eq('id', proposalId)
+        .maybeSingle();
+      return !!data?.pricing_has_divergence;
+    },
+    enabled: !!proposalId,
+    staleTime: 10_000,
+  });
+  const hasDivergence = !!divergenceFlag;
 
   const createIntent = useCreatePaymentIntent(proposalId);
   const genPix = useGeneratePixCharge(proposalId);
@@ -53,6 +74,7 @@ export function ProposalDynamicPaymentPanel({ proposalId }: Props) {
   const currentAmount = snapshot?.current_amount ?? null;
 
   if (!dynamicEnabled) return null;
+
 
   return (
     <>
@@ -102,7 +124,8 @@ export function ProposalDynamicPaymentPanel({ proposalId }: Props) {
           <div className="flex flex-wrap gap-2">
             <Button
               size="sm"
-              disabled={blocked || createIntent.isPending}
+              disabled={blocked || createIntent.isPending || hasDivergence}
+              title={hasDivergence ? DIVERGENCE_TOOLTIP : undefined}
               onClick={() => createIntent.mutate('crm_manual')}
             >
               {createIntent.isPending ? (
@@ -117,7 +140,8 @@ export function ProposalDynamicPaymentPanel({ proposalId }: Props) {
               <Button
                 size="sm"
                 variant="outline"
-                disabled={genPix.isPending}
+                disabled={genPix.isPending || hasDivergence}
+                title={hasDivergence ? DIVERGENCE_TOOLTIP : undefined}
                 onClick={() => genPix.mutate(latest.id)}
               >
                 Gerar Pix QR
@@ -134,7 +158,8 @@ export function ProposalDynamicPaymentPanel({ proposalId }: Props) {
               <Button
                 size="sm"
                 variant="destructive"
-                disabled={complementary.isPending}
+                disabled={complementary.isPending || hasDivergence}
+                title={hasDivergence ? DIVERGENCE_TOOLTIP : undefined}
                 onClick={() => complementary.mutate(latest.id)}
               >
                 Gerar cobrança complementar
@@ -145,7 +170,8 @@ export function ProposalDynamicPaymentPanel({ proposalId }: Props) {
               <Button
                 size="sm"
                 variant="ghost"
-                disabled={sync.isPending}
+                disabled={sync.isPending || hasDivergence}
+                title={hasDivergence ? DIVERGENCE_TOOLTIP : undefined}
                 onClick={() => sync.mutate(latest.id)}
               >
                 <RefreshCw className="h-4 w-4 mr-1" /> Sincronizar ERP
@@ -156,6 +182,7 @@ export function ProposalDynamicPaymentPanel({ proposalId }: Props) {
               <History className="h-4 w-4 mr-1" /> Histórico
             </Button>
           </div>
+
 
           {showHistory && (
             <div className="rounded-md border divide-y text-xs max-h-64 overflow-auto">
