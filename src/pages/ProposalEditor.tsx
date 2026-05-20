@@ -16,6 +16,9 @@ import { ProposalVisualizarTab } from '@/components/proposals/ProposalVisualizar
 import { ProposalParticipantsManager } from '@/components/proposals/ProposalParticipantsManager';
 import { ProposalInventoryPanel } from '@/components/proposals/ProposalInventoryPanel';
 import { ProposalDynamicPricingPanel } from '@/components/proposals/ProposalDynamicPricingPanel';
+import { ProposalPricingBreakdown } from '@/components/proposals/ProposalPricingBreakdown';
+import { ProposalPricingDivergenceAlert } from '@/components/proposals/ProposalPricingDivergenceAlert';
+import { warnIfLedgerMissing } from '@/lib/proposals/pricingLedger';
 import { DynamicPricingMismatchAlert } from '@/components/proposals/DynamicPricingMismatchAlert';
 
 // Analytics moved to OpportunityAnalyticsTab
