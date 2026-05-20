@@ -61,6 +61,7 @@ export function OpportunityGraphSignals({ opportunityId }: OpportunityGraphSigna
     queryClient.invalidateQueries({ queryKey: ['opportunity-network-summary', opportunityId] });
     queryClient.invalidateQueries({ queryKey: ['nrhs'] });
     queryClient.invalidateQueries({ queryKey: ['nrhs-analytics'] });
+    queryClient.invalidateQueries({ queryKey: ['entity-insights', 'opportunity', opportunityId] });
     queryClient.invalidateQueries({ queryKey: ['opportunity', opportunityId] });
     queryClient.invalidateQueries({ queryKey: ['opportunity-detail', opportunityId] });
     // Fire-and-forget NRHS recalc so the pillar updates immediately.
@@ -74,6 +75,7 @@ export function OpportunityGraphSignals({ opportunityId }: OpportunityGraphSigna
         },
       });
       queryClient.invalidateQueries({ queryKey: ['nrhs'] });
+      queryClient.invalidateQueries({ queryKey: ['nrhs-score-lite', opportunityId] });
     } catch (err) {
       console.warn('[OpportunityGraphSignals] NRHS recalc fallback:', err);
     }
