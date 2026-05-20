@@ -150,7 +150,8 @@ export async function createErpCharge(input: ErpChargeInput): Promise<ErpChargeR
 
 export type ErpStatusResult = {
   ok: boolean;
-  provider: 'human_erp' | 'mock';
+  provider: ErpProvider;
+  pending_provider?: boolean;
   status?: string;
   paid_amount?: number;
   paid_at?: string | null;
@@ -167,9 +168,14 @@ export async function getErpChargeStatus(erpChargeId: string): Promise<ErpStatus
   const base = normalizeBaseUrl(Deno.env.get('HUMAN_ERP_BASE_URL'));
   const key = normalizeKey(Deno.env.get('HUMAN_ERP_API_KEY'));
   if (!base || !key) {
+    // Sem provider: NUNCA simula baixa. Devolve pending_provider sem paid_amount.
     return {
-      ok: true, provider: 'mock', status: 'pending',
-      raw_response: { mock: true }, latency_ms: Date.now() - start,
+      ok: true,
+      provider: 'pending_provider',
+      pending_provider: true,
+      status: 'pending_provider',
+      raw_response: { pending_provider: true, reason: 'HUMAN_ERP secrets not configured' },
+      latency_ms: Date.now() - start,
     };
   }
   try {
