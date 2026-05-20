@@ -53,6 +53,31 @@ export function OpportunityGraphSignals({ opportunityId }: OpportunityGraphSigna
   const { createActivityFromInsight } = useCreateActivityFromInsight();
   const queryClient = useQueryClient();
   const [settingChampion, setSettingChampion] = useState<string | null>(null);
+  const [settingDecisionMaker, setSettingDecisionMaker] = useState<string | null>(null);
+
+  // Helper: invalidate NRHS + network caches and fire recalc edge function.
+  const refreshAfterStakeholderChange = async (organizationId?: string | null) => {
+    await refetchGraph();
+    queryClient.invalidateQueries({ queryKey: ['opportunity-network-summary', opportunityId] });
+    queryClient.invalidateQueries({ queryKey: ['nrhs'] });
+    queryClient.invalidateQueries({ queryKey: ['nrhs-analytics'] });
+    queryClient.invalidateQueries({ queryKey: ['opportunity', opportunityId] });
+    queryClient.invalidateQueries({ queryKey: ['opportunity-detail', opportunityId] });
+    // Fire-and-forget NRHS recalc so the pillar updates immediately.
+    try {
+      await supabase.functions.invoke('calculate-nrhs', {
+        body: {
+          opportunity_id: opportunityId,
+          organization_id: organizationId ?? undefined,
+          trigger_source: 'opportunity_network_tab',
+          trigger_action: 'stakeholder_role_change',
+        },
+      });
+      queryClient.invalidateQueries({ queryKey: ['nrhs'] });
+    } catch (err) {
+      console.warn('[OpportunityGraphSignals] NRHS recalc fallback:', err);
+    }
+  };
 
   // Fetch opportunity to get account_id
   const { data: opportunity } = useQuery({
@@ -60,7 +85,7 @@ export function OpportunityGraphSignals({ opportunityId }: OpportunityGraphSigna
     queryFn: async () => {
       const { data, error } = await supabase
         .from('opportunities')
-        .select('id, account_id')
+        .select('id, account_id, organization_id')
         .eq('id', opportunityId)
         .single();
       if (error) throw error;
@@ -493,6 +518,16 @@ export function OpportunityGraphSignals({ opportunityId }: OpportunityGraphSigna
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-sm">Stakeholders Mapeados</CardTitle>
+          <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-3 flex-wrap">
+            <span className="inline-flex items-center gap-1">
+              <Star className="h-3 w-3 text-yellow-600 fill-current" />
+              <strong>Champion:</strong> defensor interno do negócio
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <Target className="h-3 w-3 text-blue-600" />
+              <strong>Decisor:</strong> quem aprova a compra
+            </span>
+          </p>
         </CardHeader>
         <CardContent>
           <ScrollArea className="max-h-[250px]">
@@ -504,6 +539,7 @@ export function OpportunityGraphSignals({ opportunityId }: OpportunityGraphSigna
                   const isChampion = analysis.championContactId === contact.entity_id;
                   const isDecisionMaker = analysis.decisionMakerContactId === contact.entity_id;
                   const isSettingThis = settingChampion === contact.entity_id;
+                  const isSettingDMThis = settingDecisionMaker === contact.entity_id;
                   
                   const handleSetChampion = async () => {
                     setSettingChampion(contact.entity_id);
@@ -515,13 +551,31 @@ export function OpportunityGraphSignals({ opportunityId }: OpportunityGraphSigna
                         await setOpportunityChampion(opportunityId, contact.entity_id);
                         toast.success('Champion definido com sucesso');
                       }
-                      await refetchGraph();
-                      queryClient.invalidateQueries({ queryKey: ['opportunity-network-summary', opportunityId] });
+                      await refreshAfterStakeholderChange(opportunity?.organization_id);
                     } catch (error) {
                       console.error('Error setting champion:', error);
                       toast.error('Erro ao definir champion');
                     } finally {
                       setSettingChampion(null);
+                    }
+                  };
+
+                  const handleSetDecisionMaker = async () => {
+                    setSettingDecisionMaker(contact.entity_id);
+                    try {
+                      if (isDecisionMaker) {
+                        await removeOpportunityDecisionMaker(opportunityId);
+                        toast.success('Decisor removido');
+                      } else {
+                        await setOpportunityDecisionMaker(opportunityId, contact.entity_id);
+                        toast.success('Decisor definido com sucesso');
+                      }
+                      await refreshAfterStakeholderChange(opportunity?.organization_id);
+                    } catch (error) {
+                      console.error('Error setting decision maker:', error);
+                      toast.error('Erro ao definir decisor');
+                    } finally {
+                      setSettingDecisionMaker(null);
                     }
                   };
                   
@@ -546,10 +600,10 @@ export function OpportunityGraphSignals({ opportunityId }: OpportunityGraphSigna
                                 Champion
                               </Badge>
                             )}
-                            {isDecisionMaker && !isChampion && (
+                            {isDecisionMaker && (
                               <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-blue-500 text-blue-600">
                                 <Target className="h-2.5 w-2.5 mr-0.5" />
-                                Decision Maker
+                                Decisor
                               </Badge>
                             )}
                           </div>
@@ -580,12 +634,29 @@ export function OpportunityGraphSignals({ opportunityId }: OpportunityGraphSigna
                           )}
                           onClick={handleSetChampion}
                           disabled={isSettingThis}
-                          title={isChampion ? 'Remover champion' : 'Definir como champion'}
+                          title={isChampion ? 'Remover Champion (defensor interno do negócio)' : 'Marcar como Champion (defensor interno do negócio)'}
                         >
                           {isSettingThis ? (
                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
                           ) : (
                             <Star className={cn("h-3.5 w-3.5", isChampion && "fill-current")} />
+                          )}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={isDecisionMaker ? "secondary" : "ghost"}
+                          className={cn(
+                            "h-7 px-2 text-xs",
+                            isDecisionMaker && "bg-blue-500/20 hover:bg-blue-500/30 text-blue-700"
+                          )}
+                          onClick={handleSetDecisionMaker}
+                          disabled={isSettingDMThis}
+                          title={isDecisionMaker ? 'Remover Decisor (quem aprova a compra)' : 'Marcar como Decisor (quem aprova a compra)'}
+                        >
+                          {isSettingDMThis ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Target className={cn("h-3.5 w-3.5", isDecisionMaker && "fill-current")} />
                           )}
                         </Button>
                       </div>
