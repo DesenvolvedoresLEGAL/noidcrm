@@ -510,10 +510,11 @@ function generateProposalHTML(proposal: any, items: any[], paymentTerms: any[], 
       <table class="items-table">
         <thead>
           <tr>
-            <th style="width: 48%;">Item</th>
+            <th style="width: 12%;">Foto</th>
+            <th style="width: 38%;">Item / Descrição</th>
             <th class="text-center" style="width: 8%;">Qtd</th>
-            <th class="text-right" style="width: 15%;">Preço Unit.</th>
-            <th class="text-right" style="width: 12%;">Desconto</th>
+            <th class="text-right" style="width: 14%;">Preço Unit.</th>
+            <th class="text-right" style="width: 11%;">Desconto</th>
             <th class="text-right" style="width: 17%;">Total</th>
           </tr>
         </thead>
@@ -529,19 +530,16 @@ function generateProposalHTML(proposal: any, items: any[], paymentTerms: any[], 
             const priceCell = isPointDay && ppd != null
               ? `R$ ${Number(ppd).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} <span style="font-size:0.75em;color:#666;">/ ponto-dia</span>`
               : `R$ ${item.unit_price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
-            const thumb = item.image_url
-              ? `<img src="${item.image_url}" alt="" style="width:48px;height:48px;object-fit:cover;border-radius:6px;border:1px solid #e5e7eb;flex-shrink:0;" onerror="this.style.display='none'" />`
-              : '';
+            const imgSrc = item.image_url || item.product?.image_url || null;
+            const thumbCell = imgSrc
+              ? `<img src="${imgSrc}" alt="" style="width:72px;height:72px;object-fit:cover;border-radius:6px;border:1px solid #e5e7eb;display:block;" onerror="this.style.visibility='hidden'" />`
+              : `<div style="width:72px;height:72px;border-radius:6px;border:1px solid #e5e7eb;background:#f3f4f6;"></div>`;
             return `
             <tr>
+              <td style="vertical-align:top;">${thumbCell}</td>
               <td>
-                <div style="display:flex;align-items:flex-start;gap:12px;">
-                  ${thumb}
-                  <div style="min-width:0;flex:1;">
-                    <div class="item-name">${item.name}</div>
-                    ${item.description ? `<div class="item-desc">${item.description}</div>` : ''}
-                  </div>
-                </div>
+                <div class="item-name">${item.name}</div>
+                ${item.description ? `<div class="item-desc">${item.description}</div>` : ''}
               </td>
               <td class="text-center">${qtyCell}</td>
               <td class="text-right">${priceCell}</td>
