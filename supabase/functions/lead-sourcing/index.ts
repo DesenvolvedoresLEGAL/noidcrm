@@ -2747,18 +2747,20 @@ ${chunk}`,
     if (!companyName || companyName.length < 2) continue;
 
     const normalizedName = normalizeCompanyName(companyName);
+    const stableProviderId = ex._informa_connect_external_id ? `informa-connect:${ex._informa_connect_external_id}` : null;
 
     // Intra-run dedupe by name + domain + profile URL
-    if (seenNames.has(normalizedName)) { metrics.deduped_in_run++; continue; }
+    const nameDedupeKey = stableProviderId ? `${normalizedName}::${stableProviderId}` : normalizedName;
+    if (seenNames.has(nameDedupeKey)) { metrics.deduped_in_run++; continue; }
 
     const domain = extractDomain(ex.website || "");
-    if (domain && seenDomains.has(domain)) { metrics.deduped_in_run++; continue; }
+    if (!stableProviderId && domain && seenDomains.has(domain)) { metrics.deduped_in_run++; continue; }
 
     const profileUrl = ex.exhibitor_profile_url || null;
     if (profileUrl && seenProfileUrls.has(profileUrl)) { metrics.deduped_in_run++; continue; }
 
-    seenNames.add(normalizedName);
-    if (domain) seenDomains.add(domain);
+    seenNames.add(nameDedupeKey);
+    if (!stableProviderId && domain) seenDomains.add(domain);
     if (profileUrl) seenProfileUrls.add(profileUrl);
 
     const website = ex.website || (domain ? `https://${domain}` : null);
