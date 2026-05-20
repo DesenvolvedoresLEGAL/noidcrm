@@ -1521,6 +1521,74 @@ async function handleEventFirecrawl(
     }
   }
 
+  // ── Step 0e2: Informa Connect (marketing sites) provider ──
+  // Informa Markets também opera sites de marketing Next.js (abfexpo.com.br,
+  // fispalfoodservice.com.br, hospitalar.com etc.) que renderizam
+  // `informa-exhibitor-list-module` vazio no SSR e buscam expositores via
+  // api-connect.informamarkets.com. Endpoint público, sem auth.
+  if (allExhibitors.length === 0) {
+    try {
+      const { tryInformaConnectFromUrl } = await import("./providers/index.ts");
+      const ic = await tryInformaConnectFromUrl(eventUrl);
+      if (ic.detection) {
+        await logRunEvent(supabase, organizationId, run.id, "info", "Informa Connect detectado", {
+          edition_code: ic.detection.editionCode,
+          event_site_url: ic.detection.eventSiteUrl,
+        });
+        if (ic.result && ic.result.exhibitors.length > 0) {
+          for (const ex of ic.result.exhibitors) {
+            allExhibitors.push({
+              company_name: ex.name,
+              website: ex.website,
+              category: ex.categories[0] || null,
+              description: null,
+              booth: ex.booth,
+              country: ex.country,
+              city: ex.city,
+              exhibitor_profile_url: ex.source_url,
+              signals: [
+                "informa_connect_official",
+                "listed_in_official_directory",
+                ex.country ? "has_country" : null,
+                ex.categories.length > 0 ? "has_category" : null,
+                ex.website ? "has_website" : null,
+                ex.booth ? "has_booth" : null,
+              ].filter(Boolean) as string[],
+              confidence: 95,
+              _source_url: ex.source_url,
+              _page_type: "informa_connect_listings",
+              _extraction_method: "informa_connect_api",
+              _logo_url: ex.logo_url,
+              _informa_connect_external_id: ex.external_id,
+              _informa_connect_categories: ex.categories,
+            });
+          }
+          providerUsed = "informa-connect";
+          metrics.exhibitors_extracted_raw = allExhibitors.length;
+          metrics.html_hybrid_extracted = allExhibitors.length;
+          (metrics as any).provider = "informa-connect";
+          (metrics as any).informa_connect_edition_code = ic.result.edition_code;
+          (metrics as any).informa_connect_total_count = ic.result.total_count;
+          (metrics as any).informa_connect_pages_fetched = ic.result.pages_fetched;
+          await logRunEvent(supabase, organizationId, run.id, "info",
+            `Informa Connect forneceu ${ic.result.exhibitors.length}/${ic.result.total_count ?? "?"} expositores em ${ic.result.pages_fetched} páginas — pulando Firecrawl`,
+            { provider: "informa-connect", count: ic.result.exhibitors.length },
+          );
+        } else if (ic.error) {
+          await logRunEvent(supabase, organizationId, run.id, "warn",
+            "Informa Connect detectado mas API falhou — caindo para próximo provider",
+            { error: ic.error },
+          );
+        }
+      }
+    } catch (providerErr) {
+      await logRunEvent(supabase, organizationId, run.id, "warn",
+        "Erro ao tentar provider Informa Connect — seguindo com SPA/Firecrawl",
+        { error: String(providerErr) },
+      );
+    }
+  }
+
   // ── Step 0f: Generic SPA (Next.js / Nuxt / React) provider ──
   // For sites where the initial HTML is an empty shell + spinner (e.g. vitrine.fcecosmetique.com.br).
   // Tries hydrated payload (__NEXT_DATA__, RSC) first, then internal API sniffing.
