@@ -106,40 +106,52 @@ Deno.serve(async (req) => {
     metadata: { is_approved: isApproved },
   });
 
-  // 5) Persiste retorno + log.
+  // 5) Persistir retorno + log.
+  const isPending = result.provider === 'pending_provider' || result.pending_provider === true;
+
   if (result.ok) {
+    // Snapshot financeiro completo gravado em TODO cenário (real e pending_provider).
+    const gatewaySnapshot = {
+      provider: result.provider,
+      pending_provider: isPending,
+      erp_charge_id: result.erp_charge_id ?? null,
+      erp_invoice_id: result.erp_invoice_id ?? null,
+      due_date: result.due_date ?? null,
+      status: result.status ?? null,
+      amount_sent: amount,                                       // SEMPRE pricing_erp_amount (ou approved_amount)
+      pricing_erp_amount: proposal.pricing_erp_amount,
+      pricing_breakdown_snapshot: proposal.pricing_breakdown_snapshot,
+      approval_snapshot: isApproved ? proposal.approval_snapshot : null,
+      raw_request: result.raw_request,
+      raw_response: result.raw_response,
+      ts: new Date().toISOString(),
+    };
+
     await admin.from('proposal_payment_intents').update({
-      erp_charge_id: null, // mantemos o uuid local; gravamos o id externo em payment_reference/snapshot
-      pix_qr_code: result.pix_qr_code ?? null,
-      pix_copy_paste: result.pix_copy_paste ?? null,
-      payment_reference: result.erp_charge_id ?? null,
-      payment_gateway_snapshot: {
-        provider: result.provider,
-        erp_charge_id: result.erp_charge_id,
-        erp_invoice_id: result.erp_invoice_id,
-        due_date: result.due_date,
-        status: result.status,
-        amount_sent: amount,
-        pricing_breakdown_snapshot: proposal.pricing_breakdown_snapshot,
-        approval_snapshot: isApproved ? proposal.approval_snapshot : null,
-        raw_response: result.raw_response,
-        ts: new Date().toISOString(),
-      },
+      // Sem provider configurado: NUNCA escrever pix nem expor cobrança real.
+      pix_qr_code: isPending ? null : (result.pix_qr_code ?? null),
+      pix_copy_paste: isPending ? null : (result.pix_copy_paste ?? null),
+      payment_reference: isPending ? null : (result.erp_charge_id ?? null),
+      status: isPending ? 'pending_provider' : 'pending',
+      payment_gateway_snapshot: gatewaySnapshot,
     }).eq('id', intentId);
 
     await admin.from('proposal_payment_events').insert({
       organization_id: proposal.organization_id,
       proposal_id: proposal.id,
       payment_intent_id: intentId,
-      event_type: 'pix_generated',
+      event_type: isPending ? 'payment_intent_created' : 'pix_generated',
       expected_amount: amount,
-      message: result.provider === 'mock'
-        ? 'Cobrança gerada (mock — Human ERP não configurado)'
+      message: isPending
+        ? 'Cobrança registrada. Provider financeiro pendente de configuração.'
         : 'Cobrança gerada no Human ERP',
       metadata: {
         provider: result.provider,
-        erp_charge_id: result.erp_charge_id,
-        erp_invoice_id: result.erp_invoice_id,
+        pending_provider: isPending,
+        erp_charge_id: result.erp_charge_id ?? null,
+        erp_invoice_id: result.erp_invoice_id ?? null,
+        pricing_erp_amount: proposal.pricing_erp_amount,
+        approval_snapshot_present: !!isApproved,
       },
     });
   }
@@ -150,7 +162,7 @@ Deno.serve(async (req) => {
     payment_intent_id: intentId,
     provider: result.provider,
     operation: 'create_charge',
-    status: result.ok ? (result.provider === 'mock' ? 'mock' : 'success') : 'error',
+    status: result.ok ? (isPending ? 'pending_provider' : 'success') : 'error',
     request_payload: (result.raw_request as any) ?? {},
     response_payload: (result.raw_response as any) ?? {},
     http_status: result.http_status ?? null,
@@ -162,15 +174,20 @@ Deno.serve(async (req) => {
   return json({
     ok: result.ok,
     provider: result.provider,
+    pending_provider: isPending,
     configured: isHumanErpConfigured(),
     payment_intent_id: intentId,
-    erp_charge_id: result.erp_charge_id,
-    erp_invoice_id: result.erp_invoice_id,
-    pix_qr_code: result.pix_qr_code,
-    pix_copy_paste: result.pix_copy_paste,
-    due_date: result.due_date,
-    status: result.status,
-    error_code: result.error_code,
-    error_message: result.error_message,
+    erp_charge_id: isPending ? null : (result.erp_charge_id ?? null),
+    erp_invoice_id: isPending ? null : (result.erp_invoice_id ?? null),
+    // Pix NUNCA retornado em pending_provider (nada de mock público).
+    pix_qr_code: isPending ? null : (result.pix_qr_code ?? null),
+    pix_copy_paste: isPending ? null : (result.pix_copy_paste ?? null),
+    due_date: result.due_date ?? null,
+    status: isPending ? 'pending_provider' : (result.status ?? 'pending'),
+    error_code: result.error_code ?? null,
+    error_message: result.error_message ?? null,
+    message: isPending
+      ? 'Cobrança registrada. Provider financeiro pendente de configuração.'
+      : (result.ok ? 'Cobrança gerada no Human ERP' : (result.error_message ?? 'Falha ao gerar cobrança')),
   }, result.ok ? 200 : 502);
 });
