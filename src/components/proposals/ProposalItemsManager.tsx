@@ -25,7 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Plus, Trash2, GripVertical, Package, ChevronUp, ChevronDown, Repeat, Zap } from 'lucide-react';
+import { Plus, Trash2, GripVertical, Package, ChevronUp, ChevronDown, Repeat, Zap, Image as ImageIcon } from 'lucide-react';
 import { ProposalItem } from '@/services/crm/proposal-items';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
