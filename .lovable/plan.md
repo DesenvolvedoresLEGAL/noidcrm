@@ -1,89 +1,71 @@
-
 ## Diagnóstico
 
-O site `abfexpo.com.br/expositores-2026/` **não** é o Swapcard (app.informamarkets.com.br) e por isso o provider `informa-markets.ts` atual não pega — ele só detecta hosts `*.informamarkets.com(.br)` com path `/event/.../exhibitors/...`.
+Hoje, na aba **Rede** da oportunidade (`OpportunityGraphSignals.tsx`), só existe UI para marcar **Champion** (botão estrela). Não há botão para marcar **Decisor**, mesmo já existindo as funções `setOpportunityDecisionMaker` / `removeOpportunityDecisionMaker` importadas mas **não conectadas a nenhum botão**.
 
-O site da ABF é um Next.js marketing da Informa que renderiza um módulo `informa-exhibitor-list-module` vazio no SSR e busca os expositores client-side numa **API pública sem autenticação**:
+### Conceitos (precisam ficar claros na UI)
 
-```
-GET https://api-connect.informamarkets.com/api/v1/editions/BRZ26ABF/listings?lang=pt&page=1&limit=50
-```
+- **Champion** = **defensor interno** do deal. É quem te ajuda por dentro, abre portas, dá informação privilegiada, "torce" pelo fechamento. Pode ou não ter poder de decisão. Hoje a UI só diz "Champion" sem explicar.
+- **Decisor (Decision Maker)** = quem **assina / aprova** a compra. Pode ser o mesmo que o champion, mas geralmente é outra pessoa (Diretor, CEO, Sócio, Head…).
+- **Influenciador** ≠ champion. Influenciador opina mas não decide nem defende. Hoje não temos esse papel explícito — o NRHS não cobra ele.
 
-Verificado: retorna 205 expositores da ABF Expo 2026 em 5 páginas (status 200, ~80KB/página), com `paging.next` para iterar. O código da edição (`BRZ26ABF`) está embutido no payload SSR do Next.js como `"eventEditionCode":"BRZ26ABF"` (escapado dentro de `self.__next_f.push(...)`).
+### Como o NRHS decide se tem Decisor (`decision-maker-checker.ts`)
 
-Esse padrão cobre toda a rede de marketing Informa BR (ABF Expo, Fispal, Hospitalar, etc.), não só ABF.
+Em ordem de prioridade:
+1. `graph_edges` do tipo `decision_maker` (atribuição explícita — é o que o botão novo vai gravar)
+2. `deal_participants.role = 'decision_maker'`
+3. Cargo do contato bate com lista (`diretor`, `gerente`, `ceo`, `owner`, `sócio`, `presidente`, `head`, `c-level`, `vp`, `vice-presidente`, `superintendente`)
+
+Ou seja: hoje, se o contato **não** tem um desses cargos e não foi marcado manualmente em lugar nenhum, o NRHS cobra "Decisor não identificado" e não há UI para resolver. É exatamente o que está acontecendo no print da MATTOS FILHO (Karoline, cargo "Marketing").
+
+---
 
 ## Plano
 
-**Sem mexer em nenhum provider existente.** Adicionar 1 provider novo e plugá-lo no orquestrador.
+### 1. Adicionar botão "Marcar como Decisor" na aba Rede
 
-### 1. Novo provider `supabase/functions/lead-sourcing/providers/informa-connect.ts`
+Em `src/components/graph/OpportunityGraphSignals.tsx`, dentro da lista **Stakeholders Mapeados**, ao lado do botão estrela (Champion), adicionar um segundo botão com ícone `Target` (alvo) para marcar/desmarcar **Decisor**. Mesmo padrão de toggle do Champion:
 
-Exporta:
+- Se ainda não é decisor → `setOpportunityDecisionMaker(opportunityId, contact.entity_id)`
+- Se já é decisor → `removeOpportunityDecisionMaker(opportunityId)`
+- Toast + refetch do grafo + invalidação de `opportunity-network-summary`, `nrhs` e `nrhs-analytics` para o card Revenue Hygiene recalcular na hora.
 
-- `detectInformaConnect(url, html?)` — retorna `{ editionCode, eventSiteUrl }` quando:
-  - URL aponta para um site Informa marketing (heurística: HTML contém `informa-exhibitor-list-module` **ou** `BaseLayout_wrapper` **ou** `"eventEditionCode":"..."`); **e**
-  - consegue extrair o `eventEditionCode` via regex `/"eventEditionCode"\s*:\s*"([A-Z0-9_]+)"/` no HTML cru (cobre tanto JSON puro quanto a forma escapada `\"eventEditionCode\":\"...\"` do streaming Next.js).
-- `fetchInformaConnectExhibitors(editionCode, eventSiteUrl)` — pagina `/api/v1/editions/{code}/listings?lang=pt&page=N&limit=50` enquanto `data.paging.next` existir. Hard cap de 100 páginas (5000 expositores) por segurança.
-- `tryInformaConnectFromUrl(url)` — orquestra: faz `fetch` da URL → detecta → busca → normaliza.
+### 2. Tornar Champion vs Decisor visualmente óbvio
 
-Normalização do item da API → schema padrão de exhibitor já usado pelos outros providers (`external_id`, `name`, `website`, `logo_url`, `source_url`, `booth`, `categories`, `address`):
+- Tooltips explicativos nos dois botões:
+  - **Estrela amarela** → "Champion: defensor interno do negócio"
+  - **Alvo azul** → "Decisor: quem aprova a compra"
+- Manter os badges atuais (Champion / Decision Maker) já existentes na linha de cada contato.
+- Permitir que o mesmo contato seja **Champion e Decisor** ao mesmo tempo (ambos os botões podem ficar ativos).
 
-| Campo Kairós | Origem na API |
-|---|---|
-| `external_id` | `item.id` (com prefixo `informa-connect:`) |
-| `name` | `item.title` |
-| `website` | `item.website_url` ou `item.company.website` (vazio se placeholder) |
-| `logo_url` | `item.logo.original` (descartar se contiver `logo_placeholder`) |
-| `source_url` | `${eventSiteUrl}/elisting/${item.slug}` (ex: `https://www.abfexpo.com.br/elisting/5asec`) |
-| `booth` | `item.booths[0].booth_number` |
-| `categories` | `Object.values(item.categories || {})` |
-| `address` | composição de `item.address` (rua, cidade, estado, país) |
+### 3. Atualizar o card "Decisor não identificado" (bloco superior da Rede)
 
-### 2. Registrar no `providers/index.ts`
+O bloco "Decisor não identificado" / "Decision Maker" já existe mais acima na mesma tela. Adicionar ali um CTA secundário **"Selecionar decisor"** que rola a página para a lista de Stakeholders Mapeados (ou abre um popover de seleção rápida entre os contatos existentes), pra fechar o loop visual com o que o NRHS está cobrando.
 
-Adicionar export do novo provider (mantendo todos os existentes intactos).
+### 4. Recalcular NRHS após marcação
 
-### 3. Plugar no `supabase/functions/lead-sourcing/index.ts`
+Depois de `setOpportunityDecisionMaker`, disparar `calculate-nrhs` (mesmo padrão usado em `useNRHS.recalculate`) para que o pilar **Mapeamento de Stakeholders** suba de 10 → para a pontuação correta sem o usuário precisar clicar em "Atualizar".
 
-Inserir a chamada `tryInformaConnectFromUrl` **antes** do fallback genérico (Firecrawl/AI hybrid) e **depois** dos providers mais específicos já registrados (ExpoFP, Informa Markets/Swapcard, DRTS, Francal/Totvs, InfraFM, MundoGeo, NM Brasil, SPA Next.js). Ordem importa: o provider só reivindica a URL quando o regex acha `eventEditionCode`, então não há risco de roubar URL de outro provider.
+### 5. Documentar no tooltip do pilar NRHS
 
-### 4. Telemetria
+No `NRHSBreakdown.tsx`, no item `decisor`, adicionar texto curto:
+> "Marque o decisor no menu **Rede** da oportunidade, no botão alvo (🎯) ao lado de cada contato."
 
-Logar no `run_events` (padrão já usado pelos outros providers): `provider="informa-connect"`, `edition_code`, `total_exhibitors`, `pages_fetched`, `firecrawl_credits_used=0`.
+---
 
-## Detalhes técnicos
+## Fora de escopo (não mexer agora)
 
-- **Auth**: nenhum header especial necessário. Testado via `curl` retornando 200 sem cookie/token.
-- **Rate**: 5 páginas paralelas seguras; vou paginar **sequencialmente** (igual ExpoFP/Informa Markets) para não estressar o backend público da Informa.
-- **i18n**: hardcoded `lang=pt` (mesmo padrão do site).
-- **Edge cases**:
-  - Página sem `eventEditionCode` no HTML → provider retorna `null` e deixa o fallback agir.
-  - `data.paging.next === ""` → fim da paginação.
-  - `logo.original` contém `/sites/default/files/logo_placeholder_` → tratar como sem logo.
-  - `website_url` vazio é comum → deixar `null`, enriquecimento Apollo/Caramelo cuida depois.
+- Não alterar a lógica de fallback por cargo no `decision-maker-checker.ts` — continua valendo como detecção automática.
+- Não criar campo novo em `contacts` (ex.: `is_decision_maker` global) — decisor é **por oportunidade**, via `graph_edges`, e isso já está certo arquiteturalmente.
+- Não tocar em `deal_participants`.
+- Sem migração de banco.
 
-## Arquivos afetados
+---
 
-- **NOVO**: `supabase/functions/lead-sourcing/providers/informa-connect.ts`
-- `supabase/functions/lead-sourcing/providers/index.ts` (apenas adicionar exports)
-- `supabase/functions/lead-sourcing/index.ts` (adicionar 1 bloco try/await na cadeia de providers)
+## Arquivos impactados
 
-## Garantias de não-quebra
-
-- Zero alteração em `informa-markets.ts`, `expofp.ts`, `spa-nextjs.ts`, `drts-directory.ts`, `francal-totvs.ts`, `infrafm.ts`, `mundogeo.ts`, `nm-brasil.ts`.
-- Detecção exige match positivo (`eventEditionCode` regex) — URLs já cobertas por outros providers não acionam este.
-- Mesmo schema de saída dos demais providers → consumidores downstream (matching, enrichment, dedupe) não mudam.
+- `src/components/graph/OpportunityGraphSignals.tsx` (adicionar botão Decisor + tooltips + recalc NRHS)
+- `src/components/nrhs/NRHSBreakdown.tsx` (tooltip orientando o usuário) — opcional, pequeno
 
 ## Riscos
 
-- Se a Informa rotacionar o endpoint público (improvável, é a API que alimenta todos os sites institucionais deles), revalidar a URL base. Detecção fica isolada num único arquivo.
-- Sem proteção anti-bot observada hoje; se aparecer, basta adicionar `User-Agent` realista ao fetch.
-
-## Próximos passos após aprovação
-
-1. Implementar `informa-connect.ts`.
-2. Plugar no orquestrador.
-3. Deploy de `lead-sourcing`.
-4. Testar rodando Kairós em `https://www.abfexpo.com.br/expositores-2026/` e validar 205 expositores importados sem créditos Firecrawl.
-5. Atualizar memória `mem://architectural-decision/intelligence/` com o novo provider.
+- **Baixo.** As funções `setOpportunityDecisionMaker` / `removeOpportunityDecisionMaker` já existem, testadas, e gravam em `graph_edges` (multi-tenant safe via RLS já existente). O `decision-maker-checker` já lê dessa fonte como prioridade 1.
