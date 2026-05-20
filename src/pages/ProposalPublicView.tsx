@@ -1126,7 +1126,7 @@ export default function ProposalPublicView() {
         className="bg-white border-b-4 shadow-sm"
         style={{ borderBottomColor: organization?.primary_color || '#6366f1' }}
       >
-        <div className="max-w-5xl mx-auto px-3 py-4 md:px-4 md:py-6">
+        <div className="max-w-7xl mx-auto px-3 py-4 md:px-4 md:py-6">
           <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
             {/* Left: Logo + Company Info */}
             <div className="flex items-start gap-3 md:gap-4">
