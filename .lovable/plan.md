@@ -1,62 +1,61 @@
 ## Objetivo
-Garantir que qualquer envio para ERP/API/fatura use sempre o valor aprovado vigente da proposta (`R$ 1.686,10` no caso CONNECT FUN), nunca o total bruto/base dos itens (`R$ 1.297,00`).
 
-## Diagnóstico
-- A proposta aceita correta está gravada com:
-  - `approved_amount = 1686.10`
-  - `payment_expected_amount = 1686.10`
-  - `dynamic_pricing_current_amount = 1686.10`
-  - `total_amount = 1297.00` (base dos itens, legado)
-- O envio direto `notify-deal-won` já tem proteção parcial: manda campos de topo com valor líquido e escala os produtos.
-- A API `api-deals`, usada por integrações/ERP para buscar deals, ainda retorna `products[].total_price` com o valor bruto dos itens e não inclui `approved_amount` / `amount_source`. Se o ERP soma produtos ou lê campo legado, ele recebe `1297`.
+Trazer a foto do produto/serviço (campo `image_url`, que já existe em `products` e em `proposal_items`) de forma elegante em todas as superfícies onde o item aparece, e ampliar a largura útil do link público da proposta. Sem mexer em regras de negócio (preço, desconto, totais, RLS).
 
-## Plano de correção segura
-1. **Unificar o resolvedor de valor aprovado na API de deals**
-   - Importar e usar `resolveApprovedProposalAmount` em `supabase/functions/api-deals/index.ts`.
-   - Incluir no select da proposta os campos necessários: `approved_amount`, `dynamic_pricing_enabled`, `dynamic_pricing_status`, `dynamic_pricing_snapshot`.
-   - Prioridade final: `approved_amount` → `payment_expected_amount` → dinâmica vigente → `total_amount` → `value`.
+## Diagnóstico rápido
 
-2. **Blindar todos os campos monetários enviados ao ERP**
-   - Em `api-deals`, preencher os campos principais com o valor líquido aprovado:
-     - `amount`
-     - `net_total`
-     - `final_amount`
-     - `valor_liquido`
-     - `total_with_discount`
-     - `total_negotiated`
-     - `contract_total`
-   - Adicionar metadados claros:
-     - `approved_amount`
-     - `amount_source`
-     - `base_amount`
-     - `dynamic_pricing_*`
+- A coluna `image_url` já existe em `public.products` e em `public.proposal_items`.
+- O service `proposal-items.ts` e o `ProposalItemsManager` já gravam `image_url` ao adicionar item a partir de um produto — ou seja, o dado já está chegando na proposta.
+- O que falta hoje é **renderização** em 4 superfícies:
+  1. Editor da proposta (aba "Itens" — `ProposalItemsManager.tsx`)
+  2. Visualização Rápida (`ProposalPreview.tsx`, usada no `ProposalViewModal`)
+  3. Link público (`src/pages/ProposalPublicView.tsx`)
+  4. PDF (`supabase/functions/generate-proposal-pdf/index.ts`)
 
-3. **Corrigir o array de produtos para não induzir o ERP ao erro**
-   - Escalar `products[].total_price` para que a soma dos produtos bata exatamente com o valor aprovado líquido.
-   - Preservar auditoria com `original_total_price` e `net_total_price`, sem alterar `unit_price`/`quantity`.
-   - Esse padrão já existe no `notify-deal-won`; vou replicar na `api-deals` para consistência.
+- Largura do link público hoje: `max-w-5xl` (~64rem) no header (linha 1129) e no `<main>` (linha 1192) de `ProposalPublicView.tsx`. Cliente quer mais largo.
 
-4. **Corrigir o contrato/fatura/termos quando campo legado vier zerado**
-   - Ajustar `contract_total` dentro de `payment_terms` para cair no valor líquido aprovado quando o termo estiver `0`/nulo.
-   - Evita ERP ler `contract_total = 0` ou voltar para item bruto.
+## Mudanças propostas (somente UI/render)
 
-5. **Criar uma proteção no banco para propostas aceitas**
-   - Migration pequena para reforçar a função `orchestrate_proposal_financials`: proposta aceita mantém `approved_amount` realinhado ao valor comercial canônico.
-   - Backfill específico para propostas aceitas/dinâmicas garantindo `approved_amount`, `payment_expected_amount` e `opportunities.valor_previsto` consistentes.
-   - Sem mexer em RLS, sem abrir dados entre organizações.
+### 1. Editor — `ProposalItemsManager.tsx`
+- Adicionar uma miniatura 40×40 (rounded-md, border, `object-cover`) à esquerda do nome do item em cada linha.
+- Placeholder discreto (ícone `ImageIcon` em fundo `muted`) quando `image_url` for nulo.
+- Não adicionar nenhum botão de upload aqui — a foto continua sendo gerida no cadastro de produto/serviço.
 
-6. **Validar antes de concluir**
-   - Reconsultar a proposta CONNECT FUN e confirmar valor aprovado `1686.10`.
-   - Testar/inspecionar payload da `api-deals` para confirmar:
-     - `amount = 1686.10`
-     - `products[].total_price` somando `1686.10`
-     - nenhum campo monetário principal retornando `1297` como valor final.
+### 2. Visualização Rápida — `ProposalPreview.tsx`
+- Mesma miniatura 48×48 dentro da célula "Item" da tabela de itens (avulsos e recorrentes), antes do nome e descrição.
+- Layout flex: thumb + bloco de texto (nome em bold + descrição HTML existente).
 
-## Arquivos impactados
-- `supabase/functions/api-deals/index.ts`
-- Nova migration em `supabase/migrations/...sql`
+### 3. Link público — `src/pages/ProposalPublicView.tsx`
+- **Largura**: trocar `max-w-5xl` por `max-w-7xl` no header (linha 1129) e no `<main>` (linha 1192). Mantém `mx-auto` e padding responsivo — apenas dá mais respiro horizontal em telas grandes (>1280px), sem afetar mobile.
+- **Miniaturas**: na coluna "Item" das tabelas de Itens Avulsos (~linha 1407) e Itens Recorrentes (~linha 1547), envolver `name` + `description` num `flex gap-3` com thumb 56×56 à esquerda (arredondada, com borda sutil, `object-cover`). Em mobile (`<sm`) reduzir para 40×40 para não comer espaço.
+- Quando `image_url` for nulo: não renderiza thumb (mantém layout limpo, sem placeholder no público — visual mais elegante para o cliente final).
+
+### 4. PDF — `supabase/functions/generate-proposal-pdf/index.ts`
+- No `<td>` do nome do item (linha 533), inserir antes do `item-name` um bloco `<img>` quando `item.image_url` existir:
+  - 56×56px, `object-fit: cover`, `border-radius: 6px`, `border: 1px solid #e5e7eb`, `float: left; margin-right: 12px;` (ou `display: flex` no `<td>` — usar flex para consistência com o resto do HTML do PDF).
+- Ajustar a largura da coluna "Item" de `45%` para `48%` para acomodar a thumb sem espremer o texto. As demais (`8/15/12/20`) somam 55%; reduzimos "Total" de 20% → 17% para fechar 100%.
+- Importante: o renderizador de PDF precisa conseguir buscar a imagem por URL pública. Como o `image_url` dos produtos já é uma URL pública servida pelo storage, funciona direto. Não precisa de signed URL.
+
+## Onde NÃO mexer
+
+- Schema do banco (colunas já existem).
+- Lógica de preços, descontos, totais, valor líquido, sincronização com ERP, RLS — nada disso muda.
+- Upload de imagem de produto: fora de escopo (o usuário disse "eu adicionei fotos nos produtos" → fluxo de upload já funciona).
+- `MiniRichTextEditor` e demais editores rich-text — fora de escopo.
 
 ## Riscos
-- Baixo risco: a mudança é localizada na saída de integração e em função financeira já existente.
-- Não altera RLS, autenticação, UI de propostas nem criação de itens.
-- A única mudança comportamental intencional é impedir que integrações usem o valor bruto/base como valor final aprovado.
+
+- Largura `max-w-7xl` em telas ultra-wide pode parecer "esticada" demais para texto corrido (intro/termos). Mitigação: aplicar `max-w-7xl` no container externo, mas manter os blocos de prose (intro, termos, notas) com `max-w-4xl mx-auto` internamente para preservar legibilidade. Tabelas, cards de pagamento e itens aproveitam toda a largura.
+- Imagens muito grandes no PDF podem inflar o tamanho do arquivo. Como já são as mesmas URLs servidas no app, e o PDF é gerado por renderer HTML→PDF, o impacto é marginal (56×56 renderizado).
+- Thumbnails quebradas (URL 404): adicionar `onerror="this.style.display='none'"` no `<img>` do PDF e fallback silencioso no React (já tratado pelo `image_url` nulo + `<img>` padrão do browser esconde alt).
+
+## Arquivos a alterar
+
+1. `src/components/proposals/ProposalItemsManager.tsx` — thumb na linha do item
+2. `src/components/proposals/ProposalPreview.tsx` — thumb nas tabelas de itens
+3. `src/pages/ProposalPublicView.tsx` — `max-w-7xl` + thumbs nas tabelas de itens (avulsos e recorrentes); manter prose interno em `max-w-4xl`
+4. `supabase/functions/generate-proposal-pdf/index.ts` — `<img>` no `<td>` do item + ajuste de largura de coluna
+
+## Próximos passos
+
+Aprovado o plano, implemento os 4 ajustes em uma única rodada, sem tocar em business logic. Validação visual: abrir a mesma proposta `PROP-2026-00639` no editor, no Visualização Rápida, no link público e gerar o PDF para conferir as miniaturas e a nova largura.
