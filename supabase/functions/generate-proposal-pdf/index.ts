@@ -667,9 +667,40 @@ function generateProposalHTML(proposal: any, items: any[], paymentTerms: any[], 
     </div>
   ` : ''}
 
-  ${paymentTerms.length > 0 ? `
+  ${(ledger && ledger.paymentSchedule && ledger.paymentSchedule.length > 0) ? `
     <div class="section">
       <h2 class="section-title">Condições de Pagamento</h2>
+      <div class="payment-section">
+        <div class="payment-header">
+          <div class="payment-icon payment-icon-onetime">💳</div>
+          <div>
+            <div style="font-size: 18px; font-weight: 700; color: #1f2937;">${ledger.frozen ? 'Cronograma Aprovado' : 'Cronograma Vigente'}</div>
+            <div style="margin-top: 6px; color:#6b7280; font-size: 13px;">
+              Total: <strong>${fmtBRL(ledger.paymentScheduleTotal || ledger.effectiveAmount)}</strong>
+              ${ledger.hasDivergence ? ` <span style="color:#dc2626; margin-left:8px;">⚠ divergência detectada</span>` : ''}
+            </div>
+          </div>
+        </div>
+        <div class="payment-body">
+          <table class="payment-table onetime-table" style="border-collapse: collapse; width: 100%;">
+            <thead><tr><th>Parcela</th><th>Vencimento</th><th class="text-right">Valor</th></tr></thead>
+            <tbody>
+              ${ledger.paymentSchedule.map((p: any) => `
+                <tr>
+                  <td><strong>${p.label || `Parcela ${p.index ?? ''}`}</strong></td>
+                  <td>${p.due_date ? new Date(p.due_date + 'T12:00:00').toLocaleDateString('pt-BR') : '—'}</td>
+                  <td class="text-right"><strong>${fmtBRL(Number(p.amount))}</strong></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  ` : (paymentTerms.length > 0 ? `
+    <div class="section">
+      <h2 class="section-title">Condições de Pagamento</h2>
+      
       
       ${(() => {
         const oneTimeTerm = paymentTerms.find(t => t.payment_type === 'one_time');
