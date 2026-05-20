@@ -115,6 +115,7 @@ const settingsCategories: SettingsCategory[] = [
     items: [
       { id: 'proposal-settings', label: 'Configurações', description: 'Opções de propostas', icon: Settings, path: '/app/settings/proposal-settings', requiredLevel: 'full', keywords: ['configuração', 'opções', 'numeração', 'prefixo'] },
       { id: 'proposal-layouts', label: 'Modelos', description: 'Templates de propostas', icon: FileText, path: '/app/settings/proposal-layouts', requiredLevel: 'partial', keywords: ['modelo', 'template', 'layout'] },
+      { id: 'proposal-financial-audit', label: 'Auditoria Financeira', description: 'Reconciliação de propostas aprovadas', icon: FileText, path: '/app/settings/auditoria-financeira-propostas', requiredLevel: 'full', keywords: ['auditoria', 'financeira', 'reconciliação', 'divergência', 'price audit'] },
     ],
   },
   // 7. Relatórios (NOVA CATEGORIA)

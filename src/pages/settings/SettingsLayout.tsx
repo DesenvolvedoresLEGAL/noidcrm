@@ -24,6 +24,7 @@ const pathToBreadcrumb: Record<string, { label: string; parent?: { label: string
   '/app/settings/product-categories': { label: 'Categorias' },
   '/app/settings/proposal-layouts': { label: 'Modelos de Proposta' },
   '/app/settings/proposal-settings': { label: 'Configurações de Proposta' },
+  '/app/settings/auditoria-financeira-propostas': { label: 'Auditoria Financeira de Propostas' },
   '/app/settings/integrations': { label: 'Integrações' },
   '/app/settings/data-management': { label: 'Gestão de Dados' },
   '/app/settings/custom-fields': { label: 'Campos Personalizados' },
