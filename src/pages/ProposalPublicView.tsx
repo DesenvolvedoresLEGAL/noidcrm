@@ -48,6 +48,8 @@ import {
   Image as ImageIcon
 } from 'lucide-react';
 import { getProposalByToken, declineProposal, trackView } from '@/services/crm/proposals';
+import { getProposalPricingSummary } from '@/lib/proposals/pricingLedger';
+import { ProposalPricingBreakdown } from '@/components/proposals/ProposalPricingBreakdown';
 import { listProposalItems } from '@/services/crm/proposal-items';
 import { getPaymentTerms, calculateInstallments } from '@/services/crm/proposal-payment-terms';
 import { PublicProposalApprovedScreen } from '@/components/proposals/PublicProposalApprovedScreen';
