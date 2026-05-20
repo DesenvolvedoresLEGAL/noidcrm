@@ -715,16 +715,19 @@ export async function acceptProposal(token: string): Promise<void> {
     throw new Error('Proposal not found');
   }
 
-  const { error } = await supabase
-    .from('proposals')
-    .update({
-      status: 'accepted',
-      accepted_at: new Date().toISOString(),
-      signature_status: 'accepted',
-    })
-    .eq('id', proposalId);
-
-  if (error) throw error;
+  // PRICE CORE 2.0C — central guard + freeze in a single RPC.
+  // Blocks acceptance when the proposal has divergent pricing values.
+  const { data: freezeRes, error: freezeErr } = await (supabase as any).rpc(
+    'freeze_proposal_approval',
+    { p_proposal_id: proposalId },
+  );
+  if (freezeErr) throw freezeErr;
+  if (!freezeRes?.ok) {
+    throw new Error(
+      freezeRes?.message ||
+        'Não foi possível aprovar a proposta. Existem valores divergentes. Recalcule antes de tentar novamente.',
+    );
+  }
 
   // Fire-and-forget: notify ERP about the accepted deal
   try {
