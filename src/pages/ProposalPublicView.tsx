@@ -1394,6 +1394,7 @@ export default function ProposalPublicView() {
                       <table className="w-full">
                         <thead>
                           <tr className="border-b bg-amber-50 dark:bg-amber-950/30">
+                            <th className="text-left py-2 px-2 md:py-3 md:px-4 font-medium text-xs md:text-sm w-20 md:w-24">Foto</th>
                             <th className="text-left py-2 px-2 md:py-3 md:px-4 font-medium text-xs md:text-sm">Item</th>
                             <th className="text-center py-2 px-2 md:py-3 md:px-4 font-medium text-xs md:text-sm">Qtd</th>
                             <th className="text-right py-2 px-2 md:py-3 md:px-4 font-medium text-xs md:text-sm hidden sm:table-cell">Preço Un.</th>
