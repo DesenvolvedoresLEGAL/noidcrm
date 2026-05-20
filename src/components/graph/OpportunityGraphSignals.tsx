@@ -590,10 +590,10 @@ export function OpportunityGraphSignals({ opportunityId }: OpportunityGraphSigna
                                 Champion
                               </Badge>
                             )}
-                            {isDecisionMaker && !isChampion && (
+                            {isDecisionMaker && (
                               <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-blue-500 text-blue-600">
                                 <Target className="h-2.5 w-2.5 mr-0.5" />
-                                Decision Maker
+                                Decisor
                               </Badge>
                             )}
                           </div>
