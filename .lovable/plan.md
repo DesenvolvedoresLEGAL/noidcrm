@@ -1,43 +1,89 @@
-## Ajustes nas miniaturas de produto + alinhamento da Apresentação + imagens no PDF
 
-Vou tratar 4 problemas reportados, sem mexer em lógica de preço/negócio.
+## Diagnóstico
 
-### 1. Editor da proposta (`ProposalItemsManager.tsx`)
-- Remover a miniatura 40×40 da esquerda do campo nome.
-- Adicionar uma **nova coluna "Foto"** logo após a coluna "Item", com thumb **64×64** arredondada, borda sutil e placeholder com ícone quando não houver imagem.
-- Ajustar o `<TableHeader>` para incluir o novo `<TableHead>Foto</TableHead>` e o `colSpan` de eventuais linhas de rodapé/totais.
+O site `abfexpo.com.br/expositores-2026/` **não** é o Swapcard (app.informamarkets.com.br) e por isso o provider `informa-markets.ts` atual não pega — ele só detecta hosts `*.informamarkets.com(.br)` com path `/event/.../exhibitors/...`.
 
-### 2. Link público (`ProposalPublicView.tsx`) — Itens Avulsos e Recorrentes
-- Remover a thumb 56×56 que hoje fica à esquerda do nome.
-- Adicionar uma **coluna dedicada "Foto"** depois da coluna "Item" nas duas tabelas (avulsos e recorrentes), com thumb **72×72** (60×60 no mobile), `object-cover`, borda e cantos arredondados.
-- Placeholder discreto (ícone em fundo `muted`) quando `image_url` for nulo, para manter alinhamento da coluna.
-- Atualizar `colSpan` das linhas de subtotal/desconto/total para refletir a coluna extra.
+O site da ABF é um Next.js marketing da Informa que renderiza um módulo `informa-exhibitor-list-module` vazio no SSR e busca os expositores client-side numa **API pública sem autenticação**:
 
-### 3. Bloco "Apresentação" desalinhado (`ProposalPublicView.tsx`)
-- O HTML do TipTap herda `text-align:center` quando o usuário centralizou parágrafos no editor; combinado com `prose max-w-4xl mx-auto` isso deixa o título "Apresentação" colado à esquerda e o corpo centralizado.
-- Mudar o container de `max-w-4xl mx-auto` para **largura total do card** (`max-w-none`) e deixar o alinhamento horizontal ser controlado pelo próprio HTML salvo. Aplicar o mesmo padrão nos blocos de Termos e Observações (linhas 1974 e 1989) para consistência.
-- Manter `prose prose-sm` para tipografia.
+```
+GET https://api-connect.informamarkets.com/api/v1/editions/BRZ26ABF/listings?lang=pt&page=1&limit=50
+```
 
-### 4. Imagem não aparece no PDF (`generate-proposal-pdf/index.ts`)
-Hoje a query em `proposal_items` lê `image_url`, mas itens antigos (criados antes do sync produto→item) têm `image_url = null`. Além disso, mesmo quando presente, o Puppeteer/Chromium do gerador pode pular imagens que ainda não carregaram quando snapshota a página.
+Verificado: retorna 205 expositores da ABF Expo 2026 em 5 páginas (status 200, ~80KB/página), com `paging.next` para iterar. O código da edição (`BRZ26ABF`) está embutido no payload SSR do Next.js como `"eventEditionCode":"BRZ26ABF"` (escapado dentro de `self.__next_f.push(...)`).
 
-Correções:
-- **Fallback de origem da imagem:** expandir o `select` para incluir `product:products(image_url)` e usar `item.image_url ?? item.product?.image_url` ao montar `thumb`.
-- **Coluna dedicada "Foto"** no `<table class="items-table">` (após "Item / Descrição"), thumb **72×72** com `border-radius:6px`. Ajustar larguras das colunas (Item passa de ~45% para ~38%, nova coluna Foto 12%).
-- Garantir que o gerador aguarde o carregamento das imagens antes do snapshot (`waitUntil: 'networkidle0'` se já não estiver, ou aguardar `img.complete`). Vou verificar/ajustar no ponto onde o HTML é convertido em PDF.
-- Manter `onerror="this.style.display='none'"` como salvaguarda.
+Esse padrão cobre toda a rede de marketing Informa BR (ABF Expo, Fispal, Hospitalar, etc.), não só ABF.
 
-### Arquivos a editar
-- `src/components/proposals/ProposalItemsManager.tsx`
-- `src/pages/ProposalPublicView.tsx`
-- `supabase/functions/generate-proposal-pdf/index.ts`
+## Plano
 
-### Fora de escopo
-- Upload de imagem direto pelo editor de itens (continua vindo do cadastro de Produto).
-- Mudança de largura geral do link público (já está em `max-w-7xl`).
-- Qualquer cálculo financeiro / RLS / multi-tenant.
+**Sem mexer em nenhum provider existente.** Adicionar 1 provider novo e plugá-lo no orquestrador.
 
-### Riscos
-- Coluna nova pode apertar layout em telas estreitas → mitigado escondendo a coluna Foto em `<sm` via `hidden sm:table-cell` no link público.
-- Itens muito antigos sem `image_url` nem produto vinculado mostrarão placeholder (intencional).
-- Mudar `max-w-4xl mx-auto` para `max-w-none` na Apresentação pode aumentar a largura de leitura — aceitável dado o pedido explícito de alinhamento.
+### 1. Novo provider `supabase/functions/lead-sourcing/providers/informa-connect.ts`
+
+Exporta:
+
+- `detectInformaConnect(url, html?)` — retorna `{ editionCode, eventSiteUrl }` quando:
+  - URL aponta para um site Informa marketing (heurística: HTML contém `informa-exhibitor-list-module` **ou** `BaseLayout_wrapper` **ou** `"eventEditionCode":"..."`); **e**
+  - consegue extrair o `eventEditionCode` via regex `/"eventEditionCode"\s*:\s*"([A-Z0-9_]+)"/` no HTML cru (cobre tanto JSON puro quanto a forma escapada `\"eventEditionCode\":\"...\"` do streaming Next.js).
+- `fetchInformaConnectExhibitors(editionCode, eventSiteUrl)` — pagina `/api/v1/editions/{code}/listings?lang=pt&page=N&limit=50` enquanto `data.paging.next` existir. Hard cap de 100 páginas (5000 expositores) por segurança.
+- `tryInformaConnectFromUrl(url)` — orquestra: faz `fetch` da URL → detecta → busca → normaliza.
+
+Normalização do item da API → schema padrão de exhibitor já usado pelos outros providers (`external_id`, `name`, `website`, `logo_url`, `source_url`, `booth`, `categories`, `address`):
+
+| Campo Kairós | Origem na API |
+|---|---|
+| `external_id` | `item.id` (com prefixo `informa-connect:`) |
+| `name` | `item.title` |
+| `website` | `item.website_url` ou `item.company.website` (vazio se placeholder) |
+| `logo_url` | `item.logo.original` (descartar se contiver `logo_placeholder`) |
+| `source_url` | `${eventSiteUrl}/elisting/${item.slug}` (ex: `https://www.abfexpo.com.br/elisting/5asec`) |
+| `booth` | `item.booths[0].booth_number` |
+| `categories` | `Object.values(item.categories || {})` |
+| `address` | composição de `item.address` (rua, cidade, estado, país) |
+
+### 2. Registrar no `providers/index.ts`
+
+Adicionar export do novo provider (mantendo todos os existentes intactos).
+
+### 3. Plugar no `supabase/functions/lead-sourcing/index.ts`
+
+Inserir a chamada `tryInformaConnectFromUrl` **antes** do fallback genérico (Firecrawl/AI hybrid) e **depois** dos providers mais específicos já registrados (ExpoFP, Informa Markets/Swapcard, DRTS, Francal/Totvs, InfraFM, MundoGeo, NM Brasil, SPA Next.js). Ordem importa: o provider só reivindica a URL quando o regex acha `eventEditionCode`, então não há risco de roubar URL de outro provider.
+
+### 4. Telemetria
+
+Logar no `run_events` (padrão já usado pelos outros providers): `provider="informa-connect"`, `edition_code`, `total_exhibitors`, `pages_fetched`, `firecrawl_credits_used=0`.
+
+## Detalhes técnicos
+
+- **Auth**: nenhum header especial necessário. Testado via `curl` retornando 200 sem cookie/token.
+- **Rate**: 5 páginas paralelas seguras; vou paginar **sequencialmente** (igual ExpoFP/Informa Markets) para não estressar o backend público da Informa.
+- **i18n**: hardcoded `lang=pt` (mesmo padrão do site).
+- **Edge cases**:
+  - Página sem `eventEditionCode` no HTML → provider retorna `null` e deixa o fallback agir.
+  - `data.paging.next === ""` → fim da paginação.
+  - `logo.original` contém `/sites/default/files/logo_placeholder_` → tratar como sem logo.
+  - `website_url` vazio é comum → deixar `null`, enriquecimento Apollo/Caramelo cuida depois.
+
+## Arquivos afetados
+
+- **NOVO**: `supabase/functions/lead-sourcing/providers/informa-connect.ts`
+- `supabase/functions/lead-sourcing/providers/index.ts` (apenas adicionar exports)
+- `supabase/functions/lead-sourcing/index.ts` (adicionar 1 bloco try/await na cadeia de providers)
+
+## Garantias de não-quebra
+
+- Zero alteração em `informa-markets.ts`, `expofp.ts`, `spa-nextjs.ts`, `drts-directory.ts`, `francal-totvs.ts`, `infrafm.ts`, `mundogeo.ts`, `nm-brasil.ts`.
+- Detecção exige match positivo (`eventEditionCode` regex) — URLs já cobertas por outros providers não acionam este.
+- Mesmo schema de saída dos demais providers → consumidores downstream (matching, enrichment, dedupe) não mudam.
+
+## Riscos
+
+- Se a Informa rotacionar o endpoint público (improvável, é a API que alimenta todos os sites institucionais deles), revalidar a URL base. Detecção fica isolada num único arquivo.
+- Sem proteção anti-bot observada hoje; se aparecer, basta adicionar `User-Agent` realista ao fetch.
+
+## Próximos passos após aprovação
+
+1. Implementar `informa-connect.ts`.
+2. Plugar no orquestrador.
+3. Deploy de `lead-sourcing`.
+4. Testar rodando Kairós em `https://www.abfexpo.com.br/expositores-2026/` e validar 205 expositores importados sem créditos Firecrawl.
+5. Atualizar memória `mem://architectural-decision/intelligence/` com o novo provider.
