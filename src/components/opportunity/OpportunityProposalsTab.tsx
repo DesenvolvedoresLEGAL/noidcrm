@@ -646,12 +646,22 @@ export function OpportunityProposalsTab({
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                           onClick={() => updateStatusMutation.mutate({ id: proposal.id, status: 'accepted' })}
-                          disabled={proposal.status === 'accepted' || updateStatusMutation.isPending}
+                          disabled={
+                            proposal.status === 'accepted' ||
+                            updateStatusMutation.isPending ||
+                            !!(proposal as any).pricing_has_divergence
+                          }
+                          title={
+                            (proposal as any).pricing_has_divergence
+                              ? 'Existem valores divergentes nesta proposta. Recalcule antes de continuar.'
+                              : undefined
+                          }
                           className="text-success"
                         >
                           <CheckCircle className="h-4 w-4 mr-2" />
                           Marcar como aceita
                         </DropdownMenuItem>
+
                         <DropdownMenuItem
                           onClick={() => updateStatusMutation.mutate({ id: proposal.id, status: 'rejected' })}
                           disabled={proposal.status === 'rejected' || updateStatusMutation.isPending}
