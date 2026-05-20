@@ -1306,6 +1306,17 @@ export default function ProposalEditor() {
                     <AlertDescription>{paymentTermsError}</AlertDescription>
                   </Alert>
                 )}
+                {proposalData && (
+                  <>
+                    <ProposalPricingDivergenceAlert proposal={proposalData} />
+                    {(() => { warnIfLedgerMissing(proposalData, 'ProposalEditor:payment-terms'); return null; })()}
+                    <ProposalPricingBreakdown
+                      proposal={proposalData}
+                      audience="internal"
+                      className="rounded-md border bg-card p-4"
+                    />
+                  </>
+                )}
                 {currentProposalId && (() => {
                   const p: any = proposalData ?? {};
                   // Use proposal DB fields as primary source of truth, fall back to template
