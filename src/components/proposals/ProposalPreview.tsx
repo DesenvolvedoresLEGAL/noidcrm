@@ -296,6 +296,9 @@ export function ProposalPreview({
 
   return (
     <div className="space-y-6">
+      {/* PRICE CORE 2.0B — divergence alert (visual only, does not block) */}
+      <ProposalPricingDivergenceAlert proposal={dynamicPricing} />
+
       {/* Header */}
       <Card>
         <CardHeader className="pb-3">
