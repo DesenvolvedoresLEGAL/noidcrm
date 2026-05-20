@@ -253,9 +253,14 @@ Deno.serve(async (req) => {
       base_amount: approved.base_amount || itemsNetTotal,
       approved_amount: approved.amount || null,
       amount_source: approved.source,
+      // PRICE CORE 2.0C — canonical ledger fields for auditing on ERP side.
+      pricing_erp_amount: pricingErpAmount || null,
+      pricing_breakdown_snapshot: (proposal as any).pricing_breakdown_snapshot || null,
+      approval_snapshot: (proposal as any).approval_snapshot || null,
       dynamic_pricing_enabled: approved.dynamic_enabled,
       dynamic_pricing_status: approved.dynamic_status,
       dynamic_pricing_snapshot: approved.snapshot,
+
       status: "won",
       won_date: proposal.accepted_at,
       created_at: proposal.created_at,
