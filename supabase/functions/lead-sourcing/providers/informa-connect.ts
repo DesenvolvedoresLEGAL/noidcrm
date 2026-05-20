@@ -139,21 +139,23 @@ export async function fetchInformaConnectExhibitors(
   let pagesFetched = 0;
   let totalCount: number | null = null;
 
-  let nextPath: string | null =
-    `/api/v1/editions/${encodeURIComponent(detection.editionCode)}/listings?lang=pt&page=1&limit=${PAGE_LIMIT}`;
-
-  while (nextPath && pagesFetched < MAX_PAGES) {
-    const url = nextPath.startsWith("http") ? nextPath : `${API_BASE}${nextPath}`;
+  // IMPORTANT: do not follow data.paging.next verbatim. Informa Connect returns
+  // `/api/v1/editions/<numeric-id>/listings?page=N...` for ABF, and that numeric
+  // edition URL currently returns HTTP 500. The stable public route is the
+  // eventEditionCode route (`BRZ26ABF`) with `lang=pt` on every page.
+  for (let page = 1; page <= MAX_PAGES; page++) {
+    const url = `${API_BASE}/api/v1/editions/${encodeURIComponent(detection.editionCode)}/listings?lang=pt&page=${page}&limit=${PAGE_LIMIT}`;
     const resp = await fetch(url, {
       headers: {
         "User-Agent": BROWSER_UA,
         "Accept": "application/json",
         "Referer": `${detection.eventSiteUrl}/`,
       },
+      signal: AbortSignal.timeout(20_000),
     });
     if (!resp.ok) {
       throw new Error(
-        `Informa Connect listings fetch failed: HTTP ${resp.status} (page ${pagesFetched + 1})`,
+        `Informa Connect listings fetch failed: HTTP ${resp.status} (page ${page})`,
       );
     }
 
@@ -175,7 +177,9 @@ export async function fetchInformaConnectExhibitors(
     }
 
     const nextRaw = data?.paging?.next;
-    nextPath = typeof nextRaw === "string" && nextRaw.length > 0 ? nextRaw : null;
+    const hasNext = typeof nextRaw === "string" && nextRaw.length > 0;
+    const reachedTotal = totalCount !== null && all.length >= totalCount;
+    if (!hasNext || reachedTotal || items.length === 0) break;
   }
 
   return {
