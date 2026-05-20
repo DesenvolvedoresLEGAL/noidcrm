@@ -393,3 +393,12 @@ verify_jwt = false
 
 [functions.check-proposal-pricing-tier-transition]
 verify_jwt = false
+
+[functions.erp-create-charge]
+verify_jwt = true
+
+[functions.erp-sync-charge-status]
+verify_jwt = true
+
+[functions.erp-payment-webhook]
+verify_jwt = false
