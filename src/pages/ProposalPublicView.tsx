@@ -44,7 +44,8 @@ import {
   Download,
   MapPin,
   ExternalLink,
-  MessageCircle
+  MessageCircle,
+  Image as ImageIcon
 } from 'lucide-react';
 import { getProposalByToken, declineProposal, trackView } from '@/services/crm/proposals';
 import { listProposalItems } from '@/services/crm/proposal-items';
@@ -1352,7 +1353,7 @@ export default function ProposalPublicView() {
             </CardHeader>
             <CardContent>
               <div 
-                className="prose prose-sm max-w-4xl mx-auto"
+                className="prose prose-sm max-w-none"
                 dangerouslySetInnerHTML={{ __html: sanitizeHtml(proposal.introduction) }}
               />
             </CardContent>
@@ -1375,7 +1376,7 @@ export default function ProposalPublicView() {
           const dpSnapItems: any = (proposal as any)?.dynamic_pricing_snapshot ?? null;
           const dpBreakdown = getDynamicPricingBreakdown(dpSnapItems, oneTimeTotal);
           const showDpBreakdown = dpBreakdown.active && dpBreakdown.hasAdjustment;
-          const colSpanLabel = hasItemDiscounts ? 4 : 3;
+          const colSpanLabel = hasItemDiscounts ? 5 : 4;
 
           return (
             <>
@@ -1393,6 +1394,7 @@ export default function ProposalPublicView() {
                       <table className="w-full">
                         <thead>
                           <tr className="border-b bg-amber-50 dark:bg-amber-950/30">
+                            <th className="text-left py-2 px-2 md:py-3 md:px-4 font-medium text-xs md:text-sm w-20 md:w-24">Foto</th>
                             <th className="text-left py-2 px-2 md:py-3 md:px-4 font-medium text-xs md:text-sm">Item</th>
                             <th className="text-center py-2 px-2 md:py-3 md:px-4 font-medium text-xs md:text-sm">Qtd</th>
                             <th className="text-right py-2 px-2 md:py-3 md:px-4 font-medium text-xs md:text-sm hidden sm:table-cell">Preço Un.</th>
@@ -1405,26 +1407,30 @@ export default function ProposalPublicView() {
                         <tbody>
                           {oneTimeItems.map(item => (
                             <tr key={item.id} className="border-b hover:bg-muted/30 transition-colors">
+                              <td className="py-3 px-2 md:py-4 md:px-4 align-top">
+                                {(item as any).image_url ? (
+                                  <img
+                                    src={(item as any).image_url}
+                                    alt={item.name}
+                                    loading="lazy"
+                                    className="h-16 w-16 md:h-[72px] md:w-[72px] rounded-md border object-cover bg-muted"
+                                    onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                                  />
+                                ) : (
+                                  <div className="h-16 w-16 md:h-[72px] md:w-[72px] rounded-md border bg-muted flex items-center justify-center" aria-hidden>
+                                    <ImageIcon className="h-5 w-5 text-muted-foreground/40" />
+                                  </div>
+                                )}
+                              </td>
                               <td className="py-3 px-2 md:py-4 md:px-4">
-                                <div className="flex items-start gap-3">
-                                  {(item as any).image_url && (
-                                    <img
-                                      src={(item as any).image_url}
-                                      alt={item.name}
-                                      loading="lazy"
-                                      className="h-10 w-10 md:h-14 md:w-14 rounded-md border object-cover flex-shrink-0 bg-muted"
-                                      onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                                <div className="min-w-0 flex-1">
+                                  <div className="font-medium text-sm md:text-base">{item.name}</div>
+                                  {item.description && (
+                                    <div 
+                                      className="text-xs md:text-sm text-muted-foreground prose prose-sm max-w-none mt-1"
+                                      dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.description) }}
                                     />
                                   )}
-                                  <div className="min-w-0 flex-1">
-                                    <div className="font-medium text-sm md:text-base">{item.name}</div>
-                                    {item.description && (
-                                      <div 
-                                        className="text-xs md:text-sm text-muted-foreground prose prose-sm max-w-none mt-1"
-                                        dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.description) }}
-                                      />
-                                    )}
-                                  </div>
                                 </div>
                               </td>
                               <td className="text-center py-3 px-2 md:py-4 md:px-4 text-sm">
@@ -1466,13 +1472,13 @@ export default function ProposalPublicView() {
                           {hasItemDiscounts && (
                             <>
                               <tr className="bg-muted/30">
-                                <td colSpan={2} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm text-muted-foreground sm:hidden">Subtotal Bruto</td>
-                                <td colSpan={hasItemDiscounts ? 4 : 3} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm text-muted-foreground hidden sm:table-cell">Subtotal Bruto</td>
+                                <td colSpan={3} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm text-muted-foreground sm:hidden">Subtotal Bruto</td>
+                                <td colSpan={colSpanLabel} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm text-muted-foreground hidden sm:table-cell">Subtotal Bruto</td>
                                 <td className="text-right py-2 px-2 md:py-3 md:px-4 text-sm">{formatCurrency(oneTimeSubtotal)}</td>
                               </tr>
                               <tr className="bg-muted/30">
-                                <td colSpan={2} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm text-red-600 sm:hidden">Descontos dos Itens</td>
-                                <td colSpan={hasItemDiscounts ? 4 : 3} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm text-red-600 hidden sm:table-cell">Descontos dos Itens</td>
+                                <td colSpan={3} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm text-red-600 sm:hidden">Descontos dos Itens</td>
+                                <td colSpan={colSpanLabel} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm text-red-600 hidden sm:table-cell">Descontos dos Itens</td>
                                 <td className="text-right py-2 px-2 md:py-3 md:px-4 text-sm text-red-600 font-medium">- {formatCurrency(oneTimeItemDiscount)}</td>
                               </tr>
                             </>
@@ -1480,12 +1486,12 @@ export default function ProposalPublicView() {
                           {showDpBreakdown ? (
                             <>
                               <tr className="bg-muted/30">
-                                <td colSpan={2} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm text-muted-foreground sm:hidden">Subtotal dos Itens</td>
+                                <td colSpan={3} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm text-muted-foreground sm:hidden">Subtotal dos Itens</td>
                                 <td colSpan={colSpanLabel} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm text-muted-foreground hidden sm:table-cell">Subtotal dos Itens</td>
                                 <td className="text-right py-2 px-2 md:py-3 md:px-4 text-sm">{formatCurrency(oneTimeTotal)}</td>
                               </tr>
                               <tr className="bg-amber-50/60 dark:bg-amber-950/20">
-                                <td colSpan={2} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm font-medium text-amber-700 dark:text-amber-300 sm:hidden">
+                                <td colSpan={3} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm font-medium text-amber-700 dark:text-amber-300 sm:hidden">
                                   Ajuste por antecedência ({dpBreakdown.adjustmentPercent >= 0 ? '+' : ''}{dpBreakdown.adjustmentPercent.toFixed(1)}%)
                                 </td>
                                 <td colSpan={colSpanLabel} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm font-medium text-amber-700 dark:text-amber-300 hidden sm:table-cell">
@@ -1496,7 +1502,7 @@ export default function ProposalPublicView() {
                                 </td>
                               </tr>
                               <tr className="bg-amber-50 dark:bg-amber-950/30 border-t-2 border-amber-300 dark:border-amber-700">
-                                <td colSpan={2} className="text-right py-3 px-2 md:py-4 md:px-4 font-bold text-sm md:text-base sm:hidden">Total Vigente Hoje</td>
+                                <td colSpan={3} className="text-right py-3 px-2 md:py-4 md:px-4 font-bold text-sm md:text-base sm:hidden">Total Vigente Hoje</td>
                                 <td colSpan={colSpanLabel} className="text-right py-3 px-2 md:py-4 md:px-4 font-bold text-sm md:text-base hidden sm:table-cell">Total Vigente Hoje</td>
                                 <td className="text-right py-3 px-2 md:py-4 md:px-4 font-bold text-base md:text-lg text-amber-700 dark:text-amber-300">
                                   {formatCurrency(dpBreakdown.current)}
@@ -1505,7 +1511,7 @@ export default function ProposalPublicView() {
                             </>
                           ) : (
                             <tr className="bg-amber-50 dark:bg-amber-950/30">
-                              <td colSpan={2} className="text-right py-3 px-2 md:py-4 md:px-4 font-bold text-sm md:text-base sm:hidden">Subtotal Avulso</td>
+                              <td colSpan={3} className="text-right py-3 px-2 md:py-4 md:px-4 font-bold text-sm md:text-base sm:hidden">Subtotal Avulso</td>
                               <td colSpan={colSpanLabel} className="text-right py-3 px-2 md:py-4 md:px-4 font-bold text-sm md:text-base hidden sm:table-cell">Subtotal Avulso</td>
                               <td className="text-right py-3 px-2 md:py-4 md:px-4 font-bold text-base md:text-lg">{formatCurrency(oneTimeTotal)}</td>
                             </tr>
@@ -1541,6 +1547,7 @@ export default function ProposalPublicView() {
                       <table className="w-full">
                         <thead>
                           <tr className="border-b bg-emerald-50 dark:bg-emerald-950/30">
+                            <th className="text-left py-2 px-2 md:py-3 md:px-4 font-medium text-xs md:text-sm w-20 md:w-24">Foto</th>
                             <th className="text-left py-2 px-2 md:py-3 md:px-4 font-medium text-xs md:text-sm">Item</th>
                             <th className="text-center py-2 px-2 md:py-3 md:px-4 font-medium text-xs md:text-sm">Qtd</th>
                             <th className="text-right py-2 px-2 md:py-3 md:px-4 font-medium text-xs md:text-sm hidden sm:table-cell">Preço/mês</th>
@@ -1553,26 +1560,30 @@ export default function ProposalPublicView() {
                         <tbody>
                           {recurringItems.map(item => (
                             <tr key={item.id} className="border-b hover:bg-muted/30 transition-colors">
+                              <td className="py-3 px-2 md:py-4 md:px-4 align-top">
+                                {(item as any).image_url ? (
+                                  <img
+                                    src={(item as any).image_url}
+                                    alt={item.name}
+                                    loading="lazy"
+                                    className="h-16 w-16 md:h-[72px] md:w-[72px] rounded-md border object-cover bg-muted"
+                                    onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                                  />
+                                ) : (
+                                  <div className="h-16 w-16 md:h-[72px] md:w-[72px] rounded-md border bg-muted flex items-center justify-center" aria-hidden>
+                                    <ImageIcon className="h-5 w-5 text-muted-foreground/40" />
+                                  </div>
+                                )}
+                              </td>
                               <td className="py-3 px-2 md:py-4 md:px-4">
-                                <div className="flex items-start gap-3">
-                                  {(item as any).image_url && (
-                                    <img
-                                      src={(item as any).image_url}
-                                      alt={item.name}
-                                      loading="lazy"
-                                      className="h-10 w-10 md:h-14 md:w-14 rounded-md border object-cover flex-shrink-0 bg-muted"
-                                      onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                                <div className="min-w-0 flex-1">
+                                  <div className="font-medium text-sm md:text-base">{item.name}</div>
+                                  {item.description && (
+                                    <div 
+                                      className="text-xs md:text-sm text-muted-foreground prose prose-sm max-w-none mt-1"
+                                      dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.description) }}
                                     />
                                   )}
-                                  <div className="min-w-0 flex-1">
-                                    <div className="font-medium text-sm md:text-base">{item.name}</div>
-                                    {item.description && (
-                                      <div 
-                                        className="text-xs md:text-sm text-muted-foreground prose prose-sm max-w-none mt-1"
-                                        dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.description) }}
-                                      />
-                                    )}
-                                  </div>
                                 </div>
                               </td>
                               <td className="text-center py-3 px-2 md:py-4 md:px-4 text-sm">{item.quantity}</td>
@@ -1597,20 +1608,20 @@ export default function ProposalPublicView() {
                           {hasRecurringItemDiscounts && (
                             <>
                               <tr className="bg-muted/30">
-                                <td colSpan={2} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm text-muted-foreground sm:hidden">Subtotal Bruto</td>
-                                <td colSpan={hasRecurringItemDiscounts ? 4 : 3} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm text-muted-foreground hidden sm:table-cell">Subtotal Bruto</td>
+                                <td colSpan={3} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm text-muted-foreground sm:hidden">Subtotal Bruto</td>
+                                <td colSpan={hasRecurringItemDiscounts ? 5 : 4} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm text-muted-foreground hidden sm:table-cell">Subtotal Bruto</td>
                                 <td className="text-right py-2 px-2 md:py-3 md:px-4 text-sm">{formatCurrency(recurringSubtotal)}/mês</td>
                               </tr>
                               <tr className="bg-muted/30">
-                                <td colSpan={2} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm text-red-600 sm:hidden">Descontos dos Itens</td>
-                                <td colSpan={hasRecurringItemDiscounts ? 4 : 3} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm text-red-600 hidden sm:table-cell">Descontos dos Itens</td>
+                                <td colSpan={3} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm text-red-600 sm:hidden">Descontos dos Itens</td>
+                                <td colSpan={hasRecurringItemDiscounts ? 5 : 4} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm text-red-600 hidden sm:table-cell">Descontos dos Itens</td>
                                 <td className="text-right py-2 px-2 md:py-3 md:px-4 text-sm text-red-600 font-medium">- {formatCurrency(recurringItemDiscount)}/mês</td>
                               </tr>
                             </>
                           )}
                           <tr className="bg-emerald-50 dark:bg-emerald-950/30">
-                            <td colSpan={2} className="text-right py-3 px-2 md:py-4 md:px-4 font-bold text-sm md:text-base sm:hidden">MRR Total</td>
-                            <td colSpan={hasRecurringItemDiscounts ? 4 : 3} className="text-right py-3 px-2 md:py-4 md:px-4 font-bold text-sm md:text-base hidden sm:table-cell">MRR Total</td>
+                            <td colSpan={3} className="text-right py-3 px-2 md:py-4 md:px-4 font-bold text-sm md:text-base sm:hidden">MRR Total</td>
+                            <td colSpan={hasRecurringItemDiscounts ? 5 : 4} className="text-right py-3 px-2 md:py-4 md:px-4 font-bold text-sm md:text-base hidden sm:table-cell">MRR Total</td>
                             <td className="text-right py-3 px-2 md:py-4 md:px-4 font-bold text-base md:text-lg text-emerald-600">{formatCurrency(recurringMRR)}/mês</td>
                           </tr>
                         </tfoot>
@@ -1971,7 +1982,7 @@ export default function ProposalPublicView() {
             </CardHeader>
             <CardContent>
               <div 
-                className="prose prose-sm max-w-4xl mx-auto"
+                className="prose prose-sm max-w-none"
                 dangerouslySetInnerHTML={{ __html: sanitizeHtml(proposal.terms) }}
               />
             </CardContent>
@@ -1986,7 +1997,7 @@ export default function ProposalPublicView() {
             </CardHeader>
             <CardContent>
               <div 
-                className="prose prose-sm max-w-4xl mx-auto"
+                className="prose prose-sm max-w-none"
                 dangerouslySetInnerHTML={{ __html: sanitizeHtml(proposal.notes) }}
               />
             </CardContent>
