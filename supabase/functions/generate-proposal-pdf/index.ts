@@ -157,23 +157,78 @@ serve(async (req) => {
   }
 });
 
+// PRICE CORE 2.0B — Ledger reader (mirrors src/lib/proposals/pricingLedger.ts)
+// When the proposal has a usable pricing_breakdown_snapshot, the PDF totals and
+// payment schedule MUST come from the ledger instead of summing items locally.
+// For accepted proposals with approved_amount, the approved snapshot wins.
+function getPdfPricingView(proposal: any) {
+  const status = proposal?.status;
+  const approvedAmount = proposal?.approved_amount;
+  const approvedSchedule = Array.isArray(proposal?.approved_payment_schedule)
+    ? proposal.approved_payment_schedule
+    : null;
+  const snap = proposal?.pricing_breakdown_snapshot;
+  const hasSnap = snap && typeof snap === 'object' && snap.version && snap.effective_amount != null;
+
+  if (!hasSnap) {
+    console.warn('[PRICE CORE 2.0B] PDF rendering without pricing_breakdown_snapshot, proposal', proposal?.id, 'status', status);
+    return null;
+  }
+
+  const md = snap.manual_discount ?? {};
+  const dyn = snap.dynamic_adjustment ?? {};
+  const num = (v: any, f = 0) => {
+    const n = typeof v === 'number' ? v : Number(v);
+    return Number.isFinite(n) ? n : f;
+  };
+
+  const isAcceptedFrozen = status === 'accepted' && approvedAmount != null;
+  const effectiveAmount = isAcceptedFrozen ? num(approvedAmount) : num(snap.effective_amount);
+  const paymentSchedule = isAcceptedFrozen && approvedSchedule && approvedSchedule.length
+    ? approvedSchedule
+    : (Array.isArray(snap.payment_schedule) ? snap.payment_schedule : []);
+
+  return {
+    subtotalItems: num(snap.subtotal_items),
+    recurringSubtotal: num(snap.recurring_subtotal),
+    manualDiscountPercent: num(md.percent),
+    manualDiscountAmount: num(md.amount),
+    inventoryAdjustmentAmount: num(snap.inventory_adjustment_amount),
+    baseAmount: num(snap.base_amount),
+    dynamicEnabled: !!dyn.enabled,
+    dynamicPercent: num(dyn.percent),
+    dynamicAmount: num(dyn.amount),
+    dynamicTierLabel: dyn.tier_label ?? null,
+    effectiveAmount,
+    paymentScheduleTotal: num(snap.payment_schedule_total),
+    paymentSchedule,
+    hasDivergence: !!snap.has_divergence,
+    frozen: isAcceptedFrozen,
+  };
+}
+
 function generateProposalHTML(proposal: any, items: any[], paymentTerms: any[], layoutPages: any[] = []): string {
   const org = proposal.organization;
   const opp = proposal.opportunity;
   const account = opp?.account;
   const contact = opp?.contact;
-  
-  // Separate items by billing_type
+
+  // PRICE CORE 2.0B — pricing ledger as primary source for totals + payment schedule
+  const ledger = getPdfPricingView(proposal);
+
+  // Separate items by billing_type (still needed to render the items table)
   const oneTimeItems = items.filter(item => item.billing_type !== 'recurring');
   const recurringItems = items.filter(item => item.billing_type === 'recurring');
   const oneTimeTotal = oneTimeItems.reduce((sum, item) => sum + (item.total || 0), 0);
   const recurringTotal = recurringItems.reduce((sum, item) => sum + (item.total || 0), 0);
-  
-  // Calculate totals
+
+  // Legacy totals (fallback only)
   const subtotal = items.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
-  const total = items.reduce((sum, item) => sum + item.total, 0);
+  const legacyTotal = items.reduce((sum, item) => sum + item.total, 0);
+  const total = ledger ? ledger.effectiveAmount : legacyTotal;
   const hasDiscount = items.some(item => item.discount_percent > 0);
   const hasBothTypes = oneTimeTotal > 0 && recurringTotal > 0;
+  const fmtBRL = (v: number) => `R$ ${Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   
   // Format rich text
   const formatRichText = (text: string) => {
