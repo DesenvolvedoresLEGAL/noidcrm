@@ -58,6 +58,22 @@ export function CloserPerformanceReportV2() {
     request,
   });
 
+  const { data: ssotSummary } = useClosedRevenueSummary({
+    surface: 'reports-closer-v2-totals',
+    organizationId: organization?.id,
+    start: effectiveDates.startDate,
+    end: effectiveDates.endDate,
+    pipelineIds: filters.pipelines?.length ? filters.pipelines : undefined,
+    sellerIds: filters.users && filters.users !== 'all' ? [filters.users] : undefined,
+  });
+  const { data: bySeller } = useRevenueBySeller({
+    surface: 'reports-closer-v2-per-seller',
+    organizationId: organization?.id,
+    start: effectiveDates.startDate,
+    end: effectiveDates.endDate,
+    pipelineIds: filters.pipelines?.length ? filters.pipelines : undefined,
+  });
+
   if (isLoading || teamVisibility.loading) return <ReportLoadingState cardCount={7} />;
   if (error) return <ReportErrorState message={(error as Error).message} onRetry={() => refetch()} />;
 
@@ -73,19 +89,24 @@ export function CloserPerformanceReportV2() {
   }
 
   const totals = computeCloserTotals(rows);
+  const sellerMap = new Map((bySeller ?? []).map((g) => [g.key, g] as const));
+  const wonRevenueSsot = ssotSummary?.total ?? totals.wonRevenue;
+  const wonCountSsot = ssotSummary?.count ?? totals.wonCount;
+  const avgTicketSsot = ssotSummary?.avgTicket ?? totals.avgTicket;
 
   return (
     <div className="space-y-4">
       <ReportMetaBar meta={meta} reportLabel="Performance Closer" />
+      <RevenueSsotBanner surface="Relatórios → Closer" />
       <ReportWarningsPanel confidence={meta?.confidence} />
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-7">
-        <MiniCard icon={DollarSign} label="Receita ganha" value={formatCurrency(totals.wonRevenue)} />
-        <MiniCard icon={Trophy} label="Ganhos" value={formatNumber(totals.wonCount)} />
+        <MiniCard icon={DollarSign} label="Receita ganha" value={formatCurrency(wonRevenueSsot)} />
+        <MiniCard icon={Trophy} label="Ganhos" value={formatNumber(wonCountSsot)} />
         <MiniCard icon={TrendingDown} label="Perdidas" value={formatNumber(totals.lostCount)} />
         <MiniCard icon={Activity} label="Ativos" value={formatNumber(totals.activeCount)} />
         <MiniCard icon={Target} label="Win rate" value={formatPct(totals.winRatePct)} />
-        <MiniCard icon={Wallet} label="Ticket médio" value={formatCurrency(totals.avgTicket)} />
+        <MiniCard icon={Wallet} label="Ticket médio" value={formatCurrency(avgTicketSsot)} />
         <MiniCard icon={Clock} label="Ciclo médio" value={formatDays(totals.avgCycleDays)} />
       </div>
 
@@ -109,19 +130,25 @@ export function CloserPerformanceReportV2() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map((r) => (
-                <TableRow key={r.closerUserId}>
-                  <TableCell className="font-medium">{r.closerName ?? '—'}</TableCell>
-                  <TableCell className="text-right">{formatNumber(r.wonCount)}</TableCell>
-                  <TableCell className="text-right">{formatNumber(r.lostCount)}</TableCell>
-                  <TableCell className="text-right">{formatNumber(r.activeCount)}</TableCell>
-                  <TableCell className="text-right font-medium">{formatCurrency(r.wonRevenue)}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(r.activePipelineValue)}</TableCell>
-                  <TableCell className="text-right">{formatPct(r.winRatePct)}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(r.avgWonTicket)}</TableCell>
-                  <TableCell className="text-right">{formatDays(r.avgSalesCycleDays)}</TableCell>
-                </TableRow>
-              ))}
+              {rows.map((r) => {
+                const ssot = sellerMap.get(r.closerUserId);
+                const wonCount = ssot?.count ?? r.wonCount;
+                const wonRev = ssot?.total ?? r.wonRevenue;
+                const avgTk = ssot?.avgTicket ?? r.avgWonTicket;
+                return (
+                  <TableRow key={r.closerUserId}>
+                    <TableCell className="font-medium">{r.closerName ?? '—'}</TableCell>
+                    <TableCell className="text-right">{formatNumber(wonCount)}</TableCell>
+                    <TableCell className="text-right">{formatNumber(r.lostCount)}</TableCell>
+                    <TableCell className="text-right">{formatNumber(r.activeCount)}</TableCell>
+                    <TableCell className="text-right font-medium">{formatCurrency(wonRev)}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(r.activePipelineValue)}</TableCell>
+                    <TableCell className="text-right">{formatPct(r.winRatePct)}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(avgTk)}</TableCell>
+                    <TableCell className="text-right">{formatDays(r.avgSalesCycleDays)}</TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </CardContent>
@@ -129,3 +156,4 @@ export function CloserPerformanceReportV2() {
     </div>
   );
 }
+
