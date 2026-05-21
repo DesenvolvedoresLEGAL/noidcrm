@@ -45,8 +45,8 @@ export function StageConversionReportV2() {
   const { data: ssotByPipeline } = useRevenueByPipeline({
     surface: 'reports-stages',
     organizationId: organization?.id,
-    start: effectiveDates?.from?.toISOString(),
-    end: effectiveDates?.to?.toISOString(),
+    start: effectiveDates?.startDate ? new Date(effectiveDates.startDate).toISOString() : undefined,
+    end: effectiveDates?.endDate ? new Date(effectiveDates.endDate).toISOString() : undefined,
   });
   const wonValueByPipeline = useMemo(() => {
     const m = new Map<string, number>();
