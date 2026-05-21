@@ -74,6 +74,7 @@ import {
 } from '@/lib/proposals/effectiveAmount';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
+import { resolveApprovedCommercialAmount } from '@/lib/proposals/resolveApprovedCommercialAmount';
 
 const proposalDetailsKey = (opportunityId: string) =>
   ['proposal-details', opportunityId] as const;
@@ -175,7 +176,7 @@ export function OpportunityProposalsTab({
     ],
     queryFn: async () => {
       const selectCols =
-        'id, proposal_number, title, total_amount, accepted_at, status, opportunity_id, currency, expires_at, public_token, approval_snapshot, approved_amount, updated_at, created_at';
+        'id, proposal_number, title, total_amount, accepted_at, status, opportunity_id, currency, expires_at, public_token, approval_snapshot, approved_amount, approved_payment_schedule, updated_at, created_at';
 
       // 1. Direct FK
       if (oppMeta?.accepted_proposal_id) {
@@ -427,12 +428,30 @@ export function OpportunityProposalsTab({
                     </p>
                   )}
                 </div>
-                <div className="text-right">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Valor aprovado</p>
-                  <p className="text-2xl font-bold text-success">
-                    {formatBRL(inheritedProposal.total_amount ?? 0, inheritedProposal.currency ?? 'BRL')}
-                  </p>
-                </div>
+                {(() => {
+                  const resolved = resolveApprovedCommercialAmount({
+                    opportunity: { accepted_proposal_id: inheritedProposal.id, valor_previsto: null },
+                    proposal: inheritedProposal as any,
+                  });
+                  const legacy = Number(inheritedProposal.total_amount ?? 0);
+                  const showLegacy =
+                    resolved.is_final_approved_value &&
+                    legacy > 0 &&
+                    Math.abs(legacy - resolved.approved_commercial_amount) > 0.01;
+                  return (
+                    <div className="text-right">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Valor aprovado</p>
+                      <p className="text-2xl font-bold text-success">
+                        {formatBRL(resolved.approved_commercial_amount, inheritedProposal.currency ?? 'BRL')}
+                      </p>
+                      {showLegacy && (
+                        <p className="text-[10px] text-muted-foreground mt-0.5">
+                          Valor original: {formatBRL(legacy, inheritedProposal.currency ?? 'BRL')}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
               <div className="flex gap-2 flex-wrap pt-2">
                 {inheritedProposal.opportunity_id && (
