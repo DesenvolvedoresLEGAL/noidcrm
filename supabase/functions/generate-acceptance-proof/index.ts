@@ -111,23 +111,6 @@ serve(async (req: Request) => {
     }
 
     const acceptedAt = new Date();
-    const approved = resolveApprovedProposalAmount(proposal as any);
-    const approvedValue = Number(Number(approved.amount || proposal.total_amount || proposal.value || proposal.opportunity?.valor_previsto || 0).toFixed(2));
-    const approvalSnapshot = {
-      proposal_id: proposalId,
-      approved_at: acceptedAt.toISOString(),
-      approved_amount: approvedValue,
-      amount_source: approved.source,
-      base_amount: approved.base_amount,
-      payment_expected_amount: proposal.payment_expected_amount ?? null,
-      dynamic_pricing: {
-        enabled: approved.dynamic_enabled,
-        status: approved.dynamic_status,
-        current_amount: approved.dynamic_amount,
-        current_tier_id: approved.current_tier_id,
-        current_label: approved.current_tier_label,
-      },
-    };
 
     // Generate acceptance hash
     const { data: hashData } = await supabaseClient.rpc(
@@ -150,12 +133,31 @@ serve(async (req: Request) => {
       console.warn("[acceptance] Ignoring non-UUID winReasonId:", winReasonId);
     }
 
-    // Update proposal with acceptance data + mirror feedback fields so we never lose them
+    const { data: freezeRes, error: freezeError } = await supabaseClient.rpc("freeze_proposal_approval", {
+      p_proposal_id: proposalId,
+      p_acceptor_name: acceptorName,
+      p_acceptor_document: acceptorDocument,
+    });
+
+    if (freezeError || !freezeRes?.ok) {
+      console.error("Failed to freeze proposal approval:", freezeError || freezeRes);
+      throw new Error(freezeRes?.message || "Failed to freeze proposal approval");
+    }
+
+    const approved = resolveApprovedProposalAmount({
+      ...(proposal as any),
+      approved_amount: freezeRes.approved_amount,
+      approved_payment_schedule: freezeRes.approved_payment_schedule,
+      approval_snapshot: freezeRes.approval_snapshot,
+    } as any);
+    const approvedValue = Number(Number(freezeRes.approved_amount || approved.amount || proposal.total_amount || proposal.value || proposal.opportunity?.valor_previsto || 0).toFixed(2));
+
+    // Store acceptance metadata + mirror feedback fields so we never lose them.
+    // Pricing/status are frozen exclusively by freeze_proposal_approval, avoiding
+    // duplicate contract creation and keeping the approved value canonical.
     const { error: updateError } = await supabaseClient
       .from("proposals")
       .update({
-        status: "accepted",
-        accepted_at: acceptedAt.toISOString(),
         acceptor_name: acceptorName,
         acceptor_document: acceptorDocument,
         acceptor_phone: acceptorPhone || null,
@@ -164,8 +166,6 @@ serve(async (req: Request) => {
         acceptor_ip: acceptorIp,
         acceptor_user_agent: acceptorUserAgent,
         acceptance_hash: acceptanceHash,
-        approved_amount: approvedValue,
-        approval_snapshot: approvalSnapshot,
         win_reason_id: safeWinReasonId,
         key_differentiator: keyDifferentiator || null,
         customer_feedback: customerFeedback || null,

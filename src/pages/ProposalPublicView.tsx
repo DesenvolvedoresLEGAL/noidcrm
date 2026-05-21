@@ -565,20 +565,6 @@ export default function ProposalPublicView() {
 
       console.log('[ProposalAccept] Direct approval (RPC freeze) succeeded!');
 
-      // Fire-and-forget: celebrations + Slack + notifications
-      supabase.functions.invoke('post-acceptance-effects', {
-        body: {
-          proposalId,
-          opportunityId: proposal?.opportunity?.id || null,
-        },
-      }).then(({ data, error: effectsError }) => {
-        if (effectsError) {
-          console.error('[ProposalAccept] post-acceptance-effects error (non-blocking):', effectsError);
-        } else {
-          console.log('[ProposalAccept] post-acceptance-effects result:', data);
-        }
-      });
-
       return { success: true, error: null };
     } catch (error) {
       console.error('[ProposalAccept] Direct approval exception:', error);
