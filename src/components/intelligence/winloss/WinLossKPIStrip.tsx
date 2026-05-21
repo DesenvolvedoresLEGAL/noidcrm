@@ -8,6 +8,12 @@ interface WinLossKPIStripProps {
   isLoading: boolean;
   terminology: { wonPlural: string; lostPlural: string; rateLabel: string };
   pipelineType?: string;
+  /** P0 Revenue SSoT — override de monetários ganhos vindo de commercial_won_revenue_view. */
+  ssotOverride?: {
+    wonCount?: number;
+    wonValue?: number;
+    avgTicketWon?: number;
+  };
 }
 
 // Para pipelines de venda, encurtamos os rótulos. Outros tipos mantêm a terminologia original.
