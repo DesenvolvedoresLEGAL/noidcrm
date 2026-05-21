@@ -28,7 +28,7 @@ function fmt(n: number) {
 
 export function VendasRealizadasTable() {
   const { effectiveDates } = useReportFiltersContext();
-  const { users } = useActiveUsers();
+  const { data: users } = useActiveUsers();
   const { pipelines } = useOrganizationPipelines();
 
   const [sellerUserId, setSellerUserId] = useState<string | undefined>(undefined);
