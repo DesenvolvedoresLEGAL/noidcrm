@@ -23,7 +23,7 @@ import {
   useAuditRuns, useAuditItems, useAuditItem,
   useRunAudit, useApplyAuditItem, useIgnoreAuditItem, useMarkAuditItemReview,
 } from '@/hooks/proposals/useProposalFinancialAudit';
-import type { AuditItem } from '@/services/proposals/proposalFinancialAuditService';
+import type { AuditItem, AuditScopeStatus } from '@/services/proposals/proposalFinancialAuditService';
 
 const SOURCE_LABEL: Record<string, string> = {
   approval_snapshot: 'Approval snapshot',
@@ -33,6 +33,18 @@ const SOURCE_LABEL: Record<string, string> = {
   payment_intent: 'Payment intent (evidência)',
   erp_payload: 'ERP (evidência)',
   manual_review: 'Revisão manual',
+  ledger: 'Ledger',
+  indeterminate: 'Indeterminado',
+};
+
+const SCOPE_LABEL: Record<AuditScopeStatus, { label: string; cls: string }> = {
+  in_scope: { label: 'In scope', cls: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400' },
+  needs_scope_review: { label: 'Revisar escopo', cls: 'bg-orange-500/10 text-orange-700 dark:text-orange-400' },
+  out_of_scope_duplicate: { label: 'Duplicada', cls: 'bg-muted text-muted-foreground' },
+  out_of_scope_superseded: { label: 'Substituída', cls: 'bg-muted text-muted-foreground' },
+  out_of_scope_draft: { label: 'Rascunho', cls: 'bg-muted text-muted-foreground' },
+  out_of_scope_old_version: { label: 'Versão antiga', cls: 'bg-muted text-muted-foreground' },
+  out_of_scope_non_winning: { label: 'Não vencedora', cls: 'bg-muted text-muted-foreground' },
 };
 
 const STATUS_VARIANT: Record<string, { label: string; cls: string }> = {
