@@ -570,8 +570,12 @@ export function useForecastData(filters: ForecastFilters) {
       ? individualSellerGoalQuery.data 
       : (orgGoalQuery.data || sellerGoalsQuery.data || salesGoalsTotal || 0);
 
-    // Use valor_previsto (real revenue) for forecast - commission_value is only for seller goals
-    const closedRevenue = closedOpps.reduce((sum, o) => sum + (o.valor_previsto ?? 0), 0);
+    // P0 Revenue SSoT — Receita Fechada vem de commercial_won_revenue_view.
+    // Fallback para soma legada apenas se SSoT ainda não retornou.
+    const ssotSummary = closedSsotQuery.data?.summary;
+    const closedRevenue = ssotSummary
+      ? ssotSummary.total
+      : closedOpps.reduce((sum, o) => sum + (o.valor_previsto ?? 0), 0);
     const totalPipeline = opportunities.reduce((sum, o) => sum + o.valor_previsto, 0);
     const weightedPipeline = opportunities.reduce((sum, o) => sum + (o.valor_previsto * o.prob / 100), 0);
 
