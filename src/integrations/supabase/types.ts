@@ -34304,6 +34304,30 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      audit_approved_amount_vs_approval_snapshot: {
+        Args: { p_end?: string; p_organization_id?: string; p_start?: string }
+        Returns: {
+          accepted_at: string
+          approved_amount_column: number
+          approved_payment_schedule_total: number
+          base_amount: number
+          cliente: string
+          delta_column_vs_snapshot: number
+          dynamic_label: string
+          manual_discount_amount: number
+          manual_discount_percent: number
+          proposal_id: string
+          proposal_number: string
+          ratio_col_over_snap: number
+          recommended_canonical_amount: number
+          recommended_source: string
+          review_required: boolean
+          risk_status: string
+          snapshot_approved_amount: number
+          snapshot_payment_expected_amount: number
+          warnings: string[]
+        }[]
+      }
       block_expired_trial: { Args: { org_id: string }; Returns: boolean }
       build_knowledge_graph: {
         Args: { p_build_type?: string; p_organization_id: string }
