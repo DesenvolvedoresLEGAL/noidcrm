@@ -30571,6 +30571,39 @@ export type Database = {
         }
         Relationships: []
       }
+      commission_eligibility_view: {
+        Row: {
+          accepted_proposal_id: string | null
+          account_id: string | null
+          account_name: string | null
+          approved_at: string | null
+          canonical_kind: string | null
+          commercial_amount: number | null
+          commercial_opportunity_id: string | null
+          commission_amount: number | null
+          commission_status: string | null
+          created_at: string | null
+          mrr_amount: number | null
+          nome_fantasia: string | null
+          one_shot_amount: number | null
+          operational_opportunity_id: string | null
+          opportunity_id: string | null
+          opportunity_title: string | null
+          organization_id: string | null
+          pipeline_id: string | null
+          pipeline_name: string | null
+          pipeline_type: string | null
+          proposal_number: string | null
+          revenue_confidence: string | null
+          review_required: boolean | null
+          seller_id: string | null
+          seller_name: string | null
+          status: string | null
+          warnings: string[] | null
+          won_at: string | null
+        }
+        Relationships: []
+      }
       crm_active_users_view: {
         Row: {
           avatar_url: string | null
