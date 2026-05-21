@@ -233,7 +233,7 @@ export function OpportunityProposalsTab({
     enabled: isOperationalHandoff,
   });
 
-  const isInheritedMode = isOperationalHandoff && !!inheritedProposal;
+
 
   const { data, isLoading } = useQuery({
     queryKey: [...proposalKeys.lists(), opportunityId],
