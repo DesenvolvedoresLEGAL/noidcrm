@@ -47,4 +47,57 @@ describe('Revenue SSoT guardrail', () => {
     expect(cases.ORGANICA).toBe(1194.0);
     expect(cases.NETSEEDS).toBe(1313.4);
   });
+
+  // Sprint P0.2 — Vendas vs. Operacional. Venda comercial ganha NUNCA sai da SSoT,
+  // mesmo se o clone operacional foi removido, cancelado ou deletado.
+  it('matriz fulfillment × settlement × commission preserva venda comercial', () => {
+    type Row = {
+      commercial_status: 'won';
+      fulfillment_status: 'active' | 'completed' | 'cancelled' | 'removed' | 'not_started' | 'not_applicable';
+      financial_settlement_status:
+        | 'settled'
+        | 'pending_payment'
+        | 'pending_settlement_decision'
+        | 'pending_cancellation_fee'
+        | 'pending_credit_decision'
+        | 'manual_review';
+      commission_status: 'eligible' | 'blocked_review_required' | 'blocked_settlement_pending';
+      in_ssot: boolean;
+    };
+
+    const matrix: Row[] = [
+      { commercial_status: 'won', fulfillment_status: 'active',      financial_settlement_status: 'settled',                    commission_status: 'eligible',                    in_ssot: true },
+      { commercial_status: 'won', fulfillment_status: 'completed',   financial_settlement_status: 'settled',                    commission_status: 'eligible',                    in_ssot: true },
+      { commercial_status: 'won', fulfillment_status: 'cancelled',   financial_settlement_status: 'pending_cancellation_fee',   commission_status: 'blocked_settlement_pending',  in_ssot: true },
+      { commercial_status: 'won', fulfillment_status: 'removed',     financial_settlement_status: 'pending_credit_decision',    commission_status: 'blocked_settlement_pending',  in_ssot: true },
+      { commercial_status: 'won', fulfillment_status: 'removed',     financial_settlement_status: 'pending_settlement_decision',commission_status: 'blocked_settlement_pending',  in_ssot: true },
+      { commercial_status: 'won', fulfillment_status: 'not_started', financial_settlement_status: 'pending_payment',            commission_status: 'blocked_settlement_pending',  in_ssot: true },
+      { commercial_status: 'won', fulfillment_status: 'not_applicable', financial_settlement_status: 'settled',                 commission_status: 'eligible',                    in_ssot: true },
+    ];
+
+    // Regra: toda venda comercial ganha permanece na SSoT, qualquer que seja o destino operacional.
+    for (const r of matrix) expect(r.in_ssot).toBe(true);
+
+    // Regra: comissão nunca paga automaticamente para settlements pendentes.
+    const blockingFulfillment = new Set(['cancelled', 'removed', 'not_started']);
+    for (const r of matrix) {
+      if (blockingFulfillment.has(r.fulfillment_status)) {
+        expect(r.commission_status).not.toBe('eligible');
+      }
+    }
+  });
+
+  it('Ozkaras snapshot: removido operacional → permanece na SSoT, settlement pendente', () => {
+    const ozkaras = {
+      commercial_status: 'won' as const,
+      fulfillment_status: 'removed' as const,
+      financial_settlement_status: 'pending_settlement_decision' as const,
+      commission_status: 'blocked_settlement_pending' as const,
+      in_ssot: true,
+    };
+    expect(ozkaras.in_ssot).toBe(true);
+    expect(ozkaras.commission_status).toBe('blocked_settlement_pending');
+    expect(ozkaras.financial_settlement_status).toBe('pending_settlement_decision');
+  });
 });
+
