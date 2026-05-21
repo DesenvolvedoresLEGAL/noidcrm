@@ -220,3 +220,52 @@ function ConfidenceBadge({ confidence, reviewRequired }: { confidence: string; r
   }
   return <Badge variant="outline" className="gap-1"><ShieldCheck className="h-3 w-3" />Trusted</Badge>;
 }
+
+function CommercialStatusBadge({ status }: { status?: string | null }) {
+  if (status === 'won') return <Badge variant="default" className="text-[10px]">Ganha</Badge>;
+  if (status === 'lost') return <Badge variant="destructive" className="text-[10px]">Perdida</Badge>;
+  return <Badge variant="outline" className="text-[10px]">{status ?? '—'}</Badge>;
+}
+
+const FULFILLMENT_LABEL: Record<string, string> = {
+  active: 'Ativo',
+  completed: 'Concluído',
+  cancelled: 'Cancelado',
+  removed: 'Removido',
+  not_started: 'Não iniciado',
+  not_applicable: 'N/A',
+};
+function FulfillmentBadge({ status }: { status?: string | null }) {
+  if (!status) return <span className="text-xs text-muted-foreground">—</span>;
+  const variant: any =
+    status === 'completed' || status === 'active' ? 'default'
+    : status === 'removed' || status === 'cancelled' ? 'destructive'
+    : 'secondary';
+  return <Badge variant={variant} className="text-[10px]">{FULFILLMENT_LABEL[status] ?? status}</Badge>;
+}
+
+const SETTLEMENT_LABEL: Record<string, string> = {
+  settled: 'Liquidado',
+  pending_payment: 'Aguard. pagamento',
+  pending_settlement_decision: 'Aguard. decisão',
+  pending_cancellation_fee: 'Aguard. multa',
+  pending_credit_decision: 'Aguard. crédito',
+  manual_review: 'Revisão manual',
+};
+function SettlementBadge({ status }: { status?: string | null }) {
+  if (!status) return <span className="text-xs text-muted-foreground">—</span>;
+  const variant: any = status === 'settled' ? 'default' : status === 'manual_review' ? 'destructive' : 'secondary';
+  return <Badge variant={variant} className="text-[10px]">{SETTLEMENT_LABEL[status] ?? status}</Badge>;
+}
+
+const COMMISSION_LABEL: Record<string, string> = {
+  eligible: 'Elegível',
+  blocked_review_required: 'Em revisão',
+  blocked_settlement_pending: 'Aguard. settlement',
+};
+function CommissionBadge({ status }: { status?: string | null }) {
+  if (!status) return <span className="text-xs text-muted-foreground">—</span>;
+  const variant: any = status === 'eligible' ? 'default' : status === 'blocked_review_required' ? 'destructive' : 'secondary';
+  return <Badge variant={variant} className="text-[10px]">{COMMISSION_LABEL[status] ?? status}</Badge>;
+}
+
