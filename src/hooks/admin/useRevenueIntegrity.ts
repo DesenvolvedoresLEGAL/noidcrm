@@ -32,6 +32,16 @@ export interface SurfaceComparison {
   source: string;
 }
 
+export interface FulfillmentPersistenceCheck {
+  opportunity_id: string;
+  account_name: string | null;
+  commercial_status: string | null;
+  fulfillment_status: string | null;
+  financial_settlement_status: string | null;
+  present_in_ssot: boolean;
+  mismatch: boolean;
+}
+
 export interface RevenueIntegrityResult {
   period: { start: string; end: string };
   ssotTotals: {
@@ -44,8 +54,10 @@ export interface RevenueIntegrityResult {
   surfaces: SurfaceComparison[];
   rows: SSoTRow[];
   reviewRows: SSoTRow[];
+  fulfillmentPersistence: FulfillmentPersistenceCheck[];
   anyMismatch: boolean;
 }
+
 
 const EPSILON = 0.01;
 const cmp = (shown: number | null | undefined, ssot: number, surface: string, source: string): SurfaceComparison => {
