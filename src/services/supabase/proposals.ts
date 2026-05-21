@@ -830,6 +830,20 @@ export async function declineProposal(token: string, reason: string): Promise<vo
  * shows the "Aceita" or "Recusada" banner.
  */
 export async function reopenProposal(proposalId: string): Promise<Proposal> {
+  // 1) Reset server-side de aprovação (limpa freeze, approved_amount,
+  //    approval_snapshot, approved_payment_schedule, approved tier) e
+  //    recalcula o ledger da condição atual. RPC SECURITY DEFINER respeita
+  //    NOT NULL ({}::jsonb) e o trigger guard_proposal_freeze_consistency.
+  const { error: resetErr } = await (supabase as any).rpc(
+    'reset_proposal_approval_state',
+    { p_proposal_id: proposalId },
+  );
+  if (resetErr) {
+    console.error('[reopenProposal] reset_proposal_approval_state failed:', resetErr);
+    throw resetErr;
+  }
+
+  // 2) Limpa marcadores terminais e devolve para "Aberta" (sent).
   const { data, error } = await supabase
     .from('proposals')
     .update({
@@ -837,6 +851,14 @@ export async function reopenProposal(proposalId: string): Promise<Proposal> {
       accepted_at: null,
       declined_at: null,
       declined_reason: null,
+      acceptor_name: null,
+      acceptor_document: null,
+      acceptor_phone: null,
+      acceptor_email: null,
+      acceptor_position: null,
+      acceptor_ip: null,
+      acceptor_user_agent: null,
+      acceptance_hash: null,
       signature_status: 'pending',
       sent_at: new Date().toISOString(),
     })
