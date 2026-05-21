@@ -3,6 +3,7 @@ import { Layout } from '@/components/Layout';
 import { Card, CardContent } from '@/components/ui/card';
 import { ReportTabs } from '@/components/reports/ReportTabs';
 import { CompactFilters } from '@/components/reports/CompactFilters';
+import { VendasRealizadasWrapper } from '@/components/reports/wrappers/VendasRealizadasWrapper';
 import { GeneralOverviewWrapper } from '@/components/reports/wrappers/GeneralOverviewWrapper';
 import { ProcessedOpportunitiesWrapper } from '@/components/reports/wrappers/ProcessedOpportunitiesWrapper';
 import { LostReasonsWrapper } from '@/components/reports/wrappers/LostReasonsWrapper';
@@ -29,7 +30,7 @@ function ReportsContent() {
   const { pipelines: availablePipelines, loading: loadingPipelines } = useOrganizationPipelines();
   const { users: availableUsers, loading: loadingUsers } = useOrganizationUsers();
   
-  const [activeReport, setActiveReport] = useState('general');
+  const [activeReport, setActiveReport] = useState('vendas-realizadas');
   const { filters, isGenerating, updateFilters, togglePipeline, generateReport, setFilters } = useReportFiltersContext();
 
   // Auto-select all pipelines when loaded
@@ -44,6 +45,8 @@ function ReportsContent() {
 
   const renderReport = () => {
     switch (activeReport) {
+      case 'vendas-realizadas':
+        return <VendasRealizadasWrapper />;
       case 'general':
         return <GeneralOverviewWrapper />;
       case 'ai-insights':
@@ -77,7 +80,7 @@ function ReportsContent() {
       case 'products':
         return <ProductsReport />;
       default:
-        return <GeneralOverviewWrapper />;
+        return <VendasRealizadasWrapper />;
     }
   };
 
