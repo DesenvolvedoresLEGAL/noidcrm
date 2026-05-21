@@ -1,6 +1,11 @@
 /**
  * P0 Revenue SSoT — Compara cada superfície contra commercial_won_revenue_view.
  * Read-only. Nenhum efeito colateral.
+ *
+ * Sprint pendente:
+ *  - displayed_value/displayed_source vêm do hook/serviço real consumido pela tela.
+ *  - Não comparamos SSoT contra SSoT: superfícies já migradas registram status='ssot_native'.
+ *  - Diagnóstico per-sale: only_in_surface, only_in_ssot, amount_diff (vs v_opportunity_amounts_v2).
  */
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -23,13 +28,36 @@ export interface SSoTRow {
   commercial_amount_source: string;
 }
 
+export type SurfaceStatus = 'ok' | 'mismatch' | 'unavailable' | 'ssot_native';
+
 export interface SurfaceComparison {
   surface: string;
-  shown: number | null;
-  ssot: number;
+  displayed_value: number | null;
+  displayed_source: string;
+  ssot_value: number;
   delta: number;
-  mismatch: boolean;
+  date_range: { start: string; end: string };
+  date_field: string;
+  hook_service: string;
+  view_rpc_edge: string;
+  status: SurfaceStatus;
+  /** Mantido para compatibilidade com UI existente. */
+  shown: number | null;
   source: string;
+  mismatch: boolean;
+}
+
+export interface PerSaleDiff {
+  opportunity_id: string;
+  proposal_number: string | null;
+  cliente: string | null;
+  vendedor: string | null;
+  won_at: string | null;
+  commercial_amount: number;
+  surface_amount: number | null;
+  amount_diff: number;
+  only_in_surface: boolean;
+  only_in_ssot: boolean;
 }
 
 export interface FulfillmentPersistenceCheck {
@@ -55,16 +83,50 @@ export interface RevenueIntegrityResult {
   rows: SSoTRow[];
   reviewRows: SSoTRow[];
   fulfillmentPersistence: FulfillmentPersistenceCheck[];
+  /** Diferenças por venda entre v_opportunity_amounts_v2 (relatórios legados) e SSoT. */
+  perSaleDiffs: PerSaleDiff[];
   anyMismatch: boolean;
 }
 
-
 const EPSILON = 0.01;
-const cmp = (shown: number | null | undefined, ssot: number, surface: string, source: string): SurfaceComparison => {
-  const s = typeof shown === 'number' ? shown : null;
-  const delta = s === null ? 0 : Math.round((s - ssot) * 100) / 100;
-  return { surface, shown: s, ssot, delta, mismatch: s !== null && Math.abs(delta) > EPSILON, source };
-};
+
+interface BuildArgs {
+  surface: string;
+  displayed: number | null;
+  displayedSource: string;
+  ssotValue: number;
+  dateField: string;
+  hookService: string;
+  viewRpcEdge: string;
+  range: { start: string; end: string };
+  native?: boolean;
+}
+
+function buildComparison({
+  surface, displayed, displayedSource, ssotValue, dateField, hookService, viewRpcEdge, range, native,
+}: BuildArgs): SurfaceComparison {
+  const shown = typeof displayed === 'number' ? displayed : null;
+  const delta = shown === null ? 0 : Math.round((shown - ssotValue) * 100) / 100;
+  let status: SurfaceStatus;
+  if (native) status = 'ssot_native';
+  else if (shown === null) status = 'unavailable';
+  else status = Math.abs(delta) > EPSILON ? 'mismatch' : 'ok';
+  return {
+    surface,
+    displayed_value: shown,
+    displayed_source: displayedSource,
+    ssot_value: ssotValue,
+    delta,
+    date_range: range,
+    date_field: dateField,
+    hook_service: hookService,
+    view_rpc_edge: viewRpcEdge,
+    status,
+    shown,
+    source: displayedSource,
+    mismatch: status === 'mismatch',
+  };
+}
 
 export function useRevenueIntegrity(organizationId?: string | null, start?: string, end?: string) {
   return useQuery({
@@ -73,6 +135,7 @@ export function useRevenueIntegrity(organizationId?: string | null, start?: stri
     staleTime: 30_000,
     queryFn: async (): Promise<RevenueIntegrityResult | null> => {
       if (!organizationId || !start || !end) return null;
+      const range = { start, end };
 
       // 1) SSoT — fonte única
       const { data: ssotData, error: ssotErr } = await (supabase as any)
@@ -97,7 +160,7 @@ export function useRevenueIntegrity(organizationId?: string | null, start?: stri
         { won_count: 0, commercial_amount: 0, mrr_amount: 0, one_shot_amount: 0, review_required_count: 0 },
       );
 
-      // 2) RPC unificada (consumida por BI Forecast e algumas telas legadas)
+      // 2) RPC unificada (consumida por algumas telas legadas)
       const { data: rpcData, error: rpcErr } = await (supabase as any).rpc('get_unified_won_revenue_v2', {
         p_organization_id: organizationId,
         p_start: start,
@@ -106,7 +169,7 @@ export function useRevenueIntegrity(organizationId?: string | null, start?: stri
       if (rpcErr) throw rpcErr;
       const rpc = (Array.isArray(rpcData) ? rpcData[0] : rpcData) || {};
 
-      // 3) v_opportunity_amounts_v2 — usado por Relatórios (Geral, Processadas, Closer, Performance, Ranking, Forecast principal)
+      // 3) v_opportunity_amounts_v2 — usado por Relatórios legados
       const { data: oppAmt, error: oppErr } = await (supabase as any)
         .from('v_opportunity_amounts_v2')
         .select('opportunity_id, net_revenue_final, status, won_at, organization_id')
@@ -115,34 +178,159 @@ export function useRevenueIntegrity(organizationId?: string | null, start?: stri
         .gte('won_at', start)
         .lte('won_at', end);
       if (oppErr) throw oppErr;
-      const reportsSum = (oppAmt ?? []).reduce((s: number, r: any) => s + (Number(r.net_revenue_final) || 0), 0);
+      const reportsRows = (oppAmt ?? []) as Array<{ opportunity_id: string; net_revenue_final: number | null }>;
+      const reportsSum = reportsRows.reduce((s, r) => s + (Number(r.net_revenue_final) || 0), 0);
 
-      // Win/Loss Ganhos — após Sprint P0 lê do mesmo SSoT, então deve bater por construção.
-      const winLossGanhos = ssotTotals.commercial_amount;
-      const winLossTicketMedio = ssotTotals.won_count > 0 ? ssotTotals.commercial_amount / ssotTotals.won_count : 0;
-      const ssotTicketMedio = ssotTotals.won_count > 0 ? ssotTotals.commercial_amount / ssotTotals.won_count : 0;
+      // Per-sale diagnosis: v_opportunity_amounts_v2 vs SSoT
+      const ssotMap = new Map(rows.map((r) => [r.opportunity_id, r]));
+      const surfaceMap = new Map(reportsRows.map((r) => [r.opportunity_id, Number(r.net_revenue_final) || 0]));
+      const allIds = new Set<string>([...ssotMap.keys(), ...surfaceMap.keys()]);
+      const perSaleDiffs: PerSaleDiff[] = [];
+      allIds.forEach((id) => {
+        const ssot = ssotMap.get(id);
+        const surfaceAmt = surfaceMap.has(id) ? surfaceMap.get(id)! : null;
+        const commercial = ssot ? Number(ssot.commercial_amount) || 0 : 0;
+        const diff = surfaceAmt === null ? -commercial : Math.round((surfaceAmt - commercial) * 100) / 100;
+        const onlyInSurface = !ssot && surfaceAmt !== null;
+        const onlyInSsot = !!ssot && surfaceAmt === null;
+        if (onlyInSurface || onlyInSsot || Math.abs(diff) > EPSILON) {
+          perSaleDiffs.push({
+            opportunity_id: id,
+            proposal_number: ssot?.proposal_number ?? null,
+            cliente: ssot?.nome_fantasia ?? ssot?.account_name ?? null,
+            vendedor: ssot?.seller_name ?? null,
+            won_at: ssot?.won_at ?? null,
+            commercial_amount: commercial,
+            surface_amount: surfaceAmt,
+            amount_diff: diff,
+            only_in_surface: onlyInSurface,
+            only_in_ssot: onlyInSsot,
+          });
+        }
+      });
 
+      // Lista de superfícies (legacy vs migradas)
       const surfaces: SurfaceComparison[] = [
-        cmp(ssotTotals.commercial_amount, ssotTotals.commercial_amount, 'Dashboard Owner — Receita Fechada', 'commercial_won_revenue_view'),
-        cmp(ssotTotals.one_shot_amount, ssotTotals.one_shot_amount, 'Dashboard Owner — Receita Avulsa', 'commercial_won_revenue_view.one_shot_amount'),
-        cmp(ssotTotals.mrr_amount, ssotTotals.mrr_amount, 'Dashboard Owner — Novo MRR', 'commercial_won_revenue_view.mrr_amount'),
-        cmp(Number(rpc.won_revenue), ssotTotals.commercial_amount, 'Forecast principal — Fechado', 'get_unified_won_revenue_v2'),
-        cmp(Number(rpc.won_revenue), ssotTotals.commercial_amount, 'BI Forecast — Receita Fechada', 'get_unified_won_revenue_v2'),
-        cmp(Number(rpc.one_time_value), ssotTotals.one_shot_amount, 'BI — Receita Avulsa', 'get_unified_won_revenue_v2.one_time_value'),
-        cmp(Number(rpc.mrr_value), ssotTotals.mrr_amount, 'BI — Novo MRR', 'get_unified_won_revenue_v2.mrr_value'),
-        cmp(reportsSum, ssotTotals.commercial_amount, 'Relatórios Geral — Receita Fechada', 'v_opportunity_amounts_v2'),
-        cmp(reportsSum, ssotTotals.commercial_amount, 'Relatórios Processadas — Valor Ganho', 'v_opportunity_amounts_v2'),
-        cmp(reportsSum, ssotTotals.commercial_amount, 'Relatórios Closer — Receita Fechada', 'v_opportunity_amounts_v2'),
-        cmp(reportsSum, ssotTotals.commercial_amount, 'Relatórios Performance — Receita', 'v_opportunity_amounts_v2'),
-        cmp(reportsSum, ssotTotals.commercial_amount, 'Ranking — Soma por vendedor', 'v_opportunity_amounts_v2'),
-        cmp(ssotTotals.commercial_amount, ssotTotals.commercial_amount, 'Relatórios → Vendas Realizadas', 'commercial_won_revenue_view'),
-        cmp(winLossGanhos, ssotTotals.commercial_amount, 'Win/Loss — Valor Ganho', 'commercial_won_revenue_view (Sprint P0)'),
-        cmp(winLossTicketMedio, ssotTicketMedio, 'Win/Loss — Ticket Médio Ganho', 'commercial_won_revenue_view (Sprint P0)'),
-        cmp(ssotTotals.commercial_amount, ssotTotals.commercial_amount, 'Comissão — Base', 'commission_eligibility_view'),
+        buildComparison({
+          surface: 'Relatórios → Vendas Realizadas',
+          displayed: ssotTotals.commercial_amount,
+          displayedSource: 'useVendasRealizadas → commercial_won_revenue_view',
+          ssotValue: ssotTotals.commercial_amount,
+          dateField: 'won_at',
+          hookService: 'useVendasRealizadas',
+          viewRpcEdge: 'commercial_won_revenue_view',
+          range,
+          native: true,
+        }),
+        buildComparison({
+          surface: 'Dashboard Owner — Receita Fechada',
+          displayed: ssotTotals.commercial_amount,
+          displayedSource: 'useClosedRevenueSummary',
+          ssotValue: ssotTotals.commercial_amount,
+          dateField: 'won_at',
+          hookService: 'useClosedRevenueSummary',
+          viewRpcEdge: 'commercial_won_revenue_view',
+          range,
+          native: true,
+        }),
+        buildComparison({
+          surface: 'Forecast principal — Receita Fechada',
+          displayed: ssotTotals.commercial_amount,
+          displayedSource: 'useForecastData.kpis.closedRevenue (SSoT override)',
+          ssotValue: ssotTotals.commercial_amount,
+          dateField: 'won_at',
+          hookService: 'useForecastData + revenueSsotService',
+          viewRpcEdge: 'commercial_won_revenue_view',
+          range,
+          native: true,
+        }),
+        buildComparison({
+          surface: 'BI Forecast — Receita Fechada (RPC)',
+          displayed: Number(rpc.won_revenue),
+          displayedSource: 'get_unified_won_revenue_v2.won_revenue',
+          ssotValue: ssotTotals.commercial_amount,
+          dateField: 'closed_at',
+          hookService: 'BI Forecast widget',
+          viewRpcEdge: 'rpc get_unified_won_revenue_v2',
+          range,
+        }),
+        buildComparison({
+          surface: 'BI — Receita Avulsa (RPC)',
+          displayed: Number(rpc.one_time_value),
+          displayedSource: 'get_unified_won_revenue_v2.one_time_value',
+          ssotValue: ssotTotals.one_shot_amount,
+          dateField: 'closed_at',
+          hookService: 'BI Forecast widget',
+          viewRpcEdge: 'rpc get_unified_won_revenue_v2',
+          range,
+        }),
+        buildComparison({
+          surface: 'BI — Novo MRR (RPC)',
+          displayed: Number(rpc.mrr_value),
+          displayedSource: 'get_unified_won_revenue_v2.mrr_value',
+          ssotValue: ssotTotals.mrr_amount,
+          dateField: 'closed_at',
+          hookService: 'BI Forecast widget',
+          viewRpcEdge: 'rpc get_unified_won_revenue_v2',
+          range,
+        }),
+        buildComparison({
+          surface: 'Relatórios Geral / Processadas / Closer / Performance — soma legada',
+          displayed: reportsSum,
+          displayedSource: 'v_opportunity_amounts_v2.net_revenue_final',
+          ssotValue: ssotTotals.commercial_amount,
+          dateField: 'won_at',
+          hookService: 'edge report-* (legacy)',
+          viewRpcEdge: 'view v_opportunity_amounts_v2',
+          range,
+        }),
+        buildComparison({
+          surface: 'Relatórios v2 (migrado) — Receita Ganha',
+          displayed: ssotTotals.commercial_amount,
+          displayedSource: 'useClosedRevenueSummary (override v2)',
+          ssotValue: ssotTotals.commercial_amount,
+          dateField: 'won_at',
+          hookService: 'useClosedRevenueSummary',
+          viewRpcEdge: 'commercial_won_revenue_view',
+          range,
+          native: true,
+        }),
+        buildComparison({
+          surface: 'Relatórios → Estágios — etapa Ganhamos',
+          displayed: ssotTotals.commercial_amount,
+          displayedSource: 'useRevenueByPipeline override em Ganhamos',
+          ssotValue: ssotTotals.commercial_amount,
+          dateField: 'won_at',
+          hookService: 'useRevenueByPipeline',
+          viewRpcEdge: 'commercial_won_revenue_view (agrupado por pipeline)',
+          range,
+          native: true,
+        }),
+        buildComparison({
+          surface: 'Win/Loss — Valor Ganho / Ticket Médio Ganho',
+          displayed: ssotTotals.commercial_amount,
+          displayedSource: 'useClosedRevenueSummary (ssotOverride)',
+          ssotValue: ssotTotals.commercial_amount,
+          dateField: 'won_at',
+          hookService: 'useClosedRevenueSummary',
+          viewRpcEdge: 'commercial_won_revenue_view',
+          range,
+          native: true,
+        }),
+        buildComparison({
+          surface: 'Comissão — Base elegível',
+          displayed: ssotTotals.commercial_amount,
+          displayedSource: 'commission_eligibility_view',
+          ssotValue: ssotTotals.commercial_amount,
+          dateField: 'won_at',
+          hookService: 'commission services',
+          viewRpcEdge: 'commission_eligibility_view (deriva de SSoT)',
+          range,
+          native: true,
+        }),
       ];
 
       // Diagnóstico: venda comercial deve persistir na SSoT mesmo se operacional foi removido/cancelado.
-      // Também garante que não há duplicação (mesma opportunity_id aparece exatamente uma vez).
       const idCounts = new Map<string, number>();
       for (const r of rows) idCounts.set(r.opportunity_id, (idCounts.get(r.opportunity_id) ?? 0) + 1);
 
@@ -150,7 +338,7 @@ export function useRevenueIntegrity(organizationId?: string | null, start?: stri
         .map((r: any) => {
           const fs = r.fulfillment_status as string | null;
           const isRemovedOrCancelled = fs === 'removed' || fs === 'cancelled';
-          const presentInSsot = true; // já veio do SSoT
+          const presentInSsot = true;
           const duplicated = (idCounts.get(r.opportunity_id) ?? 0) > 1;
           return {
             opportunity_id: r.opportunity_id,
@@ -164,7 +352,10 @@ export function useRevenueIntegrity(organizationId?: string | null, start?: stri
         })
         .filter((c) => c.mismatch || c.fulfillment_status === 'removed' || c.fulfillment_status === 'cancelled');
 
-      const anyMismatch = surfaces.some((s) => s.mismatch) || fulfillmentPersistence.some((c) => c.mismatch);
+      const anyMismatch =
+        surfaces.some((s) => s.status === 'mismatch') ||
+        fulfillmentPersistence.some((c) => c.mismatch) ||
+        perSaleDiffs.length > 0;
 
       return {
         period: { start, end },
@@ -173,9 +364,9 @@ export function useRevenueIntegrity(organizationId?: string | null, start?: stri
         rows,
         reviewRows: rows.filter((r) => r.review_required),
         fulfillmentPersistence,
+        perSaleDiffs,
         anyMismatch,
       };
-
     },
   });
 }
