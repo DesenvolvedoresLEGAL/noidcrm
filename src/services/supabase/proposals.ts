@@ -688,6 +688,35 @@ export async function getProposalByToken(token: string): Promise<(Proposal & { i
 
   if (!bundle?.proposal?.id) return null;
 
+  // PRICE CORE 2.0 — make sure the public link reads a fresh pricing
+  // ledger (header, "Condições de Pagamento" e "Forma e prazo do pagamento").
+  // ensure_proposal_pricing_ready is SECURITY DEFINER and no-op on frozen
+  // accepted proposals. We only trigger it for editable statuses to avoid
+  // unnecessary writes; if the snapshot is stale we re-fetch the bundle.
+  try {
+    const proposalSnapshot = bundle.proposal;
+    const status = proposalSnapshot?.status;
+    const editable = !status || ['draft', 'open', 'sent', 'viewed', 'pending_approval'].includes(status);
+    const snap = proposalSnapshot?.pricing_breakdown_snapshot;
+    const snapCalculatedAt = snap?.calculated_at ? new Date(snap.calculated_at).getTime() : 0;
+    const proposalUpdatedAt = proposalSnapshot?.updated_at ? new Date(proposalSnapshot.updated_at).getTime() : 0;
+    const stale = !snap || !snap.version || snapCalculatedAt < proposalUpdatedAt;
+    if (editable && stale) {
+      await (supabase as any).rpc('ensure_proposal_pricing_ready', { p_proposal_id: proposalSnapshot.id });
+      // Re-fetch the bundle so flattened result carries the fresh snapshot
+      for (const candidate of candidates) {
+        const { data, error } = await supabase.rpc('get_proposal_by_public_token', { p_token: candidate });
+        if (error) continue;
+        if (data && typeof data === 'object' && (data as any).proposal?.id) {
+          bundle = data;
+          break;
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('[getProposalByToken] ledger refresh skipped:', (e as any)?.message ?? e);
+  }
+
   // Flatten the bundle into the shape the UI expects
   const result: any = {
     ...bundle.proposal,
