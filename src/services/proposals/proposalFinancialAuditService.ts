@@ -81,6 +81,16 @@ export interface AuditItem {
   applied_at: string | null;
   applied_by: string | null;
   applied_mode: string | null;
+  is_winning_proposal: boolean;
+  is_superseded: boolean;
+  is_duplicate_candidate: boolean;
+  is_operational_clone: boolean;
+  proposal_rank_for_opportunity: number | null;
+  proposal_selection_reason: string | null;
+  source_proposal_id: string | null;
+  duplicated_from_proposal_id: string | null;
+  superseded_by_proposal_id: string | null;
+  audit_scope_status: AuditScopeStatus;
   created_at: string;
   updated_at: string;
 }
@@ -92,6 +102,8 @@ export interface AuditItemFilters {
   hasDivergence?: boolean;
   canonicalSource?: CanonicalSource;
   search?: string;
+  /** Default: in_scope + needs_scope_review. Set to 'all' to include out_of_scope. */
+  scopeMode?: 'default' | 'all' | 'only_out_of_scope';
 }
 
 export async function runAudit(opts: {
