@@ -238,7 +238,7 @@ export function OpportunityProposalsTab({
   const { data, isLoading } = useQuery({
     queryKey: [...proposalKeys.lists(), opportunityId],
     queryFn: () => listProposals({ opportunityId }),
-    enabled: !isInheritedMode,
+    enabled: !isOperationalHandoff,
   });
   const proposals = data?.data || [];
 
