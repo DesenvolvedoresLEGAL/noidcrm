@@ -93,15 +93,21 @@ export function StageConversionReportV2() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {view.balance.rows.map((r) => (
-                <TableRow key={`b-${r.pipelineId}-${r.stageId}`}>
-                  <TableCell className="text-xs text-muted-foreground">{r.pipelineId?.slice(0, 8) ?? '—'}</TableCell>
-                  <TableCell className="font-medium">{r.stageName}</TableCell>
-                  <TableCell className="text-right">{formatNumber(r.activeCount)}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(r.activeValue)}</TableCell>
-                  <TableCell className="text-right">{formatDays(r.avgDaysInStage)}</TableCell>
-                </TableRow>
-              ))}
+              {view.balance.rows.map((r) => {
+                const wonValue = isWonStage(r.stageName) && r.pipelineId
+                  ? wonValueByPipeline.get(r.pipelineId)
+                  : undefined;
+                const displayedValue = typeof wonValue === 'number' ? wonValue : r.activeValue;
+                return (
+                  <TableRow key={`b-${r.pipelineId}-${r.stageId}`}>
+                    <TableCell className="text-xs text-muted-foreground">{r.pipelineId?.slice(0, 8) ?? '—'}</TableCell>
+                    <TableCell className="font-medium">{r.stageName}</TableCell>
+                    <TableCell className="text-right">{formatNumber(r.activeCount)}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(displayedValue)}</TableCell>
+                    <TableCell className="text-right">{formatDays(r.avgDaysInStage)}</TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </CardContent>
