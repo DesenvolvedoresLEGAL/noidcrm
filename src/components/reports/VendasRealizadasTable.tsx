@@ -127,7 +127,9 @@ export function VendasRealizadasTable() {
             <SelectContent>
               <SelectItem value="all">Todas comissões</SelectItem>
               <SelectItem value="eligible">Elegíveis</SelectItem>
-              <SelectItem value="blocked_review_required">Bloqueadas (review)</SelectItem>
+              <SelectItem value="blocked_review_required">Em revisão</SelectItem>
+              <SelectItem value="blocked_settlement_pending">Aguardando settlement</SelectItem>
+
             </SelectContent>
           </Select>
         </CardContent>
