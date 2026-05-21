@@ -135,7 +135,7 @@ export async function getProposalWithDetails(id: string): Promise<Proposal | nul
         name,
         terms_pdf_url
       ),
-      opportunity:opportunities(
+      opportunity:opportunities!proposals_opportunity_id_fkey(
         id,
         title,
         owner_user_id,
@@ -288,7 +288,7 @@ export async function listProposals(params?: {
     .from('proposals')
     .select(`
       *,
-      opportunity:opportunities(
+      opportunity:opportunities!proposals_opportunity_id_fkey(
         id,
         title,
         account:accounts(id, razao_social, nome_fantasia)

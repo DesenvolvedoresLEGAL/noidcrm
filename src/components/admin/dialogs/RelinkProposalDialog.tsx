@@ -107,7 +107,7 @@ export function RelinkProposalDialog({
         // Insert new - need to get opportunity data from proposal for account_id
         const { data: proposalData } = await supabase
           .from("proposals")
-          .select("opportunity:opportunities(account_id)")
+          .select("opportunity:opportunities!proposals_opportunity_id_fkey(account_id)")
           .eq("id", proposalId)
           .single();
 
