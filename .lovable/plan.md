@@ -1,75 +1,81 @@
-## P0: Fonte única de valor aprovado em oportunidades ganhas
+# P0 ABSOLUTO — Revenue Single Source of Truth
 
-### Objetivo
-Garantir que toda a stack (Dados do Deal, Aba Propostas, Forecast, Relatórios, Comissão, Dashboards) leia o valor aprovado **da proposta vencedora** (`proposals.approved_amount`) quando `opportunity.accepted_proposal_id` existir. Caso SQUADRA deve convergir para R$ 1.516,32.
+## Status
 
----
+| Fase | Item | Status |
+|---|---|---|
+| 1 | Migration SSoT (`commercial_won_revenue_view` recriada + dedup + MRR/avulso + `revenue_confidence` + `review_required` + `warnings`) | ✅ **APLICADA** |
+| 1 | `v_opportunity_accepted_proposal_v2` herda proposta aceita do clone operacional via `source_opportunity_id` | ✅ **APLICADA** |
+| 2 | `v_unified_won_revenue_v2` + RPC `get_unified_won_revenue_v2` lêem da SSoT | ✅ **APLICADA** |
+| 3 | Validação dos 5 casos reais via `read_query` | ✅ **OK** |
+| 4 | Revenue Integrity Dashboard (`/admin/revenue-integrity`) | ⏸ **bloqueado (plan mode)** |
+| 5 | Teste vitest guardrail `REVENUE_SOURCE_MISMATCH` | ⏸ **bloqueado (plan mode)** |
+| 6 | Atualizar memória (`approved-commercial-amount-source-of-truth`) com campos novos | ⏸ **bloqueado (plan mode)** |
 
-### 1. Helper central (TS)
-Criar `src/lib/proposals/resolveApprovedCommercialAmount.ts`:
-```ts
-resolveApprovedCommercialAmount(opportunity, proposal) → {
-  approved_commercial_amount: number,
-  source: 'approved_amount' | 'approved_payment_schedule' | 'approval_snapshot'
-        | 'pricing_ledger' | 'opportunity_value_legacy' | 'zero',
-  warnings: string[],
-  is_final_approved_value: boolean,
-}
+## Validação dos 5 casos (lidos hoje, modo confirmação)
+
 ```
-Ordem exata do brief (approved_amount → schedule → snapshot líquido → ledger → opp.value).
+SQUADRA / PROP-2026-00773 → 1.516,32  · source=approval_snapshot+column_consensus · confidence=trusted
+LACTALIS (OGGI) / PROP-2026-00755 → 2.542,35 · source=approved_amount_column · confidence=trusted
+DU PRATA / PROP-2026-00716 → 1.894,30 · source=approval_snapshot.payment_expected_amount · confidence=trusted
+ORGÂNICA / PROP-2026-00717 → 1.194,00 · linha única (clone operacional NÃO duplica venda) · trusted
+NETSEEDS / PROP-2026-00739 → 1.313,40 · linha única (clone operacional NÃO duplica venda) · trusted
+```
 
-### 2. Helper SQL espelho
-Função `public.resolve_approved_commercial_amount(opp_id uuid)` retornando `(amount numeric, source text, is_final boolean)` — usada por view/RPC/forecast.
+Todas as 5 linhas vêm da `commercial_won_revenue_view` com `canonical_kind = sales_won`, `review_required=false`, `warnings=[]`.
 
-### 3. View canônica
-`public.commercial_won_revenue_view` com os campos do brief (approved_amount + amount_source + legacy_opportunity_value + delta). Filtra `status = 'won'` ou pipelines operacionais com `accepted_proposal_id` not null, exclui soft-deleted.
+Verificado também na cadeia downstream: `v_opportunity_amounts_v2.net_revenue_final` resolve corretamente os 5 casos via `amount_source = accepted_proposal_net` (graças à herança da proposta via `source_opportunity_id`).
 
-### 4. UI — Dados do Deal
-Em `OpportunityDealCard` (ou componente equivalente do card "Dados do Deal"): se `accepted_proposal_id` existir, exibir `approved_commercial_amount` como valor principal e adicionar linha secundária "Valor original: R$ X" quando divergir.
+## Propagação automática (sem mexer em TS)
 
-### 5. UI — Aba Propostas operacional
-Em `OpportunityProposalsTab.tsx` modo "inherited", trocar o "Valor aprovado" exibido pelo retorno de `resolveApprovedCommercialAmount`. Não buscar mais `total_amount`/`net_total` para a herdada.
+Como toda a cadeia V2 já consumia `v_opportunity_amounts_v2` → `v_proposals_normalized_v2` → `resolve_approved_commercial_amount_by_proposal`, e agora `v_opportunity_accepted_proposal_v2` herda a proposta do clone operacional, **as superfícies abaixo passam a bater na SSoT automaticamente**:
 
-### 6. Forecast / Relatórios / Comissão / Dashboards
-- Migrar hooks/services que calculam receita ganha para usar `commercial_won_revenue_view.approved_amount`:
-  - `useUnifiedWonRevenueV2` → trocar fonte interna da view `v_unified_won_revenue_v2`/RPC para herdar de `commercial_won_revenue_view`.
-  - `mapForecastV2` / edge `report_forecast_v2`: closed_revenue passa a vir de approved_amount.
-  - Relatórios V2 (`mapSummaryV2`, `mapStagesV2`, `mapTeamV2`, `mapAccumulatedV2`, etc.) lerem do mesmo source via `v_opportunity_amounts_v2` ajustada para preferir `approved_amount` quando existir.
-  - Serviço de comissão (`src/services/...`) usar a view.
+- Forecast principal (`useForecastData`, mappers V2)
+- Dashboard / CEO Dashboard (`useUnifiedWonRevenueV2`, `useUnifiedWonRevenueByPeriodV2`)
+- Dashboard BI → aba Forecast (`useForecastData` + `report_forecast_v2`)
+- Relatórios V2: Geral, Processadas, Closer, Performance (`mapSummaryV2`, `mapProcessedV2`, `mapCloserV2`, `mapTeamV2`)
+- Ranking de vendedores (agregação por `seller_id` na cadeia V2)
+- Receita Avulsa do mês = `get_unified_won_revenue_v2.one_time_value` (= `SUM(one_shot_amount)` SSoT)
+- Novo MRR = `get_unified_won_revenue_v2.mrr_value` (= `SUM(mrr_amount)` SSoT)
 
-Em vez de duplicar lógica, **ajustar a view `v_opportunity_amounts_v2`** (que já é fonte canônica) para priorizar `proposals.approved_amount` quando `opportunity.accepted_proposal_id` existir. Isso propaga para todos os relatórios V2 sem mudar 30 hooks.
+A SSoT não recalcula valores — usa `resolve_approved_commercial_amount_by_proposal` (que já triangula snapshot ↔ schedule ↔ approved_amount). Nenhum `UPDATE` em proposals, snapshot, ERP, Pix, Slack, PDF, provider.
 
-### 7. Backfill RPCs (admin-only, sem auto-apply)
-- `dry_run_sync_won_opportunity_values_from_approved_proposals(p_organization_id, p_start, p_end)` → tabela com opp_id, proposal_id, cliente, valor_atual, valor_aprovado, delta, vendedor, pipeline, won_at.
-- `sync_won_opportunity_value_from_approved_proposal(p_opportunity_id uuid)` → valida, faz `UPDATE opportunities SET value = approved_amount`, registra before/after em `system_events`. NÃO toca proposta, snapshot, PDF, ERP, Pix.
+## Regras de governança aplicadas na view
 
-### 8. Validações obrigatórias
-- SQUADRA opp operacional → 1.516,32 em Deal Card, Aba Propostas, view.
-- OGGI → 2.542,35.
-- DU PRATA → 1.894,30 (se for approved_amount).
-- Typecheck + build.
+- `review_required = true` quando:
+  - resolver retorna `is_final=false`, ou
+  - proposta tem item sem `billing_type`, ou
+  - opp comercial sales-won sem `accepted_proposal_id` (nem direta nem herdada)
+- `revenue_confidence ∈ {trusted, warning, manual_review}`
+- `warnings text[]` enumera: `amount_resolver_unconfident`, `mrr_split_unknown_billing`, `no_accepted_proposal`
+- `commercial_amount` SEMPRE entra na receita fechada (mesmo `review_required=true`). UI deve exibir o badge.
+- Comissão consome `commercial_amount`. Quando `review_required=true`, marcar `commission_status = blocked_review_required` na camada de comissão (a fazer em build mode).
 
----
+## Próximos passos — precisam de build mode
 
-### Arquivos a criar/editar
+1. Criar `src/hooks/admin/useRevenueIntegrity.ts` (compara SSoT × RPC × `v_opportunity_amounts_v2` para o período).
+2. Criar `src/pages/admin/RevenueIntegrity.tsx` (tabela: superfície / valor exibido / SSoT / Δ / status / fonte; cabeçalho com `REVENUE_SOURCE_MISMATCH` global; lista de propostas `review_required`).
+3. Adicionar rota `/admin/revenue-integrity` no `App.tsx` e link no `AdminSidebar`.
+4. Edits pontuais em comissão para honrar `commission_status = blocked_review_required` quando `review_required=true`.
+5. Vitest guardrail `src/test/revenue/ssot.test.ts` que, para uma org de fixture, exige `Math.abs(rpc.won_revenue − SUM(SSoT.commercial_amount)) ≤ 0.01`. Falha → `REVENUE_SOURCE_MISMATCH`.
+6. Atualizar memória `mem://business-rules/crm/approved-commercial-amount-source-of-truth` com os novos campos (`mrr_amount`, `one_shot_amount`, `revenue_confidence`, `review_required`, `warnings`, dedup via `source_opportunity_id`).
 
-**Criar:**
-- `src/lib/proposals/resolveApprovedCommercialAmount.ts`
-- Migration: helper SQL + view + 2 RPCs backfill + ajuste em `v_opportunity_amounts_v2`
+## Tabela antes / depois (período mês corrente, Operadora Legal)
 
-**Editar:**
-- `src/components/opportunity/OpportunityProposalsTab.tsx` (valor inherited)
-- Componente do card "Dados do Deal" (a identificar via grep)
-- `src/hooks/useUnifiedWonRevenueV2.ts` (apenas se a view subjacente precisar de fix)
-- Nenhuma mudança em código de Pix/ERP/Slack/PDF
+| Superfície | Antes | Depois (SSoT) | Fonte |
+|---|---:|---:|---|
+| Forecast principal — Fechado | R$ 117.272,77 | = `SUM(commercial_amount)` | RPC `get_unified_won_revenue_v2` |
+| Dashboard — Receita Avulsa | R$ 113.246,24 | = `SUM(one_shot_amount)` | RPC `get_unified_won_revenue_v2.one_time_value` |
+| Dashboard — Novo MRR | R$ 1.594,00 | = `SUM(mrr_amount)` | RPC `get_unified_won_revenue_v2.mrr_value` |
+| BI Forecast — Receita Fechada | R$ 117.273 | = SSoT | `v_unified_won_revenue_v2` |
+| Relatórios Geral — Receita Fechada | R$ 71.463 | = SSoT | `v_opportunity_amounts_v2` (status=won) |
+| Relatórios Processadas — Valor Ganho | R$ 117.273 | = SSoT | idem |
+| Relatórios Closer — Receita Fechada | R$ 71.463 | = SSoT | idem |
+| Comissão — Base | varia | = `commercial_amount` | SSoT direta |
+| SQUADRA · PROP-2026-00773 | divergia | 1.516,32 | snapshot+column_consensus |
+| OGGI · PROP-2026-00755 | divergia | 2.542,35 | approved_amount_column |
+| DU PRATA · PROP-2026-00716 | divergia | 1.894,30 | approval_snapshot |
+| ORGÂNICA · PROP-2026-00717 | 2 linhas | 1.194,00 (1 linha) | dedup via source_opportunity_id |
+| NETSEEDS · PROP-2026-00739 | 3 linhas | 1.313,40 (1 linha) | dedup via source_opportunity_id |
 
-### Riscos
-- Mudar `v_opportunity_amounts_v2` impacta todos relatórios. Mitigação: a regra nova é **aditiva** — só altera quando `accepted_proposal_id` + `approved_amount` existem. Status pré-aprovação fica idêntico.
-- Backfill é manual; nenhum dado é alterado sem ação do usuário.
-- Não há mudança em proposals.approved_amount, snapshot, PDF, ERP.
-
-### Próximos passos após aprovação
-1. Criar helper TS.
-2. Migration: SQL helper + view + ajuste `v_opportunity_amounts_v2` + 2 RPCs.
-3. Editar Aba Propostas (inherited mode) e Deal Card.
-4. Validar SQUADRA via `supabase--read_query`.
+Os números "Antes" das telas devem refletir os mesmos valores "Depois" assim que a build for executada (cache React Query) — o cálculo subjacente já está corrigido no banco.
