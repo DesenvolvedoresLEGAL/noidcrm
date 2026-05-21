@@ -1,159 +1,92 @@
+## P0 — Parar clone de propostas na duplicação de oportunidade (Comercial → Operacional)
 
-# PRICE AUDIT MAY 2026 — Scope Hardening
+### Diagnóstico
 
-Pausar correções. Resolver o problema de escopo: a auditoria está tratando como divergentes propostas que são clones operacionais, versões antigas ou propostas não vencedoras vinculadas ao mesmo cliente/oportunidade. Nenhuma correção será aplicada nesta rodada.
+Encontrado **um único ponto** que está clonando propostas no fluxo Ganhou → Operacional:
 
-## Achados do diagnóstico
+`supabase/functions/execute-workflow/index.ts` — action `duplicate` (linhas 576–685), bloco "Copy proposals and proposal items from source to new opportunity". Para cada proposta da oportunidade origem, ele insere uma nova linha em `proposals` com `status = 'draft'`, mais clones em `proposal_items` e `proposal_payment_terms`.
 
-Quatro propostas citadas, todas com `pricing_breakdown_snapshot`:
+Não há outro lugar que copia propostas automaticamente em duplicação/won/handoff:
+- `duplicateProposal` em `src/services/supabase/proposals.ts` é um botão manual da aba Propostas (não disparado por workflow); fica fora desta correção.
+- `notify-deal-won` e demais edge functions não criam propostas.
+- A coluna `opportunities.source_opportunity_id` já existe. **`opportunities.accepted_proposal_id` NÃO existe** no schema base (só aparece como coluna derivada na view `v_opportunity_amounts_v2`). Precisa ser criada.
 
-| Proposta | Conta | Opp Title | Opp Status | Proposal Status | accepted_at | approved_amount |
-|---|---|---|---|---|---|---|
-| PROP-2026-00717 | Organica Digital | ORGANICA DIGITAL NA PROXXIMA 2026 | won | accepted | 2026-05-14 | 1.313,40 |
-| PROP-2026-00732 | Organica Digital | ORGANICA DIGITAL NA PROXXIMA 2026 | new | sent | — | 1.194,00 |
-| PROP-2026-00739 | Ntsds Brasil | NETSEEDS NA MEDICAL CANNABIS FAIR 2026 | won | accepted | 2026-05-18 | 1.313,40 |
-| PROP-2026-00758 | Ntsds Brasil | NETSEEDS NA MEDICAL CANNABIS FAIR 2026 | new | sent | — | 1.313,40 |
+PRICE AUDIT já tem `audit_scope_status` com valores como `out_of_scope_duplicate`; vamos somar `out_of_scope_clone_error` e o tipo de divergência `OPERATIONAL_PROPOSAL_CLONE_SHOULD_NOT_EXIST`.
 
-Conclusão: cada par é (sales/won + accepted) e (operacional/clone, sent, sem accept). O usuário trata o clone operacional (00758, 00732) como a "proposta vigente" do ciclo operacional, mas a vencedora contábil é a accepted/won. A auditoria atual entra em ambas e classifica como divergente — precisa segregar escopo.
+---
 
-## Escopo desta rodada
+### Plano
 
-1. Schema: adicionar campos de vínculo/escopo em `proposal_financial_audit_items`.
-2. RPC `run_proposal_financial_audit`: ranking por oportunidade + por conta+título + classificação `audit_scope_status`.
-3. UI: KPIs e tabela separando escopo vs fora-de-escopo, drawer com evidências de vínculo.
-4. Dry-run de maio 2026 e validação dos quatro casos.
-5. Nada de `apply_*`, ERP, Pix, banco, provider, total_amount.
+#### 1. Schema — vincular oportunidade operacional à proposta aprovada original
+Migration:
+- `opportunities.accepted_proposal_id uuid null` + FK para `proposals(id)` ON DELETE SET NULL + index.
+- `proposals.superseded_by_proposal_id uuid null` (auto-referência) + index — usado para marcar clones que apontam para a proposta válida.
+- `proposals.clone_status text null check in ('clone_error','superseded','active')` default null + index parcial.
+- Trigger `trg_block_operational_proposal_clone`: BEFORE INSERT em `proposals`. Se a oportunidade alvo tem `source_opportunity_id` NOT NULL **e** o pipeline alvo é do tipo `onboarding` / `operational` / `cs` (via join em `pipelines.pipeline_type`) **e** já existe uma `proposals` com `accepted_at IS NOT NULL` na oportunidade origem, **levanta exceção** `OPERATIONAL_PROPOSAL_CLONE_BLOCKED`. Esse trigger é a salvaguarda no banco, independente do código de edge.
+- Extender CHECK de `proposal_financial_audit_items.audit_scope_status` para incluir `out_of_scope_clone_error`.
 
-## 1. Migração de schema
+#### 2. Edge function `execute-workflow` — remover clone de propostas
+Em `supabase/functions/execute-workflow/index.ts`, na action `duplicate` (linhas 576–685):
+- Remover por completo o bloco "Copy proposals and proposal items from source to new opportunity" (incluindo `proposal_items` e `proposal_payment_terms`).
+- Substituir por: localizar na origem a proposta válida — `proposals.opportunity_id = origem AND accepted_at IS NOT NULL` (tie-break por `accepted_at` mais recente; fallback para `status='accepted'`); se encontrada, gravar `accepted_proposal_id = <id>` na nova oportunidade via `UPDATE opportunities`.
+- Registrar em `system_events` evento `operational_handoff_proposal_link` com `source_opportunity_id`, `operational_opportunity_id`, `accepted_proposal_id`. Se não houver proposta aprovada, registrar `operational_handoff_no_accepted_proposal` e deixar `accepted_proposal_id = null` (a aba Propostas tratará o estado vazio).
 
-`ALTER TABLE proposal_financial_audit_items` adicionar:
+#### 3. UI — aba Propostas da oportunidade operacional
+`src/components/opportunity/OpportunityProposalsTab.tsx`:
+- Quando a oportunidade tiver `source_opportunity_id` (ou pipeline tipo operacional/cs) e `accepted_proposal_id`, mudar para modo **read-only herdado**: buscar a proposta original por `accepted_proposal_id` e exibir 1 card com badge "Proposta aprovada herdada do comercial" + link "Ver no funil comercial". Esconder botões "Nova proposta", "Duplicar", "Editar como nova".
+- Se `accepted_proposal_id IS NULL` em oportunidade operacional: mostrar empty state explicando que a comercial ainda não tem proposta aprovada vinculada (sem botão de criar).
+- Sem mudanças em oportunidades comerciais — a aba continua igual.
 
-- `is_winning_proposal boolean DEFAULT false`
-- `is_superseded boolean DEFAULT false`
-- `is_duplicate_candidate boolean DEFAULT false`
-- `is_operational_clone boolean DEFAULT false`
-- `proposal_rank_for_opportunity integer`
-- `proposal_selection_reason text`
-- `source_proposal_id uuid` (lido de `proposals.source_proposal_id` se existir; senão NULL)
-- `duplicated_from_proposal_id uuid` (idem `duplicated_from_proposal_id`/`cloned_from_proposal_id`)
-- `superseded_by_proposal_id uuid`
-- `audit_scope_status text DEFAULT 'in_scope'` com CHECK em: `in_scope`, `out_of_scope_duplicate`, `out_of_scope_superseded`, `out_of_scope_draft`, `out_of_scope_old_version`, `out_of_scope_non_winning`, `needs_scope_review`
-- Índice em `(audit_run_id, audit_scope_status)`
+#### 4. PRICE AUDIT — detectar clones operacionais legados
+- Estender a RPC `run_proposal_financial_audit` (v4): para cada `proposals` cuja `opportunity` tem `source_opportunity_id IS NOT NULL` e pipeline tipo operacional/cs, e cuja origem possui proposta com `accepted_at`, marcar:
+  - `audit_scope_status = 'out_of_scope_clone_error'`
+  - acrescentar `OPERATIONAL_PROPOSAL_CLONE_SHOULD_NOT_EXIST` em `divergence_types`
+  - `recommended_action = 'mark_clone_error_and_link_original'`
+  - preencher `source_proposal_id` com a proposta aprovada da origem
+- Atualizar contadores em `proposal_financial_audit_runs` (`out_of_scope_count` e novo `clone_error_count`).
+- Service `proposalFinancialAuditService.ts` + UI `PriceAuditPage.tsx`: novo KPI "Clones operacionais", novo filtro `scopeMode = 'only_clone_errors'` e badge dedicado na coluna Escopo. Apply continua bloqueado para qualquer item ≠ `in_scope`.
 
-Adicionar em `proposal_financial_audit_runs`:
+#### 5. Correção retroativa (dry-run only, sem deletar)
+Nova RPC `dry_run_detect_operational_proposal_clones(p_period_start, p_period_end)`:
+- Retorna linhas com `clone_proposal_id`, `original_approved_proposal_id`, `source_opportunity_id`, `operational_opportunity_id`, `client`, `value_clone`, `value_original`, `created_at`, `reason_detected`.
+- Não escreve em `proposals` nem deleta nada. Apenas registra um evento por run em `system_events` (`operational_clone_dry_run`).
+- Nova RPC manual `mark_operational_proposal_clone(p_clone_proposal_id, p_original_proposal_id)` (SECURITY DEFINER, exige role admin):
+  - `UPDATE proposals SET clone_status='clone_error', superseded_by_proposal_id=p_original_proposal_id` no clone
+  - `UPDATE opportunities SET accepted_proposal_id=p_original_proposal_id` na operacional
+  - Insere `system_events` com before/after. Nada é deletado.
+- UI: botão "Marcar como clone operacional" no drawer do PRICE AUDIT quando `divergence_types` contém `OPERATIONAL_PROPOSAL_CLONE_SHOULD_NOT_EXIST`. Confirmação dupla.
 
-- `in_scope_count integer DEFAULT 0`
-- `out_of_scope_count integer DEFAULT 0`
-- `needs_scope_review_count integer DEFAULT 0`
-- `out_of_scope_delta numeric(14,2) DEFAULT 0`
-- `in_scope_delta numeric(14,2) DEFAULT 0` (= `total_detected_delta` apenas dos in_scope)
+#### 6. Casos NETSEEDS / ORGÂNICA
+Após deploy, rodar `dry_run_detect_operational_proposal_clones('2026-05-01','2026-05-31')` e validar manualmente:
+- NETSEEDS: PROP-2026-00739 = original aprovada; PROP-2026-00758 = candidata a clone_error.
+- ORGÂNICA: PROP-2026-00717 = original aprovada; PROP-2026-00732 = candidata a clone_error.
+Marcar via UI somente após confirmação do usuário (nada automático).
 
-A migração detecta colunas opcionais (`source_proposal_id`, `duplicated_from_proposal_id`, `superseded_by_proposal_id`) em `proposals` via `information_schema` antes de referenciá-las, para não quebrar se ainda não existirem.
+#### 7. Critérios de aceite
+- Workflow `duplicate` não cria mais linhas em `proposals` / `proposal_items` / `proposal_payment_terms`.
+- Oportunidade operacional gravada com `accepted_proposal_id` apontando para a proposta aprovada da comercial.
+- Aba Propostas da operacional mostra a proposta original com badge herdado, sem botão de criar/duplicar.
+- Trigger DB rejeita qualquer INSERT em `proposals` que tente clonar para pipeline operacional quando há proposta aprovada na origem.
+- PRICE AUDIT classifica clones legados como `out_of_scope_clone_error`, sem afetar `in_scope_delta`.
+- Dry-run lista NETSEEDS-00758 e ORGÂNICA-00732 como clones candidatos; nenhuma alteração automática.
+- Nada deletado. Tudo auditado em `system_events`.
+- Typecheck e build passam.
 
-## 2. RPC `run_proposal_financial_audit` (v3)
+---
 
-Mantém a v2 (regra de desconto manual aplicada à canonical) e adiciona, antes da escrita do item:
+### Fora de escopo
+- `duplicateProposal` manual (botão da aba) — mantido.
+- ERP, Pix, provider bancário, Slack: sem mudanças neste passo.
+- Recalcular comissão/forecast retroativamente: virá em passo separado após marcação manual dos clones.
 
-**a. Coleta de evidências de fechamento** por proposta candidata:
+### Arquivos afetados
+- `supabase/migrations/<nova>_block_operational_proposal_clone.sql`
+- `supabase/functions/execute-workflow/index.ts`
+- `src/components/opportunity/OpportunityProposalsTab.tsx`
+- `src/services/proposals/proposalFinancialAuditService.ts`
+- `src/pages/settings/system/PriceAuditPage.tsx`
+- `src/integrations/supabase/types.ts` (auto)
 
-```text
-has_accept = (status IN ('accepted','approved','won') OR accepted_at IS NOT NULL)
-has_snapshot = approval_snapshot IS NOT NULL AND approval_snapshot::text <> '{}'
-has_approved_amount = approved_amount IS NOT NULL
-has_payment_intent = EXISTS payment_intent linked
-has_erp_sync = EXISTS erp_billing linked
-opp_is_won = opportunity.status IN ('won','ganha','closed_won')
-```
-
-**b. Ranking por oportunidade** (`window function ROW_NUMBER() OVER (PARTITION BY opportunity_id ORDER BY ...)`):
-
-Score (maior vence):
-1. has_accept → +1000
-2. opp_is_won AND has_accept → +500
-3. has_snapshot → +100
-4. has_approved_amount → +50
-5. has_payment_intent OR has_erp_sync → +30
-6. mais recente por `accepted_at`, senão `sent_at`, senão `created_at` → desempate
-
-`is_winning_proposal = (rank = 1 AND score >= 100)`. Sem evidência mínima (score < 100) → todas da opp ficam `needs_scope_review`.
-
-**c. Classificação `audit_scope_status`**:
-
-- `status IN ('draft')` → `out_of_scope_draft`
-- `superseded_by_proposal_id IS NOT NULL` (quando coluna existe) → `out_of_scope_superseded`
-- `duplicated_from_proposal_id IS NOT NULL` AND outra mais nova com `has_accept` → `out_of_scope_duplicate`
-- não vencedora da opp (rank > 1) com vencedora `has_accept` → `out_of_scope_non_winning`
-- não vencedora da opp, mais antiga, sem evidência → `out_of_scope_old_version`
-- vencedora ou única → `in_scope`
-- sem evidência alguma na opp → `needs_scope_review`
-
-**d. Detecção de clone operacional** (caso NETSEEDS/ORGÂNICA): segundo passo de ranking por `(account_id, normalize(opportunity.title))`. Quando há duas opportunities ativas com mesmo cliente+título e uma é `won` (accepted) e a outra `new` (sem accept) com proposta `sent`, a `sent` recebe `is_operational_clone = true` e `audit_scope_status = needs_scope_review` (não bloqueia, mas tira do balde de divergência financeira). `proposal_selection_reason` registra o motivo textual ("clone operacional do ciclo onboarding").
-
-**e. Totais do run**: `in_scope_*`, `out_of_scope_*`, `needs_scope_review_*` recomputados ao final. `total_detected_delta` permanece como soma geral; `in_scope_delta` é o número que a UI usa por padrão.
-
-## 3. Service e hook (frontend)
-
-- `proposalFinancialAuditService.ts`: estender `AuditItem` com os novos campos; `AuditItemFilters` ganha `scopeStatus?: AuditScopeStatus | 'all_in_scope'` (default = in_scope + needs_scope_review).
-- `listAuditItems`: filtro padrão `audit_scope_status IN ('in_scope','needs_scope_review')`.
-- `useAuditRuns`/`useAuditItems`: sem mudança de assinatura externa.
-
-## 4. UI — `PriceAuditPage.tsx`
-
-KPIs (cards), separados:
-- Total auditado
-- In scope
-- Fora de escopo
-- Needs scope review
-- Divergências reais (= in_scope com `max_delta > 0.01`)
-- Delta in_scope (R$)
-- Delta fora de escopo (R$) — card secundário/cinza
-
-Tabela:
-- Nova coluna **Escopo** (badge): In scope / Duplicada / Substituída / Versão antiga / Não vencedora / Rascunho / Revisar escopo
-- Toggle "Mostrar fora de escopo" (default off)
-- Filtro de status financeiro só conta in_scope
-
-Drawer da proposta — nova seção "Vínculo & Escopo":
-- opportunity_id, opp title, opp status
-- proposal status, created_at, sent_at, accepted_at
-- has_snapshot, has_approved_amount, has_payment_intent, has_erp_sync
-- source_proposal_id / duplicated_from_proposal_id / superseded_by_proposal_id (links)
-- rank_for_opportunity, is_winning_proposal, is_operational_clone
-- proposal_selection_reason
-
-Botões `Apply` ficam desabilitados quando `audit_scope_status != 'in_scope'`, com tooltip "Fora de escopo — revisar vínculo antes de corrigir".
-
-## 5. Dry-run de validação
-
-Rodar `run_proposal_financial_audit(2026-05-01, 2026-05-31, dry_run=true)` e validar:
-
-- PROP-2026-00717 (Organica, opp won, accepted) → `is_winning_proposal=true`, `in_scope`
-- PROP-2026-00732 (Organica, opp new, sent) → `is_operational_clone=true`, `needs_scope_review`
-- PROP-2026-00739 (Netseeds, opp won, accepted) → `is_winning_proposal=true`, `in_scope`
-- PROP-2026-00758 (Netseeds, opp new, sent) → `is_operational_clone=true`, `needs_scope_review`
-- PROP-2026-00755 (OGGI) → continua `divergent`/`needs_review` com a regra do desconto manual
-
-Nenhum `apply_*` será executado. Nenhuma alteração em proposta, oportunidade, forecast, comissão, Slack, ERP, Pix ou provider.
-
-## 6. Garantias
-
-- Typecheck + build obrigatórios após mudanças de tipos.
-- Mantém compatibilidade com itens já gravados: defaults preenchem `in_scope` para linhas antigas; a UI continua exibindo runs anteriores sem quebrar.
-- Sem mudanças em `total_amount`, ERP, Pix, provider, Slack.
-
-## Arquivos impactados
-
-- `supabase/migrations/<novo>_price_audit_scope_hardening.sql` (schema + RPC v3)
-- `src/services/proposals/proposalFinancialAuditService.ts` (tipos e filtros)
-- `src/hooks/proposals/useProposalFinancialAudit.ts` (passar filtro de escopo)
-- `src/pages/settings/system/PriceAuditPage.tsx` (KPIs, coluna Escopo, toggle, drawer)
-- `src/integrations/supabase/types.ts` (regenerado pela migração)
-
-## Riscos
-
-- Detecção de "clone operacional" depende de igualdade normalizada do título da opp; falsos positivos possíveis em títulos idênticos legítimos — por isso cai em `needs_scope_review`, nunca em `out_of_scope` duro.
-- Colunas `source_proposal_id`/`duplicated_from_proposal_id`/`superseded_by_proposal_id` podem não existir em todos os ambientes; RPC usa detecção dinâmica para não falhar.
-
-## Fora de escopo
-
-Provider financeiro, Pix público, ERP real, baixa financeira, mock de pagamento, qualquer `apply_proposal_financial_audit_item`.
+### Riscos
+- Workflows ativos que dependiam do clone de proposta vão parar de criar drafts no operacional. Comportamento intencional; comunicado pela badge "herdada".
+- Trigger DB pode bloquear scripts manuais antigos; mitigado por mensagem clara `OPERATIONAL_PROPOSAL_CLONE_BLOCKED` e exceção apenas quando há `accepted_at` na origem.
