@@ -10,7 +10,18 @@ export type CanonicalSource =
   | 'pricing_breakdown_snapshot'
   | 'payment_intent'
   | 'erp_payload'
-  | 'manual_review';
+  | 'manual_review'
+  | 'ledger'
+  | 'indeterminate';
+
+export type AuditScopeStatus =
+  | 'in_scope'
+  | 'out_of_scope_duplicate'
+  | 'out_of_scope_superseded'
+  | 'out_of_scope_draft'
+  | 'out_of_scope_old_version'
+  | 'out_of_scope_non_winning'
+  | 'needs_scope_review';
 
 export interface AuditRun {
   id: string;
