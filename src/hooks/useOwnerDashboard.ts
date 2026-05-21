@@ -179,10 +179,13 @@ export function useOwnerDashboard() {
       // Fonte ÚNICA: commercial_won_revenue_view.
       // Dashboard, Forecast, BI, Relatórios → Vendas Realizadas, Comissão e Win/Loss Ganhos
       // DEVEM reconciliar contra esta view no mesmo período.
+      // FILTRO OBRIGATÓRIO: somente pipelines de VENDAS contam para os cards
+      // (exclui renewal/onboarding/qualification). Mês atual vigente apenas.
       const { data: ssotRows, error: ssotErr } = await (supabase as any)
         .from('commercial_won_revenue_view')
-        .select('opportunity_id, commercial_amount, one_shot_amount, mrr_amount, won_at')
+        .select('opportunity_id, commercial_amount, one_shot_amount, mrr_amount, won_at, pipeline_type')
         .eq('organization_id', organizationId)
+        .eq('pipeline_type', 'sales')
         .gte('won_at', startOfCurrentMonth.toISOString())
         .lte('won_at', endOfMonth(now).toISOString());
       if (ssotErr) {
