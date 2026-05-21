@@ -35,11 +35,24 @@ export function ProposalPricingBreakdown({
   const showDynamic = s.dynamicAdjustment.enabled && s.dynamicAdjustment.amount !== 0;
   const showRecurring = s.recurringSubtotal > 0;
 
+  const snapCalcAt = s.calculatedAt ? new Date(s.calculatedAt).getTime() : 0;
+  const proposalUpdAt = proposal?.updated_at ? new Date(proposal.updated_at).getTime() : 0;
+  const isStale = audience === 'internal' && snapCalcAt > 0 && proposalUpdAt > snapCalcAt;
+
   return (
     <div className={className}>
       {!bare && (
-        <div className="text-sm font-semibold mb-2">Composição do valor</div>
+        <div className="flex items-center justify-between mb-2">
+          <div className="text-sm font-semibold">Composição do valor</div>
+          {isStale && (
+            <Badge variant="outline" className="text-[10px] gap-1">
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+              Atualizando valores…
+            </Badge>
+          )}
+        </div>
       )}
+
 
       <div className="space-y-1.5 text-sm">
         <div className="flex justify-between">
