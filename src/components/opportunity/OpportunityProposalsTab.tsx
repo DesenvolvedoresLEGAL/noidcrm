@@ -454,6 +454,33 @@ export function OpportunityProposalsTab({
                   <FileDown className="h-4 w-4 mr-2" />
                   PDF aprovado
                 </Button>
+                {inheritedProposal.public_token && (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.open(buildProposalDirectUrl(inheritedProposal.public_token), '_blank')}
+                    >
+                      <ExternalLink className="h-4 w-4 mr-2" />
+                      Abrir proposta
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(buildProposalPublicUrl(inheritedProposal.public_token));
+                          toast.success('Link copiado');
+                        } catch {
+                          toast.error('Erro ao copiar link');
+                        }
+                      }}
+                    >
+                      <Copy className="h-4 w-4 mr-2" />
+                      Copiar link
+                    </Button>
+                  </>
+                )}
               </div>
             </CardContent>
           </Card>
