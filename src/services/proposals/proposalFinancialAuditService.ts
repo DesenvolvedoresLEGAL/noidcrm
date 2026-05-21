@@ -21,6 +21,7 @@ export type AuditScopeStatus =
   | 'out_of_scope_draft'
   | 'out_of_scope_old_version'
   | 'out_of_scope_non_winning'
+  | 'out_of_scope_clone_error'
   | 'needs_scope_review';
 
 export interface AuditRun {
