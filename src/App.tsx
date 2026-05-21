@@ -190,6 +190,7 @@ const AdminTrash = lazy(() => import("./pages/admin/AdminTrash"));
 const BackupSettings = lazy(() => import("./pages/admin/BackupSettings"));
 const AdminPlans = lazy(() => import("./pages/admin/Plans"));
 const PLGScoreConfig = lazy(() => import("./pages/admin/PLGScoreConfig"));
+const RevenueIntegrity = lazy(() => import("./pages/admin/RevenueIntegrity"));
 const HoneypotDashboard = lazy(() => import("./pages/admin/HoneypotDashboard"));
 const UserActivityReport = lazy(() => import("./pages/admin/UserActivityReport"));
 const ForensicExport = lazy(() => import("./pages/admin/ForensicExport"));
@@ -1201,6 +1202,7 @@ const App = () => (
                 <Route path="trace/:traceId" element={<TraceViewer />} />
                 <Route path="plans" element={<AdminPlans />} />
                 <Route path="plg-score" element={<PLGScoreConfig />} />
+                <Route path="revenue-integrity" element={<RevenueIntegrity />} />
               </Route>
 
               {/* Forensic Security Command Center - Tracking & Honeypots */}
