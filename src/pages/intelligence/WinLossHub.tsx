@@ -27,6 +27,8 @@ import { WinLossInterviewsTab } from '@/components/intelligence/winloss/tabs/Win
 import { WinLossRevenueTab } from '@/components/intelligence/winloss/tabs/WinLossRevenueTab';
 import { WinLossRecommendationsTab } from '@/components/intelligence/winloss/tabs/WinLossRecommendationsTab';
 import { ProposalApprovalsTab } from '@/components/intelligence/winloss/tabs/ProposalApprovalsTab';
+import { useClosedRevenueSummary } from '@/hooks/revenue/useRevenueSsot';
+import { RevenueSsotBanner } from '@/components/revenue/RevenueSsotBanner';
 
 export default function WinLossHub() {
   const { organization } = useCurrentUser();
