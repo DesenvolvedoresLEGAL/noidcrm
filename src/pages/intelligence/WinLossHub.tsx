@@ -132,6 +132,12 @@ export default function WinLossHub() {
         </div>
 
 
+        {/* P0 Revenue SSoT — Banner explicando origem dos monetários ganhos */}
+        <RevenueSsotBanner
+          variant="migrated"
+          surface="Win/Loss — Ganhos, Valor Ganho e Ticket Médio via commercial_won_revenue_view"
+        />
+
         {/* Context Selector */}
         <WinLossContextSelector
           pipelines={pipelines}
