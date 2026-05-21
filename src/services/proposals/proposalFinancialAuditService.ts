@@ -36,6 +36,11 @@ export interface AuditRun {
   needs_review_count: number;
   total_approved_amount: number;
   total_detected_delta: number;
+  in_scope_count: number;
+  out_of_scope_count: number;
+  needs_scope_review_count: number;
+  in_scope_delta: number;
+  out_of_scope_delta: number;
   created_by: string | null;
   created_at: string;
   completed_at: string | null;
