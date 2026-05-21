@@ -13,11 +13,14 @@ import { useReportTeamV2 } from '@/hooks/useReportTeamV2';
 import { buildReportV2RequestFromFilters } from '@/lib/reports/buildReportV2Request';
 import { mapTeamV2, computeTeamTotals } from '@/lib/reports/mappers/mapTeamV2';
 import { formatCurrency, formatNumber, formatPct } from '@/lib/reports/formatReportNumbers';
+import { useClosedRevenueSummary, useRevenueBySeller } from '@/hooks/revenue/useRevenueSsot';
+import { RevenueSsotBanner } from '@/components/revenue/RevenueSsotBanner';
 import { ReportMetaBar } from './shared/ReportMetaBar';
 import { ReportWarningsPanel } from './shared/ReportWarningsPanel';
 import { ReportLoadingState } from './shared/ReportLoadingState';
 import { ReportErrorState } from './shared/ReportErrorState';
 import { ReportEmptyState } from './shared/ReportEmptyState';
+
 
 function MiniCard({ icon: Icon, label, value }: { icon: React.ComponentType<{ className?: string }>; label: string; value: string }) {
   return (
