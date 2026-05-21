@@ -14,6 +14,8 @@ import { useTeamVisibility } from '@/hooks/useTeamVisibility';
 import { useReportFiltersContext } from '@/contexts/ReportFiltersContext';
 import { useReportSummaryV2 } from '@/hooks/useReportSummaryV2';
 import { useUnifiedWonRevenueV2 } from '@/hooks/useUnifiedWonRevenueV2';
+import { useClosedRevenueSummary } from '@/hooks/revenue/useRevenueSsot';
+import { RevenueSsotBanner } from '@/components/revenue/RevenueSsotBanner';
 import { buildReportV2RequestFromFilters } from '@/lib/reports/buildReportV2Request';
 import { mapSummaryV2 } from '@/lib/reports/mappers/mapSummaryV2';
 import { formatCurrency, formatNumber, formatPct } from '@/lib/reports/formatReportNumbers';
@@ -24,6 +26,7 @@ import { ReportErrorState } from './shared/ReportErrorState';
 import { ReportEmptyState } from './shared/ReportEmptyState';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Info, AlertTriangle } from 'lucide-react';
+
 
 interface KpiCardProps {
   icon: React.ComponentType<{ className?: string }>;
