@@ -7,6 +7,29 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 
+export type FulfillmentStatus =
+  | 'active'
+  | 'completed'
+  | 'cancelled'
+  | 'removed'
+  | 'not_started'
+  | 'not_applicable';
+
+export type FinancialSettlementStatus =
+  | 'settled'
+  | 'pending_payment'
+  | 'pending_settlement_decision'
+  | 'pending_cancellation_fee'
+  | 'pending_credit_decision'
+  | 'manual_review';
+
+export type CommercialStatus = 'won' | 'lost' | 'open';
+
+export type CommissionStatusValue =
+  | 'eligible'
+  | 'blocked_review_required'
+  | 'blocked_settlement_pending';
+
 export interface VendaRealizadaRow {
   organization_id: string;
   opportunity_id: string;
@@ -16,7 +39,7 @@ export interface VendaRealizadaRow {
   account_id?: string | null;
   account_name: string | null;
   nome_fantasia: string | null;
-  seller_user_id?: string | null;
+  seller_id?: string | null;
   seller_name: string | null;
   pipeline_id?: string | null;
   pipeline_name?: string | null;
@@ -28,7 +51,12 @@ export interface VendaRealizadaRow {
   revenue_confidence: 'trusted' | 'warning' | 'manual_review';
   review_required: boolean;
   warnings: string[];
+  commercial_status?: CommercialStatus | null;
+  fulfillment_status?: FulfillmentStatus | null;
+  financial_settlement_status?: FinancialSettlementStatus | null;
+  commission_status?: CommissionStatusValue | null;
 }
+
 
 export interface VendasRealizadasFilters {
   start: string;
