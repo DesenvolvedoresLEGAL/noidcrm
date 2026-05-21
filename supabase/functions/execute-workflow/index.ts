@@ -573,115 +573,53 @@ serve(async (req) => {
                   console.error('[execute-workflow] Error copying custom field values:', cfvError);
                 }
 
-                // Copy proposals and proposal items from source to new opportunity
+                // ✅ Não clonar propostas no handoff Comercial → Operacional.
+                // A proposta válida é a aprovada pelo cliente, na opp de origem.
+                // Vinculamos a opp operacional via opportunities.accepted_proposal_id.
                 try {
-                  const { data: sourceProposals } = await supabase
+                  const { data: acceptedProposal } = await supabase
                     .from('proposals')
-                    .select('*')
-                    .eq('opportunity_id', opportunity.id);
+                    .select('id, proposal_number, accepted_at, status')
+                    .eq('opportunity_id', opportunity.id)
+                    .is('deleted_at', null)
+                    .or('accepted_at.not.is.null,status.in.(accepted,approved,won)')
+                    .order('accepted_at', { ascending: false, nullsFirst: false })
+                    .order('updated_at', { ascending: false })
+                    .limit(1)
+                    .maybeSingle();
 
-                  if (sourceProposals && sourceProposals.length > 0) {
-                    for (const proposal of sourceProposals) {
-                      const { 
-                        id: oldProposalId, 
-                        created_at, 
-                        updated_at,
-                        public_token,
-                        acceptance_hash,
-                        proposal_number,
-                        acceptor_name,
-                        acceptor_document,
-                        acceptor_document_masked,
-                        acceptor_position,
-                        acceptor_ip,
-                        acceptor_user_agent,
-                        acceptor_email,
-                        acceptor_phone,
-                        accepted_at,
-                        signed_at,
-                        signature_status,
-                        declined_at,
-                        declined_reason,
-                        sent_at,
-                        viewed_at,
-                        views_count,
-                        last_viewed_at,
-                        acceptance_proof_url,
-                        pdf_url,
-                        ...proposalData 
-                      } = proposal;
-                      const { data: newProposal, error: propError } = await supabase
-                        .from('proposals')
-                        .insert({
-                          ...proposalData,
-                          opportunity_id: data.id,
-                          status: 'draft',
-                        })
-                        .select()
-                        .single();
+                  if (acceptedProposal?.id) {
+                    await supabase
+                      .from('opportunities')
+                      .update({ accepted_proposal_id: acceptedProposal.id })
+                      .eq('id', data.id);
 
-                      if (propError) {
-                        console.error('[execute-workflow] Error copying proposal:', propError);
-                        continue;
-                      }
-
-                      console.log(`[execute-workflow] Copied proposal ${oldProposalId} -> ${newProposal.id}`);
-
-                      // Copy proposal items
-                      const { data: sourceItems } = await supabase
-                        .from('proposal_items')
-                        .select('*')
-                        .eq('proposal_id', oldProposalId);
-
-                      if (sourceItems && sourceItems.length > 0) {
-                        const itemsToInsert = sourceItems.map((item: any) => {
-                          const { id, created_at, updated_at, ...itemData } = item;
-                          return {
-                            ...itemData,
-                            proposal_id: newProposal.id,
-                          };
-                        });
-
-                        const { error: itemsError } = await supabase
-                          .from('proposal_items')
-                          .insert(itemsToInsert);
-
-                        if (itemsError) {
-                          console.error('[execute-workflow] Error copying proposal items:', itemsError);
-                        } else {
-                          console.log(`[execute-workflow] Copied ${sourceItems.length} items for proposal ${newProposal.id}`);
-                        }
-                      }
-
-                      // Copy proposal payment terms
-                      const { data: sourceTerms } = await supabase
-                        .from('proposal_payment_terms')
-                        .select('*')
-                        .eq('proposal_id', oldProposalId);
-
-                      if (sourceTerms && sourceTerms.length > 0) {
-                        const termsToInsert = sourceTerms.map((term: any) => {
-                          const { id, created_at, updated_at, ...termData } = term;
-                          return {
-                            ...termData,
-                            proposal_id: newProposal.id,
-                          };
-                        });
-
-                        const { error: termsError } = await supabase
-                          .from('proposal_payment_terms')
-                          .insert(termsToInsert);
-
-                        if (termsError) {
-                          console.error('[execute-workflow] Error copying payment terms:', termsError);
-                        } else {
-                          console.log(`[execute-workflow] Copied ${sourceTerms.length} payment terms for proposal ${newProposal.id}`);
-                        }
-                      }
-                    }
+                    await supabase.from('system_events').insert({
+                      organization_id: opportunity.organization_id,
+                      event_type: 'operational_handoff_proposal_link',
+                      payload: {
+                        source_opportunity_id: opportunity.id,
+                        operational_opportunity_id: data.id,
+                        accepted_proposal_id: acceptedProposal.id,
+                        proposal_number: acceptedProposal.proposal_number,
+                      },
+                      created_by: opportunity.owner_user_id,
+                    });
+                    console.log(`[execute-workflow] Linked operational opp ${data.id} to accepted proposal ${acceptedProposal.id} (no clone created)`);
+                  } else {
+                    await supabase.from('system_events').insert({
+                      organization_id: opportunity.organization_id,
+                      event_type: 'operational_handoff_no_accepted_proposal',
+                      payload: {
+                        source_opportunity_id: opportunity.id,
+                        operational_opportunity_id: data.id,
+                      },
+                      created_by: opportunity.owner_user_id,
+                    });
+                    console.warn(`[execute-workflow] Source opp ${opportunity.id} has no accepted proposal — operational opp ${data.id} created without accepted_proposal_id`);
                   }
-                } catch (proposalError) {
-                  console.error('[execute-workflow] Error copying proposals:', proposalError);
+                } catch (linkErr) {
+                  console.error('[execute-workflow] Error linking accepted proposal:', linkErr);
                 }
 
                 // Copy opportunity files from source to new opportunity
