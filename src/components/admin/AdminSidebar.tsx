@@ -16,7 +16,8 @@ import {
   Activity,
   Trash2,
   TrendingUp,
-  Scale
+  Scale,
+  ShieldAlert
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -64,6 +65,12 @@ const menuItems = [
     label: "Revenue", 
     icon: DollarSign,
     description: "Billing Intelligence"
+  },
+  {
+    path: "/admin/revenue-integrity",
+    label: "Revenue Integrity",
+    icon: ShieldAlert,
+    description: "SSoT vs superfícies"
   },
   { 
     path: "/admin/analytics", 
