@@ -73,6 +73,7 @@ import {
   formatPct,
 } from '@/lib/proposals/effectiveAmount';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
 
 const proposalDetailsKey = (opportunityId: string) =>
   ['proposal-details', opportunityId] as const;
