@@ -49,7 +49,7 @@ export function WinLossKPIStrip({ data, isLoading, terminology, pipelineType, ss
   const kpis = [
     {
       label: wonLabel,
-      value: data?.wonCount || 0,
+      value: wonCount,
       format: 'number' as const,
       icon: TrendingUp,
       color: 'text-emerald-500',
@@ -81,7 +81,7 @@ export function WinLossKPIStrip({ data, isLoading, terminology, pipelineType, ss
     },
     {
       label: 'Ticket Médio Ganho',
-      value: data?.avgTicketWon || 0,
+      value: avgTicketWon,
       format: 'currency' as const,
       icon: BarChart3,
       color: 'text-emerald-500',
