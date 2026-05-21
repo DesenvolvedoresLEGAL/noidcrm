@@ -137,6 +137,20 @@ export function GeneralOverviewV2() {
           </div>
         </div>
 
+      <div className="space-y-4">
+        <ReportMetaBar meta={meta} reportLabel="Visão Geral" />
+        <RevenueSsotBanner surface="Relatórios → Geral" />
+        <ReportWarningsPanel confidence={meta?.confidence} />
+
+        {/* Sprint 2.11 — escopo all-time vs CEO Dashboard mensal */}
+        <div className="flex items-start gap-3 rounded-md border border-primary/30 bg-primary/5 p-3 text-sm">
+          <Info className="h-4 w-4 mt-0.5 text-primary flex-shrink-0" />
+          <div>
+            <strong>Escopo:</strong> esta tela mostra o <strong>histórico completo</strong> de oportunidades ganhas/perdidas da organização.
+            O <em>Dashboard CEO</em> mostra apenas o <strong>mês corrente</strong> — os dois usam a mesma cascata monetária (proposta aceita → valor previsto), portanto valores diferentes refletem janelas de tempo diferentes, não cálculos diferentes.
+          </div>
+        </div>
+
         {lowProposalCoverage && (
           <div className="flex items-start gap-3 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
             <AlertTriangle className="h-4 w-4 mt-0.5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
@@ -150,43 +164,22 @@ export function GeneralOverviewV2() {
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
           <KpiCard icon={Layers} label="Pipeline ativo" value={formatNumber(view.activePipelineCount)} tone="primary" />
           <KpiCard icon={Wallet} label="Valor do pipeline" value={formatCurrency(view.activePipelineValue)} tone="primary" />
-          <KpiCard icon={Trophy} label="Ganhas" value={formatNumber(view.wonCount)} tone="success" />
-          {unified ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="cursor-help">
-                  <KpiCard
-                    icon={DollarSign}
-                    label="Receita ganha"
-                    value={formatCurrency(view.wonRevenue)}
-                    tone="success"
-                    hint={`${proposalBasedPct}% via proposta`}
-                  />
-                </div>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="max-w-sm">
-                <div className="space-y-1 text-xs">
-                  <div className="font-semibold">Composição da receita ganha (histórico):</div>
-                  <div>• Via proposta aceita: <strong>{formatCurrency(unified.won_revenue_via_accepted_proposal)}</strong> ({unified.won_count_via_accepted_proposal} deals)</div>
-                  <div>• Via última proposta: <strong>{formatCurrency(unified.won_revenue_via_latest_proposal)}</strong> ({unified.won_count_via_latest_proposal} deals)</div>
-                  <div>• Via valor previsto: <strong>{formatCurrency(unified.won_revenue_via_opportunity_fallback)}</strong> ({unified.won_count_via_opportunity_fallback} deals)</div>
-                  {unified.won_count_via_zero_fallback > 0 && (
-                    <div className="text-destructive">• Sem valor: {unified.won_count_via_zero_fallback} deals</div>
-                  )}
-                  <div className="border-t pt-1 mt-1 font-semibold">Total: {formatCurrency(unified.won_revenue)}</div>
-                </div>
-              </TooltipContent>
-            </Tooltip>
-          ) : (
-            <KpiCard icon={DollarSign} label="Receita ganha" value={formatCurrency(view.wonRevenue)} tone="success" />
-          )}
+          <KpiCard icon={Trophy} label="Ganhas" value={formatNumber(wonCountSsot)} tone="success" />
+          <KpiCard
+            icon={DollarSign}
+            label="Receita ganha"
+            value={formatCurrency(wonRevenueSsot)}
+            tone="success"
+            hint="commercial_won_revenue_view"
+          />
           <KpiCard icon={TrendingDown} label="Perdidas" value={formatNumber(view.lostCount)} tone="danger" />
           <KpiCard icon={Wallet} label="Valor perdido" value={formatCurrency(view.lostValue)} tone="danger" />
           <KpiCard icon={Activity} label="Processadas" value={formatNumber(view.processedCount)} />
           <KpiCard icon={Target} label="Taxa de conversão" value={formatPct(view.winRatePct)} hint="ganhas / processadas" />
-          <KpiCard icon={TrendingUp} label="Ticket médio ganho" value={formatCurrency(view.avgWonTicket)} />
+          <KpiCard icon={TrendingUp} label="Ticket médio ganho" value={formatCurrency(avgWonTicketSsot)} />
         </div>
       </div>
     </TooltipProvider>
   );
 }
+
