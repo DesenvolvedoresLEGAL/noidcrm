@@ -134,11 +134,15 @@ export default function RevenueIntegrity() {
                     <TableRow key={s.surface}>
                       <TableCell className="font-medium">{s.surface}</TableCell>
                       <TableCell className="text-right">{s.shown === null ? '—' : BRL(s.shown)}</TableCell>
-                      <TableCell className="text-right">{BRL(s.ssot)}</TableCell>
+                      <TableCell className="text-right">{BRL(s.ssot_value)}</TableCell>
                       <TableCell className="text-right">{BRL(s.delta)}</TableCell>
                       <TableCell>
-                        {s.mismatch ? (
+                        {s.status === 'mismatch' ? (
                           <Badge variant="destructive">REVENUE_SOURCE_MISMATCH</Badge>
+                        ) : s.status === 'ssot_native' ? (
+                          <Badge variant="secondary">SSoT NATIVE</Badge>
+                        ) : s.status === 'unavailable' ? (
+                          <Badge variant="outline">N/D</Badge>
                         ) : (
                           <Badge variant="secondary">OK</Badge>
                         )}
