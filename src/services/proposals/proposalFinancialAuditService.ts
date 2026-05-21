@@ -10,7 +10,18 @@ export type CanonicalSource =
   | 'pricing_breakdown_snapshot'
   | 'payment_intent'
   | 'erp_payload'
-  | 'manual_review';
+  | 'manual_review'
+  | 'ledger'
+  | 'indeterminate';
+
+export type AuditScopeStatus =
+  | 'in_scope'
+  | 'out_of_scope_duplicate'
+  | 'out_of_scope_superseded'
+  | 'out_of_scope_draft'
+  | 'out_of_scope_old_version'
+  | 'out_of_scope_non_winning'
+  | 'needs_scope_review';
 
 export interface AuditRun {
   id: string;
@@ -25,6 +36,11 @@ export interface AuditRun {
   needs_review_count: number;
   total_approved_amount: number;
   total_detected_delta: number;
+  in_scope_count: number;
+  out_of_scope_count: number;
+  needs_scope_review_count: number;
+  in_scope_delta: number;
+  out_of_scope_delta: number;
   created_by: string | null;
   created_at: string;
   completed_at: string | null;
@@ -65,6 +81,16 @@ export interface AuditItem {
   applied_at: string | null;
   applied_by: string | null;
   applied_mode: string | null;
+  is_winning_proposal: boolean;
+  is_superseded: boolean;
+  is_duplicate_candidate: boolean;
+  is_operational_clone: boolean;
+  proposal_rank_for_opportunity: number | null;
+  proposal_selection_reason: string | null;
+  source_proposal_id: string | null;
+  duplicated_from_proposal_id: string | null;
+  superseded_by_proposal_id: string | null;
+  audit_scope_status: AuditScopeStatus;
   created_at: string;
   updated_at: string;
 }
@@ -76,6 +102,8 @@ export interface AuditItemFilters {
   hasDivergence?: boolean;
   canonicalSource?: CanonicalSource;
   search?: string;
+  /** Default: in_scope + needs_scope_review. Set to 'all' to include out_of_scope. */
+  scopeMode?: 'default' | 'all' | 'only_out_of_scope';
 }
 
 export async function runAudit(opts: {
@@ -122,6 +150,15 @@ export async function listAuditItems(filters: AuditItemFilters): Promise<AuditIt
   if (filters.hasDivergence) q = q.gt('max_delta', 0.01);
   if (filters.sellerName) q = q.ilike('seller_name', `%${filters.sellerName}%`);
   if (filters.search) q = q.or(`proposal_number.ilike.%${filters.search}%,account_name.ilike.%${filters.search}%`);
+  const mode = filters.scopeMode ?? 'default';
+  if (mode === 'default') {
+    q = q.in('audit_scope_status', ['in_scope', 'needs_scope_review']);
+  } else if (mode === 'only_out_of_scope') {
+    q = q.in('audit_scope_status', [
+      'out_of_scope_duplicate', 'out_of_scope_superseded',
+      'out_of_scope_draft', 'out_of_scope_old_version', 'out_of_scope_non_winning',
+    ]);
+  }
   const { data, error } = await q;
   if (error) throw error;
   return (data ?? []) as unknown as AuditItem[];

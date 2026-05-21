@@ -1,135 +1,159 @@
-## PRICE AUDIT MAY 2026 — Plano final (com ajustes obrigatórios)
 
-Auditoria retroativa read-only por padrão. Pix/Provider/Banco/ERP real **fora de escopo**. Primeira execução será **somente dry-run de maio/2026**.
+# PRICE AUDIT MAY 2026 — Scope Hardening
 
-### Ajustes incorporados
+Pausar correções. Resolver o problema de escopo: a auditoria está tratando como divergentes propostas que são clones operacionais, versões antigas ou propostas não vencedoras vinculadas ao mesmo cliente/oportunidade. Nenhuma correção será aplicada nesta rodada.
 
-- `proposals.total_amount` é **legado/evidência**. Apply nunca prioriza esse campo.
-- `canonical_source = 'erp_payload'` **nunca** aplica em modo safe → força `needs_review`.
-- Slack é **evidência, nunca fonte contábil**. Sem parsing frágil de texto.
-- `reconstructed_ledger_amount` é apenas diagnóstico, nunca vira canonical automático.
-- Validação obrigatória: PROP-2026-00755 deve aparecer como `divergent` com todos os valores conflitantes.
+## Achados do diagnóstico
 
----
+Quatro propostas citadas, todas com `pricing_breakdown_snapshot`:
 
-### 1. Migration — Schema
+| Proposta | Conta | Opp Title | Opp Status | Proposal Status | accepted_at | approved_amount |
+|---|---|---|---|---|---|---|
+| PROP-2026-00717 | Organica Digital | ORGANICA DIGITAL NA PROXXIMA 2026 | won | accepted | 2026-05-14 | 1.313,40 |
+| PROP-2026-00732 | Organica Digital | ORGANICA DIGITAL NA PROXXIMA 2026 | new | sent | — | 1.194,00 |
+| PROP-2026-00739 | Ntsds Brasil | NETSEEDS NA MEDICAL CANNABIS FAIR 2026 | won | accepted | 2026-05-18 | 1.313,40 |
+| PROP-2026-00758 | Ntsds Brasil | NETSEEDS NA MEDICAL CANNABIS FAIR 2026 | new | sent | — | 1.313,40 |
 
-**`proposal_financial_audit_runs`**: id, organization_id, period_start/end, status (`running|completed|failed`), `dry_run boolean default true`, total_proposals, ok_count, divergent_count, needs_review_count, total_approved_amount, total_detected_delta, created_by, created_at, completed_at, metadata jsonb. RLS: org members SELECT; mutação via RPC.
+Conclusão: cada par é (sales/won + accepted) e (operacional/clone, sent, sem accept). O usuário trata o clone operacional (00758, 00732) como a "proposta vigente" do ciclo operacional, mas a vencedora contábil é a accepted/won. A auditoria atual entra em ambas e classifica como divergente — precisa segregar escopo.
 
-**`proposal_financial_audit_items`**: todos os campos do briefing, mais:
-- `reconstructed_ledger_amount numeric` — diagnóstico para propostas sem ledger/snapshot.
-- `raw_values jsonb` inclui `raw_slack_payload`, `raw_slack_message`, `raw_erp_payload`, `raw_payment_intent`, `raw_approval_snapshot`.
-- CHECK constraints para enums `audit_status` (`ok|divergent|needs_review|fixed|ignored`) e `canonical_source` (`approval_snapshot|approved_amount|approved_payment_schedule|pricing_breakdown_snapshot|payment_intent|erp_payload|manual_review`).
-- Índices: `(audit_run_id)`, `(proposal_id)`, `(organization_id, audit_status)`.
+## Escopo desta rodada
 
-**Flags em `proposals` (ADD COLUMN IF NOT EXISTS)**: `financial_audit_status text`, `financial_audit_last_run_id uuid`, `financial_audit_delta numeric`, `erp_sync_needs_review boolean default false`, `slack_notification_needs_correction boolean default false`.
+1. Schema: adicionar campos de vínculo/escopo em `proposal_financial_audit_items`.
+2. RPC `run_proposal_financial_audit`: ranking por oportunidade + por conta+título + classificação `audit_scope_status`.
+3. UI: KPIs e tabela separando escopo vs fora-de-escopo, drawer com evidências de vínculo.
+4. Dry-run de maio 2026 e validação dos quatro casos.
+5. Nada de `apply_*`, ERP, Pix, banco, provider, total_amount.
 
-### 2. RPC `run_proposal_financial_audit(p_period_start, p_period_end, p_dry_run default true)`
+## 1. Migração de schema
 
-SECURITY DEFINER, `search_path = public`, gate `has_role` admin/owner.
+`ALTER TABLE proposal_financial_audit_items` adicionar:
 
-1. Cria run com `status = 'running'`.
-2. Seleciona propostas da org no período via `approved_at`/`accepted_at`/oportunidade ganha (`closed_at`)/existência de `proposal_erp_sync_logs`.
-3. Para cada proposta coleta:
-   - `slack_amount`: **somente** se `notification_delivery_logs` tem campo estruturado (`payload->>'amount'` numérico). Caso contrário fica NULL e o payload bruto vai em `raw_values.raw_slack_payload`/`raw_slack_message`. Sem regex sobre texto.
-   - `deal_amount`: `opportunities.value`.
-   - `proposal_total_amount`: legado, só evidência.
-   - `ledger_effective_amount`, `ledger_erp_amount`: de `pricing_breakdown_snapshot`.
-   - `approved_amount`, `approval_snapshot_amount` (`approval_snapshot->>'amount'`), `payment_schedule_total` (soma de `approved_payment_schedule`).
-   - `payment_intent_expected_amount`: último `proposal_payment_intents`.
-   - `erp_sent_amount`: último payload em `proposal_erp_sync_logs`.
-   - `reconstructed_ledger_amount`: se faltam ledger e approval_snapshot, recomputa via itens + descontos atuais para diagnóstico (marca `divergence_types += SEM_LEDGER`/`SEM_APPROVAL_SNAPSHOT`). Nunca usado como canonical automático.
-4. `max_delta` = maior diferença par-a-par entre valores não-nulos contábeis (Slack excluído do cálculo de divergência contábil; gera apenas flag `DIVERGENCIA_SLACK` se diferir).
-5. Classifica `divergence_types`: `DIVERGENCIA_HEADER`, `DIVERGENCIA_DEAL`, `DIVERGENCIA_PAYMENT_SCHEDULE`, `DIVERGENCIA_SLACK`, `DIVERGENCIA_ERP`, `DIVERGENCIA_APPROVAL_SNAPSHOT`, `SEM_LEDGER`, `SEM_APPROVAL_SNAPSHOT`, `VALOR_APROVADO_INDETERMINADO`.
-6. `canonical_amount` na ordem: `approval_snapshot` → `approved_amount` → `approved_payment_schedule` → `pricing_breakdown_snapshot` → `payment_intent` → `erp_payload` (apenas como rótulo) → `manual_review`.
-7. `recommended_action`:
-   - `apply_safe` somente quando `canonical_source ∈ {approval_snapshot, approved_amount, approved_payment_schedule, pricing_breakdown_snapshot}`.
-   - `manual_review` quando `canonical_source ∈ {payment_intent, erp_payload, manual_review}` ou divergências contábeis sem fonte confiável.
-   - `mark_erp_review` quando há `DIVERGENCIA_ERP`.
-   - `mark_slack_correction` quando há `DIVERGENCIA_SLACK`.
-8. `audit_status`: `ok` se `max_delta <= 0.01` e sem flags `SEM_*`/`INDETERMINADO`; senão `divergent` ou `needs_review` (quando fonte canônica não é confiável).
-9. Insere itens; atualiza run com totais; **não muda nada nas propostas em dry-run**.
-10. Se `p_dry_run = false`, atualiza apenas as flags de auditoria em `proposals` (`financial_audit_status`, `financial_audit_last_run_id`, `financial_audit_delta`). Nunca toca valores aprovados nem `total_amount` aqui.
+- `is_winning_proposal boolean DEFAULT false`
+- `is_superseded boolean DEFAULT false`
+- `is_duplicate_candidate boolean DEFAULT false`
+- `is_operational_clone boolean DEFAULT false`
+- `proposal_rank_for_opportunity integer`
+- `proposal_selection_reason text`
+- `source_proposal_id uuid` (lido de `proposals.source_proposal_id` se existir; senão NULL)
+- `duplicated_from_proposal_id uuid` (idem `duplicated_from_proposal_id`/`cloned_from_proposal_id`)
+- `superseded_by_proposal_id uuid`
+- `audit_scope_status text DEFAULT 'in_scope'` com CHECK em: `in_scope`, `out_of_scope_duplicate`, `out_of_scope_superseded`, `out_of_scope_draft`, `out_of_scope_old_version`, `out_of_scope_non_winning`, `needs_scope_review`
+- Índice em `(audit_run_id, audit_scope_status)`
 
-### 3. RPC `apply_proposal_financial_audit_item(p_audit_item_id, p_apply_mode default 'safe')`
+Adicionar em `proposal_financial_audit_runs`:
 
-SECURITY DEFINER, apenas admin/owner. Captura `metadata.before` (proposta + opp + flags) e `metadata.after`.
+- `in_scope_count integer DEFAULT 0`
+- `out_of_scope_count integer DEFAULT 0`
+- `needs_scope_review_count integer DEFAULT 0`
+- `out_of_scope_delta numeric(14,2) DEFAULT 0`
+- `in_scope_delta numeric(14,2) DEFAULT 0` (= `total_detected_delta` apenas dos in_scope)
 
-Regras de modo `safe`:
-1. **Rejeita** quando `canonical_source ∈ {erp_payload, payment_intent, manual_review}` → vira `needs_review` automaticamente (sem tocar dados).
-2. **Não atualiza `proposals.total_amount` como primeira opção.** Ordem de atualização:
-   - Atualiza `opportunities.value` se `DIVERGENCIA_DEAL`.
-   - Atualiza campos de base de forecast/comissão (se colunas dedicadas existirem na proposta/oportunidade).
-   - Atualiza flags de auditoria na proposta.
-3. `proposals.total_amount` só é atualizado se `p_apply_mode = 'mirror_legacy_total'` (modo separado). Nesse caso registra before/after e adiciona `metadata.mirrored_legacy_total = true`.
-4. Marca `erp_sync_needs_review = true` se `DIVERGENCIA_ERP`.
-5. Marca `slack_notification_needs_correction = true` se `DIVERGENCIA_SLACK`.
-6. **Nunca sobrescreve `approval_snapshot`**. Caso a inconsistência exija (raro), exige `p_apply_mode = 'force_with_snapshot'` e guarda original em `metadata.previous_approval_snapshot`.
-7. Insere `system_events` (`price_audit.applied`) com before/after e modo aplicado.
-8. Atualiza item: `audit_status = 'fixed'`, `applied_at`, `applied_by`, `applied_mode`, `notes`.
-9. Retorna JSON `{ before, after, applied_fields[], mode }`.
+A migração detecta colunas opcionais (`source_proposal_id`, `duplicated_from_proposal_id`, `superseded_by_proposal_id`) em `proposals` via `information_schema` antes de referenciá-las, para não quebrar se ainda não existirem.
 
-RPCs auxiliares:
-- `ignore_proposal_financial_audit_item(p_audit_item_id, p_note)` → `audit_status='ignored'`.
-- `mark_proposal_financial_audit_item_review(p_audit_item_id, p_note)` → `audit_status='needs_review'`.
+## 2. RPC `run_proposal_financial_audit` (v3)
 
-### 4. Serviço + Hook
+Mantém a v2 (regra de desconto manual aplicada à canonical) e adiciona, antes da escrita do item:
 
-`src/services/proposals/proposalFinancialAuditService.ts`: runAudit, listAuditRuns, listAuditItems, getAuditItemDetail, applyAuditItem(mode), ignoreAuditItem, markNeedsReview.
+**a. Coleta de evidências de fechamento** por proposta candidata:
 
-`src/hooks/proposals/useProposalFinancialAudit.ts`: React Query com invalidação cruzada (proposta, opp, forecast).
+```text
+has_accept = (status IN ('accepted','approved','won') OR accepted_at IS NOT NULL)
+has_snapshot = approval_snapshot IS NOT NULL AND approval_snapshot::text <> '{}'
+has_approved_amount = approved_amount IS NOT NULL
+has_payment_intent = EXISTS payment_intent linked
+has_erp_sync = EXISTS erp_billing linked
+opp_is_won = opportunity.status IN ('won','ganha','closed_won')
+```
 
-### 5. UI Admin
+**b. Ranking por oportunidade** (`window function ROW_NUMBER() OVER (PARTITION BY opportunity_id ORDER BY ...)`):
 
-Rota: `/settings/system/auditoria-financeira-propostas` (registrada em `SettingsLayout`).
+Score (maior vence):
+1. has_accept → +1000
+2. opp_is_won AND has_accept → +500
+3. has_snapshot → +100
+4. has_approved_amount → +50
+5. has_payment_intent OR has_erp_sync → +30
+6. mais recente por `accepted_at`, senão `sent_at`, senão `created_at` → desempate
 
-Página `src/pages/settings/system/PriceAuditPage.tsx` envolta em `SettingsGate requiredLevel="full"`.
+`is_winning_proposal = (rank = 1 AND score >= 100)`. Sem evidência mínima (score < 100) → todas da opp ficam `needs_scope_review`.
 
-- Botão **Rodar auditoria** (modal: período, `dry-run` on/off, default ON e bloqueado para a primeira execução).
-- Filtros: período, status, vendedor, com divergência, fonte canônica, cliente, busca por proposta.
-- KPIs: Total auditado, OK, Com divergência, Necessitam revisão, Delta financeiro total, Comissões afetadas.
-- Tabela com colunas do briefing + coluna **Reconstruído** (quando aplicável) e ação por linha.
-- Ações por linha:
-  - **Ver detalhes** (drawer).
-  - **Aplicar correção segura** — desabilitada e com tooltip quando `recommended_action != 'apply_safe'`.
-  - **Espelhar total legado** (oculta em padrão; visível só para owner em item já fixed).
-  - **Ignorar** / **Marcar revisão manual**.
-- Drawer de detalhe:
-  - Todos os valores lado a lado (Slack, Deal, Proposal total, Ledger effective, Ledger ERP, Approved, Approval snapshot, Payment schedule, Payment intent, ERP sent, **Reconstructed ledger** quando houver).
-  - Badge explicando fonte canônica e por que Slack/ERP são evidência.
-  - Diff antes/depois (preview do apply).
-  - Eventos (aprovação, ERP, Slack — payload bruto quando sem campo estruturado).
+**c. Classificação `audit_scope_status`**:
 
-Componentes: `PriceAuditKpis`, `PriceAuditFilters`, `PriceAuditTable`, `PriceAuditItemDrawer`, `PriceAuditRunDialog`. Reusa `formatLedgerBRL`.
+- `status IN ('draft')` → `out_of_scope_draft`
+- `superseded_by_proposal_id IS NOT NULL` (quando coluna existe) → `out_of_scope_superseded`
+- `duplicated_from_proposal_id IS NOT NULL` AND outra mais nova com `has_accept` → `out_of_scope_duplicate`
+- não vencedora da opp (rank > 1) com vencedora `has_accept` → `out_of_scope_non_winning`
+- não vencedora da opp, mais antiga, sem evidência → `out_of_scope_old_version`
+- vencedora ou única → `in_scope`
+- sem evidência alguma na opp → `needs_scope_review`
 
-### 6. Segurança
+**d. Detecção de clone operacional** (caso NETSEEDS/ORGÂNICA): segundo passo de ranking por `(account_id, normalize(opportunity.title))`. Quando há duas opportunities ativas com mesmo cliente+título e uma é `won` (accepted) e a outra `new` (sem accept) com proposta `sent`, a `sent` recebe `is_operational_clone = true` e `audit_scope_status = needs_scope_review` (não bloqueia, mas tira do balde de divergência financeira). `proposal_selection_reason` registra o motivo textual ("clone operacional do ciclo onboarding").
 
-- Todas RPCs `SECURITY DEFINER` + `SET search_path = public` + gate `has_role`.
-- Dry-run default + confirmação textual no apply.
-- Nenhuma chamada a ERP/Pix/banco.
-- `approval_snapshot` imutável salvo modo forçado com snapshot guardado.
-- Logs em `system_events` + `metadata.before/after` por item.
+**e. Totais do run**: `in_scope_*`, `out_of_scope_*`, `needs_scope_review_*` recomputados ao final. `total_detected_delta` permanece como soma geral; `in_scope_delta` é o número que a UI usa por padrão.
 
-### 7. Validação obrigatória
+## 3. Service e hook (frontend)
 
-1. Migration aplicada.
-2. Dry-run da org de OGGI para `2026-05-01..2026-05-31`.
-3. **Checagem mandatória**: PROP-2026-00755 listada como `divergent`, com Slack 2991.00, Deal 2542.35, Header 2203.37, Itens 2991.00, Pagamento 2203.37, Cronograma 2127.10, ERP 2991.00 — todos visíveis no drawer.
-4. Nenhuma alteração em propostas após dry-run.
-5. `tsc --noEmit` + build limpos.
+- `proposalFinancialAuditService.ts`: estender `AuditItem` com os novos campos; `AuditItemFilters` ganha `scopeStatus?: AuditScopeStatus | 'all_in_scope'` (default = in_scope + needs_scope_review).
+- `listAuditItems`: filtro padrão `audit_scope_status IN ('in_scope','needs_scope_review')`.
+- `useAuditRuns`/`useAuditItems`: sem mudança de assinatura externa.
 
-### 8. Fora de escopo
+## 4. UI — `PriceAuditPage.tsx`
 
-- Pix, provider, banco, ERP real, novas cobranças.
-- Recálculo automático sem dry-run.
-- Uso de `total_amount` como fonte canônica.
-- Parsing de texto Slack.
+KPIs (cards), separados:
+- Total auditado
+- In scope
+- Fora de escopo
+- Needs scope review
+- Divergências reais (= in_scope com `max_delta > 0.01`)
+- Delta in_scope (R$)
+- Delta fora de escopo (R$) — card secundário/cinza
 
----
+Tabela:
+- Nova coluna **Escopo** (badge): In scope / Duplicada / Substituída / Versão antiga / Não vencedora / Rascunho / Revisar escopo
+- Toggle "Mostrar fora de escopo" (default off)
+- Filtro de status financeiro só conta in_scope
 
-### Ordem de execução
-1. Migration (tabelas + flags + RPCs run/apply/ignore/mark_review).
-2. Tipos Supabase regenerados.
-3. Serviço + hook.
-4. Página + componentes + rota.
-5. Dry-run maio/2026 + validação OGGI.
+Drawer da proposta — nova seção "Vínculo & Escopo":
+- opportunity_id, opp title, opp status
+- proposal status, created_at, sent_at, accepted_at
+- has_snapshot, has_approved_amount, has_payment_intent, has_erp_sync
+- source_proposal_id / duplicated_from_proposal_id / superseded_by_proposal_id (links)
+- rank_for_opportunity, is_winning_proposal, is_operational_clone
+- proposal_selection_reason
+
+Botões `Apply` ficam desabilitados quando `audit_scope_status != 'in_scope'`, com tooltip "Fora de escopo — revisar vínculo antes de corrigir".
+
+## 5. Dry-run de validação
+
+Rodar `run_proposal_financial_audit(2026-05-01, 2026-05-31, dry_run=true)` e validar:
+
+- PROP-2026-00717 (Organica, opp won, accepted) → `is_winning_proposal=true`, `in_scope`
+- PROP-2026-00732 (Organica, opp new, sent) → `is_operational_clone=true`, `needs_scope_review`
+- PROP-2026-00739 (Netseeds, opp won, accepted) → `is_winning_proposal=true`, `in_scope`
+- PROP-2026-00758 (Netseeds, opp new, sent) → `is_operational_clone=true`, `needs_scope_review`
+- PROP-2026-00755 (OGGI) → continua `divergent`/`needs_review` com a regra do desconto manual
+
+Nenhum `apply_*` será executado. Nenhuma alteração em proposta, oportunidade, forecast, comissão, Slack, ERP, Pix ou provider.
+
+## 6. Garantias
+
+- Typecheck + build obrigatórios após mudanças de tipos.
+- Mantém compatibilidade com itens já gravados: defaults preenchem `in_scope` para linhas antigas; a UI continua exibindo runs anteriores sem quebrar.
+- Sem mudanças em `total_amount`, ERP, Pix, provider, Slack.
+
+## Arquivos impactados
+
+- `supabase/migrations/<novo>_price_audit_scope_hardening.sql` (schema + RPC v3)
+- `src/services/proposals/proposalFinancialAuditService.ts` (tipos e filtros)
+- `src/hooks/proposals/useProposalFinancialAudit.ts` (passar filtro de escopo)
+- `src/pages/settings/system/PriceAuditPage.tsx` (KPIs, coluna Escopo, toggle, drawer)
+- `src/integrations/supabase/types.ts` (regenerado pela migração)
+
+## Riscos
+
+- Detecção de "clone operacional" depende de igualdade normalizada do título da opp; falsos positivos possíveis em títulos idênticos legítimos — por isso cai em `needs_scope_review`, nunca em `out_of_scope` duro.
+- Colunas `source_proposal_id`/`duplicated_from_proposal_id`/`superseded_by_proposal_id` podem não existir em todos os ambientes; RPC usa detecção dinâmica para não falhar.
+
+## Fora de escopo
+
+Provider financeiro, Pix público, ERP real, baixa financeira, mock de pagamento, qualquer `apply_proposal_financial_audit_item`.

@@ -22644,14 +22644,20 @@ export type Database = {
           approved_amount: number | null
           approved_at: string | null
           audit_run_id: string
+          audit_scope_status: string
           audit_status: string
           canonical_amount: number | null
           canonical_source: string | null
           created_at: string
           deal_amount: number | null
           divergence_types: string[]
+          duplicated_from_proposal_id: string | null
           erp_sent_amount: number | null
           id: string
+          is_duplicate_candidate: boolean
+          is_operational_clone: boolean
+          is_superseded: boolean
+          is_winning_proposal: boolean
           ledger_effective_amount: number | null
           ledger_erp_amount: number | null
           max_delta: number
@@ -22663,6 +22669,8 @@ export type Database = {
           payment_schedule_total: number | null
           proposal_id: string
           proposal_number: string | null
+          proposal_rank_for_opportunity: number | null
+          proposal_selection_reason: string | null
           proposal_status: string | null
           proposal_total_amount: number | null
           raw_values: Json
@@ -22670,6 +22678,8 @@ export type Database = {
           reconstructed_ledger_amount: number | null
           seller_name: string | null
           slack_amount: number | null
+          source_proposal_id: string | null
+          superseded_by_proposal_id: string | null
           updated_at: string
         }
         Insert: {
@@ -22681,14 +22691,20 @@ export type Database = {
           approved_amount?: number | null
           approved_at?: string | null
           audit_run_id: string
+          audit_scope_status?: string
           audit_status?: string
           canonical_amount?: number | null
           canonical_source?: string | null
           created_at?: string
           deal_amount?: number | null
           divergence_types?: string[]
+          duplicated_from_proposal_id?: string | null
           erp_sent_amount?: number | null
           id?: string
+          is_duplicate_candidate?: boolean
+          is_operational_clone?: boolean
+          is_superseded?: boolean
+          is_winning_proposal?: boolean
           ledger_effective_amount?: number | null
           ledger_erp_amount?: number | null
           max_delta?: number
@@ -22700,6 +22716,8 @@ export type Database = {
           payment_schedule_total?: number | null
           proposal_id: string
           proposal_number?: string | null
+          proposal_rank_for_opportunity?: number | null
+          proposal_selection_reason?: string | null
           proposal_status?: string | null
           proposal_total_amount?: number | null
           raw_values?: Json
@@ -22707,6 +22725,8 @@ export type Database = {
           reconstructed_ledger_amount?: number | null
           seller_name?: string | null
           slack_amount?: number | null
+          source_proposal_id?: string | null
+          superseded_by_proposal_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -22718,14 +22738,20 @@ export type Database = {
           approved_amount?: number | null
           approved_at?: string | null
           audit_run_id?: string
+          audit_scope_status?: string
           audit_status?: string
           canonical_amount?: number | null
           canonical_source?: string | null
           created_at?: string
           deal_amount?: number | null
           divergence_types?: string[]
+          duplicated_from_proposal_id?: string | null
           erp_sent_amount?: number | null
           id?: string
+          is_duplicate_candidate?: boolean
+          is_operational_clone?: boolean
+          is_superseded?: boolean
+          is_winning_proposal?: boolean
           ledger_effective_amount?: number | null
           ledger_erp_amount?: number | null
           max_delta?: number
@@ -22737,6 +22763,8 @@ export type Database = {
           payment_schedule_total?: number | null
           proposal_id?: string
           proposal_number?: string | null
+          proposal_rank_for_opportunity?: number | null
+          proposal_selection_reason?: string | null
           proposal_status?: string | null
           proposal_total_amount?: number | null
           raw_values?: Json
@@ -22744,6 +22772,8 @@ export type Database = {
           reconstructed_ledger_amount?: number | null
           seller_name?: string | null
           slack_amount?: number | null
+          source_proposal_id?: string | null
+          superseded_by_proposal_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -22820,10 +22850,15 @@ export type Database = {
           divergent_count: number
           dry_run: boolean
           id: string
+          in_scope_count: number
+          in_scope_delta: number
           metadata: Json
           needs_review_count: number
+          needs_scope_review_count: number
           ok_count: number
           organization_id: string
+          out_of_scope_count: number
+          out_of_scope_delta: number
           period_end: string
           period_start: string
           status: string
@@ -22838,10 +22873,15 @@ export type Database = {
           divergent_count?: number
           dry_run?: boolean
           id?: string
+          in_scope_count?: number
+          in_scope_delta?: number
           metadata?: Json
           needs_review_count?: number
+          needs_scope_review_count?: number
           ok_count?: number
           organization_id: string
+          out_of_scope_count?: number
+          out_of_scope_delta?: number
           period_end: string
           period_start: string
           status?: string
@@ -22856,10 +22896,15 @@ export type Database = {
           divergent_count?: number
           dry_run?: boolean
           id?: string
+          in_scope_count?: number
+          in_scope_delta?: number
           metadata?: Json
           needs_review_count?: number
+          needs_scope_review_count?: number
           ok_count?: number
           organization_id?: string
+          out_of_scope_count?: number
+          out_of_scope_delta?: number
           period_end?: string
           period_start?: string
           status?: string

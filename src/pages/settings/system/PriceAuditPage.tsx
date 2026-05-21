@@ -23,7 +23,7 @@ import {
   useAuditRuns, useAuditItems, useAuditItem,
   useRunAudit, useApplyAuditItem, useIgnoreAuditItem, useMarkAuditItemReview,
 } from '@/hooks/proposals/useProposalFinancialAudit';
-import type { AuditItem } from '@/services/proposals/proposalFinancialAuditService';
+import type { AuditItem, AuditScopeStatus } from '@/services/proposals/proposalFinancialAuditService';
 
 const SOURCE_LABEL: Record<string, string> = {
   approval_snapshot: 'Approval snapshot',
@@ -33,6 +33,18 @@ const SOURCE_LABEL: Record<string, string> = {
   payment_intent: 'Payment intent (evidência)',
   erp_payload: 'ERP (evidência)',
   manual_review: 'Revisão manual',
+  ledger: 'Ledger',
+  indeterminate: 'Indeterminado',
+};
+
+const SCOPE_LABEL: Record<AuditScopeStatus, { label: string; cls: string }> = {
+  in_scope: { label: 'In scope', cls: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400' },
+  needs_scope_review: { label: 'Revisar escopo', cls: 'bg-orange-500/10 text-orange-700 dark:text-orange-400' },
+  out_of_scope_duplicate: { label: 'Duplicada', cls: 'bg-muted text-muted-foreground' },
+  out_of_scope_superseded: { label: 'Substituída', cls: 'bg-muted text-muted-foreground' },
+  out_of_scope_draft: { label: 'Rascunho', cls: 'bg-muted text-muted-foreground' },
+  out_of_scope_old_version: { label: 'Versão antiga', cls: 'bg-muted text-muted-foreground' },
+  out_of_scope_non_winning: { label: 'Não vencedora', cls: 'bg-muted text-muted-foreground' },
 };
 
 const STATUS_VARIANT: Record<string, { label: string; cls: string }> = {
@@ -64,6 +76,7 @@ function PriceAuditContent() {
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
+  const [showOutOfScope, setShowOutOfScope] = useState(false);
   const [openItemId, setOpenItemId] = useState<string | null>(null);
 
   const runs = useAuditRuns();
@@ -72,6 +85,7 @@ function PriceAuditContent() {
       runId: selectedRunId ?? undefined,
       status: statusFilter !== 'all' ? (statusFilter as any) : undefined,
       search: search || undefined,
+      scopeMode: showOutOfScope ? 'all' : 'default',
     },
     !!selectedRunId,
   );
@@ -87,19 +101,20 @@ function PriceAuditContent() {
   );
 
   if (selectedRunId == null && runs.data && runs.data[0]) {
-    // auto-select latest
     setTimeout(() => setSelectedRunId(runs.data![0].id), 0);
   }
 
   const kpis = useMemo(() => {
     const list = items.data ?? [];
+    const inScopeList = list.filter((i) => i.audit_scope_status === 'in_scope');
     return {
       total: activeRun?.total_proposals ?? list.length,
-      ok: activeRun?.ok_count ?? list.filter((i) => i.audit_status === 'ok').length,
-      divergent: activeRun?.divergent_count ?? list.filter((i) => i.audit_status === 'divergent').length,
-      review: activeRun?.needs_review_count ?? list.filter((i) => i.audit_status === 'needs_review').length,
-      totalDelta: activeRun?.total_detected_delta ?? list.reduce((a, b) => a + (b.max_delta ?? 0), 0),
-      affectedSellers: new Set(list.filter((i) => i.audit_status !== 'ok').map((i) => i.seller_name)).size,
+      inScope: activeRun?.in_scope_count ?? inScopeList.length,
+      outOfScope: activeRun?.out_of_scope_count ?? list.filter((i) => i.audit_scope_status.startsWith('out_of_scope')).length,
+      scopeReview: activeRun?.needs_scope_review_count ?? list.filter((i) => i.audit_scope_status === 'needs_scope_review').length,
+      realDivergent: inScopeList.filter((i) => (i.max_delta ?? 0) > 0.01).length,
+      inScopeDelta: activeRun?.in_scope_delta ?? inScopeList.reduce((a, b) => a + (b.max_delta ?? 0), 0),
+      outOfScopeDelta: activeRun?.out_of_scope_delta ?? list.filter((i) => i.audit_scope_status !== 'in_scope').reduce((a, b) => a + (b.max_delta ?? 0), 0),
     };
   }, [items.data, activeRun]);
 
@@ -203,16 +218,17 @@ function PriceAuditContent() {
       )}
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
         {[
           { label: 'Total auditado', value: kpis.total },
-          { label: 'OK', value: kpis.ok },
-          { label: 'Com divergência', value: kpis.divergent },
-          { label: 'Revisão manual', value: kpis.review },
-          { label: 'Delta total', value: formatLedgerBRL(kpis.totalDelta) },
-          { label: 'Vendedores afetados', value: kpis.affectedSellers },
+          { label: 'In scope', value: kpis.inScope },
+          { label: 'Revisar escopo', value: kpis.scopeReview },
+          { label: 'Fora de escopo', value: kpis.outOfScope, muted: true },
+          { label: 'Divergências reais', value: kpis.realDivergent },
+          { label: 'Δ in scope', value: formatLedgerBRL(kpis.inScopeDelta) },
+          { label: 'Δ fora de escopo', value: formatLedgerBRL(kpis.outOfScopeDelta), muted: true },
         ].map((k) => (
-          <Card key={k.label}>
+          <Card key={k.label} className={k.muted ? 'opacity-70' : ''}>
             <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">{k.label}</CardTitle></CardHeader>
             <CardContent className="text-2xl font-semibold">{k.value}</CardContent>
           </Card>
@@ -238,6 +254,10 @@ function PriceAuditContent() {
             <SelectItem value="ignored">Ignoradas</SelectItem>
           </SelectContent>
         </Select>
+        <div className="flex items-center gap-2 rounded-md border px-3 py-1.5">
+          <Switch checked={showOutOfScope} onCheckedChange={setShowOutOfScope} id="show-oos" />
+          <Label htmlFor="show-oos" className="cursor-pointer text-xs">Mostrar fora de escopo</Label>
+        </div>
       </div>
 
       {/* Table */}
@@ -263,6 +283,7 @@ function PriceAuditContent() {
                   <TableHead className="text-right">Slack</TableHead>
                   <TableHead className="text-right">Delta</TableHead>
                   <TableHead>Fonte</TableHead>
+                  <TableHead>Escopo</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
@@ -270,9 +291,11 @@ function PriceAuditContent() {
               <TableBody>
                 {items.data.map((it) => {
                   const sv = STATUS_VARIANT[it.audit_status] ?? STATUS_VARIANT.ok;
-                  const canApplySafe = it.recommended_action === 'apply_safe' && it.audit_status !== 'fixed' && it.audit_status !== 'ignored';
+                  const scope = SCOPE_LABEL[it.audit_scope_status] ?? SCOPE_LABEL.in_scope;
+                  const inScope = it.audit_scope_status === 'in_scope';
+                  const canApplySafe = inScope && it.recommended_action === 'apply_safe' && it.audit_status !== 'fixed' && it.audit_status !== 'ignored';
                   return (
-                    <TableRow key={it.id}>
+                    <TableRow key={it.id} className={inScope ? '' : 'opacity-70'}>
                       <TableCell className="font-mono text-xs">{it.proposal_number ?? '—'}</TableCell>
                       <TableCell>{it.account_name ?? '—'}</TableCell>
                       <TableCell>{it.seller_name ?? '—'}</TableCell>
@@ -283,6 +306,7 @@ function PriceAuditContent() {
                       <TableCell className="text-right font-mono">{formatLedgerBRL(it.slack_amount)}</TableCell>
                       <TableCell className="text-right font-mono">{formatLedgerBRL(it.max_delta)}</TableCell>
                       <TableCell className="text-xs">{it.canonical_source ? SOURCE_LABEL[it.canonical_source] : '—'}</TableCell>
+                      <TableCell><Badge className={scope.cls} variant="secondary">{scope.label}</Badge></TableCell>
                       <TableCell><Badge className={sv.cls} variant="secondary">{sv.label}</Badge></TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
@@ -294,7 +318,9 @@ function PriceAuditContent() {
                             variant="ghost"
                             disabled={!canApplySafe || applyMut.isPending}
                             onClick={() => handleApply(it.id)}
-                            title={canApplySafe ? 'Aplicar correção segura' : 'Fonte canônica não é confiável para apply automático'}
+                            title={inScope
+                              ? (canApplySafe ? 'Aplicar correção segura' : 'Fonte canônica não é confiável para apply automático')
+                              : 'Fora de escopo — revisar vínculo antes de corrigir'}
                           >
                             <CheckCircle2 className="h-4 w-4" />
                           </Button>
@@ -331,6 +357,33 @@ function PriceAuditContent() {
                 </div>
                 <div className="mt-1 text-muted-foreground">
                   Slack e ERP são tratados como evidência, nunca fonte contábil automática.
+                </div>
+              </div>
+
+              <div>
+                <h3 className="mb-2 text-sm font-semibold">Vínculo & Escopo</h3>
+                <div className="space-y-1 rounded-md border bg-card p-3 text-xs">
+                  <div className="flex justify-between"><span className="text-muted-foreground">Escopo</span>
+                    <Badge className={(SCOPE_LABEL[item.data.audit_scope_status] ?? SCOPE_LABEL.in_scope).cls} variant="secondary">
+                      {(SCOPE_LABEL[item.data.audit_scope_status] ?? SCOPE_LABEL.in_scope).label}
+                    </Badge></div>
+                  {item.data.proposal_selection_reason && (
+                    <div className="text-muted-foreground">{item.data.proposal_selection_reason}</div>
+                  )}
+                  <div className="flex justify-between"><span className="text-muted-foreground">Vencedora?</span><span>{item.data.is_winning_proposal ? 'sim' : 'não'}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Clone operacional?</span><span>{item.data.is_operational_clone ? 'sim' : 'não'}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Rank na oportunidade</span><span>{item.data.proposal_rank_for_opportunity ?? '—'}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Opp status</span><span>{item.data.opportunity_status ?? '—'}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Proposal status</span><span>{item.data.proposal_status ?? '—'}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">accepted_at</span><span className="font-mono">{(item.data.raw_values as any)?.has_accept ? (item.data.approved_at ?? '—') : '—'}</span></div>
+                  <div className="grid grid-cols-2 gap-2 pt-2">
+                    {['has_accept','has_snapshot','has_approved_amount','has_payment_intent','has_erp_sync','opp_is_won'].map((k) => (
+                      <div key={k} className="flex justify-between rounded bg-muted/40 px-2 py-1">
+                        <span className="text-muted-foreground">{k}</span>
+                        <span>{(item.data!.raw_values as any)?.[k] ? '✓' : '—'}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
 
