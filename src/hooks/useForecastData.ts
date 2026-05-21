@@ -514,6 +514,34 @@ export function useForecastData(filters: ForecastFilters) {
     },
   });
 
+  // P0 Revenue SSoT — Receita Fechada lida exclusivamente de commercial_won_revenue_view.
+  // Quando disponível, override em KPIs.closedRevenue e SellerForecast.closed.
+  const closedSsotQuery = useQuery({
+    queryKey: forecastKeys.closedSsot({
+      start: periodStart.toISOString(),
+      end: periodEnd.toISOString(),
+      pipelineId,
+      userId,
+    }),
+    queryFn: async () => {
+      const { data: orgId } = await supabase.rpc('get_user_organization_id');
+      if (!orgId) return null;
+      const params = {
+        organizationId: orgId as string,
+        start: periodStart.toISOString(),
+        end: periodEnd.toISOString(),
+        pipelineIds: pipelineId ? [pipelineId] : null,
+        sellerIds: userId ? [userId] : null,
+      };
+      const [summary, bySeller] = await Promise.all([
+        revenueSsotService.getClosedRevenueSummary(params),
+        revenueSsotService.getRevenueBySeller(params),
+      ]);
+      return { summary, bySeller };
+    },
+    staleTime: 30_000,
+  });
+
   // Fetch team members for seller breakdown
   const teamQuery = useQuery({
     queryKey: forecastKeys.team(),
