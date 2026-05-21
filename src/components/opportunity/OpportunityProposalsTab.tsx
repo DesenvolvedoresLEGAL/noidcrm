@@ -160,25 +160,80 @@ export function OpportunityProposalsTab({
     },
   });
   const inheritedPipelineTypes = new Set(['onboarding', 'renewal']);
-  const isInheritedMode = !!(
-    oppMeta?.accepted_proposal_id &&
+  const isOperationalHandoff = !!(
     oppMeta?.source_opportunity_id &&
     inheritedPipelineTypes.has(oppMeta?.pipeline?.pipeline_type)
   );
 
+  // Resolve the proposal to inherit: prefer the explicit FK on the opportunity,
+  // otherwise fall back to the accepted/approved proposal on the source opportunity.
   const { data: inheritedProposal } = useQuery({
-    queryKey: ['inherited-accepted-proposal', oppMeta?.accepted_proposal_id],
+    queryKey: [
+      'inherited-accepted-proposal',
+      oppMeta?.accepted_proposal_id ?? null,
+      oppMeta?.source_opportunity_id ?? null,
+    ],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('proposals')
-        .select('id, proposal_number, title, total_amount, accepted_at, status, opportunity_id, currency, expires_at')
-        .eq('id', oppMeta!.accepted_proposal_id)
-        .maybeSingle();
-      if (error) throw error;
-      return data as any;
+      const selectCols =
+        'id, proposal_number, title, total_amount, accepted_at, status, opportunity_id, currency, expires_at, public_token, approval_snapshot, approved_amount, updated_at, created_at';
+
+      // 1. Direct FK
+      if (oppMeta?.accepted_proposal_id) {
+        const { data, error } = await supabase
+          .from('proposals')
+          .select(selectCols)
+          .eq('id', oppMeta.accepted_proposal_id)
+          .maybeSingle();
+        if (error) throw error;
+        if (data) return data as any;
+      }
+
+      // 2. Fallback: look at source opportunity for any accepted/approved proposal
+      if (oppMeta?.source_opportunity_id) {
+        const { data, error } = await supabase
+          .from('proposals')
+          .select(selectCols)
+          .eq('opportunity_id', oppMeta.source_opportunity_id)
+          .is('deleted_at', null);
+        if (error) throw error;
+        const list = (data ?? []) as any[];
+        if (!list.length) return null;
+        const score = (p: any) => {
+          if (p.accepted_at) return 5;
+          if (p.approval_snapshot) return 4;
+          if (p.approved_amount != null) return 3;
+          if (['accepted', 'approved', 'won'].includes(p.status)) return 2;
+          return 0;
+        };
+        const sorted = [...list].sort((a, b) => {
+          const ds = score(b) - score(a);
+          if (ds !== 0) return ds;
+          const ad = a.accepted_at ?? a.updated_at ?? a.created_at ?? '';
+          const bd = b.accepted_at ?? b.updated_at ?? b.created_at ?? '';
+          return bd.localeCompare(ad);
+        });
+        const best = sorted[0];
+        if (score(best) === 0) return null;
+
+        // Best-effort backfill of the FK so future loads are direct.
+        if (!oppMeta.accepted_proposal_id && best?.id) {
+          supabase
+            .from('opportunities')
+            .update({ accepted_proposal_id: best.id })
+            .eq('id', opportunityId)
+            .then(() => {
+              queryClient.invalidateQueries({ queryKey: ['opportunity-handoff-meta', opportunityId] });
+            });
+        }
+        return best;
+      }
+
+      return null;
     },
-    enabled: isInheritedMode,
+    enabled: isOperationalHandoff,
   });
+
+  const isInheritedMode = isOperationalHandoff && !!inheritedProposal;
 
   const { data, isLoading } = useQuery({
     queryKey: [...proposalKeys.lists(), opportunityId],
