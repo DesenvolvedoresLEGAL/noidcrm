@@ -73,6 +73,7 @@ import {
   formatPct,
 } from '@/lib/proposals/effectiveAmount';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
 
 const proposalDetailsKey = (opportunityId: string) =>
   ['proposal-details', opportunityId] as const;
@@ -143,9 +144,46 @@ export function OpportunityProposalsTab({
   const [emailProposalId, setEmailProposalId] = useState<string | null>(null);
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
 
+  // Inherited-proposal mode: if this opportunity is an operational/renewal handoff
+  // linked to an accepted commercial proposal, show the original (read-only) instead
+  // of letting users create/clone new proposals here.
+  const { data: oppMeta } = useQuery({
+    queryKey: ['opportunity-handoff-meta', opportunityId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('opportunities')
+        .select('id, source_opportunity_id, accepted_proposal_id, pipeline:pipelines(pipeline_type)')
+        .eq('id', opportunityId)
+        .maybeSingle();
+      if (error) throw error;
+      return data as any;
+    },
+  });
+  const inheritedPipelineTypes = new Set(['onboarding', 'renewal']);
+  const isInheritedMode = !!(
+    oppMeta?.accepted_proposal_id &&
+    oppMeta?.source_opportunity_id &&
+    inheritedPipelineTypes.has(oppMeta?.pipeline?.pipeline_type)
+  );
+
+  const { data: inheritedProposal } = useQuery({
+    queryKey: ['inherited-accepted-proposal', oppMeta?.accepted_proposal_id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('proposals')
+        .select('id, proposal_number, title, total_amount, accepted_at, status, opportunity_id, currency, expires_at')
+        .eq('id', oppMeta!.accepted_proposal_id)
+        .maybeSingle();
+      if (error) throw error;
+      return data as any;
+    },
+    enabled: isInheritedMode,
+  });
+
   const { data, isLoading } = useQuery({
     queryKey: [...proposalKeys.lists(), opportunityId],
     queryFn: () => listProposals({ opportunityId }),
+    enabled: !isInheritedMode,
   });
   const proposals = data?.data || [];
 
@@ -306,8 +344,79 @@ export function OpportunityProposalsTab({
     if (proposalToDelete) deleteMutation.mutate(proposalToDelete);
   };
 
+  if (isInheritedMode) {
+    return (
+      <div className="space-y-4">
+        <Alert variant="default" className="border-primary/40 bg-primary/5">
+          <FileText className="h-4 w-4 text-primary" />
+          <AlertTitle className="text-primary">Proposta aprovada herdada do comercial</AlertTitle>
+          <AlertDescription className="text-muted-foreground">
+            Esta oportunidade operacional usa a proposta originalmente aprovada pelo cliente
+            no funil comercial. Não crie nem duplique propostas aqui — o vínculo é único.
+          </AlertDescription>
+        </Alert>
+        {inheritedProposal ? (
+          <Card>
+            <CardContent className="p-5 space-y-3">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div>
+                  <h4 className="text-lg font-semibold flex items-center gap-2">
+                    {inheritedProposal.proposal_number ?? inheritedProposal.title ?? 'Proposta'}
+                    <Badge variant="secondary" className="border-primary/30 text-primary bg-primary/10">
+                      Herdada do comercial
+                    </Badge>
+                  </h4>
+                  {inheritedProposal.accepted_at && (
+                    <p className="text-xs text-muted-foreground">
+                      Aceita em {formatDateBR(inheritedProposal.accepted_at)}
+                    </p>
+                  )}
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Valor aprovado</p>
+                  <p className="text-2xl font-bold text-success">
+                    {formatBRL(inheritedProposal.total_amount ?? 0, inheritedProposal.currency ?? 'BRL')}
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2 flex-wrap pt-2">
+                {inheritedProposal.opportunity_id && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate(`/app/opportunities/${inheritedProposal.opportunity_id}`)}
+                  >
+                    <LinkIcon className="h-4 w-4 mr-2" />
+                    Abrir oportunidade comercial
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleGeneratePDF(inheritedProposal.id)}
+                  disabled={loadingPDF === inheritedProposal.id}
+                >
+                  <FileDown className="h-4 w-4 mr-2" />
+                  PDF aprovado
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card>
+            <CardContent className="py-8 text-center text-muted-foreground">
+              <Loader2 className="h-5 w-5 mx-auto mb-2 animate-spin" />
+              Carregando proposta original…
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
+
       {!canCreateProposals && (
         <Alert variant="default" className="border-warning/40 bg-warning/10">
           <AlertTriangle className="h-4 w-4 text-warning" />

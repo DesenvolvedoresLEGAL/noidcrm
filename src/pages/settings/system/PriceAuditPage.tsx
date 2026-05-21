@@ -45,6 +45,7 @@ const SCOPE_LABEL: Record<AuditScopeStatus, { label: string; cls: string }> = {
   out_of_scope_draft: { label: 'Rascunho', cls: 'bg-muted text-muted-foreground' },
   out_of_scope_old_version: { label: 'Versão antiga', cls: 'bg-muted text-muted-foreground' },
   out_of_scope_non_winning: { label: 'Não vencedora', cls: 'bg-muted text-muted-foreground' },
+  out_of_scope_clone_error: { label: 'Clone operacional', cls: 'bg-destructive/10 text-destructive' },
 };
 
 const STATUS_VARIANT: Record<string, { label: string; cls: string }> = {
