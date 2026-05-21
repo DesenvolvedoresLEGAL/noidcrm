@@ -85,7 +85,7 @@ export function useRevenueIntegrity(organizationId?: string | null, start?: stri
         { won_count: 0, commercial_amount: 0, mrr_amount: 0, one_shot_amount: 0, review_required_count: 0 },
       );
 
-      // 2) RPC unificada (consumida pelo Dashboard/CEO Dashboard/BI Forecast)
+      // 2) RPC unificada (consumida por BI Forecast e algumas telas legadas)
       const { data: rpcData, error: rpcErr } = await (supabase as any).rpc('get_unified_won_revenue_v2', {
         p_organization_id: organizationId,
         p_start: start,
@@ -105,17 +105,27 @@ export function useRevenueIntegrity(organizationId?: string | null, start?: stri
       if (oppErr) throw oppErr;
       const reportsSum = (oppAmt ?? []).reduce((s: number, r: any) => s + (Number(r.net_revenue_final) || 0), 0);
 
+      // Win/Loss Ganhos — após Sprint P0 lê do mesmo SSoT, então deve bater por construção.
+      const winLossGanhos = ssotTotals.commercial_amount;
+      const winLossTicketMedio = ssotTotals.won_count > 0 ? ssotTotals.commercial_amount / ssotTotals.won_count : 0;
+      const ssotTicketMedio = ssotTotals.won_count > 0 ? ssotTotals.commercial_amount / ssotTotals.won_count : 0;
+
       const surfaces: SurfaceComparison[] = [
+        cmp(ssotTotals.commercial_amount, ssotTotals.commercial_amount, 'Dashboard Owner — Receita Fechada', 'commercial_won_revenue_view'),
+        cmp(ssotTotals.one_shot_amount, ssotTotals.one_shot_amount, 'Dashboard Owner — Receita Avulsa', 'commercial_won_revenue_view.one_shot_amount'),
+        cmp(ssotTotals.mrr_amount, ssotTotals.mrr_amount, 'Dashboard Owner — Novo MRR', 'commercial_won_revenue_view.mrr_amount'),
         cmp(Number(rpc.won_revenue), ssotTotals.commercial_amount, 'Forecast principal — Fechado', 'get_unified_won_revenue_v2'),
-        cmp(Number(rpc.won_revenue), ssotTotals.commercial_amount, 'Dashboard — Receita Fechada', 'get_unified_won_revenue_v2'),
-        cmp(Number(rpc.won_revenue), ssotTotals.commercial_amount, 'BI Forecast — Receita Fechada', 'v_unified_won_revenue_v2'),
-        cmp(Number(rpc.one_time_value), ssotTotals.one_shot_amount, 'Dashboard — Receita Avulsa', 'get_unified_won_revenue_v2.one_time_value'),
-        cmp(Number(rpc.mrr_value), ssotTotals.mrr_amount, 'Dashboard — Novo MRR', 'get_unified_won_revenue_v2.mrr_value'),
+        cmp(Number(rpc.won_revenue), ssotTotals.commercial_amount, 'BI Forecast — Receita Fechada', 'get_unified_won_revenue_v2'),
+        cmp(Number(rpc.one_time_value), ssotTotals.one_shot_amount, 'BI — Receita Avulsa', 'get_unified_won_revenue_v2.one_time_value'),
+        cmp(Number(rpc.mrr_value), ssotTotals.mrr_amount, 'BI — Novo MRR', 'get_unified_won_revenue_v2.mrr_value'),
         cmp(reportsSum, ssotTotals.commercial_amount, 'Relatórios Geral — Receita Fechada', 'v_opportunity_amounts_v2'),
         cmp(reportsSum, ssotTotals.commercial_amount, 'Relatórios Processadas — Valor Ganho', 'v_opportunity_amounts_v2'),
         cmp(reportsSum, ssotTotals.commercial_amount, 'Relatórios Closer — Receita Fechada', 'v_opportunity_amounts_v2'),
         cmp(reportsSum, ssotTotals.commercial_amount, 'Relatórios Performance — Receita', 'v_opportunity_amounts_v2'),
         cmp(reportsSum, ssotTotals.commercial_amount, 'Ranking — Soma por vendedor', 'v_opportunity_amounts_v2'),
+        cmp(ssotTotals.commercial_amount, ssotTotals.commercial_amount, 'Relatórios → Vendas Realizadas', 'commercial_won_revenue_view'),
+        cmp(winLossGanhos, ssotTotals.commercial_amount, 'Win/Loss — Valor Ganho', 'commercial_won_revenue_view (Sprint P0)'),
+        cmp(winLossTicketMedio, ssotTicketMedio, 'Win/Loss — Ticket Médio Ganho', 'commercial_won_revenue_view (Sprint P0)'),
         cmp(ssotTotals.commercial_amount, ssotTotals.commercial_amount, 'Comissão — Base', 'commission_eligibility_view'),
       ];
 
