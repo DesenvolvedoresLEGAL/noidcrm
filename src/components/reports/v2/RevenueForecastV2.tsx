@@ -17,11 +17,14 @@ import { useReportForecastV2 } from '@/hooks/useReportForecastV2';
 import { buildReportV2RequestFromFilters } from '@/lib/reports/buildReportV2Request';
 import { mapForecastV2 } from '@/lib/reports/mappers/mapForecastV2';
 import { formatCurrency, formatPct } from '@/lib/reports/formatReportNumbers';
+import { useClosedRevenueSummary } from '@/hooks/revenue/useRevenueSsot';
+import { RevenueSsotBanner } from '@/components/revenue/RevenueSsotBanner';
 import { ReportMetaBar } from './shared/ReportMetaBar';
 import { ReportWarningsPanel } from './shared/ReportWarningsPanel';
 import { ReportLoadingState } from './shared/ReportLoadingState';
 import { ReportErrorState } from './shared/ReportErrorState';
 import { ReportEmptyState } from './shared/ReportEmptyState';
+
 
 function ScenarioCard({
   label, value, tone, hint,
