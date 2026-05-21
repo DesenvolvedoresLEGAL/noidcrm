@@ -175,49 +175,47 @@ export function useOwnerDashboard() {
       });
       const realMRR = mrrResult.totalMRR;
 
-      // =================== CLOSED REVENUE — UNIFIED SOURCE (Sprint 2.11) ===================
-      // Consome get_unified_won_revenue_v2 — mesma cascata monetária que Reports V2.
-      // Garante que CEO Dashboard e "Visão Geral" mostrem EXATAMENTE o mesmo valor.
-      const { data: unifiedRows, error: unifiedErr } = await (supabase as any).rpc(
-        'get_unified_won_revenue_v2',
-        {
-          p_organization_id: organizationId,
-          p_start: startOfCurrentMonth.toISOString(),
-          p_end: endOfMonth(now).toISOString(),
-        }
-      );
-      if (unifiedErr) {
-        console.warn('[useOwnerDashboard] unified won revenue RPC failed, falling back to legacy:', unifiedErr);
-      }
-      const unified = Array.isArray(unifiedRows) ? unifiedRows[0] : unifiedRows;
-      const unifiedWonRevenue = Number(unified?.won_revenue ?? 0);
-      const unifiedMrrValue = Number(unified?.mrr_value ?? 0);
-      const unifiedOneTimeValue = Number(unified?.one_time_value ?? 0);
-
-      // Closed revenue this month — fonte única (Reports V2 vai bater com este número).
-      const closedRevenueThisMonth = unifiedWonRevenue
-        || wonSalesThisMonth.reduce((sum, o) => sum + (o.valor_previsto || 0), 0); // fallback legacy
-
-      // =================== SEPARATE ONE-TIME VS MRR CLOSED THIS MONTH ===================
-      // Get opportunity IDs that have recurring proposals and their MRR values
-      const opportunityIdsWithRecurring = new Set<string>();
-      
-      // Fetch proposals with payment terms to check which opportunities have recurring
-      const { data: proposalsWithTerms } = await supabase
-        .from('proposals')
-        .select('opportunity_id, proposal_payment_terms!inner(payment_type, monthly_value)')
+      // =================== CLOSED REVENUE — SINGLE SOURCE OF TRUTH ===================
+      // Fonte ÚNICA: commercial_won_revenue_view.
+      // Dashboard, Forecast, BI, Relatórios → Vendas Realizadas, Comissão e Win/Loss Ganhos
+      // DEVEM reconciliar contra esta view no mesmo período.
+      const { data: ssotRows, error: ssotErr } = await (supabase as any)
+        .from('commercial_won_revenue_view')
+        .select('opportunity_id, commercial_amount, one_shot_amount, mrr_amount, won_at')
         .eq('organization_id', organizationId)
-        .eq('status', 'accepted');
-      
+        .gte('won_at', startOfCurrentMonth.toISOString())
+        .lte('won_at', endOfMonth(now).toISOString());
+      if (ssotErr) {
+        console.error('[useOwnerDashboard] commercial_won_revenue_view failed:', ssotErr);
+      }
+      const ssotTotals = (ssotRows ?? []).reduce(
+        (acc: any, r: any) => {
+          acc.commercial += Number(r.commercial_amount) || 0;
+          acc.one_shot += Number(r.one_shot_amount) || 0;
+          acc.mrr += Number(r.mrr_amount) || 0;
+          return acc;
+        },
+        { commercial: 0, one_shot: 0, mrr: 0 },
+      );
+
+      const closedRevenueThisMonth = ssotTotals.commercial;
+      const closedMRRThisMonth = ssotTotals.mrr;
+      const closedOneTimeThisMonth = ssotTotals.one_shot;
+
+      // Mantém estrutura `recurringMRRByOpportunity` para outras seções legadas que dependem dela.
+      const opportunityIdsWithRecurring = new Set<string>();
       const recurringMRRByOpportunity = new Map<string, number>();
       const oppIdToAccountId = new Map<string, string>();
       opportunities.forEach((o: any) => {
         if (o?.id && o?.account_id) oppIdToAccountId.set(o.id, o.account_id);
       });
-
+      const { data: proposalsWithTerms } = await supabase
+        .from('proposals')
+        .select('opportunity_id, proposal_payment_terms!inner(payment_type, monthly_value)')
+        .eq('organization_id', organizationId)
+        .eq('status', 'accepted');
       (proposalsWithTerms || []).forEach((p: any) => {
         if (!p.opportunity_id) return;
-
         const terms = p.proposal_payment_terms || [];
         terms.forEach((t: any) => {
           if (t.payment_type === 'recurring' || t.payment_type === 'monthly') {
@@ -228,68 +226,6 @@ export function useOwnerDashboard() {
         });
       });
 
-      // Closed MRR this month = fonte unificada quando disponível, fallback legado local.
-      const legacyClosedMRRThisMonth = wonSalesThisMonth.reduce((sum, o) => {
-        return sum + (recurringMRRByOpportunity.get(o.id) || 0);
-      }, 0);
-      const closedMRRThisMonth = unifiedMrrValue || legacyClosedMRRThisMonth;
-
-      // =================== ONE-TIME REVENUE CALCULATION (FIXED) ===================
-      // Usa proposals.total_amount (já com desconto de condição de pagamento aplicado)
-      // Receita Avulsa = total_amount - parte recurring (MRR)
-      // Isso garante consistência com Forecast/BI que usam valor_previsto (também descontado)
-      const wonSalesThisMonthIds = wonSalesThisMonth.map(o => o.id);
-      const { data: acceptedProposalsThisMonth } = await supabase
-        .from('proposals')
-        .select(
-          'opportunity_id, total_amount, value, dynamic_pricing_enabled, dynamic_pricing_status, dynamic_pricing_current_amount, dynamic_pricing_snapshot, payment_expected_amount',
-        )
-        .eq('organization_id', organizationId)
-        .eq('status', 'accepted')
-        .in('opportunity_id', wonSalesThisMonthIds.length > 0 ? wonSalesThisMonthIds : ['none']);
-
-      // Calculate one-time revenue from accepted proposals using APPROVED value
-      // (dynamic-pricing aware) instead of raw total_amount.
-      const wonOppsWithAcceptedProposal = new Set<string>();
-      let oneTimeFromProposals = 0;
-      (acceptedProposalsThisMonth || []).forEach((p: any) => {
-        if (!p.opportunity_id) return;
-        wonOppsWithAcceptedProposal.add(p.opportunity_id);
-        const dynActive =
-          !!p.dynamic_pricing_enabled &&
-          (!p.dynamic_pricing_status ||
-            ['active', 'current', 'vigente', 'approved', 'aprovado'].includes(
-              String(p.dynamic_pricing_status).toLowerCase(),
-            ));
-        const dynCurrent = Number(p.dynamic_pricing_current_amount) || 0;
-        const snapshotCurrent = Number(p.dynamic_pricing_snapshot?.current_amount) || 0;
-        const expected = Number(p.payment_expected_amount) || 0;
-        const approved =
-          expected > 0
-            ? expected
-            : dynActive && dynCurrent > 0
-              ? dynCurrent
-              : dynActive && snapshotCurrent > 0
-                ? snapshotCurrent
-                : Number(p.total_amount) || Number(p.value) || 0;
-        const recurringPart = recurringMRRByOpportunity.get(p.opportunity_id) || 0;
-        oneTimeFromProposals += Math.max(0, approved - recurringPart);
-      });
-
-      // Fallback: opps without accepted proposal AND without recurring → use valor_previsto
-      const oneTimeFallback = wonSalesThisMonth.reduce((sum, o) => {
-        if (wonOppsWithAcceptedProposal.has(o.id) || opportunityIdsWithRecurring.has(o.id)) {
-          return sum;
-        }
-        return sum + (o.valor_previsto || 0);
-      }, 0);
-
-      // Receita avulsa = total fechado do mês − parcela MRR (1 mês) contida nesses deals.
-      // Garante que: Receita Avulsa + Novo MRR (1m) = Receita Fechada (BI/Forecast).
-      // (unifiedOneTimeValue assume 12 meses de MRR — não bate com o card que mostra MRR/mês.)
-      const closedOneTimeThisMonth = Math.max(0, closedRevenueThisMonth - closedMRRThisMonth);
-      // Mantém referências legadas para evitar warnings de variáveis não usadas
-      void unifiedOneTimeValue; void oneTimeFromProposals; void oneTimeFallback;
       
       // ARR is based on actual MRR, not assumed
       const arr = realMRR * 12;

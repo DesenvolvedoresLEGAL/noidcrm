@@ -15,7 +15,8 @@ import {
   Brain,
   Compass,
   UserSearch,
-  Package
+  Package,
+  ShieldCheck
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -25,6 +26,7 @@ interface ReportTabsProps {
 }
 
 const reportTabs = [
+  { id: 'vendas-realizadas', label: 'Vendas Realizadas', icon: ShieldCheck, category: 'overview' },
   { id: 'general', label: 'Geral', icon: BarChart3, category: 'overview' },
   { id: 'ai-insights', label: 'Insights IA', icon: Brain, category: 'overview' },
   { id: 'processed', label: 'Processadas', icon: Activity, category: 'opportunities' },
