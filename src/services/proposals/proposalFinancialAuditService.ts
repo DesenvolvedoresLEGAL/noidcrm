@@ -150,6 +150,15 @@ export async function listAuditItems(filters: AuditItemFilters): Promise<AuditIt
   if (filters.hasDivergence) q = q.gt('max_delta', 0.01);
   if (filters.sellerName) q = q.ilike('seller_name', `%${filters.sellerName}%`);
   if (filters.search) q = q.or(`proposal_number.ilike.%${filters.search}%,account_name.ilike.%${filters.search}%`);
+  const mode = filters.scopeMode ?? 'default';
+  if (mode === 'default') {
+    q = q.in('audit_scope_status', ['in_scope', 'needs_scope_review']);
+  } else if (mode === 'only_out_of_scope') {
+    q = q.in('audit_scope_status', [
+      'out_of_scope_duplicate', 'out_of_scope_superseded',
+      'out_of_scope_draft', 'out_of_scope_old_version', 'out_of_scope_non_winning',
+    ]);
+  }
   const { data, error } = await q;
   if (error) throw error;
   return (data ?? []) as unknown as AuditItem[];
