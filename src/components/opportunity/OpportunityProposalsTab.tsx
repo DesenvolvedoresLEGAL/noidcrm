@@ -399,7 +399,7 @@ export function OpportunityProposalsTab({
     if (proposalToDelete) deleteMutation.mutate(proposalToDelete);
   };
 
-  if (isInheritedMode) {
+  if (isOperationalHandoff) {
     return (
       <div className="space-y-4">
         <Alert variant="default" className="border-primary/40 bg-primary/5">
