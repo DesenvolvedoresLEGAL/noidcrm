@@ -17023,6 +17023,7 @@ export type Database = {
       }
       opportunities: {
         Row: {
+          accepted_proposal_id: string | null
           account_id: string | null
           activated_features: Json | null
           ai_win_probability_metadata: Json
@@ -17131,6 +17132,7 @@ export type Database = {
           won_at: string | null
         }
         Insert: {
+          accepted_proposal_id?: string | null
           account_id?: string | null
           activated_features?: Json | null
           ai_win_probability_metadata?: Json
@@ -17239,6 +17241,7 @@ export type Database = {
           won_at?: string | null
         }
         Update: {
+          accepted_proposal_id?: string | null
           account_id?: string | null
           activated_features?: Json | null
           ai_win_probability_metadata?: Json
@@ -17360,6 +17363,48 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "opportunities_accepted_proposal_id_fkey"
+            columns: ["accepted_proposal_id"]
+            isOneToOne: false
+            referencedRelation: "proposals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunities_accepted_proposal_id_fkey"
+            columns: ["accepted_proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_accepted_proposal_v2"
+            referencedColumns: ["proposal_id"]
+          },
+          {
+            foreignKeyName: "opportunities_accepted_proposal_id_fkey"
+            columns: ["accepted_proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["accepted_proposal_id"]
+          },
+          {
+            foreignKeyName: "opportunities_accepted_proposal_id_fkey"
+            columns: ["accepted_proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["latest_proposal_id"]
+          },
+          {
+            foreignKeyName: "opportunities_accepted_proposal_id_fkey"
+            columns: ["accepted_proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_latest_commercial_proposal_v2"
+            referencedColumns: ["proposal_id"]
+          },
+          {
+            foreignKeyName: "opportunities_accepted_proposal_id_fkey"
+            columns: ["accepted_proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_proposals_normalized_v2"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "opportunities_account_id_fkey"
@@ -24115,6 +24160,7 @@ export type Database = {
           approved_payment_schedule: Json
           client_email: string | null
           client_name: string | null
+          clone_status: string | null
           content: Json | null
           created_at: string | null
           currency: string | null
@@ -24187,6 +24233,7 @@ export type Database = {
           slack_notification_needs_correction: boolean
           status: string
           subtotal: number | null
+          superseded_by_proposal_id: string | null
           template_name: string | null
           terms: string | null
           title: string | null
@@ -24217,6 +24264,7 @@ export type Database = {
           approved_payment_schedule?: Json
           client_email?: string | null
           client_name?: string | null
+          clone_status?: string | null
           content?: Json | null
           created_at?: string | null
           currency?: string | null
@@ -24289,6 +24337,7 @@ export type Database = {
           slack_notification_needs_correction?: boolean
           status?: string
           subtotal?: number | null
+          superseded_by_proposal_id?: string | null
           template_name?: string | null
           terms?: string | null
           title?: string | null
@@ -24319,6 +24368,7 @@ export type Database = {
           approved_payment_schedule?: Json
           client_email?: string | null
           client_name?: string | null
+          clone_status?: string | null
           content?: Json | null
           created_at?: string | null
           currency?: string | null
@@ -24391,6 +24441,7 @@ export type Database = {
           slack_notification_needs_correction?: boolean
           status?: string
           subtotal?: number | null
+          superseded_by_proposal_id?: string | null
           template_name?: string | null
           terms?: string | null
           title?: string | null
@@ -24533,6 +24584,48 @@ export type Database = {
           {
             foreignKeyName: "proposals_parent_proposal_id_fkey"
             columns: ["parent_proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_proposals_normalized_v2"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposals_superseded_by_proposal_id_fkey"
+            columns: ["superseded_by_proposal_id"]
+            isOneToOne: false
+            referencedRelation: "proposals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposals_superseded_by_proposal_id_fkey"
+            columns: ["superseded_by_proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_accepted_proposal_v2"
+            referencedColumns: ["proposal_id"]
+          },
+          {
+            foreignKeyName: "proposals_superseded_by_proposal_id_fkey"
+            columns: ["superseded_by_proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["accepted_proposal_id"]
+          },
+          {
+            foreignKeyName: "proposals_superseded_by_proposal_id_fkey"
+            columns: ["superseded_by_proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["latest_proposal_id"]
+          },
+          {
+            foreignKeyName: "proposals_superseded_by_proposal_id_fkey"
+            columns: ["superseded_by_proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_latest_commercial_proposal_v2"
+            referencedColumns: ["proposal_id"]
+          },
+          {
+            foreignKeyName: "proposals_superseded_by_proposal_id_fkey"
+            columns: ["superseded_by_proposal_id"]
             isOneToOne: false
             referencedRelation: "v_proposals_normalized_v2"
             referencedColumns: ["id"]
@@ -34135,6 +34228,22 @@ export type Database = {
         Args: { _rec_id: string }
         Returns: string
       }
+      dry_run_detect_operational_proposal_clones: {
+        Args: { p_period_end: string; p_period_start: string }
+        Returns: {
+          client: string
+          clone_proposal_id: string
+          clone_proposal_number: string
+          created_at: string
+          operational_opportunity_id: string
+          original_approved_proposal_id: string
+          original_proposal_number: string
+          reason_detected: string
+          source_opportunity_id: string
+          value_clone: number
+          value_original: number
+        }[]
+      }
       enqueue_email: {
         Args: { payload: Json; queue_name: string }
         Returns: number
@@ -34934,6 +35043,10 @@ export type Database = {
           p_trace_id: string
         }
         Returns: string
+      }
+      mark_operational_proposal_clone: {
+        Args: { p_clone_proposal_id: string; p_original_proposal_id: string }
+        Returns: Json
       }
       mark_proposal_financial_audit_item_review: {
         Args: { p_audit_item_id: string; p_note?: string }
