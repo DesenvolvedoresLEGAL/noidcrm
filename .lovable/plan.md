@@ -1,81 +1,107 @@
-# P0 ABSOLUTO — Revenue Single Source of Truth
+# P0 — Dashboard + Win/Loss alinhados à Revenue SSoT (aprovado)
 
-## Status
+Fonte única: `commercial_won_revenue_view`. Todas as superfícies de receita realizada passam a ler dela. Nada de `opportunity.value`, `proposal.total_amount`, `created_at`, pipeline aberto, `v_unified_won_revenue_v2` legada ou fallback de oportunidade sem proposta aprovada.
 
-| Fase | Item | Status |
-|---|---|---|
-| 1 | Migration SSoT (`commercial_won_revenue_view` recriada + dedup + MRR/avulso + `revenue_confidence` + `review_required` + `warnings`) | ✅ **APLICADA** |
-| 1 | `v_opportunity_accepted_proposal_v2` herda proposta aceita do clone operacional via `source_opportunity_id` | ✅ **APLICADA** |
-| 2 | `v_unified_won_revenue_v2` + RPC `get_unified_won_revenue_v2` lêem da SSoT | ✅ **APLICADA** |
-| 3 | Validação dos 5 casos reais via `read_query` | ✅ **OK** |
-| 4 | Revenue Integrity Dashboard (`/admin/revenue-integrity`) | ⏸ **bloqueado (plan mode)** |
-| 5 | Teste vitest guardrail `REVENUE_SOURCE_MISMATCH` | ⏸ **bloqueado (plan mode)** |
-| 6 | Atualizar memória (`approved-commercial-amount-source-of-truth`) com campos novos | ⏸ **bloqueado (plan mode)** |
+## 1. Aba "Vendas Realizadas" em Relatórios (PRIMEIRA aba, antes de "Geral")
 
-## Validação dos 5 casos (lidos hoje, modo confirmação)
+- Adicionar em `src/components/reports/ReportTabs.tsx` na categoria `overview`, ANTES de `general`:
+  `{ id: 'vendas-realizadas', label: 'Vendas Realizadas', icon: DollarSign, category: 'overview' }`
+- Em `src/pages/Reports.tsx`: novo case `'vendas-realizadas'` no `switch` e default inicial passa a ser essa aba.
+- Criar:
+  - `src/hooks/reports/useVendasRealizadas.ts` — query única em `commercial_won_revenue_view` com filtros: período, vendedor, pipeline, tipo de receita, origem, `revenue_confidence`, `commission_status`. Join client-side com `commission_eligibility_view`.
+  - `src/components/reports/wrappers/VendasRealizadasWrapper.tsx` — usa filtros do `ReportFiltersContext`.
+  - `src/components/reports/vendas-realizadas/VendasRealizadasTable.tsx` — tabela + cards superiores.
+- Colunas: data da venda, cliente, proposta, oportunidade, vendedor, origem, pipeline comercial, tipo de receita, `one_shot_amount`, `mrr_amount`, `commercial_amount`, `commercial_amount_source`, `revenue_confidence`, `review_required`, `commission_status`.
+- Cards no topo: Receita total fechada (`SUM(commercial_amount)`), Receita avulsa (`SUM(one_shot_amount)`), Novo MRR (`SUM(mrr_amount)`), Quantidade (`COUNT(*)`), Ticket médio (`SUM(commercial_amount)/COUNT(*)`), Comissões elegíveis, Comissões bloqueadas para revisão.
 
+## 2. Dashboard Owner — substituir cálculos legados
+
+Em `src/hooks/useOwnerDashboard.ts`, remover o bloco `=== CLOSED REVENUE — UNIFIED SOURCE ===` + todo o pipeline `recurringMRRByOpportunity` / `acceptedProposalsThisMonth` / `dynamic_pricing_*` / `oneTimeFromProposals` / `oneTimeFallback`. Substituir por uma única leitura:
+
+```text
+SELECT commercial_amount, mrr_amount, one_shot_amount
+FROM commercial_won_revenue_view
+WHERE organization_id = :org AND won_at BETWEEN :startOfMonth AND :endOfMonth
 ```
-SQUADRA / PROP-2026-00773 → 1.516,32  · source=approval_snapshot+column_consensus · confidence=trusted
-LACTALIS (OGGI) / PROP-2026-00755 → 2.542,35 · source=approved_amount_column · confidence=trusted
-DU PRATA / PROP-2026-00716 → 1.894,30 · source=approval_snapshot.payment_expected_amount · confidence=trusted
-ORGÂNICA / PROP-2026-00717 → 1.194,00 · linha única (clone operacional NÃO duplica venda) · trusted
-NETSEEDS / PROP-2026-00739 → 1.313,40 · linha única (clone operacional NÃO duplica venda) · trusted
-```
 
-Todas as 5 linhas vêm da `commercial_won_revenue_view` com `canonical_kind = sales_won`, `review_required=false`, `warnings=[]`.
+- `closedRevenueThisMonth` = `SUM(commercial_amount)`
+- `closedOneTimeThisMonth` = `SUM(one_shot_amount)` (sem derivação `revenue − mrr`)
+- `closedMRRThisMonth` = `SUM(mrr_amount)`
+- `avgTicketThisMonth` = `closedRevenueThisMonth / ssotWonCount`
+- Insight "Receita fechada este mês" lê `closedRevenueThisMonth` da SSoT
+- `wonDealsCount` exibido no KPICard passa a refletir `ssotWonCount` (vendas realizadas reais), não `wonSalesThisMonth.length` (que conta oportunidades com `closed_at` no mês mesmo sem proposta aprovada)
 
-Verificado também na cadeia downstream: `v_opportunity_amounts_v2.net_revenue_final` resolve corretamente os 5 casos via `amount_source = accepted_proposal_net` (graças à herança da proposta via `source_opportunity_id`).
+Manter intactos: forecast, sellerStats, churnRisk, salesTrend, MRR total acumulado (já vem de `calculateRealMRR`).
 
-## Propagação automática (sem mexer em TS)
+## 3. Win/Loss — vira inteligência de decisão
 
-Como toda a cadeia V2 já consumia `v_opportunity_amounts_v2` → `v_proposals_normalized_v2` → `resolve_approved_commercial_amount_by_proposal`, e agora `v_opportunity_accepted_proposal_v2` herda a proposta do clone operacional, **as superfícies abaixo passam a bater na SSoT automaticamente**:
+Em `src/pages/intelligence/WinLossHub.tsx`, adicionar banner logo após `<PageHeader>`:
 
-- Forecast principal (`useForecastData`, mappers V2)
-- Dashboard / CEO Dashboard (`useUnifiedWonRevenueV2`, `useUnifiedWonRevenueByPeriodV2`)
-- Dashboard BI → aba Forecast (`useForecastData` + `report_forecast_v2`)
-- Relatórios V2: Geral, Processadas, Closer, Performance (`mapSummaryV2`, `mapProcessedV2`, `mapCloserV2`, `mapTeamV2`)
-- Ranking de vendedores (agregação por `seller_id` na cadeia V2)
-- Receita Avulsa do mês = `get_unified_won_revenue_v2.one_time_value` (= `SUM(one_shot_amount)` SSoT)
-- Novo MRR = `get_unified_won_revenue_v2.mrr_value` (= `SUM(mrr_amount)` SSoT)
+> "Base de decisões comerciais. Receita oficial em Relatórios → Vendas Realizadas."
 
-A SSoT não recalcula valores — usa `resolve_approved_commercial_amount_by_proposal` (que já triangula snapshot ↔ schedule ↔ approved_amount). Nenhum `UPDATE` em proposals, snapshot, ERP, Pix, Slack, PDF, provider.
+Componente: `<Alert>` com link para `/app/reports?tab=vendas-realizadas`.
 
-## Regras de governança aplicadas na view
+Em `WinLossKPIStrip` (cards "Ganhos", "Ticket Médio Ganho", "Valor Ganho"): quando `pipelineType === 'sales'`, ler `wonCount`, `wonValue` e `avgTicketWon` da `commercial_won_revenue_view` (via novo hook compartilhado `useSsotWonSummary(orgId, dateRange, pipelineId?)`). Caso contrário, mantém base atual de decisões. Adicionar tooltip "Sincronizado com Revenue SSoT".
 
-- `review_required = true` quando:
-  - resolver retorna `is_final=false`, ou
-  - proposta tem item sem `billing_type`, ou
-  - opp comercial sales-won sem `accepted_proposal_id` (nem direta nem herdada)
-- `revenue_confidence ∈ {trusted, warning, manual_review}`
-- `warnings text[]` enumera: `amount_resolver_unconfident`, `mrr_split_unknown_billing`, `no_accepted_proposal`
-- `commercial_amount` SEMPRE entra na receita fechada (mesmo `review_required=true`). UI deve exibir o badge.
-- Comissão consome `commercial_amount`. Quando `review_required=true`, marcar `commission_status = blocked_review_required` na camada de comissão (a fazer em build mode).
+A aba "Relatório" (`ProposalApprovalsTab`) que hoje mostra "Nenhuma proposta neste filtro/período" enquanto cards mostram 40/22 — investigar e corrigir o filtro para listar propostas aprovadas/recusadas/expiradas com cliente, vendedor, data da decisão, valor (aprovadas → SSoT; recusadas/expiradas → valor proposto rotulado "valor proposto, não receita realizada"), motivo, fonte.
 
-## Próximos passos — precisam de build mode
+## 4. Revenue Integrity — diagnóstico cross-fonte
 
-1. Criar `src/hooks/admin/useRevenueIntegrity.ts` (compara SSoT × RPC × `v_opportunity_amounts_v2` para o período).
-2. Criar `src/pages/admin/RevenueIntegrity.tsx` (tabela: superfície / valor exibido / SSoT / Δ / status / fonte; cabeçalho com `REVENUE_SOURCE_MISMATCH` global; lista de propostas `review_required`).
-3. Adicionar rota `/admin/revenue-integrity` no `App.tsx` e link no `AdminSidebar`.
-4. Edits pontuais em comissão para honrar `commission_status = blocked_review_required` quando `review_required=true`.
-5. Vitest guardrail `src/test/revenue/ssot.test.ts` que, para uma org de fixture, exige `Math.abs(rpc.won_revenue − SUM(SSoT.commercial_amount)) ≤ 0.01`. Falha → `REVENUE_SOURCE_MISMATCH`.
-6. Atualizar memória `mem://business-rules/crm/approved-commercial-amount-source-of-truth` com os novos campos (`mrr_amount`, `one_shot_amount`, `revenue_confidence`, `review_required`, `warnings`, dedup via `source_opportunity_id`).
+Em `src/hooks/admin/useRevenueIntegrity.ts`, adicionar superfícies novas:
 
-## Tabela antes / depois (período mês corrente, Operadora Legal)
+- "Dashboard Owner — Receita Avulsa" → re-roda lógica nova do `useOwnerDashboard` (ou apenas SUM SSoT one_shot, mostrando o que o card exibe)
+- "Dashboard Owner — Novo MRR"
+- "Dashboard Owner — Ticket Médio" (compara com `SUM(commercial_amount)/COUNT`)
+- "Win/Loss — Ganhos (qtd)" (compara `COUNT` com SSoT; tolerância 0)
+- "Win/Loss — Valor Ganho"
+- "Win/Loss — Ticket Médio Ganho"
 
-| Superfície | Antes | Depois (SSoT) | Fonte |
-|---|---:|---:|---|
-| Forecast principal — Fechado | R$ 117.272,77 | = `SUM(commercial_amount)` | RPC `get_unified_won_revenue_v2` |
-| Dashboard — Receita Avulsa | R$ 113.246,24 | = `SUM(one_shot_amount)` | RPC `get_unified_won_revenue_v2.one_time_value` |
-| Dashboard — Novo MRR | R$ 1.594,00 | = `SUM(mrr_amount)` | RPC `get_unified_won_revenue_v2.mrr_value` |
-| BI Forecast — Receita Fechada | R$ 117.273 | = SSoT | `v_unified_won_revenue_v2` |
-| Relatórios Geral — Receita Fechada | R$ 71.463 | = SSoT | `v_opportunity_amounts_v2` (status=won) |
-| Relatórios Processadas — Valor Ganho | R$ 117.273 | = SSoT | idem |
-| Relatórios Closer — Receita Fechada | R$ 71.463 | = SSoT | idem |
-| Comissão — Base | varia | = `commercial_amount` | SSoT direta |
-| SQUADRA · PROP-2026-00773 | divergia | 1.516,32 | snapshot+column_consensus |
-| OGGI · PROP-2026-00755 | divergia | 2.542,35 | approved_amount_column |
-| DU PRATA · PROP-2026-00716 | divergia | 1.894,30 | approval_snapshot |
-| ORGÂNICA · PROP-2026-00717 | 2 linhas | 1.194,00 (1 linha) | dedup via source_opportunity_id |
-| NETSEEDS · PROP-2026-00739 | 3 linhas | 1.313,40 (1 linha) | dedup via source_opportunity_id |
+Adicionar tabela "Diagnóstico cross-fonte" em `src/pages/admin/RevenueIntegrity.tsx` com colunas: fonte, qtd vendas, receita fechada, ticket médio, filtros aplicados, campo de data usado (`won_at` / `accepted_at` / `created_at` / `updated_at`), view/RPC/hook consumido. Marca `REVENUE_SOURCE_MISMATCH` para qualquer fonte que use `opportunity.value`, `proposal.total_amount`, `created_at`, pipeline aberto, `v_unified_won_revenue_v2` legada ou fallback de opp sem proposta aprovada.
 
-Os números "Antes" das telas devem refletir os mesmos valores "Depois" assim que a build for executada (cache React Query) — o cálculo subjacente já está corrigido no banco.
+## 5. Guardrails
+
+Estender `src/test/revenue/ssot.test.ts`:
+- Para cada superfície monitorada: `|shown − ssot| ≤ R$ 0,01` (vendas: delta exato 0)
+- Snapshot Maio/2026: Dashboard Owner Receita Avulsa não pode ser > 2× SSoT
+- Manter casos reais: SQUADRA 1.516,32 / OGGI 2.542,35 / DU PRATA 1.894,30 / ORGÂNICA 1.194,00 / NETSEEDS 1.313,40
+
+## 6. Travas (não fazer)
+
+- Sem mexer em Pix, ERP, Slack, PDF, provider, `approval_snapshot`, `proposals.approved_amount`, preço dinâmico, proposta aprovada, cobrança
+- Sem `UPDATE` em massa
+- Sem `DROP VIEW CASCADE`
+- Sem criar clones
+- Sem nova funcionalidade fora do escopo acima
+
+## 7. Critério de aceite (Maio/2026)
+
+Todos devem reconciliar com `commercial_won_revenue_view`:
+- Forecast Fechado
+- BI Forecast Receita Fechada
+- Relatórios Geral / Processadas / Closer / Performance / Ranking
+- Dashboard Receita Avulsa (= SUM(one_shot_amount))
+- Dashboard Novo MRR (= SUM(mrr_amount))
+- Relatórios → Vendas Realizadas
+- Win/Loss Ganhos / Ticket Médio Ganho / Valor Ganho
+- Comissão Base
+
+Typecheck e build passam.
+
+## Arquivos
+
+Editar:
+- `src/hooks/useOwnerDashboard.ts`
+- `src/components/reports/ReportTabs.tsx`
+- `src/pages/Reports.tsx`
+- `src/hooks/admin/useRevenueIntegrity.ts`
+- `src/pages/admin/RevenueIntegrity.tsx`
+- `src/pages/intelligence/WinLossHub.tsx`
+- `src/components/intelligence/winloss/WinLossKPIStrip.tsx`
+- `src/components/intelligence/winloss/tabs/ProposalApprovalsTab.tsx` (corrigir filtro)
+- `src/test/revenue/ssot.test.ts`
+
+Criar:
+- `src/hooks/reports/useVendasRealizadas.ts`
+- `src/components/reports/wrappers/VendasRealizadasWrapper.tsx`
+- `src/components/reports/vendas-realizadas/VendasRealizadasTable.tsx`
+- `src/hooks/intelligence/useSsotWonSummary.ts` (compartilhado WinLoss + Integrity)
