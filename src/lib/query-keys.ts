@@ -119,12 +119,15 @@ export const forecastKeys = {
     ['forecast-opportunities', f.start, f.end, f.pipelineId, f.userId] as const,
   closed: (f: ForecastPeriodFilters) =>
     ['forecast-closed', f.start, f.end, f.pipelineId, f.userId] as const,
+  closedSsot: (f: ForecastPeriodFilters) =>
+    ['forecast-closed-ssot', f.start, f.end, f.pipelineId, f.userId] as const,
   lost: (f: ForecastPeriodFilters) =>
     ['forecast-lost', f.start, f.end, f.pipelineId, f.userId] as const,
 
   // Prefixes (used by `invalidateQueries` to nuke an entire family).
   opportunitiesAll: () => ['forecast-opportunities'] as const,
   closedAll: () => ['forecast-closed'] as const,
+  closedSsotAll: () => ['forecast-closed-ssot'] as const,
   lostAll: () => ['forecast-lost'] as const,
 
   team: () => ['forecast-team'] as const,

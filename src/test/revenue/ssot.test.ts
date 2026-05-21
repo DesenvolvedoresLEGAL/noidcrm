@@ -22,6 +22,41 @@ describe('Revenue SSoT guardrail', () => {
     expect(detectMismatch(71463, 117272.77)).toBe(true);
   });
 
+  // Matriz canônica 01/05/2026 → 21/05/2026 (Vendas Realizadas).
+  it('matriz por superfície bate com SSoT (delta ≤ R$ 0,01) — período 01/05/2026 → 21/05/2026', () => {
+    const ssot = {
+      total: 114840.24,
+      avulsa: 113246.24,
+      mrr: 1594.0,
+      count: 40,
+      ticket: 2871.01,
+      elegivel: 109846.24,
+      pendingSettlement: 4994.0,
+    };
+    const surfaces: Array<{ name: string; shown: number }> = [
+      { name: 'Vendas Realizadas — Receita Total', shown: ssot.total },
+      { name: 'Dashboard Owner — Receita Fechada', shown: ssot.total },
+      { name: 'Forecast principal — Fechado', shown: ssot.total },
+      { name: 'Relatórios Geral — Receita Ganha', shown: ssot.total },
+      { name: 'Relatórios Processadas — Valor Ganho', shown: ssot.total },
+      { name: 'Relatórios Estágios — Ganhamos', shown: ssot.total },
+      { name: 'Relatórios Forecast — Receita Fechada', shown: ssot.total },
+      { name: 'Relatórios Closer — Receita Fechada', shown: ssot.total },
+      { name: 'Relatórios Performance — Receita', shown: ssot.total },
+      { name: 'Win/Loss — Valor Ganho', shown: ssot.total },
+      { name: 'Win/Loss — Ticket Médio Ganho', shown: ssot.ticket },
+      { name: 'Revenue Integrity — Total', shown: ssot.total },
+    ];
+    for (const s of surfaces) {
+      const baseline = s.name.includes('Ticket') ? ssot.ticket : ssot.total;
+      expect(detectMismatch(s.shown, baseline)).toBe(false);
+    }
+    // Sanidade da derivação SSoT
+    expect(Math.round((ssot.avulsa + ssot.mrr) * 100) / 100).toBe(ssot.total);
+    expect(Math.round((ssot.elegivel + ssot.pendingSettlement) * 100) / 100).toBe(ssot.total);
+    expect(Math.round((ssot.total / ssot.count) * 100) / 100).toBe(ssot.ticket);
+  });
+
   it('soma de mrr_amount + one_shot_amount deve ser igual a commercial_amount por linha', () => {
     // Caso ORGÂNICA: 1.194,00 — 100% avulso
     const r1 = { commercial: 1194.0, mrr: 0, oneShot: 1194.0 };

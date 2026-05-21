@@ -8,6 +8,12 @@ interface WinLossKPIStripProps {
   isLoading: boolean;
   terminology: { wonPlural: string; lostPlural: string; rateLabel: string };
   pipelineType?: string;
+  /** P0 Revenue SSoT — override de monetários ganhos vindo de commercial_won_revenue_view. */
+  ssotOverride?: {
+    wonCount?: number;
+    wonValue?: number;
+    avgTicketWon?: number;
+  };
 }
 
 // Para pipelines de venda, encurtamos os rótulos. Outros tipos mantêm a terminologia original.
@@ -18,10 +24,13 @@ const SHORT_LABELS: Record<string, { won: string; lost: string }> = {
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
 
-export function WinLossKPIStrip({ data, isLoading, terminology, pipelineType }: WinLossKPIStripProps) {
+export function WinLossKPIStrip({ data, isLoading, terminology, pipelineType, ssotOverride }: WinLossKPIStripProps) {
   const short = pipelineType ? SHORT_LABELS[pipelineType] : undefined;
   const wonLabel = short?.won ?? terminology.wonPlural;
   const lostLabel = short?.lost ?? terminology.lostPlural;
+  // P0 Revenue SSoT — monetários ganhos vêm de commercial_won_revenue_view quando informado.
+  const wonCount = ssotOverride?.wonCount ?? data?.wonCount ?? 0;
+  const avgTicketWon = ssotOverride?.avgTicketWon ?? data?.avgTicketWon ?? 0;
 
   // Ciclo Médio Geral: média ponderada de won + lost (quando ambos existem).
   const wonCycles = data?.validWinCyclesCount ?? 0;
@@ -40,7 +49,7 @@ export function WinLossKPIStrip({ data, isLoading, terminology, pipelineType }: 
   const kpis = [
     {
       label: wonLabel,
-      value: data?.wonCount || 0,
+      value: wonCount,
       format: 'number' as const,
       icon: TrendingUp,
       color: 'text-emerald-500',
@@ -72,7 +81,7 @@ export function WinLossKPIStrip({ data, isLoading, terminology, pipelineType }: 
     },
     {
       label: 'Ticket Médio Ganho',
-      value: data?.avgTicketWon || 0,
+      value: avgTicketWon,
       format: 'currency' as const,
       icon: BarChart3,
       color: 'text-emerald-500',

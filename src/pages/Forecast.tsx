@@ -24,6 +24,7 @@ import { useForecastData, useDefaultFilters, ForecastFilters as FilterType } fro
 import { BarChart3, Users, Search, Sparkles, AlertTriangle, ShieldCheck, Target, TrendingUp, Shield } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { cn } from '@/lib/utils';
+import { RevenueSsotBanner } from '@/components/revenue/RevenueSsotBanner';
 
 export default function Forecast() {
   const defaultFilters = useDefaultFilters();
@@ -89,6 +90,8 @@ export default function Forecast() {
           isFetching={isFetching}
           dataUpdatedAt={dataUpdatedAt}
         />
+
+        <RevenueSsotBanner variant="migrated" surface="Forecast — Receita Fechada via commercial_won_revenue_view" />
 
         {/* KPI Cards */}
         <ForecastKPICards kpis={kpis} isLoading={isLoading} />

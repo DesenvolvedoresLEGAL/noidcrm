@@ -134,11 +134,15 @@ export default function RevenueIntegrity() {
                     <TableRow key={s.surface}>
                       <TableCell className="font-medium">{s.surface}</TableCell>
                       <TableCell className="text-right">{s.shown === null ? '—' : BRL(s.shown)}</TableCell>
-                      <TableCell className="text-right">{BRL(s.ssot)}</TableCell>
+                      <TableCell className="text-right">{BRL(s.ssot_value)}</TableCell>
                       <TableCell className="text-right">{BRL(s.delta)}</TableCell>
                       <TableCell>
-                        {s.mismatch ? (
+                        {s.status === 'mismatch' ? (
                           <Badge variant="destructive">REVENUE_SOURCE_MISMATCH</Badge>
+                        ) : s.status === 'ssot_native' ? (
+                          <Badge variant="secondary">SSoT NATIVE</Badge>
+                        ) : s.status === 'unavailable' ? (
+                          <Badge variant="outline">N/D</Badge>
                         ) : (
                           <Badge variant="secondary">OK</Badge>
                         )}
@@ -186,6 +190,52 @@ export default function RevenueIntegrity() {
               )}
             </CardContent>
           </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Diagnóstico por venda — v_opportunity_amounts_v2 vs SSoT ({data.perSaleDiffs.length})</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {data.perSaleDiffs.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Nenhuma divergência por venda no período.</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Proposta</TableHead>
+                      <TableHead>Cliente</TableHead>
+                      <TableHead>Vendedor</TableHead>
+                      <TableHead>Fechado em</TableHead>
+                      <TableHead className="text-right">SSoT</TableHead>
+                      <TableHead className="text-right">Superfície</TableHead>
+                      <TableHead className="text-right">Δ</TableHead>
+                      <TableHead>Motivo</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {data.perSaleDiffs.map((d) => (
+                      <TableRow key={d.opportunity_id}>
+                        <TableCell className="font-mono text-xs">{d.proposal_number ?? '—'}</TableCell>
+                        <TableCell>{d.cliente ?? '—'}</TableCell>
+                        <TableCell>{d.vendedor ?? '—'}</TableCell>
+                        <TableCell className="text-xs">{d.won_at?.slice(0, 10) ?? '—'}</TableCell>
+                        <TableCell className="text-right">{BRL(d.commercial_amount)}</TableCell>
+                        <TableCell className="text-right">{d.surface_amount === null ? '—' : BRL(d.surface_amount)}</TableCell>
+                        <TableCell className="text-right">{BRL(d.amount_diff)}</TableCell>
+                        <TableCell>
+                          {d.only_in_surface ? <Badge variant="destructive">only_in_surface</Badge>
+                            : d.only_in_ssot ? <Badge variant="outline">only_in_ssot</Badge>
+                            : <Badge variant="secondary">amount_diff</Badge>}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+
+
 
           <Card>
             <CardHeader>

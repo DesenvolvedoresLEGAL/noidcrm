@@ -4,6 +4,7 @@ import { startOfMonth, endOfMonth, differenceInDays, format, parseISO } from 'da
 import { parseDateOnly } from '@/lib/dateUtils';
 import { calculateForecastScenarios } from '@/services/crm/forecast';
 import { forecastKeys, salesGoalKeys } from '@/lib/query-keys';
+import { revenueSsotService } from '@/services/revenue/revenueSsotService';
 
 export interface ForecastFilters {
   periodType: 'monthly' | 'quarterly' | 'yearly';
@@ -513,6 +514,34 @@ export function useForecastData(filters: ForecastFilters) {
     },
   });
 
+  // P0 Revenue SSoT — Receita Fechada lida exclusivamente de commercial_won_revenue_view.
+  // Quando disponível, override em KPIs.closedRevenue e SellerForecast.closed.
+  const closedSsotQuery = useQuery({
+    queryKey: forecastKeys.closedSsot({
+      start: periodStart.toISOString(),
+      end: periodEnd.toISOString(),
+      pipelineId,
+      userId,
+    }),
+    queryFn: async () => {
+      const { data: orgId } = await supabase.rpc('get_user_organization_id');
+      if (!orgId) return null;
+      const params = {
+        organizationId: orgId as string,
+        start: periodStart.toISOString(),
+        end: periodEnd.toISOString(),
+        pipelineIds: pipelineId ? [pipelineId] : null,
+        sellerIds: userId ? [userId] : null,
+      };
+      const [summary, bySeller] = await Promise.all([
+        revenueSsotService.getClosedRevenueSummary(params),
+        revenueSsotService.getRevenueBySeller(params),
+      ]);
+      return { summary, bySeller };
+    },
+    staleTime: 30_000,
+  });
+
   // Fetch team members for seller breakdown
   const teamQuery = useQuery({
     queryKey: forecastKeys.team(),
@@ -541,8 +570,12 @@ export function useForecastData(filters: ForecastFilters) {
       ? individualSellerGoalQuery.data 
       : (orgGoalQuery.data || sellerGoalsQuery.data || salesGoalsTotal || 0);
 
-    // Use valor_previsto (real revenue) for forecast - commission_value is only for seller goals
-    const closedRevenue = closedOpps.reduce((sum, o) => sum + (o.valor_previsto ?? 0), 0);
+    // P0 Revenue SSoT — Receita Fechada vem de commercial_won_revenue_view.
+    // Fallback para soma legada apenas se SSoT ainda não retornou.
+    const ssotSummary = closedSsotQuery.data?.summary;
+    const closedRevenue = ssotSummary
+      ? ssotSummary.total
+      : closedOpps.reduce((sum, o) => sum + (o.valor_previsto ?? 0), 0);
     const totalPipeline = opportunities.reduce((sum, o) => sum + o.valor_previsto, 0);
     const weightedPipeline = opportunities.reduce((sum, o) => sum + (o.valor_previsto * o.prob / 100), 0);
 
@@ -685,15 +718,26 @@ export function useForecastData(filters: ForecastFilters) {
       });
     });
 
-    // Add closed revenue
+    // P0 Revenue SSoT — receita ganha por vendedor vem de commercial_won_revenue_view.
+    const ssotBySeller = new Map<string, number>(
+      (closedSsotQuery.data?.bySeller ?? []).map((g) => [g.key, g.total]),
+    );
+    const useSsot = ssotBySeller.size > 0;
+
+    // Add closed revenue (count from legado; valor monetário vem do SSoT quando disponível)
     closedOpps.forEach(opp => {
       if (!opp.owner_user_id) return;
       const seller = sellerMap.get(opp.owner_user_id);
       if (seller) {
-        seller.closed += opp.valor_previsto || 0;
+        if (!useSsot) seller.closed += opp.valor_previsto || 0;
         seller.dealCount += 1;
       }
     });
+    if (useSsot) {
+      sellerMap.forEach((seller, userId) => {
+        seller.closed = ssotBySeller.get(userId) ?? 0;
+      });
+    }
 
     // Add pipeline
     opportunities.forEach(opp => {
@@ -725,6 +769,7 @@ export function useForecastData(filters: ForecastFilters) {
   const isFetching =
     opportunitiesQuery.isFetching ||
     closedQuery.isFetching ||
+    closedSsotQuery.isFetching ||
     goalsQuery.isFetching ||
     lostQuery.isFetching;
 
@@ -740,22 +785,26 @@ export function useForecastData(filters: ForecastFilters) {
     dataUpdatedAt: Math.max(
       opportunitiesQuery.dataUpdatedAt || 0,
       closedQuery.dataUpdatedAt || 0,
+      closedSsotQuery.dataUpdatedAt || 0,
     ),
     refetch: async () => {
       await queryClient.invalidateQueries({ queryKey: forecastKeys.opportunitiesAll() });
       await queryClient.invalidateQueries({ queryKey: forecastKeys.closedAll() });
+      await queryClient.invalidateQueries({ queryKey: forecastKeys.closedSsotAll() });
       await queryClient.invalidateQueries({ queryKey: forecastKeys.lostAll() });
       await queryClient.invalidateQueries({ queryKey: salesGoalKeys.listAll() });
       await queryClient.invalidateQueries({ queryKey: forecastKeys.aiInsightsAll() });
       await Promise.all([
         opportunitiesQuery.refetch(),
         closedQuery.refetch(),
+        closedSsotQuery.refetch(),
         goalsQuery.refetch(),
         lostQuery.refetch(),
       ]);
     },
   };
 }
+
 
 export function useDefaultFilters(): ForecastFilters {
   const now = new Date();

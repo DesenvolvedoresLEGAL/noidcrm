@@ -27,6 +27,8 @@ import { WinLossInterviewsTab } from '@/components/intelligence/winloss/tabs/Win
 import { WinLossRevenueTab } from '@/components/intelligence/winloss/tabs/WinLossRevenueTab';
 import { WinLossRecommendationsTab } from '@/components/intelligence/winloss/tabs/WinLossRecommendationsTab';
 import { ProposalApprovalsTab } from '@/components/intelligence/winloss/tabs/ProposalApprovalsTab';
+import { useClosedRevenueSummary } from '@/hooks/revenue/useRevenueSsot';
+import { RevenueSsotBanner } from '@/components/revenue/RevenueSsotBanner';
 
 export default function WinLossHub() {
   const { organization } = useCurrentUser();
@@ -56,6 +58,15 @@ export default function WinLossHub() {
     selectedPipelineId,
     dateRange
   );
+
+  // P0 Revenue SSoT — monetários ganhos vêm de commercial_won_revenue_view.
+  const { data: ssotWonSummary } = useClosedRevenueSummary({
+    surface: 'winloss-hub',
+    organizationId: organization?.id,
+    start: dateRange.from.toISOString(),
+    end: dateRange.to.toISOString(),
+    pipelineIds: selectedPipelineId ? [selectedPipelineId] : null,
+  });
 
   // Log errors for debugging
   if (winLossError) {
@@ -121,6 +132,12 @@ export default function WinLossHub() {
         </div>
 
 
+        {/* P0 Revenue SSoT — Banner explicando origem dos monetários ganhos */}
+        <RevenueSsotBanner
+          variant="migrated"
+          surface="Win/Loss — Ganhos, Valor Ganho e Ticket Médio via commercial_won_revenue_view"
+        />
+
         {/* Context Selector */}
         <WinLossContextSelector
           pipelines={pipelines}
@@ -150,6 +167,15 @@ export default function WinLossHub() {
           isLoading={isLoading}
           terminology={terminology}
           pipelineType={pipelineType}
+          ssotOverride={
+            ssotWonSummary
+              ? {
+                  wonCount: ssotWonSummary.count,
+                  wonValue: ssotWonSummary.total,
+                  avgTicketWon: ssotWonSummary.avgTicket,
+                }
+              : undefined
+          }
         />
 
         {/* AI Insights Banner */}

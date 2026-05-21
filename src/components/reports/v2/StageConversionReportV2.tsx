@@ -17,6 +17,7 @@ import { ReportLoadingState } from './shared/ReportLoadingState';
 import { ReportErrorState } from './shared/ReportErrorState';
 import { ReportEmptyState } from './shared/ReportEmptyState';
 import { RevenueSsotBanner } from '@/components/revenue/RevenueSsotBanner';
+import { useRevenueByPipeline } from '@/hooks/revenue/useRevenueSsot';
 
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -40,6 +41,21 @@ export function StageConversionReportV2() {
     organizationId: organization?.id, request,
   });
 
+  // P0 Revenue SSoT — etapa Ganhamos lê o valor financeiro de commercial_won_revenue_view.
+  const { data: ssotByPipeline } = useRevenueByPipeline({
+    surface: 'reports-stages',
+    organizationId: organization?.id,
+    start: effectiveDates?.startDate ? new Date(effectiveDates.startDate).toISOString() : undefined,
+    end: effectiveDates?.endDate ? new Date(effectiveDates.endDate).toISOString() : undefined,
+  });
+  const wonValueByPipeline = useMemo(() => {
+    const m = new Map<string, number>();
+    (ssotByPipeline ?? []).forEach((g) => m.set(g.key, g.total));
+    return m;
+  }, [ssotByPipeline]);
+  const isWonStage = (name?: string | null) =>
+    !!name && /ganhamos|ganho|won/i.test(name);
+
   if (isLoading || teamVisibility.loading) return <ReportLoadingState cardCount={2} />;
   if (error) return <ReportErrorState message={(error as Error).message} onRetry={() => refetch()} />;
 
@@ -51,7 +67,10 @@ export function StageConversionReportV2() {
   return (
     <div className="space-y-4">
       <ReportMetaBar meta={meta} reportLabel="Conversão por Estágio" />
-      <RevenueSsotBanner variant="legacy" surface="Relatórios → Estágios (totais por etapa não migrados)" />
+      <RevenueSsotBanner
+        variant="migrated"
+        surface="Relatórios → Estágios — etapa Ganhamos via commercial_won_revenue_view (demais etapas seguem report v2)"
+      />
 
       <ReportWarningsPanel confidence={meta?.confidence} />
 
@@ -74,15 +93,21 @@ export function StageConversionReportV2() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {view.balance.rows.map((r) => (
-                <TableRow key={`b-${r.pipelineId}-${r.stageId}`}>
-                  <TableCell className="text-xs text-muted-foreground">{r.pipelineId?.slice(0, 8) ?? '—'}</TableCell>
-                  <TableCell className="font-medium">{r.stageName}</TableCell>
-                  <TableCell className="text-right">{formatNumber(r.activeCount)}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(r.activeValue)}</TableCell>
-                  <TableCell className="text-right">{formatDays(r.avgDaysInStage)}</TableCell>
-                </TableRow>
-              ))}
+              {view.balance.rows.map((r) => {
+                const wonValue = isWonStage(r.stageName) && r.pipelineId
+                  ? wonValueByPipeline.get(r.pipelineId)
+                  : undefined;
+                const displayedValue = typeof wonValue === 'number' ? wonValue : r.activeValue;
+                return (
+                  <TableRow key={`b-${r.pipelineId}-${r.stageId}`}>
+                    <TableCell className="text-xs text-muted-foreground">{r.pipelineId?.slice(0, 8) ?? '—'}</TableCell>
+                    <TableCell className="font-medium">{r.stageName}</TableCell>
+                    <TableCell className="text-right">{formatNumber(r.activeCount)}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(displayedValue)}</TableCell>
+                    <TableCell className="text-right">{formatDays(r.avgDaysInStage)}</TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </CardContent>
