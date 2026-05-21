@@ -76,6 +76,7 @@ function PriceAuditContent() {
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
+  const [showOutOfScope, setShowOutOfScope] = useState(false);
   const [openItemId, setOpenItemId] = useState<string | null>(null);
 
   const runs = useAuditRuns();
@@ -84,6 +85,7 @@ function PriceAuditContent() {
       runId: selectedRunId ?? undefined,
       status: statusFilter !== 'all' ? (statusFilter as any) : undefined,
       search: search || undefined,
+      scopeMode: showOutOfScope ? 'all' : 'default',
     },
     !!selectedRunId,
   );
@@ -99,19 +101,20 @@ function PriceAuditContent() {
   );
 
   if (selectedRunId == null && runs.data && runs.data[0]) {
-    // auto-select latest
     setTimeout(() => setSelectedRunId(runs.data![0].id), 0);
   }
 
   const kpis = useMemo(() => {
     const list = items.data ?? [];
+    const inScopeList = list.filter((i) => i.audit_scope_status === 'in_scope');
     return {
       total: activeRun?.total_proposals ?? list.length,
-      ok: activeRun?.ok_count ?? list.filter((i) => i.audit_status === 'ok').length,
-      divergent: activeRun?.divergent_count ?? list.filter((i) => i.audit_status === 'divergent').length,
-      review: activeRun?.needs_review_count ?? list.filter((i) => i.audit_status === 'needs_review').length,
-      totalDelta: activeRun?.total_detected_delta ?? list.reduce((a, b) => a + (b.max_delta ?? 0), 0),
-      affectedSellers: new Set(list.filter((i) => i.audit_status !== 'ok').map((i) => i.seller_name)).size,
+      inScope: activeRun?.in_scope_count ?? inScopeList.length,
+      outOfScope: activeRun?.out_of_scope_count ?? list.filter((i) => i.audit_scope_status.startsWith('out_of_scope')).length,
+      scopeReview: activeRun?.needs_scope_review_count ?? list.filter((i) => i.audit_scope_status === 'needs_scope_review').length,
+      realDivergent: inScopeList.filter((i) => (i.max_delta ?? 0) > 0.01).length,
+      inScopeDelta: activeRun?.in_scope_delta ?? inScopeList.reduce((a, b) => a + (b.max_delta ?? 0), 0),
+      outOfScopeDelta: activeRun?.out_of_scope_delta ?? list.filter((i) => i.audit_scope_status !== 'in_scope').reduce((a, b) => a + (b.max_delta ?? 0), 0),
     };
   }, [items.data, activeRun]);
 
