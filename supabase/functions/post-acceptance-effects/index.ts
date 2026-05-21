@@ -534,15 +534,15 @@ async function processJob(supabase: any, job: any) {
           }
         }
 
-        await supabase.from("acceptance_effect_jobs")
-          .update({ slack_processed_at: new Date().toISOString() })
-          .eq("id", jobId);
+        // slack_processed_at was already set by the atomic claim above — no need to update again.
       } catch (slackError) {
         console.error("Slack stage failed:", slackError);
+        // Release the claim so the next retry can attempt to send.
         await supabase.from("acceptance_effect_jobs")
-          .update({ last_error: `Slack: ${slackError.message}` })
+          .update({ slack_processed_at: null, last_error: `Slack: ${slackError.message}` })
           .eq("id", jobId);
       }
+      } // close else (claim succeeded)
     } else {
       console.log(`Slack already processed for job ${jobId}`);
       slackSent = true;
