@@ -151,14 +151,17 @@ export function VendasRealizadasTable() {
                 <TableHead className="text-right">Avulsa</TableHead>
                 <TableHead className="text-right">MRR</TableHead>
                 <TableHead className="text-right">Total Comercial</TableHead>
-                <TableHead>Fonte</TableHead>
+                <TableHead>Comercial</TableHead>
+                <TableHead>Operacional</TableHead>
+                <TableHead>Settlement</TableHead>
+                <TableHead>Comissão</TableHead>
                 <TableHead>Confiança</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {rows.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={12} className="text-center text-muted-foreground py-8">
                     Nenhuma venda realizada no período.
                   </TableCell>
                 </TableRow>
@@ -176,12 +179,16 @@ export function VendasRealizadasTable() {
                   <TableCell className="text-right tabular-nums">{fmt(Number(r.one_shot_amount) || 0)}</TableCell>
                   <TableCell className="text-right tabular-nums">{fmt(Number(r.mrr_amount) || 0)}</TableCell>
                   <TableCell className="text-right tabular-nums font-semibold">{fmt(Number(r.commercial_amount) || 0)}</TableCell>
-                  <TableCell><Badge variant="outline" className="text-[10px]">{r.commercial_amount_source}</Badge></TableCell>
+                  <TableCell><CommercialStatusBadge status={r.commercial_status} /></TableCell>
+                  <TableCell><FulfillmentBadge status={r.fulfillment_status} /></TableCell>
+                  <TableCell><SettlementBadge status={r.financial_settlement_status} /></TableCell>
+                  <TableCell><CommissionBadge status={r.commission_status} /></TableCell>
                   <TableCell>
                     <ConfidenceBadge confidence={r.revenue_confidence} reviewRequired={r.review_required} />
                   </TableCell>
                 </TableRow>
               ))}
+
             </TableBody>
           </Table>
         </CardContent>
