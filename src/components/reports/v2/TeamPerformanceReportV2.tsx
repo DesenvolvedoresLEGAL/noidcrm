@@ -13,11 +13,14 @@ import { useReportTeamV2 } from '@/hooks/useReportTeamV2';
 import { buildReportV2RequestFromFilters } from '@/lib/reports/buildReportV2Request';
 import { mapTeamV2, computeTeamTotals } from '@/lib/reports/mappers/mapTeamV2';
 import { formatCurrency, formatNumber, formatPct } from '@/lib/reports/formatReportNumbers';
+import { useClosedRevenueSummary, useRevenueBySeller } from '@/hooks/revenue/useRevenueSsot';
+import { RevenueSsotBanner } from '@/components/revenue/RevenueSsotBanner';
 import { ReportMetaBar } from './shared/ReportMetaBar';
 import { ReportWarningsPanel } from './shared/ReportWarningsPanel';
 import { ReportLoadingState } from './shared/ReportLoadingState';
 import { ReportErrorState } from './shared/ReportErrorState';
 import { ReportEmptyState } from './shared/ReportEmptyState';
+
 
 function MiniCard({ icon: Icon, label, value }: { icon: React.ComponentType<{ className?: string }>; label: string; value: string }) {
   return (
@@ -56,6 +59,22 @@ export function TeamPerformanceReportV2() {
     request,
   });
 
+  const { data: ssotSummary } = useClosedRevenueSummary({
+    surface: 'reports-team-v2-totals',
+    organizationId: organization?.id,
+    start: effectiveDates.startDate,
+    end: effectiveDates.endDate,
+    pipelineIds: filters.pipelines?.length ? filters.pipelines : undefined,
+    sellerIds: filters.users && filters.users !== 'all' ? [filters.users] : undefined,
+  });
+  const { data: bySeller } = useRevenueBySeller({
+    surface: 'reports-team-v2-per-seller',
+    organizationId: organization?.id,
+    start: effectiveDates.startDate,
+    end: effectiveDates.endDate,
+    pipelineIds: filters.pipelines?.length ? filters.pipelines : undefined,
+  });
+
   if (isLoading || teamVisibility.loading) return <ReportLoadingState cardCount={6} />;
   if (error) return <ReportErrorState message={(error as Error).message} onRetry={() => refetch()} />;
 
@@ -71,19 +90,24 @@ export function TeamPerformanceReportV2() {
   }
 
   const totals = computeTeamTotals(rows);
+  const sellerMap = new Map((bySeller ?? []).map((g) => [g.key, g] as const));
+  const wonRevenueSsot = ssotSummary?.total ?? totals.wonRevenue;
+  const wonCountSsot = ssotSummary?.count ?? totals.wonCount;
+  const avgTicketSsot = ssotSummary?.avgTicket ?? totals.avgTicket;
 
   return (
     <div className="space-y-4">
       <ReportMetaBar meta={meta} reportLabel="Performance Equipe" />
+      <RevenueSsotBanner surface="Relatórios → Performance Equipe" />
       <ReportWarningsPanel confidence={meta?.confidence} />
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
-        <MiniCard icon={DollarSign} label="Receita ganha" value={formatCurrency(totals.wonRevenue)} />
-        <MiniCard icon={Trophy} label="Ganhos" value={formatNumber(totals.wonCount)} />
+        <MiniCard icon={DollarSign} label="Receita ganha" value={formatCurrency(wonRevenueSsot)} />
+        <MiniCard icon={Trophy} label="Ganhos" value={formatNumber(wonCountSsot)} />
         <MiniCard icon={TrendingDown} label="Perdidas" value={formatNumber(totals.lostCount)} />
         <MiniCard icon={Activity} label="Ativos" value={formatNumber(totals.activeCount)} />
         <MiniCard icon={Target} label="Win rate oficial" value={formatPct(totals.winRatePct)} />
-        <MiniCard icon={Wallet} label="Ticket médio" value={formatCurrency(totals.avgTicket)} />
+        <MiniCard icon={Wallet} label="Ticket médio" value={formatCurrency(avgTicketSsot)} />
       </div>
 
       <Card>
@@ -105,18 +129,24 @@ export function TeamPerformanceReportV2() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map((r) => (
-                <TableRow key={r.ownerUserId}>
-                  <TableCell className="font-medium">{r.ownerName ?? '—'}</TableCell>
-                  <TableCell className="text-right">{formatNumber(r.wonCount)}</TableCell>
-                  <TableCell className="text-right">{formatNumber(r.lostCount)}</TableCell>
-                  <TableCell className="text-right">{formatNumber(r.activeCount)}</TableCell>
-                  <TableCell className="text-right font-medium">{formatCurrency(r.wonRevenue)}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(r.activePipelineValue)}</TableCell>
-                  <TableCell className="text-right">{formatPct(r.winRatePct)}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(r.avgWonTicket)}</TableCell>
-                </TableRow>
-              ))}
+              {rows.map((r) => {
+                const ssot = sellerMap.get(r.ownerUserId);
+                const wonCount = ssot?.count ?? r.wonCount;
+                const wonRev = ssot?.total ?? r.wonRevenue;
+                const avgTk = ssot?.avgTicket ?? r.avgWonTicket;
+                return (
+                  <TableRow key={r.ownerUserId}>
+                    <TableCell className="font-medium">{r.ownerName ?? '—'}</TableCell>
+                    <TableCell className="text-right">{formatNumber(wonCount)}</TableCell>
+                    <TableCell className="text-right">{formatNumber(r.lostCount)}</TableCell>
+                    <TableCell className="text-right">{formatNumber(r.activeCount)}</TableCell>
+                    <TableCell className="text-right font-medium">{formatCurrency(wonRev)}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(r.activePipelineValue)}</TableCell>
+                    <TableCell className="text-right">{formatPct(r.winRatePct)}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(avgTk)}</TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </CardContent>
@@ -124,3 +154,4 @@ export function TeamPerformanceReportV2() {
     </div>
   );
 }
+

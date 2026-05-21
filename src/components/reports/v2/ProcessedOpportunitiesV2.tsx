@@ -11,11 +11,14 @@ import { useReportProcessedV2 } from '@/hooks/useReportProcessedV2';
 import { buildReportV2RequestFromFilters } from '@/lib/reports/buildReportV2Request';
 import { mapProcessedV2 } from '@/lib/reports/mappers/mapProcessedV2';
 import { formatCurrency, formatNumber, formatPct } from '@/lib/reports/formatReportNumbers';
+import { useClosedRevenueSummary } from '@/hooks/revenue/useRevenueSsot';
+import { RevenueSsotBanner } from '@/components/revenue/RevenueSsotBanner';
 import { ReportMetaBar } from './shared/ReportMetaBar';
 import { ReportWarningsPanel } from './shared/ReportWarningsPanel';
 import { ReportLoadingState } from './shared/ReportLoadingState';
 import { ReportErrorState } from './shared/ReportErrorState';
 import { ReportEmptyState } from './shared/ReportEmptyState';
+
 
 function KpiCard({ icon: Icon, label, value, tone = 'default' }: {
   icon: React.ComponentType<{ className?: string }>;
@@ -53,21 +56,35 @@ export function ProcessedOpportunitiesV2() {
     organizationId: organization?.id, request,
   });
 
+  const { data: ssotSummary } = useClosedRevenueSummary({
+    surface: 'reports-processadas-v2',
+    organizationId: organization?.id,
+    start: effectiveDates.startDate,
+    end: effectiveDates.endDate,
+    pipelineIds: filters.pipelines?.length ? filters.pipelines : undefined,
+    sellerIds: filters.users && filters.users !== 'all' ? [filters.users] : undefined,
+  });
+
   if (isLoading || teamVisibility.loading) return <ReportLoadingState cardCount={8} />;
   if (error) return <ReportErrorState message={(error as Error).message} onRetry={() => refetch()} />;
 
   const view = mapProcessedV2(data);
   if (!view) return <ReportEmptyState icon={Activity} title="Sem oportunidades processadas" description="Ajuste o período para visualizar oportunidades fechadas." />;
 
+  const wonCountSsot = ssotSummary?.count ?? view.wonCount;
+  const wonRevenueSsot = ssotSummary?.total ?? view.wonRevenue;
+  const avgWonTicketSsot = ssotSummary?.avgTicket ?? view.avgWonTicket;
+
   return (
     <div className="space-y-4">
       <ReportMetaBar meta={meta} reportLabel="Processadas" />
+      <RevenueSsotBanner surface="Relatórios → Processadas" />
       <ReportWarningsPanel confidence={meta?.confidence} />
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <KpiCard icon={Activity} label="Total processadas" value={formatNumber(view.processedCount)} />
-        <KpiCard icon={Trophy} label="Ganhas" value={formatNumber(view.wonCount)} tone="success" />
-        <KpiCard icon={DollarSign} label="Receita ganha" value={formatCurrency(view.wonRevenue)} tone="success" />
-        <KpiCard icon={TrendingUp} label="Ticket médio ganho" value={formatCurrency(view.avgWonTicket)} tone="success" />
+        <KpiCard icon={Trophy} label="Ganhas" value={formatNumber(wonCountSsot)} tone="success" />
+        <KpiCard icon={DollarSign} label="Receita ganha" value={formatCurrency(wonRevenueSsot)} tone="success" />
+        <KpiCard icon={TrendingUp} label="Ticket médio ganho" value={formatCurrency(avgWonTicketSsot)} tone="success" />
         <KpiCard icon={TrendingDown} label="Perdidas" value={formatNumber(view.lostCount)} tone="danger" />
         <KpiCard icon={Wallet} label="Valor perdido" value={formatCurrency(view.lostValue)} tone="danger" />
         <KpiCard icon={TrendingDown} label="Ticket médio perdido" value={formatCurrency(view.avgLostTicket)} tone="danger" />
@@ -76,3 +93,4 @@ export function ProcessedOpportunitiesV2() {
     </div>
   );
 }
+

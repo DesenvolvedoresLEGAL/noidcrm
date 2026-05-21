@@ -14,6 +14,8 @@ import { useTeamVisibility } from '@/hooks/useTeamVisibility';
 import { useReportFiltersContext } from '@/contexts/ReportFiltersContext';
 import { useReportSummaryV2 } from '@/hooks/useReportSummaryV2';
 import { useUnifiedWonRevenueV2 } from '@/hooks/useUnifiedWonRevenueV2';
+import { useClosedRevenueSummary } from '@/hooks/revenue/useRevenueSsot';
+import { RevenueSsotBanner } from '@/components/revenue/RevenueSsotBanner';
 import { buildReportV2RequestFromFilters } from '@/lib/reports/buildReportV2Request';
 import { mapSummaryV2 } from '@/lib/reports/mappers/mapSummaryV2';
 import { formatCurrency, formatNumber, formatPct } from '@/lib/reports/formatReportNumbers';
@@ -24,6 +26,7 @@ import { ReportErrorState } from './shared/ReportErrorState';
 import { ReportEmptyState } from './shared/ReportEmptyState';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Info, AlertTriangle } from 'lucide-react';
+
 
 interface KpiCardProps {
   icon: React.ComponentType<{ className?: string }>;
@@ -79,6 +82,16 @@ export function GeneralOverviewV2() {
   // Sprint 2.10: fonte única de receita ganha (CEO ↔ Reports)
   const { data: unified } = useUnifiedWonRevenueV2(organization?.id);
 
+  // P0 Revenue SSoT — override de receita ganha vem de commercial_won_revenue_view
+  const { data: ssotSummary } = useClosedRevenueSummary({
+    surface: 'reports-geral-v2',
+    organizationId: organization?.id,
+    start: effectiveDates.startDate,
+    end: effectiveDates.endDate,
+    pipelineIds: filters.pipelines?.length ? filters.pipelines : undefined,
+    sellerIds: filters.users && filters.users !== 'all' ? [filters.users] : undefined,
+  });
+
   if (isLoading || teamVisibility.loading) return <ReportLoadingState cardCount={9} />;
   if (error) return <ReportErrorState message={(error as Error).message} onRetry={() => refetch()} />;
 
@@ -93,6 +106,12 @@ export function GeneralOverviewV2() {
     );
   }
 
+  // SSoT override (monetário ganho + count + ticket médio ganho)
+  const wonCountSsot = ssotSummary?.count ?? view.wonCount;
+  const wonRevenueSsot = ssotSummary?.total ?? view.wonRevenue;
+  const avgWonTicketSsot = ssotSummary?.avgTicket ?? view.avgWonTicket;
+
+
   // Cobertura por proposta para warning executivo
   const totalWonForCoverage = (unified?.won_count_via_accepted_proposal ?? 0)
     + (unified?.won_count_via_latest_proposal ?? 0)
@@ -105,8 +124,11 @@ export function GeneralOverviewV2() {
 
   return (
     <TooltipProvider>
+
+
       <div className="space-y-4">
         <ReportMetaBar meta={meta} reportLabel="Visão Geral" />
+        <RevenueSsotBanner surface="Relatórios → Geral" />
         <ReportWarningsPanel confidence={meta?.confidence} />
 
         {/* Sprint 2.11 — escopo all-time vs CEO Dashboard mensal */}
@@ -131,43 +153,22 @@ export function GeneralOverviewV2() {
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
           <KpiCard icon={Layers} label="Pipeline ativo" value={formatNumber(view.activePipelineCount)} tone="primary" />
           <KpiCard icon={Wallet} label="Valor do pipeline" value={formatCurrency(view.activePipelineValue)} tone="primary" />
-          <KpiCard icon={Trophy} label="Ganhas" value={formatNumber(view.wonCount)} tone="success" />
-          {unified ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="cursor-help">
-                  <KpiCard
-                    icon={DollarSign}
-                    label="Receita ganha"
-                    value={formatCurrency(view.wonRevenue)}
-                    tone="success"
-                    hint={`${proposalBasedPct}% via proposta`}
-                  />
-                </div>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="max-w-sm">
-                <div className="space-y-1 text-xs">
-                  <div className="font-semibold">Composição da receita ganha (histórico):</div>
-                  <div>• Via proposta aceita: <strong>{formatCurrency(unified.won_revenue_via_accepted_proposal)}</strong> ({unified.won_count_via_accepted_proposal} deals)</div>
-                  <div>• Via última proposta: <strong>{formatCurrency(unified.won_revenue_via_latest_proposal)}</strong> ({unified.won_count_via_latest_proposal} deals)</div>
-                  <div>• Via valor previsto: <strong>{formatCurrency(unified.won_revenue_via_opportunity_fallback)}</strong> ({unified.won_count_via_opportunity_fallback} deals)</div>
-                  {unified.won_count_via_zero_fallback > 0 && (
-                    <div className="text-destructive">• Sem valor: {unified.won_count_via_zero_fallback} deals</div>
-                  )}
-                  <div className="border-t pt-1 mt-1 font-semibold">Total: {formatCurrency(unified.won_revenue)}</div>
-                </div>
-              </TooltipContent>
-            </Tooltip>
-          ) : (
-            <KpiCard icon={DollarSign} label="Receita ganha" value={formatCurrency(view.wonRevenue)} tone="success" />
-          )}
+          <KpiCard icon={Trophy} label="Ganhas" value={formatNumber(wonCountSsot)} tone="success" />
+          <KpiCard
+            icon={DollarSign}
+            label="Receita ganha"
+            value={formatCurrency(wonRevenueSsot)}
+            tone="success"
+            hint="commercial_won_revenue_view"
+          />
           <KpiCard icon={TrendingDown} label="Perdidas" value={formatNumber(view.lostCount)} tone="danger" />
           <KpiCard icon={Wallet} label="Valor perdido" value={formatCurrency(view.lostValue)} tone="danger" />
           <KpiCard icon={Activity} label="Processadas" value={formatNumber(view.processedCount)} />
           <KpiCard icon={Target} label="Taxa de conversão" value={formatPct(view.winRatePct)} hint="ganhas / processadas" />
-          <KpiCard icon={TrendingUp} label="Ticket médio ganho" value={formatCurrency(view.avgWonTicket)} />
+          <KpiCard icon={TrendingUp} label="Ticket médio ganho" value={formatCurrency(avgWonTicketSsot)} />
         </div>
       </div>
     </TooltipProvider>
   );
 }
+
