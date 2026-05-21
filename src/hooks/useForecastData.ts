@@ -718,15 +718,26 @@ export function useForecastData(filters: ForecastFilters) {
       });
     });
 
-    // Add closed revenue
+    // P0 Revenue SSoT — receita ganha por vendedor vem de commercial_won_revenue_view.
+    const ssotBySeller = new Map<string, number>(
+      (closedSsotQuery.data?.bySeller ?? []).map((g) => [g.key, g.total]),
+    );
+    const useSsot = ssotBySeller.size > 0;
+
+    // Add closed revenue (count from legado; valor monetário vem do SSoT quando disponível)
     closedOpps.forEach(opp => {
       if (!opp.owner_user_id) return;
       const seller = sellerMap.get(opp.owner_user_id);
       if (seller) {
-        seller.closed += opp.valor_previsto || 0;
+        if (!useSsot) seller.closed += opp.valor_previsto || 0;
         seller.dealCount += 1;
       }
     });
+    if (useSsot) {
+      sellerMap.forEach((seller, userId) => {
+        seller.closed = ssotBySeller.get(userId) ?? 0;
+      });
+    }
 
     // Add pipeline
     opportunities.forEach(opp => {
