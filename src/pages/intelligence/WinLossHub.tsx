@@ -59,6 +59,15 @@ export default function WinLossHub() {
     dateRange
   );
 
+  // P0 Revenue SSoT — monetários ganhos vêm de commercial_won_revenue_view.
+  const { data: ssotWonSummary } = useClosedRevenueSummary({
+    surface: 'winloss-hub',
+    organizationId: organization?.id,
+    start: dateRange.from.toISOString(),
+    end: dateRange.to.toISOString(),
+    pipelineIds: selectedPipelineId ? [selectedPipelineId] : null,
+  });
+
   // Log errors for debugging
   if (winLossError) {
     console.error('[WinLossHub] Data loading error:', winLossError);
