@@ -455,6 +455,31 @@ export default function ProposalEditor() {
     }
   }, [proposalData, isNewProposal, templates, queryClient]);
 
+  // PRICE CORE 2.0 — keep "Composição do valor" honest. Whenever an editable
+  // proposal is opened, refresh the pricing ledger once. This catches
+  // proposals whose items / payment terms / dynamic tier changed without
+  // a downstream action (cobrança/ERP/clique manual) triggering recalc.
+  const ledgerRefreshedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!proposalData || isNewProposal) return;
+    const p: any = proposalData;
+    if (!p?.id) return;
+    if (ledgerRefreshedRef.current === p.id) return;
+    const status = p.status;
+    if (status && !['draft', 'open', 'sent', 'viewed', 'pending_approval'].includes(status)) return;
+
+    ledgerRefreshedRef.current = p.id;
+    (async () => {
+      try {
+        await (supabase as any).rpc('ensure_proposal_pricing_ready', { p_proposal_id: p.id });
+        await queryClient.invalidateQueries({ queryKey: proposalKeys.detail(p.id) });
+      } catch (e) {
+        console.warn('[ProposalEditor] ledger refresh on open failed:', e);
+      }
+    })();
+  }, [proposalData, isNewProposal, queryClient]);
+
+
   // Load context data (account, contact, owner)
   useEffect(() => {
     const loadContextData = async () => {
