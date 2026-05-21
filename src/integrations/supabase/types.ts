@@ -35065,6 +35065,10 @@ export type Database = {
         Returns: Json
       }
       reset_monthly_volts: { Args: never; Returns: undefined }
+      reset_proposal_approval_state: {
+        Args: { p_proposal_id: string }
+        Returns: Json
+      }
       resolve_approved_commercial_amount: {
         Args: { p_opportunity_id: string }
         Returns: {
