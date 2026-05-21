@@ -769,6 +769,7 @@ export function useForecastData(filters: ForecastFilters) {
   const isFetching =
     opportunitiesQuery.isFetching ||
     closedQuery.isFetching ||
+    closedSsotQuery.isFetching ||
     goalsQuery.isFetching ||
     lostQuery.isFetching;
 
@@ -784,22 +785,26 @@ export function useForecastData(filters: ForecastFilters) {
     dataUpdatedAt: Math.max(
       opportunitiesQuery.dataUpdatedAt || 0,
       closedQuery.dataUpdatedAt || 0,
+      closedSsotQuery.dataUpdatedAt || 0,
     ),
     refetch: async () => {
       await queryClient.invalidateQueries({ queryKey: forecastKeys.opportunitiesAll() });
       await queryClient.invalidateQueries({ queryKey: forecastKeys.closedAll() });
+      await queryClient.invalidateQueries({ queryKey: forecastKeys.closedSsotAll() });
       await queryClient.invalidateQueries({ queryKey: forecastKeys.lostAll() });
       await queryClient.invalidateQueries({ queryKey: salesGoalKeys.listAll() });
       await queryClient.invalidateQueries({ queryKey: forecastKeys.aiInsightsAll() });
       await Promise.all([
         opportunitiesQuery.refetch(),
         closedQuery.refetch(),
+        closedSsotQuery.refetch(),
         goalsQuery.refetch(),
         lostQuery.refetch(),
       ]);
     },
   };
 }
+
 
 export function useDefaultFilters(): ForecastFilters {
   const now = new Date();
