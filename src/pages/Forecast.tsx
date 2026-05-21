@@ -91,6 +91,8 @@ export default function Forecast() {
           dataUpdatedAt={dataUpdatedAt}
         />
 
+        <RevenueSsotBanner variant="migrated" surface="Forecast — Receita Fechada via commercial_won_revenue_view" />
+
         {/* KPI Cards */}
         <ForecastKPICards kpis={kpis} isLoading={isLoading} />
 
