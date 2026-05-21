@@ -1,65 +1,61 @@
+## Problema
 
-# Revenue Surfaces Reconciliation — SSoT Migration
+O bloco "Composição do valor" (editor → aba Pagamento) e o link público da proposta (header, condições de pagamento, forma e prazo) leem de `proposals.pricing_breakdown_snapshot`. Esse snapshot só é regravado em ações de cobrança/ERP ou clique manual no alerta de divergência. Alterações em itens, desconto, condição comercial, validade ou modo de precificação **não** disparam recálculo, então o snapshot fica velho.
 
-## Goal
-`commercial_won_revenue_view` becomes the only source for closed revenue across all 9 surfaces. Target reference (01/05/2026 → 21/05/2026): Total R$ 114.840,24 · Avulsa R$ 113.246,24 · Novo MRR R$ 1.594,00 · Vendas 40 · Ticket R$ 2.871,01 · Comissão Elegível R$ 109.846,24 · Settlement R$ 4.994,00.
+Caso real PROP-2026-00740: snapshot mostra subtotal R$ 2.544,00 / vigente R$ 2.798,40, enquanto os itens reais somam R$ 4.579,00 e o vigente dinâmico real é R$ 5.036,90. O PDF está correto porque é gerado server-side a partir dos dados reais.
 
-## New shared infrastructure
-1. `src/services/revenue/dateRange.ts` — period resolver (`thisMonth` = 1st → today using `won_at`, `lastMonth`, `custom`). No rolling 30 days. Timezone America/Sao_Paulo.
-2. `src/services/revenue/revenueSsotService.ts` — single client over `commercial_won_revenue_view` exposing:
-   - `getClosedRevenueSummary({ orgId, start, end, pipelineIds?, sellerIds?, revenueType? })` → total, avulsa, mrr, count, avgTicket, eligible, pendingSettlement
-   - `getClosedRevenueRows(...)`
-   - `getRevenueBySeller`, `getRevenueByPipeline`, `getRevenueByStage`, `getRevenueByType`
-3. `src/hooks/revenue/useRevenueSsot.ts` — React Query wrappers, stable cache keys per surface.
-4. `src/components/revenue/RevenueSsotBanner.tsx` — info banner for migrated surfaces; warning variant `"Esta tela ainda não usa a fonte oficial de receita."` for any not yet migrated.
+Escopo: apenas frontend/orquestração de recálculo. **Não** mexer em `approved_amount`, `approval_snapshot`, preço dinâmico, propostas aceitas, clones operacionais, updates em massa, PDF, Pix, ERP, Slack, SSoT de receita.
 
-## Per-surface changes (monetary won values only)
-1. **Dashboard Owner** (`useOwnerDashboard.ts`) — `closedRevenue`, `closedRevenueOneTime`, `closedRevenueMRR`, `avgTicket`, won count for `conversionRate` → SSoT. Pipeline/forecast/loss blocks untouched.
-2. **Forecast** (`useForecastData.ts`) — "Fechado" parcel of Committed/Best Case from SSoT; probabilistic pipeline math unchanged.
-3. **Reports → Geral V2** — `wonCount`, `wonRevenue`, `avgWonTicket` from SSoT.
-4. **Reports → Processadas V2** — Ganhos count, Valor Total Ganho, Média Ganho from SSoT.
-5. **Reports → Estágios V2** — "Ganhamos" totals from SSoT; other stages untouched.
-6. **Reports → Forecast V2** — "Receita Fechada" from SSoT.
-7. **Reports → Closer V2** — Receita Fechada, Ticket Médio, Receita por vendedor, Deals ganhos from `getRevenueBySeller`.
-8. **Reports → Performance Equipe V2** — Revenue por seller/team from `getRevenueBySeller`.
-9. **Win/Loss Hub** — "Ganhos", "Valor Ganho", "Ticket Médio Ganho" from SSoT; loss blocks unchanged.
+## Ajustes
 
-## Revenue Integrity
-- `useRevenueIntegrity.ts`: for each surface, read its real production value via the new service hooks AND directly from the legacy path; compare to SSoT.
-- Per-sale diff payload: `only_in_surface`, `only_in_ssot`, `amount_diff` with `proposal_number`, `opportunity_id`, `cliente`, `vendedor`, `won_at`, `commercial_amount`, `source`, `motivo`.
-- Any |delta| > R$ 0,01 → `REVENUE_SOURCE_MISMATCH`.
-- `/admin/revenue-integrity` page lists 9 surfaces with PASS/FAIL chips.
+### 1. Recálculo no editor (aba Pagamento)
 
-## Guardrails
-- ESLint custom rule banning `valor_previsto`, `proposals.total_amount`, `v_opportunity_amounts_v2`, `useUnifiedWonRevenueV2`, `get_unified_won_revenue_v2`, `v_unified_won_revenue_v2`, `report_summary_v2.*won*`, `report_forecast_v2.*fechado*`, `report_closer_v2.*revenue*`, `report_team_v2.*revenue*` in revenue contexts.
-- Warning banner on any surface not yet migrated.
-- No `DROP VIEW CASCADE`. CREATE OR REPLACE only if any view tweak is needed.
+Em `src/pages/ProposalEditor.tsx`:
+- `useEffect` ao carregar `proposalData`, se status ∈ {`draft`,`open`,`pending_approval`}, disparar `recalculateProposalLedger(currentProposalId)` uma vez por sessão e invalidar `proposalKeys.detail`.
+- Helper `scheduleLedgerRecalc()` com debounce ~400 ms chamado nos handlers de save de: itens, condições de pagamento, desconto, modo dinâmico, validade, save geral.
+- Pular auto-recálculo em `accepted`/`declined`/`expired`/`cancelled`.
 
-## Hard prohibitions (do not touch)
-Pix · ERP · Slack · PDF · `proposals.approved_amount` · `approval_snapshot` · dynamic pricing · accepted proposals · operational clones · proposal recalculation · mass updates · `DROP VIEW CASCADE`.
+### 2. Recálculo no link público
 
-## Tests (`src/test/revenue/ssot.test.ts`)
-Matrix per surface (Dashboard, Forecast, Reports Geral, Processadas, Estágios, Forecast V2, Closer, Performance, Win/Loss, Revenue Integrity) asserting delta ≤ R$ 0,01 vs `commercial_won_revenue_view` for the reference May 2026 window. Preserve the 5 fixed cases (SQUADRA 1.516,32 · OGGI 2.542,35 · DU PRATA 1.894,30 · ORGÂNICA 1.194,00 · NETSEEDS 1.313,40).
+Em `src/pages/ProposalPublicView.tsx` (e/ou edge function que monta o bundle público):
+- Ao carregar o bundle público, se o snapshot estiver vencido (`snapshot.calculated_at < proposal.updated_at`, ou ausente), chamar a RPC `ensure_proposal_pricing_ready` server-side **uma vez** antes de devolver o bundle ao cliente.
+- Implementação preferida: na edge function `get-public-proposal` (ou equivalente que já resolve o token), executar `ensure_proposal_pricing_ready(p_proposal_id)` via service role antes de montar o payload. Mantém o token de acesso público inalterado e garante que header, "Condições de Pagamento" e "Forma e prazo do pagamento" leiam números frescos.
+- Se a proposta estiver `accepted` com `frozen=true`, a RPC é no-op (o ledger já respeita o congelamento). Seguro.
+- Cliente não dispara recálculo — público nunca escreve.
 
-## Files to create
-- `src/services/revenue/dateRange.ts`
-- `src/services/revenue/revenueSsotService.ts`
-- `src/hooks/revenue/useRevenueSsot.ts`
-- `src/components/revenue/RevenueSsotBanner.tsx`
-- `eslint-rules/no-legacy-revenue-source.js` (+ wire into `.eslintrc`)
+### 3. Indicador defensivo no breakdown interno
 
-## Files to edit
-- `src/hooks/useOwnerDashboard.ts`
-- `src/hooks/useForecastData.ts`
-- `src/components/reports/v2/GeneralOverviewV2.tsx`
-- `src/components/reports/v2/ProcessedOpportunitiesV2.tsx`
-- `src/components/reports/v2/StageConversionReportV2.tsx`
-- `src/components/reports/v2/ForecastReportV2.tsx`
-- `src/components/reports/v2/CloserPerformanceV2.tsx`
-- `src/components/reports/v2/TeamPerformanceV2.tsx`
-- `src/hooks/intelligence/useWinLossData.ts` + `WinLossKPIStrip.tsx`
-- `src/hooks/admin/useRevenueIntegrity.ts` + `src/pages/admin/RevenueIntegrity.tsx`
-- `src/test/revenue/ssot.test.ts`
+Em `ProposalPricingBreakdown` (audience `internal`), quando `snapshot.calculated_at < proposal.updated_at`, mostrar chip "Atualizando valores…" e acionar callback do editor para o recálculo debounced. Cobre propostas legadas.
 
-## Acceptance (May 1–21, 2026)
-All 9 surfaces return Total = R$ 114.840,24, Avulsa = R$ 113.246,24, Novo MRR = R$ 1.594,00, Vendas = 40, Ticket = R$ 2.871,01. Revenue Integrity all green. Typecheck and build green.
+### 4. Propostas legadas
+
+Sem backfill em massa. O fluxo dos itens 1 e 2 garante recálculo na primeira abertura (interna ou pública) de cada proposta afetada.
+
+## Detalhes técnicos
+
+- Reutilizar `recalculateProposalLedger` (`src/services/proposals/proposalPricingGuard.ts`).
+- Para o público: a RPC já existente `ensure_proposal_pricing_ready` é idempotente; chamar via service role na edge function que serve o bundle público. **Sem** novos endpoints, sem mudar RLS, sem mudar contrato do token público.
+- Reutilizar `proposalKeys.detail` em `src/lib/query-keys.ts` para invalidar caches no editor.
+- Sem mudanças em PDF, ERP, Pix, Slack, aprovação, clone, SSoT.
+
+## Arquivos impactados
+
+- `src/pages/ProposalEditor.tsx` — `useEffect` de recálculo na carga + `scheduleLedgerRecalc` nos handlers de save existentes.
+- `src/components/proposals/ProposalPricingBreakdown.tsx` — chip "Atualizando valores…" + callback `onStaleSnapshot`.
+- `supabase/functions/<edge-do-bundle-público>/index.ts` — chamar `ensure_proposal_pricing_ready` server-side antes de montar o payload (identificar a função real ao implementar; candidatos: `get-public-proposal` / `public-proposal-bundle`).
+- `src/pages/ProposalPublicView.tsx` — sem mudança de lógica de cálculo; só passa a receber bundle já com snapshot fresco.
+
+## Riscos
+
+- Latência extra no primeiro load público (1 RPC). Aceitável; é cache hit nas próximas.
+- Múltiplos saves rápidos no editor: mitigado pelo debounce.
+- Race save↔recálculo: invalidate só após Promise do save resolver.
+- Propostas congeladas: RPC é no-op, sem efeito colateral.
+
+## Validação
+
+1. Editor PROP-2026-00740 → Pagamento → subtotal **4.579,00**, vigente **5.036,90**.
+2. Link público da mesma proposta → header, "Condições de Pagamento" (Resumo Financeiro) e "Forma e prazo do pagamento" mostram **5.036,90** (alinhado ao PDF).
+3. Editar item → salvar → editor e (após reload) link público atualizam.
+4. Mudar condição comercial → recalcula em ambos.
+5. Build e typecheck verdes.
