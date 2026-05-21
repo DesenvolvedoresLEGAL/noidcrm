@@ -124,18 +124,7 @@ export function GeneralOverviewV2() {
 
   return (
     <TooltipProvider>
-      <div className="space-y-4">
-        <ReportMetaBar meta={meta} reportLabel="Visão Geral" />
-        <ReportWarningsPanel confidence={meta?.confidence} />
 
-        {/* Sprint 2.11 — escopo all-time vs CEO Dashboard mensal */}
-        <div className="flex items-start gap-3 rounded-md border border-primary/30 bg-primary/5 p-3 text-sm">
-          <Info className="h-4 w-4 mt-0.5 text-primary flex-shrink-0" />
-          <div>
-            <strong>Escopo:</strong> esta tela mostra o <strong>histórico completo</strong> de oportunidades ganhas/perdidas da organização.
-            O <em>Dashboard CEO</em> mostra apenas o <strong>mês corrente</strong> — os dois usam a mesma cascata monetária (proposta aceita → valor previsto), portanto valores diferentes refletem janelas de tempo diferentes, não cálculos diferentes.
-          </div>
-        </div>
 
       <div className="space-y-4">
         <ReportMetaBar meta={meta} reportLabel="Visão Geral" />
