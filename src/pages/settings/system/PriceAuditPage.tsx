@@ -218,16 +218,17 @@ function PriceAuditContent() {
       )}
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
         {[
           { label: 'Total auditado', value: kpis.total },
-          { label: 'OK', value: kpis.ok },
-          { label: 'Com divergência', value: kpis.divergent },
-          { label: 'Revisão manual', value: kpis.review },
-          { label: 'Delta total', value: formatLedgerBRL(kpis.totalDelta) },
-          { label: 'Vendedores afetados', value: kpis.affectedSellers },
+          { label: 'In scope', value: kpis.inScope },
+          { label: 'Revisar escopo', value: kpis.scopeReview },
+          { label: 'Fora de escopo', value: kpis.outOfScope, muted: true },
+          { label: 'Divergências reais', value: kpis.realDivergent },
+          { label: 'Δ in scope', value: formatLedgerBRL(kpis.inScopeDelta) },
+          { label: 'Δ fora de escopo', value: formatLedgerBRL(kpis.outOfScopeDelta), muted: true },
         ].map((k) => (
-          <Card key={k.label}>
+          <Card key={k.label} className={k.muted ? 'opacity-70' : ''}>
             <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">{k.label}</CardTitle></CardHeader>
             <CardContent className="text-2xl font-semibold">{k.value}</CardContent>
           </Card>
@@ -253,6 +254,10 @@ function PriceAuditContent() {
             <SelectItem value="ignored">Ignoradas</SelectItem>
           </SelectContent>
         </Select>
+        <div className="flex items-center gap-2 rounded-md border px-3 py-1.5">
+          <Switch checked={showOutOfScope} onCheckedChange={setShowOutOfScope} id="show-oos" />
+          <Label htmlFor="show-oos" className="cursor-pointer text-xs">Mostrar fora de escopo</Label>
+        </div>
       </div>
 
       {/* Table */}
