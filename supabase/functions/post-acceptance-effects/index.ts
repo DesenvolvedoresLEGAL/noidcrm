@@ -274,6 +274,7 @@ async function processJob(supabase: any, job: any) {
         .select("id")
         .in("type", ["deal_won", "team_deal_won", "new_contract", "new_onboarding"])
         .eq("metadata->>proposal_id", proposal_id)
+        .gte("created_at", job.accepted_at)
         .limit(1);
 
       if (existingNotifs && existingNotifs.length > 0) {
