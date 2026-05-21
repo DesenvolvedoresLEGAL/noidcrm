@@ -61,11 +61,14 @@ serve(async (req: Request) => {
     }
 
     // Get proposal details with opportunity and pipeline info - FETCH ALL FIELDS for duplication
+    // IMPORTANT: there are two FKs between proposals and opportunities
+    // (`proposals.opportunity_id` and `opportunities.accepted_proposal_id`).
+    // We MUST disambiguate or PostgREST returns PGRST201 ("could not embed").
     const { data: proposal, error: proposalError } = await supabaseClient
       .from("proposals")
       .select(`
         *,
-        opportunity:opportunities(
+        opportunity:opportunities!proposals_opportunity_id_fkey(
           id,
           title,
           pipeline_id,
