@@ -283,6 +283,7 @@ function PriceAuditContent() {
                   <TableHead className="text-right">Slack</TableHead>
                   <TableHead className="text-right">Delta</TableHead>
                   <TableHead>Fonte</TableHead>
+                  <TableHead>Escopo</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
@@ -290,9 +291,11 @@ function PriceAuditContent() {
               <TableBody>
                 {items.data.map((it) => {
                   const sv = STATUS_VARIANT[it.audit_status] ?? STATUS_VARIANT.ok;
-                  const canApplySafe = it.recommended_action === 'apply_safe' && it.audit_status !== 'fixed' && it.audit_status !== 'ignored';
+                  const scope = SCOPE_LABEL[it.audit_scope_status] ?? SCOPE_LABEL.in_scope;
+                  const inScope = it.audit_scope_status === 'in_scope';
+                  const canApplySafe = inScope && it.recommended_action === 'apply_safe' && it.audit_status !== 'fixed' && it.audit_status !== 'ignored';
                   return (
-                    <TableRow key={it.id}>
+                    <TableRow key={it.id} className={inScope ? '' : 'opacity-70'}>
                       <TableCell className="font-mono text-xs">{it.proposal_number ?? '—'}</TableCell>
                       <TableCell>{it.account_name ?? '—'}</TableCell>
                       <TableCell>{it.seller_name ?? '—'}</TableCell>
@@ -303,6 +306,7 @@ function PriceAuditContent() {
                       <TableCell className="text-right font-mono">{formatLedgerBRL(it.slack_amount)}</TableCell>
                       <TableCell className="text-right font-mono">{formatLedgerBRL(it.max_delta)}</TableCell>
                       <TableCell className="text-xs">{it.canonical_source ? SOURCE_LABEL[it.canonical_source] : '—'}</TableCell>
+                      <TableCell><Badge className={scope.cls} variant="secondary">{scope.label}</Badge></TableCell>
                       <TableCell><Badge className={sv.cls} variant="secondary">{sv.label}</Badge></TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
@@ -314,7 +318,9 @@ function PriceAuditContent() {
                             variant="ghost"
                             disabled={!canApplySafe || applyMut.isPending}
                             onClick={() => handleApply(it.id)}
-                            title={canApplySafe ? 'Aplicar correção segura' : 'Fonte canônica não é confiável para apply automático'}
+                            title={inScope
+                              ? (canApplySafe ? 'Aplicar correção segura' : 'Fonte canônica não é confiável para apply automático')
+                              : 'Fora de escopo — revisar vínculo antes de corrigir'}
                           >
                             <CheckCircle2 className="h-4 w-4" />
                           </Button>
