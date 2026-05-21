@@ -24,6 +24,7 @@ import { formatPhoneDisplay, extractPhone, extractEmail } from '@/lib/contactFor
 import { useAccountScore } from '@/hooks/useAccountScoring';
 import { useAccountTagsBulk } from '@/hooks/useAccountTags';
 import { AccountTagsBadges } from '@/components/accounts/AccountTagsSelector';
+import { useApprovedCommercialAmount } from '@/hooks/useApprovedCommercialAmount';
 
 interface SidebarDataSectionProps {
   opportunity: any;
@@ -44,6 +45,24 @@ export function SidebarDataSection({ opportunity, onUpdateField, isClosed }: Sid
   const accountIdsForTags = opportunity.account?.id ? [opportunity.account.id] : [];
   const { data: tagsByAccount } = useAccountTagsBulk(accountIdsForTags);
   const accountTags = (opportunity.account?.id && tagsByAccount?.[opportunity.account.id]) || [];
+
+  // Fonte única do valor comercial aprovado. Quando a oportunidade tem
+  // accepted_proposal_id, o valor exibido é o approved_amount da proposta
+  // aprovada (não o valor_previsto/total_amount/snapshot).
+  const approvedResolution = useApprovedCommercialAmount({
+    id: opportunity?.id,
+    accepted_proposal_id: opportunity?.accepted_proposal_id ?? null,
+    valor_previsto: opportunity?.valor_previsto ?? null,
+  });
+  const hasApprovedOverride =
+    approvedResolution.isInherited &&
+    approvedResolution.is_final_approved_value &&
+    approvedResolution.approved_commercial_amount > 0;
+  const legacyValuePrevisto = Number(opportunity?.valor_previsto ?? 0);
+  const showLegacyHint =
+    hasApprovedOverride &&
+    legacyValuePrevisto > 0 &&
+    Math.abs(legacyValuePrevisto - approvedResolution.approved_commercial_amount) > 0.01;
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat('pt-BR', {
