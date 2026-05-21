@@ -432,8 +432,22 @@ export async function advanceOpportunity(id: string, targetStageId: string): Pro
     // never block the move on a score recalc failure
   }
 
+  // Handoff latency fix — kick `process-pending-workflows` async right after
+  // the stage change so stage_enter rules (close_won / duplicate / activities)
+  // execute in seconds instead of waiting for the 5-min cron. Fire-and-forget:
+  // the cron remains as fallback if this client-side trigger drops.
+  void (async () => {
+    try {
+      const { processPendingWorkflows } = await import('../crm/workflow-rules');
+      await processPendingWorkflows(id);
+    } catch (err) {
+      console.error('[advanceOpportunity] Background workflow trigger failed:', err);
+    }
+  })();
+
   return data as Opportunity;
 }
+
 
 export async function moveOpportunity(id: string, newStageId: string): Promise<Opportunity> {
   return advanceOpportunity(id, newStageId);
