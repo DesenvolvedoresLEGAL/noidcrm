@@ -33320,30 +33320,6 @@ export type Database = {
           status: string | null
           updated_at: string | null
         }
-        Insert: {
-          accepted_at?: string | null
-          created_at?: string | null
-          discount_amount?: never
-          gross_amount?: never
-          id?: string | null
-          net_amount?: never
-          opportunity_id?: string | null
-          organization_id?: string | null
-          status?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          accepted_at?: string | null
-          created_at?: string | null
-          discount_amount?: never
-          gross_amount?: never
-          id?: string | null
-          net_amount?: never
-          opportunity_id?: string | null
-          organization_id?: string | null
-          status?: string | null
-          updated_at?: string | null
-        }
         Relationships: [
           {
             foreignKeyName: "proposals_opportunity_id_fkey"
@@ -35840,6 +35816,14 @@ export type Database = {
       reset_monthly_volts: { Args: never; Returns: undefined }
       resolve_approved_commercial_amount: {
         Args: { p_opportunity_id: string }
+        Returns: {
+          amount: number
+          is_final: boolean
+          source: string
+        }[]
+      }
+      resolve_approved_commercial_amount_by_proposal: {
+        Args: { p_proposal_id: string }
         Returns: {
           amount: number
           is_final: boolean
