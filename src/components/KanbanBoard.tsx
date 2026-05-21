@@ -5,7 +5,8 @@ import {
   DragOverEvent,
   DragOverlay,
   DragStartEvent,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   useSensor,
   useSensors,
   pointerWithin,
@@ -59,12 +60,15 @@ export function KanbanBoard({
     return rectIntersection(args);
   };
 
+  // Mouse (desktop) ativa após mover 8px; Touch (mobile) ativa após segurar 250ms
+  // com tolerância de 8px para não conflitar com scroll vertical.
   const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
-    })
+    useSensor(MouseSensor, {
+      activationConstraint: { distance: 8 },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 250, tolerance: 8 },
+    }),
   );
 
   // Helper: encontrar qual stage contém um item
