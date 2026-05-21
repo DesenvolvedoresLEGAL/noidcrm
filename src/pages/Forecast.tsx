@@ -24,6 +24,7 @@ import { useForecastData, useDefaultFilters, ForecastFilters as FilterType } fro
 import { BarChart3, Users, Search, Sparkles, AlertTriangle, ShieldCheck, Target, TrendingUp, Shield } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { cn } from '@/lib/utils';
+import { RevenueSsotBanner } from '@/components/revenue/RevenueSsotBanner';
 
 export default function Forecast() {
   const defaultFilters = useDefaultFilters();
