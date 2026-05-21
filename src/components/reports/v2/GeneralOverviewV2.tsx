@@ -82,6 +82,16 @@ export function GeneralOverviewV2() {
   // Sprint 2.10: fonte única de receita ganha (CEO ↔ Reports)
   const { data: unified } = useUnifiedWonRevenueV2(organization?.id);
 
+  // P0 Revenue SSoT — override de receita ganha vem de commercial_won_revenue_view
+  const { data: ssotSummary } = useClosedRevenueSummary({
+    surface: 'reports-geral-v2',
+    organizationId: organization?.id,
+    start: effectiveDates.startDate,
+    end: effectiveDates.endDate,
+    pipelineIds: filters.pipelines?.length ? filters.pipelines : undefined,
+    sellerIds: filters.users && filters.users !== 'all' ? [filters.users] : undefined,
+  });
+
   if (isLoading || teamVisibility.loading) return <ReportLoadingState cardCount={9} />;
   if (error) return <ReportErrorState message={(error as Error).message} onRetry={() => refetch()} />;
 
@@ -95,6 +105,12 @@ export function GeneralOverviewV2() {
       />
     );
   }
+
+  // SSoT override (monetário ganho + count + ticket médio ganho)
+  const wonCountSsot = ssotSummary?.count ?? view.wonCount;
+  const wonRevenueSsot = ssotSummary?.total ?? view.wonRevenue;
+  const avgWonTicketSsot = ssotSummary?.avgTicket ?? view.avgWonTicket;
+
 
   // Cobertura por proposta para warning executivo
   const totalWonForCoverage = (unified?.won_count_via_accepted_proposal ?? 0)
