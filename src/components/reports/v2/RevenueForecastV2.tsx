@@ -76,6 +76,15 @@ export function RevenueForecastV2() {
     request,
   });
 
+  const { data: ssotSummary } = useClosedRevenueSummary({
+    surface: 'reports-forecast-v2',
+    organizationId: organization?.id,
+    start: effectiveDates.startDate,
+    end: effectiveDates.endDate,
+    pipelineIds: filters.pipelines?.length ? filters.pipelines : undefined,
+    sellerIds: filters.users && filters.users !== 'all' ? [filters.users] : undefined,
+  });
+
   if (isLoading || teamVisibility.loading) return <ReportLoadingState cardCount={4} />;
   if (error) return <ReportErrorState message={(error as Error).message} onRetry={() => refetch()} />;
 
@@ -89,6 +98,8 @@ export function RevenueForecastV2() {
       />
     );
   }
+
+  const closedRevenueSsot = ssotSummary?.total ?? view.closedRevenue;
 
   return (
     <div className="space-y-4">
@@ -105,6 +116,7 @@ export function RevenueForecastV2() {
           Ver cálculo
         </Button>
       </div>
+      <RevenueSsotBanner surface="Forecast → Receita fechada" />
       <ReportWarningsPanel confidence={meta?.confidence} />
 
       <ForecastAuditDrawer
@@ -124,9 +136,10 @@ export function RevenueForecastV2() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(view.closedRevenue)}</div>
+            <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(closedRevenueSsot)}</div>
           </CardContent>
         </Card>
+
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
