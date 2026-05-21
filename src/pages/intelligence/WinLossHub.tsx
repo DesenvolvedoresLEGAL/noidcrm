@@ -167,6 +167,15 @@ export default function WinLossHub() {
           isLoading={isLoading}
           terminology={terminology}
           pipelineType={pipelineType}
+          ssotOverride={
+            ssotWonSummary
+              ? {
+                  wonCount: ssotWonSummary.count,
+                  wonValue: ssotWonSummary.total,
+                  avgTicketWon: ssotWonSummary.avgTicket,
+                }
+              : undefined
+          }
         />
 
         {/* AI Insights Banner */}
