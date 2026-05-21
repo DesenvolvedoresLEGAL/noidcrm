@@ -67,7 +67,10 @@ export function StageConversionReportV2() {
   return (
     <div className="space-y-4">
       <ReportMetaBar meta={meta} reportLabel="Conversão por Estágio" />
-      <RevenueSsotBanner variant="legacy" surface="Relatórios → Estágios (totais por etapa não migrados)" />
+      <RevenueSsotBanner
+        variant="migrated"
+        surface="Relatórios → Estágios — etapa Ganhamos via commercial_won_revenue_view (demais etapas seguem report v2)"
+      />
 
       <ReportWarningsPanel confidence={meta?.confidence} />
 
