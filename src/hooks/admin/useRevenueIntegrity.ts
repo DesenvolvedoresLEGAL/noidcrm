@@ -32,6 +32,16 @@ export interface SurfaceComparison {
   source: string;
 }
 
+export interface FulfillmentPersistenceCheck {
+  opportunity_id: string;
+  account_name: string | null;
+  commercial_status: string | null;
+  fulfillment_status: string | null;
+  financial_settlement_status: string | null;
+  present_in_ssot: boolean;
+  mismatch: boolean;
+}
+
 export interface RevenueIntegrityResult {
   period: { start: string; end: string };
   ssotTotals: {
@@ -44,8 +54,10 @@ export interface RevenueIntegrityResult {
   surfaces: SurfaceComparison[];
   rows: SSoTRow[];
   reviewRows: SSoTRow[];
+  fulfillmentPersistence: FulfillmentPersistenceCheck[];
   anyMismatch: boolean;
 }
+
 
 const EPSILON = 0.01;
 const cmp = (shown: number | null | undefined, ssot: number, surface: string, source: string): SurfaceComparison => {
@@ -129,7 +141,30 @@ export function useRevenueIntegrity(organizationId?: string | null, start?: stri
         cmp(ssotTotals.commercial_amount, ssotTotals.commercial_amount, 'Comissão — Base', 'commission_eligibility_view'),
       ];
 
-      const anyMismatch = surfaces.some((s) => s.mismatch);
+      // Diagnóstico: venda comercial deve persistir na SSoT mesmo se operacional foi removido/cancelado.
+      // Também garante que não há duplicação (mesma opportunity_id aparece exatamente uma vez).
+      const idCounts = new Map<string, number>();
+      for (const r of rows) idCounts.set(r.opportunity_id, (idCounts.get(r.opportunity_id) ?? 0) + 1);
+
+      const fulfillmentPersistence: FulfillmentPersistenceCheck[] = rows
+        .map((r: any) => {
+          const fs = r.fulfillment_status as string | null;
+          const isRemovedOrCancelled = fs === 'removed' || fs === 'cancelled';
+          const presentInSsot = true; // já veio do SSoT
+          const duplicated = (idCounts.get(r.opportunity_id) ?? 0) > 1;
+          return {
+            opportunity_id: r.opportunity_id,
+            account_name: r.nome_fantasia ?? r.account_name ?? null,
+            commercial_status: r.commercial_status ?? null,
+            fulfillment_status: fs,
+            financial_settlement_status: r.financial_settlement_status ?? null,
+            present_in_ssot: presentInSsot,
+            mismatch: duplicated || (isRemovedOrCancelled && !presentInSsot),
+          };
+        })
+        .filter((c) => c.mismatch || c.fulfillment_status === 'removed' || c.fulfillment_status === 'cancelled');
+
+      const anyMismatch = surfaces.some((s) => s.mismatch) || fulfillmentPersistence.some((c) => c.mismatch);
 
       return {
         period: { start, end },
@@ -137,8 +172,10 @@ export function useRevenueIntegrity(organizationId?: string | null, start?: stri
         surfaces,
         rows,
         reviewRows: rows.filter((r) => r.review_required),
+        fulfillmentPersistence,
         anyMismatch,
       };
+
     },
   });
 }

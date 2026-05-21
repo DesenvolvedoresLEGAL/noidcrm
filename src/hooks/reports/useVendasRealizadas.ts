@@ -7,6 +7,29 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 
+export type FulfillmentStatus =
+  | 'active'
+  | 'completed'
+  | 'cancelled'
+  | 'removed'
+  | 'not_started'
+  | 'not_applicable';
+
+export type FinancialSettlementStatus =
+  | 'settled'
+  | 'pending_payment'
+  | 'pending_settlement_decision'
+  | 'pending_cancellation_fee'
+  | 'pending_credit_decision'
+  | 'manual_review';
+
+export type CommercialStatus = 'won' | 'lost' | 'open';
+
+export type CommissionStatusValue =
+  | 'eligible'
+  | 'blocked_review_required'
+  | 'blocked_settlement_pending';
+
 export interface VendaRealizadaRow {
   organization_id: string;
   opportunity_id: string;
@@ -16,7 +39,7 @@ export interface VendaRealizadaRow {
   account_id?: string | null;
   account_name: string | null;
   nome_fantasia: string | null;
-  seller_user_id?: string | null;
+  seller_id?: string | null;
   seller_name: string | null;
   pipeline_id?: string | null;
   pipeline_name?: string | null;
@@ -28,7 +51,12 @@ export interface VendaRealizadaRow {
   revenue_confidence: 'trusted' | 'warning' | 'manual_review';
   review_required: boolean;
   warnings: string[];
+  commercial_status?: CommercialStatus | null;
+  fulfillment_status?: FulfillmentStatus | null;
+  financial_settlement_status?: FinancialSettlementStatus | null;
+  commission_status?: CommissionStatusValue | null;
 }
+
 
 export interface VendasRealizadasFilters {
   start: string;
@@ -36,7 +64,7 @@ export interface VendasRealizadasFilters {
   sellerUserId?: string | null;
   pipelineId?: string | null;
   revenueType?: 'all' | 'one_time' | 'mrr' | 'mixed';
-  commissionStatus?: 'all' | 'eligible' | 'blocked_review_required';
+  commissionStatus?: 'all' | CommissionStatusValue;
 }
 
 export interface VendasRealizadasResult {
@@ -48,7 +76,8 @@ export interface VendasRealizadasResult {
     mrr_amount: number;
     avg_ticket: number;
     eligible_commission: number;
-    blocked_commission: number;
+    review_commission: number;
+    settlement_pending_commission: number;
   };
 }
 
@@ -71,13 +100,26 @@ export function useVendasRealizadas(filters: VendasRealizadasFilters) {
         .lte('won_at', filters.end)
         .order('won_at', { ascending: false });
 
-      if (filters.sellerUserId) q = q.eq('seller_user_id', filters.sellerUserId);
+      if (filters.sellerUserId) q = q.eq('seller_id', filters.sellerUserId);
       if (filters.pipelineId) q = q.eq('pipeline_id', filters.pipelineId);
 
       const { data, error } = await q;
       if (error) throw error;
 
       let rows = (data ?? []) as VendaRealizadaRow[];
+
+      // Sempre busca commission_status para enriquecer linhas (badges) e filtrar quando solicitado.
+      const { data: elig } = await (supabase as any)
+        .from('commission_eligibility_view')
+        .select('opportunity_id, commission_status')
+        .eq('organization_id', organizationId);
+      const commissionMap = new Map<string, CommissionStatusValue>(
+        (elig ?? []).map((e: any) => [e.opportunity_id, e.commission_status as CommissionStatusValue]),
+      );
+      rows = rows.map((r) => ({
+        ...r,
+        commission_status: commissionMap.get(r.opportunity_id) ?? r.commission_status ?? null,
+      }));
 
       if (filters.revenueType && filters.revenueType !== 'all') {
         rows = rows.filter((r) => {
@@ -90,14 +132,8 @@ export function useVendasRealizadas(filters: VendasRealizadasFilters) {
         });
       }
 
-      // Commission status (join client-side via commission_eligibility_view se necessário).
       if (filters.commissionStatus && filters.commissionStatus !== 'all') {
-        const { data: elig } = await (supabase as any)
-          .from('commission_eligibility_view')
-          .select('opportunity_id, commission_status')
-          .eq('organization_id', organizationId);
-        const map = new Map<string, string>((elig ?? []).map((e: any) => [e.opportunity_id, e.commission_status]));
-        rows = rows.filter((r) => map.get(r.opportunity_id) === filters.commissionStatus);
+        rows = rows.filter((r) => r.commission_status === filters.commissionStatus);
       }
 
       const totals = rows.reduce(
@@ -106,8 +142,11 @@ export function useVendasRealizadas(filters: VendasRealizadasFilters) {
           acc.commercial_amount += Number(r.commercial_amount) || 0;
           acc.one_shot_amount += Number(r.one_shot_amount) || 0;
           acc.mrr_amount += Number(r.mrr_amount) || 0;
-          if (r.review_required) acc.blocked_commission += Number(r.commercial_amount) || 0;
-          else acc.eligible_commission += Number(r.commercial_amount) || 0;
+          const cs = r.commission_status;
+          const amt = Number(r.commercial_amount) || 0;
+          if (cs === 'blocked_review_required') acc.review_commission += amt;
+          else if (cs === 'blocked_settlement_pending') acc.settlement_pending_commission += amt;
+          else acc.eligible_commission += amt;
           return acc;
         },
         {
@@ -117,7 +156,8 @@ export function useVendasRealizadas(filters: VendasRealizadasFilters) {
           mrr_amount: 0,
           avg_ticket: 0,
           eligible_commission: 0,
-          blocked_commission: 0,
+          review_commission: 0,
+          settlement_pending_commission: 0,
         },
       );
       totals.avg_ticket = totals.won_count > 0 ? totals.commercial_amount / totals.won_count : 0;
@@ -126,3 +166,4 @@ export function useVendasRealizadas(filters: VendasRealizadasFilters) {
     },
   });
 }
+

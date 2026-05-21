@@ -34,7 +34,7 @@ export function VendasRealizadasTable() {
   const [sellerUserId, setSellerUserId] = useState<string | undefined>(undefined);
   const [pipelineId, setPipelineId] = useState<string | undefined>(undefined);
   const [revenueType, setRevenueType] = useState<'all' | 'one_time' | 'mrr' | 'mixed'>('all');
-  const [commissionStatus, setCommissionStatus] = useState<'all' | 'eligible' | 'blocked_review_required'>('all');
+  const [commissionStatus, setCommissionStatus] = useState<'all' | 'eligible' | 'blocked_review_required' | 'blocked_settlement_pending'>('all');
 
   const filters: VendasRealizadasFilters = useMemo(
     () => ({
@@ -80,15 +80,17 @@ export function VendasRealizadasTable() {
       </Alert>
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
         <KPI label="Receita Total" value={fmt(totals?.commercial_amount ?? 0)} />
         <KPI label="Receita Avulsa" value={fmt(totals?.one_shot_amount ?? 0)} />
         <KPI label="Novo MRR" value={fmt(totals?.mrr_amount ?? 0)} />
         <KPI label="Vendas" value={String(totals?.won_count ?? 0)} />
         <KPI label="Ticket Médio" value={fmt(totals?.avg_ticket ?? 0)} />
         <KPI label="Comissão Elegível" value={fmt(totals?.eligible_commission ?? 0)} variant="success" />
-        <KPI label="Comissão Bloqueada" value={fmt(totals?.blocked_commission ?? 0)} variant="warning" />
+        <KPI label="Comissão em Revisão" value={fmt(totals?.review_commission ?? 0)} variant="warning" />
+        <KPI label="Aguardando Settlement" value={fmt(totals?.settlement_pending_commission ?? 0)} variant="warning" />
       </div>
+
 
       {/* Filtros */}
       <Card>
@@ -125,7 +127,9 @@ export function VendasRealizadasTable() {
             <SelectContent>
               <SelectItem value="all">Todas comissões</SelectItem>
               <SelectItem value="eligible">Elegíveis</SelectItem>
-              <SelectItem value="blocked_review_required">Bloqueadas (review)</SelectItem>
+              <SelectItem value="blocked_review_required">Em revisão</SelectItem>
+              <SelectItem value="blocked_settlement_pending">Aguardando settlement</SelectItem>
+
             </SelectContent>
           </Select>
         </CardContent>
@@ -147,14 +151,17 @@ export function VendasRealizadasTable() {
                 <TableHead className="text-right">Avulsa</TableHead>
                 <TableHead className="text-right">MRR</TableHead>
                 <TableHead className="text-right">Total Comercial</TableHead>
-                <TableHead>Fonte</TableHead>
+                <TableHead>Comercial</TableHead>
+                <TableHead>Operacional</TableHead>
+                <TableHead>Settlement</TableHead>
+                <TableHead>Comissão</TableHead>
                 <TableHead>Confiança</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {rows.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={12} className="text-center text-muted-foreground py-8">
                     Nenhuma venda realizada no período.
                   </TableCell>
                 </TableRow>
@@ -172,12 +179,16 @@ export function VendasRealizadasTable() {
                   <TableCell className="text-right tabular-nums">{fmt(Number(r.one_shot_amount) || 0)}</TableCell>
                   <TableCell className="text-right tabular-nums">{fmt(Number(r.mrr_amount) || 0)}</TableCell>
                   <TableCell className="text-right tabular-nums font-semibold">{fmt(Number(r.commercial_amount) || 0)}</TableCell>
-                  <TableCell><Badge variant="outline" className="text-[10px]">{r.commercial_amount_source}</Badge></TableCell>
+                  <TableCell><CommercialStatusBadge status={r.commercial_status} /></TableCell>
+                  <TableCell><FulfillmentBadge status={r.fulfillment_status} /></TableCell>
+                  <TableCell><SettlementBadge status={r.financial_settlement_status} /></TableCell>
+                  <TableCell><CommissionBadge status={r.commission_status} /></TableCell>
                   <TableCell>
                     <ConfidenceBadge confidence={r.revenue_confidence} reviewRequired={r.review_required} />
                   </TableCell>
                 </TableRow>
               ))}
+
             </TableBody>
           </Table>
         </CardContent>
@@ -209,3 +220,52 @@ function ConfidenceBadge({ confidence, reviewRequired }: { confidence: string; r
   }
   return <Badge variant="outline" className="gap-1"><ShieldCheck className="h-3 w-3" />Trusted</Badge>;
 }
+
+function CommercialStatusBadge({ status }: { status?: string | null }) {
+  if (status === 'won') return <Badge variant="default" className="text-[10px]">Ganha</Badge>;
+  if (status === 'lost') return <Badge variant="destructive" className="text-[10px]">Perdida</Badge>;
+  return <Badge variant="outline" className="text-[10px]">{status ?? '—'}</Badge>;
+}
+
+const FULFILLMENT_LABEL: Record<string, string> = {
+  active: 'Ativo',
+  completed: 'Concluído',
+  cancelled: 'Cancelado',
+  removed: 'Removido',
+  not_started: 'Não iniciado',
+  not_applicable: 'N/A',
+};
+function FulfillmentBadge({ status }: { status?: string | null }) {
+  if (!status) return <span className="text-xs text-muted-foreground">—</span>;
+  const variant: any =
+    status === 'completed' || status === 'active' ? 'default'
+    : status === 'removed' || status === 'cancelled' ? 'destructive'
+    : 'secondary';
+  return <Badge variant={variant} className="text-[10px]">{FULFILLMENT_LABEL[status] ?? status}</Badge>;
+}
+
+const SETTLEMENT_LABEL: Record<string, string> = {
+  settled: 'Liquidado',
+  pending_payment: 'Aguard. pagamento',
+  pending_settlement_decision: 'Aguard. decisão',
+  pending_cancellation_fee: 'Aguard. multa',
+  pending_credit_decision: 'Aguard. crédito',
+  manual_review: 'Revisão manual',
+};
+function SettlementBadge({ status }: { status?: string | null }) {
+  if (!status) return <span className="text-xs text-muted-foreground">—</span>;
+  const variant: any = status === 'settled' ? 'default' : status === 'manual_review' ? 'destructive' : 'secondary';
+  return <Badge variant={variant} className="text-[10px]">{SETTLEMENT_LABEL[status] ?? status}</Badge>;
+}
+
+const COMMISSION_LABEL: Record<string, string> = {
+  eligible: 'Elegível',
+  blocked_review_required: 'Em revisão',
+  blocked_settlement_pending: 'Aguard. settlement',
+};
+function CommissionBadge({ status }: { status?: string | null }) {
+  if (!status) return <span className="text-xs text-muted-foreground">—</span>;
+  const variant: any = status === 'eligible' ? 'default' : status === 'blocked_review_required' ? 'destructive' : 'secondary';
+  return <Badge variant={variant} className="text-[10px]">{COMMISSION_LABEL[status] ?? status}</Badge>;
+}
+
