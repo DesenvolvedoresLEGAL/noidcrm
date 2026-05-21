@@ -4,6 +4,7 @@ import { startOfMonth, endOfMonth, differenceInDays, format, parseISO } from 'da
 import { parseDateOnly } from '@/lib/dateUtils';
 import { calculateForecastScenarios } from '@/services/crm/forecast';
 import { forecastKeys, salesGoalKeys } from '@/lib/query-keys';
+import { revenueSsotService } from '@/services/revenue/revenueSsotService';
 
 export interface ForecastFilters {
   periodType: 'monthly' | 'quarterly' | 'yearly';
