@@ -144,9 +144,46 @@ export function OpportunityProposalsTab({
   const [emailProposalId, setEmailProposalId] = useState<string | null>(null);
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
 
+  // Inherited-proposal mode: if this opportunity is an operational/renewal handoff
+  // linked to an accepted commercial proposal, show the original (read-only) instead
+  // of letting users create/clone new proposals here.
+  const { data: oppMeta } = useQuery({
+    queryKey: ['opportunity-handoff-meta', opportunityId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('opportunities')
+        .select('id, source_opportunity_id, accepted_proposal_id, pipeline:pipelines(pipeline_type)')
+        .eq('id', opportunityId)
+        .maybeSingle();
+      if (error) throw error;
+      return data as any;
+    },
+  });
+  const inheritedPipelineTypes = new Set(['onboarding', 'renewal']);
+  const isInheritedMode = !!(
+    oppMeta?.accepted_proposal_id &&
+    oppMeta?.source_opportunity_id &&
+    inheritedPipelineTypes.has(oppMeta?.pipeline?.pipeline_type)
+  );
+
+  const { data: inheritedProposal } = useQuery({
+    queryKey: ['inherited-accepted-proposal', oppMeta?.accepted_proposal_id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('proposals')
+        .select('id, proposal_number, title, total_amount, accepted_at, status, opportunity_id, currency, expires_at')
+        .eq('id', oppMeta!.accepted_proposal_id)
+        .maybeSingle();
+      if (error) throw error;
+      return data as any;
+    },
+    enabled: isInheritedMode,
+  });
+
   const { data, isLoading } = useQuery({
     queryKey: [...proposalKeys.lists(), opportunityId],
     queryFn: () => listProposals({ opportunityId }),
+    enabled: !isInheritedMode,
   });
   const proposals = data?.data || [];
 
