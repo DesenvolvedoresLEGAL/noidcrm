@@ -17,6 +17,7 @@ import { ReportLoadingState } from './shared/ReportLoadingState';
 import { ReportErrorState } from './shared/ReportErrorState';
 import { ReportEmptyState } from './shared/ReportEmptyState';
 import { RevenueSsotBanner } from '@/components/revenue/RevenueSsotBanner';
+import { useRevenueByPipeline } from '@/hooks/revenue/useRevenueSsot';
 
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
