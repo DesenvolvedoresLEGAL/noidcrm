@@ -11,9 +11,11 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useVendasRealizadas, type VendasRealizadasFilters } from '@/hooks/reports/useVendasRealizadas';
 import { useReportFiltersContext } from '@/contexts/ReportFiltersContext';
-import { useActiveUsers } from '@/hooks/useActiveUsers';
+import { useActiveUsers } from '@/hooks/users/useActiveUsers';
 import { useOrganizationPipelines } from '@/hooks/useOrganizationPipelines';
-import { formatCurrency } from '@/lib/format';
+
+const formatCurrency = (n: number) =>
+  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(n) || 0);
 import { AlertTriangle, ShieldCheck, ShieldAlert } from 'lucide-react';
 
 function fmt(n: number) {
