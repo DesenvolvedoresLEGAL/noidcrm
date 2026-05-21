@@ -112,14 +112,33 @@ export function SidebarDataSection({ opportunity, onUpdateField, isClosed }: Sid
                 Valores
               </div>
               <div className="space-y-2">
-                <EditableField
-                  label="Valor Total"
-                  value={opportunity.valor_previsto || 0}
-                  onSave={(val) => onUpdateField('valor_previsto', parseFloat(val))}
-                  type="currency"
-                  icon={<DollarSign className="h-3 w-3" />}
-                  displayFormatter={formatCurrency}
-                />
+                {hasApprovedOverride ? (
+                  <>
+                    <FieldRow
+                      label="Valor Total"
+                      value={
+                        <span className="font-semibold text-success" title="Valor aprovado pela proposta vencedora">
+                          {formatCurrency(approvedResolution.approved_commercial_amount)}
+                        </span>
+                      }
+                      icon={<DollarSign className="h-3 w-3" />}
+                    />
+                    {showLegacyHint && (
+                      <p className="text-[10px] text-muted-foreground pl-5 -mt-1">
+                        Valor original/legado: {formatCurrency(legacyValuePrevisto)}
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <EditableField
+                    label="Valor Total"
+                    value={opportunity.valor_previsto || 0}
+                    onSave={(val) => onUpdateField('valor_previsto', parseFloat(val))}
+                    type="currency"
+                    icon={<DollarSign className="h-3 w-3" />}
+                    displayFormatter={formatCurrency}
+                  />
+                )}
 
                 <EditableField
                   label="Previsão"
