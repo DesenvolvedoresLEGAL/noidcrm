@@ -76,7 +76,7 @@ export function ProposalPreview({
       if (proposalId) {
         const { data: proposal } = await supabase
           .from('proposals')
-          .select('*, opportunity:opportunities(*)')
+          .select('*, opportunity:opportunities!proposals_opportunity_id_fkey(*)')
           .eq('id', proposalId)
           .single();
 
