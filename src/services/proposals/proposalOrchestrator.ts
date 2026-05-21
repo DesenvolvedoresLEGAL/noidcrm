@@ -34,5 +34,16 @@ export async function orchestrateProposalFinancials(
     console.error('[orchestrateProposalFinancials] error:', error);
     return { ok: false, error: error.message };
   }
+
+  // PRICE CORE 2.0 — also refresh the pricing ledger snapshot so the
+  // "Composição do valor" breakdown (editor + public link + PDF inputs)
+  // reflects current items / dynamic tier / payment terms. The RPC is
+  // idempotent and is a no-op on frozen accepted proposals.
+  try {
+    await c.rpc('ensure_proposal_pricing_ready', { p_proposal_id: proposalId });
+  } catch (e) {
+    console.warn('[orchestrateProposalFinancials] ledger refresh failed:', e);
+  }
+
   return data as OrchestrationResult;
 }
