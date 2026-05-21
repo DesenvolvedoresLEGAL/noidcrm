@@ -41,6 +41,21 @@ export function StageConversionReportV2() {
     organizationId: organization?.id, request,
   });
 
+  // P0 Revenue SSoT — etapa Ganhamos lê o valor financeiro de commercial_won_revenue_view.
+  const { data: ssotByPipeline } = useRevenueByPipeline({
+    surface: 'reports-stages',
+    organizationId: organization?.id,
+    start: effectiveDates?.from?.toISOString(),
+    end: effectiveDates?.to?.toISOString(),
+  });
+  const wonValueByPipeline = useMemo(() => {
+    const m = new Map<string, number>();
+    (ssotByPipeline ?? []).forEach((g) => m.set(g.key, g.total));
+    return m;
+  }, [ssotByPipeline]);
+  const isWonStage = (name?: string | null) =>
+    !!name && /ganhamos|ganho|won/i.test(name);
+
   if (isLoading || teamVisibility.loading) return <ReportLoadingState cardCount={2} />;
   if (error) return <ReportErrorState message={(error as Error).message} onRetry={() => refetch()} />;
 
