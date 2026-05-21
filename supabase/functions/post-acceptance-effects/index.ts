@@ -412,9 +412,27 @@ async function processJob(supabase: any, job: any) {
       console.log(`Notifications already processed for job ${jobId}`);
     }
 
-    // ===== STAGE 2: SLACK (per-stage idempotency with retry) =====
+    // ===== STAGE 2: SLACK (atomic claim to prevent duplicate sends across concurrent workers) =====
     let slackSent = false;
     if (!job.slack_processed_at) {
+      // Atomic claim: only one worker can set slack_processed_at from NULL → now().
+      // If 0 rows returned, another concurrent invocation already claimed/sent this stage.
+      const claimTs = new Date().toISOString();
+      const { data: claimedRows, error: claimErr } = await supabase
+        .from("acceptance_effect_jobs")
+        .update({ slack_processed_at: claimTs })
+        .eq("id", jobId)
+        .is("slack_processed_at", null)
+        .select("id");
+
+      if (claimErr) {
+        console.error("[slack] failed to claim slack stage:", claimErr);
+      }
+
+      if (!claimedRows || claimedRows.length === 0) {
+        console.log(`[slack] stage already claimed/processed for job ${jobId} — skipping to avoid duplicate Slack message`);
+        slackSent = true;
+      } else {
       try {
         const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
         const SLACK_API_KEY = Deno.env.get("SLACK_API_KEY");
