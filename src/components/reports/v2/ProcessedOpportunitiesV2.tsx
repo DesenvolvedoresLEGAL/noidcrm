@@ -11,11 +11,14 @@ import { useReportProcessedV2 } from '@/hooks/useReportProcessedV2';
 import { buildReportV2RequestFromFilters } from '@/lib/reports/buildReportV2Request';
 import { mapProcessedV2 } from '@/lib/reports/mappers/mapProcessedV2';
 import { formatCurrency, formatNumber, formatPct } from '@/lib/reports/formatReportNumbers';
+import { useClosedRevenueSummary } from '@/hooks/revenue/useRevenueSsot';
+import { RevenueSsotBanner } from '@/components/revenue/RevenueSsotBanner';
 import { ReportMetaBar } from './shared/ReportMetaBar';
 import { ReportWarningsPanel } from './shared/ReportWarningsPanel';
 import { ReportLoadingState } from './shared/ReportLoadingState';
 import { ReportErrorState } from './shared/ReportErrorState';
 import { ReportEmptyState } from './shared/ReportEmptyState';
+
 
 function KpiCard({ icon: Icon, label, value, tone = 'default' }: {
   icon: React.ComponentType<{ className?: string }>;
