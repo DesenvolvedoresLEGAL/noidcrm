@@ -230,7 +230,8 @@ async function processJob(supabase: any, job: any) {
 
     console.log(`[post-acceptance-effects] Resolved: accountName="${accountName}", acceptor="${proposal.acceptor_name || 'N/A'}"`);
 
-    const acceptorName = proposal.acceptor_name || "Cliente";
+    // Prefer explicit acceptor name; fall back to account/client name (never the generic "Cliente").
+    const acceptorName = proposal.acceptor_name || accountName || proposal.client_name || "Cliente";
 
     // Get seller name
     let sellerName = "Equipe";
