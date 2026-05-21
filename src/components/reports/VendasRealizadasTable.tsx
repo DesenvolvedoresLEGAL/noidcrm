@@ -34,7 +34,7 @@ export function VendasRealizadasTable() {
   const [sellerUserId, setSellerUserId] = useState<string | undefined>(undefined);
   const [pipelineId, setPipelineId] = useState<string | undefined>(undefined);
   const [revenueType, setRevenueType] = useState<'all' | 'one_time' | 'mrr' | 'mixed'>('all');
-  const [commissionStatus, setCommissionStatus] = useState<'all' | 'eligible' | 'blocked_review_required'>('all');
+  const [commissionStatus, setCommissionStatus] = useState<'all' | 'eligible' | 'blocked_review_required' | 'blocked_settlement_pending'>('all');
 
   const filters: VendasRealizadasFilters = useMemo(
     () => ({
