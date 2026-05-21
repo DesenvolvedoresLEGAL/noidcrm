@@ -193,6 +193,52 @@ export default function RevenueIntegrity() {
 
           <Card>
             <CardHeader>
+              <CardTitle>Diagnóstico por venda — v_opportunity_amounts_v2 vs SSoT ({data.perSaleDiffs.length})</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {data.perSaleDiffs.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Nenhuma divergência por venda no período.</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Proposta</TableHead>
+                      <TableHead>Cliente</TableHead>
+                      <TableHead>Vendedor</TableHead>
+                      <TableHead>Fechado em</TableHead>
+                      <TableHead className="text-right">SSoT</TableHead>
+                      <TableHead className="text-right">Superfície</TableHead>
+                      <TableHead className="text-right">Δ</TableHead>
+                      <TableHead>Motivo</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {data.perSaleDiffs.map((d) => (
+                      <TableRow key={d.opportunity_id}>
+                        <TableCell className="font-mono text-xs">{d.proposal_number ?? '—'}</TableCell>
+                        <TableCell>{d.cliente ?? '—'}</TableCell>
+                        <TableCell>{d.vendedor ?? '—'}</TableCell>
+                        <TableCell className="text-xs">{d.won_at?.slice(0, 10) ?? '—'}</TableCell>
+                        <TableCell className="text-right">{BRL(d.commercial_amount)}</TableCell>
+                        <TableCell className="text-right">{d.surface_amount === null ? '—' : BRL(d.surface_amount)}</TableCell>
+                        <TableCell className="text-right">{BRL(d.amount_diff)}</TableCell>
+                        <TableCell>
+                          {d.only_in_surface ? <Badge variant="destructive">only_in_surface</Badge>
+                            : d.only_in_ssot ? <Badge variant="outline">only_in_ssot</Badge>
+                            : <Badge variant="secondary">amount_diff</Badge>}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+
+
+
+          <Card>
+            <CardHeader>
               <CardTitle>SSoT — todas as vendas do período ({data.rows.length})</CardTitle>
             </CardHeader>
             <CardContent>
