@@ -361,6 +361,33 @@ function PriceAuditContent() {
               </div>
 
               <div>
+                <h3 className="mb-2 text-sm font-semibold">Vínculo & Escopo</h3>
+                <div className="space-y-1 rounded-md border bg-card p-3 text-xs">
+                  <div className="flex justify-between"><span className="text-muted-foreground">Escopo</span>
+                    <Badge className={(SCOPE_LABEL[item.data.audit_scope_status] ?? SCOPE_LABEL.in_scope).cls} variant="secondary">
+                      {(SCOPE_LABEL[item.data.audit_scope_status] ?? SCOPE_LABEL.in_scope).label}
+                    </Badge></div>
+                  {item.data.proposal_selection_reason && (
+                    <div className="text-muted-foreground">{item.data.proposal_selection_reason}</div>
+                  )}
+                  <div className="flex justify-between"><span className="text-muted-foreground">Vencedora?</span><span>{item.data.is_winning_proposal ? 'sim' : 'não'}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Clone operacional?</span><span>{item.data.is_operational_clone ? 'sim' : 'não'}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Rank na oportunidade</span><span>{item.data.proposal_rank_for_opportunity ?? '—'}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Opp status</span><span>{item.data.opportunity_status ?? '—'}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Proposal status</span><span>{item.data.proposal_status ?? '—'}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">accepted_at</span><span className="font-mono">{(item.data.raw_values as any)?.has_accept ? (item.data.approved_at ?? '—') : '—'}</span></div>
+                  <div className="grid grid-cols-2 gap-2 pt-2">
+                    {['has_accept','has_snapshot','has_approved_amount','has_payment_intent','has_erp_sync','opp_is_won'].map((k) => (
+                      <div key={k} className="flex justify-between rounded bg-muted/40 px-2 py-1">
+                        <span className="text-muted-foreground">{k}</span>
+                        <span>{(item.data!.raw_values as any)?.[k] ? '✓' : '—'}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div>
                 <h3 className="mb-2 text-sm font-semibold">Valores observados</h3>
                 <div className="rounded-md border bg-card p-2">
                   <ValueRow label="Slack (evidência)" value={item.data.slack_amount} />
