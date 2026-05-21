@@ -1387,10 +1387,12 @@ export default function ProposalPublicView() {
                                   <img
                                     src={(item as any).image_url}
                                     alt={item.name}
-                                    loading="lazy"
-                                    className="h-20 w-20 md:h-24 md:w-24 rounded-md border object-cover bg-muted"
+                                    loading="eager"
+                                    decoding="sync"
+                                    className="h-20 w-20 md:h-24 md:w-24 rounded-md object-contain bg-transparent [image-rendering:auto]"
                                     onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
                                   />
+
                                 ) : (
                                   <div className="h-20 w-20 md:h-24 md:w-24 rounded-md border bg-muted flex items-center justify-center" aria-hidden>
                                     <ImageIcon className="h-5 w-5 text-muted-foreground/40" />
@@ -1540,10 +1542,12 @@ export default function ProposalPublicView() {
                                   <img
                                     src={(item as any).image_url}
                                     alt={item.name}
-                                    loading="lazy"
-                                    className="h-20 w-20 md:h-24 md:w-24 rounded-md border object-cover bg-muted"
+                                    loading="eager"
+                                    decoding="sync"
+                                    className="h-20 w-20 md:h-24 md:w-24 rounded-md object-contain bg-transparent [image-rendering:auto]"
                                     onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
                                   />
+
                                 ) : (
                                   <div className="h-20 w-20 md:h-24 md:w-24 rounded-md border bg-muted flex items-center justify-center" aria-hidden>
                                     <ImageIcon className="h-5 w-5 text-muted-foreground/40" />
