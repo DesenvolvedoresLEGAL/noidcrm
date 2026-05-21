@@ -80,7 +80,7 @@ serve(async (req) => {
       .from('proposals')
       .select(`
         *,
-        opportunities (
+        opportunities!proposals_opportunity_id_fkey (
           title,
           valor_previsto,
           temperature,
