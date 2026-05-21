@@ -1,61 +1,92 @@
-## Problema
+## Diagnóstico forense
 
-O bloco "Composição do valor" (editor → aba Pagamento) e o link público da proposta (header, condições de pagamento, forma e prazo) leem de `proposals.pricing_breakdown_snapshot`. Esse snapshot só é regravado em ações de cobrança/ERP ou clique manual no alerta de divergência. Alterações em itens, desconto, condição comercial, validade ou modo de precificação **não** disparam recálculo, então o snapshot fica velho.
+Encontrei dois problemas reais no fluxo da proposta da oportunidade `b92b045f-cf08-4af0-88ab-622c77c534ac`:
 
-Caso real PROP-2026-00740: snapshot mostra subtotal R$ 2.544,00 / vigente R$ 2.798,40, enquanto os itens reais somam R$ 4.579,00 e o vigente dinâmico real é R$ 5.036,90. O PDF está correto porque é gerado server-side a partir dos dados reais.
+1. **Erro atual no aceite público**
+   - A função `generate-acceptance-proof` está falhando com `PGRST201`.
+   - Motivo: depois das mudanças recentes, existem duas relações entre `proposals` e `opportunities` (`proposal.opportunity_id` e `opportunity.accepted_proposal_id`). A query da função usa `opportunity:opportunities(...)` sem escolher qual relação quer, então o backend não sabe qual caminho usar e retorna “Proposal not found”.
+   - Correção: trocar o embed para a relação explícita `opportunity:opportunities!proposals_opportunity_id_fkey(...)`.
 
-Escopo: apenas frontend/orquestração de recálculo. **Não** mexer em `approved_amount`, `approval_snapshot`, preço dinâmico, propostas aceitas, clones operacionais, updates em massa, PDF, Pix, ERP, Slack, SSoT de receita.
+2. **Estado inconsistente após reabrir proposta já aceita**
+   - A proposta `PROP-2026-00778` está `sent`, mas ainda tem `price_frozen_on_approval = true`, `approved_amount = 1313,40`, `approved_payment_schedule` antigo e `pricing_breakdown_snapshot.frozen = true`.
+   - Isso é perigoso porque a proposta está reaberta, mas ainda carrega travas/snapshots de uma aprovação anterior.
+   - Correção: ao reabrir, limpar todos os campos de aprovação/freeze da proposta e forçar recálculo do ledger antes de permitir novo aceite.
 
-## Ajustes
+## Plano de implementação
 
-### 1. Recálculo no editor (aba Pagamento)
+### 1. Corrigir a função de aceite público
+Arquivo: `supabase/functions/generate-acceptance-proof/index.ts`
 
-Em `src/pages/ProposalEditor.tsx`:
-- `useEffect` ao carregar `proposalData`, se status ∈ {`draft`,`open`,`pending_approval`}, disparar `recalculateProposalLedger(currentProposalId)` uma vez por sessão e invalidar `proposalKeys.detail`.
-- Helper `scheduleLedgerRecalc()` com debounce ~400 ms chamado nos handlers de save de: itens, condições de pagamento, desconto, modo dinâmico, validade, save geral.
-- Pular auto-recálculo em `accepted`/`declined`/`expired`/`cancelled`.
+- Alterar o relacionamento ambíguo:
+  - De: `opportunity:opportunities(...)`
+  - Para: `opportunity:opportunities!proposals_opportunity_id_fkey(...)`
+- Antes de atualizar a proposta como aceita, chamar `freeze_proposal_approval(proposalId, acceptorName, acceptorDocument)` como única fonte de verdade do valor aprovado.
+- Usar o resultado da RPC para `approved_amount`, `approved_payment_schedule` e `approval_snapshot`, evitando cálculo paralelo dentro da função.
+- Manter o restante do fluxo: histórico, Win/Loss, contato, oportunidade ganha, contrato e prova de aceite.
 
-### 2. Recálculo no link público
+### 2. Corrigir a reabertura de proposta
+Arquivo: `src/services/supabase/proposals.ts`
 
-Em `src/pages/ProposalPublicView.tsx` (e/ou edge function que monta o bundle público):
-- Ao carregar o bundle público, se o snapshot estiver vencido (`snapshot.calculated_at < proposal.updated_at`, ou ausente), chamar a RPC `ensure_proposal_pricing_ready` server-side **uma vez** antes de devolver o bundle ao cliente.
-- Implementação preferida: na edge function `get-public-proposal` (ou equivalente que já resolve o token), executar `ensure_proposal_pricing_ready(p_proposal_id)` via service role antes de montar o payload. Mantém o token de acesso público inalterado e garante que header, "Condições de Pagamento" e "Forma e prazo do pagamento" leiam números frescos.
-- Se a proposta estiver `accepted` com `frozen=true`, a RPC é no-op (o ledger já respeita o congelamento). Seguro.
-- Cliente não dispara recálculo — público nunca escreve.
+- Ajustar `reopenProposal()` para limpar campos terminais e campos congelados:
+  - `accepted_at`, `acceptor_name`, `acceptor_document`, `acceptor_phone`, `acceptor_email`, `acceptor_position`, `acceptor_ip`, `acceptor_user_agent`, `acceptance_hash`
+  - `approved_amount`, `approved_payment_schedule`, `approved_dynamic_pricing_tier_id`, `approval_snapshot`
+  - `price_frozen_on_approval = false`
+  - `pricing_needs_recalculation = true`
+  - `signature_status = 'pending'`
+- Depois da reabertura, chamar `ensure_proposal_pricing_ready` para recalcular o ledger da condição atual.
 
-### 3. Indicador defensivo no breakdown interno
+### 3. Corrigir a reabertura de oportunidade
+Arquivo: `src/services/supabase/opportunities.ts`
 
-Em `ProposalPricingBreakdown` (audience `internal`), quando `snapshot.calculated_at < proposal.updated_at`, mostrar chip "Atualizando valores…" e acionar callback do editor para o recálculo debounced. Cobre propostas legadas.
+- Quando uma oportunidade ganha for reaberta, não deixar a proposta antiga num meio-termo técnico.
+- Para propostas aceitas que serão reabertas para novo aceite:
+  - limpar freeze/aprovação igual ao item 2;
+  - manter o link público existente;
+  - forçar recálculo do ledger.
+- Preservar rastreabilidade no `audit_log` com o motivo da reabertura e os valores anteriores.
 
-### 4. Propostas legadas
+### 4. Blindagem contra recorrência
+Banco de dados via migration
 
-Sem backfill em massa. O fluxo dos itens 1 e 2 garante recálculo na primeira abertura (interna ou pública) de cada proposta afetada.
+- Criar/ajustar uma RPC segura `reopen_proposal_for_reapproval(p_proposal_id, p_reason)` para centralizar a reabertura no servidor.
+- Essa RPC deve:
+  - validar organização/tenant;
+  - limpar aprovação anterior;
+  - recalcular pricing;
+  - registrar auditoria;
+  - impedir proposta `sent/viewed` com `price_frozen_on_approval = true`.
+- Adicionar uma função/trigger de proteção para bloquear estados inválidos futuros:
+  - proposta não aceita não pode ficar com `price_frozen_on_approval = true`;
+  - proposta reaberta não pode manter `approval_snapshot` ativo como fonte vigente.
 
-## Detalhes técnicos
+### 5. Correção pontual da proposta afetada
+Banco de dados via data fix controlado
 
-- Reutilizar `recalculateProposalLedger` (`src/services/proposals/proposalPricingGuard.ts`).
-- Para o público: a RPC já existente `ensure_proposal_pricing_ready` é idempotente; chamar via service role na edge function que serve o bundle público. **Sem** novos endpoints, sem mudar RLS, sem mudar contrato do token público.
-- Reutilizar `proposalKeys.detail` em `src/lib/query-keys.ts` para invalidar caches no editor.
-- Sem mudanças em PDF, ERP, Pix, Slack, aprovação, clone, SSoT.
+- Para `PROP-2026-00778`, normalizar o estado atual:
+  - manter `status = sent`;
+  - limpar freeze e campos de aprovação antiga;
+  - recalcular ledger;
+  - manter link público para o cliente conseguir aprovar novamente.
+- Não alterar PDF histórico, contratos já gerados, ERP, Slack ou receita realizada sem ação explícita.
+
+### 6. Testes e validação
+
+- Testar o aceite público da proposta afetada até passar sem erro.
+- Verificar que o valor aprovado novo vem do ledger atual, não do snapshot antigo.
+- Confirmar que `generate-acceptance-proof` não gera mais `PGRST201`.
+- Confirmar que o Slack continua notificando apenas uma vez.
+- Confirmar que o texto do Slack usa o nome do cliente/conta quando o aprovador explícito estiver ausente.
 
 ## Arquivos impactados
 
-- `src/pages/ProposalEditor.tsx` — `useEffect` de recálculo na carga + `scheduleLedgerRecalc` nos handlers de save existentes.
-- `src/components/proposals/ProposalPricingBreakdown.tsx` — chip "Atualizando valores…" + callback `onStaleSnapshot`.
-- `supabase/functions/<edge-do-bundle-público>/index.ts` — chamar `ensure_proposal_pricing_ready` server-side antes de montar o payload (identificar a função real ao implementar; candidatos: `get-public-proposal` / `public-proposal-bundle`).
-- `src/pages/ProposalPublicView.tsx` — sem mudança de lógica de cálculo; só passa a receber bundle já com snapshot fresco.
+- `supabase/functions/generate-acceptance-proof/index.ts`
+- `src/services/supabase/proposals.ts`
+- `src/services/supabase/opportunities.ts`
+- Migration de banco para RPC/trigger de proteção
+- Data fix pontual para `PROP-2026-00778`
 
 ## Riscos
 
-- Latência extra no primeiro load público (1 RPC). Aceitável; é cache hit nas próximas.
-- Múltiplos saves rápidos no editor: mitigado pelo debounce.
-- Race save↔recálculo: invalidate só após Promise do save resolver.
-- Propostas congeladas: RPC é no-op, sem efeito colateral.
-
-## Validação
-
-1. Editor PROP-2026-00740 → Pagamento → subtotal **4.579,00**, vigente **5.036,90**.
-2. Link público da mesma proposta → header, "Condições de Pagamento" (Resumo Financeiro) e "Forma e prazo do pagamento" mostram **5.036,90** (alinhado ao PDF).
-3. Editar item → salvar → editor e (após reload) link público atualizam.
-4. Mudar condição comercial → recalcula em ambos.
-5. Build e typecheck verdes.
+- Baixo risco se a correção ficar restrita ao fluxo de aceite/reabertura.
+- Não vou mexer em PDF, ERP, Pix, comissão, receita SSoT ou cálculo financeiro global.
+- O ponto sensível é limpar corretamente o snapshot antigo apenas quando a proposta foi reaberta para nova aprovação.
