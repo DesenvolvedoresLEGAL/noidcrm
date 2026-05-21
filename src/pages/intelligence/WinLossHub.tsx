@@ -110,6 +110,17 @@ export default function WinLossHub() {
           }
         />
 
+        {/* SSoT disclaimer */}
+        <div className="rounded-md border border-amber-300/50 bg-amber-50 dark:bg-amber-950/30 text-amber-900 dark:text-amber-100 px-3 py-2 text-xs flex items-center gap-2">
+          <AlertTriangle className="h-3.5 w-3.5" />
+          <span>
+            Base de <strong>decisões</strong> — não é relatório financeiro oficial. Para receita realizada use{' '}
+            <a href="/reports" className="underline font-medium">Relatórios → Vendas Realizadas</a> (fonte:{' '}
+            <code className="font-mono">commercial_won_revenue_view</code>).
+          </span>
+        </div>
+
+
         {/* Context Selector */}
         <WinLossContextSelector
           pipelines={pipelines}
