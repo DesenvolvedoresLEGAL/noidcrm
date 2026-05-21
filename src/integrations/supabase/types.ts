@@ -30544,8 +30544,11 @@ export type Database = {
           commercial_amount: number | null
           commercial_amount_source: string | null
           commercial_opportunity_id: string | null
+          commercial_status: string | null
           created_at: string | null
           delta_vs_opportunity_value: number | null
+          financial_settlement_status: string | null
+          fulfillment_status: string | null
           is_final_approved_value: boolean | null
           is_recurring: boolean | null
           legacy_opportunity_value: number | null
@@ -30580,9 +30583,12 @@ export type Database = {
           canonical_kind: string | null
           commercial_amount: number | null
           commercial_opportunity_id: string | null
+          commercial_status: string | null
           commission_amount: number | null
           commission_status: string | null
           created_at: string | null
+          financial_settlement_status: string | null
+          fulfillment_status: string | null
           mrr_amount: number | null
           nome_fantasia: string | null
           one_shot_amount: number | null
