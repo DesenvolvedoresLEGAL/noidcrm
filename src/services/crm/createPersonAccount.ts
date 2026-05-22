@@ -133,7 +133,6 @@ async function createLinkedContact(args: {
     primeiro_nome: args.firstName,
     ultimo_nome: args.lastName || null,
     nome: (args.firstName + (args.lastName ? ' ' + args.lastName : '')).trim(),
-    is_primary: true,
   };
   if (args.email?.trim()) contactInsert.emails = [args.email.trim()];
   if (args.phone?.trim()) contactInsert.telefones = [args.phone.trim()];
