@@ -19894,48 +19894,75 @@ export type Database = {
       ote_sales_records: {
         Row: {
           client_name: string
+          closed_at: string | null
+          counts_toward_goal: boolean
           created_at: string
+          exclusion_reason: string | null
           id: string
+          mrr_amount: number
           observations: string | null
+          one_shot_amount: number
           opportunity_id: string | null
           organization_id: string
           ote_result_id: string
           payment_date: string | null
           payment_status: string | null
+          pipeline_id: string | null
+          pipeline_name: string | null
           proposal_id: string | null
           proposal_number: string | null
+          record_kind: string
+          revenue_confidence: string | null
           sale_date: string
           sale_value: number
           updated_at: string
         }
         Insert: {
           client_name: string
+          closed_at?: string | null
+          counts_toward_goal?: boolean
           created_at?: string
+          exclusion_reason?: string | null
           id?: string
+          mrr_amount?: number
           observations?: string | null
+          one_shot_amount?: number
           opportunity_id?: string | null
           organization_id: string
           ote_result_id: string
           payment_date?: string | null
           payment_status?: string | null
+          pipeline_id?: string | null
+          pipeline_name?: string | null
           proposal_id?: string | null
           proposal_number?: string | null
+          record_kind?: string
+          revenue_confidence?: string | null
           sale_date: string
           sale_value: number
           updated_at?: string
         }
         Update: {
           client_name?: string
+          closed_at?: string | null
+          counts_toward_goal?: boolean
           created_at?: string
+          exclusion_reason?: string | null
           id?: string
+          mrr_amount?: number
           observations?: string | null
+          one_shot_amount?: number
           opportunity_id?: string | null
           organization_id?: string
           ote_result_id?: string
           payment_date?: string | null
           payment_status?: string | null
+          pipeline_id?: string | null
+          pipeline_name?: string | null
           proposal_id?: string | null
           proposal_number?: string | null
+          record_kind?: string
+          revenue_confidence?: string | null
           sale_date?: string
           sale_value?: number
           updated_at?: string

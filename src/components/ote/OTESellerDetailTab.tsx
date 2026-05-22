@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { OTEMonthlyResult } from '@/hooks/useOTEData';
-import { 
-  User, 
-  Target, 
-  TrendingUp, 
+import { useOTESalesRecords } from '@/hooks/useOTESalesRecords';
+import { OTESellerSalesDrilldown } from './OTESellerSalesDrilldown';
+import {
+  User,
+  Target,
+  TrendingUp,
   Zap,
   Flag,
   ChevronDown,
@@ -26,6 +28,9 @@ interface OTESellerDetailTabProps {
 
 export function OTESellerDetailTab({ results, isLoading, isOTEMode = true }: OTESellerDetailTabProps) {
   const [expandedSeller, setExpandedSeller] = useState<string | null>(null);
+  const resultIds = results.map((r) => r.id);
+  const { data: allRecords = [], isLoading: recordsLoading } = useOTESalesRecords(resultIds);
+
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -236,6 +241,16 @@ export function OTESellerDetailTab({ results, isLoading, isOTEMode = true }: OTE
                     </div>
                   </div>
                 </div>
+
+                {/* Drill-down: detalhe transparente das vendas / leads qualificados */}
+                <div className="mt-6 pt-4 border-t">
+                  <OTESellerSalesDrilldown
+                    records={allRecords.filter((r) => r.ote_result_id === result.id)}
+                    kind={result.goal_type === 'leads' ? 'qualified_lead' : 'sale'}
+                    loading={recordsLoading}
+                  />
+                </div>
+
 
                 {/* Status */}
                 <div className="mt-6 pt-4 border-t flex items-center justify-between">

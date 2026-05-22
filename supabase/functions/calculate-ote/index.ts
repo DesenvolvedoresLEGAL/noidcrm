@@ -153,15 +153,18 @@ serve(async (req) => {
     // Get all pipelines for the organization (needed for goal_type filtering)
     const { data: allPipelines } = await supabase
       .from('pipelines')
-      .select('id, pipeline_type')
+      .select('id, name, pipeline_type')
       .eq('organization_id', organizationId);
 
+    const pipelineMap = new Map<string, { name: string; pipeline_type: string }>(
+      (allPipelines || []).map((p: any) => [p.id, { name: p.name, pipeline_type: p.pipeline_type }])
+    );
     const qualificationPipelineIds = (allPipelines || [])
-      .filter(p => p.pipeline_type === 'qualification')
-      .map(p => p.id);
+      .filter((p: any) => p.pipeline_type === 'qualification')
+      .map((p: any) => p.id);
     const salesPipelineIds = (allPipelines || [])
-      .filter(p => p.pipeline_type === 'sales')
-      .map(p => p.id);
+      .filter((p: any) => p.pipeline_type === 'sales')
+      .map((p: any) => p.id);
 
     console.log(`Pipelines - qualification: ${qualificationPipelineIds.length}, sales: ${salesPipelineIds.length}`);
 
@@ -511,25 +514,72 @@ serve(async (req) => {
         continue;
       }
 
-      // Create sales records
+      // Create sales/qualification detail records for full transparency
       if (opportunities && opportunities.length > 0 && upsertedResult) {
-        // Delete existing sales records for this result
+        // Delete existing detail records for this result
         await supabase
           .from('ote_sales_records')
           .delete()
           .eq('ote_result_id', upsertedResult.id);
 
-        // Insert new sales records
-        const salesRecords = opportunities.map(opp => {
+        // For revenue sellers: enrich with commercial_won_revenue_view (SSoT)
+        let revenueMap = new Map<string, any>();
+        if (goalType !== 'leads') {
+          const oppIds = opportunities.map((o: any) => o.id);
+          const { data: revRows } = await supabase
+            .from('commercial_won_revenue_view')
+            .select('opportunity_id, commercial_amount, mrr_amount, one_shot_amount, revenue_confidence')
+            .eq('organization_id', organizationId)
+            .in('opportunity_id', oppIds);
+          revenueMap = new Map((revRows || []).map((r: any) => [r.opportunity_id, r]));
+        }
+
+        const salesRecords = opportunities.map((opp: any) => {
           const acc = opp.account as any;
+          const pipelineInfo = pipelineMap.get(opp.pipeline_id);
+          const closedAt = opp.closed_at || opp.updated_at;
+          const closedDate = closedAt ? new Date(closedAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+
+          if (goalType === 'leads') {
+            return {
+              organization_id: organizationId,
+              ote_result_id: upsertedResult.id,
+              opportunity_id: opp.id,
+              client_name: acc?.nome_fantasia || acc?.razao_social || opp.title,
+              sale_value: 0,
+              mrr_amount: 0,
+              one_shot_amount: 0,
+              sale_date: closedDate,
+              closed_at: closedAt,
+              pipeline_id: opp.pipeline_id,
+              pipeline_name: pipelineInfo?.name || null,
+              payment_status: 'pending',
+              counts_toward_goal: true,
+              record_kind: 'qualified_lead',
+            };
+          }
+
+          const ssot = revenueMap.get(opp.id);
+          const commercial = Number(ssot?.commercial_amount ?? opp.commission_value ?? opp.valor_previsto ?? 0);
+          const mrr = Number(ssot?.mrr_amount ?? 0);
+          const oneShot = Number(ssot?.one_shot_amount ?? (ssot ? 0 : commercial));
+
           return {
             organization_id: organizationId,
             ote_result_id: upsertedResult.id,
             opportunity_id: opp.id,
             client_name: acc?.nome_fantasia || acc?.razao_social || opp.title,
-            sale_value: opp.commission_value ?? opp.valor_previsto ?? 0,
-            sale_date: new Date().toISOString().split('T')[0],
+            sale_value: commercial,
+            mrr_amount: mrr,
+            one_shot_amount: oneShot,
+            sale_date: closedDate,
+            closed_at: closedAt,
+            pipeline_id: opp.pipeline_id,
+            pipeline_name: pipelineInfo?.name || null,
             payment_status: 'pending',
+            counts_toward_goal: true,
+            record_kind: 'sale',
+            revenue_confidence: ssot?.revenue_confidence || null,
           };
         });
 

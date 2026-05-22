@@ -9,7 +9,11 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calculator, RefreshCw, FileSpreadsheet, Target, Settings, DollarSign } from 'lucide-react';
 import { useCalculateOTE, useOTEMonthlyResults } from '@/hooks/useOTEData';
+import { useOTESalesRecords } from '@/hooks/useOTESalesRecords';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
+import { buildOTEWorkbook, downloadOTEWorkbook } from '@/components/ote/export/buildOTEWorkbook';
+import { toast } from 'sonner';
 import { format, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { PageHeader } from '@/components/ui/page-header';
@@ -22,6 +26,9 @@ export default function OTEReport() {
   
   const { data: results, isLoading, isPending, refetch } = useOTEMonthlyResults(selectedPeriod);
   const calculateOTE = useCalculateOTE();
+  const { profile } = useCurrentUser();
+  const resultIds = (results || []).map((r) => r.id);
+  const { data: records = [] } = useOTESalesRecords(resultIds);
 
   const isOTEMode = organization?.goal_system_mode !== 'simple';
 
@@ -40,9 +47,26 @@ export default function OTEReport() {
   };
 
   const handleExportExcel = () => {
-    // TODO: Implement Excel export
-    console.log('Export to Excel');
+    if (!results || results.length === 0) {
+      toast.error('Nenhum dado para exportar. Clique em "Calcular" primeiro.');
+      return;
+    }
+    try {
+      const wb = buildOTEWorkbook({
+        periodMonth: selectedPeriod,
+        organizationName: organization?.name,
+        exporterName: (profile as any)?.full_name,
+        results,
+        records,
+      });
+      downloadOTEWorkbook(wb, selectedPeriod);
+      toast.success('Relatório OTE exportado.');
+    } catch (e) {
+      console.error('OTE export error:', e);
+      toast.error('Erro ao gerar Excel.');
+    }
   };
+
 
   return (
     <Layout>
