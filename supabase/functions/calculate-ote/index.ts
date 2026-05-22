@@ -306,20 +306,28 @@ serve(async (req) => {
         flagReason = `Abaixo de ${flagYellowMinThreshold}% da meta`;
       }
 
-      // Get roleplay data
-      const { data: roleplaySessions } = await supabase
+      // Get roleplay data — sessions concluídas no período (finished_at != null)
+      // OBS: a tabela `roleplay_sessions` não tem coluna `status`; usar finished_at + score_overall
+      const { data: roleplaySessions, error: roleplayErr } = await supabase
         .from('roleplay_sessions')
-        .select('score_overall, passed')
+        .select('score_overall, passed, finished_at')
+        .eq('organization_id', organizationId)
         .eq('seller_id', config.user_id)
+        .not('finished_at', 'is', null)
+        .not('score_overall', 'is', null)
         .gte('started_at', startDate)
-        .lte('started_at', endDate)
-        .eq('status', 'completed');
+        .lte('started_at', endDate);
+
+      if (roleplayErr) {
+        console.error(`[calculate-ote] roleplay query error for ${config.user_id}:`, roleplayErr);
+      }
 
       let roleplayScore = null;
       let roleplayAccelerator = 0;
       if (roleplaySessions && roleplaySessions.length > 0) {
-        const avgScore = roleplaySessions.reduce((sum, s) => sum + (s.score_overall || 0), 0) / roleplaySessions.length;
+        const avgScore = roleplaySessions.reduce((sum, s) => sum + (Number(s.score_overall) || 0), 0) / roleplaySessions.length;
         roleplayScore = avgScore;
+        console.log(`[calculate-ote] roleplay seller=${config.user_id} sessions=${roleplaySessions.length} avgScore=${avgScore.toFixed(2)}`);
         
         // Apply roleplay rules
         if (rules) {

@@ -1,105 +1,73 @@
-# OTE — Transparência total de cálculo de comissão
+## Problemas identificados
 
-## Objetivo
-Garantir auditabilidade completa do módulo OTE: cada real de variável precisa ter rastro até a venda (ou lead qualificado) que originou. Hoje o botão "Excel" não faz nada e a aba "Por Vendedor" não mostra a lista de vendas/leads que compõem o resultado.
+### 1. OTE mostra valores em R$ para vendedores com meta de leads qualificados
+No print, **Ana Paula (Hunter)** e **Bruno (Scout)** têm `goal_type = 'leads'`, mas a UI exibe a meta como "R$ 50,00 / Vendas R$ 9,00" — deveria ser "50 leads / 9 leads".
 
-## Escopo desta entrega
-1. Exportação real para Excel (.xlsx) com abas detalhadas por vendedor.
-2. Drill-down detalhado na aba "Por Vendedor" mostrando cada venda ou cada lead qualificado.
-3. Marcação transparente de itens que NÃO contam para a meta (produtos/serviços fora da meta), tanto na tela quanto no Excel.
-4. Aba "Histórico" — sem alterações nesta entrega (validar com usuário se quiser refinar depois).
+Pontos onde o currency aparece indevidamente quando `goal_type === 'leads'`:
 
-## O que será construído
+- `src/components/ote/OTESellerDetailTab.tsx`
+  - Bloco "Vendas e Meta" → `formatCurrency(result.goal_amount)` e `formatCurrency(result.total_sales)` (linhas 133 e 137).
+  - Header colapsado: "Variável Final R$ 0,00" deve **permanecer em R$** (é comissão paga), mas o subtítulo "Variável Base" / "Ajuste Final" / "Variável Final" continuam em R$ pois são valores monetários reais — manter.
+- `src/components/ote/OTEOverviewTab.tsx` — verificar e ajustar os cards/listas que mostram "Meta" e "Total de Vendas" usando currency.
+- `src/components/ote/export/buildOTEWorkbook.ts` — colunas "Meta" e "Vendas" no Excel também devem ser formatadas como inteiros + "leads" (ou número puro com header "Leads qualificados") quando `goal_type='leads'`.
 
-### 1. Drill-down "Por Vendedor" (tela)
-Dentro de cada card expansível do vendedor, adicionar uma seção nova: **"Vendas que compuseram a meta"** (Closers) ou **"Leads qualificados"** (Pré-vendas/SDR).
+Regra: usar um helper `formatGoalValue(value, goalType)` que retorna `"X leads"` quando `goalType === 'leads'` e `formatCurrency(value)` quando `'revenue'`. Já existe padrão equivalente em `RepKPICards.tsx` / `RepPACECard.tsx` — reaproveitar a mesma convenção.
 
-Para **Closers (revenue)** — tabela com:
-- Nº da proposta / Oportunidade
-- Cliente
-- Data e hora de fechamento (`closed_at`)
-- Pipeline / Etapa
-- Valor comercial aprovado (fonte: `commercial_won_revenue_view` — Source of Truth)
-- Tipo (MRR, One-shot, Misto)
-- Conta para meta? (Sim / Não) — com motivo quando "Não" (ex.: produto marcado como `excluded_from_goal`, pipeline operacional, etc.)
-- Subtotal "elegível para meta" vs "não elegível"
+### 2. Roleplay sempre exibe `- 0%` (não puxa nada)
+Bug no edge function `supabase/functions/calculate-ote/index.ts` (linha ~315):
 
-Para **Pré-vendas (leads)** — tabela com:
-- Oportunidade
-- Cliente
-- Data e hora de qualificação (`closed_at` da oportunidade no pipeline de qualificação)
-- Pipeline de qualificação
-- Próximo destino (handoff)
-- Conta para meta? (Sim / Não)
-
-Cada linha permite abrir a oportunidade/proposta original em nova aba.
-
-### 2. Exportação Excel
-Substituir o stub atual (`handleExportExcel` em `src/pages/OTEReport.tsx`) por geração real de `.xlsx` via `xlsx`/`exceljs` (lib já leve, client-side).
-
-Estrutura do arquivo `OTE_<periodo>.xlsx`:
-- **Aba 1 — Resumo geral**: KPIs do período (Total a pagar, Vendas, Média % Meta, contagem por flag).
-- **Aba 2 — Closers consolidado**: uma linha por vendedor com Meta, Vendas, % Meta, Multiplicador, Base, Aceleradores, Desaceleradores, Variável Final, Flag, Status.
-- **Aba 3 — Pré-vendas consolidado**: análogo, com Meta em leads.
-- **Aba 4 — Detalhe de vendas (Closers)**: uma linha por venda (todas as vendas de todos os closers no período), incluindo a coluna `Conta para meta?` e motivo.
-- **Aba 5 — Detalhe de qualificações (SDRs)**: uma linha por lead qualificado, com data/hora.
-- **Aba 6 — Aceleradores/Desaceleradores**: por vendedor, mostrando Roleplay, CRM, FitScore, ajustes finais.
-
-Cabeçalho de cada aba com período, data/hora de geração, organização e quem exportou — para servir como prova de auditoria.
-
-### 3. Backend — fonte de verdade para o detalhe
-
-Hoje `ote_sales_records` é populado pela edge `calculate-ote`, mas:
-- usa `commission_value ?? valor_previsto` (legado), divergindo da SSoT (`commercial_won_revenue_view`)
-- grava `sale_date = hoje` em vez do `closed_at` real
-- não armazena MRR vs one-shot, nem flag de "não conta para meta"
-
-Ajustes mínimos:
-- Em `calculate-ote`, ao gravar `ote_sales_records`:
-  - usar `closed_at` como `sale_date`
-  - cruzar com `commercial_won_revenue_view` para pegar `commercial_amount`, `mrr_amount`, `one_shot_amount`, `revenue_confidence`
-  - adicionar colunas novas em `ote_sales_records`: `mrr_amount numeric`, `one_shot_amount numeric`, `counts_toward_goal boolean default true`, `exclusion_reason text`, `closed_at timestamptz`, `pipeline_id uuid`
-- Para SDR (`goal_type='leads'`): hoje não persiste registros. Passar a gravar uma linha por oportunidade qualificada (mesma tabela `ote_sales_records`, com `sale_value=0`, `closed_at`, `counts_toward_goal`).
-- Criar hook `useOTESalesRecords(periodMonth, userId?)` para alimentar a UI e o Excel.
-
-Regras de exclusão de meta consideradas:
-- Pipeline operacional/onboarding (já é filtrado pela edge — manter, mas mostrar como transparência se aparecer)
-- Itens de proposta marcados como `excluded_from_goal` (se a flag existir no produto — confirmar; caso contrário, deixar a coluna preparada e marcar todos como "Sim" por enquanto).
-
-## Detalhes técnicos
-
-```text
-src/
-  pages/OTEReport.tsx                    -> handleExportExcel real
-  components/ote/
-    OTESellerDetailTab.tsx               -> nova seção drill-down
-    OTESellerSalesDrilldown.tsx (novo)   -> tabela de vendas/leads
-    export/buildOTEWorkbook.ts (novo)    -> monta o .xlsx
-  hooks/
-    useOTESalesRecords.ts (novo)         -> lê ote_sales_records + join commercial_won_revenue_view
-
-supabase/
-  functions/calculate-ote/index.ts       -> grava detalhe correto (SSoT + leads + counts_toward_goal)
-  migrations/...                         -> ALTER TABLE ote_sales_records add columns
+```ts
+const { data: roleplaySessions } = await supabase
+  .from('roleplay_sessions')
+  .select('score_overall, passed')
+  .eq('seller_id', config.user_id)
+  .gte('started_at', startDate)
+  .lte('started_at', endDate)
+  .eq('status', 'completed');   // ❌ coluna 'status' não existe em roleplay_sessions
 ```
 
-Libs:
-- Usar `xlsx` (SheetJS) — leve, client-side, sem dependência server. Já existe skill xlsx para padrões, mas a exportação aqui é client-side simples (não precisa LibreOffice).
+A tabela `roleplay_sessions` **não tem coluna `status`** (confirmado via information_schema). PostgREST rejeita o filtro e devolve array vazio → `roleplayScore` sempre `null` e `roleplay_accelerator = 0`.
+
+Existem dados reais (ex.: 39 sessões para um seller com média 6.65 em maio/26), portanto basta corrigir o filtro.
+
+Correção:
+- Trocar `.eq('status', 'completed')` por `.not('finished_at', 'is', null)` (sessão concluída).
+- Adicional: filtrar por `organization_id = organizationId` (segurança multi-tenant).
+- Considerar somente sessões com `score_overall IS NOT NULL` para a média.
+
+### 3. Amarrar média de roleplay à UI/Excel
+Após o fix acima:
+- `OTESellerDetailTab.tsx` já lê `result.roleplay_score` — vai passar a popular.
+- Verificar `buildOTEWorkbook.ts` para garantir que a aba "Performance" exibe `roleplay_score`, contagem de treinos e `roleplay_accelerator` por vendedor (transparência).
+
+## Plano de execução
+
+1. **Edge function `calculate-ote`** — corrigir o query de `roleplay_sessions`:
+   - Remover `.eq('status', 'completed')`.
+   - Adicionar `.not('finished_at', 'is', null)` e `.eq('organization_id', organizationId)`.
+   - Logar `roleplaySessions.length` e `avgScore` para auditoria.
+
+2. **Helper de formatação por tipo de meta** — criar `src/components/ote/lib/formatGoal.ts` exportando `formatGoalValue(value, goalType)` e `formatGoalUnit(goalType)`. Reutilizado em todos os componentes OTE.
+
+3. **`OTESellerDetailTab.tsx`**:
+   - Substituir `formatCurrency(goal_amount)` e `formatCurrency(total_sales)` por `formatGoalValue(..., result.goal_type)`.
+   - Trocar label "Vendas" por "Leads qualificados" quando `goal_type='leads'`.
+   - Manter Variável Base / Ajuste Final / Variável Final em R$.
+
+4. **`OTEOverviewTab.tsx`** — mesmo tratamento: meta agregada deve diferenciar revenue vs leads (ou separar em duas colunas/cards quando o time é misto).
+
+5. **`buildOTEWorkbook.ts`** — nas abas "Closers", "Pré-vendas" e "Resumo":
+   - Header dinâmico ("Meta (R$)" vs "Meta (leads)").
+   - Não somar valores de revenue e leads no mesmo total.
+   - Aba "Performance" deve mostrar `Roleplay (média)`, `Nº treinos`, `Acelerador roleplay %`.
+
+6. **Deploy** do edge function e instrução: o usuário precisa clicar em **Calcular** novamente em OTE para repopular `roleplay_score`.
 
 ## Riscos
-- Recalcular OTE depois da migration é necessário para popular as colunas novas; até lá o Excel mostra os campos legados.
-- `commercial_won_revenue_view` é a SSoT; qualquer divergência entre ela e `ote_sales_records` deve ser logada como warning na coluna "Confiança".
-- RLS: garantir que `ote_sales_records` continua filtrando por organização e respeitando visibilidade (Closer vê só o próprio detalhe; gestor/admin vê todos).
+- A correção do filtro pode trazer scores que antes eram `null` → aceleradores podem mudar o `final_variable_amount`. Esperado e desejado (essa é a regra de negócio).
+- Excel precisa preservar fórmulas existentes que esperam coluna numérica em R$; ao mudar para "leads" como texto, ajustar somatórios para não quebrar.
 
-## Fora de escopo
-- Refinamento da aba "Histórico".
-- Mudança nas regras de cálculo de aceleradores/desaceleradores.
-- Workflow de aprovação/pagamento de comissão.
-
-## Próximos passos
-1. Aprovar este plano.
-2. Migration em `ote_sales_records` (colunas novas).
-3. Atualizar `calculate-ote` para popular detalhe completo (Closers + SDRs).
-4. Hook `useOTESalesRecords` + drill-down na UI.
-5. Geração real do `.xlsx` no botão Excel.
-6. Pedir ao usuário para clicar em "Calcular" no período desejado e validar.
+## Out of scope
+- Não mexer em regras de acelerador/desacelerador.
+- Não mexer no fluxo de aprovação/pagamento de comissão.
+- Não criar nova fonte de roleplay (continua `roleplay_sessions.score_overall`).
