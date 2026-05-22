@@ -1017,8 +1017,15 @@ export default function ProposalPublicView() {
     ? pricingSummary.baseAmount + pricingSummary.dynamicAdjustment.amount
     : legacyOneTimeWithDiscount;
   const effectiveOneTimeAmount = oneTimeWithDiscount;
+  // Ledger's `effective_amount` already includes 1 month of MRR
+  // (`recurring_subtotal`). To avoid double-counting recurring revenue in
+  // the public header / Proposta card, derive the one-time net from the
+  // ledger and then add the full recurring contract total separately.
+  const oneTimeNetFromLedger = pricingSummary
+    ? pricingSummary.effectiveAmount - pricingSummary.recurringSubtotal
+    : null;
   const totalAmount = pricingSummary
-    ? pricingSummary.effectiveAmount + recurringContractTotal
+    ? (oneTimeNetFromLedger ?? 0) + recurringContractTotal
     : legacyTotalAmount;
   
   // CRITICAL: Use oneTimeTotal for installments, not totalAmount (which includes MRR items)
