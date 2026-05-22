@@ -380,6 +380,19 @@ Deno.serve(async (req) => {
 
     console.log(`[notify-deal-won] ERP response: ${erpResponse.status} - ${erpBody}`);
 
+    await supabase.from("proposal_erp_sync_logs").insert({
+      organization_id: proposal.organization_id,
+      proposal_id: proposal.id,
+      provider: "umma_erp",
+      operation: "webhook",
+      status: success ? "success" : "error",
+      request_payload: dealPayload,
+      response_payload: { body: erpBody },
+      http_status: erpResponse.status,
+      error_code: success ? null : `http_${erpResponse.status}`,
+      error_message: success ? null : erpBody,
+    });
+
     if (!success) {
       console.error(`[notify-deal-won] ERP webhook FAILED: status=${erpResponse.status}, body=${erpBody}`);
     }
