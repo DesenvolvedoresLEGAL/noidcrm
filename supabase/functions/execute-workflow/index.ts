@@ -333,17 +333,18 @@ serve(async (req) => {
             if (opportunity) {
               const targetPipelineId = action.config?.target_pipeline_id || opportunity.pipeline_id;
               
-              // CRITICAL: Check if duplicate already exists in target pipeline to prevent redundant duplications.
-              // Soft-deleted duplicates (`deleted_at IS NOT NULL`) MUST be ignored — otherwise a trashed duplicate
-              // permanently blocks the workflow from recreating the opportunity in the target pipeline.
+              // CRITICAL: Check for duplicates in target pipeline to prevent redundant duplications.
+              // Canonical key = source_opportunity_id (race-safe, also enforced by partial UNIQUE INDEX
+              // opportunities_no_duplicate_handoff_uidx). Also matches by title to catch legacy duplicates
+              // created before source tracking. Soft-deleted rows are ignored.
               const { data: existingDuplicates, error: checkError } = await supabase
                 .from('opportunities')
-                .select('id, title, status')
+                .select('id, title, status, source_opportunity_id')
                 .eq('organization_id', opportunity.organization_id)
-                .eq('title', opportunity.title)
                 .eq('pipeline_id', targetPipelineId)
                 .neq('status', 'lost')
-                .is('deleted_at', null);
+                .is('deleted_at', null)
+                .or(`source_opportunity_id.eq.${opportunity.id},title.eq.${opportunity.title.replace(/,/g, '\\,')}`);
               
               if (checkError) {
                 console.error('[execute-workflow] Error checking for duplicates:', checkError);
@@ -481,7 +482,21 @@ serve(async (req) => {
                 .insert(newOpp)
                 .select()
                 .single();
-              
+
+              // 23505 = unique_violation. Triggered by partial UNIQUE INDEX
+              // opportunities_no_duplicate_handoff_uidx when two workflow runs race.
+              // Treat as skip (the other run already created the deal).
+              if (error && (error as any).code === '23505') {
+                console.log(`[execute-workflow] SKIPPING DUPLICATE (race): unique index blocked duplicate handoff for source ${opportunity.id} → pipeline ${targetPipelineId}`);
+                result = {
+                  action: 'duplicate',
+                  success: false,
+                  skipped: true,
+                  reason: 'Duplicate blocked by unique index (concurrent run)',
+                };
+                break;
+              }
+
               if (data?.id) {
                 lastDuplicatedOpportunityId = data.id;
                 
