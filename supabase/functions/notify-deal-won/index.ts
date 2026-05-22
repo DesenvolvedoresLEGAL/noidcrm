@@ -259,7 +259,7 @@ Deno.serve(async (req) => {
       gross_total: netTotal,
       discount_total: discountTotal,
       discount_percent: discountPercent,
-      base_amount: approved.base_amount || itemsNetTotal,
+      base_amount: netTotal,
       approved_amount: approved.amount || null,
       amount_source: approved.source,
       // PRICE CORE 2.0C — canonical ledger fields for auditing on ERP side.
@@ -309,8 +309,8 @@ Deno.serve(async (req) => {
             : ((contact.telefones[0] as Record<string, unknown>)?.numero || (contact.telefones[0] as Record<string, unknown>)?.value))
         : null) as string | null,
       contact_position: (contact?.cargo as string) || null,
-      // Products: total_price scaled so Σ === netTotal. unit_price/quantity preserved
-      // for human reading; original_total_price kept for auditing.
+      // Products: every ERP-facing monetary field is scaled so Σ === netTotal.
+      // Original gross values stay nested under noid_original_pricing only.
       products: scaledItems.map(({ item, original, scaled, quantity, scaledUnitPrice }) => ({
         id: item.id,
         product_id: item.product_id,
@@ -343,6 +343,10 @@ Deno.serve(async (req) => {
             contract_duration_months: paymentTerms.contract_duration_months,
             monthly_value: paymentTerms.monthly_value ? Number(paymentTerms.monthly_value) : null,
             contract_total: netTotal,
+            amount: netTotal,
+            net_total: netTotal,
+            final_amount: netTotal,
+            total_amount: netTotal,
             billing_day: paymentTerms.billing_day,
             comments: paymentTerms.comments,
             vencimento,
