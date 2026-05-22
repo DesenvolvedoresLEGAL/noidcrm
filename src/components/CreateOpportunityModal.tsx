@@ -264,6 +264,8 @@ export function CreateOpportunityModal({
         prob: 30,
         tags: [],
       });
+      setPfData({ firstName: '', lastName: '', cpf: '', email: '', phone: '' });
+      setEntityType('PJ');
       
       onOpenChange(false);
     } catch (error: any) {
