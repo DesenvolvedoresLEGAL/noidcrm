@@ -153,15 +153,18 @@ serve(async (req) => {
     // Get all pipelines for the organization (needed for goal_type filtering)
     const { data: allPipelines } = await supabase
       .from('pipelines')
-      .select('id, pipeline_type')
+      .select('id, name, pipeline_type')
       .eq('organization_id', organizationId);
 
+    const pipelineMap = new Map<string, { name: string; pipeline_type: string }>(
+      (allPipelines || []).map((p: any) => [p.id, { name: p.name, pipeline_type: p.pipeline_type }])
+    );
     const qualificationPipelineIds = (allPipelines || [])
-      .filter(p => p.pipeline_type === 'qualification')
-      .map(p => p.id);
+      .filter((p: any) => p.pipeline_type === 'qualification')
+      .map((p: any) => p.id);
     const salesPipelineIds = (allPipelines || [])
-      .filter(p => p.pipeline_type === 'sales')
-      .map(p => p.id);
+      .filter((p: any) => p.pipeline_type === 'sales')
+      .map((p: any) => p.id);
 
     console.log(`Pipelines - qualification: ${qualificationPipelineIds.length}, sales: ${salesPipelineIds.length}`);
 
