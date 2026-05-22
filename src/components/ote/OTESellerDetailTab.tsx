@@ -39,6 +39,9 @@ export function OTESellerDetailTab({ results, isLoading, isOTEMode = true }: OTE
     }).format(value);
   };
 
+  const formatGoalValue = (value: number, goalType?: 'revenue' | 'leads') =>
+    goalType === 'leads' ? `${Math.round(Number(value) || 0)} leads` : formatCurrency(value);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
