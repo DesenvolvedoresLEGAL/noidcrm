@@ -54,6 +54,7 @@ export function CreateOpportunityModal({
   const isSubmittingRef = useRef(false);
   const [currentUserId, setCurrentUserId] = useState<string>('');
   
+  const [entityType, setEntityType] = useState<'PJ' | 'PF'>('PJ');
   const [formData, setFormData] = useState({
     title: '',
     account_id: defaultAccountId || '',
@@ -66,6 +67,13 @@ export function CreateOpportunityModal({
     temperatura: 'warm' as 'cold' | 'warm' | 'hot' | 'burning',
     prob: 30,
     tags: [] as string[],
+  });
+  const [pfData, setPfData] = useState({
+    firstName: '',
+    lastName: '',
+    cpf: '',
+    email: '',
+    phone: '',
   });
   const [pipelineAutoSelected, setPipelineAutoSelected] = useState(false);
 
