@@ -183,11 +183,13 @@ async function buildDeal(
     return sum + (Number(item.total) || 0);
   }, 0);
 
-  const netTotal = approved.amount > 0
+  const roundMoney = (value: number) => Math.round((Number(value) || 0) * 100) / 100;
+
+  const netTotal = roundMoney(approved.amount > 0
     ? approved.amount
     : proposalTotalAmount > 0
       ? proposalTotalAmount
-      : Math.max(proposalSubtotal - proposalDiscountAmount, itemsGrossTotal);
+      : Math.max(proposalSubtotal - proposalDiscountAmount, itemsGrossTotal));
 
   const subtotalForBreakdown = proposalSubtotal > 0 ? proposalSubtotal : itemsGrossTotal;
   const discountTotal = proposalDiscountAmount > 0
@@ -219,14 +221,16 @@ async function buildDeal(
   const scaleFactor = itemsGrossTotal > 0 ? netTotal / itemsGrossTotal : 1;
   const scaledItems = itemsArr.map((item, idx) => {
     const original = Number(item.total) || 0;
-    let scaled = Math.round(original * scaleFactor * 100) / 100;
+    let scaled = roundMoney(original * scaleFactor);
     if (idx === itemsArr.length - 1 && itemsArr.length > 0) {
       const sumSoFar = itemsArr
         .slice(0, idx)
         .reduce((s, it) => s + Math.round((Number(it.total) || 0) * scaleFactor * 100) / 100, 0);
-      scaled = Math.round((netTotal - sumSoFar) * 100) / 100;
+      scaled = roundMoney(netTotal - sumSoFar);
     }
-    return { item, original, scaled };
+    const quantity = Number(item.quantity) || 1;
+    const scaledUnitPrice = roundMoney(scaled / quantity);
+    return { item, original, scaled, quantity, scaledUnitPrice };
   });
 
   console.log(
@@ -257,25 +261,36 @@ async function buildDeal(
     // cannot accidentally pick a gross/legacy field.
     amount: totalAmount,
     net_total: netTotal,
-    discount_total: discountTotal,
-    discount_percent: discountPercent,
-    subtotal: subtotalForBreakdown,
-    gross_total: itemsGrossTotal,
-    base_amount: approved.base_amount || itemsGrossTotal,
+    final_amount: netTotal,
+    valor_liquido: netTotal,
+    valor: netTotal,
+    value: netTotal,
+    valor_total: netTotal,
+    valor_venda: netTotal,
     total_amount: netTotal,
     total_with_discount: netTotal,
-    valor_liquido: netTotal,
-    final_amount: netTotal,
     total_negotiated: netTotal,
-    contract_total: paymentTerms?.contract_total && Number(paymentTerms.contract_total) > 0
-      ? Number(paymentTerms.contract_total)
-      : netTotal,
+    discount_total: discountTotal,
+    discount_percent: discountPercent,
+    subtotal: netTotal,
+    gross_total: netTotal,
+    base_amount: netTotal,
+    contract_total: netTotal,
     approved_amount: approved.amount || null,
     amount_source: approved.source,
     dynamic_pricing_enabled: approved.dynamic_enabled,
     dynamic_pricing_status: approved.dynamic_status,
     dynamic_pricing_current_amount: approved.dynamic_amount,
     dynamic_pricing_snapshot: approved.snapshot,
+    noid_financial_audit: {
+      canonical_amount: netTotal,
+      original_subtotal: subtotalForBreakdown,
+      original_items_gross_total: itemsGrossTotal,
+      discount_total: discountTotal,
+      discount_percent: discountPercent,
+      approved_amount: approved.amount || null,
+      amount_source: approved.source,
+    },
     status: "won",
     won_date: (proposal.accepted_at as string) || null,
     created_at: proposal.created_at as string,
@@ -311,19 +326,26 @@ async function buildDeal(
       : null) as string | null,
     contact_position: (contact?.cargo as string) || null,
 
-    // Products: total_price scaled so Σ === netTotal. unit_price/quantity preserved
-    // for human reading; original_total_price kept for auditing.
-    products: scaledItems.map(({ item, original, scaled }) => ({
+    // Products: every ERP-facing monetary field is scaled so Σ === netTotal.
+    // Original gross values stay nested under noid_original_pricing only.
+    products: scaledItems.map(({ item, original, scaled, quantity, scaledUnitPrice }) => ({
       id: item.id,
       product_id: item.product_id,
       name: item.name,
       description: item.description,
-      price: Number(item.unit_price) || 0,
-      quantity: Number(item.quantity) || 1,
+      price: scaledUnitPrice,
+      unit_price: scaledUnitPrice,
+      amount: scaled,
+      net_total: scaled,
+      final_amount: scaled,
+      quantity,
       discount_percent: Number(item.discount_percent) || 0,
       total_price: scaled,
       net_total_price: scaled,
-      original_total_price: original,
+      noid_original_pricing: {
+        unit_price: Number(item.unit_price) || 0,
+        total_price: original,
+      },
       billing_type: item.billing_type || "one_time",
       minimum_contract_months: item.minimum_contract_months ? Number(item.minimum_contract_months) : null,
     })),
@@ -339,9 +361,11 @@ async function buildDeal(
           contract_start_date: paymentTerms.contract_start_date,
           contract_duration_months: paymentTerms.contract_duration_months,
           monthly_value: paymentTerms.monthly_value ? Number(paymentTerms.monthly_value) : null,
-          contract_total: paymentTerms.contract_total && Number(paymentTerms.contract_total) > 0
-            ? Number(paymentTerms.contract_total)
-            : netTotal,
+          contract_total: netTotal,
+          amount: netTotal,
+          net_total: netTotal,
+          final_amount: netTotal,
+          total_amount: netTotal,
           billing_day: paymentTerms.billing_day,
           comments: paymentTerms.comments,
           vencimento,
