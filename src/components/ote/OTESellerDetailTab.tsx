@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { OTEMonthlyResult } from '@/hooks/useOTEData';
-import { 
-  User, 
-  Target, 
-  TrendingUp, 
+import { useOTESalesRecords } from '@/hooks/useOTESalesRecords';
+import { OTESellerSalesDrilldown } from './OTESellerSalesDrilldown';
+import {
+  User,
+  Target,
+  TrendingUp,
   Zap,
   Flag,
   ChevronDown,
