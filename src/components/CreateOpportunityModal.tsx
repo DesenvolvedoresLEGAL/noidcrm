@@ -26,8 +26,10 @@ import { ContactCombobox } from '@/components/opportunity/ContactCombobox';
 import { TagsMultiSelect } from '@/components/opportunity/TagsMultiSelect';
 import { OriginSelect } from '@/components/opportunity/OriginSelect';
 import { setOpportunityTags } from '@/hooks/useOrganizationTags';
-import { Loader2, Sparkles } from 'lucide-react';
+import { Loader2, Sparkles, Building2, User as UserIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { findOrCreatePersonAccount } from '@/services/crm/createPersonAccount';
 
 interface CreateOpportunityModalProps {
   open: boolean;
@@ -52,6 +54,7 @@ export function CreateOpportunityModal({
   const isSubmittingRef = useRef(false);
   const [currentUserId, setCurrentUserId] = useState<string>('');
   
+  const [entityType, setEntityType] = useState<'PJ' | 'PF'>('PJ');
   const [formData, setFormData] = useState({
     title: '',
     account_id: defaultAccountId || '',
@@ -64,6 +67,13 @@ export function CreateOpportunityModal({
     temperatura: 'warm' as 'cold' | 'warm' | 'hot' | 'burning',
     prob: 30,
     tags: [] as string[],
+  });
+  const [pfData, setPfData] = useState({
+    firstName: '',
+    lastName: '',
+    cpf: '',
+    email: '',
+    phone: '',
   });
   const [pipelineAutoSelected, setPipelineAutoSelected] = useState(false);
 
@@ -146,22 +156,29 @@ export function CreateOpportunityModal({
     if (isSubmittingRef.current || loading) return;
     isSubmittingRef.current = true;
     
-    if (!formData.title.trim()) {
+    if (!formData.title.trim() && entityType === 'PJ') {
       toast({ title: 'Campo obrigatório', description: 'Preencha o título da oportunidade', variant: 'destructive' });
       isSubmittingRef.current = false;
       return;
     }
 
-    if (!formData.account_id) {
-      toast({ title: 'Campo obrigatório', description: 'Selecione ou crie uma empresa', variant: 'destructive' });
-      isSubmittingRef.current = false;
-      return;
-    }
-
-    if (!formData.contact_id) {
-      toast({ title: 'Campo obrigatório', description: 'Selecione ou crie um contato', variant: 'destructive' });
-      isSubmittingRef.current = false;
-      return;
+    if (entityType === 'PJ') {
+      if (!formData.account_id) {
+        toast({ title: 'Campo obrigatório', description: 'Selecione ou crie uma empresa', variant: 'destructive' });
+        isSubmittingRef.current = false;
+        return;
+      }
+      if (!formData.contact_id) {
+        toast({ title: 'Campo obrigatório', description: 'Selecione ou crie um contato', variant: 'destructive' });
+        isSubmittingRef.current = false;
+        return;
+      }
+    } else {
+      if (!pfData.firstName.trim()) {
+        toast({ title: 'Campo obrigatório', description: 'Informe o nome da pessoa', variant: 'destructive' });
+        isSubmittingRef.current = false;
+        return;
+      }
     }
 
     if (!formData.pipeline_id) {
@@ -193,10 +210,32 @@ export function CreateOpportunityModal({
     try {
       const firstStage = selectedPipeline?.stages[0];
 
+      let accountId = formData.account_id;
+      let contactId = formData.contact_id;
+      let titleFallback = formData.account_name;
+
+      if (entityType === 'PF') {
+        const { data: { user } } = await supabase.auth.getUser();
+        const { data: orgId } = await supabase.rpc('get_user_organization_id');
+        if (!orgId) throw new Error('Usuário sem organização');
+
+        const result = await findOrCreatePersonAccount({
+          firstName: pfData.firstName,
+          lastName: pfData.lastName,
+          cpf: pfData.cpf,
+          email: pfData.email,
+          phone: pfData.phone,
+          organizationId: orgId as string,
+        });
+        accountId = result.account_id;
+        contactId = result.contact_id;
+        titleFallback = result.account_name;
+      }
+
       const opportunityData: any = {
-        title: formData.title || `Oportunidade - ${formData.account_name}`,
-        account_id: formData.account_id,
-        contact_id: formData.contact_id || undefined,
+        title: (formData.title || `Oportunidade - ${titleFallback}`).trim(),
+        account_id: accountId,
+        contact_id: contactId || undefined,
         pipeline_id: formData.pipeline_id,
         stage_id: firstStage?.id,
         owner_user_id: formData.owner_user_id || currentUserId,
@@ -225,6 +264,8 @@ export function CreateOpportunityModal({
         prob: 30,
         tags: [],
       });
+      setPfData({ firstName: '', lastName: '', cpf: '', email: '', phone: '' });
+      setEntityType('PJ');
       
       onOpenChange(false);
     } catch (error: any) {
@@ -247,44 +288,115 @@ export function CreateOpportunityModal({
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Tipo de cliente: PJ vs PF */}
+            <div className="md:col-span-2 space-y-2">
+              <Label>Tipo de cliente</Label>
+              <Tabs value={entityType} onValueChange={(v) => setEntityType(v as 'PJ' | 'PF')}>
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="PJ" disabled={!!defaultAccountId} className="gap-2">
+                    <Building2 className="h-4 w-4" /> Empresa (PJ)
+                  </TabsTrigger>
+                  <TabsTrigger value="PF" disabled={!!defaultAccountId} className="gap-2">
+                    <UserIcon className="h-4 w-4" /> Pessoa Física (PF)
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
+
             {/* Título */}
             <div className="md:col-span-2 space-y-2">
               <Label htmlFor="title">
-                Título <span className="text-destructive">*</span>
+                Título {entityType === 'PJ' && <span className="text-destructive">*</span>}
               </Label>
               <Input
                 id="title"
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                placeholder="Ex: Oportunidade - Empresa XPTO"
+                placeholder={
+                  entityType === 'PF'
+                    ? 'Opcional - será gerado a partir do nome da pessoa'
+                    : 'Ex: Oportunidade - Empresa XPTO'
+                }
               />
             </div>
 
-            {/* Conta/Empresa */}
-            <div className="space-y-2">
-              <Label>
-                Empresa <span className="text-destructive">*</span>
-              </Label>
-              <AccountCombobox
-                value={formData.account_id}
-                onChange={handleAccountChange}
-                disabled={!!defaultAccountId}
-              />
-            </div>
+            {entityType === 'PJ' ? (
+              <>
+                {/* Conta/Empresa */}
+                <div className="space-y-2">
+                  <Label>
+                    Empresa <span className="text-destructive">*</span>
+                  </Label>
+                  <AccountCombobox
+                    value={formData.account_id}
+                    onChange={handleAccountChange}
+                    disabled={!!defaultAccountId}
+                  />
+                </div>
 
-            {/* Contato */}
-            <div className="space-y-2">
-              <Label>
-                Contato <span className="text-destructive">*</span>
-              </Label>
-              <ContactCombobox
-                value={formData.contact_id}
-                onChange={(contactId) => setFormData({ ...formData, contact_id: contactId })}
-                accountId={formData.account_id}
-                disabled={!formData.account_id}
-                placeholder={!formData.account_id ? "Selecione uma empresa primeiro" : "Selecione o contato..."}
-              />
-            </div>
+                {/* Contato */}
+                <div className="space-y-2">
+                  <Label>
+                    Contato <span className="text-destructive">*</span>
+                  </Label>
+                  <ContactCombobox
+                    value={formData.contact_id}
+                    onChange={(contactId) => setFormData({ ...formData, contact_id: contactId })}
+                    accountId={formData.account_id}
+                    disabled={!formData.account_id}
+                    placeholder={!formData.account_id ? "Selecione uma empresa primeiro" : "Selecione o contato..."}
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <Label>
+                    Nome <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    value={pfData.firstName}
+                    onChange={(e) => setPfData({ ...pfData, firstName: e.target.value })}
+                    placeholder="Ex: João"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Sobrenome</Label>
+                  <Input
+                    value={pfData.lastName}
+                    onChange={(e) => setPfData({ ...pfData, lastName: e.target.value })}
+                    placeholder="Ex: Silva"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>CPF</Label>
+                  <Input
+                    value={pfData.cpf}
+                    onChange={(e) => setPfData({ ...pfData, cpf: e.target.value })}
+                    placeholder="000.000.000-00"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Telefone</Label>
+                  <Input
+                    type="tel"
+                    value={pfData.phone}
+                    onChange={(e) => setPfData({ ...pfData, phone: e.target.value })}
+                    placeholder="(11) 99999-9999"
+                  />
+                </div>
+                <div className="md:col-span-2 space-y-2">
+                  <Label>E-mail</Label>
+                  <Input
+                    type="email"
+                    value={pfData.email}
+                    onChange={(e) => setPfData({ ...pfData, email: e.target.value })}
+                    placeholder="joao@email.com"
+                  />
+                </div>
+              </>
+            )}
+
 
             {/* Pipeline */}
             <div className="space-y-2">
