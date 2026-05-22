@@ -242,6 +242,16 @@ export function OTESellerDetailTab({ results, isLoading, isOTEMode = true }: OTE
                   </div>
                 </div>
 
+                {/* Drill-down: detalhe transparente das vendas / leads qualificados */}
+                <div className="mt-6 pt-4 border-t">
+                  <OTESellerSalesDrilldown
+                    records={allRecords.filter((r) => r.ote_result_id === result.id)}
+                    kind={result.goal_type === 'leads' ? 'qualified_lead' : 'sale'}
+                    loading={recordsLoading}
+                  />
+                </div>
+
+
                 {/* Status */}
                 <div className="mt-6 pt-4 border-t flex items-center justify-between">
                   <div className="flex items-center gap-2">
