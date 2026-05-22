@@ -28,6 +28,9 @@ interface OTESellerDetailTabProps {
 
 export function OTESellerDetailTab({ results, isLoading, isOTEMode = true }: OTESellerDetailTabProps) {
   const [expandedSeller, setExpandedSeller] = useState<string | null>(null);
+  const resultIds = results.map((r) => r.id);
+  const { data: allRecords = [], isLoading: recordsLoading } = useOTESalesRecords(resultIds);
+
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
