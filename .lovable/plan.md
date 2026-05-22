@@ -1,73 +1,58 @@
-## Problemas identificados
+## Diagnóstico
 
-### 1. OTE mostra valores em R$ para vendedores com meta de leads qualificados
-No print, **Ana Paula (Hunter)** e **Bruno (Scout)** têm `goal_type = 'leads'`, mas a UI exibe a meta como "R$ 50,00 / Vendas R$ 9,00" — deveria ser "50 leads / 9 leads".
+A causa raiz é **um único bug SQL** em `public.recalculate_proposal_pricing_ledger(p_proposal_id)`. Quando a faixa dinâmica atual (`is_current=true`) tem `starts_at IS NULL` (típico da primeira faixa "30 dias ou mais antes do evento"), o filtro:
 
-Pontos onde o currency aparece indevidamente quando `goal_type === 'leads'`:
-
-- `src/components/ote/OTESellerDetailTab.tsx`
-  - Bloco "Vendas e Meta" → `formatCurrency(result.goal_amount)` e `formatCurrency(result.total_sales)` (linhas 133 e 137).
-  - Header colapsado: "Variável Final R$ 0,00" deve **permanecer em R$** (é comissão paga), mas o subtítulo "Variável Base" / "Ajuste Final" / "Variável Final" continuam em R$ pois são valores monetários reais — manter.
-- `src/components/ote/OTEOverviewTab.tsx` — verificar e ajustar os cards/listas que mostram "Meta" e "Total de Vendas" usando currency.
-- `src/components/ote/export/buildOTEWorkbook.ts` — colunas "Meta" e "Vendas" no Excel também devem ser formatadas como inteiros + "leads" (ou número puro com header "Leads qualificados") quando `goal_type='leads'`.
-
-Regra: usar um helper `formatGoalValue(value, goalType)` que retorna `"X leads"` quando `goalType === 'leads'` e `formatCurrency(value)` quando `'revenue'`. Já existe padrão equivalente em `RepKPICards.tsx` / `RepPACECard.tsx` — reaproveitar a mesma convenção.
-
-### 2. Roleplay sempre exibe `- 0%` (não puxa nada)
-Bug no edge function `supabase/functions/calculate-ote/index.ts` (linha ~315):
-
-```ts
-const { data: roleplaySessions } = await supabase
-  .from('roleplay_sessions')
-  .select('score_overall, passed')
-  .eq('seller_id', config.user_id)
-  .gte('started_at', startDate)
-  .lte('started_at', endDate)
-  .eq('status', 'completed');   // ❌ coluna 'status' não existe em roleplay_sessions
+```sql
+WHERE starts_at <= v_reference_date
+  AND (ends_at IS NULL OR ends_at > v_reference_date)
 ```
 
-A tabela `roleplay_sessions` **não tem coluna `status`** (confirmado via information_schema). PostgREST rejeita o filtro e devolve array vazio → `roleplayScore` sempre `null` e `roleplay_accelerator = 0`.
+avalia `NULL <= …` como NULL, e nenhuma faixa é selecionada. Resultado: `dynamic_adjustment.amount = 0`, `base_amount = effective_amount = subtotal_items` no snapshot.
 
-Existem dados reais (ex.: 39 sessões para um seller com média 6.65 em maio/26), portanto basta corrigir o filtro.
+Como `pricing_breakdown_snapshot` é a Single Source of Truth do PRICE CORE 2.0, todos os blocos que leem do ledger mostram R$ 1.994,00:
+- "Composição do valor" (editor)
+- Header do link público (R$ 1.994,00)
+- "Condições de Pagamento → Pagamento Avulso" no link público
 
-Correção:
-- Trocar `.eq('status', 'completed')` por `.not('finished_at', 'is', null)` (sessão concluída).
-- Adicional: filtrar por `organization_id = organizationId` (segurança multi-tenant).
-- Considerar somente sessões com `score_overall IS NOT NULL` para a média.
+Os blocos que leem **direto** de `proposal_dynamic_pricing_tiers` ou do cálculo live (cronograma do editor, Tabela de Preço Dinâmica, "Total Vigente Hoje", PDF) seguem corretos com R$ 1.794,60 — daí a inconsistência aparente.
 
-### 3. Amarrar média de roleplay à UI/Excel
-Após o fix acima:
-- `OTESellerDetailTab.tsx` já lê `result.roleplay_score` — vai passar a popular.
-- Verificar `buildOTEWorkbook.ts` para garantir que a aba "Performance" exibe `roleplay_score`, contagem de treinos e `roleplay_accelerator` por vendedor (transparência).
+Confirmação via DB para PROP-2026-00783:
+- Tier atual: `starts_at=null`, `ends_at=2026-06-16`, `adjustment_value=-10`, `final_amount=1794.60`, `is_current=true`
+- Snapshot atual: `base_amount=1994`, `dynamic.amount=0`, `effective_amount=1994`, `payment_schedule[0].amount=1994` com `due_date=2026-05-22` (também errado — deveria ser 16/06)
 
-## Plano de execução
+## O que vou fazer
 
-1. **Edge function `calculate-ote`** — corrigir o query de `roleplay_sessions`:
-   - Remover `.eq('status', 'completed')`.
-   - Adicionar `.not('finished_at', 'is', null)` e `.eq('organization_id', organizationId)`.
-   - Logar `roleplaySessions.length` e `avgScore` para auditoria.
+### 1. Migration — corrigir `recalculate_proposal_pricing_ledger`
+Trocar a cláusula que seleciona a faixa vigente para tolerar `starts_at` nulo:
 
-2. **Helper de formatação por tipo de meta** — criar `src/components/ote/lib/formatGoal.ts` exportando `formatGoalValue(value, goalType)` e `formatGoalUnit(goalType)`. Reutilizado em todos os componentes OTE.
+```sql
+WHERE proposal_id = p_proposal_id
+  AND (starts_at IS NULL OR starts_at <= v_reference_date)
+  AND (ends_at IS NULL OR ends_at > v_reference_date)
+ORDER BY tier_order DESC
+LIMIT 1;
+```
 
-3. **`OTESellerDetailTab.tsx`**:
-   - Substituir `formatCurrency(goal_amount)` e `formatCurrency(total_sales)` por `formatGoalValue(..., result.goal_type)`.
-   - Trocar label "Vendas" por "Leads qualificados" quando `goal_type='leads'`.
-   - Manter Variável Base / Ajuste Final / Variável Final em R$.
+Mantém o resto da função intacto. Sem alterar contrato/colunas/JSON do snapshot.
 
-4. **`OTEOverviewTab.tsx`** — mesmo tratamento: meta agregada deve diferenciar revenue vs leads (ou separar em duas colunas/cards quando o time é misto).
+### 2. Backfill seguro
+No mesmo migration, rodar `recalculate_proposal_pricing_ledger(id)` para todas as propostas:
+- com `dynamic_pricing_enabled = true`
+- não `cancelled`/`declined`
+- não `price_frozen_on_approval = true` (congeladas mantêm snapshot da aprovação)
+- que tenham alguma tier com `starts_at IS NULL`
 
-5. **`buildOTEWorkbook.ts`** — nas abas "Closers", "Pré-vendas" e "Resumo":
-   - Header dinâmico ("Meta (R$)" vs "Meta (leads)").
-   - Não somar valores de revenue e leads no mesmo total.
-   - Aba "Performance" deve mostrar `Roleplay (média)`, `Nº treinos`, `Acelerador roleplay %`.
+Isso normaliza retroativamente todos os ledgers afetados sem mexer em propostas congeladas/ganhas.
 
-6. **Deploy** do edge function e instrução: o usuário precisa clicar em **Calcular** novamente em OTE para repopular `roleplay_score`.
+### 3. Validação
+- Reler snapshot de PROP-2026-00783 e confirmar: `base_amount=1994`, `dynamic.amount=-199.40`, `effective_amount=1794.60`, `payment_schedule[0].amount=1794.60`, `payment_schedule[0].due_date=2026-06-16` (vem de `first_installment_date`, que já está correto após o backfill — vou validar).
+- Abrir link público e editor para confirmar que "Composição do valor", header e "Pagamento Avulso" agora batem em R$ 1.794,60.
+
+## Fora de escopo
+- Não alterar React/TS: a UI já está correta lendo do ledger; o bug é 100% backend.
+- Não alterar lógica de propostas frozen/aprovadas — ledger delas não é recalculado.
+- Não tocar em `ensure_proposal_pricing_ready` (o guard continua válido — só passa a ver o snapshot correto).
 
 ## Riscos
-- A correção do filtro pode trazer scores que antes eram `null` → aceleradores podem mudar o `final_variable_amount`. Esperado e desejado (essa é a regra de negócio).
-- Excel precisa preservar fórmulas existentes que esperam coluna numérica em R$; ao mudar para "leads" como texto, ajustar somatórios para não quebrar.
-
-## Out of scope
-- Não mexer em regras de acelerador/desacelerador.
-- Não mexer no fluxo de aprovação/pagamento de comissão.
-- Não criar nova fonte de roleplay (continua `roleplay_sessions.score_overall`).
+- **Baixo.** A mudança é uma única linha que adiciona tolerância a NULL; não muda o ordering nem o cálculo. Propostas sem faixa "starts_at NULL" continuam idênticas.
+- Backfill é idempotente e exclui propostas congeladas.
