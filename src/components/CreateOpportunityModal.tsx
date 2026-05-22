@@ -26,8 +26,10 @@ import { ContactCombobox } from '@/components/opportunity/ContactCombobox';
 import { TagsMultiSelect } from '@/components/opportunity/TagsMultiSelect';
 import { OriginSelect } from '@/components/opportunity/OriginSelect';
 import { setOpportunityTags } from '@/hooks/useOrganizationTags';
-import { Loader2, Sparkles } from 'lucide-react';
+import { Loader2, Sparkles, Building2, User as UserIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { findOrCreatePersonAccount } from '@/services/crm/createPersonAccount';
 
 interface CreateOpportunityModalProps {
   open: boolean;
