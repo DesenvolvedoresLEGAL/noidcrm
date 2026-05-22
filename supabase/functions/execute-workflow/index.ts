@@ -482,7 +482,21 @@ serve(async (req) => {
                 .insert(newOpp)
                 .select()
                 .single();
-              
+
+              // 23505 = unique_violation. Triggered by partial UNIQUE INDEX
+              // opportunities_no_duplicate_handoff_uidx when two workflow runs race.
+              // Treat as skip (the other run already created the deal).
+              if (error && (error as any).code === '23505') {
+                console.log(`[execute-workflow] SKIPPING DUPLICATE (race): unique index blocked duplicate handoff for source ${opportunity.id} → pipeline ${targetPipelineId}`);
+                result = {
+                  action: 'duplicate',
+                  success: false,
+                  skipped: true,
+                  reason: 'Duplicate blocked by unique index (concurrent run)',
+                };
+                break;
+              }
+
               if (data?.id) {
                 lastDuplicatedOpportunityId = data.id;
                 
