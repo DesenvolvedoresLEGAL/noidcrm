@@ -156,22 +156,29 @@ export function CreateOpportunityModal({
     if (isSubmittingRef.current || loading) return;
     isSubmittingRef.current = true;
     
-    if (!formData.title.trim()) {
+    if (!formData.title.trim() && entityType === 'PJ') {
       toast({ title: 'Campo obrigatório', description: 'Preencha o título da oportunidade', variant: 'destructive' });
       isSubmittingRef.current = false;
       return;
     }
 
-    if (!formData.account_id) {
-      toast({ title: 'Campo obrigatório', description: 'Selecione ou crie uma empresa', variant: 'destructive' });
-      isSubmittingRef.current = false;
-      return;
-    }
-
-    if (!formData.contact_id) {
-      toast({ title: 'Campo obrigatório', description: 'Selecione ou crie um contato', variant: 'destructive' });
-      isSubmittingRef.current = false;
-      return;
+    if (entityType === 'PJ') {
+      if (!formData.account_id) {
+        toast({ title: 'Campo obrigatório', description: 'Selecione ou crie uma empresa', variant: 'destructive' });
+        isSubmittingRef.current = false;
+        return;
+      }
+      if (!formData.contact_id) {
+        toast({ title: 'Campo obrigatório', description: 'Selecione ou crie um contato', variant: 'destructive' });
+        isSubmittingRef.current = false;
+        return;
+      }
+    } else {
+      if (!pfData.firstName.trim()) {
+        toast({ title: 'Campo obrigatório', description: 'Informe o nome da pessoa', variant: 'destructive' });
+        isSubmittingRef.current = false;
+        return;
+      }
     }
 
     if (!formData.pipeline_id) {
@@ -203,10 +210,32 @@ export function CreateOpportunityModal({
     try {
       const firstStage = selectedPipeline?.stages[0];
 
+      let accountId = formData.account_id;
+      let contactId = formData.contact_id;
+      let titleFallback = formData.account_name;
+
+      if (entityType === 'PF') {
+        const { data: { user } } = await supabase.auth.getUser();
+        const { data: orgId } = await supabase.rpc('get_user_organization_id');
+        if (!orgId) throw new Error('Usuário sem organização');
+
+        const result = await findOrCreatePersonAccount({
+          firstName: pfData.firstName,
+          lastName: pfData.lastName,
+          cpf: pfData.cpf,
+          email: pfData.email,
+          phone: pfData.phone,
+          organizationId: orgId as string,
+        });
+        accountId = result.account_id;
+        contactId = result.contact_id;
+        titleFallback = result.account_name;
+      }
+
       const opportunityData: any = {
-        title: formData.title || `Oportunidade - ${formData.account_name}`,
-        account_id: formData.account_id,
-        contact_id: formData.contact_id || undefined,
+        title: (formData.title || `Oportunidade - ${titleFallback}`).trim(),
+        account_id: accountId,
+        contact_id: contactId || undefined,
         pipeline_id: formData.pipeline_id,
         stage_id: firstStage?.id,
         owner_user_id: formData.owner_user_id || currentUserId,
