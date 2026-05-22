@@ -133,11 +133,11 @@ export function OTESellerDetailTab({ results, isLoading, isOTEMode = true }: OTE
                       <div className="grid grid-cols-2 gap-4 text-sm">
                         <div>
                           <p className="text-muted-foreground">Meta</p>
-                          <p className="font-semibold">{formatCurrency(result.goal_amount)}</p>
+                          <p className="font-semibold">{formatGoalValue(result.goal_amount, result.goal_type)}</p>
                         </div>
                         <div>
-                          <p className="text-muted-foreground">Vendas</p>
-                          <p className="font-semibold">{formatCurrency(result.total_sales)}</p>
+                          <p className="text-muted-foreground">{result.goal_type === 'leads' ? 'Leads Qualificados' : 'Vendas'}</p>
+                          <p className="font-semibold">{formatGoalValue(result.total_sales, result.goal_type)}</p>
                         </div>
                       </div>
                     </div>
