@@ -164,12 +164,16 @@ Deno.serve(async (req) => {
       ? pricingErpAmount
       : (approved.amount > 0 ? approved.amount : itemsNetTotal);
 
+    const roundMoney = (value: number) => Math.round((Number(value) || 0) * 100) / 100;
+
     // Financial breakdown — same shape as api-deals so the ERP receives an
-    // unambiguous NET value across every legacy field name.
+    // unambiguous NET value across every legacy field name. Gross/source
+    // values must stay only inside noid_financial_audit so the ERP cannot
+    // accidentally pick subtotal/items gross as the receivable amount.
     const proposalSubtotal = Number((proposal as any).subtotal) || 0;
     const proposalDiscountAmount = Number((proposal as any).discount_amount) || 0;
     const subtotalForBreakdown = proposalSubtotal > 0 ? proposalSubtotal : rawTotal;
-    const netTotal = totalAmount;
+    const netTotal = roundMoney(totalAmount);
     const discountTotal = proposalDiscountAmount > 0
       ? proposalDiscountAmount
       : Math.max(subtotalForBreakdown - netTotal, 0);
@@ -201,15 +205,17 @@ Deno.serve(async (req) => {
     const scaleFactor = grossSum > 0 ? netTotal / grossSum : 1;
     const scaledItems = itemsArr.map((item, idx) => {
       const original = Number(item.total) || 0;
-      let scaled = Math.round(original * scaleFactor * 100) / 100;
+      let scaled = roundMoney(original * scaleFactor);
       // Force last item to absorb rounding so the sum matches netTotal exactly.
       if (idx === itemsArr.length - 1) {
         const sumSoFar = itemsArr
           .slice(0, idx)
           .reduce((s, it) => s + Math.round((Number(it.total) || 0) * scaleFactor * 100) / 100, 0);
-        scaled = Math.round((netTotal - sumSoFar) * 100) / 100;
+        scaled = roundMoney(netTotal - sumSoFar);
       }
-      return { item, original, scaled };
+      const quantity = Number(item.quantity) || 1;
+      const scaledUnitPrice = roundMoney(scaled / quantity);
+      return { item, original, scaled, quantity, scaledUnitPrice };
     });
     const scaledSum = scaledItems.reduce((s, x) => s + x.scaled, 0);
     console.log(
@@ -242,12 +248,15 @@ Deno.serve(async (req) => {
       net_total: netTotal,
       final_amount: netTotal,
       valor_liquido: netTotal,
+      valor: netTotal,
+      value: netTotal,
+      valor_total: netTotal,
+      valor_venda: netTotal,
       total_with_discount: netTotal,
       total_negotiated: netTotal,
       total_amount: netTotal,
-      // Breakdown for transparency
-      subtotal: subtotalForBreakdown,
-      gross_total: grossSum,
+      subtotal: netTotal,
+      gross_total: netTotal,
       discount_total: discountTotal,
       discount_percent: discountPercent,
       base_amount: approved.base_amount || itemsNetTotal,
@@ -257,6 +266,17 @@ Deno.serve(async (req) => {
       pricing_erp_amount: pricingErpAmount || null,
       pricing_breakdown_snapshot: (proposal as any).pricing_breakdown_snapshot || null,
       approval_snapshot: (proposal as any).approval_snapshot || null,
+      noid_financial_audit: {
+        canonical_amount: netTotal,
+        original_subtotal: subtotalForBreakdown,
+        original_items_gross_total: grossSum,
+        original_items_net_total: itemsNetTotal,
+        discount_total: discountTotal,
+        discount_percent: discountPercent,
+        pricing_erp_amount: pricingErpAmount || null,
+        approved_amount: approved.amount || null,
+        amount_source: approved.source,
+      },
       dynamic_pricing_enabled: approved.dynamic_enabled,
       dynamic_pricing_status: approved.dynamic_status,
       dynamic_pricing_snapshot: approved.snapshot,
@@ -291,17 +311,24 @@ Deno.serve(async (req) => {
       contact_position: (contact?.cargo as string) || null,
       // Products: total_price scaled so Σ === netTotal. unit_price/quantity preserved
       // for human reading; original_total_price kept for auditing.
-      products: scaledItems.map(({ item, original, scaled }) => ({
+      products: scaledItems.map(({ item, original, scaled, quantity, scaledUnitPrice }) => ({
         id: item.id,
         product_id: item.product_id,
         name: item.name,
         description: item.description,
-        price: Number(item.unit_price) || 0,
-        quantity: Number(item.quantity) || 1,
+        price: scaledUnitPrice,
+        unit_price: scaledUnitPrice,
+        amount: scaled,
+        net_total: scaled,
+        final_amount: scaled,
+        quantity,
         discount_percent: Number(item.discount_percent) || 0,
         total_price: scaled,
         net_total_price: scaled,
-        original_total_price: original,
+        noid_original_pricing: {
+          unit_price: Number(item.unit_price) || 0,
+          total_price: original,
+        },
         billing_type: item.billing_type || "one_time",
         minimum_contract_months: item.minimum_contract_months ? Number(item.minimum_contract_months) : null,
       })),
@@ -315,7 +342,7 @@ Deno.serve(async (req) => {
             contract_start_date: paymentTerms.contract_start_date,
             contract_duration_months: paymentTerms.contract_duration_months,
             monthly_value: paymentTerms.monthly_value ? Number(paymentTerms.monthly_value) : null,
-            contract_total: paymentTerms.contract_total ? Number(paymentTerms.contract_total) : netTotal,
+            contract_total: netTotal,
             billing_day: paymentTerms.billing_day,
             comments: paymentTerms.comments,
             vencimento,
