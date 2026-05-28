@@ -1,15 +1,27 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { Calendar, RefreshCw, Filter } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Calendar, RefreshCw, Star, AlertTriangle } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { format, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear, formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { ForecastFilters as FilterType } from '@/hooks/useForecastData';
-import { forecastKeys } from '@/lib/query-keys';
 import { toast } from 'sonner';
 
 interface ForecastFiltersProps {
+  filters: FilterType;
+  onFiltersChange: (filters: FilterType) => void;
+  onRefresh: () => void | Promise<void>;
+  isLoading?: boolean;
+  isFetching?: boolean;
+  dataUpdatedAt?: number;
+  /** Sprint F2.10 — official sales pipeline (read-only badge) */
+  salesPipelineName?: string | null;
+  /** Sprint F2.10 — true when no sales pipeline could be resolved */
+  salesPipelineMissing?: boolean;
+}
+
   filters: FilterType;
   onFiltersChange: (filters: FilterType) => void;
   onRefresh: () => void | Promise<void>;
