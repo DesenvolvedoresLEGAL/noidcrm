@@ -1,12 +1,12 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { Calendar, RefreshCw, Filter } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Calendar, RefreshCw, Star, AlertTriangle } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { format, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear, formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { ForecastFilters as FilterType } from '@/hooks/useForecastData';
-import { forecastKeys } from '@/lib/query-keys';
 import { toast } from 'sonner';
 
 interface ForecastFiltersProps {
@@ -16,22 +16,22 @@ interface ForecastFiltersProps {
   isLoading?: boolean;
   isFetching?: boolean;
   dataUpdatedAt?: number;
+  /** Sprint F2.10 — official sales pipeline (read-only badge) */
+  salesPipelineName?: string | null;
+  /** Sprint F2.10 — true when no sales pipeline could be resolved */
+  salesPipelineMissing?: boolean;
 }
 
-export function ForecastFilters({ filters, onFiltersChange, onRefresh, isLoading, isFetching, dataUpdatedAt }: ForecastFiltersProps) {
-  const { data: pipelines } = useQuery({
-    queryKey: forecastKeys.pipelines(),
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('pipelines')
-        .select('id, name, pipeline_type, is_primary')
-        .eq('pipeline_type', 'sales')
-        .order('name');
-      if (error) throw error;
-      return data || [];
-    },
-  });
-
+export function ForecastFilters({
+  filters,
+  onFiltersChange,
+  onRefresh,
+  isLoading,
+  isFetching,
+  dataUpdatedAt,
+  salesPipelineName,
+  salesPipelineMissing,
+}: ForecastFiltersProps) {
   const { data: team } = useQuery({
     queryKey: ['team-members-sales-cs'],
     queryFn: async () => {
@@ -111,25 +111,18 @@ export function ForecastFilters({ filters, onFiltersChange, onRefresh, isLoading
         <span className="text-sm text-muted-foreground capitalize">{periodLabel}</span>
       </div>
 
-      <div className="flex items-center gap-2">
-        <Filter className="h-4 w-4 text-muted-foreground" />
-        <Select
-          value={filters.pipelineId || 'all'}
-          onValueChange={(v) => onFiltersChange({ ...filters, pipelineId: v === 'all' ? undefined : v })}
-        >
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Todos os pipelines" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Pipeline Principal</SelectItem>
-            {pipelines?.map((p) => (
-              <SelectItem key={p.id} value={p.id}>
-                {p.name} {(p as any).is_primary ? '⭐' : ''}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      {/* Sprint F2.10 — Pipeline de vendas é resolvido automaticamente, não editável */}
+      {salesPipelineMissing ? (
+        <Badge variant="outline" className="gap-1.5 px-3 py-1.5 border-red-500/40 bg-red-500/10 text-red-600">
+          <AlertTriangle className="h-3.5 w-3.5" />
+          Pipeline de vendas não configurado
+        </Badge>
+      ) : (
+        <Badge variant="outline" className="gap-1.5 px-3 py-1.5 border-emerald-500/30 bg-emerald-500/10 text-emerald-700">
+          <Star className="h-3.5 w-3.5 fill-current" />
+          Pipeline de Vendas: {salesPipelineName ?? '—'}
+        </Badge>
+      )}
 
       <Select
         value={filters.userId || 'all'}

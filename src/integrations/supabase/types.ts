@@ -34238,6 +34238,10 @@ export type Database = {
         }
         Returns: Json
       }
+      get_forecast_sales_pipeline_v2: {
+        Args: { p_organization_id: string }
+        Returns: Json
+      }
       get_forecast_seller_accuracy_v2: {
         Args: {
           p_organization_id: string
