@@ -121,43 +121,54 @@ serve(async (req) => {
 
       for (const org of orgs || []) {
         try {
-          // Pipelines comerciais ativos
-          let pipelinesQuery = supabase
-            .from('pipelines')
-            .select('id, pipeline_type, is_primary')
-            .eq('organization_id', org.id)
-            .eq('pipeline_type', 'sales');
-          if (payload.pipeline_id) pipelinesQuery = pipelinesQuery.eq('id', payload.pipeline_id);
-          const { data: pipelines, error: pipErr } = await pipelinesQuery;
-          if (pipErr) throw pipErr;
+          // Sprint F2.10 — resolve pipeline oficial de vendas (1 por org)
+          const { data: resolved, error: resolveErr } = await supabase.rpc(
+            'get_forecast_sales_pipeline_v2',
+            { p_organization_id: org.id },
+          );
+          if (resolveErr) throw resolveErr;
+          const salesPipelineId = (resolved as any)?.pipeline_id as string | null;
 
-          for (const pipeline of pipelines || []) {
-            // Snapshot global
-            await runOne(org.id, pipeline.id, null);
+          if (!salesPipelineId) {
+            console.warn('[snapshot] skipped_no_sales_pipeline', { orgId: org.id });
+            errors.push({ orgId: org.id, status: 'skipped_no_sales_pipeline' });
+            continue;
+          }
 
-            // Snapshot por vendedor com oportunidades no período
-            try {
-              const { data: sellers } = await supabase
-                .from('opportunities')
-                .select('user_id')
-                .eq('organization_id', org.id)
-                .eq('pipeline_id', pipeline.id)
-                .is('deleted_at', null)
-                .not('user_id', 'is', null);
-              const uniqueSellers = Array.from(new Set((sellers || []).map((s: any) => s.user_id).filter(Boolean)));
-              for (const sellerId of uniqueSellers) {
-                await runOne(org.id, pipeline.id, sellerId as string);
-              }
-            } catch (e: any) {
-              console.error('[snapshot] sellers fetch failed', { orgId: org.id, pipelineId: pipeline.id, error: e?.message });
+          if (payload.pipeline_id && payload.pipeline_id !== salesPipelineId) {
+            console.warn('[snapshot] requested pipeline is not the sales pipeline; skipping', {
+              orgId: org.id,
+              requested: payload.pipeline_id,
+              sales: salesPipelineId,
+            });
+            continue;
+          }
+
+          // Snapshot global
+          await runOne(org.id, salesPipelineId, null);
+
+          // Snapshot por vendedor com oportunidades no período (apenas pipeline de vendas)
+          try {
+            const { data: sellers } = await supabase
+              .from('opportunities')
+              .select('user_id')
+              .eq('organization_id', org.id)
+              .eq('pipeline_id', salesPipelineId)
+              .is('deleted_at', null)
+              .not('user_id', 'is', null);
+            const uniqueSellers = Array.from(new Set((sellers || []).map((s: any) => s.user_id).filter(Boolean)));
+            for (const sellerId of uniqueSellers) {
+              await runOne(org.id, salesPipelineId, sellerId as string);
             }
+          } catch (e: any) {
+            console.error('[snapshot] sellers fetch failed', { orgId: org.id, pipelineId: salesPipelineId, error: e?.message });
           }
         } catch (e: any) {
           console.error('[snapshot] org failed', { orgId: org.id, error: e?.message });
           errors.push({ orgId: org.id, message: e?.message || String(e) });
         }
       }
-    }
+
   } catch (e: any) {
     console.error('[snapshot] fatal', e);
     if (logId) {
