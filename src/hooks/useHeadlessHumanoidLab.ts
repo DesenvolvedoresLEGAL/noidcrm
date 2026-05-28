@@ -63,7 +63,7 @@ export function useHeadlessHumanoidHealth() {
   return useQuery({
     queryKey: ['hh-lab', 'health', organization?.id],
     enabled: !!organization?.id,
-    refetchInterval: 30000,
+    refetchInterval: 90000, // Fase 1A: 30s → 90s
     queryFn: async (): Promise<HeadlessHumanoidHealth> => {
       const { data, error } = await supabase.rpc('get_headless_humanoid_health' as never, {
         p_org_id: organization!.id,
@@ -107,7 +107,7 @@ export function useActionExecutions(filters: ExecutionFilters = {}) {
   return useQuery({
     queryKey: ['hh-lab', 'executions', organization?.id, filters],
     enabled: !!organization?.id,
-    refetchInterval: 15000,
+    refetchInterval: 60000, // Fase 1A: 15s → 60s
     queryFn: async () => {
       let q = supabase
         .from('action_executions' as never)
@@ -146,7 +146,7 @@ export function useApprovalQueue() {
   return useQuery({
     queryKey: ['hh-lab', 'approvals', organization?.id],
     enabled: !!organization?.id,
-    refetchInterval: 15000,
+    refetchInterval: 60000, // Fase 1A: 15s → 60s
     queryFn: async () => {
       const { data, error } = await supabase
         .from('unified_approval_queue_view' as never)
@@ -195,7 +195,7 @@ export function useUnifiedAudit(limit = 200) {
   return useQuery({
     queryKey: ['hh-lab', 'audit', organization?.id, limit],
     enabled: !!organization?.id,
-    refetchInterval: 20000,
+    refetchInterval: 60000, // Fase 1A: 20s → 60s
     queryFn: async () => {
       const { data, error } = await supabase
         .from('unified_audit_view' as never)

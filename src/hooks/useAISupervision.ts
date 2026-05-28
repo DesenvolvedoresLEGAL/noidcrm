@@ -23,7 +23,11 @@ export function useAIActionStats() {
   return useQuery<AIActionStats>({
     queryKey: aiSupervisionKeys.actionStats(),
     queryFn: getAIActionStats,
-    refetchInterval: 30000,
+export function useAIActionStats() {
+  return useQuery<AIActionStats>({
+    queryKey: aiSupervisionKeys.actionStats(),
+    queryFn: getAIActionStats,
+    refetchInterval: 60000, // Fase 1A: 30s → 60s (não crítico)
   });
 }
 
@@ -31,7 +35,7 @@ export function useAIAlertStats() {
   return useQuery<AIAlertStats>({
     queryKey: aiSupervisionKeys.alertStats(),
     queryFn: getAIAlertStats,
-    refetchInterval: 30000,
+    refetchInterval: 60000, // Fase 1A: 30s → 60s (não crítico)
   });
 }
 
@@ -39,7 +43,7 @@ export function useRecentAIActions(limit = 20) {
   return useQuery<AIAction[]>({
     queryKey: aiSupervisionKeys.recentActions(limit),
     queryFn: () => getRecentAIActions(limit),
-    refetchInterval: 15000,
+    refetchInterval: 60000, // Fase 1A: 15s → 60s (não crítico)
   });
 }
 
@@ -47,7 +51,7 @@ export function usePendingApprovals() {
   return useQuery<AIAction[]>({
     queryKey: aiSupervisionKeys.pendingApprovals(),
     queryFn: getPendingApprovals,
-    refetchInterval: 10000,
+    refetchInterval: 10000, // mantido: aprovações de IA são críticas
   });
 }
 
@@ -55,7 +59,10 @@ export function useActiveAlerts() {
   return useQuery<AIAlert[]>({
     queryKey: aiSupervisionKeys.activeAlerts(),
     queryFn: getActiveAlerts,
-    refetchInterval: 15000,
+    refetchInterval: 45000, // Fase 1A: 15s → 45s (não crítico)
+  });
+}
+
   });
 }
 

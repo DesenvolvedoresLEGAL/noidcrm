@@ -234,9 +234,10 @@ export function useRunEvents(runId: string | null) {
       return data as RunEvent[];
     },
     enabled: !!runId,
-    // Fallback (run_events nem sempre tem realtime habilitado): 30s
-    refetchInterval: 30000,
+    // Realtime ativo acima; fallback longo apenas para reconexão.
+    refetchInterval: 120000,
   });
+
 }
 
 export function useProspects(runId: string | null) {
@@ -268,8 +269,10 @@ export function useProspects(runId: string | null) {
       return data as Prospect[];
     },
     enabled: !!runId,
-    refetchInterval: 60000,
+    // Realtime ativo acima; fallback longo apenas para reconexão.
+    refetchInterval: 180000,
   });
+
 
   // Background: classifica relationship_status de prospects ainda não verificados
   useEffect(() => {

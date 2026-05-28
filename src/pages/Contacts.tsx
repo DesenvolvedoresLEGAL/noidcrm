@@ -11,6 +11,10 @@ import { contactKeys } from '@/lib/query-keys';
 import { useToast } from '@/hooks/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { useRealtimeContacts } from '@/hooks/useRealtimeContacts';
+
+export default function Contacts() {
+  useRealtimeContacts();
 
 export default function Contacts() {
   const { toast } = useToast();
