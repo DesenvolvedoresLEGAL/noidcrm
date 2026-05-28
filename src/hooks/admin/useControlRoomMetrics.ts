@@ -127,7 +127,7 @@ export function useControlRoomMetrics() {
         lastEventAt: lastEvent?.created_at,
       };
     },
-    refetchInterval: 30000, // Refresh every 30s
+    refetchInterval: 60000, // Fase 1A: 30s → 60s
   });
 
   const recentExecutionsQuery = useQuery({
@@ -153,7 +153,7 @@ export function useControlRoomMetrics() {
         traceId: event.trace_id,
       }));
     },
-    refetchInterval: 10000, // Refresh every 10s
+    refetchInterval: 30000, // Fase 1A: 10s → 30s
   });
 
   return {
