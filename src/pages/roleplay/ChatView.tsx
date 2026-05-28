@@ -155,8 +155,8 @@ export default function ChatView() {
       return result;
     },
     enabled: !!sessionId,
-    // Polling reduzido de 2s → 5s (UX continua fluida; mutation invalida na hora)
-    refetchInterval: 5000,
+    // Fase 1A: 5s → 10s (mensagens são invalidadas pela mutation de envio).
+    refetchInterval: 10000,
     retry: 3,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000)
   });

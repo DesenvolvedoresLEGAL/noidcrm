@@ -109,8 +109,9 @@ export function useOpportunityApprovals(opportunityId: string | undefined) {
     queryKey: aiAgentKeys.opportunityApprovals(opportunityId),
     queryFn: () => fetchOpportunityApprovals(opportunityId!),
     enabled: !!opportunityId,
-    refetchInterval: 15000,
+    // Sem refetchInterval: realtime abaixo já invalida em mudanças (audit Fase 1A).
   });
+
 
   // Realtime: any change in the approval/run/email tables refreshes the
   // opportunity surfaces immediately (no hard refresh needed).

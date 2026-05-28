@@ -84,9 +84,11 @@ export function useAccountResponsibleOptions() {
         cs: byRole(CS_ROLES, 'cs'),
       };
     },
-    staleTime: 0,
-    refetchOnMount: 'always' as const,
+    // Fase 1A: opções mudam raramente; cache 10min evita refetch a cada mount.
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
   });
+
 
   return {
     ownerUsers: query.data?.owners || [],
