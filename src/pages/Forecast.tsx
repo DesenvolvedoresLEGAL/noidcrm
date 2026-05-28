@@ -108,148 +108,166 @@ export default function Forecast() {
         {/* Filters */}
         <ForecastFilters
           filters={filters}
-          onFiltersChange={setFilters}
+          onFiltersChange={(next) => setFilters({ ...next, pipelineId: salesPipelineId ?? next.pipelineId })}
           onRefresh={refetch}
           isLoading={isLoading}
           isFetching={isFetching}
           dataUpdatedAt={dataUpdatedAt}
+          salesPipelineName={salesPipelineName}
+          salesPipelineMissing={!salesPipelineLoading && requiresConfiguration}
         />
 
         <RevenueSsotBanner variant="migrated" surface="Forecast — Receita Fechada via commercial_won_revenue_view" />
 
-        {/* KPI Cards */}
-        <ForecastKPICards kpis={kpis} isLoading={isLoading} />
+        {/* Sprint F2.10 — Estado vazio quando não há pipeline oficial de vendas */}
+        {!salesPipelineLoading && !pipelineFound ? (
+          <Card className="border-amber-500/30 bg-amber-500/5">
+            <CardContent className="py-10 text-center space-y-2">
+              <AlertTriangle className="h-10 w-10 mx-auto text-amber-500" />
+              <h3 className="text-lg font-semibold">Pipeline de vendas não configurado</h3>
+              <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                Configure um pipeline com tipo <strong>Vendas</strong> e marque-o como principal para ativar o Forecast V2.
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <>
+            {/* KPI Cards */}
+            <ForecastKPICards kpis={kpis} isLoading={isLoading} />
 
-        {/* Tabs */}
-        <Tabs defaultValue="overview" className="w-full">
-          <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 scrollbar-hide">
-            <TabsList className={cn(
-              'inline-flex w-max md:w-auto md:grid gap-1 p-1 min-w-max',
-              showHealth ? 'md:grid-cols-8' : 'md:grid-cols-7'
-            )}>
-              <TabsTrigger value="overview" className="gap-1.5 px-3 py-2 text-xs md:text-sm whitespace-nowrap">
-                <BarChart3 className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                <span>Geral</span>
-              </TabsTrigger>
-              <TabsTrigger value="quality" className="gap-1.5 px-3 py-2 text-xs md:text-sm whitespace-nowrap">
-                <ShieldCheck className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                <span>Qualidade</span>
-              </TabsTrigger>
-              <TabsTrigger value="accuracy" className="gap-1.5 px-3 py-2 text-xs md:text-sm whitespace-nowrap">
-                <Target className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                <span>Acurácia</span>
-              </TabsTrigger>
-              <TabsTrigger value="sellers" className="gap-1.5 px-3 py-2 text-xs md:text-sm whitespace-nowrap">
-                <Users className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                <span>Vendedor</span>
-              </TabsTrigger>
-              <TabsTrigger value="deals" className="gap-1.5 px-3 py-2 text-xs md:text-sm whitespace-nowrap">
-                <Search className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                <span>Deals</span>
-              </TabsTrigger>
-              <TabsTrigger value="insights" className="gap-1.5 px-3 py-2 text-xs md:text-sm whitespace-nowrap">
-                <Sparkles className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                <span>AI</span>
-              </TabsTrigger>
-              <TabsTrigger value="risks" className="gap-1.5 px-3 py-2 text-xs md:text-sm whitespace-nowrap">
-                <AlertTriangle className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                <span>Riscos</span>
-              </TabsTrigger>
-              {showHealth && (
-                <TabsTrigger value="health" className="gap-1.5 px-3 py-2 text-xs md:text-sm whitespace-nowrap">
-                  <ShieldCheck className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                  <span>Saúde V2</span>
-                </TabsTrigger>
-              )}
-            </TabsList>
-          </div>
+            {/* Tabs */}
+            <Tabs defaultValue="overview" className="w-full">
+              <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 scrollbar-hide">
+                <TabsList className={cn(
+                  'inline-flex w-max md:w-auto md:grid gap-1 p-1 min-w-max',
+                  showHealth ? 'md:grid-cols-8' : 'md:grid-cols-7'
+                )}>
+                  <TabsTrigger value="overview" className="gap-1.5 px-3 py-2 text-xs md:text-sm whitespace-nowrap">
+                    <BarChart3 className="h-3.5 w-3.5 md:h-4 md:w-4" />
+                    <span>Geral</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="quality" className="gap-1.5 px-3 py-2 text-xs md:text-sm whitespace-nowrap">
+                    <ShieldCheck className="h-3.5 w-3.5 md:h-4 md:w-4" />
+                    <span>Qualidade</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="accuracy" className="gap-1.5 px-3 py-2 text-xs md:text-sm whitespace-nowrap">
+                    <Target className="h-3.5 w-3.5 md:h-4 md:w-4" />
+                    <span>Acurácia</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="sellers" className="gap-1.5 px-3 py-2 text-xs md:text-sm whitespace-nowrap">
+                    <Users className="h-3.5 w-3.5 md:h-4 md:w-4" />
+                    <span>Vendedor</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="deals" className="gap-1.5 px-3 py-2 text-xs md:text-sm whitespace-nowrap">
+                    <Search className="h-3.5 w-3.5 md:h-4 md:w-4" />
+                    <span>Deals</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="insights" className="gap-1.5 px-3 py-2 text-xs md:text-sm whitespace-nowrap">
+                    <Sparkles className="h-3.5 w-3.5 md:h-4 md:w-4" />
+                    <span>AI</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="risks" className="gap-1.5 px-3 py-2 text-xs md:text-sm whitespace-nowrap">
+                    <AlertTriangle className="h-3.5 w-3.5 md:h-4 md:w-4" />
+                    <span>Riscos</span>
+                  </TabsTrigger>
+                  {showHealth && (
+                    <TabsTrigger value="health" className="gap-1.5 px-3 py-2 text-xs md:text-sm whitespace-nowrap">
+                      <ShieldCheck className="h-3.5 w-3.5 md:h-4 md:w-4" />
+                      <span>Saúde V2</span>
+                    </TabsTrigger>
+                  )}
+                </TabsList>
+              </div>
 
-          {/* Overview Tab */}
-          <TabsContent value="overview" className="mt-6">
-            <div className="grid lg:grid-cols-2 gap-6">
-              {kpis && <ForecastWaterfallChart kpis={kpis} />}
-              <ForecastScenariosCard 
-                scenarios={scenarios} 
-                goal={kpis?.goal || 0} 
-                opportunities={opportunities}
-                closedRevenue={kpis?.closedRevenue || 0}
-              />
-            </div>
-          </TabsContent>
-
-          {/* Quality Tab */}
-          <TabsContent value="quality" className="mt-6">
-            <div className="grid lg:grid-cols-2 gap-6">
-              <ForecastDataQuality opportunities={opportunities} goal={kpis?.goal || 0} kpis={kpis} />
-              <ForecastScenariosCard 
-                scenarios={scenarios} 
-                goal={kpis?.goal || 0}
-                opportunities={opportunities}
-                closedRevenue={kpis?.closedRevenue || 0}
-              />
-            </div>
-          </TabsContent>
-
-          {/* Accuracy Tab */}
-          <TabsContent value="accuracy" className="mt-6">
-            <AccuracyDashboard pipelineId={filters.pipelineId} userId={filters.userId} />
-          </TabsContent>
-
-          {/* Sellers Tab */}
-          <TabsContent value="sellers" className="mt-6">
-            <SellerPerformanceSection
-              periodStart={filters.periodStart}
-              periodEnd={filters.periodEnd}
-              pipelineId={filters.pipelineId}
-              legacySellers={sellerForecasts}
-            />
-          </TabsContent>
-
-          {/* Deal Inspection Tab */}
-          <TabsContent value="deals" className="mt-6">
-            <DealInspectionTable opportunities={opportunities} filterCategory="all" />
-          </TabsContent>
-
-          {/* AI Insights Tab — F2.6 HUMANOID Forecast Intelligence */}
-          <TabsContent value="insights" className="mt-6 space-y-6">
-            <ForecastIntelligencePanel
-              periodStart={filters.periodStart}
-              periodEnd={filters.periodEnd}
-              pipelineId={filters.pipelineId}
-              sellerId={filters.userId ?? null}
-            />
-            {kpis && (
-              <details className="border rounded-md p-3 text-sm">
-                <summary className="cursor-pointer text-muted-foreground">Ver insights legados (heurísticas locais)</summary>
-                <div className="mt-3">
-                  <AIForecastInsightsPanel kpis={kpis} opportunities={opportunities} pipelineId={filters.pipelineId} />
+              {/* Overview Tab */}
+              <TabsContent value="overview" className="mt-6">
+                <div className="grid lg:grid-cols-2 gap-6">
+                  {kpis && <ForecastWaterfallChart kpis={kpis} />}
+                  <ForecastScenariosCard
+                    scenarios={scenarios}
+                    goal={kpis?.goal || 0}
+                    opportunities={opportunities}
+                    closedRevenue={kpis?.closedRevenue || 0}
+                  />
                 </div>
-              </details>
-            )}
-          </TabsContent>
+              </TabsContent>
 
-          {/* Risks Tab — F2.7 Risk Center */}
-          <TabsContent value="risks" className="mt-6">
-            <ForecastRiskCenterPanel
-              periodStart={filters.periodStart}
-              periodEnd={filters.periodEnd}
-              pipelineId={filters.pipelineId}
-              sellerId={filters.userId ?? null}
-              opportunitiesFallback={opportunities}
-            />
-          </TabsContent>
+              {/* Quality Tab */}
+              <TabsContent value="quality" className="mt-6">
+                <div className="grid lg:grid-cols-2 gap-6">
+                  <ForecastDataQuality opportunities={opportunities} goal={kpis?.goal || 0} kpis={kpis} />
+                  <ForecastScenariosCard
+                    scenarios={scenarios}
+                    goal={kpis?.goal || 0}
+                    opportunities={opportunities}
+                    closedRevenue={kpis?.closedRevenue || 0}
+                  />
+                </div>
+              </TabsContent>
 
-          {/* Health Tab — F2.8 Saúde V2 (admin/manager) */}
-          {showHealth && (
-            <TabsContent value="health" className="mt-6">
-              <ForecastV2HealthPanel
-                periodStart={filters.periodStart}
-                periodEnd={filters.periodEnd}
-                pipelineId={filters.pipelineId}
-              />
-            </TabsContent>
-          )}
-        </Tabs>
+              {/* Accuracy Tab */}
+              <TabsContent value="accuracy" className="mt-6">
+                <AccuracyDashboard pipelineId={salesPipelineId ?? undefined} userId={filters.userId} />
+              </TabsContent>
+
+              {/* Sellers Tab */}
+              <TabsContent value="sellers" className="mt-6">
+                <SellerPerformanceSection
+                  periodStart={filters.periodStart}
+                  periodEnd={filters.periodEnd}
+                  pipelineId={salesPipelineId ?? undefined}
+                  legacySellers={sellerForecasts}
+                />
+              </TabsContent>
+
+              {/* Deal Inspection Tab */}
+              <TabsContent value="deals" className="mt-6">
+                <DealInspectionTable opportunities={opportunities} filterCategory="all" />
+              </TabsContent>
+
+              {/* AI Insights Tab — F2.6 HUMANOID Forecast Intelligence */}
+              <TabsContent value="insights" className="mt-6 space-y-6">
+                <ForecastIntelligencePanel
+                  periodStart={filters.periodStart}
+                  periodEnd={filters.periodEnd}
+                  pipelineId={salesPipelineId ?? undefined}
+                  sellerId={filters.userId ?? null}
+                />
+                {kpis && (
+                  <details className="border rounded-md p-3 text-sm">
+                    <summary className="cursor-pointer text-muted-foreground">Ver insights legados (heurísticas locais)</summary>
+                    <div className="mt-3">
+                      <AIForecastInsightsPanel kpis={kpis} opportunities={opportunities} pipelineId={salesPipelineId ?? undefined} />
+                    </div>
+                  </details>
+                )}
+              </TabsContent>
+
+              {/* Risks Tab — F2.7 Risk Center */}
+              <TabsContent value="risks" className="mt-6">
+                <ForecastRiskCenterPanel
+                  periodStart={filters.periodStart}
+                  periodEnd={filters.periodEnd}
+                  pipelineId={salesPipelineId ?? undefined}
+                  sellerId={filters.userId ?? null}
+                  opportunitiesFallback={opportunities}
+                />
+              </TabsContent>
+
+              {/* Health Tab — F2.8 Saúde V2 (admin/manager) */}
+              {showHealth && (
+                <TabsContent value="health" className="mt-6">
+                  <ForecastV2HealthPanel
+                    periodStart={filters.periodStart}
+                    periodEnd={filters.periodEnd}
+                    pipelineId={salesPipelineId ?? undefined}
+                  />
+                </TabsContent>
+              )}
+            </Tabs>
+          </>
+        )}
+
       </div>
     </Layout>
   );
