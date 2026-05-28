@@ -117,6 +117,44 @@ export function resolveApprovedCommercialAmount(
   const proposal = input.proposal ?? null;
   const hasAcceptedLink = !!opportunity?.accepted_proposal_id;
 
+  // FROZEN-FIRST: se a proposta tiver schedule aprovado OU snapshot de
+  // aprovação, esse valor é IMUTÁVEL e prevalece sobre approved_amount
+  // (coluna pode ter sido contaminada por reaplicação de dynamic pricing).
+  // Hierarquia: schedule sum → snapshot.payment_expected → snapshot.approval/effective.
+  // Ver `resolveFrozenApprovedAmount` para a regra completa.
+  const scheduleSum = sumSchedule(proposal?.approved_payment_schedule);
+  if (scheduleSum != null && scheduleSum > 0) {
+    const col = toNumber(proposal?.approved_amount);
+    if (col != null && Math.abs(col - scheduleSum) > 0.5) {
+      warnings.push('approved_amount_column_contaminated_after_approval');
+      warnings.push('approved_amount_column_mismatch');
+    }
+    return finalize(scheduleSum, 'approved_payment_schedule', warnings, true, false);
+  }
+
+  // Snapshot — tenta múltiplos nomes (payment_expected_amount, approval_amount,
+  // effective_amount, approved_amount). Se algum existe e é > 0, congela aqui.
+  const snapRaw = proposal?.approval_snapshot as any;
+  if (snapRaw && typeof snapRaw === 'object') {
+    const snapCandidate =
+      toNumber(snapRaw.payment_expected_amount) ??
+      toNumber(snapRaw.approval_amount) ??
+      toNumber(snapRaw.effective_amount) ??
+      toNumber(snapRaw.approved_amount);
+    if (snapCandidate != null && snapCandidate > 0) {
+      const col = toNumber(proposal?.approved_amount);
+      if (col != null && Math.abs(col - snapCandidate) > 0.5) {
+        warnings.push('approved_amount_column_contaminated_after_approval');
+        warnings.push('approved_amount_column_mismatch');
+      }
+      const snapSource: ApprovedAmountSource =
+        snapRaw.payment_expected_amount != null
+          ? 'approval_snapshot.payment_expected_amount'
+          : 'approval_snapshot.approved_amount';
+      return finalize(snapCandidate, snapSource, warnings, true, false);
+    }
+  }
+
   const base = toNumber(proposal?.total_amount);
   const column = toNumber(proposal?.approved_amount);
   const snapInfo = snapshotNetAmount(proposal?.approval_snapshot);
@@ -126,12 +164,13 @@ export function resolveApprovedCommercialAmount(
     toNumber(proposal?.pricing_manual_discount_amount) ??
     toNumber(proposal?.discount_amount) ??
     0;
-  const scheduleSum = sumSchedule(proposal?.approved_payment_schedule);
+  // (scheduleSum já calculado acima; mantido para compatibilidade abaixo)
 
   const snapshotSource: ApprovedAmountSource =
     snapField === 'approved_amount'
       ? 'approval_snapshot.approved_amount'
       : 'approval_snapshot.payment_expected_amount';
+
 
   // ── Casos triviais ────────────────────────────────────────────────
   // Sem snapshot nem column: cair para schedule/ledger/legado

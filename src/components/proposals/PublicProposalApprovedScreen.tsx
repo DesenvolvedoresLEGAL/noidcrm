@@ -13,6 +13,9 @@ import {
   User,
 } from 'lucide-react';
 import { formatDateBR } from '@/lib/dateUtils';
+import { resolveFrozenApprovedAmount } from '@/lib/proposals/resolveFrozenApprovedAmount';
+
+
 
 interface ScheduleItem {
   number?: number;
@@ -48,13 +51,12 @@ export function PublicProposalApprovedScreen({
 }: Props) {
   const snap = (proposal?.approval_snapshot ?? {}) as any;
   const dynSnap = snap?.dynamic_pricing ?? {};
-  const approvedAmount =
-    snap?.approved_amount
-    ?? proposal?.approved_amount
-    ?? proposal?.payment_expected_amount
-    ?? proposal?.dynamic_pricing_current_amount
-    ?? proposal?.total_amount;
+  // FROZEN APPROVAL AMOUNT — proposta aceita NUNCA pode exibir valor vigente
+  // recalculado por dynamic pricing. Hierarquia: schedule → snapshot → coluna.
+  const frozen = resolveFrozenApprovedAmount(proposal);
+  const approvedAmount = frozen.amount;
   const consultant = snap?.consultant ?? {};
+
   const paymentMethod = snap?.payment_method ?? null;
   const paymentCondition = snap?.payment_condition ?? 'upfront';
 
@@ -66,10 +68,24 @@ export function PublicProposalApprovedScreen({
     custom_schedule: 'Cronograma customizado',
   };
 
-  const renderedSchedule: ScheduleItem[] =
-    Array.isArray(snap?.payment_schedule) && snap.payment_schedule.length > 0
-      ? snap.payment_schedule
-      : installments;
+  // Cronograma renderizado: APENAS fontes congeladas. Nunca usar `installments`
+  // (que vêm de payment terms vivos e podem refletir tabela dinâmica atual).
+  const frozenScheduleRaw =
+    (Array.isArray(proposal?.approved_payment_schedule?.schedule)
+      ? proposal.approved_payment_schedule.schedule
+      : Array.isArray(proposal?.approved_payment_schedule)
+        ? proposal.approved_payment_schedule
+        : null) ??
+    (Array.isArray(snap?.payment_schedule) ? snap.payment_schedule : null) ??
+    [];
+  const renderedSchedule: ScheduleItem[] = frozenScheduleRaw.map((item: any, idx: number) => ({
+    number: item?.index ?? item?.number ?? idx + 1,
+    dueDate: item?.due_date ?? item?.dueDate,
+    amount: Number(item?.amount ?? item?.value ?? item?.total ?? 0),
+    type: item?.type,
+    label: item?.label,
+  }));
+
 
   return (
     <div className="space-y-4 md:space-y-6">
