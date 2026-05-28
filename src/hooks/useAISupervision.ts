@@ -23,10 +23,6 @@ export function useAIActionStats() {
   return useQuery<AIActionStats>({
     queryKey: aiSupervisionKeys.actionStats(),
     queryFn: getAIActionStats,
-export function useAIActionStats() {
-  return useQuery<AIActionStats>({
-    queryKey: aiSupervisionKeys.actionStats(),
-    queryFn: getAIActionStats,
     refetchInterval: 60000, // Fase 1A: 30s → 60s (não crítico)
   });
 }
@@ -63,8 +59,6 @@ export function useActiveAlerts() {
   });
 }
 
-  });
-}
 
 export function useApproveAIAction() {
   const queryClient = useQueryClient();

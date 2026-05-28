@@ -15,9 +15,8 @@ import { useRealtimeContacts } from '@/hooks/useRealtimeContacts';
 
 export default function Contacts() {
   useRealtimeContacts();
-
-export default function Contacts() {
   const { toast } = useToast();
+
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
