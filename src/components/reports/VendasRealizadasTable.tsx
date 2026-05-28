@@ -36,17 +36,20 @@ export function VendasRealizadasTable() {
   const [revenueType, setRevenueType] = useState<'all' | 'one_time' | 'mrr' | 'mixed'>('all');
   const [commissionStatus, setCommissionStatus] = useState<'all' | 'eligible' | 'blocked_review_required' | 'blocked_settlement_pending'>('all');
 
-  const filters: VendasRealizadasFilters = useMemo(
-    () => ({
-      start: new Date(effectiveDates.startDate).toISOString(),
-      end: new Date(effectiveDates.endDate).toISOString(),
+  const filters: VendasRealizadasFilters = useMemo(() => {
+    // HOTFIX: expandir para limites de dia, senão vendas com won_at>00:00 do
+    // dia final ficam fora do filtro (a view usa won_at BETWEEN start AND end).
+    const start = new Date(`${effectiveDates.startDate}T00:00:00.000Z`).toISOString();
+    const end = new Date(`${effectiveDates.endDate}T23:59:59.999Z`).toISOString();
+    return {
+      start,
+      end,
       sellerUserId: sellerUserId || null,
       pipelineId: pipelineId || null,
       revenueType,
       commissionStatus,
-    }),
-    [effectiveDates, sellerUserId, pipelineId, revenueType, commissionStatus],
-  );
+    };
+  }, [effectiveDates, sellerUserId, pipelineId, revenueType, commissionStatus]);
 
   const { data, isLoading, error } = useVendasRealizadas(filters);
 
