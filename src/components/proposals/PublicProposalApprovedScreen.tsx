@@ -13,6 +13,9 @@ import {
   User,
 } from 'lucide-react';
 import { formatDateBR } from '@/lib/dateUtils';
+import { resolveFrozenApprovedAmount } from '@/lib/proposals/resolveFrozenApprovedAmount';
+
+
 
 interface ScheduleItem {
   number?: number;
