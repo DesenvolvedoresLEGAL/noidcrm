@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Layout } from '@/components/Layout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -21,8 +21,10 @@ import { AIForecastInsightsPanel } from '@/components/forecast/AIForecastInsight
 import { ForecastIntelligencePanel } from '@/components/forecast/ForecastIntelligencePanel';
 import { AccuracyDashboard } from '@/components/forecast/AccuracyDashboard';
 import { useForecastData, useDefaultFilters, ForecastFilters as FilterType } from '@/hooks/useForecastData';
+import { useForecastSalesPipeline } from '@/hooks/forecast/useForecastSalesPipeline';
 import { BarChart3, Users, Search, Sparkles, AlertTriangle, ShieldCheck, Target, TrendingUp, Shield } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
+import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { RevenueSsotBanner } from '@/components/revenue/RevenueSsotBanner';
 
@@ -30,11 +32,33 @@ export default function Forecast() {
   const defaultFilters = useDefaultFilters();
   const [filters, setFilters] = useState<FilterType>(defaultFilters);
   const { isAdmin, isManager } = useUserRole();
-  const { isOwner } = useCurrentOrganization();
+  const { isOwner, organization } = useCurrentOrganization();
   const { isPlatformAdmin } = usePlatformAdmin();
   const showHealth = isAdmin || isManager || isOwner || isPlatformAdmin;
 
-  const { kpis, scenarios, opportunities, sellerForecasts, isLoading, isFetching, dataUpdatedAt, refetch } = useForecastData(filters);
+  // Sprint F2.10 — Forecast V2 é exclusivo do pipeline oficial de vendas
+  const {
+    salesPipelineId,
+    salesPipelineName,
+    pipelineFound,
+    requiresConfiguration,
+    isLoading: salesPipelineLoading,
+  } = useForecastSalesPipeline({ organizationId: organization?.id ?? null });
+
+  // Trava filters.pipelineId no pipeline oficial assim que resolvido
+  useEffect(() => {
+    if (salesPipelineId && filters.pipelineId !== salesPipelineId) {
+      setFilters((prev) => ({ ...prev, pipelineId: salesPipelineId }));
+    }
+  }, [salesPipelineId, filters.pipelineId]);
+
+  const effectiveFilters: FilterType = useMemo(
+    () => ({ ...filters, pipelineId: salesPipelineId ?? filters.pipelineId }),
+    [filters, salesPipelineId],
+  );
+
+  const { kpis, scenarios, opportunities, sellerForecasts, isLoading, isFetching, dataUpdatedAt, refetch } =
+    useForecastData(effectiveFilters);
 
   return (
     <Layout>
