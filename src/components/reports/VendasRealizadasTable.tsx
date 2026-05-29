@@ -158,6 +158,7 @@ export function VendasRealizadasTable() {
                 <TableHead className="text-right">Avulsa</TableHead>
                 <TableHead className="text-right">MRR</TableHead>
                 <TableHead className="text-right">Total Comercial</TableHead>
+                <TableHead>Meta</TableHead>
                 <TableHead>Comercial</TableHead>
                 <TableHead>Operacional</TableHead>
                 <TableHead>Settlement</TableHead>
@@ -168,33 +169,39 @@ export function VendasRealizadasTable() {
             <TableBody>
               {rows.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={12} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={13} className="text-center text-muted-foreground py-8">
                     Nenhuma venda realizada no período.
                   </TableCell>
                 </TableRow>
               )}
-              {rows.map((r) => (
-                <TableRow key={r.opportunity_id}>
-                  <TableCell className="whitespace-nowrap text-xs">
-                    {r.won_at ? new Date(r.won_at).toLocaleDateString('pt-BR') : '—'}
-                  </TableCell>
-                  <TableCell className="max-w-[220px] truncate" title={r.nome_fantasia || r.account_name || ''}>
-                    {r.nome_fantasia || r.account_name || '—'}
-                  </TableCell>
-                  <TableCell className="font-mono text-xs">{r.proposal_number ?? '—'}</TableCell>
-                  <TableCell className="text-sm">{r.seller_name ?? '—'}</TableCell>
-                  <TableCell className="text-right tabular-nums">{fmt(Number(r.one_shot_amount) || 0)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{fmt(Number(r.mrr_amount) || 0)}</TableCell>
-                  <TableCell className="text-right tabular-nums font-semibold">{fmt(Number(r.commercial_amount) || 0)}</TableCell>
-                  <TableCell><CommercialStatusBadge status={r.commercial_status} /></TableCell>
-                  <TableCell><FulfillmentBadge status={r.fulfillment_status} /></TableCell>
-                  <TableCell><SettlementBadge status={r.financial_settlement_status} /></TableCell>
-                  <TableCell><CommissionBadge status={r.commission_status} /></TableCell>
-                  <TableCell>
-                    <ConfidenceBadge confidence={r.revenue_confidence} reviewRequired={r.review_required} />
-                  </TableCell>
-                </TableRow>
-              ))}
+              {rows.map((r) => {
+                const excluded = isExcludedFromGoal(r);
+                return (
+                  <TableRow key={r.opportunity_id} className={excluded ? 'opacity-80' : ''}>
+                    <TableCell className="whitespace-nowrap text-xs">
+                      {r.won_at ? new Date(r.won_at).toLocaleDateString('pt-BR') : '—'}
+                    </TableCell>
+                    <TableCell className="max-w-[220px] truncate" title={r.nome_fantasia || r.account_name || ''}>
+                      {r.nome_fantasia || r.account_name || '—'}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs">{r.proposal_number ?? '—'}</TableCell>
+                    <TableCell className="text-sm">{r.seller_name ?? '—'}</TableCell>
+                    <TableCell className="text-right tabular-nums">{fmt(Number(r.one_shot_amount) || 0)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{fmt(Number(r.mrr_amount) || 0)}</TableCell>
+                    <TableCell className={`text-right tabular-nums font-semibold ${excluded ? 'line-through text-muted-foreground' : ''}`}>
+                      {fmt(Number(r.commercial_amount) || 0)}
+                    </TableCell>
+                    <TableCell><GoalBadge row={r} /></TableCell>
+                    <TableCell><CommercialStatusBadge status={r.commercial_status} /></TableCell>
+                    <TableCell><FulfillmentBadge status={r.fulfillment_status} /></TableCell>
+                    <TableCell><SettlementBadge status={r.financial_settlement_status} /></TableCell>
+                    <TableCell><CommissionBadge status={r.commission_status} /></TableCell>
+                    <TableCell>
+                      <ConfidenceBadge confidence={r.revenue_confidence} reviewRequired={r.review_required} />
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
 
             </TableBody>
           </Table>
