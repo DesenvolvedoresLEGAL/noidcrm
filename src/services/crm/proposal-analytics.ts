@@ -1,4 +1,9 @@
 import { supabase } from '@/integrations/supabase/client';
+import {
+  calculateProposalAnalyticsScore,
+  type ProposalScoringResult,
+  PROPOSAL_ANALYTICS_SCORING_VERSION,
+} from '@/lib/proposals/analyticsScoring';
 
 export interface ProposalView {
   id: string;
@@ -80,8 +85,12 @@ export interface ProposalAnalytics {
   viewsByLocation: { country: string; city: string; count: number }[];
   viewTimeline: { date: string; views: number }[];
   sectionEngagement: Record<string, number>;
+  /** v2: current engagement (recency-weighted) — same field name for UI compatibility */
   engagementScore: number;
   forwardedCount: number;
+  /** v2 deterministic scoring breakdown (Sprint C) */
+  scoring: ProposalScoringResult;
+  scoringVersion: string;
 }
 
 export async function getProposalViews(proposalId: string, externalOnly: boolean = true): Promise<ProposalView[]> {
@@ -157,15 +166,33 @@ export async function getProposalAnalytics(proposalId: string): Promise<Proposal
   // Detect potential forwards (different IPs viewing)
   const forwardedCount = Math.max(0, uniqueIps.size - 1);
   
-  // Calculate engagement score (0-100)
-  const engagementScore = calculateEngagementScore({
-    totalViews: views.length,
-    uniqueViewers: uniqueIps.size,
-    avgSessionDuration: views.length > 0 ? totalTimeSpent / views.length : 0,
-    daysSinceLastView,
-    sectionEngagement,
+  // v2 deterministic scoring (Sprint C)
+  const aggregatedSections = new Set<string>();
+  views.forEach((v) => {
+    (v.sections_viewed || []).forEach((s) => aggregatedSections.add(s));
+    if (v.section_views) Object.keys(v.section_views).forEach((s) => aggregatedSections.add(s));
+    if (v.time_per_section) Object.keys(v.time_per_section).forEach((s) => aggregatedSections.add(s));
   });
-  
+  const sectionList = Array.from(aggregatedSections);
+  const lower = sectionList.map((s) => s.toLowerCase());
+  const has = (token: string) => lower.some((s) => s.includes(token));
+
+  const scoring = calculateProposalAnalyticsScore({
+    total_views: views.length,
+    unique_visitors: uniqueIps.size,
+    total_duration_seconds: totalTimeSpent,
+    avg_duration_seconds: views.length > 0 ? totalTimeSpent / views.length : 0,
+    last_viewed_at: lastViewedAt,
+    forwarded_count: forwardedCount,
+    viewed_sections: sectionList,
+    attention_map: sectionEngagement,
+    pricing_section_seen: has('pric') || has('preco') || has('preço') || has('valor'),
+    payment_section_seen: has('pay') || has('pagamento') || has('parcel'),
+    items_section_seen: has('item') || has('produt') || has('escopo'),
+    header_section_seen: has('header') || has('capa'),
+    cta_section_seen: has('cta') || has('aceit') || has('approve'),
+  });
+
   return {
     totalViews: views.length,
     uniqueViewers: uniqueIps.size,
@@ -177,56 +204,16 @@ export async function getProposalAnalytics(proposalId: string): Promise<Proposal
     viewsByLocation,
     viewTimeline,
     sectionEngagement,
-    engagementScore,
+    engagementScore: scoring.current_engagement_score,
     forwardedCount,
+    scoring,
+    scoringVersion: PROPOSAL_ANALYTICS_SCORING_VERSION,
   };
 }
 
-// Calculate engagement score based on multiple factors
-function calculateEngagementScore(params: {
-  totalViews: number;
-  uniqueViewers: number;
-  avgSessionDuration: number;
-  daysSinceLastView: number | null;
-  sectionEngagement: Record<string, number>;
-}): number {
-  const { totalViews, uniqueViewers, avgSessionDuration, daysSinceLastView, sectionEngagement } = params;
-  
-  // No views = 0 score
-  if (totalViews === 0) return 0;
-  
-  let score = 0;
-  
-  // Views component (max 25 points)
-  // 1 view = 10, 2 views = 15, 3+ views = 20-25
-  score += Math.min(25, 10 + (totalViews - 1) * 5);
-  
-  // Multiple viewers bonus (max 15 points) - indicates forwarding/sharing
-  if (uniqueViewers > 1) {
-    score += Math.min(15, uniqueViewers * 5);
-  }
-  
-  // Session duration component (max 30 points)
-  // 30s = 5, 1min = 10, 2min = 15, 3min+ = 20-30
-  const durationMinutes = avgSessionDuration / 60;
-  score += Math.min(30, Math.floor(durationMinutes * 10));
-  
-  // Recency component (max 20 points)
-  if (daysSinceLastView !== null) {
-    if (daysSinceLastView === 0) score += 20;      // Today
-    else if (daysSinceLastView <= 1) score += 18;  // Yesterday
-    else if (daysSinceLastView <= 3) score += 15;  // Last 3 days
-    else if (daysSinceLastView <= 7) score += 10;  // Last week
-    else if (daysSinceLastView <= 14) score += 5;  // Last 2 weeks
-    // Older than 2 weeks = 0 points
-  }
-  
-  // Section engagement diversity (max 10 points)
-  const sectionsViewed = Object.keys(sectionEngagement).length;
-  score += Math.min(10, sectionsViewed * 2);
-  
-  return Math.min(100, Math.round(score));
-}
+// Legacy calculateEngagementScore removed in Sprint C — replaced by
+// calculateProposalAnalyticsScore in src/lib/proposals/analyticsScoring.ts
+
 
 export async function getProposalAlerts(proposalId: string): Promise<ProposalAlert[]> {
   const { data, error } = await supabase

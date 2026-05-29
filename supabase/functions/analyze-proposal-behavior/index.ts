@@ -1,6 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { callAI } from "../_shared/ai-client.ts";
+import {
+  calculateProposalAnalyticsScore,
+  PROPOSAL_ANALYTICS_SCORING_VERSION,
+} from "../_shared/proposal-analytics-scoring.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -188,7 +192,37 @@ serve(async (req) => {
     // Forward detection
     const wasForwarded = uniqueIPs > 1 || uniqueDevices > 1;
 
-    // Build context for AI
+    // Aggregate viewed sections
+    const viewedSectionsSet = new Set<string>();
+    views?.forEach(v => {
+      (v.sections_viewed as string[] | null)?.forEach(s => viewedSectionsSet.add(s));
+      if (v.time_per_section) Object.keys(v.time_per_section).forEach(s => viewedSectionsSet.add(s));
+    });
+    const viewedSections = Array.from(viewedSectionsSet);
+    const sectionLower = viewedSections.map(s => s.toLowerCase());
+    const sectionHas = (token: string) => sectionLower.some(s => s.includes(token));
+
+    // ---- Sprint C: deterministic scoring v2 ----
+    const scoring = calculateProposalAnalyticsScore({
+      proposal_status: proposal.status,
+      proposal_sent_at: proposal.sent_at,
+      proposal_expires_at: proposal.expires_at,
+      total_views: totalViews,
+      unique_visitors: uniqueIPs,
+      total_duration_seconds: totalDuration,
+      avg_duration_seconds: avgDuration,
+      last_viewed_at: lastViewDate ? lastViewDate.toISOString() : null,
+      forwarded_count: wasForwarded ? Math.max(0, uniqueIPs - 1) : 0,
+      viewed_sections: viewedSections,
+      attention_map: sectionTimes,
+      pricing_section_seen: sectionHas('pric') || sectionHas('preco') || sectionHas('preço') || sectionHas('valor'),
+      payment_section_seen: sectionHas('pay') || sectionHas('pagamento') || sectionHas('parcel'),
+      items_section_seen: sectionHas('item') || sectionHas('produt') || sectionHas('escopo'),
+      header_section_seen: sectionHas('header') || sectionHas('capa'),
+      cta_section_seen: sectionHas('cta') || sectionHas('aceit') || sectionHas('approve'),
+    });
+
+    // Build context for AI - now includes deterministic scoring
     const behaviorContext = {
       proposal: {
         title: proposal.title,
@@ -199,6 +233,7 @@ serve(async (req) => {
         expires_at: proposal.expires_at,
         opportunity: proposal.opportunities
       },
+      deterministic_scoring: scoring,
       metrics: {
         total_views: totalViews,
         total_duration_seconds: totalDuration,
@@ -221,37 +256,53 @@ serve(async (req) => {
       }
     };
 
-    // Call Lovable AI for analysis
-    const systemPrompt = `Você é um especialista em análise comportamental de propostas comerciais B2B.
-Analise os dados de comportamento do cliente ao visualizar uma proposta e gere insights acionáveis.
+    // Sprint C: AI must respect deterministic scoring — never contradict it
+    const systemPrompt = `Você é um analista comercial sênior interpretando o engajamento de uma proposta B2B.
 
-IMPORTANTE:
-- Responda SEMPRE em português brasileiro
-- Seja específico e prático nas recomendações
-- Foque em ações que o vendedor pode tomar AGORA
-- Considere urgência baseada no comportamento recente
+REGRAS OBRIGATÓRIAS (NÃO violar):
+1. O sistema já calculou scores determinísticos em "deterministic_scoring". Você NÃO calcula score, apenas interpreta.
+2. NÃO classifique o cliente como "altamente engajado" se last_view_age_days > 7.
+3. NÃO gere tendência positiva de fechamento (engagement_level high/very_high) se não houve interação recente.
+4. Diferencie "interesse histórico" de "engajamento atual". Leitura antiga NÃO é intenção atual.
+5. Priorize alertas ACIONÁVEIS. NÃO transforme métrica descritiva em alerta (ex: "foi visualizada 4 vezes" sem ação não é alerta).
+6. Se a entrega está próxima e não houve nova interação, o alerta principal DEVE ser de risco comercial.
+7. Se preço/pagamento não foram vistos, gere alerta orientando reforço de valor antes de desconto.
+8. Use o "engagement_label" e "score_explanation" do scoring como referência de tom.
+9. Responda SEMPRE em português brasileiro.
 
-Retorne um JSON válido com esta estrutura:
+MAPEAMENTO de engagement_level que você DEVE seguir:
+- current_engagement_score >= 75 e last_view_age_days <= 1 → "very_high"
+- current_engagement_score >= 60 e last_view_age_days <= 3 → "high"
+- current_engagement_score >= 40 → "medium"
+- caso contrário → "low"
+
+Retorne JSON válido:
 {
-  "summary": "Resumo executivo de 1-2 frases sobre o comportamento do cliente",
+  "summary": "1-2 frases de diagnóstico comercial (não métrica descritiva)",
   "engagement_level": "low" | "medium" | "high" | "very_high",
-  "concerns": ["lista de possíveis preocupações do cliente baseadas no comportamento"],
+  "commercial_diagnosis": "Análise comercial em 1-2 frases distinguindo histórico de atual",
+  "risk_reading": "Leitura de risco em 1 frase",
+  "concerns": ["preocupações comerciais reais"],
   "recommended_actions": [
+    { "type": "call" | "email" | "meeting" | "discount" | "follow_up", "message": "Ação específica e direta", "priority": "low" | "medium" | "high" }
+  ],
+  "win_probability_delta": "use exatamente o valor de close_probability do scoring (0-100)",
+  "best_contact_time": "Se last_view_age_days <= 3, sugira janela. Se > 7, retorne ação comercial urgente em vez de horário. Se > 14, retorne 'Contato de decisão. Confirmar se o projeto segue ativo.'",
+  "next_best_action": "A única próxima ação mais importante",
+  "followup_tone": "consultivo" | "urgente" | "decisao" | "reativacao",
+  "followup_timing": "agora" | "hoje" | "24h" | "esta_semana",
+  "smart_alerts": [
     {
-      "type": "call" | "email" | "meeting" | "discount" | "follow_up",
-      "message": "Ação específica recomendada",
-      "priority": "low" | "medium" | "high"
+      "severity": "low" | "medium" | "high" | "critical",
+      "title": "Título do alerta (sem repetir métrica)",
+      "description": "O que foi observado em termos comerciais",
+      "why_it_matters": "Por que isso importa comercialmente AGORA",
+      "recommended_action": "Ação concreta que o vendedor deve tomar",
+      "source_metric": "campo do scoring que originou o alerta (ex: last_view_age_days, pricing_section_seen, days_to_delivery)"
     }
   ],
-  "win_probability_delta": número entre -30 e +30 representando mudança na probabilidade de fechamento,
-  "best_contact_time": "Melhor momento para contato ou null se não aplicável",
   "insights": [
-    {
-      "type": "pricing_focus" | "detailed_review" | "hesitation" | "comparison" | "urgency" | "inactivity" | "forwarded" | "high_engagement",
-      "title": "Título curto do insight",
-      "description": "Descrição detalhada do que foi observado",
-      "severity": "info" | "warning" | "success" | "critical"
-    }
+    { "type": "pricing_focus" | "detailed_review" | "hesitation" | "comparison" | "urgency" | "inactivity" | "forwarded" | "high_engagement", "title": "string", "description": "string", "severity": "info" | "warning" | "success" | "critical" }
   ]
 }`;
 
@@ -366,16 +417,44 @@ Gere insights acionáveis baseados nos padrões observados.`;
       }
     }
 
-    // ---- Persist cache ----
-    const engagementMap: Record<string, number> = { low: 25, medium: 55, high: 80, very_high: 95 };
+    // ---- Persist cache (Sprint C: deterministic scoring wins over AI level) ----
+    // Map AI level to a number only as fallback; the real score comes from deterministic engine.
+    const aiLevelMap: Record<string, number> = { low: 25, medium: 55, high: 80, very_high: 95 };
+    const trendMap: Record<string, string> = { up: 'up', down: 'down', neutral: 'neutral' };
+    const smartAlerts = Array.isArray((analysis as any).smart_alerts) && (analysis as any).smart_alerts.length > 0
+      ? (analysis as any).smart_alerts
+      : analysis.insights;
+
     const insightsPayload = {
+      scoring_version: PROPOSAL_ANALYTICS_SCORING_VERSION,
       summary: analysis.summary,
-      engagement: { score: engagementMap[analysis.engagement_level] ?? null, level: analysis.engagement_level },
-      close_probability: { value: analysis.win_probability_delta, trend: 'neutral' },
+      commercial_diagnosis: (analysis as any).commercial_diagnosis ?? null,
+      risk_reading: (analysis as any).risk_reading ?? null,
+      engagement: {
+        score: scoring.current_engagement_score,
+        level: analysis.engagement_level,
+        label: scoring.engagement_label,
+        historical: scoring.historical_interest_score,
+      },
+      close_probability: {
+        value: scoring.close_probability,
+        trend: trendMap[scoring.close_probability_trend] ?? 'neutral',
+      },
+      score_explanation: scoring.score_explanation,
+      risk: { score: scoring.risk_score, label: scoring.risk_label },
+      penalties: scoring.penalties,
+      bonuses: scoring.bonuses,
+      last_view_age_days: scoring.last_view_age_days,
+      days_to_delivery: scoring.days_to_delivery,
+      days_to_expiration: scoring.days_to_expiration,
+      recommended_followup_priority: scoring.recommended_followup_priority,
       insights: analysis.insights,
       recommended_actions: analysis.recommended_actions,
-      smart_alerts: analysis.insights,
+      smart_alerts: smartAlerts,
       best_contact_time: analysis.best_contact_time,
+      next_best_action: (analysis as any).next_best_action ?? null,
+      followup_tone: (analysis as any).followup_tone ?? null,
+      followup_timing: (analysis as any).followup_timing ?? null,
       concerns: analysis.concerns,
       metrics: behaviorContext.metrics,
     };
@@ -391,12 +470,12 @@ Gere insights acionáveis baseados nos padrões observados.`;
         p_proposal_id: proposal_id,
         p_analytics_signature: currentSignature,
         p_insights_payload: insightsPayload,
-        p_engagement_score: engagementMap[analysis.engagement_level] ?? null,
+        p_engagement_score: scoring.current_engagement_score,
         p_engagement_level: analysis.engagement_level,
-        p_close_probability: analysis.win_probability_delta,
-        p_risk_level: null,
+        p_close_probability: scoring.close_probability,
+        p_risk_level: scoring.risk_label,
         p_recommended_actions: analysis.recommended_actions as any,
-        p_smart_alerts: analysis.insights as any,
+        p_smart_alerts: smartAlerts as any,
         p_generated_summary: analysis.summary,
         p_model_used: modelUsed,
         p_tokens_input: tokensIn,
