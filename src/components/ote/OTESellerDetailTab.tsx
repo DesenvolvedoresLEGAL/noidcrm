@@ -134,7 +134,7 @@ export function OTESellerDetailTab({ results, isLoading, isOTEMode = true }: OTE
                       {(() => {
                         const sellerRecords = allRecords.filter((r) => r.ote_result_id === result.id);
                         const { ssotTotal, eligibleTotal, nonEligibleTotal } =
-                          require('./oteEligibility').aggregateEligible(sellerRecords);
+                          aggregateEligible(sellerRecords);
                         const isLeads = result.goal_type === 'leads';
                         return (
                           <>
