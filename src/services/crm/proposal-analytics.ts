@@ -166,15 +166,34 @@ export async function getProposalAnalytics(proposalId: string): Promise<Proposal
   // Detect potential forwards (different IPs viewing)
   const forwardedCount = Math.max(0, uniqueIps.size - 1);
   
-  // Calculate engagement score (0-100)
-  const engagementScore = calculateEngagementScore({
-    totalViews: views.length,
-    uniqueViewers: uniqueIps.size,
-    avgSessionDuration: views.length > 0 ? totalTimeSpent / views.length : 0,
-    daysSinceLastView,
-    sectionEngagement,
+  // v2 deterministic scoring (Sprint C)
+  const lastView = views[0];
+  const aggregatedSections = new Set<string>();
+  views.forEach((v) => {
+    (v.sections_viewed || []).forEach((s) => aggregatedSections.add(s));
+    if (v.section_views) Object.keys(v.section_views).forEach((s) => aggregatedSections.add(s));
+    if (v.time_per_section) Object.keys(v.time_per_section).forEach((s) => aggregatedSections.add(s));
   });
-  
+  const sectionList = Array.from(aggregatedSections);
+  const lower = sectionList.map((s) => s.toLowerCase());
+  const has = (token: string) => lower.some((s) => s.includes(token));
+
+  const scoring = calculateProposalAnalyticsScore({
+    total_views: views.length,
+    unique_visitors: uniqueIps.size,
+    total_duration_seconds: totalTimeSpent,
+    avg_duration_seconds: views.length > 0 ? totalTimeSpent / views.length : 0,
+    last_viewed_at: lastViewedAt,
+    forwarded_count: forwardedCount,
+    viewed_sections: sectionList,
+    attention_map: sectionEngagement,
+    pricing_section_seen: has('pric') || has('preco') || has('preço') || has('valor'),
+    payment_section_seen: has('pay') || has('pagamento') || has('parcel'),
+    items_section_seen: has('item') || has('produt') || has('escopo'),
+    header_section_seen: has('header') || has('capa'),
+    cta_section_seen: has('cta') || has('aceit') || has('approve'),
+  });
+
   return {
     totalViews: views.length,
     uniqueViewers: uniqueIps.size,
@@ -186,8 +205,10 @@ export async function getProposalAnalytics(proposalId: string): Promise<Proposal
     viewsByLocation,
     viewTimeline,
     sectionEngagement,
-    engagementScore,
+    engagementScore: scoring.current_engagement_score,
     forwardedCount,
+    scoring,
+    scoringVersion: PROPOSAL_ANALYTICS_SCORING_VERSION,
   };
 }
 
