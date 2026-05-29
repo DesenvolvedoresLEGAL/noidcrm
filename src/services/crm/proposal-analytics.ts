@@ -167,7 +167,6 @@ export async function getProposalAnalytics(proposalId: string): Promise<Proposal
   const forwardedCount = Math.max(0, uniqueIps.size - 1);
   
   // v2 deterministic scoring (Sprint C)
-  const lastView = views[0];
   const aggregatedSections = new Set<string>();
   views.forEach((v) => {
     (v.sections_viewed || []).forEach((s) => aggregatedSections.add(s));
