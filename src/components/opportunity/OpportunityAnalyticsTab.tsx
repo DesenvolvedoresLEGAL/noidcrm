@@ -117,15 +117,20 @@ export function OpportunityAnalyticsTab({ opportunityId }: OpportunityAnalyticsT
 
       {activeProposalId ? (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main Analytics Panel - 2 columns */}
+          {/* Main Analytics Panel + Recommended Actions - 2 columns */}
           <div className="lg:col-span-2 space-y-6">
             <ProposalAnalyticsPanel proposalId={activeProposalId} />
+            <RecommendedActionsGrid proposalId={activeProposalId} opportunityId={opportunityId} />
           </div>
 
-          {/* AI Insights & Alerts - 1 column */}
+          {/* AI Insights only - 1 column (sem ações recomendadas, foco em leitura) */}
           <div className="space-y-6">
-            <AIProposalInsightCard proposalId={activeProposalId} autoLoad opportunityId={opportunityId} />
-            {/* Sprint C.1: ProposalAlertsCard removido — AI Insights é a única fonte. */}
+            <AIProposalInsightCard
+              proposalId={activeProposalId}
+              autoLoad
+              opportunityId={opportunityId}
+              showRecommendedActions={false}
+            />
           </div>
         </div>
       ) : (
