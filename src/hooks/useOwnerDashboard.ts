@@ -312,9 +312,10 @@ export function useOwnerDashboard() {
       const last3MonthsRevenue = salesTrend.slice(-3).reduce((sum, m) => sum + m.value, 0) / 3;
       const dataQuality = salesTrend.filter(m => m.count > 0).length; // Months with data
       
-      // Open deals in sales pipelines
-      // Include both 'open' and 'new' status as open deals
-      const openSalesOpportunities = salesOpportunities.filter(o => o.status === 'open' || o.status === 'new');
+      // Open deals in sales pipelines — alinhado com a tela Pipeline (qualquer status != won/lost).
+      // Ver `src/services/supabase/opportunities.ts` (`not status in (won,lost)`).
+      const CLOSED_STATUSES = new Set(['won', 'lost']);
+      const openSalesOpportunities = salesOpportunities.filter(o => !CLOSED_STATUSES.has((o as any).status));
       const weightedPipeline = openSalesOpportunities.reduce((sum, o) => {
         const prob = o.prob || 30;
         return sum + ((o.valor_previsto || 0) * prob / 100);
