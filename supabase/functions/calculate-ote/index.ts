@@ -706,6 +706,7 @@ serve(async (req) => {
           const commercial = enr?.commercial ?? 0;
           const eligible = enr?.eligible ?? commercial;
           const nonEligible = enr?.nonEligible ?? 0;
+          const recordCountsForGoal = nonEligible <= 0.01;
 
           return {
             opportunityId: opp.id,
@@ -726,7 +727,7 @@ serve(async (req) => {
               pipeline_id: opp.pipeline_id,
               pipeline_name: pipelineInfo?.name || null,
               payment_status: 'pending',
-              counts_toward_goal: eligible > 0,
+              counts_toward_goal: recordCountsForGoal,
               exclusion_reason: enr?.exclusionReason ?? null,
               record_kind: 'sale',
               revenue_confidence: enr?.revenueConfidence || null,
