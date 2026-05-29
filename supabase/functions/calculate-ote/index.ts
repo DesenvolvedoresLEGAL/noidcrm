@@ -362,6 +362,29 @@ serve(async (req) => {
               : 'Proposta sem itens vinculados — valor cheio considerado elegível';
           }
 
+          // REGRA OFICIAL: venda ganha que foi reaberta/removida operacionalmente,
+          // ou cujo status comercial virou "perdida", NÃO pode contar na meta.
+          // Mantemos o registro para transparência mas zeramos a parcela elegível.
+          const fulfillment = (ssot?.fulfillment_status ?? '').toLowerCase();
+          const commercialSt = (ssot?.commercial_status ?? '').toLowerCase();
+          const reopenedLost =
+            fulfillment === 'removed' ||
+            fulfillment === 'cancelled' ||
+            commercialSt === 'lost';
+          if (reopenedLost && eligible > 0) {
+            nonEligible += eligible;
+            eligible = 0;
+            for (const it of items) {
+              it.counts_toward_goal = false;
+              it.exclusion_reason =
+                'Venda reaberta/removida — excluída da meta por regra oficial';
+            }
+            exclusionReason =
+              commercialSt === 'lost'
+                ? 'Venda reaberta e marcada como perdida — excluída da meta'
+                : 'Venda removida operacionalmente após aprovação — excluída da meta';
+          }
+
           oppEnrichment.set(opp.id, {
             commercial,
             mrr,
