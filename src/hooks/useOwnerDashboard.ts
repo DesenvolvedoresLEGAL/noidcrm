@@ -3,7 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "./useCurrentUser";
 import { startOfMonth, subMonths, format, startOfYear, endOfMonth } from "date-fns";
 import { parseDateOnly } from "@/lib/dateUtils";
-import { calculateForecastConfidence, ForecastConfidenceResult } from "@/services/crm/forecastConfidence";
+import { ForecastConfidenceResult } from "@/services/crm/forecastConfidence";
+import { calculateForecastConfidenceFromNRHS } from "@/lib/forecast/confidenceFromNRHS";
 import { subDays } from "date-fns";
 
 export interface OwnerDashboardData {
@@ -65,7 +66,7 @@ export function useOwnerDashboard() {
   const currentMonthKey = format(new Date(), 'yyyy-MM');
 
   return useQuery({
-    queryKey: ['owner-dashboard', organizationId, currentMonthKey, 'monthly-sales-win-rate-v4-sales-only'],
+    queryKey: ['owner-dashboard', organizationId, currentMonthKey, 'ssot-aligned-v5'],
     queryFn: async (): Promise<OwnerDashboardData> => {
       if (!organizationId) throw new Error('No organization');
 
@@ -98,7 +99,7 @@ export function useOwnerDashboard() {
         salesConfigResult,
         expiringProposalsResult,
       ] = await Promise.all([
-        supabase.from('opportunities').select('id, account_id, owner_user_id, pipeline_id, stage_id, status, valor_previsto, prob, close_date_prevista, closed_at, updated_at, created_at, produto, deleted_at, title, pipelines!inner(pipeline_type)').eq('organization_id', organizationId).is('deleted_at', null),
+        supabase.from('opportunities').select('id, account_id, owner_user_id, pipeline_id, stage_id, status, valor_previsto, prob, close_date_prevista, closed_at, updated_at, created_at, produto, deleted_at, title, nrhs_score, pipelines!inner(pipeline_type)').eq('organization_id', organizationId).is('deleted_at', null),
         supabase.from('accounts').select('id, razao_social, nome_fantasia, pontuacao_nps, data_tornou_cliente, lifecycle_stage').eq('organization_id', organizationId),
         supabase.from('profiles').select('id, user_id, full_name, monthly_goal').eq('organization_id', organizationId),
         supabase.from('stages').select('id, name, pipeline_id, order_index, probability, stagnation_alert_days').eq('organization_id', organizationId),
@@ -181,15 +182,28 @@ export function useOwnerDashboard() {
       // DEVEM reconciliar contra esta view no mesmo período.
       // FILTRO OBRIGATÓRIO: somente pipelines de VENDAS contam para os cards
       // (exclui renewal/onboarding/qualification). Mês atual vigente apenas.
-      const { data: ssotRows, error: ssotErr } = await (supabase as any)
-        .from('commercial_won_revenue_view')
-        .select('opportunity_id, commercial_amount, one_shot_amount, mrr_amount, won_at, pipeline_type')
-        .eq('organization_id', organizationId)
-        .eq('pipeline_type', 'sales')
-        .gte('won_at', startOfCurrentMonth.toISOString())
-        .lte('won_at', endOfMonth(now).toISOString());
-      if (ssotErr) {
-        console.error('[useOwnerDashboard] commercial_won_revenue_view failed:', ssotErr);
+      const [ssotMonthRes, ssotYearRes] = await Promise.all([
+        (supabase as any)
+          .from('commercial_won_revenue_view')
+          .select('opportunity_id, commercial_amount, one_shot_amount, mrr_amount, won_at, pipeline_type')
+          .eq('organization_id', organizationId)
+          .eq('pipeline_type', 'sales')
+          .gte('won_at', startOfCurrentMonth.toISOString())
+          .lte('won_at', endOfMonth(now).toISOString()),
+        (supabase as any)
+          .from('commercial_won_revenue_view')
+          .select('commercial_amount')
+          .eq('organization_id', organizationId)
+          .eq('pipeline_type', 'sales')
+          .gte('won_at', startOfYearDate.toISOString())
+          .lte('won_at', endOfMonth(now).toISOString()),
+      ]);
+      const ssotRows = ssotMonthRes.data ?? [];
+      if (ssotMonthRes.error) {
+        console.error('[useOwnerDashboard] commercial_won_revenue_view (month) failed:', ssotMonthRes.error);
+      }
+      if (ssotYearRes.error) {
+        console.error('[useOwnerDashboard] commercial_won_revenue_view (ytd) failed:', ssotYearRes.error);
       }
       const ssotTotals = (ssotRows ?? []).reduce(
         (acc: any, r: any) => {
@@ -199,6 +213,13 @@ export function useOwnerDashboard() {
           return acc;
         },
         { commercial: 0, one_shot: 0, mrr: 0 },
+      );
+      // SSoT-aligned count for current month (fonte única — bate com Vendas Realizadas).
+      const ssotWonCountThisMonth = ssotRows.length;
+      // YTD commercial revenue from SSoT (run rate alinhado à SSoT, não a valor_previsto).
+      const ssotYearlyRevenue = ((ssotYearRes.data ?? []) as any[]).reduce(
+        (sum, r) => sum + (Number(r.commercial_amount) || 0),
+        0,
       );
 
       const closedRevenueThisMonth = ssotTotals.commercial;
@@ -233,8 +254,10 @@ export function useOwnerDashboard() {
       // ARR is based on actual MRR, not assumed
       const arr = realMRR * 12;
       
-      // Yearly revenue from SALES pipelines
-      const yearlyRevenue = wonSalesThisYear.reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
+      // Yearly revenue from SSoT (commercial_won_revenue_view YTD).
+      // Antes usava soma de `valor_previsto` (campo legado, frequentemente zerado em
+      // negócios herdados de proposta aprovada) — resultado caía artificialmente.
+      const yearlyRevenue = ssotYearlyRevenue;
       const monthsElapsed = now.getMonth() + 1;
       const runRate = monthsElapsed > 0 ? (yearlyRevenue / monthsElapsed) * 12 : 0;
 
@@ -246,9 +269,9 @@ export function useOwnerDashboard() {
         1000000;
 
       // =================== TICKET MÉDIO ===================
-      // Average ticket do MÊS ATUAL (fonte de verdade para KPI principal)
-      const avgTicketThisMonth = wonSalesThisMonth.length > 0 
-        ? closedRevenueThisMonth / wonSalesThisMonth.length 
+      // Average ticket do MÊS ATUAL — count da SSoT (mesmo número de Vendas Realizadas).
+      const avgTicketThisMonth = ssotWonCountThisMonth > 0
+        ? closedRevenueThisMonth / ssotWonCountThisMonth
         : 0;
       
       // Average ticket HISTÓRICO (para referência, se necessário)
@@ -289,9 +312,10 @@ export function useOwnerDashboard() {
       const last3MonthsRevenue = salesTrend.slice(-3).reduce((sum, m) => sum + m.value, 0) / 3;
       const dataQuality = salesTrend.filter(m => m.count > 0).length; // Months with data
       
-      // Open deals in sales pipelines
-      // Include both 'open' and 'new' status as open deals
-      const openSalesOpportunities = salesOpportunities.filter(o => o.status === 'open' || o.status === 'new');
+      // Open deals in sales pipelines — alinhado com a tela Pipeline (qualquer status != won/lost).
+      // Ver `src/services/supabase/opportunities.ts` (`not status in (won,lost)`).
+      const CLOSED_STATUSES = new Set(['won', 'lost']);
+      const openSalesOpportunities = salesOpportunities.filter(o => !CLOSED_STATUSES.has((o as any).status));
       const weightedPipeline = openSalesOpportunities.reduce((sum, o) => {
         const prob = o.prob || 30;
         return sum + ((o.valor_previsto || 0) * prob / 100);
@@ -311,40 +335,10 @@ export function useOwnerDashboard() {
       const optimistic = realistic * (1 + Math.max(growthRate, 0.15));
       const pessimistic = realistic * 0.7;
 
-      // Real confidence using FULL centralized calculation (same as Forecast page)
+      // Real confidence — fonte ÚNICA com a página Forecast (NRHS médio das open).
       const pipelineValue = openSalesOpportunities.reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
-      
-      // Coletar métricas reais das oportunidades para cálculo completo
-      const withProbability = openSalesOpportunities.filter(o => o.prob !== null && o.prob > 0).length;
-      const withCloseDate = openSalesOpportunities.filter(o => o.close_date_prevista !== null).length;
-      const withValue = openSalesOpportunities.filter(o => (o.valor_previsto || 0) > 0).length;
-
-      // Atividade recente (últimos 7 dias)
-      const sevenDaysAgo = subDays(now, 7);
-      const oppsWithRecentActivity = new Set<string>();
-      activities.forEach(a => {
-        if (a.opportunity_id && new Date(a.created_at || '') >= sevenDaysAgo) {
-          oppsWithRecentActivity.add(a.opportunity_id);
-        }
-      });
-      const withRecentActivity = openSalesOpportunities.filter(o => oppsWithRecentActivity.has(o.id)).length;
-
-      // Baixo risco = prob >= 60% e tem data de fechamento
-      const lowRiskCount = openSalesOpportunities.filter(o => 
-        (o.prob || 0) >= 60 && o.close_date_prevista !== null
-      ).length;
-
-      const forecastConfidenceResult = calculateForecastConfidence({
-        totalOpportunities: openSalesOpportunities.length,
-        withProbability,
-        withCloseDate,
-        withValue,
-        withRecentActivity,
-        lowRiskCount,
-        monthsWithSalesData: dataQuality,
-        totalWonOpportunities: wonSalesOpportunities.length,
-        pipelineValue,
-        goal: yearlyGoal
+      const forecastConfidenceResult = calculateForecastConfidenceFromNRHS({
+        openSalesOpportunities: openSalesOpportunities as Array<{ nrhs_score?: number | null }>,
       });
 
       // =================== SELLER PRODUCTIVITY (SALES ROLE ONLY) ===================
@@ -542,15 +536,27 @@ export function useOwnerDashboard() {
         ? Math.round(npsAccounts.reduce((sum, a) => sum + (a.pontuacao_nps || 0), 0) / npsAccounts.length)
         : 0;
 
-      // Repurchase rate
-      const repeatCustomers = accounts.filter(a => {
-        const customerOpps = wonSalesOpportunities.filter(o => o.account_id === a.id);
-        return customerOpps.length > 1;
-      }).length;
-      const repurchaseRate = accounts.length > 0 ? (repeatCustomers / accounts.length) * 100 : 0;
+      // Repurchase rate — clientes (lifecycle_stage = 'Cliente') que fecharam mais
+      // de uma vez, considerando ganhos em pipelines de vendas E renewal.
+      const renewalPipelineIds = new Set(
+        pipelines.filter(p => p.pipeline_type === 'sales' || p.pipeline_type === 'renewal').map(p => p.id),
+      );
+      const wonForRepurchase = opportunities.filter(
+        (o: any) => o.status === 'won' && renewalPipelineIds.has(o.pipeline_id),
+      );
+      const wonByAccount = wonForRepurchase.reduce((acc: Map<string, number>, o: any) => {
+        if (!o.account_id) return acc;
+        acc.set(o.account_id, (acc.get(o.account_id) || 0) + 1);
+        return acc;
+      }, new Map<string, number>());
+      const customerAccounts = accounts.filter(a => a.lifecycle_stage === 'Cliente');
+      const repeatCustomers = customerAccounts.filter(a => (wonByAccount.get(a.id) || 0) > 1).length;
+      const repurchaseRate = customerAccounts.length > 0
+        ? (repeatCustomers / customerAccounts.length) * 100
+        : 0;
 
-      // Conversion rate (mês atual, mesma regra do Forecast e Win/Loss)
-      const totalWon = wonSalesThisMonth.length;
+      // Conversion rate (mês atual) — numerador alinhado à SSoT (Vendas Realizadas).
+      const totalWon = ssotWonCountThisMonth;
       const totalLost = lostSalesThisMonth.length;
       const totalClosed = totalWon + totalLost;
       const conversionRate = totalClosed > 0 ? (totalWon / totalClosed) * 100 : 0;
