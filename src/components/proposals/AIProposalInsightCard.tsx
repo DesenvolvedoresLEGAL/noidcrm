@@ -160,10 +160,13 @@ export function AIProposalInsightCard({ proposalId, opportunityId }: AIProposalI
 
   if (!data) return null;
 
-  const insights = data.insights || data.smart_alerts || [];
+  const insights = (data as any).smart_alerts || data.insights || [];
   const recommendedActions = data.recommended_actions || [];
+  const engagementLabel = (data as any).engagement?.label;
   const engagementLevel = data.engagement?.level || data.engagement_level;
-  const winDelta = data.close_probability?.value ?? data.win_probability_delta ?? 0;
+  const closeProbValue = data.close_probability?.value ?? data.win_probability_delta ?? 0;
+  const closeProbTrend = (data.close_probability?.trend as string) || 'neutral';
+  const scoreExplanation = (data as any).score_explanation as string | undefined;
   const isStale = data.status === 'stale';
 
   return (
