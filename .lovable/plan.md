@@ -1,47 +1,82 @@
 
-# Hotfix — CEO Dashboard: alinhar todos os KPIs às fontes oficiais
+## Problema
 
-## Diagnóstico por card (com base em `src/hooks/useOwnerDashboard.ts`)
+Dois números deveriam ser idênticos para o Wagner em maio/2026, mas não são:
 
-| Card | Valor exibido | Valor correto | Causa raiz |
-|---|---|---|---|
-| Receita Avulsa "35 negócios" | 35 | 55 | Badge usa `metrics.wonDealsCount = wonSalesThisMonth.length` (tabela `opportunities` filtrada por `closed_at`/`updated_at`). A SSoT `commercial_won_revenue_view` já retorna 55 e o **valor** (R$ 143.492,19) bate. Divergência é só de **count** porque algumas oportunidades com proposta aceita herdada (ex.: PROP-2026-00761 da MLabs) entram no view mas não no filtro local. |
-| Ticket Médio | R$ 4.099,78 (143.492 / 35) | R$ 2.608,95 (143.492 / 55) | Consequência direta do `wonDealsCount` errado. |
-| Taxa de Conversão | 49% | 59% (Win/Loss Hub: 55 ganhos / 39 perdas) | `totalWon = wonSalesThisMonth.length` (35) em vez do count da SSoT (55). |
-| Pipeline Aberto | 54 | 56 | `openSalesOpportunities` filtra só `status in ('open','new')`. Pipeline real considera `status NOT IN ('won','lost')`, incluindo `pre_approval`, `qualified`, `negotiation`, etc. (ver `services/supabase/opportunities.ts:70`). |
-| Confiança Forecast | 43% | 57% | Dashboard usa `calculateForecastConfidence` local. Página Forecast usa NRHS V2 (`ForecastDataQuality` → `avgNRHS` de `useForecastData`). Fórmulas diferentes ⇒ divergência permanente. |
-| Meta vs Run Rate (caindo) | 17% | maior | `yearlyRevenue` soma `valor_previsto` das won YTD (campo legado, frequentemente 0 ou desalinhado da proposta aprovada). Deve usar a SSoT `commercial_won_revenue_view` YTD (mesma fonte do card mensal). |
-| Taxa Recompra | 0% | >0 | Denominador é `accounts.length` (toda a base de contas, incluindo leads). Numerador é só contas com `>1 won_sales_opportunities`, ignorando ganhos em pipeline `renewal` (recompras reais). |
+- **Relatórios → Vendas Realizadas**: Receita Total **R$ 158.443,59** (60 vendas) — vem de `commercial_won_revenue_view` (SSoT oficial).
+- **Resultados → Por Vendedor**: header **"Vendas R$ 126.150,15"** e meta 210,3% — vem de `ote_monthly_results.total_sales`.
+- No mesmo card OTE, o rodapé "Elegível para meta" mostra **R$ 158.443,59** (vem de `ote_sales_records`, que já consome a SSoT).
 
-## Mudanças (somente frontend, sem alterar regra de negócio comercial)
+Ou seja: o próprio card OTE já tem dois números divergentes para a mesma coisa, e o de cima viola a regra **"commercial_won_revenue_view é a ÚNICA fonte oficial de receita realizada"**.
 
-### 1. `src/hooks/useOwnerDashboard.ts`
-- **wonDealsCount / avgTicket / conversionRate**: derivar `wonCountThisMonth` de `ssotRows.length` (já buscado). `avgTicketThisMonth = closedRevenueThisMonth / ssotWonCount`. Para `conversionRate`, manter `lostSalesThisMonth.length` no denominador mas usar `ssotWonCount` no numerador e no total fechados.
-- **openDealsCount**: substituir filtro `status === 'open' || 'new'` por `!['won','lost','deleted'].includes(o.status)` para casar com a definição canônica do Pipeline. Atualizar `openSalesOpportunities` (afeta também `weightedPipeline`, `strategicOpportunities`, `enterpriseDeals`, `pipelineValue` no cálculo de confidence — todos passam a refletir o pipeline real).
-- **Run Rate**: buscar segunda agregação de `commercial_won_revenue_view` YTD (sem filtro mensal, mesmo pipeline_type='sales'), usar `commercial` somado como `yearlyRevenue`. Mantém `runRate = yearlyRevenue / monthsElapsed * 12`.
-- **Repurchase rate**: numerador = contas com ≥ 2 propostas/ganhos em qualquer pipeline `sales` ou `renewal` (incluir renewal); denominador = `accounts.filter(a => a.lifecycle_stage === 'Cliente').length` (somente clientes, não toda a base). Não criar tabela nova — usar `opportunities` + `pipelines.pipeline_type IN ('sales','renewal')` já carregadas (adicionar fetch leve só do pipeline_type renewal se necessário, sem mudar RLS).
+## Causa-raiz
 
-### 2. Confiança do Forecast — fonte única
-- Criar pequena variante: dashboard deixa de calcular confidence localmente e passa a **reusar** a mesma fonte do `Forecast.tsx` (NRHS V2). Caminho: extrair a função pura que calcula `avgNRHS` + composições de `ForecastDataQuality` para um helper compartilhado `src/lib/forecast/confidenceFromNRHS.ts` e consumi-la no `useOwnerDashboard` carregando as oportunidades elegíveis (mesmo `salesPipelineId` resolvido via `useForecastSalesPipeline`). Alternativa mais leve (preferida): no hook do dashboard, fazer `select` em `opportunities` com `nrhs_score, forecast_eligibility` (já existem) restrito ao pipeline de vendas e calcular `avgNRHS` ali — exatamente como o Forecast V2 faz. Resultado: dashboard e Forecast mostram o mesmo número.
+`supabase/functions/calculate-ote/index.ts` calcula `total_sales` somando `commission_value ?? valor_previsto` direto de `opportunities` (linhas 253-256). Logo depois, ao gerar `ote_sales_records`, enriquece com `commercial_won_revenue_view` (linhas 533-594) — esse caminho está correto. Resultado: header e drill-down nunca batem, e a meta % é calculada sobre o número errado.
 
-### 3. Sem mudanças em
-- `commercial_won_revenue_view`, `commission_eligibility_view`, RLS, profiles, organization_members, edge functions, ERP, propostas aprovadas, Pix, Slack.
-- Componente `OwnerKPICards.tsx` (só consome `data.metrics.*` — já passa a refletir os números corretos automaticamente).
+Além disso, hoje **todo** registro em `ote_sales_records` é gravado com `counts_toward_goal = true`. Não respeitamos a flag `products.counts_for_commission` configurada em Produtos, então não há como o vendedor ver "este produto contou / este não contou".
 
-## Arquivos a alterar
-- `src/hooks/useOwnerDashboard.ts` (toda a lógica acima)
-- `src/lib/forecast/confidenceFromNRHS.ts` (novo helper puro, opcional se decidirmos extrair)
+## Plano
 
-## Critério de aceite
-- "Receita Avulsa (Mês)" badge mostra **55 negócios**.
-- "Ticket Médio" subtítulo mostra **55 negócios fechados** e valor **R$ 2.608,95**.
-- "Taxa de Conversão" = **59%** (55/(55+39)) — bate com Win/Loss Hub.
-- "Pipeline Aberto" = **56** — bate com tela Pipeline.
-- "Confiança Forecast" = mesmo número da página Forecast (atualmente 57%).
-- "Meta vs Run Rate" volta a refletir o YTD da SSoT (não cai mais por causa de `valor_previsto` zerado).
-- "Taxa Recompra" > 0 quando há ao menos 1 cliente com 2+ ganhos.
-- Nada muda em commercial_won_revenue_view, comissão, settlement, propostas, ERP.
+### Sprint 1 — Reconciliar OTE com a SSoT (corrige a divergência)
+
+1. **Backend (`calculate-ote`)**
+   - Buscar `commercial_won_revenue_view` uma única vez por vendedor (filtrando por `seller_id` + período via `won_at`/`closed_at` e `pipeline_id` em `relevantPipelineIds`), e usar essa lista como fonte única de oportunidades e valores.
+   - `total_sales` (revenue) = soma de `commercial_amount` da SSoT, filtrada por `counts_toward_goal` (ver passo 2). Para `goalType='leads'`, manter contagem.
+   - Garantir que `ote_sales_records` use exatamente a mesma lista usada no cálculo (sem branch separado lendo `opportunities`), eliminando a possibilidade de divergência futura.
+   - Persistir `revenue_confidence` e bloquear cálculo (ou marcar `review_required`) quando a SSoT retornar `review_required=true`, alinhado à core rule de Comissão.
+
+2. **Transparência produto/serviço (`counts_toward_goal` real)**
+   - Para cada oportunidade ganha, ler `proposal_items` da `accepted_proposal_id` (campos: `quantity`, `unit_price`, `discount_pct`, `product_id`, `description`) e juntar com `products.counts_for_commission` + `products.type`/`billing_type`.
+   - Calcular por linha:
+     - `line_amount` proporcional ao `commercial_amount` da SSoT (rateio quando há ajuste de aprovação) — evita inventar valor; mantém a SSoT como teto.
+     - `counts_toward_goal_line = products.counts_for_commission`.
+   - Persistir em uma nova tabela filha **`ote_sales_record_items`** (`ote_sales_record_id`, `product_id`, `product_name`, `line_amount`, `mrr_amount`, `one_shot_amount`, `counts_toward_goal`, `exclusion_reason`).
+   - Atualizar `ote_sales_records`:
+     - `sale_value` continua = `commercial_amount` total da proposta (não muda a receita).
+     - Novos campos: `eligible_amount` (soma das linhas com `counts_toward_goal=true`), `non_eligible_amount`, `counts_toward_goal` passa a ser `eligible_amount > 0`, `exclusion_reason` preenchido quando 100% não conta (ex.: "Produtos sem `counts_for_commission`").
+   - `total_sales` no `ote_monthly_results` = soma de `eligible_amount` (não mais o `commercial_amount` cheio quando há produtos fora da meta).
+
+3. **Fallback seguro**
+   - Quando a proposta não tem itens vinculados a `products` (ex.: proposta legada manual), tratar como `counts_toward_goal=true` (comportamento atual) e marcar `exclusion_reason='sem itens vinculados — revisar'` para gerar visibilidade sem quebrar dados antigos.
+
+### Sprint 2 — UI transparente para o vendedor
+
+1. **`OTESellerDetailTab` — header "Vendas e Meta"**
+   - Mostrar **dois números explícitos** lado a lado:
+     - "Vendas (SSoT)" = soma de `sale_value` da SSoT.
+     - "Elegível p/ meta" = `ote_monthly_results.total_sales` (já alinhado).
+   - Quando houver diferença, badge azul "Parte do valor não conta para meta — ver detalhamento".
+
+2. **`OTESellerSalesDrilldown`**
+   - Adicionar coluna "Itens não elegíveis" (resumo: ex. "2 produtos · R$ 600,00") com tooltip listando os produtos e o motivo (`exclusion_reason`).
+   - Expandir linha (accordion) mostrando os `ote_sales_record_items` com badge Sim/Não por produto.
+   - Resumo no rodapé já existe ("Elegível para meta" / "Fora da meta") — passa a vir das somas dos itens, não mais por venda inteira.
+
+3. **`VendasRealizadasTable` (Relatórios)**
+   - Acrescentar nova coluna **"Elegível meta"** (Sim/Parcial/Não) ao lado de "Comissão", com tooltip mostrando o detalhamento por produto. Mesma fonte (`ote_sales_record_items`) — assim Relatórios e OTE contam a mesma história.
+
+### Sprint 3 — Guardrail e teste
+
+- Estender o vitest `REVENUE_SOURCE_MISMATCH` existente para incluir o par `(ote_monthly_results.total_sales, soma(ote_sales_record_items.eligible))` no mesmo período/vendedor.
+- Página admin `/admin/revenue-integrity`: adicionar bloco "OTE × SSoT" com lista de vendedores onde `|total_sales - sum(eligible_amount)| > R$ 0,01`.
+- Backfill: rodar `calculate-ote` para todos os meses fechados após o deploy, recriando os `ote_sales_record_items`.
 
 ## Riscos
-- Mudar `openDealsCount` para regra ampliada vai aumentar `weightedPipeline` e a contagem de "Oportunidades ativas" — comportamento desejado (alinhar com Pipeline). Sem impacto em receita realizada.
-- Reaproveitar NRHS para confidence depende de `nrhs_score` estar populado nas oportunidades abertas; já é o caso na página Forecast.
+
+- `total_sales` de meses anteriores vai mudar para vendedores que tinham produtos não elegíveis — comunicar (1 linha no card "Calculado em ...": "Recalculado com regra de produto X meta"). Variável final pode mudar; **não** alterar comissões já `paid`/`approved` automaticamente — apenas marcar `review_required=true` para o admin decidir.
+- Rateio por item depende de `proposal_items.unit_price * quantity * (1 - discount)`. Quando a soma dos itens diverge de `commercial_amount` (proposta aprovada por valor manual), aplicar rateio proporcional e logar `warning` em `ote_sales_records.observations`.
+- Performance: 1 query extra de `proposal_items` por vendedor com `IN (proposal_ids)` — aceitável (já fazemos query de `opportunities`).
+
+## Arquivos impactados (estimativa)
+
+- `supabase/functions/calculate-ote/index.ts` (refator do cálculo + items)
+- Migration: criar `ote_sales_record_items` (+ GRANTs + RLS por `organization_id`); adicionar colunas `eligible_amount`, `non_eligible_amount`, `observations` em `ote_sales_records`.
+- `src/hooks/useOTESalesRecords.ts` (incluir items via relação)
+- `src/components/ote/OTESellerDetailTab.tsx`, `OTESellerSalesDrilldown.tsx`
+- `src/components/reports/VendasRealizadasTable.tsx`
+- `src/pages/admin/RevenueIntegrity*` + teste vitest do guardrail
+
+## Fora de escopo
+
+- Não alterar `commercial_won_revenue_view` nem a lógica de `approved_amount` (SSoT permanece intocada).
+- Não mexer em comissões já pagas — só sinalizar revisão.
