@@ -78,7 +78,20 @@ export interface VendasRealizadasResult {
     eligible_commission: number;
     review_commission: number;
     settlement_pending_commission: number;
+    goal_eligible_amount: number;
+    goal_excluded_amount: number;
+    goal_excluded_count: number;
   };
+}
+
+/**
+ * Regra oficial: venda ganha que foi reaberta/removida operacionalmente,
+ * ou cujo status comercial virou "perdida", NÃO conta na meta do vendedor.
+ */
+export function isExcludedFromGoal(r: VendaRealizadaRow): boolean {
+  const f = (r.fulfillment_status ?? '').toLowerCase();
+  const c = (r.commercial_status ?? '').toLowerCase();
+  return f === 'removed' || f === 'cancelled' || c === 'lost';
 }
 
 export function useVendasRealizadas(filters: VendasRealizadasFilters) {
