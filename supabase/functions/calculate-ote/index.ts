@@ -650,74 +650,125 @@ serve(async (req) => {
 
       // Create sales/qualification detail records for full transparency
       if (opportunities && opportunities.length > 0 && upsertedResult) {
-        // Delete existing detail records for this result
+        // Delete existing detail records (cascade clears ote_sales_record_items)
         await supabase
           .from('ote_sales_records')
           .delete()
           .eq('ote_result_id', upsertedResult.id);
 
-        // For revenue sellers: enrich with commercial_won_revenue_view (SSoT)
-        let revenueMap = new Map<string, any>();
-        if (goalType !== 'leads') {
-          const oppIds = opportunities.map((o: any) => o.id);
-          const { data: revRows } = await supabase
-            .from('commercial_won_revenue_view')
-            .select('opportunity_id, commercial_amount, mrr_amount, one_shot_amount, revenue_confidence')
-            .eq('organization_id', organizationId)
-            .in('opportunity_id', oppIds);
-          revenueMap = new Map((revRows || []).map((r: any) => [r.opportunity_id, r]));
-        }
+        type PendingRecord = {
+          record: any;
+          items: any[];
+          opportunityId: string;
+        };
 
-        const salesRecords = opportunities.map((opp: any) => {
+        const pending: PendingRecord[] = opportunities.map((opp: any) => {
           const acc = opp.account as any;
           const pipelineInfo = pipelineMap.get(opp.pipeline_id);
           const closedAt = opp.closed_at || opp.updated_at;
-          const closedDate = closedAt ? new Date(closedAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+          const closedDate = closedAt
+            ? new Date(closedAt).toISOString().split('T')[0]
+            : new Date().toISOString().split('T')[0];
 
           if (goalType === 'leads') {
             return {
+              opportunityId: opp.id,
+              items: [],
+              record: {
+                organization_id: organizationId,
+                ote_result_id: upsertedResult.id,
+                opportunity_id: opp.id,
+                client_name: acc?.nome_fantasia || acc?.razao_social || opp.title,
+                sale_value: 0,
+                mrr_amount: 0,
+                one_shot_amount: 0,
+                eligible_amount: 0,
+                non_eligible_amount: 0,
+                sale_date: closedDate,
+                closed_at: closedAt,
+                pipeline_id: opp.pipeline_id,
+                pipeline_name: pipelineInfo?.name || null,
+                payment_status: 'pending',
+                counts_toward_goal: true,
+                record_kind: 'qualified_lead',
+              },
+            };
+          }
+
+          const enr = oppEnrichment.get(opp.id);
+          const commercial = enr?.commercial ?? 0;
+          const eligible = enr?.eligible ?? commercial;
+          const nonEligible = enr?.nonEligible ?? 0;
+
+          return {
+            opportunityId: opp.id,
+            items: enr?.items || [],
+            record: {
               organization_id: organizationId,
               ote_result_id: upsertedResult.id,
               opportunity_id: opp.id,
+              proposal_id: enr?.proposalId || null,
               client_name: acc?.nome_fantasia || acc?.razao_social || opp.title,
-              sale_value: 0,
-              mrr_amount: 0,
-              one_shot_amount: 0,
+              sale_value: commercial,
+              mrr_amount: enr?.mrr ?? 0,
+              one_shot_amount: enr?.oneShot ?? commercial,
+              eligible_amount: eligible,
+              non_eligible_amount: nonEligible,
               sale_date: closedDate,
               closed_at: closedAt,
               pipeline_id: opp.pipeline_id,
               pipeline_name: pipelineInfo?.name || null,
               payment_status: 'pending',
-              counts_toward_goal: true,
-              record_kind: 'qualified_lead',
-            };
-          }
-
-          const ssot = revenueMap.get(opp.id);
-          const commercial = Number(ssot?.commercial_amount ?? opp.commission_value ?? opp.valor_previsto ?? 0);
-          const mrr = Number(ssot?.mrr_amount ?? 0);
-          const oneShot = Number(ssot?.one_shot_amount ?? (ssot ? 0 : commercial));
-
-          return {
-            organization_id: organizationId,
-            ote_result_id: upsertedResult.id,
-            opportunity_id: opp.id,
-            client_name: acc?.nome_fantasia || acc?.razao_social || opp.title,
-            sale_value: commercial,
-            mrr_amount: mrr,
-            one_shot_amount: oneShot,
-            sale_date: closedDate,
-            closed_at: closedAt,
-            pipeline_id: opp.pipeline_id,
-            pipeline_name: pipelineInfo?.name || null,
-            payment_status: 'pending',
-            counts_toward_goal: true,
-            record_kind: 'sale',
-            revenue_confidence: ssot?.revenue_confidence || null,
+              counts_toward_goal: eligible > 0,
+              exclusion_reason: enr?.exclusionReason ?? null,
+              record_kind: 'sale',
+              revenue_confidence: enr?.revenueConfidence || null,
+            },
           };
         });
 
-        await supabase.from('ote_sales_records').insert(salesRecords);
+        const { data: insertedRecords, error: insertErr } = await supabase
+          .from('ote_sales_records')
+          .insert(pending.map((p) => p.record))
+          .select('id, opportunity_id');
+
+        if (insertErr) {
+          console.error('Error inserting ote_sales_records:', insertErr);
+        } else if (insertedRecords && insertedRecords.length > 0) {
+          // Build per-item rows referencing the freshly inserted record ids
+          const recordIdByOpp = new Map(
+            insertedRecords.map((r: any) => [r.opportunity_id, r.id]),
+          );
+          const itemRows: any[] = [];
+          for (const p of pending) {
+            const recId = recordIdByOpp.get(p.opportunityId);
+            if (!recId) continue;
+            for (const it of p.items) {
+              itemRows.push({
+                organization_id: organizationId,
+                ote_sales_record_id: recId,
+                proposal_item_id: it.proposal_item_id,
+                product_id: it.product_id,
+                product_name: it.product_name,
+                billing_type: it.billing_type,
+                quantity: it.quantity,
+                line_amount: it.line_amount,
+                mrr_amount: it.mrr_amount,
+                one_shot_amount: it.one_shot_amount,
+                counts_toward_goal: it.counts_toward_goal,
+                exclusion_reason: it.exclusion_reason,
+              });
+            }
+          }
+          if (itemRows.length > 0) {
+            const { error: itemsErr } = await supabase
+              .from('ote_sales_record_items')
+              .insert(itemRows);
+            if (itemsErr) {
+              console.error('Error inserting ote_sales_record_items:', itemsErr);
+            }
+          }
+        }
       }
 
       results.push(upsertedResult);
