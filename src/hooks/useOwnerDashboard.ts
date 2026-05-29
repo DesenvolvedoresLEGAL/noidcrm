@@ -335,40 +335,10 @@ export function useOwnerDashboard() {
       const optimistic = realistic * (1 + Math.max(growthRate, 0.15));
       const pessimistic = realistic * 0.7;
 
-      // Real confidence using FULL centralized calculation (same as Forecast page)
+      // Real confidence — fonte ÚNICA com a página Forecast (NRHS médio das open).
       const pipelineValue = openSalesOpportunities.reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
-      
-      // Coletar métricas reais das oportunidades para cálculo completo
-      const withProbability = openSalesOpportunities.filter(o => o.prob !== null && o.prob > 0).length;
-      const withCloseDate = openSalesOpportunities.filter(o => o.close_date_prevista !== null).length;
-      const withValue = openSalesOpportunities.filter(o => (o.valor_previsto || 0) > 0).length;
-
-      // Atividade recente (últimos 7 dias)
-      const sevenDaysAgo = subDays(now, 7);
-      const oppsWithRecentActivity = new Set<string>();
-      activities.forEach(a => {
-        if (a.opportunity_id && new Date(a.created_at || '') >= sevenDaysAgo) {
-          oppsWithRecentActivity.add(a.opportunity_id);
-        }
-      });
-      const withRecentActivity = openSalesOpportunities.filter(o => oppsWithRecentActivity.has(o.id)).length;
-
-      // Baixo risco = prob >= 60% e tem data de fechamento
-      const lowRiskCount = openSalesOpportunities.filter(o => 
-        (o.prob || 0) >= 60 && o.close_date_prevista !== null
-      ).length;
-
-      const forecastConfidenceResult = calculateForecastConfidence({
-        totalOpportunities: openSalesOpportunities.length,
-        withProbability,
-        withCloseDate,
-        withValue,
-        withRecentActivity,
-        lowRiskCount,
-        monthsWithSalesData: dataQuality,
-        totalWonOpportunities: wonSalesOpportunities.length,
-        pipelineValue,
-        goal: yearlyGoal
+      const forecastConfidenceResult = calculateForecastConfidenceFromNRHS({
+        openSalesOpportunities: openSalesOpportunities as Array<{ nrhs_score?: number | null }>,
       });
 
       // =================== SELLER PRODUCTIVITY (SALES ROLE ONLY) ===================
