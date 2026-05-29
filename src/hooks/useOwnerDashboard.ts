@@ -536,15 +536,27 @@ export function useOwnerDashboard() {
         ? Math.round(npsAccounts.reduce((sum, a) => sum + (a.pontuacao_nps || 0), 0) / npsAccounts.length)
         : 0;
 
-      // Repurchase rate
-      const repeatCustomers = accounts.filter(a => {
-        const customerOpps = wonSalesOpportunities.filter(o => o.account_id === a.id);
-        return customerOpps.length > 1;
-      }).length;
-      const repurchaseRate = accounts.length > 0 ? (repeatCustomers / accounts.length) * 100 : 0;
+      // Repurchase rate — clientes (lifecycle_stage = 'Cliente') que fecharam mais
+      // de uma vez, considerando ganhos em pipelines de vendas E renewal.
+      const renewalPipelineIds = new Set(
+        pipelines.filter(p => p.pipeline_type === 'sales' || p.pipeline_type === 'renewal').map(p => p.id),
+      );
+      const wonForRepurchase = opportunities.filter(
+        (o: any) => o.status === 'won' && renewalPipelineIds.has(o.pipeline_id),
+      );
+      const wonByAccount = wonForRepurchase.reduce((acc: Map<string, number>, o: any) => {
+        if (!o.account_id) return acc;
+        acc.set(o.account_id, (acc.get(o.account_id) || 0) + 1);
+        return acc;
+      }, new Map<string, number>());
+      const customerAccounts = accounts.filter(a => a.lifecycle_stage === 'Cliente');
+      const repeatCustomers = customerAccounts.filter(a => (wonByAccount.get(a.id) || 0) > 1).length;
+      const repurchaseRate = customerAccounts.length > 0
+        ? (repeatCustomers / customerAccounts.length) * 100
+        : 0;
 
-      // Conversion rate (mês atual, mesma regra do Forecast e Win/Loss)
-      const totalWon = wonSalesThisMonth.length;
+      // Conversion rate (mês atual) — numerador alinhado à SSoT (Vendas Realizadas).
+      const totalWon = ssotWonCountThisMonth;
       const totalLost = lostSalesThisMonth.length;
       const totalClosed = totalWon + totalLost;
       const conversionRate = totalClosed > 0 ? (totalWon / totalClosed) * 100 : 0;
