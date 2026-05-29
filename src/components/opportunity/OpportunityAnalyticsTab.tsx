@@ -6,10 +6,10 @@ import { Badge } from '@/components/ui/badge';
 import { BarChart3, FileText, AlertTriangle, Brain } from 'lucide-react';
 import { ProposalAnalyticsPanel } from '@/components/proposals/ProposalAnalyticsPanel';
 import { AIProposalInsightCard } from '@/components/proposals/AIProposalInsightCard';
-// Sprint C.1: legacy ProposalAlertsCard removed from Analytics tab.
-// AI Insights principal (AIProposalInsightCard) é a única fonte visual
-// de leitura comercial na lateral direita. Smart alerts continuam no
-// payload do AIProposalInsightCard, sem painel separado redundante.
+import { RecommendedActionsGrid } from '@/components/proposals/RecommendedActionsGrid';
+// Sprint C.2: Ações Recomendadas movidas para a coluna central, abaixo do
+// Mapa de Atenção, em formato de grid de cards. AI Insights na lateral
+// direita mantém apenas resumo, engajamento, probabilidade e insights.
 import { supabase } from '@/integrations/supabase/client';
 
 interface OpportunityAnalyticsTabProps {
@@ -117,15 +117,20 @@ export function OpportunityAnalyticsTab({ opportunityId }: OpportunityAnalyticsT
 
       {activeProposalId ? (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main Analytics Panel - 2 columns */}
+          {/* Main Analytics Panel + Recommended Actions - 2 columns */}
           <div className="lg:col-span-2 space-y-6">
             <ProposalAnalyticsPanel proposalId={activeProposalId} />
+            <RecommendedActionsGrid proposalId={activeProposalId} opportunityId={opportunityId} />
           </div>
 
-          {/* AI Insights & Alerts - 1 column */}
+          {/* AI Insights only - 1 column (sem ações recomendadas, foco em leitura) */}
           <div className="space-y-6">
-            <AIProposalInsightCard proposalId={activeProposalId} autoLoad opportunityId={opportunityId} />
-            {/* Sprint C.1: ProposalAlertsCard removido — AI Insights é a única fonte. */}
+            <AIProposalInsightCard
+              proposalId={activeProposalId}
+              autoLoad
+              opportunityId={opportunityId}
+              showRecommendedActions={false}
+            />
           </div>
         </div>
       ) : (
