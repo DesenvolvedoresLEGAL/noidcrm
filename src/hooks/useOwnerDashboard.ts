@@ -3,7 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "./useCurrentUser";
 import { startOfMonth, subMonths, format, startOfYear, endOfMonth } from "date-fns";
 import { parseDateOnly } from "@/lib/dateUtils";
-import { calculateForecastConfidence, ForecastConfidenceResult } from "@/services/crm/forecastConfidence";
+import { ForecastConfidenceResult } from "@/services/crm/forecastConfidence";
+import { calculateForecastConfidenceFromNRHS } from "@/lib/forecast/confidenceFromNRHS";
 import { subDays } from "date-fns";
 
 export interface OwnerDashboardData {
