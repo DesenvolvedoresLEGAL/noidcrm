@@ -19891,15 +19891,76 @@ export type Database = {
           },
         ]
       }
+      ote_sales_record_items: {
+        Row: {
+          billing_type: string | null
+          counts_toward_goal: boolean
+          created_at: string
+          exclusion_reason: string | null
+          id: string
+          line_amount: number
+          mrr_amount: number
+          one_shot_amount: number
+          organization_id: string
+          ote_sales_record_id: string
+          product_id: string | null
+          product_name: string | null
+          proposal_item_id: string | null
+          quantity: number | null
+        }
+        Insert: {
+          billing_type?: string | null
+          counts_toward_goal?: boolean
+          created_at?: string
+          exclusion_reason?: string | null
+          id?: string
+          line_amount?: number
+          mrr_amount?: number
+          one_shot_amount?: number
+          organization_id: string
+          ote_sales_record_id: string
+          product_id?: string | null
+          product_name?: string | null
+          proposal_item_id?: string | null
+          quantity?: number | null
+        }
+        Update: {
+          billing_type?: string | null
+          counts_toward_goal?: boolean
+          created_at?: string
+          exclusion_reason?: string | null
+          id?: string
+          line_amount?: number
+          mrr_amount?: number
+          one_shot_amount?: number
+          organization_id?: string
+          ote_sales_record_id?: string
+          product_id?: string | null
+          product_name?: string | null
+          proposal_item_id?: string | null
+          quantity?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ote_sales_record_items_ote_sales_record_id_fkey"
+            columns: ["ote_sales_record_id"]
+            isOneToOne: false
+            referencedRelation: "ote_sales_records"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ote_sales_records: {
         Row: {
           client_name: string
           closed_at: string | null
           counts_toward_goal: boolean
           created_at: string
+          eligible_amount: number
           exclusion_reason: string | null
           id: string
           mrr_amount: number
+          non_eligible_amount: number
           observations: string | null
           one_shot_amount: number
           opportunity_id: string | null
@@ -19922,9 +19983,11 @@ export type Database = {
           closed_at?: string | null
           counts_toward_goal?: boolean
           created_at?: string
+          eligible_amount?: number
           exclusion_reason?: string | null
           id?: string
           mrr_amount?: number
+          non_eligible_amount?: number
           observations?: string | null
           one_shot_amount?: number
           opportunity_id?: string | null
@@ -19947,9 +20010,11 @@ export type Database = {
           closed_at?: string | null
           counts_toward_goal?: boolean
           created_at?: string
+          eligible_amount?: number
           exclusion_reason?: string | null
           id?: string
           mrr_amount?: number
+          non_eligible_amount?: number
           observations?: string | null
           one_shot_amount?: number
           opportunity_id?: string | null
