@@ -85,8 +85,12 @@ export interface ProposalAnalytics {
   viewsByLocation: { country: string; city: string; count: number }[];
   viewTimeline: { date: string; views: number }[];
   sectionEngagement: Record<string, number>;
+  /** v2: current engagement (recency-weighted) — same field name for UI compatibility */
   engagementScore: number;
   forwardedCount: number;
+  /** v2 deterministic scoring breakdown (Sprint C) */
+  scoring: ProposalScoringResult;
+  scoringVersion: string;
 }
 
 export async function getProposalViews(proposalId: string, externalOnly: boolean = true): Promise<ProposalView[]> {
