@@ -99,7 +99,7 @@ export function useOwnerDashboard() {
         salesConfigResult,
         expiringProposalsResult,
       ] = await Promise.all([
-        supabase.from('opportunities').select('id, account_id, owner_user_id, pipeline_id, stage_id, status, valor_previsto, prob, close_date_prevista, closed_at, updated_at, created_at, produto, deleted_at, title, nrhs_score, forecast_eligibility, pipelines!inner(pipeline_type)').eq('organization_id', organizationId).is('deleted_at', null),
+        supabase.from('opportunities').select('id, account_id, owner_user_id, pipeline_id, stage_id, status, valor_previsto, prob, close_date_prevista, closed_at, updated_at, created_at, produto, deleted_at, title, nrhs_score, pipelines!inner(pipeline_type)').eq('organization_id', organizationId).is('deleted_at', null),
         supabase.from('accounts').select('id, razao_social, nome_fantasia, pontuacao_nps, data_tornou_cliente, lifecycle_stage').eq('organization_id', organizationId),
         supabase.from('profiles').select('id, user_id, full_name, monthly_goal').eq('organization_id', organizationId),
         supabase.from('stages').select('id, name, pipeline_id, order_index, probability, stagnation_alert_days').eq('organization_id', organizationId),
