@@ -270,7 +270,7 @@ export function AIProposalInsightCard({ proposalId, opportunityId, showRecommend
         )}
 
         {/* Recommended Actions */}
-        {recommendedActions.length > 0 && (
+        {showRecommendedActions && recommendedActions.length > 0 && (
           <div className="space-y-2">
             <h4 className="text-sm font-medium">Ações Recomendadas</h4>
             <div className="space-y-2">
