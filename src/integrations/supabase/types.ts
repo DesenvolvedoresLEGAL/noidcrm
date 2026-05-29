@@ -34577,6 +34577,20 @@ export type Database = {
           reserved_items: number
         }[]
       }
+      get_invitation_by_token: {
+        Args: { p_token: string }
+        Returns: {
+          email: string
+          expires_at: string
+          id: string
+          invited_by: string
+          org_role: string
+          organization_id: string
+          permission_set_id: string
+          status: string
+          team_id: string
+        }[]
+      }
       get_notification_admin_metrics: {
         Args: { p_from: string; p_organization_id: string; p_to: string }
         Returns: {
