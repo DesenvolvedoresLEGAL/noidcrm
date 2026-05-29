@@ -125,7 +125,7 @@ export function OpportunityAnalyticsTab({ opportunityId }: OpportunityAnalyticsT
           {/* AI Insights & Alerts - 1 column */}
           <div className="space-y-6">
             <AIProposalInsightCard proposalId={activeProposalId} autoLoad opportunityId={opportunityId} />
-            <ProposalAlertsCard proposalId={activeProposalId} />
+            {/* Sprint C.1: ProposalAlertsCard removido — AI Insights é a única fonte. */}
           </div>
         </div>
       ) : (
