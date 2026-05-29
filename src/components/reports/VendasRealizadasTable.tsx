@@ -235,6 +235,25 @@ function ConfidenceBadge({ confidence, reviewRequired }: { confidence: string; r
   return <Badge variant="outline" className="gap-1"><ShieldCheck className="h-3 w-3" />Trusted</Badge>;
 }
 
+function GoalBadge({ row }: { row: VendaRealizadaRow }) {
+  if (!isExcludedFromGoal(row)) {
+    return <Badge variant="outline" className="text-[10px] gap-1"><ShieldCheck className="h-3 w-3" />Conta meta</Badge>;
+  }
+  const f = (row.fulfillment_status ?? '').toLowerCase();
+  const c = (row.commercial_status ?? '').toLowerCase();
+  const reason =
+    c === 'lost'
+      ? 'Reaberta e marcada como perdida'
+      : f === 'cancelled'
+        ? 'Cancelada após aprovação'
+        : 'Removida após aprovação';
+  return (
+    <Badge variant="destructive" className="text-[10px] gap-1" title={`Excluída da meta — ${reason}`}>
+      <AlertTriangle className="h-3 w-3" />Excluída
+    </Badge>
+  );
+}
+
 function CommercialStatusBadge({ status }: { status?: string | null }) {
   if (status === 'won') return <Badge variant="default" className="text-[10px]">Ganha</Badge>;
   if (status === 'lost') return <Badge variant="destructive" className="text-[10px]">Perdida</Badge>;
