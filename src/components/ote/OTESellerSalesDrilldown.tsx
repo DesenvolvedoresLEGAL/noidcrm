@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, Fragment } from 'react';
 import { ChevronDown, ChevronRight, ExternalLink, Info } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -50,34 +50,6 @@ function revenueType(r: OTESalesRecord) {
   return '-';
 }
 
-function resolveEligible(r: OTESalesRecord) {
-  return resolveEligibleAmounts(r);
-}
-
-function eligibilityBadge(r: OTESalesRecord) {
-  const { eligible, nonEligible } = resolveEligible(r);
-  const sale = Number(r.sale_value) || 0;
-
-  if (sale <= 0) {
-    return <Badge variant="outline" className="text-xs">—</Badge>;
-  }
-  if (nonEligible <= 0.01) {
-    return <Badge variant="default" className="text-xs">Sim · {fmtBRL(eligible)}</Badge>;
-  }
-  if (eligible <= 0.01) {
-    return (
-      <Badge variant="destructive" className="text-xs" title={r.exclusion_reason || ''}>
-        Não · {fmtBRL(nonEligible)} fora
-      </Badge>
-    );
-  }
-  return (
-    <Badge variant="secondary" className="text-xs">
-      Parcial · {fmtBRL(eligible)} de {fmtBRL(sale)}
-    </Badge>
-  );
-}
-
 function ItemsTable({ items }: { items: OTESalesRecordItem[] }) {
   if (!items || items.length === 0) {
     return (
@@ -94,38 +66,44 @@ function ItemsTable({ items }: { items: OTESalesRecordItem[] }) {
             <TableHead className="text-xs">Produto / serviço</TableHead>
             <TableHead className="text-xs">Tipo</TableHead>
             <TableHead className="text-xs text-right">Qtd</TableHead>
-            <TableHead className="text-xs text-right">Valor</TableHead>
+            <TableHead className="text-xs text-right">Valor do item</TableHead>
             <TableHead className="text-xs">Conta p/ meta?</TableHead>
+            <TableHead className="text-xs text-right">Valor elegível</TableHead>
+            <TableHead className="text-xs">Motivo</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {items.map((it) => (
-            <TableRow key={it.id}>
-              <TableCell className="text-sm">{it.product_name || '—'}</TableCell>
-              <TableCell className="text-xs text-muted-foreground">
-                {(it.billing_type || '').toLowerCase() === 'recurring' ? 'Recorrente' : 'One-shot'}
-              </TableCell>
-              <TableCell className="text-sm text-right tabular-nums">
-                {Number(it.quantity || 0)}
-              </TableCell>
-              <TableCell className="text-sm text-right tabular-nums">
-                {fmtBRL(Number(it.line_amount))}
-              </TableCell>
-              <TableCell>
-                {it.counts_toward_goal ? (
-                  <Badge variant="default" className="text-xs">Sim</Badge>
-                ) : (
-                  <Badge
-                    variant="destructive"
-                    className="text-xs"
-                    title={it.exclusion_reason || ''}
-                  >
-                    Não
-                  </Badge>
-                )}
-              </TableCell>
-            </TableRow>
-          ))}
+          {items.map((it) => {
+            const lineAmount = Number(it.line_amount) || 0;
+            const eligible = it.counts_toward_goal ? lineAmount : 0;
+            return (
+              <TableRow key={it.id}>
+                <TableCell className="text-sm">{it.product_name || '—'}</TableCell>
+                <TableCell className="text-xs text-muted-foreground">
+                  {(it.billing_type || '').toLowerCase() === 'recurring' ? 'Recorrente' : 'One-shot'}
+                </TableCell>
+                <TableCell className="text-sm text-right tabular-nums">
+                  {Number(it.quantity || 0)}
+                </TableCell>
+                <TableCell className="text-sm text-right tabular-nums">
+                  {fmtBRL(lineAmount)}
+                </TableCell>
+                <TableCell>
+                  {it.counts_toward_goal ? (
+                    <Badge variant="default" className="text-xs">Sim</Badge>
+                  ) : (
+                    <Badge variant="destructive" className="text-xs">Não</Badge>
+                  )}
+                </TableCell>
+                <TableCell className="text-sm text-right tabular-nums">
+                  {fmtBRL(eligible)}
+                </TableCell>
+                <TableCell className="text-xs text-muted-foreground max-w-[260px] truncate">
+                  {it.exclusion_reason || '—'}
+                </TableCell>
+              </TableRow>
+            );
+          })}
         </TableBody>
       </Table>
     </div>
@@ -151,9 +129,14 @@ export function OTESellerSalesDrilldown({ records, kind, loading }: Props) {
     );
   }
 
-  const eligibleTotal = records.reduce((s, r) => s + resolveEligible(r).eligible, 0);
-  const nonEligibleTotal = records.reduce((s, r) => s + resolveEligible(r).nonEligible, 0);
+  const eligibleTotal = records.reduce((s, r) => s + resolveEligibleAmounts(r).eligible, 0);
+  const nonEligibleTotal = records.reduce((s, r) => s + resolveEligibleAmounts(r).nonEligible, 0);
   const ssotTotal = records.reduce((s, r) => s + Number(r.sale_value || 0), 0);
+
+  // Colunas da tabela (kind === 'sale'):
+  // [▸] Cliente | Pipeline | Fechado em | Valor comercial | Elegível p/ meta | Tipo | Ações
+  // kind === 'qualified_lead' fica mais simples: [▸] Cliente | Pipeline | Qualificado em | Status | Ações
+  const colSpan = kind === 'sale' ? 8 : 6;
 
   return (
     <TooltipProvider>
@@ -186,9 +169,9 @@ export function OTESellerSalesDrilldown({ records, kind, loading }: Props) {
                     <Info className="inline h-3 w-3 ml-1 text-muted-foreground" />
                   </TooltipTrigger>
                   <TooltipContent className="max-w-xs text-xs">
-                    Vendas reabertas como perdidas ou removidas operacionalmente após
-                    aprovação. Geram receita histórica mas não contam para a meta
-                    do vendedor (regra reconciliada com Vendas Realizadas).
+                    Inclui (a) vendas reabertas/perdidas e (b) produtos/serviços
+                    cuja flag "Contabiliza na meta" está desligada no catálogo.
+                    Expanda a linha para auditar item a item.
                   </TooltipContent>
                 </Tooltip>
               </span>
@@ -206,10 +189,8 @@ export function OTESellerSalesDrilldown({ records, kind, loading }: Props) {
                 <TableHead>{kind === 'qualified_lead' ? 'Qualificado em' : 'Fechado em'}</TableHead>
                 {kind === 'sale' && <TableHead className="text-right">Valor comercial</TableHead>}
                 {kind === 'sale' && <TableHead className="text-right">Elegível p/ meta</TableHead>}
-                {kind === 'sale' && <TableHead className="text-right">Fora da meta</TableHead>}
                 {kind === 'sale' && <TableHead>Tipo</TableHead>}
-                <TableHead>Conta p/ meta?</TableHead>
-                <TableHead>Confiança</TableHead>
+                {kind === 'qualified_lead' && <TableHead>Status</TableHead>}
                 <TableHead className="w-[40px]"></TableHead>
               </TableRow>
             </TableHeader>
@@ -217,11 +198,14 @@ export function OTESellerSalesDrilldown({ records, kind, loading }: Props) {
               {records.map((r) => {
                 const isOpen = expanded === r.id;
                 const hasItems = (r.items?.length || 0) > 0;
-                const canExpand = kind === 'sale' && (hasItems || (r.exclusion_reason ?? null) !== null);
-                const { eligible, nonEligible } = resolveEligible(r);
+                const canExpand =
+                  kind === 'sale' && (hasItems || (r.exclusion_reason ?? null) !== null);
+                const { eligible } = resolveEligibleAmounts(r);
+                const sale = Number(r.sale_value) || 0;
+                const partial = kind === 'sale' && sale > 0 && eligible + 0.01 < sale;
                 return (
-                  <>
-                    <TableRow key={r.id}>
+                  <Fragment key={r.id}>
+                    <TableRow>
                       <TableCell>
                         {canExpand && (
                           <Button
@@ -249,17 +233,17 @@ export function OTESellerSalesDrilldown({ records, kind, loading }: Props) {
                       </TableCell>
                       {kind === 'sale' && (
                         <TableCell className="text-right tabular-nums font-semibold">
-                          {fmtBRL(r.sale_value)}
+                          {fmtBRL(sale)}
                         </TableCell>
                       )}
                       {kind === 'sale' && (
-                        <TableCell className="text-right tabular-nums">
+                        <TableCell
+                          className={cn(
+                            'text-right tabular-nums',
+                            partial && 'text-amber-600 font-medium',
+                          )}
+                        >
                           {fmtBRL(eligible)}
-                        </TableCell>
-                      )}
-                      {kind === 'sale' && (
-                        <TableCell className="text-right tabular-nums text-muted-foreground">
-                          {nonEligible > 0.01 ? fmtBRL(nonEligible) : '—'}
                         </TableCell>
                       )}
                       {kind === 'sale' && (
@@ -269,33 +253,17 @@ export function OTESellerSalesDrilldown({ records, kind, loading }: Props) {
                           </Badge>
                         </TableCell>
                       )}
-                      <TableCell>
-                        {kind === 'sale' ? (
-                          eligibilityBadge(r)
-                        ) : r.counts_toward_goal ? (
-                          <Badge variant="default" className="text-xs">Sim</Badge>
-                        ) : (
-                          <Badge variant="destructive" className="text-xs">
-                            Não{r.exclusion_reason ? ` · ${r.exclusion_reason}` : ''}
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="text-[10px] uppercase">
-                          {r.revenue_confidence || 'trusted'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {kind === 'sale' ? (
-                          eligibilityBadge(r)
-                        ) : r.counts_toward_goal ? (
-                          <Badge variant="default" className="text-xs">Sim</Badge>
-                        ) : (
-                          <Badge variant="destructive" className="text-xs">
-                            Não{r.exclusion_reason ? ` · ${r.exclusion_reason}` : ''}
-                          </Badge>
-                        )}
-                      </TableCell>
+                      {kind === 'qualified_lead' && (
+                        <TableCell>
+                          {r.counts_toward_goal ? (
+                            <Badge variant="default" className="text-xs">Conta p/ meta</Badge>
+                          ) : (
+                            <Badge variant="destructive" className="text-xs">
+                              Não conta{r.exclusion_reason ? ` · ${r.exclusion_reason}` : ''}
+                            </Badge>
+                          )}
+                        </TableCell>
+                      )}
                       <TableCell>
                         {r.opportunity_id && (
                           <a
@@ -312,7 +280,7 @@ export function OTESellerSalesDrilldown({ records, kind, loading }: Props) {
                     </TableRow>
                     {isOpen && canExpand && (
                       <TableRow className={cn('bg-muted/20')}>
-                        <TableCell colSpan={kind === 'sale' ? 11 : 7} className="py-3">
+                        <TableCell colSpan={colSpan} className="py-3">
                           <div className="space-y-2">
                             {r.exclusion_reason && (
                               <p className="text-xs text-muted-foreground">
@@ -325,7 +293,7 @@ export function OTESellerSalesDrilldown({ records, kind, loading }: Props) {
                         </TableCell>
                       </TableRow>
                     )}
-                  </>
+                  </Fragment>
                 );
               })}
             </TableBody>

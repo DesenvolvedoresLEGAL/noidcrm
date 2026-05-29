@@ -393,7 +393,9 @@ serve(async (req) => {
             }
           }
 
-          // Sem itens conhecidos → comercial inteiro é elegível (a menos que excluído).
+          // Sem itens conhecidos → comercial inteiro é elegível (fallback legado),
+          // a menos que a venda esteja excluída por status final.
+          const usingLegacyFallback = !saleExcluded && rawItems.length === 0;
           const eligible = saleExcluded
             ? 0
             : (rawItems.length > 0 ? eligibleItemsSum : commercial);
@@ -403,7 +405,26 @@ serve(async (req) => {
             ? saleExclusionReason
             : (anyItemExcluded && nonEligible > 0.01
                 ? 'Produto/serviço não contabiliza para meta (ver itens)'
-                : null);
+                : (usingLegacyFallback && proposalId
+                    ? 'Itens da proposta não disponíveis — usando fallback legado (revisar)'
+                    : null));
+
+          // Telemetria por venda — crítica para auditar por que `eligible` pode
+          // estar igual a `commercial` quando há produtos não-elegíveis.
+          console.log(
+            `[ote] opp=${opp.id} proposal=${proposalId ?? 'none'} commercial=${commercial.toFixed(2)} ` +
+            `items=${rawItems.length} eligible=${eligible.toFixed(2)} nonEligible=${nonEligible.toFixed(2)} ` +
+            `saleExcluded=${saleExcluded} anyItemExcluded=${anyItemExcluded} legacy=${usingLegacyFallback}`,
+          );
+          if (rawItems.length > 0) {
+            for (const ent of items) {
+              console.log(
+                `  · item product=${ent.product_id ?? '-'} name="${ent.product_name ?? ''}" ` +
+                `line=${ent.line_amount.toFixed(2)} countsForGoal=${ent.counts_toward_goal} ` +
+                `reason="${ent.exclusion_reason ?? ''}"`,
+              );
+            }
+          }
 
           oppEnrichment.set(opp.id, {
             commercial,
@@ -411,13 +432,16 @@ serve(async (req) => {
             oneShot,
             eligible,
             nonEligible,
-            revenueConfidence: ssot?.revenue_confidence ?? null,
+            revenueConfidence: usingLegacyFallback
+              ? 'legacy_fallback'
+              : (ssot?.revenue_confidence ?? null),
             proposalId,
             items,
             exclusionReason,
           });
         }
       }
+
 
       // For leads goal_type: count opportunities. For revenue: sum eligible (SSoT-aligned).
       const totalSales = goalType === 'leads'
