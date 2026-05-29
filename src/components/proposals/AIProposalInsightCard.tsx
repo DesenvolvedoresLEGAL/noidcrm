@@ -220,14 +220,18 @@ export function AIProposalInsightCard({ proposalId, opportunityId }: AIProposalI
           <div className="p-3 border rounded-lg">
             <span className="text-xs text-muted-foreground">Prob. de Fechamento</span>
             <div className="flex items-center gap-1 mt-1">
-              {winDelta > 0 ? <TrendingUp className="h-4 w-4 text-green-500" /> :
-                winDelta < 0 ? <TrendingDown className="h-4 w-4 text-red-500" /> : null}
-              <span className={`font-medium text-sm ${winDelta > 0 ? 'text-green-600' : winDelta < 0 ? 'text-red-600' : ''}`}>
-                {winDelta > 0 ? '+' : ''}{winDelta}%
+              {closeProbTrend === 'up' ? <TrendingUp className="h-4 w-4 text-green-500" /> :
+                closeProbTrend === 'down' ? <TrendingDown className="h-4 w-4 text-red-500" /> : null}
+              <span className={`font-medium text-sm ${closeProbTrend === 'up' ? 'text-green-600' : closeProbTrend === 'down' ? 'text-red-600' : ''}`}>
+                {closeProbValue}%
               </span>
             </div>
           </div>
         </div>
+
+        {scoreExplanation && (
+          <p className="text-xs text-muted-foreground italic px-1">{scoreExplanation}</p>
+        )}
 
         {/* Best Contact Time */}
         {data.best_contact_time && (
