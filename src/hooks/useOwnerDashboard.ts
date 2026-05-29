@@ -66,7 +66,7 @@ export function useOwnerDashboard() {
   const currentMonthKey = format(new Date(), 'yyyy-MM');
 
   return useQuery({
-    queryKey: ['owner-dashboard', organizationId, currentMonthKey, 'monthly-sales-win-rate-v4-sales-only'],
+    queryKey: ['owner-dashboard', organizationId, currentMonthKey, 'ssot-aligned-v5'],
     queryFn: async (): Promise<OwnerDashboardData> => {
       if (!organizationId) throw new Error('No organization');
 
