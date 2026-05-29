@@ -285,7 +285,7 @@ serve(async (req) => {
         // 1) SSoT amounts
         const { data: ssotRows } = await supabase
           .from('commercial_won_revenue_view')
-          .select('opportunity_id, accepted_proposal_id, commercial_amount, mrr_amount, one_shot_amount, revenue_confidence')
+          .select('opportunity_id, accepted_proposal_id, commercial_amount, mrr_amount, one_shot_amount, revenue_confidence, commercial_status, fulfillment_status')
           .eq('organization_id', organizationId)
           .in('opportunity_id', oppIds);
         const ssotMap = new Map((ssotRows || []).map((r: any) => [r.opportunity_id, r]));
