@@ -324,7 +324,7 @@ export function OTESellerSalesDrilldown({ records, kind, loading }: Props) {
                     </TableRow>
                     {isOpen && canExpand && (
                       <TableRow className={cn('bg-muted/20')}>
-                        <TableCell colSpan={kind === 'sale' ? 8 : 6} className="py-3">
+                        <TableCell colSpan={kind === 'sale' ? 11 : 7} className="py-3">
                           <div className="space-y-2">
                             {r.exclusion_reason && (
                               <p className="text-xs text-muted-foreground">
