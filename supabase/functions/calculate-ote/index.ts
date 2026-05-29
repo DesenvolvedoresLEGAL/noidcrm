@@ -250,10 +250,136 @@ serve(async (req) => {
         });
       }
 
-      // For leads goal_type: count opportunities. For revenue: sum values.
+      // === SSoT enrichment (revenue only) ===
+      // For revenue sellers, valor comercial vem de commercial_won_revenue_view
+      // (única fonte oficial). totalSales passa a ser a soma do eligible_amount
+      // por oportunidade — ou seja, apenas os itens com counts_for_commission=true.
+      // Fallback: quando a oportunidade não tem accepted_proposal_id nem itens,
+      // o valor inteiro é considerado elegível (comportamento legado).
+      const oppEnrichment = new Map<string, {
+        commercial: number;
+        mrr: number;
+        oneShot: number;
+        eligible: number;
+        nonEligible: number;
+        revenueConfidence: string | null;
+        proposalId: string | null;
+        items: Array<{
+          proposal_item_id: string | null;
+          product_id: string | null;
+          product_name: string | null;
+          billing_type: string | null;
+          quantity: number;
+          line_amount: number;
+          mrr_amount: number;
+          one_shot_amount: number;
+          counts_toward_goal: boolean;
+          exclusion_reason: string | null;
+        }>;
+        exclusionReason: string | null;
+      }>();
+
+      if (goalType !== 'leads' && opportunities.length > 0) {
+        const oppIds = opportunities.map((o: any) => o.id);
+
+        // 1) SSoT amounts
+        const { data: ssotRows } = await supabase
+          .from('commercial_won_revenue_view')
+          .select('opportunity_id, accepted_proposal_id, commercial_amount, mrr_amount, one_shot_amount, revenue_confidence')
+          .eq('organization_id', organizationId)
+          .in('opportunity_id', oppIds);
+        const ssotMap = new Map((ssotRows || []).map((r: any) => [r.opportunity_id, r]));
+
+        // 2) Proposal items (para detalhar counts_for_commission por linha)
+        const proposalIds = (ssotRows || [])
+          .map((r: any) => r.accepted_proposal_id)
+          .filter((id: string | null): id is string => !!id);
+
+        const itemsByProposal = new Map<string, any[]>();
+        if (proposalIds.length > 0) {
+          const { data: items } = await supabase
+            .from('proposal_items')
+            .select('id, proposal_id, product_id, name, billing_type, quantity, total, counts_for_commission')
+            .in('proposal_id', proposalIds);
+          for (const it of items || []) {
+            const arr = itemsByProposal.get(it.proposal_id) || [];
+            arr.push(it);
+            itemsByProposal.set(it.proposal_id, arr);
+          }
+        }
+
+        for (const opp of opportunities) {
+          const ssot: any = ssotMap.get(opp.id);
+          const commercial = Number(
+            ssot?.commercial_amount ?? opp.commission_value ?? opp.valor_previsto ?? 0,
+          );
+          const mrr = Number(ssot?.mrr_amount ?? 0);
+          const oneShot = Number(ssot?.one_shot_amount ?? (ssot ? 0 : commercial));
+          const proposalId: string | null = ssot?.accepted_proposal_id ?? null;
+          const rawItems = proposalId ? itemsByProposal.get(proposalId) || [] : [];
+
+          let eligible = 0;
+          let nonEligible = 0;
+          let exclusionReason: string | null = null;
+          const items: any[] = [];
+
+          if (rawItems.length > 0) {
+            // Rateio: somar totais dos itens; se diverge do commercial (proposta com
+            // approved_amount manual), aplicar fator proporcional para preservar SSoT.
+            const itemsSum = rawItems.reduce(
+              (s: number, it: any) => s + Number(it.total || 0),
+              0,
+            );
+            const factor = itemsSum > 0 ? commercial / itemsSum : 0;
+
+            for (const it of rawItems) {
+              const lineAmount = Number(it.total || 0) * factor;
+              const counts = it.counts_for_commission !== false; // default true
+              const isMrr = (it.billing_type || '').toLowerCase() === 'recurring';
+              items.push({
+                proposal_item_id: it.id,
+                product_id: it.product_id,
+                product_name: it.name,
+                billing_type: it.billing_type,
+                quantity: Number(it.quantity || 0),
+                line_amount: lineAmount,
+                mrr_amount: isMrr ? lineAmount : 0,
+                one_shot_amount: isMrr ? 0 : lineAmount,
+                counts_toward_goal: counts,
+                exclusion_reason: counts ? null : 'Produto/serviço não elegível para meta',
+              });
+              if (counts) eligible += lineAmount;
+              else nonEligible += lineAmount;
+            }
+            if (eligible === 0 && nonEligible > 0) {
+              exclusionReason = 'Todos os itens marcados como não-elegíveis para meta';
+            }
+          } else {
+            // Fallback: sem itens vinculados → conta inteiro pela meta
+            eligible = commercial;
+            exclusionReason = proposalId
+              ? null
+              : 'Proposta sem itens vinculados — valor cheio considerado elegível';
+          }
+
+          oppEnrichment.set(opp.id, {
+            commercial,
+            mrr,
+            oneShot,
+            eligible,
+            nonEligible,
+            revenueConfidence: ssot?.revenue_confidence ?? null,
+            proposalId,
+            items,
+            exclusionReason,
+          });
+        }
+      }
+
+      // For leads goal_type: count opportunities. For revenue: sum eligible (SSoT-aligned).
       const totalSales = goalType === 'leads'
         ? opportunities.length
-        : (opportunities?.reduce((sum, opp) => sum + (opp.commission_value ?? opp.valor_previsto ?? 0), 0) || 0);
+        : Array.from(oppEnrichment.values()).reduce((sum, e) => sum + e.eligible, 0);
 
       console.log(`Seller ${config.user_id}: goalType=${goalType}, totalSales=${totalSales}, opportunities=${opportunities.length}`);
 
