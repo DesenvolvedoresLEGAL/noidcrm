@@ -182,15 +182,28 @@ export function useOwnerDashboard() {
       // DEVEM reconciliar contra esta view no mesmo período.
       // FILTRO OBRIGATÓRIO: somente pipelines de VENDAS contam para os cards
       // (exclui renewal/onboarding/qualification). Mês atual vigente apenas.
-      const { data: ssotRows, error: ssotErr } = await (supabase as any)
-        .from('commercial_won_revenue_view')
-        .select('opportunity_id, commercial_amount, one_shot_amount, mrr_amount, won_at, pipeline_type')
-        .eq('organization_id', organizationId)
-        .eq('pipeline_type', 'sales')
-        .gte('won_at', startOfCurrentMonth.toISOString())
-        .lte('won_at', endOfMonth(now).toISOString());
-      if (ssotErr) {
-        console.error('[useOwnerDashboard] commercial_won_revenue_view failed:', ssotErr);
+      const [ssotMonthRes, ssotYearRes] = await Promise.all([
+        (supabase as any)
+          .from('commercial_won_revenue_view')
+          .select('opportunity_id, commercial_amount, one_shot_amount, mrr_amount, won_at, pipeline_type')
+          .eq('organization_id', organizationId)
+          .eq('pipeline_type', 'sales')
+          .gte('won_at', startOfCurrentMonth.toISOString())
+          .lte('won_at', endOfMonth(now).toISOString()),
+        (supabase as any)
+          .from('commercial_won_revenue_view')
+          .select('commercial_amount')
+          .eq('organization_id', organizationId)
+          .eq('pipeline_type', 'sales')
+          .gte('won_at', startOfYearDate.toISOString())
+          .lte('won_at', endOfMonth(now).toISOString()),
+      ]);
+      const ssotRows = ssotMonthRes.data ?? [];
+      if (ssotMonthRes.error) {
+        console.error('[useOwnerDashboard] commercial_won_revenue_view (month) failed:', ssotMonthRes.error);
+      }
+      if (ssotYearRes.error) {
+        console.error('[useOwnerDashboard] commercial_won_revenue_view (ytd) failed:', ssotYearRes.error);
       }
       const ssotTotals = (ssotRows ?? []).reduce(
         (acc: any, r: any) => {
@@ -200,6 +213,13 @@ export function useOwnerDashboard() {
           return acc;
         },
         { commercial: 0, one_shot: 0, mrr: 0 },
+      );
+      // SSoT-aligned count for current month (fonte única — bate com Vendas Realizadas).
+      const ssotWonCountThisMonth = ssotRows.length;
+      // YTD commercial revenue from SSoT (run rate alinhado à SSoT, não a valor_previsto).
+      const ssotYearlyRevenue = ((ssotYearRes.data ?? []) as any[]).reduce(
+        (sum, r) => sum + (Number(r.commercial_amount) || 0),
+        0,
       );
 
       const closedRevenueThisMonth = ssotTotals.commercial;
