@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { OTEMonthlyResult } from '@/hooks/useOTEData';
 import { useOTESalesRecords } from '@/hooks/useOTESalesRecords';
 import { OTESellerSalesDrilldown } from './OTESellerSalesDrilldown';
+import { aggregateEligible } from './oteEligibility';
 import {
   User,
   Target,
