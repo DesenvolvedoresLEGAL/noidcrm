@@ -254,8 +254,10 @@ export function useOwnerDashboard() {
       // ARR is based on actual MRR, not assumed
       const arr = realMRR * 12;
       
-      // Yearly revenue from SALES pipelines
-      const yearlyRevenue = wonSalesThisYear.reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
+      // Yearly revenue from SSoT (commercial_won_revenue_view YTD).
+      // Antes usava soma de `valor_previsto` (campo legado, frequentemente zerado em
+      // negócios herdados de proposta aprovada) — resultado caía artificialmente.
+      const yearlyRevenue = ssotYearlyRevenue;
       const monthsElapsed = now.getMonth() + 1;
       const runRate = monthsElapsed > 0 ? (yearlyRevenue / monthsElapsed) * 12 : 0;
 
@@ -267,9 +269,9 @@ export function useOwnerDashboard() {
         1000000;
 
       // =================== TICKET MÉDIO ===================
-      // Average ticket do MÊS ATUAL (fonte de verdade para KPI principal)
-      const avgTicketThisMonth = wonSalesThisMonth.length > 0 
-        ? closedRevenueThisMonth / wonSalesThisMonth.length 
+      // Average ticket do MÊS ATUAL — count da SSoT (mesmo número de Vendas Realizadas).
+      const avgTicketThisMonth = ssotWonCountThisMonth > 0
+        ? closedRevenueThisMonth / ssotWonCountThisMonth
         : 0;
       
       // Average ticket HISTÓRICO (para referência, se necessário)
