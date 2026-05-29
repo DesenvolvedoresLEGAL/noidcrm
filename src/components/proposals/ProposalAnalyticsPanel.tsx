@@ -111,7 +111,13 @@ export function ProposalAnalyticsPanel({ proposalId }: ProposalAnalyticsPanelPro
       </div>
 
       {/* Engagement Score Card - Full Width */}
-      <EngagementScoreCard score={analytics?.engagementScore || 0} />
+      <EngagementScoreCard
+        score={analytics?.engagementScore || 0}
+        label={analytics?.scoring?.engagement_label}
+        explanation={analytics?.scoring?.score_explanation}
+        historicalScore={analytics?.scoring?.historical_interest_score}
+        riskScore={analytics?.scoring?.risk_score}
+      />
 
       {/* KPI Cards Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
