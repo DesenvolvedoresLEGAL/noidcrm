@@ -21,6 +21,7 @@ import type {
   OTESalesRecord,
   OTESalesRecordItem,
 } from '@/hooks/useOTESalesRecords';
+import { resolveEligibleAmounts } from './oteEligibility';
 
 interface Props {
   records: OTESalesRecord[];
