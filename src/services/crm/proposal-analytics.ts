@@ -1,4 +1,9 @@
 import { supabase } from '@/integrations/supabase/client';
+import {
+  calculateProposalAnalyticsScore,
+  type ProposalScoringResult,
+  PROPOSAL_ANALYTICS_SCORING_VERSION,
+} from '@/lib/proposals/analyticsScoring';
 
 export interface ProposalView {
   id: string;
