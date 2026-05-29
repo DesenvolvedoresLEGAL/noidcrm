@@ -6,10 +6,10 @@ import { Badge } from '@/components/ui/badge';
 import { BarChart3, FileText, AlertTriangle, Brain } from 'lucide-react';
 import { ProposalAnalyticsPanel } from '@/components/proposals/ProposalAnalyticsPanel';
 import { AIProposalInsightCard } from '@/components/proposals/AIProposalInsightCard';
-// Sprint C.1: legacy ProposalAlertsCard removed from Analytics tab.
-// AI Insights principal (AIProposalInsightCard) é a única fonte visual
-// de leitura comercial na lateral direita. Smart alerts continuam no
-// payload do AIProposalInsightCard, sem painel separado redundante.
+import { RecommendedActionsGrid } from '@/components/proposals/RecommendedActionsGrid';
+// Sprint C.2: Ações Recomendadas movidas para a coluna central, abaixo do
+// Mapa de Atenção, em formato de grid de cards. AI Insights na lateral
+// direita mantém apenas resumo, engajamento, probabilidade e insights.
 import { supabase } from '@/integrations/supabase/client';
 
 interface OpportunityAnalyticsTabProps {
