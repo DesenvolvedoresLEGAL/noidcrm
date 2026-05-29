@@ -251,11 +251,13 @@ serve(async (req) => {
       }
 
       // === SSoT enrichment (revenue only) ===
-      // For revenue sellers, valor comercial vem de commercial_won_revenue_view
-      // (única fonte oficial). totalSales passa a ser a soma do eligible_amount
-      // por oportunidade — ou seja, apenas os itens com counts_for_commission=true.
-      // Fallback: quando a oportunidade não tem accepted_proposal_id nem itens,
-      // o valor inteiro é considerado elegível (comportamento legado).
+      // REGRA OFICIAL DE RECONCILIAÇÃO (Sprint reconcile-OTE-com-VendasRealizadas):
+      // - Receita comercial fechada por linha = commercial_won_revenue_view.commercial_amount
+      // - Conta para meta da venda (linha): !isExcludedFromGoal (igual useVendasRealizadas).
+      //   isExcludedFromGoal = fulfillment_status in ('removed','cancelled')
+      //                       OR commercial_status = 'lost'
+      // - Itens da proposta (counts_for_commission) seguem expostos APENAS para
+      //   transparência de drill-down — NÃO afetam o agregado da meta da venda.
       const oppEnrichment = new Map<string, {
         commercial: number;
         mrr: number;
@@ -282,7 +284,7 @@ serve(async (req) => {
       if (goalType !== 'leads' && opportunities.length > 0) {
         const oppIds = opportunities.map((o: any) => o.id);
 
-        // 1) SSoT amounts
+        // 1) SSoT amounts (única fonte de receita realizada)
         const { data: ssotRows } = await supabase
           .from('commercial_won_revenue_view')
           .select('opportunity_id, accepted_proposal_id, commercial_amount, mrr_amount, one_shot_amount, revenue_confidence, commercial_status, fulfillment_status')
@@ -290,7 +292,7 @@ serve(async (req) => {
           .in('opportunity_id', oppIds);
         const ssotMap = new Map((ssotRows || []).map((r: any) => [r.opportunity_id, r]));
 
-        // 2) Proposal items (para detalhar counts_for_commission por linha)
+        // 2) Proposal items — apenas para drill-down (transparência por produto)
         const proposalIds = (ssotRows || [])
           .map((r: any) => r.accepted_proposal_id)
           .filter((id: string | null): id is string => !!id);
@@ -318,24 +320,38 @@ serve(async (req) => {
           const proposalId: string | null = ssot?.accepted_proposal_id ?? null;
           const rawItems = proposalId ? itemsByProposal.get(proposalId) || [] : [];
 
-          let eligible = 0;
-          let nonEligible = 0;
-          let exclusionReason: string | null = null;
-          const items: any[] = [];
+          // Regra OFICIAL de elegibilidade da VENDA (reconcilia com Vendas Realizadas).
+          const fulfillment = (ssot?.fulfillment_status ?? '').toLowerCase();
+          const commercialSt = (ssot?.commercial_status ?? '').toLowerCase();
+          const excludedFromGoal =
+            fulfillment === 'removed' ||
+            fulfillment === 'cancelled' ||
+            commercialSt === 'lost';
 
+          const eligible = excludedFromGoal ? 0 : commercial;
+          const nonEligible = excludedFromGoal ? commercial : 0;
+          const exclusionReason = excludedFromGoal
+            ? (commercialSt === 'lost'
+                ? 'Venda reaberta e marcada como perdida — excluída da meta'
+                : 'Venda removida/cancelada operacionalmente após aprovação — excluída da meta')
+            : null;
+
+          // Drill-down dos itens (só transparência). O rateio preserva o SSoT da venda.
+          const items: any[] = [];
           if (rawItems.length > 0) {
-            // Rateio: somar totais dos itens; se diverge do commercial (proposta com
-            // approved_amount manual), aplicar fator proporcional para preservar SSoT.
             const itemsSum = rawItems.reduce(
               (s: number, it: any) => s + Number(it.total || 0),
               0,
             );
             const factor = itemsSum > 0 ? commercial / itemsSum : 0;
-
             for (const it of rawItems) {
               const lineAmount = Number(it.total || 0) * factor;
-              const counts = it.counts_for_commission !== false; // default true
+              const itemCountsForCommission = it.counts_for_commission !== false;
               const isMrr = (it.billing_type || '').toLowerCase() === 'recurring';
+              // Linha conta p/ meta da venda quando a venda inteira não foi excluída,
+              // independente da flag de comissão do produto (essa flag afeta payout,
+              // não a meta de venda).
+              const lineCountsForGoal = !excludedFromGoal;
               items.push({
                 proposal_item_id: it.id,
                 product_id: it.product_id,
@@ -345,44 +361,12 @@ serve(async (req) => {
                 line_amount: lineAmount,
                 mrr_amount: isMrr ? lineAmount : 0,
                 one_shot_amount: isMrr ? 0 : lineAmount,
-                counts_toward_goal: counts,
-                exclusion_reason: counts ? null : 'Produto/serviço não elegível para meta',
+                counts_toward_goal: lineCountsForGoal,
+                exclusion_reason: excludedFromGoal
+                  ? exclusionReason
+                  : (itemCountsForCommission ? null : 'Produto não elegível para comissão (não afeta a meta)'),
               });
-              if (counts) eligible += lineAmount;
-              else nonEligible += lineAmount;
             }
-            if (eligible === 0 && nonEligible > 0) {
-              exclusionReason = 'Todos os itens marcados como não-elegíveis para meta';
-            }
-          } else {
-            // Fallback: sem itens vinculados → conta inteiro pela meta
-            eligible = commercial;
-            exclusionReason = proposalId
-              ? null
-              : 'Proposta sem itens vinculados — valor cheio considerado elegível';
-          }
-
-          // REGRA OFICIAL: venda ganha que foi reaberta/removida operacionalmente,
-          // ou cujo status comercial virou "perdida", NÃO pode contar na meta.
-          // Mantemos o registro para transparência mas zeramos a parcela elegível.
-          const fulfillment = (ssot?.fulfillment_status ?? '').toLowerCase();
-          const commercialSt = (ssot?.commercial_status ?? '').toLowerCase();
-          const reopenedLost =
-            fulfillment === 'removed' ||
-            fulfillment === 'cancelled' ||
-            commercialSt === 'lost';
-          if (reopenedLost && eligible > 0) {
-            nonEligible += eligible;
-            eligible = 0;
-            for (const it of items) {
-              it.counts_toward_goal = false;
-              it.exclusion_reason =
-                'Venda reaberta/removida — excluída da meta por regra oficial';
-            }
-            exclusionReason =
-              commercialSt === 'lost'
-                ? 'Venda reaberta e marcada como perdida — excluída da meta'
-                : 'Venda removida operacionalmente após aprovação — excluída da meta';
           }
 
           oppEnrichment.set(opp.id, {
