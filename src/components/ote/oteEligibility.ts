@@ -27,10 +27,15 @@ export function resolveEligibleAmounts(r: OTESalesRecord): EligibilitySplit {
   if (eligStored > 0.01 || nonStored > 0.01) {
     return { eligible: eligStored, nonEligible: nonStored };
   }
-  return r.counts_toward_goal
-    ? { eligible: sale, nonEligible: 0 }
-    : { eligible: 0, nonEligible: sale };
+  // Fallback conservador apenas para registros legados SEM split persistido:
+  // só elevar a venda inteira a elegível quando NÃO houver motivo de exclusão
+  // e a flag counts_toward_goal estiver ligada. Caso contrário, mantém 0.
+  if (r.counts_toward_goal && !r.exclusion_reason) {
+    return { eligible: sale, nonEligible: 0 };
+  }
+  return { eligible: 0, nonEligible: sale };
 }
+
 
 export function aggregateEligible(records: OTESalesRecord[]): {
   ssotTotal: number;
