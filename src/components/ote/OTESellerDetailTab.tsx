@@ -132,9 +132,9 @@ export function OTESellerDetailTab({ results, isLoading, isOTEMode = true }: OTE
                       </div>
                       {(() => {
                         const sellerRecords = allRecords.filter((r) => r.ote_result_id === result.id);
-                        const ssotTotal = sellerRecords.reduce((s, r) => s + Number(r.sale_value || 0), 0);
-                        const eligibleTotal = Number(result.total_sales || 0);
-                        const showSplit = result.goal_type !== 'leads' && Math.abs(ssotTotal - eligibleTotal) > 0.01;
+                        const { ssotTotal, eligibleTotal, nonEligibleTotal } =
+                          require('./oteEligibility').aggregateEligible(sellerRecords);
+                        const isLeads = result.goal_type === 'leads';
                         return (
                           <>
                             <div className="grid grid-cols-2 gap-4 text-sm">
@@ -144,12 +144,16 @@ export function OTESellerDetailTab({ results, isLoading, isOTEMode = true }: OTE
                               </div>
                               <div>
                                 <p className="text-muted-foreground">
-                                  {result.goal_type === 'leads' ? 'Leads Qualificados' : 'Elegível p/ meta'}
+                                  {isLeads ? 'Leads Qualificados' : 'Elegível p/ meta'}
                                 </p>
-                                <p className="font-semibold">{formatGoalValue(eligibleTotal, result.goal_type)}</p>
+                                <p className="font-semibold">
+                                  {isLeads
+                                    ? formatGoalValue(Number(result.total_sales || 0), 'leads')
+                                    : formatCurrency(eligibleTotal)}
+                                </p>
                               </div>
                             </div>
-                            {showSplit && (
+                            {!isLeads && (
                               <div className="rounded-md bg-muted/40 border border-dashed px-3 py-2 text-xs space-y-1">
                                 <div className="flex justify-between">
                                   <span className="text-muted-foreground">Receita total (SSoT)</span>
@@ -157,11 +161,12 @@ export function OTESellerDetailTab({ results, isLoading, isOTEMode = true }: OTE
                                 </div>
                                 <div className="flex justify-between">
                                   <span className="text-muted-foreground">Fora da meta</span>
-                                  <span className="font-medium">{formatCurrency(ssotTotal - eligibleTotal)}</span>
+                                  <span className="font-medium">{formatCurrency(nonEligibleTotal)}</span>
                                 </div>
                                 <p className="text-[11px] text-muted-foreground pt-1">
-                                  Itens com "Conta para comissão" desligada em Produtos geram receita,
-                                  mas não somam na meta. Veja o detalhamento abaixo.
+                                  Fonte: <strong>commercial_won_revenue_view</strong>. Vendas
+                                  reabertas/perdidas ou removidas após aprovação ficam fora da meta
+                                  (reconciliado com Vendas Realizadas).
                                 </p>
                               </div>
                             )}
