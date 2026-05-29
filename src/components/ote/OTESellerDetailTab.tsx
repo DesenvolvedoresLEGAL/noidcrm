@@ -130,16 +130,44 @@ export function OTESellerDetailTab({ results, isLoading, isOTEMode = true }: OTE
                           className="h-2"
                         />
                       </div>
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <p className="text-muted-foreground">Meta</p>
-                          <p className="font-semibold">{formatGoalValue(result.goal_amount, result.goal_type)}</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground">{result.goal_type === 'leads' ? 'Leads Qualificados' : 'Vendas'}</p>
-                          <p className="font-semibold">{formatGoalValue(result.total_sales, result.goal_type)}</p>
-                        </div>
-                      </div>
+                      {(() => {
+                        const sellerRecords = allRecords.filter((r) => r.ote_result_id === result.id);
+                        const ssotTotal = sellerRecords.reduce((s, r) => s + Number(r.sale_value || 0), 0);
+                        const eligibleTotal = Number(result.total_sales || 0);
+                        const showSplit = result.goal_type !== 'leads' && Math.abs(ssotTotal - eligibleTotal) > 0.01;
+                        return (
+                          <>
+                            <div className="grid grid-cols-2 gap-4 text-sm">
+                              <div>
+                                <p className="text-muted-foreground">Meta</p>
+                                <p className="font-semibold">{formatGoalValue(result.goal_amount, result.goal_type)}</p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground">
+                                  {result.goal_type === 'leads' ? 'Leads Qualificados' : 'Elegível p/ meta'}
+                                </p>
+                                <p className="font-semibold">{formatGoalValue(eligibleTotal, result.goal_type)}</p>
+                              </div>
+                            </div>
+                            {showSplit && (
+                              <div className="rounded-md bg-muted/40 border border-dashed px-3 py-2 text-xs space-y-1">
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">Receita total (SSoT)</span>
+                                  <span className="font-medium">{formatCurrency(ssotTotal)}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">Fora da meta</span>
+                                  <span className="font-medium">{formatCurrency(ssotTotal - eligibleTotal)}</span>
+                                </div>
+                                <p className="text-[11px] text-muted-foreground pt-1">
+                                  Itens com "Conta para comissão" desligada em Produtos geram receita,
+                                  mas não somam na meta. Veja o detalhamento abaixo.
+                                </p>
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
                   </div>
 
