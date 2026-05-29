@@ -131,30 +131,60 @@ export function buildOTEWorkbook({
   );
   XLSX.utils.book_append_sheet(wb, wsSdr, 'Pré-vendas');
 
-  // 4. Detalhe de vendas
+  // 4. Detalhe de vendas — agora com split eligible/non-eligible por venda
   const saleRecords = records.filter((r) => r.record_kind !== 'qualified_lead');
   const detailSales = saleRecords.map((r) => {
     const owner = resultMap.get(r.ote_result_id);
+    const sale = Number(r.sale_value || 0);
+    const eligible = Number(r.eligible_amount ?? 0);
+    const nonEligible = Number(r.non_eligible_amount ?? Math.max(0, sale - eligible));
     return [
       owner?.profile?.full_name || '-',
       r.client_name,
+      r.proposal_number || '-',
       r.pipeline_name || '-',
       fmtDateTime(r.closed_at || r.sale_date),
-      Number(r.sale_value || 0),
-      Number(r.mrr_amount || 0),
-      Number(r.one_shot_amount || 0),
+      sale,
+      eligible,
+      nonEligible,
       revenueType(r),
-      r.counts_toward_goal ? 'Sim' : 'Não',
+      r.counts_toward_goal ? 'Conta p/ meta' : 'Fora da meta',
       r.exclusion_reason || '',
-      r.revenue_confidence || '',
     ];
   });
   const wsDetailSales = buildSheet(
     headerRows(periodMonth, organizationName, exporterName, 'Detalhe de vendas (Closers)'),
-    ['Vendedor', 'Cliente', 'Pipeline', 'Fechado em', 'Valor comercial', 'MRR', 'One-shot', 'Tipo', 'Conta p/ meta?', 'Motivo exclusão', 'Confiança'],
+    ['Vendedor', 'Cliente', 'Proposta', 'Pipeline', 'Fechado em', 'Valor comercial', 'Valor elegível p/ meta', 'Valor fora da meta', 'Tipo', 'Status final', 'Motivo geral'],
     detailSales,
   );
   XLSX.utils.book_append_sheet(wb, wsDetailSales, 'Detalhe Vendas');
+
+  // 4b. Itens da venda — auditoria item a item (produtos/serviços)
+  const itemRows: any[] = [];
+  for (const r of saleRecords) {
+    const owner = resultMap.get(r.ote_result_id);
+    const ownerName = owner?.profile?.full_name || '-';
+    for (const it of r.items || []) {
+      const line = Number(it.line_amount || 0);
+      const eligible = it.counts_toward_goal ? line : 0;
+      itemRows.push([
+        ownerName,
+        r.client_name,
+        r.proposal_number || '-',
+        it.product_name || '—',
+        line,
+        it.counts_toward_goal ? 'Sim' : 'Não',
+        eligible,
+        it.exclusion_reason || '',
+      ]);
+    }
+  }
+  const wsDetailItems = buildSheet(
+    headerRows(periodMonth, organizationName, exporterName, 'Itens da venda'),
+    ['Vendedor', 'Cliente', 'Proposta', 'Produto/Serviço', 'Valor do item', 'Contabiliza na meta?', 'Valor elegível do item', 'Motivo de exclusão'],
+    itemRows,
+  );
+  XLSX.utils.book_append_sheet(wb, wsDetailItems, 'Itens da venda');
 
   // 5. Detalhe de qualificações
   const leadRecords = records.filter((r) => r.record_kind === 'qualified_lead');

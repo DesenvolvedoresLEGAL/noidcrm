@@ -1,17 +1,19 @@
 /**
  * OTE ⇄ Vendas Realizadas — reconciliação oficial de elegibilidade por venda.
  *
- * Regra única (espelha `isExcludedFromGoal` do hook useVendasRealizadas):
- *  - Venda "ganha" cuja `fulfillment_status` é 'removed' ou 'cancelled',
- *    OU cujo `commercial_status` virou 'lost' (reaberta perdida)
- *    → NÃO conta para meta. Vai para "fora da meta".
- *  - Caso contrário, o valor comercial inteiro é elegível.
+ * Regra única:
+ *  - eligible_amount / non_eligible_amount são calculados ITEM A ITEM no backend
+ *    (`supabase/functions/calculate-ote/index.ts`), respeitando:
+ *      a) status final da venda (perdida/cancelada/reaberta → 0 elegível);
+ *      b) flag `counts_for_commission` do produto/serviço;
+ *      c) flag `counts_for_commission` do item da proposta.
  *
- * Fallback de leitura: preferimos o que foi gravado em
- * `eligible_amount`/`non_eligible_amount`. Quando esses campos vierem zerados
- * (registros legados antes da migration de transparência), reconstruímos a
- * elegibilidade a partir de `counts_toward_goal`/`sale_value` para evitar o
- * badge "Sim · R$ 0,00".
+ *  - A UI SEMPRE confia no que o backend persistiu. Não inferimos elegibilidade
+ *    aqui — fazer isso esconde casos em que o cálculo precisa ser rodado de novo.
+ *
+ *  - Se ambos os campos estiverem zerados e a venda tiver valor comercial > 0,
+ *    tratamos como "fora da meta" (eligible = 0) e o usuário deve clicar em
+ *    "Calcular" para reprocessar o período.
  */
 import type { OTESalesRecord } from '@/hooks/useOTESalesRecords';
 
@@ -27,12 +29,8 @@ export function resolveEligibleAmounts(r: OTESalesRecord): EligibilitySplit {
   if (eligStored > 0.01 || nonStored > 0.01) {
     return { eligible: eligStored, nonEligible: nonStored };
   }
-  // Fallback conservador apenas para registros legados SEM split persistido:
-  // só elevar a venda inteira a elegível quando NÃO houver motivo de exclusão
-  // e a flag counts_toward_goal estiver ligada. Caso contrário, mantém 0.
-  if (r.counts_toward_goal && !r.exclusion_reason) {
-    return { eligible: sale, nonEligible: 0 };
-  }
+  // Sem split persistido: NÃO inferir elegibilidade. Considera 0 elegível para
+  // sinalizar a necessidade de recálculo via botão "Calcular".
   return { eligible: 0, nonEligible: sale };
 }
 
