@@ -85,12 +85,16 @@ export function VendasRealizadasTable() {
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
         <KPI label="Receita Total" value={fmt(totals?.commercial_amount ?? 0)} />
-        <KPI label="Receita Avulsa" value={fmt(totals?.one_shot_amount ?? 0)} />
+        <KPI label="Elegível p/ meta" value={fmt(totals?.goal_eligible_amount ?? 0)} variant="success" />
+        <KPI
+          label={`Excluído da meta${totals?.goal_excluded_count ? ` (${totals.goal_excluded_count})` : ''}`}
+          value={fmt(totals?.goal_excluded_amount ?? 0)}
+          variant={totals && totals.goal_excluded_amount > 0 ? 'warning' : undefined}
+        />
         <KPI label="Novo MRR" value={fmt(totals?.mrr_amount ?? 0)} />
         <KPI label="Vendas" value={String(totals?.won_count ?? 0)} />
         <KPI label="Ticket Médio" value={fmt(totals?.avg_ticket ?? 0)} />
         <KPI label="Comissão Elegível" value={fmt(totals?.eligible_commission ?? 0)} variant="success" />
-        <KPI label="Comissão em Revisão" value={fmt(totals?.review_commission ?? 0)} variant="warning" />
         <KPI label="Aguardando Settlement" value={fmt(totals?.settlement_pending_commission ?? 0)} variant="warning" />
       </div>
 
