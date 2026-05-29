@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useVendasRealizadas, type VendasRealizadasFilters } from '@/hooks/reports/useVendasRealizadas';
+import { useVendasRealizadas, isExcludedFromGoal, type VendasRealizadasFilters, type VendaRealizadaRow } from '@/hooks/reports/useVendasRealizadas';
 import { useReportFiltersContext } from '@/contexts/ReportFiltersContext';
 import { useActiveUsers } from '@/hooks/users/useActiveUsers';
 import { useOrganizationPipelines } from '@/hooks/useOrganizationPipelines';
