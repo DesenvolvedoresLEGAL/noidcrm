@@ -1,58 +1,47 @@
-## Diagnóstico
 
-A causa raiz é **um único bug SQL** em `public.recalculate_proposal_pricing_ledger(p_proposal_id)`. Quando a faixa dinâmica atual (`is_current=true`) tem `starts_at IS NULL` (típico da primeira faixa "30 dias ou mais antes do evento"), o filtro:
+# Hotfix — CEO Dashboard: alinhar todos os KPIs às fontes oficiais
 
-```sql
-WHERE starts_at <= v_reference_date
-  AND (ends_at IS NULL OR ends_at > v_reference_date)
-```
+## Diagnóstico por card (com base em `src/hooks/useOwnerDashboard.ts`)
 
-avalia `NULL <= …` como NULL, e nenhuma faixa é selecionada. Resultado: `dynamic_adjustment.amount = 0`, `base_amount = effective_amount = subtotal_items` no snapshot.
+| Card | Valor exibido | Valor correto | Causa raiz |
+|---|---|---|---|
+| Receita Avulsa "35 negócios" | 35 | 55 | Badge usa `metrics.wonDealsCount = wonSalesThisMonth.length` (tabela `opportunities` filtrada por `closed_at`/`updated_at`). A SSoT `commercial_won_revenue_view` já retorna 55 e o **valor** (R$ 143.492,19) bate. Divergência é só de **count** porque algumas oportunidades com proposta aceita herdada (ex.: PROP-2026-00761 da MLabs) entram no view mas não no filtro local. |
+| Ticket Médio | R$ 4.099,78 (143.492 / 35) | R$ 2.608,95 (143.492 / 55) | Consequência direta do `wonDealsCount` errado. |
+| Taxa de Conversão | 49% | 59% (Win/Loss Hub: 55 ganhos / 39 perdas) | `totalWon = wonSalesThisMonth.length` (35) em vez do count da SSoT (55). |
+| Pipeline Aberto | 54 | 56 | `openSalesOpportunities` filtra só `status in ('open','new')`. Pipeline real considera `status NOT IN ('won','lost')`, incluindo `pre_approval`, `qualified`, `negotiation`, etc. (ver `services/supabase/opportunities.ts:70`). |
+| Confiança Forecast | 43% | 57% | Dashboard usa `calculateForecastConfidence` local. Página Forecast usa NRHS V2 (`ForecastDataQuality` → `avgNRHS` de `useForecastData`). Fórmulas diferentes ⇒ divergência permanente. |
+| Meta vs Run Rate (caindo) | 17% | maior | `yearlyRevenue` soma `valor_previsto` das won YTD (campo legado, frequentemente 0 ou desalinhado da proposta aprovada). Deve usar a SSoT `commercial_won_revenue_view` YTD (mesma fonte do card mensal). |
+| Taxa Recompra | 0% | >0 | Denominador é `accounts.length` (toda a base de contas, incluindo leads). Numerador é só contas com `>1 won_sales_opportunities`, ignorando ganhos em pipeline `renewal` (recompras reais). |
 
-Como `pricing_breakdown_snapshot` é a Single Source of Truth do PRICE CORE 2.0, todos os blocos que leem do ledger mostram R$ 1.994,00:
-- "Composição do valor" (editor)
-- Header do link público (R$ 1.994,00)
-- "Condições de Pagamento → Pagamento Avulso" no link público
+## Mudanças (somente frontend, sem alterar regra de negócio comercial)
 
-Os blocos que leem **direto** de `proposal_dynamic_pricing_tiers` ou do cálculo live (cronograma do editor, Tabela de Preço Dinâmica, "Total Vigente Hoje", PDF) seguem corretos com R$ 1.794,60 — daí a inconsistência aparente.
+### 1. `src/hooks/useOwnerDashboard.ts`
+- **wonDealsCount / avgTicket / conversionRate**: derivar `wonCountThisMonth` de `ssotRows.length` (já buscado). `avgTicketThisMonth = closedRevenueThisMonth / ssotWonCount`. Para `conversionRate`, manter `lostSalesThisMonth.length` no denominador mas usar `ssotWonCount` no numerador e no total fechados.
+- **openDealsCount**: substituir filtro `status === 'open' || 'new'` por `!['won','lost','deleted'].includes(o.status)` para casar com a definição canônica do Pipeline. Atualizar `openSalesOpportunities` (afeta também `weightedPipeline`, `strategicOpportunities`, `enterpriseDeals`, `pipelineValue` no cálculo de confidence — todos passam a refletir o pipeline real).
+- **Run Rate**: buscar segunda agregação de `commercial_won_revenue_view` YTD (sem filtro mensal, mesmo pipeline_type='sales'), usar `commercial` somado como `yearlyRevenue`. Mantém `runRate = yearlyRevenue / monthsElapsed * 12`.
+- **Repurchase rate**: numerador = contas com ≥ 2 propostas/ganhos em qualquer pipeline `sales` ou `renewal` (incluir renewal); denominador = `accounts.filter(a => a.lifecycle_stage === 'Cliente').length` (somente clientes, não toda a base). Não criar tabela nova — usar `opportunities` + `pipelines.pipeline_type IN ('sales','renewal')` já carregadas (adicionar fetch leve só do pipeline_type renewal se necessário, sem mudar RLS).
 
-Confirmação via DB para PROP-2026-00783:
-- Tier atual: `starts_at=null`, `ends_at=2026-06-16`, `adjustment_value=-10`, `final_amount=1794.60`, `is_current=true`
-- Snapshot atual: `base_amount=1994`, `dynamic.amount=0`, `effective_amount=1994`, `payment_schedule[0].amount=1994` com `due_date=2026-05-22` (também errado — deveria ser 16/06)
+### 2. Confiança do Forecast — fonte única
+- Criar pequena variante: dashboard deixa de calcular confidence localmente e passa a **reusar** a mesma fonte do `Forecast.tsx` (NRHS V2). Caminho: extrair a função pura que calcula `avgNRHS` + composições de `ForecastDataQuality` para um helper compartilhado `src/lib/forecast/confidenceFromNRHS.ts` e consumi-la no `useOwnerDashboard` carregando as oportunidades elegíveis (mesmo `salesPipelineId` resolvido via `useForecastSalesPipeline`). Alternativa mais leve (preferida): no hook do dashboard, fazer `select` em `opportunities` com `nrhs_score, forecast_eligibility` (já existem) restrito ao pipeline de vendas e calcular `avgNRHS` ali — exatamente como o Forecast V2 faz. Resultado: dashboard e Forecast mostram o mesmo número.
 
-## O que vou fazer
+### 3. Sem mudanças em
+- `commercial_won_revenue_view`, `commission_eligibility_view`, RLS, profiles, organization_members, edge functions, ERP, propostas aprovadas, Pix, Slack.
+- Componente `OwnerKPICards.tsx` (só consome `data.metrics.*` — já passa a refletir os números corretos automaticamente).
 
-### 1. Migration — corrigir `recalculate_proposal_pricing_ledger`
-Trocar a cláusula que seleciona a faixa vigente para tolerar `starts_at` nulo:
+## Arquivos a alterar
+- `src/hooks/useOwnerDashboard.ts` (toda a lógica acima)
+- `src/lib/forecast/confidenceFromNRHS.ts` (novo helper puro, opcional se decidirmos extrair)
 
-```sql
-WHERE proposal_id = p_proposal_id
-  AND (starts_at IS NULL OR starts_at <= v_reference_date)
-  AND (ends_at IS NULL OR ends_at > v_reference_date)
-ORDER BY tier_order DESC
-LIMIT 1;
-```
-
-Mantém o resto da função intacto. Sem alterar contrato/colunas/JSON do snapshot.
-
-### 2. Backfill seguro
-No mesmo migration, rodar `recalculate_proposal_pricing_ledger(id)` para todas as propostas:
-- com `dynamic_pricing_enabled = true`
-- não `cancelled`/`declined`
-- não `price_frozen_on_approval = true` (congeladas mantêm snapshot da aprovação)
-- que tenham alguma tier com `starts_at IS NULL`
-
-Isso normaliza retroativamente todos os ledgers afetados sem mexer em propostas congeladas/ganhas.
-
-### 3. Validação
-- Reler snapshot de PROP-2026-00783 e confirmar: `base_amount=1994`, `dynamic.amount=-199.40`, `effective_amount=1794.60`, `payment_schedule[0].amount=1794.60`, `payment_schedule[0].due_date=2026-06-16` (vem de `first_installment_date`, que já está correto após o backfill — vou validar).
-- Abrir link público e editor para confirmar que "Composição do valor", header e "Pagamento Avulso" agora batem em R$ 1.794,60.
-
-## Fora de escopo
-- Não alterar React/TS: a UI já está correta lendo do ledger; o bug é 100% backend.
-- Não alterar lógica de propostas frozen/aprovadas — ledger delas não é recalculado.
-- Não tocar em `ensure_proposal_pricing_ready` (o guard continua válido — só passa a ver o snapshot correto).
+## Critério de aceite
+- "Receita Avulsa (Mês)" badge mostra **55 negócios**.
+- "Ticket Médio" subtítulo mostra **55 negócios fechados** e valor **R$ 2.608,95**.
+- "Taxa de Conversão" = **59%** (55/(55+39)) — bate com Win/Loss Hub.
+- "Pipeline Aberto" = **56** — bate com tela Pipeline.
+- "Confiança Forecast" = mesmo número da página Forecast (atualmente 57%).
+- "Meta vs Run Rate" volta a refletir o YTD da SSoT (não cai mais por causa de `valor_previsto` zerado).
+- "Taxa Recompra" > 0 quando há ao menos 1 cliente com 2+ ganhos.
+- Nada muda em commercial_won_revenue_view, comissão, settlement, propostas, ERP.
 
 ## Riscos
-- **Baixo.** A mudança é uma única linha que adiciona tolerância a NULL; não muda o ordering nem o cálculo. Propostas sem faixa "starts_at NULL" continuam idênticas.
-- Backfill é idempotente e exclui propostas congeladas.
+- Mudar `openDealsCount` para regra ampliada vai aumentar `weightedPipeline` e a contagem de "Oportunidades ativas" — comportamento desejado (alinhar com Pipeline). Sem impacto em receita realizada.
+- Reaproveitar NRHS para confidence depende de `nrhs_score` estar populado nas oportunidades abertas; já é o caso na página Forecast.
