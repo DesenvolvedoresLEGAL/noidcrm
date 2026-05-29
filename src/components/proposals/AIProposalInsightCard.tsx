@@ -20,9 +20,10 @@ interface AIProposalInsightCardProps {
   proposalId: string;
   autoLoad?: boolean; // kept for API compatibility (no-op: hook auto-loads from cache)
   opportunityId?: string;
+  showRecommendedActions?: boolean;
 }
 
-export function AIProposalInsightCard({ proposalId, opportunityId }: AIProposalInsightCardProps) {
+export function AIProposalInsightCard({ proposalId, opportunityId, showRecommendedActions = true }: AIProposalInsightCardProps) {
   const { data, isLoading, isRefreshing, isFromCache, generatedAt, status, error, refresh } =
     useProposalAIInsights(proposalId);
 
