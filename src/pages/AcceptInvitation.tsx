@@ -49,29 +49,20 @@ export default function AcceptInvitation() {
       }
 
       try {
-        // Simplified token validation with public RLS policy
+        // Secure token lookup via SECURITY DEFINER RPC — only returns the
+        // single matching pending invitation when the exact token is provided.
         const { data, error } = await supabase
-          .from("user_invitations")
-          .select("id, email, org_role, organization_id, team_id, permission_set_id, expires_at, status, invited_by")
-          .eq("token", token)
-          .eq("status", "pending")
-          .single();
+          .rpc("get_invitation_by_token", { p_token: token });
 
-        if (error || !data) {
+        const invite = Array.isArray(data) ? data[0] : data;
+        if (error || !invite) {
           console.error("Invitation error:", error);
-          setError("Convite inválido ou já utilizado");
+          setError("Convite inválido, expirado ou já utilizado");
           setLoading(false);
           return;
         }
 
-        // Check if invitation has expired
-        if (new Date(data.expires_at) < new Date()) {
-          setError("Este convite expirou. Solicite um novo convite ao administrador.");
-          setLoading(false);
-          return;
-        }
-
-        setInvitation(data);
+        setInvitation(invite);
       } catch (err) {
         console.error("Error validating invitation:", err);
         setError("Erro ao validar o convite");
