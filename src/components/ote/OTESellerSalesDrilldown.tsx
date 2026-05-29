@@ -50,21 +50,8 @@ function revenueType(r: OTESalesRecord) {
   return '-';
 }
 
-function resolveEligible(r: OTESalesRecord): { eligible: number; nonEligible: number } {
-  const sale = Number(r.sale_value) || 0;
-  // Reconciliação com Vendas Realizadas: se a venda conta para meta, o elegível
-  // é o valor comercial cheio. Caso contrário, vai 100% para "fora da meta".
-  // Usamos eligible_amount apenas quando explicitamente preenchido (>0); senão
-  // caímos para counts_toward_goal — protege registros legados onde o coluna
-  // ficou em 0 por padrão.
-  const eligStored = Number(r.eligible_amount ?? 0);
-  const nonStored = Number(r.non_eligible_amount ?? 0);
-  if (eligStored > 0.01 || nonStored > 0.01) {
-    return { eligible: eligStored, nonEligible: nonStored };
-  }
-  return r.counts_toward_goal
-    ? { eligible: sale, nonEligible: 0 }
-    : { eligible: 0, nonEligible: sale };
+function resolveEligible(r: OTESalesRecord) {
+  return resolveEligibleAmounts(r);
 }
 
 function eligibilityBadge(r: OTESalesRecord) {
