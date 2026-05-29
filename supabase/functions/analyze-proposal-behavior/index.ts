@@ -417,16 +417,44 @@ Gere insights acionáveis baseados nos padrões observados.`;
       }
     }
 
-    // ---- Persist cache ----
-    const engagementMap: Record<string, number> = { low: 25, medium: 55, high: 80, very_high: 95 };
+    // ---- Persist cache (Sprint C: deterministic scoring wins over AI level) ----
+    // Map AI level to a number only as fallback; the real score comes from deterministic engine.
+    const aiLevelMap: Record<string, number> = { low: 25, medium: 55, high: 80, very_high: 95 };
+    const trendMap: Record<string, string> = { up: 'up', down: 'down', neutral: 'neutral' };
+    const smartAlerts = Array.isArray((analysis as any).smart_alerts) && (analysis as any).smart_alerts.length > 0
+      ? (analysis as any).smart_alerts
+      : analysis.insights;
+
     const insightsPayload = {
+      scoring_version: PROPOSAL_ANALYTICS_SCORING_VERSION,
       summary: analysis.summary,
-      engagement: { score: engagementMap[analysis.engagement_level] ?? null, level: analysis.engagement_level },
-      close_probability: { value: analysis.win_probability_delta, trend: 'neutral' },
+      commercial_diagnosis: (analysis as any).commercial_diagnosis ?? null,
+      risk_reading: (analysis as any).risk_reading ?? null,
+      engagement: {
+        score: scoring.current_engagement_score,
+        level: analysis.engagement_level,
+        label: scoring.engagement_label,
+        historical: scoring.historical_interest_score,
+      },
+      close_probability: {
+        value: scoring.close_probability,
+        trend: trendMap[scoring.close_probability_trend] ?? 'neutral',
+      },
+      score_explanation: scoring.score_explanation,
+      risk: { score: scoring.risk_score, label: scoring.risk_label },
+      penalties: scoring.penalties,
+      bonuses: scoring.bonuses,
+      last_view_age_days: scoring.last_view_age_days,
+      days_to_delivery: scoring.days_to_delivery,
+      days_to_expiration: scoring.days_to_expiration,
+      recommended_followup_priority: scoring.recommended_followup_priority,
       insights: analysis.insights,
       recommended_actions: analysis.recommended_actions,
-      smart_alerts: analysis.insights,
+      smart_alerts: smartAlerts,
       best_contact_time: analysis.best_contact_time,
+      next_best_action: (analysis as any).next_best_action ?? null,
+      followup_tone: (analysis as any).followup_tone ?? null,
+      followup_timing: (analysis as any).followup_timing ?? null,
       concerns: analysis.concerns,
       metrics: behaviorContext.metrics,
     };
@@ -442,12 +470,12 @@ Gere insights acionáveis baseados nos padrões observados.`;
         p_proposal_id: proposal_id,
         p_analytics_signature: currentSignature,
         p_insights_payload: insightsPayload,
-        p_engagement_score: engagementMap[analysis.engagement_level] ?? null,
+        p_engagement_score: scoring.current_engagement_score,
         p_engagement_level: analysis.engagement_level,
-        p_close_probability: analysis.win_probability_delta,
-        p_risk_level: null,
+        p_close_probability: scoring.close_probability,
+        p_risk_level: scoring.risk_label,
         p_recommended_actions: analysis.recommended_actions as any,
-        p_smart_alerts: analysis.insights as any,
+        p_smart_alerts: smartAlerts as any,
         p_generated_summary: analysis.summary,
         p_model_used: modelUsed,
         p_tokens_input: tokensIn,
