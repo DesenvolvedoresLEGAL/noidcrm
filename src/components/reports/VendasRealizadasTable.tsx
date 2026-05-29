@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useVendasRealizadas, type VendasRealizadasFilters } from '@/hooks/reports/useVendasRealizadas';
+import { useVendasRealizadas, isExcludedFromGoal, type VendasRealizadasFilters, type VendaRealizadaRow } from '@/hooks/reports/useVendasRealizadas';
 import { useReportFiltersContext } from '@/contexts/ReportFiltersContext';
 import { useActiveUsers } from '@/hooks/users/useActiveUsers';
 import { useOrganizationPipelines } from '@/hooks/useOrganizationPipelines';
@@ -85,12 +85,16 @@ export function VendasRealizadasTable() {
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
         <KPI label="Receita Total" value={fmt(totals?.commercial_amount ?? 0)} />
-        <KPI label="Receita Avulsa" value={fmt(totals?.one_shot_amount ?? 0)} />
+        <KPI label="Elegível p/ meta" value={fmt(totals?.goal_eligible_amount ?? 0)} variant="success" />
+        <KPI
+          label={`Excluído da meta${totals?.goal_excluded_count ? ` (${totals.goal_excluded_count})` : ''}`}
+          value={fmt(totals?.goal_excluded_amount ?? 0)}
+          variant={totals && totals.goal_excluded_amount > 0 ? 'warning' : undefined}
+        />
         <KPI label="Novo MRR" value={fmt(totals?.mrr_amount ?? 0)} />
         <KPI label="Vendas" value={String(totals?.won_count ?? 0)} />
         <KPI label="Ticket Médio" value={fmt(totals?.avg_ticket ?? 0)} />
         <KPI label="Comissão Elegível" value={fmt(totals?.eligible_commission ?? 0)} variant="success" />
-        <KPI label="Comissão em Revisão" value={fmt(totals?.review_commission ?? 0)} variant="warning" />
         <KPI label="Aguardando Settlement" value={fmt(totals?.settlement_pending_commission ?? 0)} variant="warning" />
       </div>
 
@@ -154,6 +158,7 @@ export function VendasRealizadasTable() {
                 <TableHead className="text-right">Avulsa</TableHead>
                 <TableHead className="text-right">MRR</TableHead>
                 <TableHead className="text-right">Total Comercial</TableHead>
+                <TableHead>Meta</TableHead>
                 <TableHead>Comercial</TableHead>
                 <TableHead>Operacional</TableHead>
                 <TableHead>Settlement</TableHead>
@@ -164,33 +169,39 @@ export function VendasRealizadasTable() {
             <TableBody>
               {rows.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={12} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={13} className="text-center text-muted-foreground py-8">
                     Nenhuma venda realizada no período.
                   </TableCell>
                 </TableRow>
               )}
-              {rows.map((r) => (
-                <TableRow key={r.opportunity_id}>
-                  <TableCell className="whitespace-nowrap text-xs">
-                    {r.won_at ? new Date(r.won_at).toLocaleDateString('pt-BR') : '—'}
-                  </TableCell>
-                  <TableCell className="max-w-[220px] truncate" title={r.nome_fantasia || r.account_name || ''}>
-                    {r.nome_fantasia || r.account_name || '—'}
-                  </TableCell>
-                  <TableCell className="font-mono text-xs">{r.proposal_number ?? '—'}</TableCell>
-                  <TableCell className="text-sm">{r.seller_name ?? '—'}</TableCell>
-                  <TableCell className="text-right tabular-nums">{fmt(Number(r.one_shot_amount) || 0)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{fmt(Number(r.mrr_amount) || 0)}</TableCell>
-                  <TableCell className="text-right tabular-nums font-semibold">{fmt(Number(r.commercial_amount) || 0)}</TableCell>
-                  <TableCell><CommercialStatusBadge status={r.commercial_status} /></TableCell>
-                  <TableCell><FulfillmentBadge status={r.fulfillment_status} /></TableCell>
-                  <TableCell><SettlementBadge status={r.financial_settlement_status} /></TableCell>
-                  <TableCell><CommissionBadge status={r.commission_status} /></TableCell>
-                  <TableCell>
-                    <ConfidenceBadge confidence={r.revenue_confidence} reviewRequired={r.review_required} />
-                  </TableCell>
-                </TableRow>
-              ))}
+              {rows.map((r) => {
+                const excluded = isExcludedFromGoal(r);
+                return (
+                  <TableRow key={r.opportunity_id} className={excluded ? 'opacity-80' : ''}>
+                    <TableCell className="whitespace-nowrap text-xs">
+                      {r.won_at ? new Date(r.won_at).toLocaleDateString('pt-BR') : '—'}
+                    </TableCell>
+                    <TableCell className="max-w-[220px] truncate" title={r.nome_fantasia || r.account_name || ''}>
+                      {r.nome_fantasia || r.account_name || '—'}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs">{r.proposal_number ?? '—'}</TableCell>
+                    <TableCell className="text-sm">{r.seller_name ?? '—'}</TableCell>
+                    <TableCell className="text-right tabular-nums">{fmt(Number(r.one_shot_amount) || 0)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{fmt(Number(r.mrr_amount) || 0)}</TableCell>
+                    <TableCell className={`text-right tabular-nums font-semibold ${excluded ? 'line-through text-muted-foreground' : ''}`}>
+                      {fmt(Number(r.commercial_amount) || 0)}
+                    </TableCell>
+                    <TableCell><GoalBadge row={r} /></TableCell>
+                    <TableCell><CommercialStatusBadge status={r.commercial_status} /></TableCell>
+                    <TableCell><FulfillmentBadge status={r.fulfillment_status} /></TableCell>
+                    <TableCell><SettlementBadge status={r.financial_settlement_status} /></TableCell>
+                    <TableCell><CommissionBadge status={r.commission_status} /></TableCell>
+                    <TableCell>
+                      <ConfidenceBadge confidence={r.revenue_confidence} reviewRequired={r.review_required} />
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
 
             </TableBody>
           </Table>
@@ -222,6 +233,25 @@ function ConfidenceBadge({ confidence, reviewRequired }: { confidence: string; r
     return <Badge variant="secondary" className="gap-1"><AlertTriangle className="h-3 w-3" />Warning</Badge>;
   }
   return <Badge variant="outline" className="gap-1"><ShieldCheck className="h-3 w-3" />Trusted</Badge>;
+}
+
+function GoalBadge({ row }: { row: VendaRealizadaRow }) {
+  if (!isExcludedFromGoal(row)) {
+    return <Badge variant="outline" className="text-[10px] gap-1"><ShieldCheck className="h-3 w-3" />Conta meta</Badge>;
+  }
+  const f = (row.fulfillment_status ?? '').toLowerCase();
+  const c = (row.commercial_status ?? '').toLowerCase();
+  const reason =
+    c === 'lost'
+      ? 'Reaberta e marcada como perdida'
+      : f === 'cancelled'
+        ? 'Cancelada após aprovação'
+        : 'Removida após aprovação';
+  return (
+    <Badge variant="destructive" className="text-[10px] gap-1" title={`Excluída da meta — ${reason}`}>
+      <AlertTriangle className="h-3 w-3" />Excluída
+    </Badge>
+  );
 }
 
 function CommercialStatusBadge({ status }: { status?: string | null }) {

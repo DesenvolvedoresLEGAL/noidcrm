@@ -78,7 +78,20 @@ export interface VendasRealizadasResult {
     eligible_commission: number;
     review_commission: number;
     settlement_pending_commission: number;
+    goal_eligible_amount: number;
+    goal_excluded_amount: number;
+    goal_excluded_count: number;
   };
+}
+
+/**
+ * Regra oficial: venda ganha que foi reaberta/removida operacionalmente,
+ * ou cujo status comercial virou "perdida", NÃO conta na meta do vendedor.
+ */
+export function isExcludedFromGoal(r: VendaRealizadaRow): boolean {
+  const f = (r.fulfillment_status ?? '').toLowerCase();
+  const c = (r.commercial_status ?? '').toLowerCase();
+  return f === 'removed' || f === 'cancelled' || c === 'lost';
 }
 
 export function useVendasRealizadas(filters: VendasRealizadasFilters) {
@@ -139,14 +152,20 @@ export function useVendasRealizadas(filters: VendasRealizadasFilters) {
       const totals = rows.reduce(
         (acc, r) => {
           acc.won_count += 1;
-          acc.commercial_amount += Number(r.commercial_amount) || 0;
+          const amt = Number(r.commercial_amount) || 0;
+          acc.commercial_amount += amt;
           acc.one_shot_amount += Number(r.one_shot_amount) || 0;
           acc.mrr_amount += Number(r.mrr_amount) || 0;
           const cs = r.commission_status;
-          const amt = Number(r.commercial_amount) || 0;
           if (cs === 'blocked_review_required') acc.review_commission += amt;
           else if (cs === 'blocked_settlement_pending') acc.settlement_pending_commission += amt;
           else acc.eligible_commission += amt;
+          if (isExcludedFromGoal(r)) {
+            acc.goal_excluded_amount += amt;
+            acc.goal_excluded_count += 1;
+          } else {
+            acc.goal_eligible_amount += amt;
+          }
           return acc;
         },
         {
@@ -158,6 +177,9 @@ export function useVendasRealizadas(filters: VendasRealizadasFilters) {
           eligible_commission: 0,
           review_commission: 0,
           settlement_pending_commission: 0,
+          goal_eligible_amount: 0,
+          goal_excluded_amount: 0,
+          goal_excluded_count: 0,
         },
       );
       totals.avg_ticket = totals.won_count > 0 ? totals.commercial_amount / totals.won_count : 0;
