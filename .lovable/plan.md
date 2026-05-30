@@ -1,124 +1,75 @@
-## Sprint Resultados OTE 1.2 — Visão Geral executiva + 3 modos de remuneração
+# Patch: Atribuição Histórica no OTE
 
-Objetivo: o módulo Resultados deve se adaptar ao modo escolhido pela organização (Metas Simples, Comissão Padrão, Sistema OTE Completo) com cards, tabelas, labels, abas e Excel próprios para cada modo. Sem mexer no cálculo OTE por item já corrigido, sem tocar em Vendas Realizadas nem em `commercial_won_revenue_view`.
+## Causa raiz confirmada
 
-### 1. Schema (mínimo, retrocompatível)
+`commercial_won_revenue_view.seller_id = opportunities.owner_user_id` (dono atual). Em maio/2026, 10 das 84 oportunidades atribuídas ao Wagner eram do Leandro André antes do `closed_at` (transferidas após o ganho). É isso que infla Wagner para R$ 506.722,07.
 
-Migration:
-- `ALTER TABLE public.organizations` — drop CHECK antigo de `goal_system_mode` e recriar com 3 valores: `ote`, `simple`, `standard_commission`. Default continua `ote`.
-- Atualizar comentário da coluna.
-- Atualizar `src/hooks/useCurrentOrganization.ts` (`Organization.goal_system_mode: 'ote' | 'simple' | 'standard_commission'`).
+`opportunity_owner_history` cobre 100% das oportunidades do período — temos como resolver vendedor histórico sem snapshot novo nem backfill.
 
-Nenhuma mudança em tabelas OTE, em views de receita ou em RLS.
+## Princípios
 
-### 2. Helper central de modo
+- **Não alterar** `commercial_won_revenue_view` nem o Relatório de Vendas Realizadas.
+- **Não alterar** a regra item a item (`aggregateEligible`).
+- Toda mudança fica numa camada nova de "atribuição histórica" reaproveitando `opportunity_owner_history` e `opportunity_qualification_history`.
 
-Criar `src/lib/results/resultsMode.ts`:
-- `type ResultsMode = 'simple_goals' | 'standard_commission' | 'full_ote'`
-- `getResultsMode(org)` lê `goal_system_mode` e mapeia (`ote → full_ote`, `simple → simple_goals`, `standard_commission → standard_commission`).
-- Helpers `isSimpleGoalsMode`, `isStandardCommissionMode`, `isFullOteMode`.
-- `getResultsCopy(mode)` devolve `{ pageTitle, pageSubtitle }` para o `PageHeader`.
+## Escopo
 
-Hook `src/hooks/useResultsMode.ts` empacota `useCurrentOrganization` + helper.
+### 1. Banco (migration única, sem destrutivo)
 
-### 3. `OTEReport.tsx` — roteamento por modo
+1. Função SQL `public.resolve_historical_seller_at(p_opportunity_id uuid, p_at timestamptz) returns uuid` — retorna `to_owner_user_id` da última linha de `opportunity_owner_history` com `changed_at <= p_at`; fallback: primeiro `from_owner_user_id` da história; fallback final: `opportunities.owner_user_id`. `STABLE`, `SECURITY DEFINER`, `search_path = public`.
+2. View `public.commercial_won_revenue_historical_view` — `SELECT * EXCLUDE (seller_id, seller_name), resolve_historical_seller_at(opportunity_id, won_at) AS seller_id, prof.full_name AS seller_name, original_seller_id (= seller_id da view base), attribution_source ('owner_history' | 'fallback_current_owner'), attribution_confidence ('high' | 'low')` por cima de `commercial_won_revenue_view`. GRANT SELECT para `authenticated` e `service_role`. (Nenhuma alteração na view base.)
+3. Função SQL `public.resolve_historical_qualifier(p_opportunity_id uuid) returns uuid` — `qualified_by_user_id` mais antigo em `opportunity_qualification_history`; fallback: `opportunities.owner_user_id`.
 
-- Usar `useResultsMode()` em vez do booleano `isOTEMode`.
-- Aplicar título/subtítulo do helper (Relatório OTE / Relatório de Comissões / Relatório de Metas).
-- Renderizar os componentes corretos por aba:
-  - `full_ote` → `OTEOverviewTab` / `OTESellerDetailTab` / `OTEHistoryTab` (já existentes, refinados no item 4).
-  - `standard_commission` → `CommissionOverviewTab` / `CommissionSellerDetailTab` / `CommissionHistoryTab` (novos).
-  - `simple_goals` → `SimpleGoalsOverviewTab` / `SimpleGoalsSellerDetailTab` / `SimpleGoalsHistoryTab` (novos).
-- `handleExportExcel` chama `buildResultsWorkbook({ mode, … })` (novo dispatcher) que delega para os builders por modo.
+### 2. Serviço e hooks de receita
 
-### 4. Refino do modo `full_ote` (sem tocar no cálculo por item)
+- `src/services/revenue/revenueSsotService.ts`:
+  - Adicionar `getHistoricalRevenueBySeller(p)` lendo `commercial_won_revenue_historical_view` (mesma assinatura do `getRevenueBySeller`).
+  - Não modificar funções existentes.
+- `src/hooks/revenue/useRevenueSsot.ts`:
+  - Novo `useHistoricalRevenueBySeller(p)`.
 
-`OTEOverviewTab.tsx`:
-- Cards (grid 5):
-  1. **Total a pagar** = `Σ final_variable_amount`.
-  2. **Comissão elegível comercial** = `validCommercialRevenue` (já vem de `aggregateEligible.ssotTotal`). Subtexto "Fonte: Vendas Realizadas".
-  3. **Receita elegível OTE** = `eligibleOTERevenue` (já existe). Subtexto "Após excluir itens fora da meta".
-  4. **Itens fora da meta** = `validCommercialRevenue − eligibleOTERevenue`. Subtexto "Produtos, serviços, logística, taxas e itens não comissionáveis".
-  5. **Vendedores no cálculo** = `individualResults.length`. Subtexto "Closers, pré-vendas e funções configuradas".
-- Remover card "Média % Meta (Closers)" do topo. Levar a métrica para dentro da seção Closers (linha pequena acima da tabela).
-- Adicionar faixa de reconciliação: `Comissão elegível comercial − Itens fora da meta = Receita elegível OTE`, com alerta destrutivo quando `|comercial − fora − elegível| > R$ 0,01` ou quando `Receita elegível OTE > Comissão elegível comercial`.
-- Flags: trocar labels para **Alta performance / Zona de atenção / Abaixo do mínimo** (cores e ícones permanecem). Tooltip mantém o nome legado para retrocompatibilidade.
-- Tabela Closers: renomear coluna "Vendas" → "Receita elegível OTE" (usar `eligibleTotal` por vendedor calculado a partir de `records`). Adicionar coluna "Comissão elegível comercial" (oculta abaixo de `lg`, disponível em tooltip do nome do vendedor).
+### 3. Helper central de atribuição
 
-`OTESellerDetailTab.tsx`:
-- Já não mostra bloco SSoT/Fonte — manter.
-- Renomear labels visuais ("Elegível p/ meta" → "Receita elegível OTE").
+- Novo `src/lib/results/historicalAttribution.ts`:
+  - `getHistoricalSellerId(row)` / `getHistoricalSellerName(row)` lendo a view histórica.
+  - `isUserInactiveOrDeleted(profile)` — usa `crm_active_users_view` (já é fonte oficial) para marcar histórico.
+  - `buildClosersRowsHistorical({ oteResults, historicalGroups, activeUsers })` — produz linhas mescladas: cada vendedor histórico do período aparece, com badge "Inativo"/"Excluído" quando aplicável, mesmo sem `ote_monthly_results`.
 
-### 5. Novo modo `standard_commission`
+### 4. UI — Tabela Closers (somente OTE Overview)
 
-Componentes novos em `src/components/results/commission/`:
-- `CommissionOverviewTab.tsx` com 5 cards: Comissão a pagar, Receita comissionável, Receita não comissionável, Vendas com comissão, Vendedores com comissão. Tabela principal: Vendedor / Receita comissionável / Receita não comissionável / % Comissão média / Comissão gerada / Comissão paga / Comissão pendente / Status.
-- `CommissionSellerDetailTab.tsx`: collapsible por vendedor com Receita comissionável, Comissão calculada/paga/pendente, regras aplicadas, drill-down de vendas (`OTESellerSalesDrilldown` reaproveitado com header customizado) sem meta/multiplicador/OTE.
-- `CommissionHistoryTab.tsx`: Período / Receita comissionável / Comissão gerada / Comissão paga / Comissão pendente / Qtde vendedores / Status.
+Em `src/components/ote/OTEOverviewTab.tsx`:
+- Substituir `useRevenueBySeller` por `useHistoricalRevenueBySeller` na coluna "Comissão elegível comercial".
+- Linhas da tabela passam a ser a união de `revenueResults` ∪ vendedores históricos com receita no período sem `ote_monthly_results`. Sintéticos exibem badge "Inativo" / "Excluído" e zeram somente campos OTE (multiplicador, base, acelerador, variável final) — mantêm `Comissão elegível comercial` e `Receita elegível OTE` reais.
+- Subtotal Closers continua = soma SSoT histórica (que já bate com o total comercial do período).
+- Card "Comissão elegível comercial" continua puxando do summary SSoT geral (não muda total agregado, só a distribuição por vendedor).
 
-Hook `src/hooks/useStandardCommissionResults.ts`:
-- Reaproveita `useOTEMonthlyResults` + `useOTESalesRecords` como base (os mesmos `ote_results` representam o período); a métrica "Comissão calculada" usa `final_variable_amount` ou `base_variable` (quando multiplicador = 1) e "Receita comissionável" = `eligibleTotal`. Status pago/pendente via campos já existentes em `ote_monthly_results.status`. Nenhuma nova tabela.
-- Documentar em comentário que regras avançadas de comissão por produto/categoria/pipeline são consumidas via configuração existente quando disponível; senão fallback no resultado OTE.
+### 5. UI — Tabela Pré-vendas
 
-### 6. Novo modo `simple_goals`
+- `leadsResults` recebe rows sintéticas equivalentes para SDRs históricos com qualificação no período mas sem `ote_monthly_results` (lendo `opportunity_qualification_history` no período, agrupado por `qualified_by_user_id`).
+- Novo pequeno serviço `src/services/results/historicalQualifications.ts` que conta leads qualificados por SDR histórico no período (usado apenas para a tabela).
 
-Componentes novos em `src/components/results/simple/`:
-- `SimpleGoalsOverviewTab.tsx`: 5 cards: Receita realizada, Meta do período, Atingimento, Vendedores acima da meta, Vendedores abaixo da meta. Tabela: Vendedor / Meta / Receita realizada / % Meta / Status (Meta batida / Em ritmo / Abaixo do ritmo / Sem meta configurada) / Gap para meta.
-- `SimpleGoalsSellerDetailTab.tsx`: collapsible com Meta, Receita realizada, % Meta, Gap, drill-down de vendas — sem comissão/OTE/multiplicador.
-- `SimpleGoalsHistoryTab.tsx`: Período / Meta total / Receita realizada / % Atingimento / Qtde vendedores / Status.
+### 6. Transferência operacional na exclusão de usuário
 
-Sem mexer em backend: continua lendo `ote_monthly_results` + `ote_sales_records`, ignorando colunas de variável/multiplicador/aceleradores na UI.
+- Localizar a rotina atual de exclusão/transferência e garantir que ela:
+  - **NÃO** mexe em `opportunity_owner_history`, `opportunity_qualification_history`, `ote_monthly_results`, `ote_sales_records`.
+  - Continua atualizando `opportunities.owner_user_id` apenas para registros operacionais (abertos), nunca para `won`/`lost` retroativamente.
+- Acrescentar evento de auditoria `user_transferred_operational_ownership` em `system_events` / `audit_log` com `historical_results_preserved: true`.
+- Esta etapa entra como mudança defensiva mínima; o problema histórico já está coberto pela camada de leitura.
 
-### 7. Configurações > Vendas (`GoalSystemModeSelector.tsx`)
+### 7. Fora de escopo (explícito)
 
-- Grid passa a ter 3 cards (`ote`, `simple`, `standard_commission`). Card novo "Comissão Padrão" com bullets: comissão por venda, por produto/serviço, por vendedor/função, controle pago/pendente, sem multiplicadores.
-- `handleModeChange` aceita os 3 valores e invalida as mesmas queries.
+- `calculate-ote` edge function, `ote_sales_records`, regra item a item, view comercial base, Relatório Vendas Realizadas, Comissão Padrão e Metas Simples (já cobertos por sprints anteriores).
 
-### 8. Excel adaptativo
+## Testes manuais
 
-Refatorar `src/components/ote/export/buildOTEWorkbook.ts` em:
-- `src/components/results/export/buildResultsWorkbook.ts` (dispatcher por modo).
-- `buildOTEWorkbook` (existente, ajustar abas Resumo OTE / Vendedores / Vendas / Itens conforme spec — colunas: Comissão elegível comercial, Receita elegível OTE, Itens fora da meta etc.).
-- `buildCommissionWorkbook` (Resumo Comissão / Vendedores / Vendas / Itens com regra aplicada e comissão por item).
-- `buildSimpleGoalsWorkbook` (Resumo Metas / Vendedores / Vendas).
-- `OTEReport.handleExportExcel` passa `mode` e os dados.
+1. Wagner em maio/2026: subtotal "Comissão elegível comercial" cai dos R$ 506.722,07 para o valor real dele (esperado: ~R$ 467k, com R$ ~39k indo para Leandro André).
+2. Leandro André aparece na tabela Closers com seu valor histórico e badge "Inativo/Excluído".
+3. Ana aparece na tabela Pré-vendas com seus leads qualificados; Gustavo não herda.
+4. `npx tsc --noEmit` passa limpo.
+5. Total agregado de "Comissão elegível comercial" em maio/2026 permanece igual ao Relatório de Vendas Realizadas (apenas a distribuição por vendedor muda).
 
-### 9. Validações e copy
+## Riscos
 
-- Labels proibidos: substituir todas as ocorrências de "Vendas", "Receita válida", "Média geral", "Valor total" no módulo Resultados pelos labels explícitos do modo.
-- Alertas visuais nos 3 modos (faixa abaixo dos cards) conforme spec (divergência OTE; item comissionável vs não comissionável; "Sem meta configurada").
-- `Tooltip` nas flags renomeadas explicando faixas e que limiares são configuráveis em Configurações > Vendas > Flags.
-
-### 10. Testes / verificação
-
-- `npx tsc --noEmit` deve passar.
-- Smoke manual nos 3 modos: trocar `goal_system_mode` da organização, clicar Calcular, verificar cards/tabelas/Excel.
-- Conferir cenários: Segredos da Audiência (R$ 2.397,00 elegível) e Notorious Nutrition (R$ 2.526,70 elegível) batendo entre linha principal e detalhe.
-
-### Arquivos impactados (resumo)
-
-Novos:
-- `supabase/migrations/<ts>_add_standard_commission_mode.sql`
-- `src/lib/results/resultsMode.ts`
-- `src/hooks/useResultsMode.ts`
-- `src/hooks/useStandardCommissionResults.ts`
-- `src/components/results/commission/{CommissionOverviewTab,CommissionSellerDetailTab,CommissionHistoryTab}.tsx`
-- `src/components/results/simple/{SimpleGoalsOverviewTab,SimpleGoalsSellerDetailTab,SimpleGoalsHistoryTab}.tsx`
-- `src/components/results/export/{buildResultsWorkbook,buildCommissionWorkbook,buildSimpleGoalsWorkbook}.ts`
-
-Modificados:
-- `src/pages/OTEReport.tsx`
-- `src/components/ote/OTEOverviewTab.tsx`
-- `src/components/ote/OTESellerDetailTab.tsx`
-- `src/components/ote/OTEHistoryTab.tsx` (colunas)
-- `src/components/ote/export/buildOTEWorkbook.ts`
-- `src/components/ote/GoalSystemModeSelector.tsx`
-- `src/hooks/useCurrentOrganization.ts`
-
-Não tocar:
-- `commercial_won_revenue_view`, `commission_eligibility_view`, edge `calculate-ote`, lógica em `oteEligibility.ts`, módulo Vendas Realizadas.
-
-### Riscos
-- Mudar o CHECK de `goal_system_mode` exige drop + recreate; rollout precisa garantir que nenhum valor inválido exista (default permanece `ote`).
-- Reaproveitar `ote_monthly_results` para o modo Comissão Padrão é uma simplificação de UI: regras finas de comissão por produto continuam dependendo de configuração futura — documentar no hook.
-- Refatorar o builder de Excel pode quebrar import paths existentes; manter re-export em `src/components/ote/export/buildOTEWorkbook.ts` para retrocompatibilidade.
+- View nova adiciona um JOIN lateral em `opportunity_owner_history` por linha — ok dado o índice `idx_ooh_org_opportunity_changed_at`.
+- Se houver oportunidades sem `opportunity_owner_history` (não foi o caso na amostra), cai para `owner_user_id` atual marcado como `attribution_confidence='low'`.
+- Nada do que muda toca a view base nem o pipeline de comissão/forecast; reversível removendo a view nova.
