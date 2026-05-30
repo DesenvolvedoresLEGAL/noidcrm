@@ -331,11 +331,19 @@ export function OTEOverviewTab({ results, records = [], isLoading, period, isOTE
                 <tbody>
                   {revenueResults.map((result) => {
                     const eligible = eligiblePerSeller.get(result.id) ?? 0;
-                    const sellerCommercial = ssotBySellerMap.get(result.user_id) ?? 0;
+                    const sellerCommercial = ssotBySellerMap.get(result.user_id)?.total ?? 0;
+                    const isActive = activeUserIds.has(result.user_id);
                     return (
                       <tr key={result.id} className="border-b hover:bg-muted/50">
                         <td className="py-3 px-2 font-medium">
-                          {result.profile?.full_name || result.level_name_snapshot || result.user_id.slice(0, 8) + '...'}
+                          <span className="inline-flex items-center gap-2">
+                            {result.profile?.full_name || result.level_name_snapshot || result.user_id.slice(0, 8) + '...'}
+                            {!isActive && (
+                              <Badge variant="outline" className="text-[10px] uppercase tracking-wide border-muted-foreground/30 text-muted-foreground">
+                                Inativo
+                              </Badge>
+                            )}
+                          </span>
                         </td>
                         <td className="py-3 px-2">{result.level_name_snapshot || '-'}</td>
                         <td className="py-3 px-2 text-right">{formatCurrency(result.goal_amount)}</td>
@@ -352,7 +360,40 @@ export function OTEOverviewTab({ results, records = [], isLoading, period, isOTE
                       </tr>
                     );
                   })}
+                  {/* Vendedores históricos com receita no período mas sem ote_monthly_results
+                      (ex.: usuários excluídos/desligados após o fechamento). */}
+                  {Array.from(ssotBySellerMap.entries())
+                    .filter(([uid]) => !revenueResults.some((r) => r.user_id === uid))
+                    .filter(([, v]) => (v.total ?? 0) > 0)
+                    .sort((a, b) => b[1].total - a[1].total)
+                    .map(([uid, v]) => {
+                      const isActive = activeUserIds.has(uid);
+                      const name = activeUserNameMap.get(uid) || v.name || uid.slice(0, 8) + '...';
+                      return (
+                        <tr key={`hist-${uid}`} className="border-b hover:bg-muted/50 bg-muted/10">
+                          <td className="py-3 px-2 font-medium">
+                            <span className="inline-flex items-center gap-2">
+                              {name}
+                              <Badge variant="outline" className="text-[10px] uppercase tracking-wide border-destructive/40 text-destructive">
+                                {isActive ? 'Sem nível OTE' : 'Inativo'}
+                              </Badge>
+                            </span>
+                          </td>
+                          <td className="py-3 px-2 text-muted-foreground">—</td>
+                          <td className="py-3 px-2 text-right text-muted-foreground">—</td>
+                          <td className="py-3 px-2 text-right hidden lg:table-cell">{formatCurrency(v.total)}</td>
+                          <td className="py-3 px-2 text-right text-muted-foreground">—</td>
+                          <td className="py-3 px-2 text-right text-muted-foreground">—</td>
+                          <td className="py-3 px-2 text-center text-muted-foreground">—</td>
+                          <td className="py-3 px-2 text-right text-muted-foreground">—</td>
+                          <td className="py-3 px-2 text-center text-muted-foreground">—</td>
+                          <td className="py-3 px-2 text-right text-muted-foreground">—</td>
+                          <td className="py-3 px-2 text-right text-muted-foreground">—</td>
+                        </tr>
+                      );
+                    })}
                 </tbody>
+
                 <tfoot>
                   <tr className="bg-muted/30 font-semibold">
                     <td colSpan={3} className="py-3 px-2">SUBTOTAL CLOSERS</td>
