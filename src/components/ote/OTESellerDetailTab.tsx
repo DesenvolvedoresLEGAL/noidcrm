@@ -133,45 +133,25 @@ export function OTESellerDetailTab({ results, isLoading, isOTEMode = true }: OTE
                       </div>
                       {(() => {
                         const sellerRecords = allRecords.filter((r) => r.ote_result_id === result.id);
-                        const { ssotTotal, eligibleTotal, nonEligibleTotal } =
-                          aggregateEligible(sellerRecords);
+                        const { eligibleTotal } = aggregateEligible(sellerRecords);
                         const isLeads = result.goal_type === 'leads';
                         return (
-                          <>
-                            <div className="grid grid-cols-2 gap-4 text-sm">
-                              <div>
-                                <p className="text-muted-foreground">Meta</p>
-                                <p className="font-semibold">{formatGoalValue(result.goal_amount, result.goal_type)}</p>
-                              </div>
-                              <div>
-                                <p className="text-muted-foreground">
-                                  {isLeads ? 'Leads Qualificados' : 'Elegível p/ meta'}
-                                </p>
-                                <p className="font-semibold">
-                                  {isLeads
-                                    ? formatGoalValue(Number(result.total_sales || 0), 'leads')
-                                    : formatCurrency(eligibleTotal)}
-                                </p>
-                              </div>
+                          <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                              <p className="text-muted-foreground">Meta</p>
+                              <p className="font-semibold">{formatGoalValue(result.goal_amount, result.goal_type)}</p>
                             </div>
-                            {!isLeads && (
-                              <div className="rounded-md bg-muted/40 border border-dashed px-3 py-2 text-xs space-y-1">
-                                <div className="flex justify-between">
-                                  <span className="text-muted-foreground">Receita total (SSoT)</span>
-                                  <span className="font-medium">{formatCurrency(ssotTotal)}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className="text-muted-foreground">Fora da meta</span>
-                                  <span className="font-medium">{formatCurrency(nonEligibleTotal)}</span>
-                                </div>
-                                <p className="text-[11px] text-muted-foreground pt-1">
-                                  Fonte: <strong>commercial_won_revenue_view</strong>. Vendas
-                                  reabertas/perdidas ou removidas após aprovação ficam fora da meta
-                                  (reconciliado com Vendas Realizadas).
-                                </p>
-                              </div>
-                            )}
-                          </>
+                            <div>
+                              <p className="text-muted-foreground">
+                                {isLeads ? 'Leads Qualificados' : 'Elegível p/ meta'}
+                              </p>
+                              <p className="font-semibold">
+                                {isLeads
+                                  ? formatGoalValue(Number(result.total_sales || 0), 'leads')
+                                  : formatCurrency(eligibleTotal)}
+                              </p>
+                            </div>
+                          </div>
                         );
                       })()}
                     </div>

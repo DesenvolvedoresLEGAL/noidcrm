@@ -136,6 +136,7 @@ export default function OTEReport() {
             <TabsContent value="overview">
               <OTEOverviewTab 
                 results={results || []} 
+                records={records}
                 isLoading={isLoading || isLoadingOrg || isPending} 
                 period={selectedPeriod}
                 isOTEMode={isOTEMode}

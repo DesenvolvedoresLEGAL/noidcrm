@@ -1,6 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { OTEMonthlyResult } from '@/hooks/useOTEData';
 import { useSalesConfig } from '@/hooks/useSalesConfig';
+import type { OTESalesRecord } from '@/hooks/useOTESalesRecords';
+import { aggregateEligible } from './oteEligibility';
 import { 
   DollarSign, 
   Target, 
@@ -10,18 +12,20 @@ import {
   Zap,
   AlertTriangle,
   Users2,
-  UserCheck
+  UserCheck,
+  Wallet
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface OTEOverviewTabProps {
   results: OTEMonthlyResult[];
+  records?: OTESalesRecord[];
   isLoading: boolean;
   period: string;
   isOTEMode?: boolean;
 }
 
-export function OTEOverviewTab({ results, isLoading, period, isOTEMode = true }: OTEOverviewTabProps) {
+export function OTEOverviewTab({ results, records = [], isLoading, period, isOTEMode = true }: OTEOverviewTabProps) {
   const { config } = useSalesConfig();
   
   const flagBlueThreshold = config?.flag_blue_threshold ?? 100;
@@ -43,13 +47,21 @@ export function OTEOverviewTab({ results, isLoading, period, isOTEMode = true }:
   const revenueResults = individualResults.filter(r => (r.goal_type || 'revenue') === 'revenue');
   const leadsResults = individualResults.filter(r => r.goal_type === 'leads');
 
-  // KPIs - ONLY from revenue sellers
+  // KPIs
   const totalToPay = results.reduce((sum, r) => sum + r.final_variable_amount, 0);
-  const totalRevenueSales = revenueResults.reduce((sum, r) => sum + r.total_sales, 0);
   const totalRevenueGoal = revenueResults.reduce((sum, r) => sum + r.goal_amount, 0);
   const avgRevenueAchievement = revenueResults.length > 0 
     ? revenueResults.reduce((sum, r) => sum + r.achievement_percentage, 0) / revenueResults.length 
     : 0;
+
+  // Reconciliação Vendas Realizadas ⇄ OTE.
+  // - Receita válida comercial = soma dos sale_value (commercial_won_revenue_view),
+  //   restrita aos vendedores de revenue (closers individuais).
+  // - Receita elegível OTE = soma após excluir itens/produtos não elegíveis.
+  const revenueResultIds = new Set(revenueResults.map((r) => r.id));
+  const revenueRecords = records.filter((r) => revenueResultIds.has(r.ote_result_id));
+  const { ssotTotal: validCommercialRevenue, eligibleTotal: eligibleOTERevenue, nonEligibleTotal: itemsOutOfGoal } =
+    aggregateEligible(revenueRecords);
 
   const blueFlags = results.filter(r => r.flag_color === 'blue').length;
   const yellowFlags = results.filter(r => r.flag_color === 'yellow').length;
@@ -100,7 +112,7 @@ export function OTEOverviewTab({ results, isLoading, period, isOTEMode = true }:
   return (
     <div className="space-y-6">
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
@@ -108,7 +120,7 @@ export function OTEOverviewTab({ results, isLoading, period, isOTEMode = true }:
                 <p className="text-sm text-muted-foreground">Total a Pagar</p>
                 <p className="text-2xl font-bold text-primary">{formatCurrency(totalToPay)}</p>
               </div>
-              <DollarSign className="h-8 w-8 text-primary/20" />
+              <Wallet className="h-8 w-8 text-primary/20" />
             </div>
           </CardContent>
         </Card>
@@ -117,9 +129,28 @@ export function OTEOverviewTab({ results, isLoading, period, isOTEMode = true }:
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Vendas (Closers)</p>
-                <p className="text-2xl font-bold">{formatCurrency(totalRevenueSales)}</p>
-                <p className="text-xs text-muted-foreground">Meta: {formatCurrency(totalRevenueGoal)}</p>
+                <p className="text-sm text-muted-foreground">Receita válida comercial</p>
+                <p className="text-2xl font-bold">{formatCurrency(validCommercialRevenue)}</p>
+                <p className="text-xs text-muted-foreground">
+                  Fonte: Vendas Realizadas (exclui canceladas/perdidas)
+                </p>
+              </div>
+              <DollarSign className="h-8 w-8 text-muted-foreground/20" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Receita elegível OTE</p>
+                <p className="text-2xl font-bold">{formatCurrency(eligibleOTERevenue)}</p>
+                <p className="text-xs text-muted-foreground">
+                  {itemsOutOfGoal > 0.01
+                    ? `Itens fora da meta: ${formatCurrency(itemsOutOfGoal)}`
+                    : `Meta total: ${formatCurrency(totalRevenueGoal)}`}
+                </p>
               </div>
               <TrendingUp className="h-8 w-8 text-muted-foreground/20" />
             </div>
@@ -248,7 +279,7 @@ export function OTEOverviewTab({ results, isLoading, period, isOTEMode = true }:
                 <tfoot>
                   <tr className="bg-muted/30 font-semibold">
                     <td colSpan={3} className="py-3 px-2">SUBTOTAL CLOSERS</td>
-                    <td className="py-3 px-2 text-right">{formatCurrency(totalRevenueSales)}</td>
+                    <td className="py-3 px-2 text-right">{formatCurrency(revenueResults.reduce((sum, r) => sum + r.total_sales, 0))}</td>
                     <td colSpan={5} className="py-3 px-2"></td>
                     <td className="py-3 px-2 text-right text-primary">
                       {formatCurrency(revenueResults.reduce((sum, r) => sum + r.final_variable_amount, 0))}
