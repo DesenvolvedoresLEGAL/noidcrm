@@ -25,7 +25,7 @@ interface OTEOverviewTabProps {
   isOTEMode?: boolean;
 }
 
-export function OTEOverviewTab({ results, isLoading, period, isOTEMode = true }: OTEOverviewTabProps) {
+export function OTEOverviewTab({ results, records = [], isLoading, period, isOTEMode = true }: OTEOverviewTabProps) {
   const { config } = useSalesConfig();
   
   const flagBlueThreshold = config?.flag_blue_threshold ?? 100;
@@ -47,13 +47,21 @@ export function OTEOverviewTab({ results, isLoading, period, isOTEMode = true }:
   const revenueResults = individualResults.filter(r => (r.goal_type || 'revenue') === 'revenue');
   const leadsResults = individualResults.filter(r => r.goal_type === 'leads');
 
-  // KPIs - ONLY from revenue sellers
+  // KPIs
   const totalToPay = results.reduce((sum, r) => sum + r.final_variable_amount, 0);
-  const totalRevenueSales = revenueResults.reduce((sum, r) => sum + r.total_sales, 0);
   const totalRevenueGoal = revenueResults.reduce((sum, r) => sum + r.goal_amount, 0);
   const avgRevenueAchievement = revenueResults.length > 0 
     ? revenueResults.reduce((sum, r) => sum + r.achievement_percentage, 0) / revenueResults.length 
     : 0;
+
+  // Reconciliação Vendas Realizadas ⇄ OTE.
+  // - Receita válida comercial = soma dos sale_value (commercial_won_revenue_view),
+  //   restrita aos vendedores de revenue (closers individuais).
+  // - Receita elegível OTE = soma após excluir itens/produtos não elegíveis.
+  const revenueResultIds = new Set(revenueResults.map((r) => r.id));
+  const revenueRecords = records.filter((r) => revenueResultIds.has(r.ote_result_id));
+  const { ssotTotal: validCommercialRevenue, eligibleTotal: eligibleOTERevenue, nonEligibleTotal: itemsOutOfGoal } =
+    aggregateEligible(revenueRecords);
 
   const blueFlags = results.filter(r => r.flag_color === 'blue').length;
   const yellowFlags = results.filter(r => r.flag_color === 'yellow').length;
