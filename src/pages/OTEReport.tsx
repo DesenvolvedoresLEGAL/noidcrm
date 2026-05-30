@@ -30,6 +30,7 @@ export default function OTEReport() {
   const currentMonth = format(new Date(), 'yyyy-MM');
   const [selectedPeriod, setSelectedPeriod] = useState(currentMonth);
   const { organization, isAdmin, loading: isLoadingOrg } = useCurrentOrganization();
+  const { mode, copy } = useResultsMode();
   
   const { data: results, isLoading, isPending, refetch } = useOTEMonthlyResults(selectedPeriod);
   const calculateOTE = useCalculateOTE();
@@ -37,7 +38,13 @@ export default function OTEReport() {
   const resultIds = (results || []).map((r) => r.id);
   const { data: records = [] } = useOTESalesRecords(resultIds);
 
-  const isOTEMode = organization?.goal_system_mode !== 'simple';
+  const isOTEMode = mode === 'full_ote';
+  const isCommissionMode = mode === 'standard_commission';
+  const isSimpleMode = mode === 'simple_goals';
+
+  const headerIcon = isOTEMode ? DollarSign : isCommissionMode ? Wallet : Target;
+  const badgeIcon = isOTEMode ? Calculator : isCommissionMode ? Wallet : Target;
+
 
   // Generate last 12 months
   const periods = Array.from({ length: 12 }, (_, i) => {
