@@ -312,14 +312,15 @@ export function OTEOverviewTab({ results, records = [], isLoading, period, isOTE
                 <tbody>
                   {revenueResults.map((result) => {
                     const eligible = eligiblePerSeller.get(result.id) ?? 0;
+                    const sellerCommercial = ssotBySellerMap.get(result.user_id) ?? 0;
                     return (
                       <tr key={result.id} className="border-b hover:bg-muted/50">
-                        <td className="py-3 px-2 font-medium" title={`Comissão elegível comercial: ${formatCurrency(result.total_sales)}`}>
+                        <td className="py-3 px-2 font-medium">
                           {result.profile?.full_name || result.level_name_snapshot || result.user_id.slice(0, 8) + '...'}
                         </td>
                         <td className="py-3 px-2">{result.level_name_snapshot || '-'}</td>
                         <td className="py-3 px-2 text-right">{formatCurrency(result.goal_amount)}</td>
-                        <td className="py-3 px-2 text-right hidden lg:table-cell text-muted-foreground">{formatCurrency(result.total_sales)}</td>
+                        <td className="py-3 px-2 text-right hidden lg:table-cell text-muted-foreground">{formatCurrency(sellerCommercial)}</td>
                         <td className="py-3 px-2 text-right">{formatCurrency(eligible)}</td>
                         <td className="py-3 px-2 text-right">{result.achievement_percentage.toFixed(1)}%</td>
                         <td className="py-3 px-2 text-center">{result.ote_multiplier}x</td>
