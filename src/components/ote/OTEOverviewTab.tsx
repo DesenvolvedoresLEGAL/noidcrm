@@ -352,69 +352,6 @@ export function OTEOverviewTab({ results, records = [], isLoading, period, isOTE
       )}
 
 
-
-      {/* Closers / Revenue Table */}
-      {revenueResults.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <DollarSign className="h-5 w-5" />
-              Closers (Meta em R$)
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-3 px-2">Vendedor</th>
-                    <th className="text-left py-3 px-2">Nível</th>
-                    <th className="text-right py-3 px-2">Meta (R$)</th>
-                    <th className="text-right py-3 px-2">Vendas</th>
-                    <th className="text-right py-3 px-2">% Meta</th>
-                    <th className="text-center py-3 px-2">Mult.</th>
-                    <th className="text-right py-3 px-2">Base</th>
-                    <th className="text-center py-3 px-2">Flag</th>
-                    <th className="text-right py-3 px-2">Acelerador</th>
-                    <th className="text-right py-3 px-2 font-semibold">Variável Final</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {revenueResults.map((result) => (
-                    <tr key={result.id} className="border-b hover:bg-muted/50">
-                      <td className="py-3 px-2 font-medium">
-                        {result.profile?.full_name || result.level_name_snapshot || result.user_id.slice(0, 8) + '...'}
-                      </td>
-                      <td className="py-3 px-2">{result.level_name_snapshot || '-'}</td>
-                      <td className="py-3 px-2 text-right">{formatCurrency(result.goal_amount)}</td>
-                      <td className="py-3 px-2 text-right">{formatCurrency(result.total_sales)}</td>
-                      <td className="py-3 px-2 text-right">{result.achievement_percentage.toFixed(1)}%</td>
-                      <td className="py-3 px-2 text-center">{result.ote_multiplier}x</td>
-                      <td className="py-3 px-2 text-right">{formatCurrency(result.base_variable)}</td>
-                      <td className="py-3 px-2 text-center">{renderFlagBadge(result.flag_color)}</td>
-                      <td className="py-3 px-2 text-right">{renderAdjustment(result.final_adjustment_percentage)}</td>
-                      <td className="py-3 px-2 text-right font-semibold text-primary">
-                        {formatCurrency(result.final_variable_amount)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr className="bg-muted/30 font-semibold">
-                    <td colSpan={3} className="py-3 px-2">SUBTOTAL CLOSERS</td>
-                    <td className="py-3 px-2 text-right">{formatCurrency(revenueResults.reduce((sum, r) => sum + r.total_sales, 0))}</td>
-                    <td colSpan={5} className="py-3 px-2"></td>
-                    <td className="py-3 px-2 text-right text-primary">
-                      {formatCurrency(revenueResults.reduce((sum, r) => sum + r.final_variable_amount, 0))}
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Pré-vendas / Leads Table */}
       {leadsResults.length > 0 && (
         <Card>
