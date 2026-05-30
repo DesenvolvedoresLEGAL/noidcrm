@@ -135,7 +135,7 @@ export function OTEOverviewTab({ results, records = [], isLoading, period, isOTE
 
   // Validação de reconciliação OTE.
   const reconciliationDelta = commercialEligible - itemsOutOfGoal - oteEligible;
-  const hasReconciliationIssue = Math.abs(reconciliationDelta) > 0.01 || oteEligible > commercialEligible + 0.01;
+  const hasReconciliationIssue = !ssotAvailable || Math.abs(reconciliationDelta) > 0.01 || oteEligible > commercialEligible + 0.01;
 
   return (
     <div className="space-y-6">
