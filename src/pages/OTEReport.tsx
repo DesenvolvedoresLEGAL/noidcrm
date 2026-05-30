@@ -164,13 +164,14 @@ export default function OTEReport() {
 
             <TabsContent value="sellers">
               {isCommissionMode ? (
-                <CommissionSellerDetailTab results={results || []} records={records} isLoading={loading} />
+                <CommissionSellerDetailTab results={results || []} isLoading={loading} />
               ) : isSimpleMode ? (
-                <SimpleGoalsSellerDetailTab results={results || []} records={records} isLoading={loading} />
+                <SimpleGoalsSellerDetailTab results={results || []} isLoading={loading} />
               ) : (
                 <OTESellerDetailTab results={results || []} isLoading={loading} isOTEMode={isOTEMode} />
               )}
             </TabsContent>
+
 
             <TabsContent value="history">
               {isCommissionMode ? (
