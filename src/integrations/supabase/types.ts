@@ -30630,20 +30630,31 @@ export type Database = {
           accepted_proposal_id: string | null
           account_id: string | null
           account_name: string | null
+          approved_amount: number | null
           approved_at: string | null
+          audit_status_label: string | null
           business_unit: string | null
+          cancellation_reason: string | null
+          cancelled_amount: number | null
+          cancelled_at: string | null
           canonical_kind: string | null
           commercial_amount: number | null
           commercial_amount_source: string | null
           commercial_opportunity_id: string | null
           commercial_status: string | null
+          commission_eligible_amount: number | null
+          commission_status_label: string | null
           created_at: string | null
+          delivery_status_label: string | null
           delta_vs_opportunity_value: number | null
           financial_settlement_status: string | null
+          financial_status_label: string | null
           fulfillment_status: string | null
+          is_cancelled_sale: boolean | null
           is_final_approved_value: boolean | null
           is_recurring: boolean | null
           legacy_opportunity_value: number | null
+          liquidated_amount: number | null
           mrr_amount: number | null
           nome_fantasia: string | null
           one_shot_amount: number | null
@@ -30658,9 +30669,11 @@ export type Database = {
           revenue_confidence: string | null
           revenue_type: string | null
           review_required: boolean | null
+          sale_status_label: string | null
           seller_id: string | null
           seller_name: string | null
           status: string | null
+          valid_revenue_amount: number | null
           warnings: string[] | null
           won_at: string | null
         }
