@@ -29,10 +29,25 @@ interface OTEOverviewTabProps {
 
 export function OTEOverviewTab({ results, records = [], isLoading, period, isOTEMode = true }: OTEOverviewTabProps) {
   const { config } = useSalesConfig();
+  const { organization } = useCurrentOrganization();
 
   const flagBlueThreshold = config?.flag_blue_threshold ?? 70;
   const flagYellowMinThreshold = config?.flag_yellow_min_threshold ?? 50;
   const flagYellowMaxThreshold = config?.flag_yellow_max_threshold ?? 69.99;
+
+  // SSoT oficial — mesma fonte do Relatório Vendas Realizadas (commercial_won_revenue_view).
+  const [py, pm] = (period || '').split('-').map(Number);
+  const periodStart = py && pm ? new Date(Date.UTC(py, pm - 1, 1)).toISOString() : undefined;
+  const periodEnd = py && pm ? new Date(Date.UTC(py, pm, 1) - 1).toISOString() : undefined;
+  const ssotParams = {
+    surface: 'ote-overview',
+    organizationId: organization?.id,
+    start: periodStart,
+    end: periodEnd,
+  };
+  const { data: ssotSummary, isError: ssotError } = useClosedRevenueSummary(ssotParams as any);
+  const { data: ssotBySeller = [] } = useRevenueBySeller(ssotParams as any);
+  const ssotBySellerMap = new Map(ssotBySeller.map((g) => [g.key, g.total]));
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -55,11 +70,15 @@ export function OTEOverviewTab({ results, records = [], isLoading, period, isOTE
     ? revenueResults.reduce((sum, r) => sum + r.achievement_percentage, 0) / revenueResults.length
     : 0;
 
-  // Reconciliação: Comissão elegível comercial (SSoT) − Itens fora da meta = Receita elegível OTE.
+  // Reconciliação OTE:
+  //   Comissão elegível comercial = Receita Válida do Relatório (SSoT oficial)
+  //   Itens fora da meta = Comissão elegível comercial − Receita elegível OTE (item a item)
   const revenueResultIds = new Set(revenueResults.map((r) => r.id));
   const revenueRecords = records.filter((r) => revenueResultIds.has(r.ote_result_id));
-  const { ssotTotal: commercialEligible, eligibleTotal: oteEligible, nonEligibleTotal: itemsOutOfGoal } =
-    aggregateEligible(revenueRecords);
+  const { eligibleTotal: oteEligible } = aggregateEligible(revenueRecords);
+  const ssotAvailable = !!ssotSummary && !ssotError;
+  const commercialEligible = ssotAvailable ? Number(ssotSummary!.eligible || ssotSummary!.total || 0) : 0;
+  const itemsOutOfGoal = Math.max(0, commercialEligible - oteEligible);
 
   // Eligible per seller (para a coluna "Receita elegível OTE" da tabela Closers).
   const eligiblePerSeller = new Map<string, number>();
