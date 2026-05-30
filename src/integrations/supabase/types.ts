@@ -30624,6 +30624,43 @@ export type Database = {
           },
         ]
       }
+      commercial_won_revenue_historical_view: {
+        Row: {
+          accepted_proposal_id: string | null
+          account_id: string | null
+          account_name: string | null
+          approved_amount: number | null
+          attribution_confidence: string | null
+          attribution_source: string | null
+          cancelled_amount: number | null
+          commercial_amount: number | null
+          commercial_amount_source: string | null
+          commercial_status: string | null
+          commission_eligible_amount: number | null
+          current_seller_id: string | null
+          current_seller_name: string | null
+          financial_settlement_status: string | null
+          fulfillment_status: string | null
+          is_cancelled_sale: boolean | null
+          mrr_amount: number | null
+          nome_fantasia: string | null
+          one_shot_amount: number | null
+          opportunity_id: string | null
+          organization_id: string | null
+          pipeline_id: string | null
+          pipeline_name: string | null
+          pipeline_type: string | null
+          proposal_number: string | null
+          revenue_confidence: string | null
+          review_required: boolean | null
+          seller_id: string | null
+          seller_name: string | null
+          valid_revenue_amount: number | null
+          warnings: string[] | null
+          won_at: string | null
+        }
+        Relationships: []
+      }
       commercial_won_revenue_view: {
         Row: {
           accepted_at: string | null
@@ -35214,6 +35251,14 @@ export type Database = {
           reference_at: string
           reference_type: string
         }[]
+      }
+      resolve_historical_qualifier: {
+        Args: { p_opportunity_id: string }
+        Returns: string
+      }
+      resolve_historical_seller_at: {
+        Args: { p_at: string; p_opportunity_id: string }
+        Returns: string
       }
       resolve_manual_discount: {
         Args: { p_proposal_id: string; p_subtotal_one_time: number }
