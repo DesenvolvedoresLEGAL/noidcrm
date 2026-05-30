@@ -154,13 +154,19 @@ export function OTEOverviewTab({ results, records = [], isLoading, period, isOTE
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className={cn(!ssotAvailable && 'border-destructive/40 bg-destructive/5')}>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Comissão elegível comercial</p>
-                <p className="text-2xl font-bold">{formatCurrency(commercialEligible)}</p>
-                <p className="text-xs text-muted-foreground">Fonte: Vendas Realizadas</p>
+                <p className="text-2xl font-bold">
+                  {ssotAvailable ? formatCurrency(commercialEligible) : '—'}
+                </p>
+                <p className={cn('text-xs', ssotAvailable ? 'text-muted-foreground' : 'text-destructive')}>
+                  {ssotAvailable
+                    ? 'Fonte: Vendas Realizadas (Receita Válida)'
+                    : 'Não foi possível carregar a base comercial oficial.'}
+                </p>
               </div>
               <DollarSign className="h-8 w-8 text-muted-foreground/20" />
             </div>
