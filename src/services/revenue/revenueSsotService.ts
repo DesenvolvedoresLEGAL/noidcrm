@@ -203,7 +203,9 @@ export const revenueSsotService = {
   getClosedRevenueRows,
   getClosedRevenueSummary,
   getRevenueBySeller,
+  getHistoricalRevenueBySeller,
   getRevenueByPipeline,
   getRevenueByStage,
   getRevenueByType,
 };
+
