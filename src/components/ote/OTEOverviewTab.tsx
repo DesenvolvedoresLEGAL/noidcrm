@@ -1,6 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { OTEMonthlyResult } from '@/hooks/useOTEData';
 import { useSalesConfig } from '@/hooks/useSalesConfig';
+import type { OTESalesRecord } from '@/hooks/useOTESalesRecords';
+import { aggregateEligible } from './oteEligibility';
 import { 
   DollarSign, 
   Target, 
@@ -10,12 +12,14 @@ import {
   Zap,
   AlertTriangle,
   Users2,
-  UserCheck
+  UserCheck,
+  Wallet
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface OTEOverviewTabProps {
   results: OTEMonthlyResult[];
+  records?: OTESalesRecord[];
   isLoading: boolean;
   period: string;
   isOTEMode?: boolean;
