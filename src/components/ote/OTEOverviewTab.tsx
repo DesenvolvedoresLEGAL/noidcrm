@@ -50,8 +50,23 @@ export function OTEOverviewTab({ results, records = [], isLoading, period, isOTE
     end: periodEnd,
   };
   const { data: ssotSummary, isError: ssotError } = useClosedRevenueSummary(ssotParams as any);
-  const { data: ssotBySeller = [] } = useRevenueBySeller(ssotParams as any);
-  const ssotBySellerMap = new Map(ssotBySeller.map((g) => [g.key, g.total]));
+  // Atribuição histórica imutável: vendedor no momento do ganho (não dono atual).
+  const { data: ssotBySeller = [] } = useHistoricalRevenueBySeller(ssotParams as any);
+  const ssotBySellerMap = new Map<string, { total: number; name: string }>(
+    ssotBySeller.map((g) => [g.key, { total: g.total, name: g.label }]),
+  );
+  // SDR histórico por qualificação (não dono atual do lead).
+  const { data: historicalQualifiers = [] } = useHistoricalQualifiers({
+    organizationId: organization?.id,
+    start: periodStart,
+    end: periodEnd,
+  });
+  const qualifierMap = new Map(historicalQualifiers.map((q) => [q.qualifierUserId, q.qualifiedLeads]));
+  // Usuários ativos da org (para badge Inativo/Excluído).
+  const { data: activeUsers = [] } = useActiveUsers();
+  const activeUserIds = new Set(activeUsers.map((u) => u.user_id));
+  const activeUserNameMap = new Map(activeUsers.map((u) => [u.user_id, u.full_name]));
+
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
