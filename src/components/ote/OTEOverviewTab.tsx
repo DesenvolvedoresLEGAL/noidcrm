@@ -4,9 +4,10 @@ import { useSalesConfig } from '@/hooks/useSalesConfig';
 import type { OTESalesRecord } from '@/hooks/useOTESalesRecords';
 import { aggregateEligible } from './oteEligibility';
 import { FLAG_LABELS } from '@/lib/results/resultsMode';
+import { useClosedRevenueSummary, useRevenueBySeller } from '@/hooks/revenue/useRevenueSsot';
+import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import {
   DollarSign,
-  Target,
   TrendingUp,
   Users,
   Flag,
