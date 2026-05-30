@@ -110,26 +110,41 @@ Deno.serve(async (req) => {
 
     // Transfer all records
     const transferResults: Record<string, number> = {};
+    const historicalProtection: Record<string, number> = {};
 
-    // Opportunities - owner_user_id
+    // --- HISTORICAL ATTRIBUTION GUARD ---
+    // Closed (won/lost) opportunities keep their original owner_user_id so that:
+    //  - opportunity_owner_history at closed_at still resolves to the original seller
+    //  - commercial_won_revenue_historical_view and OTE results stay immutable
+    // We only transfer OPEN (operational) records. created_by is NEVER transferred —
+    // it represents who originally created the record, an immutable historical fact.
+    const { count: closedOppsPreserved } = await supabaseAdmin
+      .from("opportunities")
+      .select("id", { count: "exact", head: true })
+      .eq("owner_user_id", user_id_to_delete)
+      .eq("organization_id", organization_id)
+      .in("status", ["won", "lost"]);
+    historicalProtection.opportunities_closed_preserved = closedOppsPreserved || 0;
+
+    // Opportunities - owner_user_id (OPEN only)
     const { count: oppOwner } = await supabaseAdmin
       .from("opportunities")
       .update({ owner_user_id: transfer_to_user_id })
       .eq("owner_user_id", user_id_to_delete)
       .eq("organization_id", organization_id)
+      .not("status", "in", "(won,lost)")
       .select("*", { count: "exact", head: true });
-    transferResults.opportunities_owner = oppOwner || 0;
+    transferResults.opportunities_owner_open = oppOwner || 0;
 
-    // Opportunities - created_by
-    const { count: oppCreated } = await supabaseAdmin
+    // created_by is immutable historical attribution — DO NOT transfer.
+    const { count: oppCreatedPreserved } = await supabaseAdmin
       .from("opportunities")
-      .update({ created_by: transfer_to_user_id })
+      .select("id", { count: "exact", head: true })
       .eq("created_by", user_id_to_delete)
-      .eq("organization_id", organization_id)
-      .select("*", { count: "exact", head: true });
-    transferResults.opportunities_created = oppCreated || 0;
+      .eq("organization_id", organization_id);
+    historicalProtection.opportunities_created_by_preserved = oppCreatedPreserved || 0;
 
-    // Accounts - owner_user_id
+    // Accounts - owner_user_id (operational, safe to transfer)
     const { count: accOwner } = await supabaseAdmin
       .from("accounts")
       .update({ owner_user_id: transfer_to_user_id })
@@ -138,14 +153,13 @@ Deno.serve(async (req) => {
       .select("*", { count: "exact", head: true });
     transferResults.accounts_owner = accOwner || 0;
 
-    // Accounts - created_by
-    const { count: accCreated } = await supabaseAdmin
+    // Accounts - created_by is immutable historical attribution — DO NOT transfer.
+    const { count: accCreatedPreserved } = await supabaseAdmin
       .from("accounts")
-      .update({ created_by: transfer_to_user_id })
+      .select("id", { count: "exact", head: true })
       .eq("created_by", user_id_to_delete)
-      .eq("organization_id", organization_id)
-      .select("*", { count: "exact", head: true });
-    transferResults.accounts_created = accCreated || 0;
+      .eq("organization_id", organization_id);
+    historicalProtection.accounts_created_by_preserved = accCreatedPreserved || 0;
 
     // Accounts - cs_user_id
     const { count: accCs } = await supabaseAdmin
