@@ -112,7 +112,7 @@ export function OTEOverviewTab({ results, records = [], isLoading, period, isOTE
   return (
     <div className="space-y-6">
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
@@ -120,7 +120,7 @@ export function OTEOverviewTab({ results, records = [], isLoading, period, isOTE
                 <p className="text-sm text-muted-foreground">Total a Pagar</p>
                 <p className="text-2xl font-bold text-primary">{formatCurrency(totalToPay)}</p>
               </div>
-              <DollarSign className="h-8 w-8 text-primary/20" />
+              <Wallet className="h-8 w-8 text-primary/20" />
             </div>
           </CardContent>
         </Card>
@@ -129,9 +129,28 @@ export function OTEOverviewTab({ results, records = [], isLoading, period, isOTE
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Vendas (Closers)</p>
-                <p className="text-2xl font-bold">{formatCurrency(totalRevenueSales)}</p>
-                <p className="text-xs text-muted-foreground">Meta: {formatCurrency(totalRevenueGoal)}</p>
+                <p className="text-sm text-muted-foreground">Receita válida comercial</p>
+                <p className="text-2xl font-bold">{formatCurrency(validCommercialRevenue)}</p>
+                <p className="text-xs text-muted-foreground">
+                  Fonte: Vendas Realizadas (exclui canceladas/perdidas)
+                </p>
+              </div>
+              <DollarSign className="h-8 w-8 text-muted-foreground/20" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Receita elegível OTE</p>
+                <p className="text-2xl font-bold">{formatCurrency(eligibleOTERevenue)}</p>
+                <p className="text-xs text-muted-foreground">
+                  {itemsOutOfGoal > 0.01
+                    ? `Itens fora da meta: ${formatCurrency(itemsOutOfGoal)}`
+                    : `Meta total: ${formatCurrency(totalRevenueGoal)}`}
+                </p>
               </div>
               <TrendingUp className="h-8 w-8 text-muted-foreground/20" />
             </div>
