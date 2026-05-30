@@ -148,34 +148,12 @@ export function OTESellerSalesDrilldown({ records, kind, loading }: Props) {
               : `Vendas no período (${records.length})`}
           </h5>
           <div className="text-xs text-muted-foreground flex gap-4 flex-wrap items-center">
-            {kind === 'sale' && (
-              <span>
-                Receita (SSoT):{' '}
-                <strong className="text-foreground">{fmtBRL(ssotTotal)}</strong>
-              </span>
-            )}
             <span>
               Elegível para meta:{' '}
               <strong className="text-foreground">
                 {kind === 'qualified_lead' ? `${records.length} leads` : fmtBRL(eligibleTotal)}
               </strong>
             </span>
-            {nonEligibleTotal > 0.01 && (
-              <span>
-                Fora da meta:{' '}
-                <strong className="text-foreground">{fmtBRL(nonEligibleTotal)}</strong>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Info className="inline h-3 w-3 ml-1 text-muted-foreground" />
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-xs text-xs">
-                    Inclui (a) vendas reabertas/perdidas e (b) produtos/serviços
-                    cuja flag "Contabiliza na meta" está desligada no catálogo.
-                    Expanda a linha para auditar item a item.
-                  </TooltipContent>
-                </Tooltip>
-              </span>
-            )}
           </div>
         </div>
 
