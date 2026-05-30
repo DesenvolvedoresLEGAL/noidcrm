@@ -4,9 +4,10 @@ import { useSalesConfig } from '@/hooks/useSalesConfig';
 import type { OTESalesRecord } from '@/hooks/useOTESalesRecords';
 import { aggregateEligible } from './oteEligibility';
 import { FLAG_LABELS } from '@/lib/results/resultsMode';
+import { useClosedRevenueSummary, useRevenueBySeller } from '@/hooks/revenue/useRevenueSsot';
+import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import {
   DollarSign,
-  Target,
   TrendingUp,
   Users,
   Flag,
@@ -28,10 +29,25 @@ interface OTEOverviewTabProps {
 
 export function OTEOverviewTab({ results, records = [], isLoading, period, isOTEMode = true }: OTEOverviewTabProps) {
   const { config } = useSalesConfig();
+  const { organization } = useCurrentOrganization();
 
   const flagBlueThreshold = config?.flag_blue_threshold ?? 70;
   const flagYellowMinThreshold = config?.flag_yellow_min_threshold ?? 50;
   const flagYellowMaxThreshold = config?.flag_yellow_max_threshold ?? 69.99;
+
+  // SSoT oficial — mesma fonte do Relatório Vendas Realizadas (commercial_won_revenue_view).
+  const [py, pm] = (period || '').split('-').map(Number);
+  const periodStart = py && pm ? new Date(Date.UTC(py, pm - 1, 1)).toISOString() : undefined;
+  const periodEnd = py && pm ? new Date(Date.UTC(py, pm, 1) - 1).toISOString() : undefined;
+  const ssotParams = {
+    surface: 'ote-overview',
+    organizationId: organization?.id,
+    start: periodStart,
+    end: periodEnd,
+  };
+  const { data: ssotSummary, isError: ssotError } = useClosedRevenueSummary(ssotParams as any);
+  const { data: ssotBySeller = [] } = useRevenueBySeller(ssotParams as any);
+  const ssotBySellerMap = new Map(ssotBySeller.map((g) => [g.key, g.total]));
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -54,11 +70,15 @@ export function OTEOverviewTab({ results, records = [], isLoading, period, isOTE
     ? revenueResults.reduce((sum, r) => sum + r.achievement_percentage, 0) / revenueResults.length
     : 0;
 
-  // Reconciliação: Comissão elegível comercial (SSoT) − Itens fora da meta = Receita elegível OTE.
+  // Reconciliação OTE:
+  //   Comissão elegível comercial = Receita Válida do Relatório (SSoT oficial)
+  //   Itens fora da meta = Comissão elegível comercial − Receita elegível OTE (item a item)
   const revenueResultIds = new Set(revenueResults.map((r) => r.id));
   const revenueRecords = records.filter((r) => revenueResultIds.has(r.ote_result_id));
-  const { ssotTotal: commercialEligible, eligibleTotal: oteEligible, nonEligibleTotal: itemsOutOfGoal } =
-    aggregateEligible(revenueRecords);
+  const { eligibleTotal: oteEligible } = aggregateEligible(revenueRecords);
+  const ssotAvailable = !!ssotSummary && !ssotError;
+  const commercialEligible = ssotAvailable ? Number(ssotSummary!.eligible || ssotSummary!.total || 0) : 0;
+  const itemsOutOfGoal = Math.max(0, commercialEligible - oteEligible);
 
   // Eligible per seller (para a coluna "Receita elegível OTE" da tabela Closers).
   const eligiblePerSeller = new Map<string, number>();
@@ -115,7 +135,7 @@ export function OTEOverviewTab({ results, records = [], isLoading, period, isOTE
 
   // Validação de reconciliação OTE.
   const reconciliationDelta = commercialEligible - itemsOutOfGoal - oteEligible;
-  const hasReconciliationIssue = Math.abs(reconciliationDelta) > 0.01 || oteEligible > commercialEligible + 0.01;
+  const hasReconciliationIssue = !ssotAvailable || Math.abs(reconciliationDelta) > 0.01 || oteEligible > commercialEligible + 0.01;
 
   return (
     <div className="space-y-6">
@@ -134,13 +154,19 @@ export function OTEOverviewTab({ results, records = [], isLoading, period, isOTE
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className={cn(!ssotAvailable && 'border-destructive/40 bg-destructive/5')}>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Comissão elegível comercial</p>
-                <p className="text-2xl font-bold">{formatCurrency(commercialEligible)}</p>
-                <p className="text-xs text-muted-foreground">Fonte: Vendas Realizadas</p>
+                <p className="text-2xl font-bold">
+                  {ssotAvailable ? formatCurrency(commercialEligible) : '—'}
+                </p>
+                <p className={cn('text-xs', ssotAvailable ? 'text-muted-foreground' : 'text-destructive')}>
+                  {ssotAvailable
+                    ? 'Fonte: Vendas Realizadas (Receita Válida)'
+                    : 'Não foi possível carregar a base comercial oficial.'}
+                </p>
               </div>
               <DollarSign className="h-8 w-8 text-muted-foreground/20" />
             </div>
@@ -286,14 +312,15 @@ export function OTEOverviewTab({ results, records = [], isLoading, period, isOTE
                 <tbody>
                   {revenueResults.map((result) => {
                     const eligible = eligiblePerSeller.get(result.id) ?? 0;
+                    const sellerCommercial = ssotBySellerMap.get(result.user_id) ?? 0;
                     return (
                       <tr key={result.id} className="border-b hover:bg-muted/50">
-                        <td className="py-3 px-2 font-medium" title={`Comissão elegível comercial: ${formatCurrency(result.total_sales)}`}>
+                        <td className="py-3 px-2 font-medium">
                           {result.profile?.full_name || result.level_name_snapshot || result.user_id.slice(0, 8) + '...'}
                         </td>
                         <td className="py-3 px-2">{result.level_name_snapshot || '-'}</td>
                         <td className="py-3 px-2 text-right">{formatCurrency(result.goal_amount)}</td>
-                        <td className="py-3 px-2 text-right hidden lg:table-cell text-muted-foreground">{formatCurrency(result.total_sales)}</td>
+                        <td className="py-3 px-2 text-right hidden lg:table-cell text-muted-foreground">{formatCurrency(sellerCommercial)}</td>
                         <td className="py-3 px-2 text-right">{formatCurrency(eligible)}</td>
                         <td className="py-3 px-2 text-right">{result.achievement_percentage.toFixed(1)}%</td>
                         <td className="py-3 px-2 text-center">{result.ote_multiplier}x</td>
@@ -324,69 +351,6 @@ export function OTEOverviewTab({ results, records = [], isLoading, period, isOTE
         </Card>
       )}
 
-
-
-      {/* Closers / Revenue Table */}
-      {revenueResults.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <DollarSign className="h-5 w-5" />
-              Closers (Meta em R$)
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-3 px-2">Vendedor</th>
-                    <th className="text-left py-3 px-2">Nível</th>
-                    <th className="text-right py-3 px-2">Meta (R$)</th>
-                    <th className="text-right py-3 px-2">Vendas</th>
-                    <th className="text-right py-3 px-2">% Meta</th>
-                    <th className="text-center py-3 px-2">Mult.</th>
-                    <th className="text-right py-3 px-2">Base</th>
-                    <th className="text-center py-3 px-2">Flag</th>
-                    <th className="text-right py-3 px-2">Acelerador</th>
-                    <th className="text-right py-3 px-2 font-semibold">Variável Final</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {revenueResults.map((result) => (
-                    <tr key={result.id} className="border-b hover:bg-muted/50">
-                      <td className="py-3 px-2 font-medium">
-                        {result.profile?.full_name || result.level_name_snapshot || result.user_id.slice(0, 8) + '...'}
-                      </td>
-                      <td className="py-3 px-2">{result.level_name_snapshot || '-'}</td>
-                      <td className="py-3 px-2 text-right">{formatCurrency(result.goal_amount)}</td>
-                      <td className="py-3 px-2 text-right">{formatCurrency(result.total_sales)}</td>
-                      <td className="py-3 px-2 text-right">{result.achievement_percentage.toFixed(1)}%</td>
-                      <td className="py-3 px-2 text-center">{result.ote_multiplier}x</td>
-                      <td className="py-3 px-2 text-right">{formatCurrency(result.base_variable)}</td>
-                      <td className="py-3 px-2 text-center">{renderFlagBadge(result.flag_color)}</td>
-                      <td className="py-3 px-2 text-right">{renderAdjustment(result.final_adjustment_percentage)}</td>
-                      <td className="py-3 px-2 text-right font-semibold text-primary">
-                        {formatCurrency(result.final_variable_amount)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr className="bg-muted/30 font-semibold">
-                    <td colSpan={3} className="py-3 px-2">SUBTOTAL CLOSERS</td>
-                    <td className="py-3 px-2 text-right">{formatCurrency(revenueResults.reduce((sum, r) => sum + r.total_sales, 0))}</td>
-                    <td colSpan={5} className="py-3 px-2"></td>
-                    <td className="py-3 px-2 text-right text-primary">
-                      {formatCurrency(revenueResults.reduce((sum, r) => sum + r.final_variable_amount, 0))}
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Pré-vendas / Leads Table */}
       {leadsResults.length > 0 && (
