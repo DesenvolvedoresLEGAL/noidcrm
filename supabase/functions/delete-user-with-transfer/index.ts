@@ -244,7 +244,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Audit log
+    // Audit log — includes both what moved AND what was preserved for historical integrity
     await supabaseAdmin.from("audit_log").insert({
       action: "user_deleted_with_transfer",
       actor_user_id: caller.id,
@@ -254,11 +254,22 @@ Deno.serve(async (req) => {
       metadata: {
         transferred_to: transfer_to_user_id,
         transfer_results: transferResults,
+        historical_protection: historicalProtection,
+        rules: {
+          opportunities_owner_user_id: "transferred only when status NOT IN (won, lost)",
+          opportunities_created_by: "preserved (immutable historical attribution)",
+          accounts_created_by: "preserved (immutable historical attribution)",
+          historical_results_source: "opportunity_owner_history + commercial_won_revenue_historical_view",
+        },
       },
     });
 
     return new Response(
-      JSON.stringify({ success: true, transfer_results: transferResults }),
+      JSON.stringify({
+        success: true,
+        transfer_results: transferResults,
+        historical_protection: historicalProtection,
+      }),
       {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
