@@ -1,10 +1,13 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { OTEMonthlyResult } from '@/hooks/useOTEData';
 import { useSalesConfig } from '@/hooks/useSalesConfig';
 import type { OTESalesRecord } from '@/hooks/useOTESalesRecords';
 import { aggregateEligible } from './oteEligibility';
 import { FLAG_LABELS } from '@/lib/results/resultsMode';
-import { useClosedRevenueSummary, useRevenueBySeller } from '@/hooks/revenue/useRevenueSsot';
+import { useClosedRevenueSummary, useHistoricalRevenueBySeller } from '@/hooks/revenue/useRevenueSsot';
+import { useHistoricalQualifiers } from '@/hooks/results/useHistoricalQualifiers';
+import { useActiveUsers } from '@/hooks/users/useActiveUsers';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import {
   DollarSign,
@@ -18,6 +21,7 @@ import {
   Ban,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
 
 interface OTEOverviewTabProps {
   results: OTEMonthlyResult[];
