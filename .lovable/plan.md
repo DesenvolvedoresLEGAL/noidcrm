@@ -1,70 +1,124 @@
-## Objetivo
+## Sprint Resultados OTE 1.2 — Visão Geral executiva + 3 modos de remuneração
 
-Corrigir o cálculo de elegibilidade do OTE para ser **item a item** (respeitando a flag "Contabiliza na meta" de produto/serviço), limpar a tabela "Vendas no período" e propagar para o Excel.
+Objetivo: o módulo Resultados deve se adaptar ao modo escolhido pela organização (Metas Simples, Comissão Padrão, Sistema OTE Completo) com cards, tabelas, labels, abas e Excel próprios para cada modo. Sem mexer no cálculo OTE por item já corrigido, sem tocar em Vendas Realizadas nem em `commercial_won_revenue_view`.
 
-Não mexer em `commercial_won_revenue_view`, Vendas Realizadas, nem refatorar o módulo.
+### 1. Schema (mínimo, retrocompatível)
 
-## Diagnóstico
+Migration:
+- `ALTER TABLE public.organizations` — drop CHECK antigo de `goal_system_mode` e recriar com 3 valores: `ote`, `simple`, `standard_commission`. Default continua `ote`.
+- Atualizar comentário da coluna.
+- Atualizar `src/hooks/useCurrentOrganization.ts` (`Organization.goal_system_mode: 'ote' | 'simple' | 'standard_commission'`).
 
-- A lógica por item **já existe** em `supabase/functions/calculate-ote/index.ts` (linhas 253–419), mas:
-  - O fallback ainda eleva o comercial inteiro a elegível quando `rawItems.length === 0`, sem sinalizar como legado.
-  - Falta log/telemetria por venda para auditar por que Wagner (mai/26) está com `eligible == commercial` apesar de itens como Fast Delivery (Motoboy) terem `products.counts_for_commission = false`.
-- A tabela do drilldown tem colunas duplicadas e ruidosas: "Fora da meta", "Conta p/ meta?" aparece **duas vezes** (col 211 e 288–298 — bug), "Confiança", e badge "Sim · R$ X" redundante.
-- `oteEligibility.ts` mantém fallback que vira `eligible = sale` quando não há split persistido, escondendo o problema.
+Nenhuma mudança em tabelas OTE, em views de receita ou em RLS.
 
-## Mudanças
+### 2. Helper central de modo
 
-### 1. Backend — `supabase/functions/calculate-ote/index.ts`
+Criar `src/lib/results/resultsMode.ts`:
+- `type ResultsMode = 'simple_goals' | 'standard_commission' | 'full_ote'`
+- `getResultsMode(org)` lê `goal_system_mode` e mapeia (`ote → full_ote`, `simple → simple_goals`, `standard_commission → standard_commission`).
+- Helpers `isSimpleGoalsMode`, `isStandardCommissionMode`, `isFullOteMode`.
+- `getResultsCopy(mode)` devolve `{ pageTitle, pageSubtitle }` para o `PageHeader`.
 
-- Manter a estrutura atual (per-item via `proposal_items` + `products.counts_for_commission`), mas:
-  - Adicionar `console.log` por oportunidade com: `opportunity_id`, `proposalId`, `items.length`, `eligibleItemsSum`, `commercial`, lista resumida `{product_id, name, itemFlag, productFlag, line_amount}`. Crítico para diagnosticar por que vendas continuam 100% elegíveis.
-  - Quando `rawItems.length === 0` e `proposalId != null`, marcar `exclusionReason = 'Itens da proposta não disponíveis — usando fallback legado'` e gravar `revenue_confidence = 'legacy_fallback'` em `ote_sales_records` para sinalizar.
-  - Quando `proposalId == null` (sem proposta aceita), idem fallback legado documentado.
-  - Persistir `eligible_amount`, `non_eligible_amount`, `counts_toward_goal = eligible > 0`, `exclusion_reason` em `ote_sales_records`; persistir `ote_sales_record_items` com `counts_toward_goal` e `exclusion_reason` por item.
+Hook `src/hooks/useResultsMode.ts` empacota `useCurrentOrganization` + helper.
 
-### 2. Helper — `src/components/ote/oteEligibility.ts`
+### 3. `OTEReport.tsx` — roteamento por modo
 
-- Remover o fallback `if (r.counts_toward_goal && !r.exclusion_reason) return { eligible: sale, nonEligible: 0 }`.
-- Regra nova: **sempre** confiar no que o backend gravou (`eligible_amount`/`non_eligible_amount`). Se ambos forem 0 e `sale_value > 0`, retornar `{ eligible: 0, nonEligible: sale }` (força recálculo pelo botão "Calcular"). Mantém `aggregateEligible` igual.
+- Usar `useResultsMode()` em vez do booleano `isOTEMode`.
+- Aplicar título/subtítulo do helper (Relatório OTE / Relatório de Comissões / Relatório de Metas).
+- Renderizar os componentes corretos por aba:
+  - `full_ote` → `OTEOverviewTab` / `OTESellerDetailTab` / `OTEHistoryTab` (já existentes, refinados no item 4).
+  - `standard_commission` → `CommissionOverviewTab` / `CommissionSellerDetailTab` / `CommissionHistoryTab` (novos).
+  - `simple_goals` → `SimpleGoalsOverviewTab` / `SimpleGoalsSellerDetailTab` / `SimpleGoalsHistoryTab` (novos).
+- `handleExportExcel` chama `buildResultsWorkbook({ mode, … })` (novo dispatcher) que delega para os builders por modo.
 
-### 3. UI — `src/components/ote/OTESellerSalesDrilldown.tsx`
+### 4. Refino do modo `full_ote` (sem tocar no cálculo por item)
 
-- Remover colunas: **Fora da meta**, **Conta p/ meta?** (duas ocorrências — uma é bug duplicado), **Confiança**, badge final "Sim · R$ X".
-- Tabela final fica: `▸ | Cliente / Oportunidade | Pipeline | Fechado em | Valor comercial | Elegível p/ meta | Tipo | Ações`.
-- Quando `eligible < sale_value`, exibir "Elegível p/ meta" em destaque sutil (ex: `text-amber-600` ou `font-medium`) — discreto, sem badge.
-- Linha expansível continua mostrando `ItemsTable` (já tem coluna "Conta p/ meta?" por item) + `exclusion_reason` no topo.
-- Atualizar `colSpan` da linha expansível para o novo número de colunas.
-- Header de totais: manter "Receita (SSoT)", "Elegível para meta", "Fora da meta" (resumo agregado é OK; o ruim era na tabela).
+`OTEOverviewTab.tsx`:
+- Cards (grid 5):
+  1. **Total a pagar** = `Σ final_variable_amount`.
+  2. **Comissão elegível comercial** = `validCommercialRevenue` (já vem de `aggregateEligible.ssotTotal`). Subtexto "Fonte: Vendas Realizadas".
+  3. **Receita elegível OTE** = `eligibleOTERevenue` (já existe). Subtexto "Após excluir itens fora da meta".
+  4. **Itens fora da meta** = `validCommercialRevenue − eligibleOTERevenue`. Subtexto "Produtos, serviços, logística, taxas e itens não comissionáveis".
+  5. **Vendedores no cálculo** = `individualResults.length`. Subtexto "Closers, pré-vendas e funções configuradas".
+- Remover card "Média % Meta (Closers)" do topo. Levar a métrica para dentro da seção Closers (linha pequena acima da tabela).
+- Adicionar faixa de reconciliação: `Comissão elegível comercial − Itens fora da meta = Receita elegível OTE`, com alerta destrutivo quando `|comercial − fora − elegível| > R$ 0,01` ou quando `Receita elegível OTE > Comissão elegível comercial`.
+- Flags: trocar labels para **Alta performance / Zona de atenção / Abaixo do mínimo** (cores e ícones permanecem). Tooltip mantém o nome legado para retrocompatibilidade.
+- Tabela Closers: renomear coluna "Vendas" → "Receita elegível OTE" (usar `eligibleTotal` por vendedor calculado a partir de `records`). Adicionar coluna "Comissão elegível comercial" (oculta abaixo de `lg`, disponível em tooltip do nome do vendedor).
 
-### 4. Cards — `src/components/ote/OTESellerDetailTab.tsx`
+`OTESellerDetailTab.tsx`:
+- Já não mostra bloco SSoT/Fonte — manter.
+- Renomear labels visuais ("Elegível p/ meta" → "Receita elegível OTE").
 
-- Nenhuma mudança estrutural — já usa `eligibleTotal` para "Elegível p/ meta" e mostra "Receita total (SSoT)" / "Fora da meta" no bloco tracejado. Sem alterações.
+### 5. Novo modo `standard_commission`
 
-### 5. Excel — `src/components/ote/export/buildOTEWorkbook.ts`
+Componentes novos em `src/components/results/commission/`:
+- `CommissionOverviewTab.tsx` com 5 cards: Comissão a pagar, Receita comissionável, Receita não comissionável, Vendas com comissão, Vendedores com comissão. Tabela principal: Vendedor / Receita comissionável / Receita não comissionável / % Comissão média / Comissão gerada / Comissão paga / Comissão pendente / Status.
+- `CommissionSellerDetailTab.tsx`: collapsible por vendedor com Receita comissionável, Comissão calculada/paga/pendente, regras aplicadas, drill-down de vendas (`OTESellerSalesDrilldown` reaproveitado com header customizado) sem meta/multiplicador/OTE.
+- `CommissionHistoryTab.tsx`: Período / Receita comissionável / Comissão gerada / Comissão paga / Comissão pendente / Qtde vendedores / Status.
 
-Garantir 3 abas conforme spec:
-- **Resumo**: Vendedor, Meta, Valor total vendido (SSoT), Valor elegível, Valor fora, % Meta, Multiplicador, Variável base, Variável final.
-- **Vendas**: Cliente/Oportunidade, Proposta, Pipeline, Fechado em, Valor comercial, Valor elegível, Valor fora, Tipo, Status final, Motivo geral.
-- **Itens da venda**: Cliente/Oportunidade, Proposta, Produto/Serviço, Valor do item, Contabiliza na meta?, Valor elegível do item, Motivo de exclusão.
+Hook `src/hooks/useStandardCommissionResults.ts`:
+- Reaproveita `useOTEMonthlyResults` + `useOTESalesRecords` como base (os mesmos `ote_results` representam o período); a métrica "Comissão calculada" usa `final_variable_amount` ou `base_variable` (quando multiplicador = 1) e "Receita comissionável" = `eligibleTotal`. Status pago/pendente via campos já existentes em `ote_monthly_results.status`. Nenhuma nova tabela.
+- Documentar em comentário que regras avançadas de comissão por produto/categoria/pipeline são consumidas via configuração existente quando disponível; senão fallback no resultado OTE.
 
-### 6. Validação
+### 6. Novo modo `simple_goals`
 
-- `npx tsc --noEmit` deve passar limpo.
-- Após deploy, usuário clica em **Calcular** para mai/2026 → Wagner deve mostrar `eligible < commercial` se houver itens não-elegíveis nas propostas.
-- Logs da edge function devem revelar caso a caso os itens encontrados (debug-friendly).
+Componentes novos em `src/components/results/simple/`:
+- `SimpleGoalsOverviewTab.tsx`: 5 cards: Receita realizada, Meta do período, Atingimento, Vendedores acima da meta, Vendedores abaixo da meta. Tabela: Vendedor / Meta / Receita realizada / % Meta / Status (Meta batida / Em ritmo / Abaixo do ritmo / Sem meta configurada) / Gap para meta.
+- `SimpleGoalsSellerDetailTab.tsx`: collapsible com Meta, Receita realizada, % Meta, Gap, drill-down de vendas — sem comissão/OTE/multiplicador.
+- `SimpleGoalsHistoryTab.tsx`: Período / Meta total / Receita realizada / % Atingimento / Qtde vendedores / Status.
 
-## Arquivos impactados
+Sem mexer em backend: continua lendo `ote_monthly_results` + `ote_sales_records`, ignorando colunas de variável/multiplicador/aceleradores na UI.
 
-- `supabase/functions/calculate-ote/index.ts` (logs + sinalização de fallback legado)
-- `src/components/ote/oteEligibility.ts` (remover fallback otimista)
-- `src/components/ote/OTESellerSalesDrilldown.tsx` (limpeza de colunas)
-- `src/components/ote/export/buildOTEWorkbook.ts` (3 abas conforme spec)
+### 7. Configurações > Vendas (`GoalSystemModeSelector.tsx`)
 
-## Riscos
+- Grid passa a ter 3 cards (`ote`, `simple`, `standard_commission`). Card novo "Comissão Padrão" com bullets: comissão por venda, por produto/serviço, por vendedor/função, controle pago/pendente, sem multiplicadores.
+- `handleModeChange` aceita os 3 valores e invalida as mesmas queries.
 
-- Remover fallback otimista do helper pode fazer registros legados (calculados antes da migração de splits) aparecerem como `0` elegível até o usuário rodar "Calcular". Mitigação: cards já têm botão "Calcular" visível.
-- Mudança de colunas pode quebrar layout responsivo — testar no viewport 1412×853 atual.
+### 8. Excel adaptativo
 
-## Fora de escopo
+Refatorar `src/components/ote/export/buildOTEWorkbook.ts` em:
+- `src/components/results/export/buildResultsWorkbook.ts` (dispatcher por modo).
+- `buildOTEWorkbook` (existente, ajustar abas Resumo OTE / Vendedores / Vendas / Itens conforme spec — colunas: Comissão elegível comercial, Receita elegível OTE, Itens fora da meta etc.).
+- `buildCommissionWorkbook` (Resumo Comissão / Vendedores / Vendas / Itens com regra aplicada e comissão por item).
+- `buildSimpleGoalsWorkbook` (Resumo Metas / Vendedores / Vendas).
+- `OTEReport.handleExportExcel` passa `mode` e os dados.
 
-- Vendas Realizadas, `commercial_won_revenue_view`, refactor de hooks, redesign visual.
+### 9. Validações e copy
+
+- Labels proibidos: substituir todas as ocorrências de "Vendas", "Receita válida", "Média geral", "Valor total" no módulo Resultados pelos labels explícitos do modo.
+- Alertas visuais nos 3 modos (faixa abaixo dos cards) conforme spec (divergência OTE; item comissionável vs não comissionável; "Sem meta configurada").
+- `Tooltip` nas flags renomeadas explicando faixas e que limiares são configuráveis em Configurações > Vendas > Flags.
+
+### 10. Testes / verificação
+
+- `npx tsc --noEmit` deve passar.
+- Smoke manual nos 3 modos: trocar `goal_system_mode` da organização, clicar Calcular, verificar cards/tabelas/Excel.
+- Conferir cenários: Segredos da Audiência (R$ 2.397,00 elegível) e Notorious Nutrition (R$ 2.526,70 elegível) batendo entre linha principal e detalhe.
+
+### Arquivos impactados (resumo)
+
+Novos:
+- `supabase/migrations/<ts>_add_standard_commission_mode.sql`
+- `src/lib/results/resultsMode.ts`
+- `src/hooks/useResultsMode.ts`
+- `src/hooks/useStandardCommissionResults.ts`
+- `src/components/results/commission/{CommissionOverviewTab,CommissionSellerDetailTab,CommissionHistoryTab}.tsx`
+- `src/components/results/simple/{SimpleGoalsOverviewTab,SimpleGoalsSellerDetailTab,SimpleGoalsHistoryTab}.tsx`
+- `src/components/results/export/{buildResultsWorkbook,buildCommissionWorkbook,buildSimpleGoalsWorkbook}.ts`
+
+Modificados:
+- `src/pages/OTEReport.tsx`
+- `src/components/ote/OTEOverviewTab.tsx`
+- `src/components/ote/OTESellerDetailTab.tsx`
+- `src/components/ote/OTEHistoryTab.tsx` (colunas)
+- `src/components/ote/export/buildOTEWorkbook.ts`
+- `src/components/ote/GoalSystemModeSelector.tsx`
+- `src/hooks/useCurrentOrganization.ts`
+
+Não tocar:
+- `commercial_won_revenue_view`, `commission_eligibility_view`, edge `calculate-ote`, lógica em `oteEligibility.ts`, módulo Vendas Realizadas.
+
+### Riscos
+- Mudar o CHECK de `goal_system_mode` exige drop + recreate; rollout precisa garantir que nenhum valor inválido exista (default permanece `ote`).
+- Reaproveitar `ote_monthly_results` para o modo Comissão Padrão é uma simplificação de UI: regras finas de comissão por produto continuam dependendo de configuração futura — documentar no hook.
+- Refatorar o builder de Excel pode quebrar import paths existentes; manter re-export em `src/components/ote/export/buildOTEWorkbook.ts` para retrocompatibilidade.
