@@ -143,6 +143,37 @@ export async function getRevenueBySeller(p: RevenueSsotParams): Promise<RevenueG
   return groupBy(rows, (r) => ({ key: r.seller_id ?? '—', label: r.seller_name ?? 'Sem vendedor' }));
 }
 
+/**
+ * Atribuição histórica imutável (Sprint OTE).
+ * Lê de `commercial_won_revenue_historical_view` — mesma base que
+ * `commercial_won_revenue_view`, porém com `seller_id` resolvido no momento
+ * do ganho via `opportunity_owner_history`. Use em Resultados/OTE/Comissão
+ * para que transferência operacional NÃO mexa em resultado histórico.
+ */
+export async function getHistoricalRevenueBySeller(p: RevenueSsotParams): Promise<RevenueGroup[]> {
+  let q = (supabase as any)
+    .from('commercial_won_revenue_historical_view')
+    .select('seller_id, seller_name, commercial_amount')
+    .eq('organization_id', p.organizationId)
+    .gte('won_at', p.start)
+    .lte('won_at', p.end);
+  if (p.pipelineIds?.length) q = q.in('pipeline_id', p.pipelineIds);
+  if (p.sellerIds?.length) q = q.in('seller_id', p.sellerIds);
+  const { data, error } = await q;
+  if (error) throw error;
+  const map = new Map<string, RevenueGroup>();
+  for (const r of (data ?? []) as Array<{ seller_id: string | null; seller_name: string | null; commercial_amount: number | null }>) {
+    const key = r.seller_id ?? '—';
+    const cur = map.get(key) ?? { key, label: r.seller_name ?? 'Sem vendedor', total: 0, count: 0, avgTicket: 0 };
+    cur.total += Number(r.commercial_amount) || 0;
+    cur.count += 1;
+    map.set(key, cur);
+  }
+  for (const g of map.values()) g.avgTicket = g.count > 0 ? g.total / g.count : 0;
+  return Array.from(map.values()).sort((a, b) => b.total - a.total);
+}
+
+
 export async function getRevenueByPipeline(p: RevenueSsotParams): Promise<RevenueGroup[]> {
   const rows = await fetchRows(p);
   return groupBy(rows, (r) => ({ key: r.pipeline_id ?? '—', label: r.pipeline_name ?? 'Sem pipeline' }));
