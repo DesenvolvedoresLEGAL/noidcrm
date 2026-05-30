@@ -279,7 +279,7 @@ export function OTEOverviewTab({ results, records = [], isLoading, period, isOTE
                 <tfoot>
                   <tr className="bg-muted/30 font-semibold">
                     <td colSpan={3} className="py-3 px-2">SUBTOTAL CLOSERS</td>
-                    <td className="py-3 px-2 text-right">{formatCurrency(totalRevenueSales)}</td>
+                    <td className="py-3 px-2 text-right">{formatCurrency(revenueResults.reduce((sum, r) => sum + r.total_sales, 0))}</td>
                     <td colSpan={5} className="py-3 px-2"></td>
                     <td className="py-3 px-2 text-right text-primary">
                       {formatCurrency(revenueResults.reduce((sum, r) => sum + r.final_variable_amount, 0))}
