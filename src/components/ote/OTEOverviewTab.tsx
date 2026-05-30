@@ -439,25 +439,70 @@ export function OTEOverviewTab({ results, records = [], isLoading, period, isOTE
                   </tr>
                 </thead>
                 <tbody>
-                  {leadsResults.map((result) => (
-                    <tr key={result.id} className="border-b hover:bg-muted/50">
-                      <td className="py-3 px-2 font-medium">
-                        {result.profile?.full_name || result.level_name_snapshot || result.user_id.slice(0, 8) + '...'}
-                      </td>
-                      <td className="py-3 px-2">{result.level_name_snapshot || '-'}</td>
-                      <td className="py-3 px-2 text-right">{result.goal_amount}</td>
-                      <td className="py-3 px-2 text-right">{result.total_sales}</td>
-                      <td className="py-3 px-2 text-right">{result.achievement_percentage.toFixed(1)}%</td>
-                      <td className="py-3 px-2 text-center">{result.ote_multiplier}x</td>
-                      <td className="py-3 px-2 text-right">{formatCurrency(result.base_variable)}</td>
-                      <td className="py-3 px-2 text-center">{renderFlagBadge(result.flag_color)}</td>
-                      <td className="py-3 px-2 text-right">{renderAdjustment(result.final_adjustment_percentage)}</td>
-                      <td className="py-3 px-2 text-right font-semibold text-primary">
-                        {formatCurrency(result.final_variable_amount)}
-                      </td>
-                    </tr>
-                  ))}
+                  {leadsResults.map((result) => {
+                    const isActive = activeUserIds.has(result.user_id);
+                    // SDR histórico: usa qualifierMap se disponível, senão mantém total_sales calculado.
+                    const histLeads = qualifierMap.get(result.user_id);
+                    const qualifiedLeads = typeof histLeads === 'number' ? histLeads : result.total_sales;
+                    return (
+                      <tr key={result.id} className="border-b hover:bg-muted/50">
+                        <td className="py-3 px-2 font-medium">
+                          <span className="inline-flex items-center gap-2">
+                            {result.profile?.full_name || result.level_name_snapshot || result.user_id.slice(0, 8) + '...'}
+                            {!isActive && (
+                              <Badge variant="outline" className="text-[10px] uppercase tracking-wide border-muted-foreground/30 text-muted-foreground">
+                                Inativo
+                              </Badge>
+                            )}
+                          </span>
+                        </td>
+                        <td className="py-3 px-2">{result.level_name_snapshot || '-'}</td>
+                        <td className="py-3 px-2 text-right">{result.goal_amount}</td>
+                        <td className="py-3 px-2 text-right">{qualifiedLeads}</td>
+                        <td className="py-3 px-2 text-right">{result.achievement_percentage.toFixed(1)}%</td>
+                        <td className="py-3 px-2 text-center">{result.ote_multiplier}x</td>
+                        <td className="py-3 px-2 text-right">{formatCurrency(result.base_variable)}</td>
+                        <td className="py-3 px-2 text-center">{renderFlagBadge(result.flag_color)}</td>
+                        <td className="py-3 px-2 text-right">{renderAdjustment(result.final_adjustment_percentage)}</td>
+                        <td className="py-3 px-2 text-right font-semibold text-primary">
+                          {formatCurrency(result.final_variable_amount)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {/* SDRs históricos com qualificação no período mas sem ote_monthly_results
+                      (ex.: Ana excluída/transferida — leads continuam dela). */}
+                  {Array.from(qualifierMap.entries())
+                    .filter(([uid]) => !leadsResults.some((r) => r.user_id === uid))
+                    .filter(([, n]) => n > 0)
+                    .sort((a, b) => b[1] - a[1])
+                    .map(([uid, n]) => {
+                      const isActive = activeUserIds.has(uid);
+                      const name = activeUserNameMap.get(uid) || uid.slice(0, 8) + '...';
+                      return (
+                        <tr key={`hist-sdr-${uid}`} className="border-b hover:bg-muted/50 bg-muted/10">
+                          <td className="py-3 px-2 font-medium">
+                            <span className="inline-flex items-center gap-2">
+                              {name}
+                              <Badge variant="outline" className="text-[10px] uppercase tracking-wide border-destructive/40 text-destructive">
+                                {isActive ? 'Sem nível OTE' : 'Inativo'}
+                              </Badge>
+                            </span>
+                          </td>
+                          <td className="py-3 px-2 text-muted-foreground">—</td>
+                          <td className="py-3 px-2 text-right text-muted-foreground">—</td>
+                          <td className="py-3 px-2 text-right">{n}</td>
+                          <td className="py-3 px-2 text-right text-muted-foreground">—</td>
+                          <td className="py-3 px-2 text-center text-muted-foreground">—</td>
+                          <td className="py-3 px-2 text-right text-muted-foreground">—</td>
+                          <td className="py-3 px-2 text-center text-muted-foreground">—</td>
+                          <td className="py-3 px-2 text-right text-muted-foreground">—</td>
+                          <td className="py-3 px-2 text-right text-muted-foreground">—</td>
+                        </tr>
+                      );
+                    })}
                 </tbody>
+
                 <tfoot>
                   <tr className="bg-muted/30 font-semibold">
                     <td colSpan={3} className="py-3 px-2">SUBTOTAL PRÉ-VENDAS</td>
