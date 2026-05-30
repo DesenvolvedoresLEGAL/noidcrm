@@ -1,10 +1,13 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { OTEMonthlyResult } from '@/hooks/useOTEData';
 import { useSalesConfig } from '@/hooks/useSalesConfig';
 import type { OTESalesRecord } from '@/hooks/useOTESalesRecords';
 import { aggregateEligible } from './oteEligibility';
 import { FLAG_LABELS } from '@/lib/results/resultsMode';
-import { useClosedRevenueSummary, useRevenueBySeller } from '@/hooks/revenue/useRevenueSsot';
+import { useClosedRevenueSummary, useHistoricalRevenueBySeller } from '@/hooks/revenue/useRevenueSsot';
+import { useHistoricalQualifiers } from '@/hooks/results/useHistoricalQualifiers';
+import { useActiveUsers } from '@/hooks/users/useActiveUsers';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import {
   DollarSign,
@@ -18,6 +21,7 @@ import {
   Ban,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
 
 interface OTEOverviewTabProps {
   results: OTEMonthlyResult[];
@@ -46,8 +50,23 @@ export function OTEOverviewTab({ results, records = [], isLoading, period, isOTE
     end: periodEnd,
   };
   const { data: ssotSummary, isError: ssotError } = useClosedRevenueSummary(ssotParams as any);
-  const { data: ssotBySeller = [] } = useRevenueBySeller(ssotParams as any);
-  const ssotBySellerMap = new Map(ssotBySeller.map((g) => [g.key, g.total]));
+  // Atribuição histórica imutável: vendedor no momento do ganho (não dono atual).
+  const { data: ssotBySeller = [] } = useHistoricalRevenueBySeller(ssotParams as any);
+  const ssotBySellerMap = new Map<string, { total: number; name: string }>(
+    ssotBySeller.map((g) => [g.key, { total: g.total, name: g.label }]),
+  );
+  // SDR histórico por qualificação (não dono atual do lead).
+  const { data: historicalQualifiers = [] } = useHistoricalQualifiers({
+    organizationId: organization?.id,
+    start: periodStart,
+    end: periodEnd,
+  });
+  const qualifierMap = new Map(historicalQualifiers.map((q) => [q.qualifierUserId, q.qualifiedLeads]));
+  // Usuários ativos da org (para badge Inativo/Excluído).
+  const { data: activeUsers = [] } = useActiveUsers();
+  const activeUserIds = new Set(activeUsers.map((u) => u.user_id));
+  const activeUserNameMap = new Map(activeUsers.map((u) => [u.user_id, u.full_name]));
+
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -312,11 +331,19 @@ export function OTEOverviewTab({ results, records = [], isLoading, period, isOTE
                 <tbody>
                   {revenueResults.map((result) => {
                     const eligible = eligiblePerSeller.get(result.id) ?? 0;
-                    const sellerCommercial = ssotBySellerMap.get(result.user_id) ?? 0;
+                    const sellerCommercial = ssotBySellerMap.get(result.user_id)?.total ?? 0;
+                    const isActive = activeUserIds.has(result.user_id);
                     return (
                       <tr key={result.id} className="border-b hover:bg-muted/50">
                         <td className="py-3 px-2 font-medium">
-                          {result.profile?.full_name || result.level_name_snapshot || result.user_id.slice(0, 8) + '...'}
+                          <span className="inline-flex items-center gap-2">
+                            {result.profile?.full_name || result.level_name_snapshot || result.user_id.slice(0, 8) + '...'}
+                            {!isActive && (
+                              <Badge variant="outline" className="text-[10px] uppercase tracking-wide border-muted-foreground/30 text-muted-foreground">
+                                Inativo
+                              </Badge>
+                            )}
+                          </span>
                         </td>
                         <td className="py-3 px-2">{result.level_name_snapshot || '-'}</td>
                         <td className="py-3 px-2 text-right">{formatCurrency(result.goal_amount)}</td>
@@ -333,7 +360,40 @@ export function OTEOverviewTab({ results, records = [], isLoading, period, isOTE
                       </tr>
                     );
                   })}
+                  {/* Vendedores históricos com receita no período mas sem ote_monthly_results
+                      (ex.: usuários excluídos/desligados após o fechamento). */}
+                  {Array.from(ssotBySellerMap.entries())
+                    .filter(([uid]) => !revenueResults.some((r) => r.user_id === uid))
+                    .filter(([, v]) => (v.total ?? 0) > 0)
+                    .sort((a, b) => b[1].total - a[1].total)
+                    .map(([uid, v]) => {
+                      const isActive = activeUserIds.has(uid);
+                      const name = activeUserNameMap.get(uid) || v.name || uid.slice(0, 8) + '...';
+                      return (
+                        <tr key={`hist-${uid}`} className="border-b hover:bg-muted/50 bg-muted/10">
+                          <td className="py-3 px-2 font-medium">
+                            <span className="inline-flex items-center gap-2">
+                              {name}
+                              <Badge variant="outline" className="text-[10px] uppercase tracking-wide border-destructive/40 text-destructive">
+                                {isActive ? 'Sem nível OTE' : 'Inativo'}
+                              </Badge>
+                            </span>
+                          </td>
+                          <td className="py-3 px-2 text-muted-foreground">—</td>
+                          <td className="py-3 px-2 text-right text-muted-foreground">—</td>
+                          <td className="py-3 px-2 text-right hidden lg:table-cell">{formatCurrency(v.total)}</td>
+                          <td className="py-3 px-2 text-right text-muted-foreground">—</td>
+                          <td className="py-3 px-2 text-right text-muted-foreground">—</td>
+                          <td className="py-3 px-2 text-center text-muted-foreground">—</td>
+                          <td className="py-3 px-2 text-right text-muted-foreground">—</td>
+                          <td className="py-3 px-2 text-center text-muted-foreground">—</td>
+                          <td className="py-3 px-2 text-right text-muted-foreground">—</td>
+                          <td className="py-3 px-2 text-right text-muted-foreground">—</td>
+                        </tr>
+                      );
+                    })}
                 </tbody>
+
                 <tfoot>
                   <tr className="bg-muted/30 font-semibold">
                     <td colSpan={3} className="py-3 px-2">SUBTOTAL CLOSERS</td>
@@ -379,25 +439,70 @@ export function OTEOverviewTab({ results, records = [], isLoading, period, isOTE
                   </tr>
                 </thead>
                 <tbody>
-                  {leadsResults.map((result) => (
-                    <tr key={result.id} className="border-b hover:bg-muted/50">
-                      <td className="py-3 px-2 font-medium">
-                        {result.profile?.full_name || result.level_name_snapshot || result.user_id.slice(0, 8) + '...'}
-                      </td>
-                      <td className="py-3 px-2">{result.level_name_snapshot || '-'}</td>
-                      <td className="py-3 px-2 text-right">{result.goal_amount}</td>
-                      <td className="py-3 px-2 text-right">{result.total_sales}</td>
-                      <td className="py-3 px-2 text-right">{result.achievement_percentage.toFixed(1)}%</td>
-                      <td className="py-3 px-2 text-center">{result.ote_multiplier}x</td>
-                      <td className="py-3 px-2 text-right">{formatCurrency(result.base_variable)}</td>
-                      <td className="py-3 px-2 text-center">{renderFlagBadge(result.flag_color)}</td>
-                      <td className="py-3 px-2 text-right">{renderAdjustment(result.final_adjustment_percentage)}</td>
-                      <td className="py-3 px-2 text-right font-semibold text-primary">
-                        {formatCurrency(result.final_variable_amount)}
-                      </td>
-                    </tr>
-                  ))}
+                  {leadsResults.map((result) => {
+                    const isActive = activeUserIds.has(result.user_id);
+                    // SDR histórico: usa qualifierMap se disponível, senão mantém total_sales calculado.
+                    const histLeads = qualifierMap.get(result.user_id);
+                    const qualifiedLeads = typeof histLeads === 'number' ? histLeads : result.total_sales;
+                    return (
+                      <tr key={result.id} className="border-b hover:bg-muted/50">
+                        <td className="py-3 px-2 font-medium">
+                          <span className="inline-flex items-center gap-2">
+                            {result.profile?.full_name || result.level_name_snapshot || result.user_id.slice(0, 8) + '...'}
+                            {!isActive && (
+                              <Badge variant="outline" className="text-[10px] uppercase tracking-wide border-muted-foreground/30 text-muted-foreground">
+                                Inativo
+                              </Badge>
+                            )}
+                          </span>
+                        </td>
+                        <td className="py-3 px-2">{result.level_name_snapshot || '-'}</td>
+                        <td className="py-3 px-2 text-right">{result.goal_amount}</td>
+                        <td className="py-3 px-2 text-right">{qualifiedLeads}</td>
+                        <td className="py-3 px-2 text-right">{result.achievement_percentage.toFixed(1)}%</td>
+                        <td className="py-3 px-2 text-center">{result.ote_multiplier}x</td>
+                        <td className="py-3 px-2 text-right">{formatCurrency(result.base_variable)}</td>
+                        <td className="py-3 px-2 text-center">{renderFlagBadge(result.flag_color)}</td>
+                        <td className="py-3 px-2 text-right">{renderAdjustment(result.final_adjustment_percentage)}</td>
+                        <td className="py-3 px-2 text-right font-semibold text-primary">
+                          {formatCurrency(result.final_variable_amount)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {/* SDRs históricos com qualificação no período mas sem ote_monthly_results
+                      (ex.: Ana excluída/transferida — leads continuam dela). */}
+                  {Array.from(qualifierMap.entries())
+                    .filter(([uid]) => !leadsResults.some((r) => r.user_id === uid))
+                    .filter(([, n]) => n > 0)
+                    .sort((a, b) => b[1] - a[1])
+                    .map(([uid, n]) => {
+                      const isActive = activeUserIds.has(uid);
+                      const name = activeUserNameMap.get(uid) || uid.slice(0, 8) + '...';
+                      return (
+                        <tr key={`hist-sdr-${uid}`} className="border-b hover:bg-muted/50 bg-muted/10">
+                          <td className="py-3 px-2 font-medium">
+                            <span className="inline-flex items-center gap-2">
+                              {name}
+                              <Badge variant="outline" className="text-[10px] uppercase tracking-wide border-destructive/40 text-destructive">
+                                {isActive ? 'Sem nível OTE' : 'Inativo'}
+                              </Badge>
+                            </span>
+                          </td>
+                          <td className="py-3 px-2 text-muted-foreground">—</td>
+                          <td className="py-3 px-2 text-right text-muted-foreground">—</td>
+                          <td className="py-3 px-2 text-right">{n}</td>
+                          <td className="py-3 px-2 text-right text-muted-foreground">—</td>
+                          <td className="py-3 px-2 text-center text-muted-foreground">—</td>
+                          <td className="py-3 px-2 text-right text-muted-foreground">—</td>
+                          <td className="py-3 px-2 text-center text-muted-foreground">—</td>
+                          <td className="py-3 px-2 text-right text-muted-foreground">—</td>
+                          <td className="py-3 px-2 text-right text-muted-foreground">—</td>
+                        </tr>
+                      );
+                    })}
                 </tbody>
+
                 <tfoot>
                   <tr className="bg-muted/30 font-semibold">
                     <td colSpan={3} className="py-3 px-2">SUBTOTAL PRÉ-VENDAS</td>

@@ -54,6 +54,31 @@ export function useRevenueBySeller(params: Partial<RevenueSsotParams> & { surfac
   });
 }
 
+/**
+ * Atribuição histórica imutável: usa a view `commercial_won_revenue_historical_view`,
+ * que resolve `seller_id` no momento do ganho (via opportunity_owner_history).
+ * Necessário para Resultados/OTE/Comissão — não usar `useRevenueBySeller` nesses
+ * contextos pois ela reflete o dono atual.
+ */
+export function useHistoricalRevenueBySeller(params: Partial<RevenueSsotParams> & { surface: string }) {
+  const enabled = Boolean(params.organizationId && params.start && params.end);
+  return useQuery<RevenueGroup[]>({
+    queryKey: [
+      SURFACE_PREFIX,
+      'historical-by-seller',
+      params.surface,
+      params.organizationId,
+      params.start,
+      params.end,
+      params.pipelineIds ?? null,
+    ],
+    enabled,
+    staleTime: 30_000,
+    queryFn: () => revenueSsotService.getHistoricalRevenueBySeller(params as RevenueSsotParams),
+  });
+}
+
+
 export function useRevenueByStage(params: Partial<RevenueSsotParams> & { surface: string }) {
   const enabled = Boolean(params.organizationId && params.start && params.end);
   return useQuery<RevenueGroup[]>({
