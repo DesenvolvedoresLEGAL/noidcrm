@@ -3,17 +3,18 @@ import { OTEMonthlyResult } from '@/hooks/useOTEData';
 import { useSalesConfig } from '@/hooks/useSalesConfig';
 import type { OTESalesRecord } from '@/hooks/useOTESalesRecords';
 import { aggregateEligible } from './oteEligibility';
-import { 
-  DollarSign, 
-  Target, 
-  TrendingUp, 
-  Users, 
-  Flag, 
-  Zap,
+import { FLAG_LABELS } from '@/lib/results/resultsMode';
+import {
+  DollarSign,
+  Target,
+  TrendingUp,
+  Users,
+  Flag,
   AlertTriangle,
   Users2,
   UserCheck,
-  Wallet
+  Wallet,
+  Ban,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -27,10 +28,10 @@ interface OTEOverviewTabProps {
 
 export function OTEOverviewTab({ results, records = [], isLoading, period, isOTEMode = true }: OTEOverviewTabProps) {
   const { config } = useSalesConfig();
-  
-  const flagBlueThreshold = config?.flag_blue_threshold ?? 100;
-  const flagYellowMinThreshold = config?.flag_yellow_min_threshold ?? 70;
-  const flagYellowMaxThreshold = config?.flag_yellow_max_threshold ?? 99.99;
+
+  const flagBlueThreshold = config?.flag_blue_threshold ?? 70;
+  const flagYellowMinThreshold = config?.flag_yellow_min_threshold ?? 50;
+  const flagYellowMaxThreshold = config?.flag_yellow_max_threshold ?? 69.99;
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -42,26 +43,29 @@ export function OTEOverviewTab({ results, records = [], isLoading, period, isOTE
   // Separate by type
   const teamResults = results.filter(r => r.is_team_target);
   const individualResults = results.filter(r => !r.is_team_target);
-  
+
   // Further split individuals by goal_type
   const revenueResults = individualResults.filter(r => (r.goal_type || 'revenue') === 'revenue');
   const leadsResults = individualResults.filter(r => r.goal_type === 'leads');
 
   // KPIs
   const totalToPay = results.reduce((sum, r) => sum + r.final_variable_amount, 0);
-  const totalRevenueGoal = revenueResults.reduce((sum, r) => sum + r.goal_amount, 0);
-  const avgRevenueAchievement = revenueResults.length > 0 
-    ? revenueResults.reduce((sum, r) => sum + r.achievement_percentage, 0) / revenueResults.length 
+  const avgRevenueAchievement = revenueResults.length > 0
+    ? revenueResults.reduce((sum, r) => sum + r.achievement_percentage, 0) / revenueResults.length
     : 0;
 
-  // Reconciliação Vendas Realizadas ⇄ OTE.
-  // - Receita válida comercial = soma dos sale_value (commercial_won_revenue_view),
-  //   restrita aos vendedores de revenue (closers individuais).
-  // - Receita elegível OTE = soma após excluir itens/produtos não elegíveis.
+  // Reconciliação: Comissão elegível comercial (SSoT) − Itens fora da meta = Receita elegível OTE.
   const revenueResultIds = new Set(revenueResults.map((r) => r.id));
   const revenueRecords = records.filter((r) => revenueResultIds.has(r.ote_result_id));
-  const { ssotTotal: validCommercialRevenue, eligibleTotal: eligibleOTERevenue, nonEligibleTotal: itemsOutOfGoal } =
+  const { ssotTotal: commercialEligible, eligibleTotal: oteEligible, nonEligibleTotal: itemsOutOfGoal } =
     aggregateEligible(revenueRecords);
+
+  // Eligible per seller (para a coluna "Receita elegível OTE" da tabela Closers).
+  const eligiblePerSeller = new Map<string, number>();
+  for (const r of revenueResults) {
+    const recs = records.filter((rec) => rec.ote_result_id === r.id);
+    eligiblePerSeller.set(r.id, aggregateEligible(recs).eligibleTotal);
+  }
 
   const blueFlags = results.filter(r => r.flag_color === 'blue').length;
   const yellowFlags = results.filter(r => r.flag_color === 'yellow').length;
@@ -95,7 +99,7 @@ export function OTEOverviewTab({ results, records = [], isLoading, period, isOTE
       flagColor === 'blue' && "bg-blue-500",
       flagColor === 'yellow' && "bg-yellow-500",
       flagColor === 'red' && "bg-red-500"
-    )}>
+    )} title={flagColor === 'blue' ? FLAG_LABELS.blue : flagColor === 'yellow' ? FLAG_LABELS.yellow : flagColor === 'red' ? FLAG_LABELS.red : undefined}>
       <Flag className="h-3 w-3 text-white" />
     </span>
   );
@@ -109,16 +113,21 @@ export function OTEOverviewTab({ results, records = [], isLoading, period, isOTE
     </span>
   );
 
+  // Validação de reconciliação OTE.
+  const reconciliationDelta = commercialEligible - itemsOutOfGoal - oteEligible;
+  const hasReconciliationIssue = Math.abs(reconciliationDelta) > 0.01 || oteEligible > commercialEligible + 0.01;
+
   return (
     <div className="space-y-6">
-      {/* KPI Cards */}
+      {/* KPI Cards (modo OTE) */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Total a Pagar</p>
+                <p className="text-sm text-muted-foreground">Total a pagar</p>
                 <p className="text-2xl font-bold text-primary">{formatCurrency(totalToPay)}</p>
+                <p className="text-xs text-muted-foreground">Variável final do período</p>
               </div>
               <Wallet className="h-8 w-8 text-primary/20" />
             </div>
@@ -129,11 +138,9 @@ export function OTEOverviewTab({ results, records = [], isLoading, period, isOTE
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Receita válida comercial</p>
-                <p className="text-2xl font-bold">{formatCurrency(validCommercialRevenue)}</p>
-                <p className="text-xs text-muted-foreground">
-                  Fonte: Vendas Realizadas (exclui canceladas/perdidas)
-                </p>
+                <p className="text-sm text-muted-foreground">Comissão elegível comercial</p>
+                <p className="text-2xl font-bold">{formatCurrency(commercialEligible)}</p>
+                <p className="text-xs text-muted-foreground">Fonte: Vendas Realizadas</p>
               </div>
               <DollarSign className="h-8 w-8 text-muted-foreground/20" />
             </div>
@@ -145,12 +152,8 @@ export function OTEOverviewTab({ results, records = [], isLoading, period, isOTE
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Receita elegível OTE</p>
-                <p className="text-2xl font-bold">{formatCurrency(eligibleOTERevenue)}</p>
-                <p className="text-xs text-muted-foreground">
-                  {itemsOutOfGoal > 0.01
-                    ? `Itens fora da meta: ${formatCurrency(itemsOutOfGoal)}`
-                    : `Meta total: ${formatCurrency(totalRevenueGoal)}`}
-                </p>
+                <p className="text-2xl font-bold">{formatCurrency(oteEligible)}</p>
+                <p className="text-xs text-muted-foreground">Após excluir itens fora da meta</p>
               </div>
               <TrendingUp className="h-8 w-8 text-muted-foreground/20" />
             </div>
@@ -161,10 +164,11 @@ export function OTEOverviewTab({ results, records = [], isLoading, period, isOTE
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Média % Meta (Closers)</p>
-                <p className="text-2xl font-bold">{avgRevenueAchievement.toFixed(1)}%</p>
+                <p className="text-sm text-muted-foreground">Itens fora da meta</p>
+                <p className="text-2xl font-bold">{formatCurrency(itemsOutOfGoal)}</p>
+                <p className="text-xs text-muted-foreground">Produtos, serviços, logística e taxas</p>
               </div>
-              <Target className="h-8 w-8 text-muted-foreground/20" />
+              <Ban className="h-8 w-8 text-muted-foreground/20" />
             </div>
           </CardContent>
         </Card>
@@ -173,14 +177,12 @@ export function OTEOverviewTab({ results, records = [], isLoading, period, isOTE
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Equipe</p>
+                <p className="text-sm text-muted-foreground">Vendedores no cálculo</p>
                 <div className="flex items-baseline gap-2">
                   <p className="text-2xl font-bold">{individualResults.length}</p>
                   <span className="text-sm text-muted-foreground">vendedores</span>
                 </div>
-                {teamResults.length > 0 && (
-                  <p className="text-xs text-muted-foreground">{teamResults.length} gestor(es)</p>
-                )}
+                <p className="text-xs text-muted-foreground">Closers, pré-vendas e funções configuradas</p>
               </div>
               <Users className="h-8 w-8 text-muted-foreground/20" />
             </div>
@@ -188,13 +190,34 @@ export function OTEOverviewTab({ results, records = [], isLoading, period, isOTE
         </Card>
       </div>
 
-      {/* Flag Summary */}
+      {/* Faixa de reconciliação OTE */}
+      <Card className={cn(hasReconciliationIssue && 'border-destructive/40 bg-destructive/5')}>
+        <CardContent className="py-3 text-sm flex flex-wrap items-center gap-2">
+          <span className="font-medium">Reconciliação OTE:</span>
+          <span>{formatCurrency(commercialEligible)}</span>
+          <span className="text-muted-foreground">(comercial)</span>
+          <span>−</span>
+          <span>{formatCurrency(itemsOutOfGoal)}</span>
+          <span className="text-muted-foreground">(fora da meta)</span>
+          <span>=</span>
+          <span className="font-semibold">{formatCurrency(oteEligible)}</span>
+          <span className="text-muted-foreground">(elegível OTE)</span>
+          {hasReconciliationIssue && (
+            <span className="ml-2 inline-flex items-center gap-1 text-destructive">
+              <AlertTriangle className="h-4 w-4" />
+              Divergência detectada — recalcule o período ou revise itens sem regra de meta.
+            </span>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Flag Summary com labels executivos */}
       <div className="grid grid-cols-3 gap-4">
         <Card className="border-l-4 border-l-blue-500">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Blue Flag</p>
+                <p className="text-sm text-muted-foreground">{FLAG_LABELS.blue}</p>
                 <p className="text-3xl font-bold text-blue-500">{blueFlags}</p>
                 <p className="text-xs text-muted-foreground">≥ {flagBlueThreshold}% da meta</p>
               </div>
@@ -207,9 +230,9 @@ export function OTEOverviewTab({ results, records = [], isLoading, period, isOTE
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Yellow Flag</p>
+                <p className="text-sm text-muted-foreground">{FLAG_LABELS.yellow}</p>
                 <p className="text-3xl font-bold text-yellow-500">{yellowFlags}</p>
-                <p className="text-xs text-muted-foreground">{flagYellowMinThreshold}% - {flagYellowMaxThreshold}% da meta</p>
+                <p className="text-xs text-muted-foreground">{flagYellowMinThreshold}% – {flagYellowMaxThreshold}% da meta</p>
               </div>
               <Flag className="h-10 w-10 text-yellow-500/30" />
             </div>
@@ -220,7 +243,7 @@ export function OTEOverviewTab({ results, records = [], isLoading, period, isOTE
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Red Flag</p>
+                <p className="text-sm text-muted-foreground">{FLAG_LABELS.red}</p>
                 <p className="text-3xl font-bold text-red-500">{redFlags}</p>
                 <p className="text-xs text-muted-foreground">&lt; {flagYellowMinThreshold}% da meta</p>
               </div>
@@ -229,6 +252,79 @@ export function OTEOverviewTab({ results, records = [], isLoading, period, isOTE
           </CardContent>
         </Card>
       </div>
+
+      {/* Closers / Revenue Table */}
+      {revenueResults.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5" />
+              Closers (Meta em R$)
+              <span className="ml-auto text-xs font-normal text-muted-foreground">
+                Média % Meta: {avgRevenueAchievement.toFixed(1)}%
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-3 px-2">Vendedor</th>
+                    <th className="text-left py-3 px-2">Nível</th>
+                    <th className="text-right py-3 px-2">Meta (R$)</th>
+                    <th className="text-right py-3 px-2 hidden lg:table-cell">Comissão elegível comercial</th>
+                    <th className="text-right py-3 px-2">Receita elegível OTE</th>
+                    <th className="text-right py-3 px-2">% Meta</th>
+                    <th className="text-center py-3 px-2">Mult.</th>
+                    <th className="text-right py-3 px-2">Base</th>
+                    <th className="text-center py-3 px-2">Flag</th>
+                    <th className="text-right py-3 px-2">Acelerador</th>
+                    <th className="text-right py-3 px-2 font-semibold">Variável Final</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {revenueResults.map((result) => {
+                    const eligible = eligiblePerSeller.get(result.id) ?? 0;
+                    return (
+                      <tr key={result.id} className="border-b hover:bg-muted/50">
+                        <td className="py-3 px-2 font-medium" title={`Comissão elegível comercial: ${formatCurrency(result.total_sales)}`}>
+                          {result.profile?.full_name || result.level_name_snapshot || result.user_id.slice(0, 8) + '...'}
+                        </td>
+                        <td className="py-3 px-2">{result.level_name_snapshot || '-'}</td>
+                        <td className="py-3 px-2 text-right">{formatCurrency(result.goal_amount)}</td>
+                        <td className="py-3 px-2 text-right hidden lg:table-cell text-muted-foreground">{formatCurrency(result.total_sales)}</td>
+                        <td className="py-3 px-2 text-right">{formatCurrency(eligible)}</td>
+                        <td className="py-3 px-2 text-right">{result.achievement_percentage.toFixed(1)}%</td>
+                        <td className="py-3 px-2 text-center">{result.ote_multiplier}x</td>
+                        <td className="py-3 px-2 text-right">{formatCurrency(result.base_variable)}</td>
+                        <td className="py-3 px-2 text-center">{renderFlagBadge(result.flag_color)}</td>
+                        <td className="py-3 px-2 text-right">{renderAdjustment(result.final_adjustment_percentage)}</td>
+                        <td className="py-3 px-2 text-right font-semibold text-primary">
+                          {formatCurrency(result.final_variable_amount)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr className="bg-muted/30 font-semibold">
+                    <td colSpan={3} className="py-3 px-2">SUBTOTAL CLOSERS</td>
+                    <td className="py-3 px-2 text-right hidden lg:table-cell">{formatCurrency(commercialEligible)}</td>
+                    <td className="py-3 px-2 text-right">{formatCurrency(oteEligible)}</td>
+                    <td colSpan={5} className="py-3 px-2"></td>
+                    <td className="py-3 px-2 text-right text-primary">
+                      {formatCurrency(revenueResults.reduce((sum, r) => sum + r.final_variable_amount, 0))}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+
 
       {/* Closers / Revenue Table */}
       {revenueResults.length > 0 && (

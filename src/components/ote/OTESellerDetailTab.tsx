@@ -143,7 +143,7 @@ export function OTESellerDetailTab({ results, isLoading, isOTEMode = true }: OTE
                             </div>
                             <div>
                               <p className="text-muted-foreground">
-                                {isLeads ? 'Leads Qualificados' : 'Elegível p/ meta'}
+                                {isLeads ? 'Leads Qualificados' : 'Receita elegível OTE'}
                               </p>
                               <p className="font-semibold">
                                 {isLeads
