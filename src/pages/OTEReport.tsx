@@ -66,21 +66,23 @@ export default function OTEReport() {
       return;
     }
     try {
-      const wb = buildOTEWorkbook({
+      const wb = buildResultsWorkbook({
+        mode,
         periodMonth: selectedPeriod,
         organizationName: organization?.name,
         exporterName: (profile as any)?.full_name,
         results,
         records,
       });
-      downloadOTEWorkbook(wb, selectedPeriod);
-      toast.success('Relatório OTE exportado.');
+      downloadResultsWorkbook(wb, mode, selectedPeriod);
+      toast.success('Relatório exportado.');
     } catch (e) {
-      console.error('OTE export error:', e);
+      console.error('Results export error:', e);
       toast.error('Erro ao gerar Excel.');
     }
   };
 
+  const loading = isLoading || isLoadingOrg || isPending;
 
   return (
     <Layout>
@@ -88,14 +90,11 @@ export default function OTEReport() {
         {/* Header */}
         <div className="p-4 md:px-6 md:pt-6 md:pb-4 border-b">
           <PageHeader
-            icon={isOTEMode ? DollarSign : Target}
-            title={isOTEMode ? 'Relatório OTE' : 'Metas e Resultados'}
-            subtitle={isOTEMode 
-              ? 'On Target Earnings - Comissões e Variáveis'
-              : 'Acompanhamento de metas individuais e de time'
-            }
+            icon={headerIcon}
+            title={copy.pageTitle}
+            subtitle={copy.pageSubtitle}
             variant="emerald"
-            badge={{ label: 'OTE', icon: Calculator }}
+            badge={{ label: copy.badgeLabel, icon: badgeIcon }}
             actions={
               <div className="flex items-center gap-3">
                 <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
@@ -148,21 +147,39 @@ export default function OTEReport() {
             </TabsList>
 
             <TabsContent value="overview">
-              <OTEOverviewTab 
-                results={results || []} 
-                records={records}
-                isLoading={isLoading || isLoadingOrg || isPending} 
-                period={selectedPeriod}
-                isOTEMode={isOTEMode}
-              />
+              {isCommissionMode ? (
+                <CommissionOverviewTab results={results || []} records={records} isLoading={loading} />
+              ) : isSimpleMode ? (
+                <SimpleGoalsOverviewTab results={results || []} records={records} isLoading={loading} />
+              ) : (
+                <OTEOverviewTab 
+                  results={results || []} 
+                  records={records}
+                  isLoading={loading} 
+                  period={selectedPeriod}
+                  isOTEMode={isOTEMode}
+                />
+              )}
             </TabsContent>
 
             <TabsContent value="sellers">
-              <OTESellerDetailTab results={results || []} isLoading={isLoading || isLoadingOrg || isPending} isOTEMode={isOTEMode} />
+              {isCommissionMode ? (
+                <CommissionSellerDetailTab results={results || []} records={records} isLoading={loading} />
+              ) : isSimpleMode ? (
+                <SimpleGoalsSellerDetailTab results={results || []} records={records} isLoading={loading} />
+              ) : (
+                <OTESellerDetailTab results={results || []} isLoading={loading} isOTEMode={isOTEMode} />
+              )}
             </TabsContent>
 
             <TabsContent value="history">
-              <OTEHistoryTab />
+              {isCommissionMode ? (
+                <CommissionHistoryTab />
+              ) : isSimpleMode ? (
+                <SimpleGoalsHistoryTab />
+              ) : (
+                <OTEHistoryTab />
+              )}
             </TabsContent>
           </Tabs>
         </div>
@@ -170,3 +187,4 @@ export default function OTEReport() {
     </Layout>
   );
 }
+
