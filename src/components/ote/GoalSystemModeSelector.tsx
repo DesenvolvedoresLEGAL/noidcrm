@@ -15,7 +15,7 @@ export function GoalSystemModeSelector() {
 
   const currentMode = organization?.goal_system_mode || 'ote';
 
-  const handleModeChange = async (mode: 'ote' | 'simple') => {
+  const handleModeChange = async (mode: 'ote' | 'simple' | 'standard_commission') => {
     if (!organization?.id || mode === currentMode) return;
 
     setIsUpdating(true);
@@ -28,9 +28,11 @@ export function GoalSystemModeSelector() {
       if (error) throw error;
 
       toast.success(
-        mode === 'ote' 
-          ? 'Sistema OTE completo ativado' 
-          : 'Modo Metas Simples ativado'
+        mode === 'ote'
+          ? 'Sistema OTE completo ativado'
+          : mode === 'standard_commission'
+            ? 'Modo Comissão Padrão ativado'
+            : 'Modo Metas Simples ativado'
       );
       
       // AUTH.1.4: substituído reload automático por invalidação reativa de cache.
