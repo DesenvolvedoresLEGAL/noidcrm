@@ -1,6 +1,7 @@
 /**
  * P0 SSoT — Tabela read-only de Vendas Realizadas.
  * Fonte: commercial_won_revenue_view.
+ * SPRINT REL V2.10 — Receita Válida vs Aprovada vs Cancelada.
  */
 import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,22 +10,21 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useVendasRealizadas, isExcludedFromGoal, type VendasRealizadasFilters, type VendaRealizadaRow } from '@/hooks/reports/useVendasRealizadas';
+import {
+  useVendasRealizadas,
+  isExcludedFromGoal,
+  type VendasRealizadasFilters,
+  type VendaRealizadaRow,
+  type SaleStatusFilter,
+  type FinancialStatusFilter,
+} from '@/hooks/reports/useVendasRealizadas';
 import { useReportFiltersContext } from '@/contexts/ReportFiltersContext';
 import { useActiveUsers } from '@/hooks/users/useActiveUsers';
 import { useOrganizationPipelines } from '@/hooks/useOrganizationPipelines';
+import { AlertTriangle, ShieldCheck, ShieldAlert, Ban } from 'lucide-react';
 
-const formatCurrency = (n: number) =>
+const fmt = (n: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(n) || 0);
-import { AlertTriangle, ShieldCheck, ShieldAlert } from 'lucide-react';
-
-function fmt(n: number) {
-  try {
-    return formatCurrency(n);
-  } catch {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n || 0);
-  }
-}
 
 export function VendasRealizadasTable() {
   const { effectiveDates } = useReportFiltersContext();
@@ -34,11 +34,13 @@ export function VendasRealizadasTable() {
   const [sellerUserId, setSellerUserId] = useState<string | undefined>(undefined);
   const [pipelineId, setPipelineId] = useState<string | undefined>(undefined);
   const [revenueType, setRevenueType] = useState<'all' | 'one_time' | 'mrr' | 'mixed'>('all');
-  const [commissionStatus, setCommissionStatus] = useState<'all' | 'eligible' | 'blocked_review_required' | 'blocked_settlement_pending'>('all');
+  const [commissionStatus, setCommissionStatus] = useState<
+    'all' | 'eligible' | 'blocked_review_required' | 'blocked_settlement_pending' | 'blocked_cancelled'
+  >('all');
+  const [saleStatus, setSaleStatus] = useState<SaleStatusFilter>('all');
+  const [financialStatus, setFinancialStatus] = useState<FinancialStatusFilter>('all');
 
   const filters: VendasRealizadasFilters = useMemo(() => {
-    // HOTFIX: expandir para limites de dia, senão vendas com won_at>00:00 do
-    // dia final ficam fora do filtro (a view usa won_at BETWEEN start AND end).
     const start = new Date(`${effectiveDates.startDate}T00:00:00.000Z`).toISOString();
     const end = new Date(`${effectiveDates.endDate}T23:59:59.999Z`).toISOString();
     return {
@@ -48,8 +50,10 @@ export function VendasRealizadasTable() {
       pipelineId: pipelineId || null,
       revenueType,
       commissionStatus,
+      saleStatus,
+      financialStatus,
     };
-  }, [effectiveDates, sellerUserId, pipelineId, revenueType, commissionStatus]);
+  }, [effectiveDates, sellerUserId, pipelineId, revenueType, commissionStatus, saleStatus, financialStatus]);
 
   const { data, isLoading, error } = useVendasRealizadas(filters);
 
@@ -78,30 +82,35 @@ export function VendasRealizadasTable() {
       <Alert>
         <ShieldCheck className="h-4 w-4" />
         <AlertDescription className="text-sm">
-          Fonte oficial: <code className="font-mono">commercial_won_revenue_view</code>. Esta tela é a verdade financeira de vendas realizadas. Outras telas (Dashboard, Forecast, Win/Loss, Comissão) devem reconciliar com este total no mesmo período.
+          Fonte oficial: <code className="font-mono">commercial_won_revenue_view</code>. Venda aprovada que foi cancelada
+          depois NÃO entra em Receita Válida, Meta, Comissão Elegível nem Ticket Médio Válido — mas continua visível na tabela,
+          marcada como Cancelada.
         </AlertDescription>
       </Alert>
 
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
-        <KPI label="Receita Total" value={fmt(totals?.commercial_amount ?? 0)} />
-        <KPI label="Elegível p/ meta" value={fmt(totals?.goal_eligible_amount ?? 0)} variant="success" />
+        <KPI label="Receita Válida" value={fmt(totals?.valid_revenue_amount ?? 0)} variant="success" highlight />
+        <KPI label="Receita Aprovada" value={fmt(totals?.approved_amount ?? 0)} />
         <KPI
-          label={`Excluído da meta${totals?.goal_excluded_count ? ` (${totals.goal_excluded_count})` : ''}`}
-          value={fmt(totals?.goal_excluded_amount ?? 0)}
-          variant={totals && totals.goal_excluded_amount > 0 ? 'warning' : undefined}
+          label="Receita Cancelada"
+          value={fmt(totals?.cancelled_amount ?? 0)}
+          variant={totals && totals.cancelled_amount > 0 ? 'warning' : undefined}
         />
-        <KPI label="Novo MRR" value={fmt(totals?.mrr_amount ?? 0)} />
-        <KPI label="Vendas" value={String(totals?.won_count ?? 0)} />
-        <KPI label="Ticket Médio" value={fmt(totals?.avg_ticket ?? 0)} />
+        <KPI label="Receita Liquidada" value={fmt(totals?.liquidated_amount ?? 0)} />
+        <KPI label="Vendas Válidas" value={String(totals?.valid_count ?? 0)} />
+        <KPI
+          label="Vendas Canceladas"
+          value={String(totals?.cancelled_count ?? 0)}
+          variant={totals && totals.cancelled_count > 0 ? 'warning' : undefined}
+        />
+        <KPI label="Ticket Médio Válido" value={fmt(totals?.valid_avg_ticket ?? 0)} />
         <KPI label="Comissão Elegível" value={fmt(totals?.eligible_commission ?? 0)} variant="success" />
-        <KPI label="Aguardando Settlement" value={fmt(totals?.settlement_pending_commission ?? 0)} variant="warning" />
       </div>
-
 
       {/* Filtros */}
       <Card>
-        <CardContent className="pt-4 grid grid-cols-1 md:grid-cols-4 gap-3">
+        <CardContent className="pt-4 grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-3">
           <Select value={sellerUserId ?? 'all'} onValueChange={(v) => setSellerUserId(v === 'all' ? undefined : v)}>
             <SelectTrigger><SelectValue placeholder="Vendedor" /></SelectTrigger>
             <SelectContent>
@@ -129,14 +138,32 @@ export function VendasRealizadasTable() {
               <SelectItem value="mixed">Mista (Avulsa + MRR)</SelectItem>
             </SelectContent>
           </Select>
+          <Select value={saleStatus} onValueChange={(v: any) => setSaleStatus(v)}>
+            <SelectTrigger><SelectValue placeholder="Status da Venda" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas as vendas</SelectItem>
+              <SelectItem value="valid">Válidas</SelectItem>
+              <SelectItem value="cancelled">Canceladas</SelectItem>
+              <SelectItem value="review">Em revisão</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={financialStatus} onValueChange={(v: any) => setFinancialStatus(v)}>
+            <SelectTrigger><SelectValue placeholder="Status Financeiro" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas situações</SelectItem>
+              <SelectItem value="settled">Liquidada</SelectItem>
+              <SelectItem value="pending">Pendente de Liquidação</SelectItem>
+              <SelectItem value="cancelled">Cancelada</SelectItem>
+            </SelectContent>
+          </Select>
           <Select value={commissionStatus} onValueChange={(v: any) => setCommissionStatus(v)}>
             <SelectTrigger><SelectValue placeholder="Comissão" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas comissões</SelectItem>
               <SelectItem value="eligible">Elegíveis</SelectItem>
               <SelectItem value="blocked_review_required">Em revisão</SelectItem>
-              <SelectItem value="blocked_settlement_pending">Aguardando settlement</SelectItem>
-
+              <SelectItem value="blocked_settlement_pending">Pendente</SelectItem>
+              <SelectItem value="blocked_cancelled">Bloqueada (cancelada)</SelectItem>
             </SelectContent>
           </Select>
         </CardContent>
@@ -157,13 +184,13 @@ export function VendasRealizadasTable() {
                 <TableHead>Vendedor</TableHead>
                 <TableHead className="text-right">Avulsa</TableHead>
                 <TableHead className="text-right">MRR</TableHead>
-                <TableHead className="text-right">Total Comercial</TableHead>
-                <TableHead>Meta</TableHead>
-                <TableHead>Comercial</TableHead>
-                <TableHead>Operacional</TableHead>
-                <TableHead>Settlement</TableHead>
+                <TableHead className="text-right">Aprovado</TableHead>
+                <TableHead className="text-right">Receita Válida</TableHead>
+                <TableHead>Status Venda</TableHead>
+                <TableHead>Status Entrega</TableHead>
+                <TableHead>Status Financeiro</TableHead>
                 <TableHead>Comissão</TableHead>
-                <TableHead>Confiança</TableHead>
+                <TableHead>Auditoria</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -175,9 +202,11 @@ export function VendasRealizadasTable() {
                 </TableRow>
               )}
               {rows.map((r) => {
-                const excluded = isExcludedFromGoal(r);
+                const cancelled = r.is_cancelled_sale === true || isExcludedFromGoal(r);
+                const approved = Number(r.approved_amount ?? r.commercial_amount) || 0;
+                const valid = Number(r.valid_revenue_amount ?? (cancelled ? 0 : approved)) || 0;
                 return (
-                  <TableRow key={r.opportunity_id} className={excluded ? 'opacity-80' : ''}>
+                  <TableRow key={r.opportunity_id} className={cancelled ? 'opacity-80' : ''}>
                     <TableCell className="whitespace-nowrap text-xs">
                       {r.won_at ? new Date(r.won_at).toLocaleDateString('pt-BR') : '—'}
                     </TableCell>
@@ -188,21 +217,20 @@ export function VendasRealizadasTable() {
                     <TableCell className="text-sm">{r.seller_name ?? '—'}</TableCell>
                     <TableCell className="text-right tabular-nums">{fmt(Number(r.one_shot_amount) || 0)}</TableCell>
                     <TableCell className="text-right tabular-nums">{fmt(Number(r.mrr_amount) || 0)}</TableCell>
-                    <TableCell className={`text-right tabular-nums font-semibold ${excluded ? 'line-through text-muted-foreground' : ''}`}>
-                      {fmt(Number(r.commercial_amount) || 0)}
+                    <TableCell className={`text-right tabular-nums ${cancelled ? 'line-through text-muted-foreground' : ''}`}>
+                      {fmt(approved)}
                     </TableCell>
-                    <TableCell><GoalBadge row={r} /></TableCell>
-                    <TableCell><CommercialStatusBadge status={r.commercial_status} /></TableCell>
-                    <TableCell><FulfillmentBadge status={r.fulfillment_status} /></TableCell>
-                    <TableCell><SettlementBadge status={r.financial_settlement_status} /></TableCell>
-                    <TableCell><CommissionBadge status={r.commission_status} /></TableCell>
-                    <TableCell>
-                      <ConfidenceBadge confidence={r.revenue_confidence} reviewRequired={r.review_required} />
+                    <TableCell className={`text-right tabular-nums font-semibold ${cancelled ? 'text-muted-foreground' : 'text-emerald-700 dark:text-emerald-400'}`}>
+                      {fmt(valid)}
                     </TableCell>
+                    <TableCell><SaleStatusBadge row={r} /></TableCell>
+                    <TableCell><DeliveryStatusBadge row={r} /></TableCell>
+                    <TableCell><FinancialStatusBadge row={r} /></TableCell>
+                    <TableCell><CommissionBadge row={r} /></TableCell>
+                    <TableCell><AuditBadge row={r} /></TableCell>
                   </TableRow>
                 );
               })}
-
             </TableBody>
           </Table>
         </CardContent>
@@ -211,94 +239,101 @@ export function VendasRealizadasTable() {
   );
 }
 
-function KPI({ label, value, variant }: { label: string; value: string; variant?: 'success' | 'warning' }) {
+function KPI({
+  label,
+  value,
+  variant,
+  highlight,
+}: {
+  label: string;
+  value: string;
+  variant?: 'success' | 'warning';
+  highlight?: boolean;
+}) {
   return (
-    <Card>
+    <Card className={highlight ? 'border-emerald-500/40 bg-emerald-500/5' : ''}>
       <CardContent className="pt-4">
         <div className="text-xs text-muted-foreground">{label}</div>
-        <div className={
-          'text-lg font-semibold tabular-nums ' +
-          (variant === 'success' ? 'text-emerald-600' : variant === 'warning' ? 'text-amber-600' : '')
-        }>{value}</div>
+        <div
+          className={
+            (highlight ? 'text-xl ' : 'text-lg ') +
+            'font-semibold tabular-nums ' +
+            (variant === 'success' ? 'text-emerald-600' : variant === 'warning' ? 'text-amber-600' : '')
+          }
+        >
+          {value}
+        </div>
       </CardContent>
     </Card>
   );
 }
 
-function ConfidenceBadge({ confidence, reviewRequired }: { confidence: string; reviewRequired: boolean }) {
-  if (reviewRequired || confidence === 'manual_review') {
-    return <Badge variant="destructive" className="gap-1"><ShieldAlert className="h-3 w-3" />Review</Badge>;
+function SaleStatusBadge({ row }: { row: VendaRealizadaRow }) {
+  const cancelled = row.is_cancelled_sale === true || isExcludedFromGoal(row);
+  if (cancelled) {
+    const reason = row.cancellation_reason === 'reopened_lost' ? 'Reaberta como perdida' : 'Cancelada após aprovação';
+    return (
+      <Badge variant="destructive" className="text-[10px] gap-1" title={reason}>
+        <Ban className="h-3 w-3" />
+        {row.cancellation_reason === 'reopened_lost' ? 'Reaberta' : 'Cancelada'}
+      </Badge>
+    );
   }
-  if (confidence === 'warning') {
-    return <Badge variant="secondary" className="gap-1"><AlertTriangle className="h-3 w-3" />Warning</Badge>;
+  if (row.review_required) {
+    return <Badge variant="secondary" className="text-[10px]">Em revisão</Badge>;
   }
-  return <Badge variant="outline" className="gap-1"><ShieldCheck className="h-3 w-3" />Trusted</Badge>;
+  return <Badge variant="default" className="text-[10px]">{row.sale_status_label ?? 'Aprovada'}</Badge>;
 }
 
-function GoalBadge({ row }: { row: VendaRealizadaRow }) {
-  if (!isExcludedFromGoal(row)) {
-    return <Badge variant="outline" className="text-[10px] gap-1"><ShieldCheck className="h-3 w-3" />Conta meta</Badge>;
-  }
-  const f = (row.fulfillment_status ?? '').toLowerCase();
-  const c = (row.commercial_status ?? '').toLowerCase();
-  const reason =
-    c === 'lost'
-      ? 'Reaberta e marcada como perdida'
-      : f === 'cancelled'
-        ? 'Cancelada após aprovação'
-        : 'Removida após aprovação';
-  return (
-    <Badge variant="destructive" className="text-[10px] gap-1" title={`Excluída da meta — ${reason}`}>
-      <AlertTriangle className="h-3 w-3" />Excluída
-    </Badge>
-  );
-}
-
-function CommercialStatusBadge({ status }: { status?: string | null }) {
-  if (status === 'won') return <Badge variant="default" className="text-[10px]">Ganha</Badge>;
-  if (status === 'lost') return <Badge variant="destructive" className="text-[10px]">Perdida</Badge>;
-  return <Badge variant="outline" className="text-[10px]">{status ?? '—'}</Badge>;
-}
-
-const FULFILLMENT_LABEL: Record<string, string> = {
-  active: 'Ativo',
-  completed: 'Concluído',
-  cancelled: 'Cancelado',
-  removed: 'Removido',
-  not_started: 'Não iniciado',
-  not_applicable: 'N/A',
+const DELIVERY_LABEL: Record<string, string> = {
+  active: 'Em execução',
+  completed: 'Entregue',
+  cancelled: 'Cancelada',
+  removed: 'Removida',
+  not_started: 'Pendente',
+  not_applicable: 'Não aplicável',
 };
-function FulfillmentBadge({ status }: { status?: string | null }) {
-  if (!status) return <span className="text-xs text-muted-foreground">—</span>;
+function DeliveryStatusBadge({ row }: { row: VendaRealizadaRow }) {
+  const s = row.fulfillment_status;
+  if (!s) return <span className="text-xs text-muted-foreground">—</span>;
+  const label = row.delivery_status_label ?? DELIVERY_LABEL[s] ?? s;
   const variant: any =
-    status === 'completed' || status === 'active' ? 'default'
-    : status === 'removed' || status === 'cancelled' ? 'destructive'
-    : 'secondary';
-  return <Badge variant={variant} className="text-[10px]">{FULFILLMENT_LABEL[status] ?? status}</Badge>;
+    s === 'completed' ? 'default'
+    : s === 'active' ? 'secondary'
+    : s === 'removed' || s === 'cancelled' ? 'destructive'
+    : 'outline';
+  return <Badge variant={variant} className="text-[10px]">{label}</Badge>;
 }
 
-const SETTLEMENT_LABEL: Record<string, string> = {
-  settled: 'Liquidado',
-  pending_payment: 'Aguard. pagamento',
-  pending_settlement_decision: 'Aguard. decisão',
-  pending_cancellation_fee: 'Aguard. multa',
-  pending_credit_decision: 'Aguard. crédito',
-  manual_review: 'Revisão manual',
-};
-function SettlementBadge({ status }: { status?: string | null }) {
+function FinancialStatusBadge({ row }: { row: VendaRealizadaRow }) {
+  const cancelled = row.is_cancelled_sale === true || isExcludedFromGoal(row);
+  if (cancelled) return <Badge variant="destructive" className="text-[10px]">Cancelada</Badge>;
+  const fs = row.financial_settlement_status;
+  if (!fs) return <span className="text-xs text-muted-foreground">—</span>;
+  if (fs === 'settled') return <Badge variant="default" className="text-[10px]">Liquidada</Badge>;
+  if (fs === 'manual_review') return <Badge variant="destructive" className="text-[10px]">Em revisão</Badge>;
+  return <Badge variant="secondary" className="text-[10px]">Pendente de Liquidação</Badge>;
+}
+
+function CommissionBadge({ row }: { row: VendaRealizadaRow }) {
+  const status = row.commission_status;
   if (!status) return <span className="text-xs text-muted-foreground">—</span>;
-  const variant: any = status === 'settled' ? 'default' : status === 'manual_review' ? 'destructive' : 'secondary';
-  return <Badge variant={variant} className="text-[10px]">{SETTLEMENT_LABEL[status] ?? status}</Badge>;
+  const map: Record<string, { label: string; variant: any }> = {
+    eligible: { label: 'Elegível', variant: 'default' },
+    blocked_review_required: { label: 'Em revisão', variant: 'destructive' },
+    blocked_settlement_pending: { label: 'Pendente', variant: 'secondary' },
+    blocked_cancelled: { label: 'Bloqueada', variant: 'destructive' },
+  };
+  const m = map[status] ?? { label: status, variant: 'outline' };
+  return <Badge variant={m.variant} className="text-[10px]">{m.label}</Badge>;
 }
 
-const COMMISSION_LABEL: Record<string, string> = {
-  eligible: 'Elegível',
-  blocked_review_required: 'Em revisão',
-  blocked_settlement_pending: 'Aguard. settlement',
-};
-function CommissionBadge({ status }: { status?: string | null }) {
-  if (!status) return <span className="text-xs text-muted-foreground">—</span>;
-  const variant: any = status === 'eligible' ? 'default' : status === 'blocked_review_required' ? 'destructive' : 'secondary';
-  return <Badge variant={variant} className="text-[10px]">{COMMISSION_LABEL[status] ?? status}</Badge>;
+function AuditBadge({ row }: { row: VendaRealizadaRow }) {
+  if (row.review_required || row.revenue_confidence === 'manual_review') {
+    return <Badge variant="destructive" className="gap-1 text-[10px]"><ShieldAlert className="h-3 w-3" />Revisar</Badge>;
+  }
+  if (row.revenue_confidence === 'warning') {
+    return <Badge variant="secondary" className="gap-1 text-[10px]"><AlertTriangle className="h-3 w-3" />Atenção</Badge>;
+  }
+  return <Badge variant="outline" className="gap-1 text-[10px]"><ShieldCheck className="h-3 w-3" />OK</Badge>;
 }
-
