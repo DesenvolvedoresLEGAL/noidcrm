@@ -240,25 +240,46 @@ serve(async (req) => {
           console.log(`No team found for manager ${config.user_id}`);
         }
       } else {
-        // Individual target - get only this seller's opportunities, filtered by pipeline type
-        let indQuery = supabase
-          .from('opportunities')
-          .select('id, valor_previsto, commission_value, title, closed_at, updated_at, pipeline_id, account:accounts(razao_social, nome_fantasia)')
-          .eq('organization_id', organizationId)
-          .eq('owner_user_id', config.user_id)
-          .eq('status', 'won');
-
-        if (relevantPipelineIds.length > 0) {
-          indQuery = indQuery.in('pipeline_id', relevantPipelineIds);
+        if (goalType === 'leads') {
+          const { data: qualRows } = await supabase
+            .from('opportunity_qualification_history')
+            .select('opportunity_id, qualification_at')
+            .eq('organization_id', organizationId)
+            .eq('qualified_by_user_id', config.user_id)
+            .gte('qualification_at', startDate)
+            .lte('qualification_at', endDate);
+          const oppIds = Array.from(new Set((qualRows || []).map((r: any) => r.opportunity_id).filter(Boolean)));
+          if (oppIds.length > 0) {
+            const { data: qualOpps } = await supabase
+              .from('opportunities')
+              .select('id, valor_previsto, commission_value, title, closed_at, updated_at, pipeline_id, account:accounts(razao_social, nome_fantasia)')
+              .eq('organization_id', organizationId)
+              .in('id', oppIds);
+            const qualAtMap = new Map((qualRows || []).map((r: any) => [r.opportunity_id, r.qualification_at]));
+            opportunities = (qualOpps || []).map((opp: any) => ({
+              ...opp,
+              closed_at: qualAtMap.get(opp.id) || opp.closed_at || opp.updated_at,
+            }));
+          }
+        } else {
+          let histQuery = supabase
+            .from('commercial_won_revenue_historical_view')
+            .select('opportunity_id, account_name, nome_fantasia, seller_id, won_at, approved_at, accepted_at, cancelled_at, pipeline_id')
+            .eq('organization_id', organizationId)
+            .eq('seller_id', config.user_id)
+            .or(`and(approved_at.gte.${startDate},approved_at.lte.${endDate}),and(approved_at.is.null,accepted_at.gte.${startDate},accepted_at.lte.${endDate}),and(is_cancelled_sale.eq.true,cancelled_at.gte.${startDate},cancelled_at.lte.${endDate})`);
+          if (relevantPipelineIds.length > 0) histQuery = histQuery.in('pipeline_id', relevantPipelineIds);
+          const { data: histRows } = await histQuery;
+          opportunities = (histRows || []).map((row: any) => ({
+            id: row.opportunity_id,
+            title: row.nome_fantasia || row.account_name || 'Venda realizada',
+            owner_user_id: row.seller_id,
+            closed_at: row.approved_at || row.accepted_at || row.cancelled_at || row.won_at,
+            updated_at: row.approved_at || row.accepted_at || row.cancelled_at || row.won_at,
+            pipeline_id: row.pipeline_id,
+            account: { razao_social: row.account_name, nome_fantasia: row.nome_fantasia },
+          }));
         }
-
-        const { data: individualOpportunities } = await indQuery;
-        
-        // Post-filter by closed_at (primary) or updated_at (fallback) within period
-        opportunities = (individualOpportunities || []).filter(opp => {
-          const closeDate = new Date((opp as any).closed_at || opp.updated_at);
-          return closeDate >= new Date(startDate) && closeDate <= new Date(endDate);
-        });
       }
 
       // === SSoT enrichment (revenue only) ===
