@@ -131,6 +131,13 @@ export async function getClosedRevenueRows(p: RevenueSsotParams): Promise<Closed
   return fetchRows(p);
 }
 
+const EMPTY_SUMMARY = (): ClosedRevenueSummary => ({
+  total: 0, avulsa: 0, mrr: 0, count: 0, avgTicket: 0,
+  eligible: 0, pendingSettlement: 0, pendingReview: 0,
+  validTotal: 0, validAvulsa: 0, validMRR: 0, validCount: 0,
+  cancelledTotal: 0, cancelledCount: 0,
+});
+
 export async function getClosedRevenueSummary(p: RevenueSsotParams): Promise<ClosedRevenueSummary> {
   const [rows, commissionMap] = await Promise.all([fetchRows(p), fetchCommissionMap(p.organizationId)]);
   const summary = rows.reduce<ClosedRevenueSummary>(
@@ -144,9 +151,23 @@ export async function getClosedRevenueSummary(p: RevenueSsotParams): Promise<Clo
       if (cs === 'blocked_review_required') acc.pendingReview += amt;
       else if (cs === 'blocked_settlement_pending') acc.pendingSettlement += amt;
       else acc.eligible += amt;
+
+      // Líquido de cancelamentos — alinhado a Relatórios → Vendas Realizadas.
+      const isCancelled = r.is_cancelled_sale === true;
+      const cancelledAmt = Number(r.cancelled_amount ?? 0) || 0;
+      const validAmt = Number(r.valid_revenue_amount ?? (isCancelled ? 0 : amt)) || 0;
+      acc.validTotal += validAmt;
+      acc.cancelledTotal += cancelledAmt;
+      if (isCancelled) {
+        acc.cancelledCount += 1;
+      } else {
+        acc.validAvulsa += Number(r.one_shot_amount) || 0;
+        acc.validMRR += Number(r.mrr_amount) || 0;
+        acc.validCount += 1;
+      }
       return acc;
     },
-    { total: 0, avulsa: 0, mrr: 0, count: 0, avgTicket: 0, eligible: 0, pendingSettlement: 0, pendingReview: 0 },
+    EMPTY_SUMMARY(),
   );
   summary.avgTicket = summary.count > 0 ? summary.total / summary.count : 0;
   return summary;
@@ -156,7 +177,7 @@ export async function getClosedRevenueSummary(p: RevenueSsotParams): Promise<Clo
 export async function getOfficialEligibleRevenueSummary(p: RevenueSsotParams): Promise<ClosedRevenueSummary> {
   let q = (supabase as any)
     .from('commercial_won_revenue_view')
-    .select('opportunity_id, approved_amount, cancelled_amount, valid_revenue_amount, commission_eligible_amount, one_shot_amount, mrr_amount')
+    .select('opportunity_id, approved_amount, cancelled_amount, valid_revenue_amount, commission_eligible_amount, one_shot_amount, mrr_amount, is_cancelled_sale')
     .eq('organization_id', p.organizationId);
 
   q = officialSalesPeriodFilter(q, p);
@@ -174,8 +195,19 @@ export async function getOfficialEligibleRevenueSummary(p: RevenueSsotParams): P
     acc.avulsa += Number(r.one_shot_amount) || 0;
     acc.mrr += Number(r.mrr_amount) || 0;
     acc.count += eligible > 0 ? 1 : 0;
+
+    const isCancelled = r.is_cancelled_sale === true;
+    const validAmt = Number(r.valid_revenue_amount ?? (isCancelled ? 0 : eligible)) || 0;
+    acc.validTotal += validAmt;
+    acc.cancelledTotal += Number(r.cancelled_amount ?? 0) || 0;
+    if (isCancelled) acc.cancelledCount += 1;
+    else {
+      acc.validAvulsa += Number(r.one_shot_amount) || 0;
+      acc.validMRR += Number(r.mrr_amount) || 0;
+      acc.validCount += 1;
+    }
     return acc;
-  }, { total: 0, avulsa: 0, mrr: 0, count: 0, avgTicket: 0, eligible: 0, pendingSettlement: 0, pendingReview: 0 });
+  }, EMPTY_SUMMARY());
   summary.avgTicket = summary.count > 0 ? summary.eligible / summary.count : 0;
   return summary;
 }
