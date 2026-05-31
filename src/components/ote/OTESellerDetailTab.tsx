@@ -3,6 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { OTEMonthlyResult } from '@/hooks/useOTEData';
 import { useOTESalesRecords } from '@/hooks/useOTESalesRecords';
 import { OTESellerSalesDrilldown } from './OTESellerSalesDrilldown';
+import { OTESellerQualifiedLeadsDrilldown } from './OTESellerQualifiedLeadsDrilldown';
+import { useHistoricalQualifiers } from '@/hooks/results/useHistoricalQualifiers';
+import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { aggregateEligible } from './oteEligibility';
 import {
   User,
@@ -19,18 +22,33 @@ import {
 import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Button } from '@/components/ui/button';
 
 interface OTESellerDetailTabProps {
   results: OTEMonthlyResult[];
   isLoading: boolean;
   isOTEMode?: boolean;
+  /** Período no formato YYYY-MM para resolver qualificações históricas. */
+  period?: string;
 }
 
-export function OTESellerDetailTab({ results, isLoading, isOTEMode = true }: OTESellerDetailTabProps) {
+export function OTESellerDetailTab({ results, isLoading, isOTEMode = true, period }: OTESellerDetailTabProps) {
   const [expandedSeller, setExpandedSeller] = useState<string | null>(null);
   const resultIds = results.map((r) => r.id);
   const { data: allRecords = [], isLoading: recordsLoading } = useOTESalesRecords(resultIds);
+  const { organization } = useCurrentOrganization();
+
+  // Fonte ÚNICA de leads qualificados (mesma do Visão Geral / Win-Loss):
+  // opportunities won em pipeline qualification + atribuição histórica.
+  const [py, pm] = (period || '').split('-').map(Number);
+  const periodStart = py && pm ? new Date(Date.UTC(py, pm - 1, 1)).toISOString() : undefined;
+  const periodEnd = py && pm ? new Date(Date.UTC(py, pm, 1) - 1).toISOString() : undefined;
+  const { data: qualifiers = [] } = useHistoricalQualifiers({
+    organizationId: organization?.id,
+    start: periodStart,
+    end: periodEnd,
+  });
+  const qualifierMap = new Map(qualifiers.map((q) => [q.qualifierUserId, q.qualifiedLeads]));
+
 
 
   const formatCurrency = (value: number) => {
