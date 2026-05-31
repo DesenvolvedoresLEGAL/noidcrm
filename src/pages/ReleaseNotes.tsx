@@ -415,7 +415,10 @@ export default function ReleaseNotes() {
             </ScrollArea>
           </div>
         </div>
+        </>
+        )}
       </div>
+
     </Layout>
   );
 }
