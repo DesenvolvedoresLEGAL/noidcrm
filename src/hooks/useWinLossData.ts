@@ -103,6 +103,9 @@ export interface WinLossDataResult {
 export function getDateRangeFromPreset(preset: TimeframePreset, custom?: DateRange): DateRange {
   const now = new Date();
   switch (preset) {
+    case 'today': return { from: startOfDay(now), to: now };
+    case '7d': return { from: startOfDay(subDays(now, 6)), to: now };
+    case '15d': return { from: startOfDay(subDays(now, 14)), to: now };
     case 'month': return { from: startOfMonth(now), to: now };
     case 'quarter': return { from: startOfQuarter(now), to: now };
     case 'semester': return { from: subMonths(startOfMonth(now), 5), to: now };
