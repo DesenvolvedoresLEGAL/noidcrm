@@ -269,25 +269,9 @@ export function OTESellerDetailTab({ results, isLoading, isOTEMode = true }: OTE
                 </div>
 
 
-                {/* Status */}
-                <div className="mt-6 pt-4 border-t flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className={cn(
-                      "px-2 py-1 rounded text-xs font-medium",
-                      result.status === 'pending' && "bg-yellow-100 text-yellow-800",
-                      result.status === 'approved' && "bg-green-100 text-green-800",
-                      result.status === 'paid' && "bg-blue-100 text-blue-800",
-                      result.status === 'disputed' && "bg-red-100 text-red-800"
-                    )}>
-                      {result.status === 'pending' && 'Pendente'}
-                      {result.status === 'approved' && 'Aprovado'}
-                      {result.status === 'paid' && 'Pago'}
-                      {result.status === 'disputed' && 'Contestado'}
-                    </span>
-                    {result.flag_reason && (
-                      <span className="text-sm text-muted-foreground">{result.flag_reason}</span>
-                    )}
-                  </div>
+                {/* Rodapé: somente timestamp de cálculo. Status/flag removidos
+                    do rodapé (apareciam soltos sem contexto). */}
+                <div className="mt-6 pt-4 border-t flex items-center justify-end">
                   <p className="text-xs text-muted-foreground">
                     Calculado em {new Date(result.calculated_at).toLocaleString('pt-BR')}
                   </p>
