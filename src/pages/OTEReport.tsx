@@ -60,21 +60,22 @@ export default function OTEReport() {
     refetch();
   };
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     if (!results || results.length === 0) {
       toast.error('Nenhum dado para exportar. Clique em "Calcular" primeiro.');
       return;
     }
     try {
-      const wb = buildResultsWorkbook({
+      const wb = await buildResultsWorkbook({
         mode,
         periodMonth: selectedPeriod,
+        organizationId: organization?.id,
         organizationName: organization?.name,
         exporterName: (profile as any)?.full_name,
         results,
         records,
       });
-      downloadResultsWorkbook(wb, mode, selectedPeriod);
+      downloadResultsWorkbook(wb, mode, selectedPeriod, organization?.name);
       toast.success('Relatório exportado.');
     } catch (e) {
       console.error('Results export error:', e);
