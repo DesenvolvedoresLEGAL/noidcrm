@@ -1,72 +1,100 @@
-## Release v1.34.0 — Inteligência de Perdas, OTE Auditável & Receita Líquida
+## Release Notes Automáticos — GitHub + Eventos do Sistema, com revisão humana
 
-**Data:** 31/05/2026 · **Tipo:** Major (`is_major = true`) · **Tabela:** `release_notes`
+Reusa a infraestrutura existente (`pending_release_changes` + edge `generate-daily-release-notes`) e adiciona ingestão híbrida, rascunho com revisão, geração via IA e disparo manual + agendado.
 
-Próxima versão após a 1.33.0 (15/05/2026). Cobre os avanços das últimas duas semanas.
+### Decisões aplicadas
+- **Fonte:** GitHub (PRs mergeados) + eventos internos (migrações, action_executions críticas, system_events relevantes, ai_runs).
+- **Disparo:** botão manual em `/release-notes` (super_admin) + cron semanal (sexta 18h America/Sao_Paulo).
+- **Publicação:** sempre como `status='draft'` — gestor revisa e clica em "Publicar". Nada vai pra timeline pública sem revisão.
 
-### Título e descrição
+### 1. Banco (migration)
 
-- **version:** `1.34.0`
-- **title:** `Inteligência de Perdas, OTE Auditável & Receita Líquida`
-- **description:** `Win/Loss Hub ganha motor semântico invisível com IA, relatório OTE com Excel auditável fim-a-fim, Forecast e Dashboard passam a refletir cancelamentos, governança unificada com MCP Catalog e aprovações via Slack.`
+**Tabela `release_notes`** — novas colunas (todas opcionais, backward compatible):
+- `status text` default `'published'` (`draft|published|discarded`)
+- `published_at timestamptz`
+- `generated_by text` (`manual|scheduled`)
+- `source_summary jsonb` — `{ github_prs: n, system_events: n, period_start, period_end }`
 
-### Changes (jsonb)
+Backfill: registros existentes ficam `status='published'`, `published_at = created_at`.
 
-**🧠 Win/Loss — Inteligência Semântica (feature)**
+**Tabela `release_notes_ingestion_log`** (nova) — auditoria de cada execução do gerador:
+- `source` (`github|system_events|action_executions|migrations|ai_runs`)
+- `external_id text` (ex.: número do PR, id do evento) — único por source
+- `payload jsonb`, `included_in_release uuid` (FK draft criado), `ingested_at`
+- Índice único `(source, external_id)` para evitar reingestão. GRANTs padrão + RLS (super_admin only).
 
-- Diagnóstico Executivo da IA agora compara o motivo declarado pelo vendedor com a causa real detectada nos textos livres, sinalizando quando há divergência.
-- Novo CRM Trust Score (0–100) que mede a qualidade dos diagnósticos de perda e a cobertura textual da operação.
-- Bloco "Motivos Ocultos" mostra ranking declarado × inferido pela IA, expondo causas que viraram caixa-preta.
-- Bloco "Gap Vendedor × Cliente" identifica os pares mais frequentes onde o time interno diverge do feedback do cliente.
-- Novo Radar Competitivo consolida concorrentes citados por humanos e detectados pela IA, com valor perdido, motivo dominante e nível de confiança.
-- Novo bloco "Drivers de Vitória" agrega motivos, diferenciais decisivos e voz do cliente nas oportunidades ganhas.
-- Alertas Inteligentes ganharam regras semânticas: trust score baixo, diagnóstico fraco em ≥30% das perdas, gap dominante, receita recuperável e motivo oculto.
-- Tendência de Motivos de Perda agora tem toggle Declarado/IA.
-- Detalhe da oportunidade perdida tem novo card "Análise Semântica da IA" com texto completo, categoria detectada, concorrente, ação recomendada e botão Reprocessar.
-- A IA nunca sobrescreve o motivo humano nem o registro de Win/Loss — apenas enriquece o diagnóstico.
+**View pública `v_release_notes_public`** (substitui leitura direta no front): exibe apenas `status='published'`. Painel de revisão (admin) lê a tabela bruta.
 
-**📊 Resultados / OTE (feature + improvement)**
+**RLS:** mantém policies atuais; adiciona policy para super_admin ler/atualizar rascunhos.
 
-- Sprint OTE 1.4: o botão Excel do relatório OTE agora exporta um workbook auditável fim-a-fim, com Visão Geral, Closers, Pré-Vendas, Por Vendedor, Detalhamento de Vendas, Itens Elegíveis e Não Elegíveis, e Oportunidades Qualificadas por Pré-Vendas — refletindo exatamente o que aparece na tela.
-- Valores monetários, datas e horas exportados em formato numérico/data nativo, prontos para análise em planilhas.
-- Cálculos canônicos preservados: regra item a item, `historicalQualifications` e atribuição histórica continuam intactos.
+### 2. Edge function `generate-release-notes-draft` (substitui a antiga)
 
-**💰 Receita Líquida em Forecast e Dashboard (fix + improvement)**
+POST `{ period_days?: number, trigger: 'manual'|'scheduled' }`. Fluxo:
 
-- Forecast "Fechado" e Dashboard CEO (Receita Avulsa, MRR, Run Rate e contagem de vendas) agora descontam vendas canceladas, lendo `valid_revenue_amount` em vez do valor bruto.
-- Alinha o Forecast e o Dashboard ao Relatório de Vendas Realizadas como fonte única — sem o gestor ver valor maior do que o efetivamente realizado.
-- `commercial_won_revenue_view` reforçada como fonte oficial de receita realizada (Forecast, Dashboard, BI, Relatórios, Ranking, Comissão).
-- Guardrail `REVENUE_SOURCE_MISMATCH` em `/admin/revenue-integrity` para detectar divergências > R$ 0,01 automaticamente.
+1. **Coleta GitHub (opcional):** se conector GitHub linkado, lista PRs mergeados em `main` no período via gateway (`/repos/{owner}/{repo}/pulls?state=closed&base=main`). Filtra `merged_at >= now() - period_days`. Persiste em `release_notes_ingestion_log`.
+2. **Coleta system events:**
+   - `action_executions` com `risk_level >= medium` ou `status='failed'` agrupados por `action_key`
+   - `system_events` com `event_category in ('release','feature_flag','migration','security')`
+   - `ai_runs` agregados por agente (contagem, taxa de sucesso)
+   - Migrações: lê `supabase_migrations.schema_migrations` (via service role) — pega só `name`, agrupa por dia.
+3. **Dedupe:** ignora qualquer item já presente em `release_notes_ingestion_log` (chave `source+external_id`).
+4. **Sumarização via OpenAI** (`_shared/ai-client.ts`, modelo `gpt-5-mini`, com `dateContextPrompt()`):
+   - Prompt recebe lista bruta agrupada por fonte + instruções de categorização (`feature|fix|improvement|security`).
+   - Saída em JSON: `{ version, title, description, changes: [{type, description}], is_major }`.
+   - Validação Zod no edge antes de inserir.
+5. **Versão:** lê última `release_notes.version`, incrementa `minor` (ou `major` se IA marcar `is_major=true`).
+6. **Insert:** `release_notes` com `status='draft'`, `generated_by`, `source_summary`. Marca todos os logs como `included_in_release = <novo id>`.
+7. **Idempotência:** se já existir um rascunho não publicado, anexa novos itens a ele em vez de criar outro.
+8. **Resposta:** retorna `{ release_id, version, items_collected, items_used }`.
 
-**🔌 Governança & MCP (feature)**
+Erros, validação Zod e CORS conforme padrão do projeto. Sem dependência obrigatória de GitHub — se conector ausente, log warning e segue só com eventos do sistema.
 
-- Action Registry: catálogo único `action_registry` + log `action_executions` centralizando toda ação sensível da plataforma (hook `useAction`).
-- Auditoria e Aprovações Unificadas: nova view `unified_audit_view` consolida 5 fontes de auditoria; tabela `approval_requests` genérica unifica filas de aprovação.
-- MCP Catalog: `mcp_action_catalog_view` expõe o Action Registry como tools MCP, abrindo o caminho para automações externas governadas.
-- Aprovações via Slack: novo edge `notify-approval-request` envia cards Block Kit ao canal de aprovações em tempo real.
-- Dispatcher genérico `execute-action` resolve qualquer ação do registry e despacha para RPC ou edge function, com `useAction.runServer()` no front.
+### 3. Cron semanal
 
-**⚡ Performance & Confiabilidade (improvement)**
+Via `pg_cron` + `pg_net` (insert tool, não migration, pois usa anon key específica do projeto):
+```sql
+select cron.schedule(
+  'generate-release-notes-weekly',
+  '0 21 * * 5', -- 18h BRT = 21h UTC, toda sexta
+  $$ select net.http_post(
+       url:='https://<ref>.supabase.co/functions/v1/generate-release-notes-draft',
+       headers:='{"Content-Type":"application/json","apikey":"<anon>"}'::jsonb,
+       body:='{"trigger":"scheduled","period_days":7}'::jsonb
+     ); $$
+);
+```
 
-- Filtros e selects de usuários agora leem de `crm_active_users_view`, eliminando inativos das listas operacionais e reduzindo o payload das telas.
-- Sugestões de IA por oportunidade têm cache determinístico via `context_signature` — só rodam OpenAI em clique manual com `force_refresh`, cortando latência e custo.
-- Realtime do Win/Loss Hub e do detalhe da oportunidade revisado para evitar re-renderizações desnecessárias.
+### 4. UI — painel de revisão em `/release-notes`
 
-**🔒 Segurança (security)**
+- **Botão "Gerar próxima release (rascunho)"** visível só pra super_admin (usa `usePlatformAdmin`). Abre modal com seletor de período (7/14/30 dias) e chama o edge via `supabase.functions.invoke`.
+- **Aba "Rascunhos"** (admin only) lista releases com `status='draft'`:
+  - Edição inline de `title`, `description`, e lista de `changes` (add/remove/edit, tipo + texto).
+  - Mostra `source_summary` (badge "X PRs · Y eventos").
+  - Botões **Publicar** (`status='published'`, `published_at=now()`) e **Descartar** (`status='discarded'`).
+- Timeline pública (`status='published'`) inalterada para todos os outros usuários.
+- `ReleaseNotes.tsx` migra leitura pública para `v_release_notes_public` (filtra drafts no servidor).
 
-- Validação server-side em `updateOpportunity` bloqueia atribuição a usuários inativos ou fora da organização.
-- Função `delete-user-with-transfer` reforçada: não transfere oportunidades fechadas nem `created_by` histórico, preservando atribuição imutável de comissão e OTE.
-- LGPD no Win/Loss: dashboards lêem apenas excerpts ≤160 caracteres; texto completo só no escopo autenticado da oportunidade.
-- Edge functions de IA padronizadas em `_shared/ai-client.ts` com `search_path` fixado e guard anti-time-travel para qualquer prompt que sugira datas.
+### 5. Arquivos
 
-### Execução
+**Criar:**
+- Migration: nova coluna `status` + tabela `release_notes_ingestion_log` + view `v_release_notes_public`.
+- `supabase/functions/generate-release-notes-draft/index.ts`
+- `src/components/admin/release-notes/GenerateReleaseDraftButton.tsx`
+- `src/components/admin/release-notes/ReleaseDraftEditor.tsx`
+- `src/components/admin/release-notes/DraftsTab.tsx`
+- `src/hooks/useReleaseNotesAdmin.ts`
 
-1. **(migração obrigatória)** `INSERT` na tabela `release_notes` com `version='1.34.0'`, `release_date='2026-05-31'`, `is_major=true`, `changes` como JSONB array de `{type, description}` usando os tipos `feature | improvement | fix | security`.
-2. Validar exibição em `/release-notes` (a página já ordena por versão semântica e auto-scroll para a última).
-3. Sem mudanças de código no front — a página `ReleaseNotes.tsx` já consome a tabela.
+**Editar:**
+- `src/pages/ReleaseNotes.tsx` — adiciona tab de rascunhos (gated por super_admin) + botão gerar; troca query pra view pública.
+- `supabase/functions/generate-daily-release-notes/index.ts` — descontinuar/redirecionar pra nova function (manter backward compat até cron antigo, se houver, sumir).
+- `mem://index.md` — adicionar entrada de Release Notes Automation.
 
-### Fora de escopo
+### 6. Conectores
 
-- Não altera `commercial_won_revenue_view`, regras de OTE, `historicalQualifications` nem `win_loss_records`.
-- Não cria aba nova de "Inteligência Semântica" — o motor permanece invisível dentro da Visão Geral.
-- Não mexe em motivos humanos selecionados (`loss_reason_id`, `client_loss_reason_id`).
+GitHub não está linkado no workspace. Após aprovar o plano, vou chamar `standard_connectors--connect` com `connector_id=github` pra abrir o seletor — sem isso, a função opera só com eventos internos (modo degradado) e o front mostra um banner "Conecte GitHub pra enriquecer com PRs".
+
+### 7. Fora de escopo
+- Não auto-publica nada (sempre draft).
+- Não envia notificação Slack/email automática (pode ser sprint 2).
+- Não toca em `commercial_won_revenue_view`, OTE, Forecast.
+- Não remove a edge antiga até a nova estar ativa (toggle no cron).
