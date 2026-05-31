@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { startOfMonth, startOfQuarter, subMonths, startOfYear, format } from 'date-fns';
+import { startOfMonth, startOfQuarter, startOfDay, subDays, subMonths, startOfYear, format } from 'date-fns';
 
 // ─── Types ───────────────────────────────────────────────────────────
 export interface DateRange {
@@ -8,7 +8,7 @@ export interface DateRange {
   to: Date;
 }
 
-export type TimeframePreset = 'month' | 'quarter' | 'semester' | 'year' | 'custom';
+export type TimeframePreset = 'today' | '7d' | '15d' | 'month' | 'quarter' | 'semester' | 'year' | 'custom';
 
 export interface WinLossDeal {
   id: string;
@@ -103,6 +103,9 @@ export interface WinLossDataResult {
 export function getDateRangeFromPreset(preset: TimeframePreset, custom?: DateRange): DateRange {
   const now = new Date();
   switch (preset) {
+    case 'today': return { from: startOfDay(now), to: now };
+    case '7d': return { from: startOfDay(subDays(now, 6)), to: now };
+    case '15d': return { from: startOfDay(subDays(now, 14)), to: now };
     case 'month': return { from: startOfMonth(now), to: now };
     case 'quarter': return { from: startOfQuarter(now), to: now };
     case 'semester': return { from: subMonths(startOfMonth(now), 5), to: now };
@@ -138,7 +141,7 @@ export function useWinLossData(organizationId: string | undefined, pipelineId: s
 
       const fromISO = dateRange.from.toISOString();
 
-      // 1. If specific pipeline selected, use it; otherwise default to sales pipelines only
+      // 1. If specific pipeline selected, use it; otherwise default to commercial pipelines (sales + qualification)
       let pipelineIds: string[] = [];
       if (pipelineId) {
         pipelineIds = [pipelineId];
@@ -147,7 +150,7 @@ export function useWinLossData(organizationId: string | undefined, pipelineId: s
           .from('pipelines')
           .select('id')
           .eq('organization_id', organizationId)
-          .eq('pipeline_type', 'sales');
+          .in('pipeline_type', ['sales', 'qualification']);
         if (pipeErr) {
           console.error('[useWinLossData] Pipeline fetch error:', pipeErr);
           throw pipeErr;

@@ -28,7 +28,6 @@ import { WinLossRevenueTab } from '@/components/intelligence/winloss/tabs/WinLos
 import { WinLossRecommendationsTab } from '@/components/intelligence/winloss/tabs/WinLossRecommendationsTab';
 import { ProposalApprovalsTab } from '@/components/intelligence/winloss/tabs/ProposalApprovalsTab';
 import { useClosedRevenueSummary } from '@/hooks/revenue/useRevenueSsot';
-import { RevenueSsotBanner } from '@/components/revenue/RevenueSsotBanner';
 
 export default function WinLossHub() {
   const { organization } = useCurrentUser();
@@ -59,13 +58,28 @@ export default function WinLossHub() {
     dateRange
   );
 
+  // Pipelines comerciais (sales + qualification) — único escopo do Win/Loss.
+  const commercialPipelineIds = useMemo(
+    () =>
+      pipelines
+        .filter((p) => p.pipeline_type === 'sales' || p.pipeline_type === 'qualification')
+        .map((p) => p.id),
+    [pipelines],
+  );
+
   // P0 Revenue SSoT — monetários ganhos vêm de commercial_won_revenue_view.
+  // "Todos" = pipelines comerciais; caso contrário restringe ao pipeline escolhido.
+  const ssotPipelineIds = selectedPipelineId
+    ? [selectedPipelineId]
+    : commercialPipelineIds.length > 0
+      ? commercialPipelineIds
+      : null;
   const { data: ssotWonSummary } = useClosedRevenueSummary({
     surface: 'winloss-hub',
     organizationId: organization?.id,
     start: dateRange.from.toISOString(),
     end: dateRange.to.toISOString(),
-    pipelineIds: selectedPipelineId ? [selectedPipelineId] : null,
+    pipelineIds: ssotPipelineIds,
   });
 
   // Log errors for debugging
@@ -95,12 +109,11 @@ export default function WinLossHub() {
   return (
     <Layout>
       <div className="p-4 md:p-6 space-y-4">
-        {/* Header */}
+        {/* Header limpo — sem badge PRIME, sem banners SSoT */}
         <PageHeader
           icon={Activity}
           title="Win/Loss Intelligence Hub"
           subtitle="Análise avançada de motivos de ganho e perda — inteligência acionável"
-          badge={{ label: "PRIME", icon: Sparkles }}
           variant="rose"
           actions={
             <div className="flex gap-2">
@@ -121,24 +134,7 @@ export default function WinLossHub() {
           }
         />
 
-        {/* SSoT disclaimer */}
-        <div className="rounded-md border border-amber-300/50 bg-amber-50 dark:bg-amber-950/30 text-amber-900 dark:text-amber-100 px-3 py-2 text-xs flex items-center gap-2">
-          <AlertTriangle className="h-3.5 w-3.5" />
-          <span>
-            Base de <strong>decisões</strong> — não é relatório financeiro oficial. Para receita realizada use{' '}
-            <a href="/reports" className="underline font-medium">Relatórios → Vendas Realizadas</a> (fonte:{' '}
-            <code className="font-mono">commercial_won_revenue_view</code>).
-          </span>
-        </div>
-
-
-        {/* P0 Revenue SSoT — Banner explicando origem dos monetários ganhos */}
-        <RevenueSsotBanner
-          variant="migrated"
-          surface="Win/Loss — Ganhos, Valor Ganho e Ticket Médio via commercial_won_revenue_view"
-        />
-
-        {/* Context Selector */}
+        {/* Context Selector (filtros comerciais + período expandido) */}
         <WinLossContextSelector
           pipelines={pipelines}
           selectedPipelineId={selectedPipelineId}

@@ -222,7 +222,13 @@ export function SmartAlertsCard({ losses, lossReasons, isLoading, contextLabel, 
     );
   }
 
-  if (alerts.length === 0) {
+  // Ordenar por severidade (high > medium > low) e limitar a 3 para evitar poluição visual.
+  const severityWeight: Record<Alert['severity'], number> = { high: 3, medium: 2, low: 1 };
+  const sortedAlerts = [...alerts]
+    .sort((a, b) => severityWeight[b.severity] - severityWeight[a.severity])
+    .slice(0, 3);
+
+  if (sortedAlerts.length === 0) {
     return (
       <Card className="border-amber-500/20">
         <CardHeader>
@@ -254,7 +260,7 @@ export function SmartAlertsCard({ losses, lossReasons, isLoading, contextLabel, 
       </CardHeader>
       <CardContent>
         <div className="space-y-3">
-          {alerts.map((alert, index) => (
+          {sortedAlerts.map((alert, index) => (
             <div 
               key={index}
               className={`p-3 rounded-lg border flex items-start gap-3 ${
