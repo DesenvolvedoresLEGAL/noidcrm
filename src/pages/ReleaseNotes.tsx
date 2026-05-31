@@ -150,7 +150,25 @@ export default function ReleaseNotes() {
                 </p>
               </div>
             </div>
+            {canManageDrafts && (
+              <div className="flex items-center gap-2 pt-2">
+                <Tabs value={activeView} onValueChange={(v) => setActiveView(v as 'published' | 'drafts')}>
+                  <TabsList className="bg-card/50">
+                    <TabsTrigger value="published">Publicadas</TabsTrigger>
+                    <TabsTrigger value="drafts" className="gap-2">
+                      <FileEdit className="h-3.5 w-3.5" />
+                      Rascunhos
+                      {drafts.length > 0 && (
+                        <Badge variant="secondary" className="h-5 px-1.5 text-xs">{drafts.length}</Badge>
+                      )}
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+                <GenerateReleaseDraftButton />
+              </div>
+            )}
           </div>
+
           
           {/* Stats Cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
