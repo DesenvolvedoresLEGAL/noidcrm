@@ -80,8 +80,8 @@ export function WinLossKPIStrip({ data, isLoading, terminology, pipelineType, ss
       bg: 'bg-yellow-500/10',
     },
     {
-      label: 'Ticket Médio Ganho',
-      value: avgTicketWon,
+      label: 'Receita Ganha',
+      value: wonValue,
       format: 'currency' as const,
       icon: BarChart3,
       color: 'text-emerald-500',
