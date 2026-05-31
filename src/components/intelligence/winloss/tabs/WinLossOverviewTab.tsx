@@ -9,6 +9,8 @@ import { LossReasonsTrendChart } from '@/components/intelligence/LossReasonsTren
 import { CrmTrustAndRecoverableStrip } from '../CrmTrustAndRecoverableStrip';
 import { HiddenReasonsBlock } from '../HiddenReasonsBlock';
 import { SellerCustomerGapBlock } from '../SellerCustomerGapBlock';
+import { CompetitiveRadarBlock } from '../CompetitiveRadarBlock';
+import { WinDriversBlock } from '../WinDriversBlock';
 import { useLossSemantic } from '@/hooks/useLossSemantic';
 import type { WinLossDataResult, TimeframePreset, DateRange } from '@/hooks/useWinLossData';
 
@@ -31,15 +33,16 @@ export function WinLossOverviewTab({ data, isLoading, organizationId, terminolog
 
   return (
     <div className="space-y-6">
-      {/* 1. Diagnóstico Executivo da IA */}
-      <AIDiagnosisCard data={data} dateRange={dateRange} />
+      {/* 1. Diagnóstico Executivo da IA (humano × IA) */}
+      <AIDiagnosisCard data={data} dateRange={dateRange} semantic={semantic} />
 
-      {/* 2. Alertas Inteligentes */}
+      {/* 2. Alertas Inteligentes (heurísticos + semânticos) */}
       <SmartAlertsCard
         losses={data?.losses || []}
         lossReasons={data?.lossReasons || []}
         isLoading={isLoading}
         contextLabel={terminology.lostPlural}
+        semantic={semantic}
       />
 
       {/* 3. CRM Trust Score + Receita Recuperável */}
@@ -59,20 +62,30 @@ export function WinLossOverviewTab({ data, isLoading, organizationId, terminolog
       {/* 6. Gap Vendedor × Cliente */}
       <SellerCustomerGapBlock semantic={semantic} />
 
-      {/* 7. Pulso Mensal (oculto no filtro Mês) */}
+      {/* 7. Radar Competitivo (humano + IA) */}
+      <CompetitiveRadarBlock semantic={semantic} />
+
+      {/* 8. Drivers de Vitória */}
+      <WinDriversBlock data={data} />
+
+      {/* 9. Pulso Mensal (oculto no filtro Mês) */}
       {showMonthlyPulse && data && data.monthlyPulse.length > 0 && (
         <MonthlyPulseCards data={data.monthlyPulse} />
       )}
 
-      {/* 8. Análise de Ganhos */}
+      {/* 10. Análise de Ganhos */}
       <WinAnalysisSection data={data} isLoading={isLoading} />
 
-      {/* 9. Ciclo de Venda */}
+      {/* 11. Ciclo de Venda */}
       <SalesCycleSection data={data} isLoading={isLoading} />
 
-      {/* 10. Tendência ou Sinais do Mês */}
+      {/* 12. Tendência ou Sinais do Mês */}
       {showTrend ? (
-        <LossReasonsTrendChart losses={data?.losses || []} isLoading={isLoading} />
+        <LossReasonsTrendChart
+          losses={data?.losses || []}
+          isLoading={isLoading}
+          semantic={semantic}
+        />
       ) : (
         <MonthSignalsCard data={data} dateRange={dateRange} />
       )}
