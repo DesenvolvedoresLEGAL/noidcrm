@@ -8,9 +8,10 @@ import { cn } from '@/lib/utils';
 import { formatDateBR } from '@/lib/dateUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { TimelineEventCard } from './TimelineEventCard';
-import { 
-  getEnhancedTimeline, 
-  LIMIT_OPTIONS, 
+import { SemanticAnalysisCard } from '@/components/intelligence/winloss/SemanticAnalysisCard';
+import {
+  getEnhancedTimeline,
+  LIMIT_OPTIONS,
   type EnhancedTimelineEvent,
   type LimitOption
 } from '@/services/crm/enhanced-timeline';
