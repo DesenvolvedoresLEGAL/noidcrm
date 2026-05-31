@@ -1,15 +1,13 @@
-import { LossAnalysisSection } from './LossAnalysisSection';
-import { WinAnalysisSection } from './WinAnalysisSection';
+// Sprint WL-UI-01 — Cockpit executivo de Win/Loss.
+// Estrutura final: KPIs → Diagnóstico IA → Alertas (max 3) → Trust+Recuperável
+// → Drivers de Vitória (compacto) → Pulso do Período → Ciclo de Venda.
+// Blocos movidos: Análise de Perdas, Top Motivos, Concorrentes, Por que estamos perdendo,
+// Radar Competitivo, Feedback dos Clientes, Tendência → migrados para outras abas.
 import { SalesCycleSection } from './SalesCycleSection';
 import { MonthlyPulseCards } from '../MonthlyPulseCards';
 import { AIDiagnosisCard } from '../AIDiagnosisCard';
-import { MonthSignalsCard } from '../MonthSignalsCard';
 import { SmartAlertsCard } from '@/components/intelligence/SmartAlertsCard';
-import { LossReasonsTrendChart } from '@/components/intelligence/LossReasonsTrendChart';
 import { CrmTrustAndRecoverableStrip } from '../CrmTrustAndRecoverableStrip';
-import { HiddenReasonsBlock } from '../HiddenReasonsBlock';
-import { SellerCustomerGapBlock } from '../SellerCustomerGapBlock';
-import { CompetitiveRadarBlock } from '../CompetitiveRadarBlock';
 import { WinDriversBlock } from '../WinDriversBlock';
 import { useLossSemantic } from '@/hooks/useLossSemantic';
 import type { WinLossDataResult, TimeframePreset, DateRange } from '@/hooks/useWinLossData';
@@ -25,18 +23,27 @@ interface Props {
   pipelineId?: string | null;
 }
 
-export function WinLossOverviewTab({ data, isLoading, organizationId, terminology, timeframe, dateRange, pipelineId = null }: Props) {
-  const showMonthlyPulse = timeframe !== 'month';
-  const showTrend = timeframe !== 'month';
+export function WinLossOverviewTab({
+  data,
+  isLoading,
+  organizationId,
+  terminology,
+  timeframe,
+  dateRange,
+  pipelineId = null,
+}: Props) {
+  // Pulso só aparece quando o período é maior que "mês" e existem dados de pulso.
+  const showMonthlyPulse =
+    timeframe !== 'today' && timeframe !== '7d' && timeframe !== '15d' && timeframe !== 'month';
 
   const { data: semantic } = useLossSemantic(organizationId, pipelineId, dateRange);
 
   return (
     <div className="space-y-6">
-      {/* 1. Diagnóstico Executivo da IA (humano × IA) */}
+      {/* 1. Diagnóstico Executivo da IA — bloco principal */}
       <AIDiagnosisCard data={data} dateRange={dateRange} semantic={semantic} />
 
-      {/* 2. Alertas Inteligentes (heurísticos + semânticos) */}
+      {/* 2. Alertas Inteligentes (máx 3, ordenados por severidade) */}
       <SmartAlertsCard
         losses={data?.losses || []}
         lossReasons={data?.lossReasons || []}
@@ -48,47 +55,16 @@ export function WinLossOverviewTab({ data, isLoading, organizationId, terminolog
       {/* 3. CRM Trust Score + Receita Recuperável */}
       <CrmTrustAndRecoverableStrip semantic={semantic} isLoading={isLoading} />
 
-      {/* 4. Motivos Ocultos (declarado vs inferido pela IA) */}
-      <HiddenReasonsBlock semantic={semantic} />
-
-      {/* 5. Top Motivos de Perda */}
-      <LossAnalysisSection
-        data={data}
-        isLoading={isLoading}
-        lostLabel={terminology.lostPlural}
-        dateRange={dateRange}
-      />
-
-      {/* 6. Gap Vendedor × Cliente */}
-      <SellerCustomerGapBlock semantic={semantic} />
-
-      {/* 7. Radar Competitivo (humano + IA) */}
-      <CompetitiveRadarBlock semantic={semantic} />
-
-      {/* 8. Drivers de Vitória */}
+      {/* 4. Drivers de Vitória (compacto: top 3 motivos + top 3 diferenciais) */}
       <WinDriversBlock data={data} />
 
-      {/* 9. Pulso Mensal (oculto no filtro Mês) */}
+      {/* 5. Pulso do Período */}
       {showMonthlyPulse && data && data.monthlyPulse.length > 0 && (
         <MonthlyPulseCards data={data.monthlyPulse} />
       )}
 
-      {/* 10. Análise de Ganhos */}
-      <WinAnalysisSection data={data} isLoading={isLoading} />
-
-      {/* 11. Ciclo de Venda */}
+      {/* 6. Ciclo de Venda (Ganhos × Perdidos × Diferença + Time-to-Loss compacto) */}
       <SalesCycleSection data={data} isLoading={isLoading} />
-
-      {/* 12. Tendência ou Sinais do Mês */}
-      {showTrend ? (
-        <LossReasonsTrendChart
-          losses={data?.losses || []}
-          isLoading={isLoading}
-          semantic={semantic}
-        />
-      ) : (
-        <MonthSignalsCard data={data} dateRange={dateRange} />
-      )}
     </div>
   );
 }
