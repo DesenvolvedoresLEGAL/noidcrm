@@ -1,8 +1,10 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Brain, AlertTriangle, Clock, DollarSign } from 'lucide-react';
+import { Brain, AlertTriangle, Clock, DollarSign, Eye, RotateCcw } from 'lucide-react';
 import { buildExecutiveDiagnosis, type Severity } from '@/lib/winloss/diagnosis';
+import { getLossCategoryLabel } from '@/utils/category-labels';
 import type { WinLossDataResult } from '@/hooks/useWinLossData';
+import type { LossSemanticAggregates } from '@/hooks/useLossSemantic';
 
 const SEVERITY_STYLES: Record<Severity, { badge: string; border: string; bg: string; label: string }> = {
   low:      { badge: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30', border: 'border-emerald-500/20', bg: 'bg-emerald-500/5',  label: 'Baixo' },
@@ -17,13 +19,19 @@ const fmtBRL = (v: number) =>
 interface Props {
   data: WinLossDataResult | undefined;
   dateRange: { from: Date; to: Date };
+  semantic?: LossSemanticAggregates;
 }
 
-export function AIDiagnosisCard({ data, dateRange }: Props) {
+export function AIDiagnosisCard({ data, dateRange, semantic }: Props) {
   if (!data) return null;
   const diag = buildExecutiveDiagnosis(data, dateRange);
   if (!diag) return null;
   const sev = SEVERITY_STYLES[diag.severity];
+
+  // Síntese humano × IA: categoria mais reportada pelo vendedor (top do diag) vs categoria mais inferida pela IA
+  const declaredTop = diag.topCategory;
+  const inferredTop = semantic?.inferredRanking?.[0]?.category;
+  const hasMismatch = !!inferredTop && inferredTop !== declaredTop;
 
   return (
     <Card className={`${sev.border} ${sev.bg}`}>
@@ -33,12 +41,31 @@ export function AIDiagnosisCard({ data, dateRange }: Props) {
             <Brain className="h-4 w-4 text-purple-500" />
             <h3 className="text-sm font-semibold">Diagnóstico Executivo da IA</h3>
           </div>
-          <Badge variant="outline" className={`text-[10px] uppercase tracking-wider ${sev.badge}`}>
-            Severidade: {sev.label}
-          </Badge>
+          <div className="flex items-center gap-2 flex-wrap">
+            {semantic && semantic.recoverableRevenue > 0 && (
+              <Badge variant="outline" className="text-[10px] border-emerald-500/30 text-emerald-600 bg-emerald-500/10">
+                <RotateCcw className="h-3 w-3 mr-1" />
+                Recuperável: {fmtBRL(semantic.recoverableRevenue)}
+              </Badge>
+            )}
+            <Badge variant="outline" className={`text-[10px] uppercase tracking-wider ${sev.badge}`}>
+              Severidade: {sev.label}
+            </Badge>
+          </div>
         </div>
 
         <p className="text-sm leading-relaxed">{diag.copy}</p>
+
+        {hasMismatch && (
+          <div className="flex items-start gap-2 text-xs p-2 rounded-md border border-amber-500/30 bg-amber-500/5">
+            <Eye className="h-3.5 w-3.5 text-amber-600 mt-0.5 shrink-0" />
+            <p className="leading-snug">
+              <span className="font-semibold">Atenção:</span> vendedores reportam{' '}
+              <span className="font-medium">{getLossCategoryLabel(declaredTop)}</span>, mas a IA detecta{' '}
+              <span className="font-medium">{getLossCategoryLabel(inferredTop!)}</span> como causa real predominante.
+            </p>
+          </div>
+        )}
 
         <div className="grid sm:grid-cols-3 gap-2 pt-1">
           <div className="flex items-center gap-2 text-xs">

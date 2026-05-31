@@ -1,7 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertTriangle, TrendingUp, TrendingDown, Target, Lightbulb } from 'lucide-react';
+import { AlertTriangle, TrendingUp, TrendingDown, Target, Lightbulb, Brain, Eye, RotateCcw } from 'lucide-react';
+import type { LossSemanticAggregates } from '@/hooks/useLossSemantic';
+import { getLossCategoryLabel } from '@/utils/category-labels';
 
 interface SmartAlertsCardProps {
   losses: Array<{
@@ -19,6 +21,7 @@ interface SmartAlertsCardProps {
   lossReasons: Array<{ reason: string; count: number }>;
   isLoading: boolean;
   contextLabel: string;
+  semantic?: LossSemanticAggregates;
 }
 
 interface Alert {
@@ -28,7 +31,10 @@ interface Alert {
   severity: 'high' | 'medium' | 'low';
 }
 
-export function SmartAlertsCard({ losses, lossReasons, isLoading, contextLabel }: SmartAlertsCardProps) {
+const fmtBRL = (v: number) =>
+  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v);
+
+export function SmartAlertsCard({ losses, lossReasons, isLoading, contextLabel, semantic }: SmartAlertsCardProps) {
   const alerts: Alert[] = [];
 
   if (losses && losses.length > 0 && lossReasons.length > 0) {
@@ -127,6 +133,78 @@ export function SmartAlertsCard({ losses, lossReasons, isLoading, contextLabel }
       });
     }
   }
+
+  // === Alertas semânticos (motor invisível da IA) ===
+  if (semantic && semantic.total > 0) {
+    // Trust Score baixo
+    if (semantic.crmTrustScore < 60) {
+      alerts.push({
+        type: 'warning',
+        icon: <Brain className="h-4 w-4" />,
+        message: `🧠 Trust Score do CRM em ${semantic.crmTrustScore}/100 — diagnósticos de perda pouco confiáveis. Reforce o registro de motivos.`,
+        severity: semantic.crmTrustScore < 40 ? 'high' : 'medium',
+      });
+    }
+
+    // Diagnóstico fraco em ≥30% das perdas
+    const weakShare =
+      semantic.total > 0
+        ? Math.round(((semantic.qualityBuckets.weak + semantic.qualityBuckets.missing) / semantic.total) * 100)
+        : 0;
+    if (weakShare >= 30) {
+      alerts.push({
+        type: 'warning',
+        icon: <AlertTriangle className="h-4 w-4" />,
+        message: `📝 ${weakShare}% das ${contextLabel.toLowerCase()} têm diagnóstico fraco ou ausente — perdas viram caixa-preta.`,
+        severity: weakShare >= 50 ? 'high' : 'medium',
+      });
+    }
+
+    // Gap vendedor × cliente alto
+    if (semantic.gapPct >= 20) {
+      const topPair = semantic.topGapPairs[0];
+      const detail = topPair
+        ? ` Padrão mais comum: vendedor reporta "${getLossCategoryLabel(topPair.declared)}" mas IA detecta "${getLossCategoryLabel(topPair.inferred)}".`
+        : '';
+      alerts.push({
+        type: 'warning',
+        icon: <Eye className="h-4 w-4" />,
+        message: `👁️ Gap vendedor × cliente em ${semantic.gapPct}% das perdas.${detail}`,
+        severity: semantic.gapPct >= 35 ? 'high' : 'medium',
+      });
+    }
+
+    // Receita recuperável
+    if (semantic.recoverableRevenue > 0 && semantic.recoverableCount > 0) {
+      const causeLabel = semantic.recoverableTopCause
+        ? ` (principal causa: ${getLossCategoryLabel(semantic.recoverableTopCause)})`
+        : '';
+      alerts.push({
+        type: 'insight',
+        icon: <RotateCcw className="h-4 w-4" />,
+        message: `♻️ ${fmtBRL(semantic.recoverableRevenue)} em ${semantic.recoverableCount} ${contextLabel.toLowerCase()} recuperáveis${causeLabel}.`,
+        severity: 'low',
+      });
+    }
+
+    // Motivo oculto: top IA diferente do top declarado
+    const declaredTop = semantic.declaredRanking[0];
+    const inferredTop = semantic.inferredRanking[0];
+    if (
+      declaredTop &&
+      inferredTop &&
+      inferredTop.category !== declaredTop.category &&
+      inferredTop.pct >= 25
+    ) {
+      alerts.push({
+        type: 'insight',
+        icon: <Brain className="h-4 w-4" />,
+        message: `🧠 Motivo oculto: vendedores reportam "${getLossCategoryLabel(declaredTop.category)}" mas IA aponta "${getLossCategoryLabel(inferredTop.category)}" em ${inferredTop.pct}% das perdas.`,
+        severity: 'medium',
+      });
+    }
+  }
+
 
   if (isLoading) {
     return (

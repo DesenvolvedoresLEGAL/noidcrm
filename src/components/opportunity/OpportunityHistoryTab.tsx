@@ -8,9 +8,10 @@ import { cn } from '@/lib/utils';
 import { formatDateBR } from '@/lib/dateUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { TimelineEventCard } from './TimelineEventCard';
-import { 
-  getEnhancedTimeline, 
-  LIMIT_OPTIONS, 
+import { SemanticAnalysisCard } from '@/components/intelligence/winloss/SemanticAnalysisCard';
+import {
+  getEnhancedTimeline,
+  LIMIT_OPTIONS,
   type EnhancedTimelineEvent,
   type LimitOption
 } from '@/services/crm/enhanced-timeline';
@@ -147,6 +148,13 @@ export function OpportunityHistoryTab({ opportunityId }: OpportunityHistoryTabPr
 
   return (
     <div className="space-y-4">
+
+      {/* Análise Semântica IA (apenas para perdas) */}
+      {winLossRecord?.outcome === 'lost' && (
+        <SemanticAnalysisCard opportunityId={opportunityId} />
+      )}
+
+
 
       {/* Win/Loss Card */}
       {winLossRecord && winLossRecord.outcome === 'won' && (winLossRecord.win_reason_id || winLossRecord.key_differentiator || winLossRecord.customer_feedback) && (
