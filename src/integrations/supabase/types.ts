@@ -19952,11 +19952,15 @@ export type Database = {
       }
       ote_sales_records: {
         Row: {
+          attribution_confidence: string | null
+          attribution_source: string | null
           client_name: string
           closed_at: string | null
+          commercial_commission_base: number
           counts_toward_goal: boolean
           created_at: string
           eligible_amount: number
+          eligible_ote_amount: number
           exclusion_reason: string | null
           id: string
           mrr_amount: number
@@ -19968,22 +19972,37 @@ export type Database = {
           ote_result_id: string
           payment_date: string | null
           payment_status: string | null
+          period_end: string | null
+          period_start: string | null
           pipeline_id: string | null
           pipeline_name: string | null
+          pre_sales_level_snapshot: string | null
+          pre_sales_name_snapshot: string | null
+          pre_sales_role_snapshot: string | null
+          pre_sales_user_id: string | null
           proposal_id: string | null
           proposal_number: string | null
+          qualified_leads_count: number
           record_kind: string
           revenue_confidence: string | null
           sale_date: string
           sale_value: number
+          seller_level_snapshot: string | null
+          seller_name_snapshot: string | null
+          seller_role_snapshot: string | null
+          seller_user_id: string | null
           updated_at: string
         }
         Insert: {
+          attribution_confidence?: string | null
+          attribution_source?: string | null
           client_name: string
           closed_at?: string | null
+          commercial_commission_base?: number
           counts_toward_goal?: boolean
           created_at?: string
           eligible_amount?: number
+          eligible_ote_amount?: number
           exclusion_reason?: string | null
           id?: string
           mrr_amount?: number
@@ -19995,22 +20014,37 @@ export type Database = {
           ote_result_id: string
           payment_date?: string | null
           payment_status?: string | null
+          period_end?: string | null
+          period_start?: string | null
           pipeline_id?: string | null
           pipeline_name?: string | null
+          pre_sales_level_snapshot?: string | null
+          pre_sales_name_snapshot?: string | null
+          pre_sales_role_snapshot?: string | null
+          pre_sales_user_id?: string | null
           proposal_id?: string | null
           proposal_number?: string | null
+          qualified_leads_count?: number
           record_kind?: string
           revenue_confidence?: string | null
           sale_date: string
           sale_value: number
+          seller_level_snapshot?: string | null
+          seller_name_snapshot?: string | null
+          seller_role_snapshot?: string | null
+          seller_user_id?: string | null
           updated_at?: string
         }
         Update: {
+          attribution_confidence?: string | null
+          attribution_source?: string | null
           client_name?: string
           closed_at?: string | null
+          commercial_commission_base?: number
           counts_toward_goal?: boolean
           created_at?: string
           eligible_amount?: number
+          eligible_ote_amount?: number
           exclusion_reason?: string | null
           id?: string
           mrr_amount?: number
@@ -20022,14 +20056,25 @@ export type Database = {
           ote_result_id?: string
           payment_date?: string | null
           payment_status?: string | null
+          period_end?: string | null
+          period_start?: string | null
           pipeline_id?: string | null
           pipeline_name?: string | null
+          pre_sales_level_snapshot?: string | null
+          pre_sales_name_snapshot?: string | null
+          pre_sales_role_snapshot?: string | null
+          pre_sales_user_id?: string | null
           proposal_id?: string | null
           proposal_number?: string | null
+          qualified_leads_count?: number
           record_kind?: string
           revenue_confidence?: string | null
           sale_date?: string
           sale_value?: number
+          seller_level_snapshot?: string | null
+          seller_name_snapshot?: string | null
+          seller_role_snapshot?: string | null
+          seller_user_id?: string | null
           updated_at?: string
         }
         Relationships: [
