@@ -592,14 +592,15 @@ export function useForecastData(filters: ForecastFilters) {
 
     const velocityPerDay = daysElapsed > 0 ? closedRevenue / daysElapsed : 0;
 
-    const wonCount = closedOpps.length;
+    // Win Rate / ticket médio alinhados ao líquido (exclui vendas canceladas).
+    const wonCount = ssotSummary?.validCount ?? closedOpps.length;
     const lostCount = lostOpps.length;
     const winRate = wonCount + lostCount > 0 ? (wonCount / (wonCount + lostCount)) * 100 : 0;
 
     const pipelineCoverage = totalGoal > 0 ? totalPipeline / totalGoal : 0;
 
-    const avgDealSize = closedOpps.length > 0
-      ? closedRevenue / closedOpps.length
+    const avgDealSize = wonCount > 0
+      ? closedRevenue / wonCount
       : opportunities.length > 0
         ? totalPipeline / opportunities.length
         : 0;
