@@ -1,19 +1,19 @@
 import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Trophy, MessageSquareQuote } from 'lucide-react';
+import { Trophy } from 'lucide-react';
 import type { WinLossDataResult } from '@/hooks/useWinLossData';
 
 interface Props {
   data: WinLossDataResult | undefined;
 }
 
+// Bloco compacto: Top 3 motivos de vitória + Top 3 diferenciais decisivos + receita associada.
 export function WinDriversBlock({ data }: Props) {
   const aggregates = useMemo(() => {
     if (!data || data.wins.length === 0) return null;
     const reasonMap = new Map<string, { count: number; value: number }>();
     const diffMap = new Map<string, number>();
-    const quotes: Array<{ feedback: string; reason?: string; value: number }> = [];
 
     for (const w of data.wins) {
       const reason = w.win_reason_name || 'Não informado';
@@ -29,26 +29,17 @@ export function WinDriversBlock({ data }: Props) {
           .filter(Boolean)
           .forEach((d) => diffMap.set(d, (diffMap.get(d) || 0) + 1));
       }
-
-      if (w.customer_feedback && w.customer_feedback.trim().length > 0) {
-        quotes.push({
-          feedback: w.customer_feedback.trim(),
-          reason: w.win_reason_name,
-          value: Number(w.final_value) || 0,
-        });
-      }
     }
 
     return {
       reasons: [...reasonMap.entries()]
         .map(([reason, { count, value }]) => ({ reason, count, value }))
         .sort((a, b) => b.count - a.count)
-        .slice(0, 5),
+        .slice(0, 3),
       differentiators: [...diffMap.entries()]
         .map(([label, count]) => ({ label, count }))
         .sort((a, b) => b.count - a.count)
-        .slice(0, 6),
-      quotes: quotes.slice(0, 3),
+        .slice(0, 3),
     };
   }, [data]);
 
@@ -64,17 +55,17 @@ export function WinDriversBlock({ data }: Props) {
 
   return (
     <Card className="border-emerald-500/20 bg-emerald-500/5">
-      <CardHeader>
+      <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
           <Trophy className="h-4 w-4 text-emerald-600" />
           Drivers de Vitória
         </CardTitle>
-        <CardDescription>Por que estamos ganhando — motivos, diferenciais e voz do cliente</CardDescription>
+        <CardDescription className="text-xs">O que está gerando ganho</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-3">
         <div>
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
-            Top motivos de vitória
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">
+            Top 3 motivos
           </p>
           <div className="space-y-1.5">
             {aggregates.reasons.map((r) => (
@@ -93,8 +84,8 @@ export function WinDriversBlock({ data }: Props) {
 
         {aggregates.differentiators.length > 0 && (
           <div>
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
-              Diferenciais decisivos
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">
+              Top 3 diferenciais decisivos
             </p>
             <div className="flex flex-wrap gap-1.5">
               {aggregates.differentiators.map((d) => (
@@ -109,26 +100,8 @@ export function WinDriversBlock({ data }: Props) {
             </div>
           </div>
         )}
-
-        {aggregates.quotes.length > 0 && (
-          <div>
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
-              Voz do cliente (vitórias)
-            </p>
-            <div className="space-y-2">
-              {aggregates.quotes.map((q, i) => (
-                <div key={i} className="flex items-start gap-2 text-xs italic text-muted-foreground">
-                  <MessageSquareQuote className="h-3.5 w-3.5 mt-0.5 shrink-0 text-emerald-600" />
-                  <p className="leading-snug">
-                    "{q.feedback.length > 200 ? q.feedback.slice(0, 200) + '…' : q.feedback}"
-                    {q.reason && <span className="not-italic"> — <span className="font-medium">{q.reason}</span></span>}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </CardContent>
     </Card>
   );
 }
+
