@@ -280,14 +280,31 @@ export function OTESellerDetailTab({ results, isLoading, isOTEMode = true, perio
                   </div>
                 </div>
 
-                {/* Drill-down: detalhe transparente das vendas / leads qualificados */}
+                {/* Drill-down: detalhe transparente das vendas / leads qualificados.
+                    Pré-vendas usa fonte ÚNICA (opportunities won + atribuição histórica). */}
                 <div className="mt-6 pt-4 border-t">
-                  <OTESellerSalesDrilldown
-                    records={allRecords.filter((r) => r.ote_result_id === result.id)}
-                    kind={result.goal_type === 'leads' ? 'qualified_lead' : 'sale'}
-                    loading={recordsLoading}
-                  />
+                  {result.goal_type === 'leads' ? (
+                    period ? (
+                      <OTESellerQualifiedLeadsDrilldown
+                        userId={result.user_id}
+                        userName={result.profile?.full_name}
+                        period={period}
+                        expectedCount={qualifierMap.get(result.user_id) ?? Number(result.total_sales || 0)}
+                      />
+                    ) : (
+                      <div className="text-sm text-muted-foreground py-4">
+                        Período não informado para detalhar qualificações.
+                      </div>
+                    )
+                  ) : (
+                    <OTESellerSalesDrilldown
+                      records={allRecords.filter((r) => r.ote_result_id === result.id)}
+                      kind="sale"
+                      loading={recordsLoading}
+                    />
+                  )}
                 </div>
+
 
 
                 {/* Rodapé: somente timestamp de cálculo. Status/flag removidos
