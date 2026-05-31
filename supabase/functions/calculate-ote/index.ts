@@ -77,15 +77,9 @@ serve(async (req) => {
 
     const { data: rawSellerConfigs } = await configQuery;
 
-    // Filter only active organization members
-    const { data: activeMembers } = await supabase
-      .from('organization_members')
-      .select('user_id')
-      .eq('organization_id', organizationId)
-      .eq('status', 'active');
-
-    const activeMemberIds = new Set(activeMembers?.map(m => m.user_id) || []);
-    const sellerConfigs = rawSellerConfigs?.filter(c => activeMemberIds.has(c.user_id)) || [];
+    // Histórico imutável: não filtrar somente membros ativos. Usuários inativos/excluídos
+    // com configuração OTE vigente no período precisam continuar no cálculo histórico.
+    const sellerConfigs = rawSellerConfigs || [];
 
     if (!sellerConfigs || sellerConfigs.length === 0) {
       console.log('No seller configs found');
@@ -147,6 +141,23 @@ serve(async (req) => {
     const [year, month] = periodMonth.split('-').map(Number);
     const startDate = new Date(year, month - 1, 1).toISOString();
     const endDate = new Date(year, month, 0, 23, 59, 59).toISOString();
+
+    // Reprocessamento limpo do período: remove detalhes antigos antes de recalcular,
+    // evitando mistura/duplicação de regras antigas com a regra atual.
+    let oldResultsQuery = supabase
+      .from('ote_monthly_results')
+      .select('id')
+      .eq('organization_id', organizationId)
+      .eq('period_month', periodMonth);
+    if (userId) oldResultsQuery = oldResultsQuery.eq('user_id', userId);
+    const { data: oldResults } = await oldResultsQuery;
+    const oldResultIds = (oldResults || []).map((r: any) => r.id);
+    if (oldResultIds.length > 0) {
+      await supabase
+        .from('ote_sales_records')
+        .delete()
+        .in('ote_result_id', oldResultIds);
+    }
 
     const results = [];
 
