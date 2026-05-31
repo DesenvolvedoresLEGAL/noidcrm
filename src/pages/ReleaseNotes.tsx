@@ -9,8 +9,14 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Search, Sparkles, Bug, Wrench, Shield, Zap, Package, Calendar, TrendingUp, Star, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Search, Sparkles, Bug, Wrench, Shield, Zap, Package, Calendar, TrendingUp, Star, ArrowUpDown, ArrowUp, ArrowDown, FileEdit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { usePlatformAdmin } from '@/hooks/usePlatformAdmin';
+import { GenerateReleaseDraftButton } from '@/components/admin/release-notes/GenerateReleaseDraftButton';
+import { DraftsTab } from '@/components/admin/release-notes/DraftsTab';
+import { useReleaseDrafts } from '@/hooks/useReleaseNotesAdmin';
+import { TabsContent } from '@/components/ui/tabs';
+
 
 interface ChangeItem {
   type: string;
@@ -54,24 +60,31 @@ export default function ReleaseNotes() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc'); // asc = oldest first, desc = newest first
   const timelineRef = useRef<HTMLDivElement>(null);
 
+  const { isSuperAdmin, isPlatformAdmin } = usePlatformAdmin();
+  const canManageDrafts = isPlatformAdmin || isSuperAdmin;
+  const [activeView, setActiveView] = useState<'published' | 'drafts'>('published');
+  const { data: drafts = [] } = useReleaseDrafts();
+
   const { data: releases = [], isLoading } = useQuery({
-    queryKey: ['release-notes'],
+    queryKey: ['release-notes', 'published'],
     queryFn: async () => {
+      // Use the public view that filters out drafts/discarded server-side
       const { data, error } = await supabase
-        .from('release_notes')
+        .from('v_release_notes_public' as any)
         .select('*');
       
       if (error) throw error;
       
       // Sort by semantic version (oldest first: 1.0.0 -> 1.24.0)
-      const sorted = (data || []).sort((a, b) => compareVersions(a.version, b.version));
+      const sorted = ((data as any[]) || []).sort((a, b) => compareVersions(a.version, b.version));
       
-      return sorted.map(item => ({
+      return sorted.map((item: any) => ({
         ...item,
         changes: (item.changes as unknown as ChangeItem[]) || [],
       })) as ReleaseNote[];
     },
   });
+
 
   // Auto-scroll to latest version on load
   useEffect(() => {
