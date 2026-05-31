@@ -376,7 +376,8 @@ export function useOTEMonthlyResults(periodMonth?: string) {
       const { data: results, error } = await query;
       if (error) throw error;
 
-      // Fetch profiles for user names
+      // Fetch profiles for user names. Não remover usuários sem profile: resultados
+      // históricos de usuários excluídos/inativos precisam permanecer visíveis.
       const userIds = results?.map(r => r.user_id) || [];
       if (userIds.length > 0) {
         const { data: profiles } = await supabase
@@ -385,9 +386,7 @@ export function useOTEMonthlyResults(periodMonth?: string) {
           .in('user_id', userIds);
         
         const profileMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
-        // Filter out results for users who no longer have a profile (deleted users)
         return results
-          ?.filter(r => profileMap.has(r.user_id))
           .map(r => ({
             ...r,
             profile: profileMap.get(r.user_id) || undefined,
