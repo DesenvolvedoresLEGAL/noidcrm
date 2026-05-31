@@ -1,7 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertTriangle, TrendingUp, TrendingDown, Target, Lightbulb } from 'lucide-react';
+import { AlertTriangle, TrendingUp, TrendingDown, Target, Lightbulb, Brain, Eye, RotateCcw } from 'lucide-react';
+import type { LossSemanticAggregates } from '@/hooks/useLossSemantic';
+import { getLossCategoryLabel } from '@/utils/category-labels';
 
 interface SmartAlertsCardProps {
   losses: Array<{
@@ -19,6 +21,7 @@ interface SmartAlertsCardProps {
   lossReasons: Array<{ reason: string; count: number }>;
   isLoading: boolean;
   contextLabel: string;
+  semantic?: LossSemanticAggregates;
 }
 
 interface Alert {
@@ -28,7 +31,10 @@ interface Alert {
   severity: 'high' | 'medium' | 'low';
 }
 
-export function SmartAlertsCard({ losses, lossReasons, isLoading, contextLabel }: SmartAlertsCardProps) {
+const fmtBRL = (v: number) =>
+  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v);
+
+export function SmartAlertsCard({ losses, lossReasons, isLoading, contextLabel, semantic }: SmartAlertsCardProps) {
   const alerts: Alert[] = [];
 
   if (losses && losses.length > 0 && lossReasons.length > 0) {
