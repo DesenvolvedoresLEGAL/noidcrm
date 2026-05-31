@@ -482,14 +482,18 @@ Deno.serve(async (req) => {
         items_used: fresh.length,
         github_prs: ghItems.length,
         system_events: sysItems.length,
+        ai_fallback_used: aiFallbackUsed,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (e) {
     console.error("[release-draft] fatal", e);
+    await logSystemEvent(supa, "release_note_generation_failed",
+      { reason: "internal_error", message: (e as Error).message?.slice(0, 200) }, callerId);
     return new Response(
-      JSON.stringify({ error: "internal_error", message: (e as Error).message }),
+      JSON.stringify({ error: "internal_error", message: "Falha interna ao gerar rascunho. Verifique os logs." }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
 });
+
