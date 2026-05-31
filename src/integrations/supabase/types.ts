@@ -20847,6 +20847,13 @@ export type Database = {
             referencedRelation: "release_notes"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "pending_release_changes_release_note_id_fkey"
+            columns: ["release_note_id"]
+            isOneToOne: false
+            referencedRelation: "v_release_notes_public"
+            referencedColumns: ["id"]
+          },
         ]
       }
       performance_activities: {
@@ -25416,10 +25423,14 @@ export type Database = {
           changes: Json
           created_at: string | null
           description: string | null
+          generated_by: string | null
           id: string
           is_major: boolean | null
           organization_id: string | null
+          published_at: string | null
           release_date: string
+          source_summary: Json
+          status: string
           title: string
           version: string
         }
@@ -25427,10 +25438,14 @@ export type Database = {
           changes?: Json
           created_at?: string | null
           description?: string | null
+          generated_by?: string | null
           id?: string
           is_major?: boolean | null
           organization_id?: string | null
+          published_at?: string | null
           release_date?: string
+          source_summary?: Json
+          status?: string
           title: string
           version: string
         }
@@ -25438,10 +25453,14 @@ export type Database = {
           changes?: Json
           created_at?: string | null
           description?: string | null
+          generated_by?: string | null
           id?: string
           is_major?: boolean | null
           organization_id?: string | null
+          published_at?: string | null
           release_date?: string
+          source_summary?: Json
+          status?: string
           title?: string
           version?: string
         }
@@ -25459,6 +25478,48 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
+          },
+        ]
+      }
+      release_notes_ingestion_log: {
+        Row: {
+          external_id: string
+          id: string
+          included_in_release: string | null
+          ingested_at: string
+          payload: Json
+          source: string
+        }
+        Insert: {
+          external_id: string
+          id?: string
+          included_in_release?: string | null
+          ingested_at?: string
+          payload?: Json
+          source: string
+        }
+        Update: {
+          external_id?: string
+          id?: string
+          included_in_release?: string | null
+          ingested_at?: string
+          payload?: Json
+          source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "release_notes_ingestion_log_included_in_release_fkey"
+            columns: ["included_in_release"]
+            isOneToOne: false
+            referencedRelation: "release_notes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "release_notes_ingestion_log_included_in_release_fkey"
+            columns: ["included_in_release"]
+            isOneToOne: false
+            referencedRelation: "v_release_notes_public"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -33439,6 +33500,60 @@ export type Database = {
           },
           {
             foreignKeyName: "proposals_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_report_legacy_retirement_readiness_v2"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
+      v_release_notes_public: {
+        Row: {
+          changes: Json | null
+          created_at: string | null
+          description: string | null
+          id: string | null
+          is_major: boolean | null
+          organization_id: string | null
+          published_at: string | null
+          release_date: string | null
+          title: string | null
+          version: string | null
+        }
+        Insert: {
+          changes?: Json | null
+          created_at?: string | null
+          description?: string | null
+          id?: string | null
+          is_major?: boolean | null
+          organization_id?: string | null
+          published_at?: string | null
+          release_date?: string | null
+          title?: string | null
+          version?: string | null
+        }
+        Update: {
+          changes?: Json | null
+          created_at?: string | null
+          description?: string | null
+          id?: string | null
+          is_major?: boolean | null
+          organization_id?: string | null
+          published_at?: string | null
+          release_date?: string | null
+          title?: string | null
+          version?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "release_notes_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "release_notes_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
