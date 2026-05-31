@@ -47,7 +47,7 @@ function isPreSalesRole(r: OTEMonthlyResult) {
 export function OTEOverviewTab({ results, records = [], isLoading, period, isOTEMode = true }: OTEOverviewTabProps) {
   const { config } = useSalesConfig();
   const { organization } = useCurrentOrganization();
-  const [showReconciliation, setShowReconciliation] = useState(false);
+  
 
   const flagBlueThreshold = config?.flag_blue_threshold ?? 70;
   const flagYellowMinThreshold = config?.flag_yellow_min_threshold ?? 50;
