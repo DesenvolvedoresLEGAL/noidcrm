@@ -149,6 +149,13 @@ export function OpportunityHistoryTab({ opportunityId }: OpportunityHistoryTabPr
   return (
     <div className="space-y-4">
 
+      {/* Análise Semântica IA (apenas para perdas) */}
+      {winLossRecord?.outcome === 'lost' && (
+        <SemanticAnalysisCard opportunityId={opportunityId} />
+      )}
+
+
+
       {/* Win/Loss Card */}
       {winLossRecord && winLossRecord.outcome === 'won' && (winLossRecord.win_reason_id || winLossRecord.key_differentiator || winLossRecord.customer_feedback) && (
         <Card className="p-4 bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800">
