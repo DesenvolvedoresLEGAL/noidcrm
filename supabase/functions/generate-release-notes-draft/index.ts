@@ -336,46 +336,56 @@ Deno.serve(async (req) => {
     }));
 
     const today = new Date().toISOString().slice(0, 10);
-    const aiRes = await callAI({
-      model: "openai/gpt-5-mini",
-      response_format: { type: "json_object" },
-      feature: "release-notes-draft",
-      messages: [
-        {
-          role: "system",
-          content:
-            `Hoje é ${today} (America/Sao_Paulo). Você é um redator técnico de release notes do NOID RevenueOS (CRM brasileiro). ` +
-            `Receberá uma lista bruta de PRs do GitHub mergeados e eventos internos das últimas ${period_days} dias. ` +
-            `Sua tarefa: agrupar tematicamente, eliminar ruído técnico, e produzir um rascunho executivo em pt-BR. ` +
-            `Cada item de 'changes' deve ser uma frase clara para usuário final (não jargão de commit). ` +
-            `Tipos permitidos: feature, fix, improvement, security. ` +
-            `Marque is_major=true APENAS se houver mudança grande (nova área do produto, refactor significativo, breaking change). ` +
-            `Saída APENAS JSON válido: { title, description, is_major, changes: [{type, description}] }.`,
-        },
-        {
-          role: "user",
-          content: JSON.stringify({ period_days, items: inputForAI }, null, 2),
-        },
-      ],
-    });
 
-    let aiJson: unknown;
+    // 3. Sumarização via IA com fallback determinístico
+    let ai: { title: string; description: string; is_major: boolean; changes: Array<{ type: "feature"|"fix"|"improvement"|"security"; description: string }> };
+    let aiFallbackUsed = false;
     try {
-      aiJson = JSON.parse(aiRes.content);
-    } catch {
-      // Tenta extrair bloco JSON
-      const m = aiRes.content.match(/\{[\s\S]*\}/);
-      aiJson = m ? JSON.parse(m[0]) : null;
+      const aiRes = await callAI({
+        model: "openai/gpt-5-mini",
+        response_format: { type: "json_object" },
+        feature: "release-notes-draft",
+        messages: [
+          {
+            role: "system",
+            content:
+              `Hoje é ${today} (America/Sao_Paulo). Você é um redator técnico de release notes do NOID RevenueOS (CRM brasileiro). ` +
+              `Receberá uma lista bruta de PRs do GitHub mergeados e eventos internos das últimas ${period_days} dias. ` +
+              `Sua tarefa: agrupar tematicamente, eliminar ruído técnico, e produzir um rascunho executivo em pt-BR. ` +
+              `Cada item de 'changes' deve ser uma frase clara para usuário final (não jargão de commit). ` +
+              `Não inclua tokens, IDs internos, nomes de tabelas, stack traces, dados pessoais ou metadados sensíveis. ` +
+              `Tipos permitidos: feature, fix, improvement, security. ` +
+              `Marque is_major=true APENAS se houver mudança grande (nova área, refactor significativo, breaking change). ` +
+              `Saída APENAS JSON válido: { title, description, is_major, changes: [{type, description}] }.`,
+          },
+          { role: "user", content: JSON.stringify({ period_days, items: inputForAI }, null, 2) },
+        ],
+      });
+      let aiJson: unknown;
+      try { aiJson = JSON.parse(aiRes.content); }
+      catch {
+        const m = aiRes.content.match(/\{[\s\S]*\}/);
+        aiJson = m ? JSON.parse(m[0]) : null;
+      }
+      const aiParsed = AIResponseSchema.safeParse(aiJson);
+      if (!aiParsed.success) {
+        console.error("[release-draft] AI invalid output, using fallback", aiParsed.error.flatten());
+        await logSystemEvent(supa, "release_note_generation_failed",
+          { reason: "ai_output_invalid", period_days, items: fresh.length }, callerId);
+        ai = deterministicDraft(fresh, period_days);
+        aiFallbackUsed = true;
+      } else {
+        ai = aiParsed.data as typeof ai;
+      }
+    } catch (e) {
+      console.error("[release-draft] AI call failed, using deterministic fallback", e);
+      await logSystemEvent(supa, "release_note_generation_failed",
+        { reason: "ai_call_error", message: (e as Error).message?.slice(0, 200), period_days, items: fresh.length }, callerId);
+      ai = deterministicDraft(fresh, period_days);
+      aiFallbackUsed = true;
     }
-    const aiParsed = AIResponseSchema.safeParse(aiJson);
-    if (!aiParsed.success) {
-      console.error("[release-draft] AI output invalid", aiParsed.error.flatten(), aiRes.content?.slice(0, 500));
-      return new Response(
-        JSON.stringify({ error: "ai_output_invalid", details: aiParsed.error.flatten() }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
-    const ai = aiParsed.data;
+
+
 
     // 4. Idempotência: se já houver draft aberto, anexa ao invés de criar novo
     const { data: openDraft } = await supa
