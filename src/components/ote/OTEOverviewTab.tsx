@@ -261,10 +261,6 @@ export function OTEOverviewTab({ results, records = [], isLoading, period, isOTE
         </Card>
       </div>
 
-      {/* Faixa de reconciliação OTE */}
-      <Card className={cn(hasReconciliationIssue && 'border-destructive/40 bg-destructive/5')}>
-        <CardContent className="py-3 text-sm flex flex-wrap items-center gap-2">
-          <span className="font-medium">Reconciliação OTE:</span>
       {/* Reconciliação OTE — colapsável (visão executiva limpa). */}
       <Collapsible open={showReconciliation} onOpenChange={setShowReconciliation}>
         <div className="flex items-center gap-2 text-sm">
