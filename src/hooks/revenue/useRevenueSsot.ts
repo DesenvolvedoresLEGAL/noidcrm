@@ -36,6 +36,16 @@ export function useClosedRevenueSummary(params: Partial<RevenueSsotParams> & { s
   });
 }
 
+export function useOfficialEligibleRevenueSummary(params: Partial<RevenueSsotParams> & { surface: string }) {
+  const enabled = Boolean(params.organizationId && params.start && params.end);
+  return useQuery<ClosedRevenueSummary | null>({
+    queryKey: [SURFACE_PREFIX, 'official-eligible-summary', params.surface, params.organizationId, params.start, params.end, params.pipelineIds ?? null],
+    enabled,
+    staleTime: 30_000,
+    queryFn: () => revenueSsotService.getOfficialEligibleRevenueSummary(params as RevenueSsotParams),
+  });
+}
+
 export function useRevenueBySeller(params: Partial<RevenueSsotParams> & { surface: string }) {
   const enabled = Boolean(params.organizationId && params.start && params.end);
   return useQuery<RevenueGroup[]>({
@@ -75,6 +85,16 @@ export function useHistoricalRevenueBySeller(params: Partial<RevenueSsotParams> 
     enabled,
     staleTime: 30_000,
     queryFn: () => revenueSsotService.getHistoricalRevenueBySeller(params as RevenueSsotParams),
+  });
+}
+
+export function useOfficialHistoricalRevenueBySeller(params: Partial<RevenueSsotParams> & { surface: string }) {
+  const enabled = Boolean(params.organizationId && params.start && params.end);
+  return useQuery<RevenueGroup[]>({
+    queryKey: [SURFACE_PREFIX, 'official-historical-by-seller', params.surface, params.organizationId, params.start, params.end, params.pipelineIds ?? null],
+    enabled,
+    staleTime: 30_000,
+    queryFn: () => revenueSsotService.getOfficialHistoricalRevenueBySeller(params as RevenueSsotParams),
   });
 }
 

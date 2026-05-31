@@ -77,15 +77,9 @@ serve(async (req) => {
 
     const { data: rawSellerConfigs } = await configQuery;
 
-    // Filter only active organization members
-    const { data: activeMembers } = await supabase
-      .from('organization_members')
-      .select('user_id')
-      .eq('organization_id', organizationId)
-      .eq('status', 'active');
-
-    const activeMemberIds = new Set(activeMembers?.map(m => m.user_id) || []);
-    const sellerConfigs = rawSellerConfigs?.filter(c => activeMemberIds.has(c.user_id)) || [];
+    // Histórico imutável: não filtrar somente membros ativos. Usuários inativos/excluídos
+    // com configuração OTE vigente no período precisam continuar no cálculo histórico.
+    const sellerConfigs = rawSellerConfigs || [];
 
     if (!sellerConfigs || sellerConfigs.length === 0) {
       console.log('No seller configs found');
@@ -147,6 +141,23 @@ serve(async (req) => {
     const [year, month] = periodMonth.split('-').map(Number);
     const startDate = new Date(year, month - 1, 1).toISOString();
     const endDate = new Date(year, month, 0, 23, 59, 59).toISOString();
+
+    // Reprocessamento limpo do período: remove detalhes antigos antes de recalcular,
+    // evitando mistura/duplicação de regras antigas com a regra atual.
+    let oldResultsQuery = supabase
+      .from('ote_monthly_results')
+      .select('id')
+      .eq('organization_id', organizationId)
+      .eq('period_month', periodMonth);
+    if (userId) oldResultsQuery = oldResultsQuery.eq('user_id', userId);
+    const { data: oldResults } = await oldResultsQuery;
+    const oldResultIds = (oldResults || []).map((r: any) => r.id);
+    if (oldResultIds.length > 0) {
+      await supabase
+        .from('ote_sales_records')
+        .delete()
+        .in('ote_result_id', oldResultIds);
+    }
 
     const results = [];
 
@@ -229,25 +240,46 @@ serve(async (req) => {
           console.log(`No team found for manager ${config.user_id}`);
         }
       } else {
-        // Individual target - get only this seller's opportunities, filtered by pipeline type
-        let indQuery = supabase
-          .from('opportunities')
-          .select('id, valor_previsto, commission_value, title, closed_at, updated_at, pipeline_id, account:accounts(razao_social, nome_fantasia)')
-          .eq('organization_id', organizationId)
-          .eq('owner_user_id', config.user_id)
-          .eq('status', 'won');
-
-        if (relevantPipelineIds.length > 0) {
-          indQuery = indQuery.in('pipeline_id', relevantPipelineIds);
+        if (goalType === 'leads') {
+          const { data: qualRows } = await supabase
+            .from('opportunity_qualification_history')
+            .select('opportunity_id, qualification_at')
+            .eq('organization_id', organizationId)
+            .eq('qualified_by_user_id', config.user_id)
+            .gte('qualification_at', startDate)
+            .lte('qualification_at', endDate);
+          const oppIds = Array.from(new Set((qualRows || []).map((r: any) => r.opportunity_id).filter(Boolean)));
+          if (oppIds.length > 0) {
+            const { data: qualOpps } = await supabase
+              .from('opportunities')
+              .select('id, valor_previsto, commission_value, title, closed_at, updated_at, pipeline_id, account:accounts(razao_social, nome_fantasia)')
+              .eq('organization_id', organizationId)
+              .in('id', oppIds);
+            const qualAtMap = new Map((qualRows || []).map((r: any) => [r.opportunity_id, r.qualification_at]));
+            opportunities = (qualOpps || []).map((opp: any) => ({
+              ...opp,
+              closed_at: qualAtMap.get(opp.id) || opp.closed_at || opp.updated_at,
+            }));
+          }
+        } else {
+          let histQuery = supabase
+            .from('commercial_won_revenue_historical_view')
+            .select('opportunity_id, account_name, nome_fantasia, seller_id, won_at, approved_at, accepted_at, cancelled_at, pipeline_id')
+            .eq('organization_id', organizationId)
+            .eq('seller_id', config.user_id)
+            .or(`and(approved_at.gte.${startDate},approved_at.lte.${endDate}),and(approved_at.is.null,accepted_at.gte.${startDate},accepted_at.lte.${endDate}),and(is_cancelled_sale.eq.true,cancelled_at.gte.${startDate},cancelled_at.lte.${endDate})`);
+          if (relevantPipelineIds.length > 0) histQuery = histQuery.in('pipeline_id', relevantPipelineIds);
+          const { data: histRows } = await histQuery;
+          opportunities = (histRows || []).map((row: any) => ({
+            id: row.opportunity_id,
+            title: row.nome_fantasia || row.account_name || 'Venda realizada',
+            owner_user_id: row.seller_id,
+            closed_at: row.approved_at || row.accepted_at || row.cancelled_at || row.won_at,
+            updated_at: row.approved_at || row.accepted_at || row.cancelled_at || row.won_at,
+            pipeline_id: row.pipeline_id,
+            account: { razao_social: row.account_name, nome_fantasia: row.nome_fantasia },
+          }));
         }
-
-        const { data: individualOpportunities } = await indQuery;
-        
-        // Post-filter by closed_at (primary) or updated_at (fallback) within period
-        opportunities = (individualOpportunities || []).filter(opp => {
-          const closeDate = new Date((opp as any).closed_at || opp.updated_at);
-          return closeDate >= new Date(startDate) && closeDate <= new Date(endDate);
-        });
       }
 
       // === SSoT enrichment (revenue only) ===

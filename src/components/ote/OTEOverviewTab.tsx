@@ -5,7 +5,7 @@ import { useSalesConfig } from '@/hooks/useSalesConfig';
 import type { OTESalesRecord } from '@/hooks/useOTESalesRecords';
 import { aggregateEligible } from './oteEligibility';
 import { FLAG_LABELS } from '@/lib/results/resultsMode';
-import { useClosedRevenueSummary, useHistoricalRevenueBySeller } from '@/hooks/revenue/useRevenueSsot';
+import { useOfficialEligibleRevenueSummary, useOfficialHistoricalRevenueBySeller } from '@/hooks/revenue/useRevenueSsot';
 import { useHistoricalQualifiers } from '@/hooks/results/useHistoricalQualifiers';
 import { useActiveUsers } from '@/hooks/users/useActiveUsers';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
@@ -31,6 +31,19 @@ interface OTEOverviewTabProps {
   isOTEMode?: boolean;
 }
 
+const REVENUE_LEVEL_RE = /closer|executor|rainmaker|dealmaker|strategic/i;
+const LEADS_LEVEL_RE = /sdr|pré|pre|hunter|scout|bdr|sniper/i;
+
+function isRevenueRole(r: OTEMonthlyResult) {
+  const level = `${r.level_name_snapshot ?? ''} ${(r.ote_level as any)?.level_code ?? ''}`;
+  return (r.goal_type || 'revenue') === 'revenue' && !r.is_team_target && REVENUE_LEVEL_RE.test(level);
+}
+
+function isPreSalesRole(r: OTEMonthlyResult) {
+  const level = `${r.level_name_snapshot ?? ''} ${(r.ote_level as any)?.level_code ?? ''}`;
+  return r.goal_type === 'leads' && !r.is_team_target && LEADS_LEVEL_RE.test(level);
+}
+
 export function OTEOverviewTab({ results, records = [], isLoading, period, isOTEMode = true }: OTEOverviewTabProps) {
   const { config } = useSalesConfig();
   const { organization } = useCurrentOrganization();
@@ -49,11 +62,11 @@ export function OTEOverviewTab({ results, records = [], isLoading, period, isOTE
     start: periodStart,
     end: periodEnd,
   };
-  const { data: ssotSummary, isError: ssotError } = useClosedRevenueSummary(ssotParams as any);
+  const { data: ssotSummary, isError: ssotError } = useOfficialEligibleRevenueSummary(ssotParams as any);
   // Atribuição histórica imutável: vendedor no momento do ganho (não dono atual).
-  const { data: ssotBySeller = [] } = useHistoricalRevenueBySeller(ssotParams as any);
-  const ssotBySellerMap = new Map<string, { total: number; name: string }>(
-    ssotBySeller.map((g) => [g.key, { total: g.total, name: g.label }]),
+  const { data: ssotBySeller = [] } = useOfficialHistoricalRevenueBySeller(ssotParams as any);
+  const ssotBySellerMap = new Map<string, { total: number; name: string; confidence?: string | null }>(
+    ssotBySeller.map((g) => [g.key, { total: g.total, name: g.label, confidence: g.attributionConfidence }]),
   );
   // SDR histórico por qualificação (não dono atual do lead).
   const { data: historicalQualifiers = [] } = useHistoricalQualifiers({
@@ -80,8 +93,8 @@ export function OTEOverviewTab({ results, records = [], isLoading, period, isOTE
   const individualResults = results.filter(r => !r.is_team_target);
 
   // Further split individuals by goal_type
-  const revenueResults = individualResults.filter(r => (r.goal_type || 'revenue') === 'revenue');
-  const leadsResults = individualResults.filter(r => r.goal_type === 'leads');
+  const revenueResults = individualResults.filter(isRevenueRole);
+  const leadsResults = individualResults.filter(isPreSalesRole);
 
   // KPIs
   const totalToPay = results.reduce((sum, r) => sum + r.final_variable_amount, 0);
@@ -96,7 +109,7 @@ export function OTEOverviewTab({ results, records = [], isLoading, period, isOTE
   const revenueRecords = records.filter((r) => revenueResultIds.has(r.ote_result_id));
   const { eligibleTotal: oteEligible } = aggregateEligible(revenueRecords);
   const ssotAvailable = !!ssotSummary && !ssotError;
-  const commercialEligible = ssotAvailable ? Number(ssotSummary!.eligible || ssotSummary!.total || 0) : 0;
+  const commercialEligible = ssotAvailable ? Number(ssotSummary!.eligible || 0) : 0;
   const itemsOutOfGoal = Math.max(0, commercialEligible - oteEligible);
 
   // Eligible per seller (para a coluna "Receita elegível OTE" da tabela Closers).
@@ -155,6 +168,13 @@ export function OTEOverviewTab({ results, records = [], isLoading, period, isOTE
   // Validação de reconciliação OTE.
   const reconciliationDelta = commercialEligible - itemsOutOfGoal - oteEligible;
   const hasReconciliationIssue = !ssotAvailable || Math.abs(reconciliationDelta) > 0.01 || oteEligible > commercialEligible + 0.01;
+  const closerCommercialSubtotal = revenueResults.reduce((sum, r) => sum + (ssotBySellerMap.get(r.user_id)?.total ?? 0), 0);
+  const syntheticCloserRows = Array.from(ssotBySellerMap.entries())
+    .filter(([uid]) => uid !== '__pending__' && !revenueResults.some((r) => r.user_id === uid))
+    .filter(([, v]) => (v.total ?? 0) > 0)
+    .sort((a, b) => b[1].total - a[1].total);
+  const pendingAttributionTotal = ssotBySellerMap.get('__pending__')?.total ?? 0;
+  const impossibleSellerTotal = Array.from(ssotBySellerMap.values()).some((v) => v.total > commercialEligible + 0.01);
 
   return (
     <div className="space-y-6">
@@ -255,6 +275,15 @@ export function OTEOverviewTab({ results, records = [], isLoading, period, isOTE
           )}
         </CardContent>
       </Card>
+
+      {(pendingAttributionTotal > 0 || impossibleSellerTotal) && (
+        <Card className="border-destructive/40 bg-destructive/5">
+          <CardContent className="py-3 text-sm flex items-center gap-2 text-destructive">
+            <AlertTriangle className="h-4 w-4" />
+            Existem vendas/leads sem responsável histórico confiável ou agregação impossível. Revise a atribuição antes do fechamento do OTE.
+          </CardContent>
+        </Card>
+      )}
 
       {/* Flag Summary com labels executivos */}
       <div className="grid grid-cols-3 gap-4">
@@ -362,10 +391,7 @@ export function OTEOverviewTab({ results, records = [], isLoading, period, isOTE
                   })}
                   {/* Vendedores históricos com receita no período mas sem ote_monthly_results
                       (ex.: usuários excluídos/desligados após o fechamento). */}
-                  {Array.from(ssotBySellerMap.entries())
-                    .filter(([uid]) => !revenueResults.some((r) => r.user_id === uid))
-                    .filter(([, v]) => (v.total ?? 0) > 0)
-                    .sort((a, b) => b[1].total - a[1].total)
+                  {syntheticCloserRows
                     .map(([uid, v]) => {
                       const isActive = activeUserIds.has(uid);
                       const name = activeUserNameMap.get(uid) || v.name || uid.slice(0, 8) + '...';
@@ -397,7 +423,7 @@ export function OTEOverviewTab({ results, records = [], isLoading, period, isOTE
                 <tfoot>
                   <tr className="bg-muted/30 font-semibold">
                     <td colSpan={3} className="py-3 px-2">SUBTOTAL CLOSERS</td>
-                    <td className="py-3 px-2 text-right hidden lg:table-cell">{formatCurrency(commercialEligible)}</td>
+                    <td className="py-3 px-2 text-right hidden lg:table-cell">{formatCurrency(closerCommercialSubtotal + syntheticCloserRows.reduce((s, [, v]) => s + v.total, 0))}</td>
                     <td className="py-3 px-2 text-right">{formatCurrency(oteEligible)}</td>
                     <td colSpan={5} className="py-3 px-2"></td>
                     <td className="py-3 px-2 text-right text-primary">
@@ -474,6 +500,7 @@ export function OTEOverviewTab({ results, records = [], isLoading, period, isOTE
                       (ex.: Ana excluída/transferida — leads continuam dela). */}
                   {Array.from(qualifierMap.entries())
                     .filter(([uid]) => !leadsResults.some((r) => r.user_id === uid))
+                    .filter(([uid]) => !revenueResults.some((r) => r.user_id === uid))
                     .filter(([, n]) => n > 0)
                     .sort((a, b) => b[1] - a[1])
                     .map(([uid, n]) => {
