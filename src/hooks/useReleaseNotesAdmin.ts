@@ -18,9 +18,17 @@ export type ReleaseDraft = {
   created_at: string;
 };
 
-export function useReleaseDrafts() {
+/**
+ * Lista rascunhos de release notes.
+ *
+ * IMPORTANTE: passe `enabled=canManageDrafts` (platform/super admin) para evitar
+ * que usuários não-admin disparem a query — a RLS já bloqueia, mas evitamos um
+ * round-trip desnecessário ao Postgres.
+ */
+export function useReleaseDrafts(enabled: boolean = true) {
   return useQuery({
     queryKey: ["release-notes", "drafts"],
+    enabled,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("release_notes")
@@ -33,6 +41,34 @@ export function useReleaseDrafts() {
         changes: Array.isArray(r.changes) ? r.changes : [],
         source_summary: r.source_summary || {},
       })) as ReleaseDraft[];
+    },
+  });
+}
+
+/**
+ * Verifica se o GitHub está configurado para enriquecer drafts com PRs reais.
+ *
+ * Requer as seguintes env vars na edge function `generate-release-notes-draft`:
+ *   - GITHUB_API_KEY        (token do connector GitHub via Lovable Gateway)
+ *   - GITHUB_DEFAULT_OWNER  (org/usuário dono do repo)
+ *   - GITHUB_DEFAULT_REPO   (nome do repositório)
+ *
+ * Quando ausentes, o sistema continua gerando drafts apenas com eventos
+ * internos (system_events, action_executions, migrations).
+ *
+ * Só faz sentido chamar para platform admins — passe `enabled` apropriado.
+ */
+export function useGithubReleaseStatus(enabled: boolean) {
+  return useQuery({
+    queryKey: ["release-notes", "github-status"],
+    enabled,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke("release-notes-github-status", {
+        body: {},
+      });
+      if (error) throw error;
+      return data as { configured: boolean; missing: string[] };
     },
   });
 }
