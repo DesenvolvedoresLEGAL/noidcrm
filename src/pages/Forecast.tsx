@@ -117,7 +117,7 @@ export default function Forecast() {
           salesPipelineMissing={!salesPipelineLoading && requiresConfiguration}
         />
 
-        <RevenueSsotBanner variant="migrated" surface="Forecast — Receita Fechada via commercial_won_revenue_view" />
+        <RevenueSsotBanner variant="migrated" surface="Forecast — Receita Fechada líquida de cancelamentos (commercial_won_revenue_view), alinhada a Relatórios → Vendas Realizadas" />
 
         {/* Sprint F2.10 — Estado vazio quando não há pipeline oficial de vendas */}
         {!salesPipelineLoading && !pipelineFound ? (
