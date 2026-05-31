@@ -27,28 +27,35 @@ export function LossReasonsTrendChart({ losses, isLoading, semantic }: LossReaso
   const [mode, setMode] = useState<ViewMode>('declared');
   const hasInferred = !!semantic && semantic.rows.length > 0;
 
-  // Group losses by month and reason
+  // Group losses by month and reason — fonte muda por modo (declarado=vendedor, inferido=IA)
   const trendData = (() => {
-    if (!losses || losses.length === 0) return [];
-
     const monthlyData: Record<string, Record<string, number>> = {};
-    const reasonSet = new Set<string>();
 
-    losses.forEach(loss => {
-      const date = loss.opportunity?.created_at;
-      if (!date) return;
+    if (mode === 'inferred' && hasInferred) {
+      for (const r of semantic!.rows) {
+        const ref = r.closed_at || r.lost_at;
+        if (!ref) continue;
+        const month = new Date(ref).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
+        const reason = getLossCategoryLabel(r.ai_detected_loss_category || 'other');
+        if (!monthlyData[month]) monthlyData[month] = {};
+        monthlyData[month][reason] = (monthlyData[month][reason] || 0) + 1;
+      }
+    } else {
+      if (!losses || losses.length === 0) return [];
+      losses.forEach((loss) => {
+        const date = loss.opportunity?.created_at;
+        if (!date) return;
+        const month = new Date(date).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
+        const reason = (loss.reason as any)?.name || loss.reason_seller || 'Não informado';
+        if (!monthlyData[month]) monthlyData[month] = {};
+        monthlyData[month][reason] = (monthlyData[month][reason] || 0) + 1;
+      });
+    }
 
-      const month = new Date(date).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
-      const reason = (loss.reason as any)?.name || loss.reason_seller || 'Não informado';
-      
-      if (!monthlyData[month]) monthlyData[month] = {};
-      monthlyData[month][reason] = (monthlyData[month][reason] || 0) + 1;
-      reasonSet.add(reason);
-    });
+    if (Object.keys(monthlyData).length === 0) return [];
 
-    // Get top 5 reasons overall
     const reasonTotals: Record<string, number> = {};
-    Object.values(monthlyData).forEach(monthData => {
+    Object.values(monthlyData).forEach((monthData) => {
       Object.entries(monthData).forEach(([reason, count]) => {
         reasonTotals[reason] = (reasonTotals[reason] || 0) + count;
       });
@@ -59,7 +66,6 @@ export function LossReasonsTrendChart({ losses, isLoading, semantic }: LossReaso
       .slice(0, 5)
       .map(([reason]) => reason);
 
-    // Convert to chart data
     const sortedMonths = Object.keys(monthlyData).sort((a, b) => {
       const partsA = a.split('/');
       const partsB = b.split('/');
@@ -70,14 +76,15 @@ export function LossReasonsTrendChart({ losses, isLoading, semantic }: LossReaso
       return dateA.getTime() - dateB.getTime();
     });
 
-    return sortedMonths.slice(-6).map(month => {
+    return sortedMonths.slice(-6).map((month) => {
       const entry: Record<string, any> = { month };
-      topReasons.forEach(reason => {
+      topReasons.forEach((reason) => {
         entry[reason] = monthlyData[month][reason] || 0;
       });
       return entry;
     });
   })();
+
 
   const topReasons = trendData.length > 0 
     ? Object.keys(trendData[0]).filter(k => k !== 'month')
