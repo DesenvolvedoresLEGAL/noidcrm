@@ -186,8 +186,82 @@ async function collectMigrations(periodDays: number): Promise<IngestionItem[]> {
   return [];
 }
 
+function sanitizePayload(p: Record<string, unknown>): Record<string, unknown> {
+  const FORBIDDEN = /(token|secret|api[_-]?key|password|authorization|bearer|cookie|session|stack|trace|email|cpf|cnpj|phone|telefone|whatsapp)/i;
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(p || {})) {
+    if (FORBIDDEN.test(k)) continue;
+    if (typeof v === "string" && v.length > 400) out[k] = v.slice(0, 400);
+    else if (typeof v === "object" && v !== null) {
+      try { out[k] = JSON.parse(JSON.stringify(v)); } catch { /* skip */ }
+    } else out[k] = v;
+  }
+  return out;
+}
+
+function deterministicDraft(items: IngestionItem[], period_days: number) {
+  const changes: Array<{ type: "feature" | "fix" | "improvement" | "security"; description: string }> = [];
+  const ghItems = items.filter((i) => i.source === "github");
+  const sysItems = items.filter((i) => i.source === "system_events");
+  const actItems = items.filter((i) => i.source === "action_executions");
+  for (const pr of ghItems.slice(0, 30)) {
+    const labels = (pr.payload as any)?.labels as string[] | undefined;
+    const type: "feature" | "fix" | "improvement" | "security" =
+      labels?.includes("security") ? "security"
+      : labels?.includes("bug") || labels?.includes("fix") ? "fix"
+      : labels?.includes("feature") ? "feature"
+      : "improvement";
+    changes.push({ type, description: pr.summary.slice(0, 240) });
+  }
+  for (const ev of sysItems.slice(0, 20)) {
+    const cat = (ev.payload as any)?.category as string | undefined;
+    changes.push({ type: cat === "security" ? "security" : "improvement", description: `Evento ${ev.summary}`.slice(0, 240) });
+  }
+  for (const a of actItems.slice(0, 10)) {
+    changes.push({ type: "improvement", description: a.summary.slice(0, 240) });
+  }
+  if (changes.length === 0) {
+    changes.push({ type: "improvement", description: `Atualizações internas dos últimos ${period_days} dias.` });
+  }
+  return {
+    title: `Atualizações dos últimos ${period_days} dias`,
+    description: `Rascunho gerado sem sumarização IA (fallback determinístico). Revise antes de publicar.`,
+    is_major: false,
+    changes: changes.slice(0, 40),
+  };
+}
+
+async function logSystemEvent(
+  supa: ReturnType<typeof createClient>,
+  event_type: string,
+  payload: Record<string, unknown>,
+  actor_id?: string,
+) {
+  try {
+    await supa.from("system_events").insert({
+      trace_id: crypto.randomUUID(),
+      actor_type: actor_id ? "user" : "system",
+      actor_id: actor_id || null,
+      event_type,
+      event_category: "system",
+      action: event_type,
+      entity_type: "release_note",
+      payload,
+    });
+  } catch (e) {
+    console.error("[release-draft] logSystemEvent failed", e);
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  const supa = createClient(
+    Deno.env.get("SUPABASE_URL") ?? "",
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+  );
+
+  let callerId: string | undefined;
 
   try {
     const raw = await req.json().catch(() => ({}));
@@ -200,15 +274,30 @@ Deno.serve(async (req) => {
     }
     const { period_days, trigger, github_owner, github_repo } = parsed.data;
 
-    const supa = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-    );
+    // Auth: manual exige platform admin; scheduled aceita chamada do cron (sem JWT de usuário).
+    if (trigger === "manual") {
+      const token = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "").trim();
+      if (!token) {
+        return new Response(JSON.stringify({ error: "unauthorized" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      const { data: userRes } = await supa.auth.getUser(token);
+      const uid = userRes?.user?.id;
+      if (!uid) {
+        return new Response(JSON.stringify({ error: "unauthorized" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      const { data: isAdmin } = await supa.rpc("is_platform_admin", { _user_id: uid });
+      if (!isAdmin) {
+        return new Response(JSON.stringify({ error: "forbidden" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      callerId = uid;
+    }
 
     const periodEnd = new Date();
     const periodStart = new Date(Date.now() - period_days * 86400_000);
 
-    // 1. Coleta
     const [ghItems, sysItems, migItems] = await Promise.all([
       collectGitHubPRs({
         periodDays: period_days,
@@ -218,9 +307,9 @@ Deno.serve(async (req) => {
       collectSystemSignals(supa, period_days),
       collectMigrations(period_days),
     ]);
-    const all: IngestionItem[] = [...ghItems, ...sysItems, ...migItems];
+    const all: IngestionItem[] = [...ghItems, ...sysItems, ...migItems]
+      .map((i) => ({ ...i, payload: sanitizePayload(i.payload) }));
 
-    // 2. Dedupe contra log
     const keys = all.map((i) => i.external_id);
     const { data: existing } = await supa
       .from("release_notes_ingestion_log")
@@ -233,10 +322,11 @@ Deno.serve(async (req) => {
 
     if (fresh.length === 0) {
       return new Response(
-        JSON.stringify({ success: true, created: false, message: "Nenhuma novidade no período." }),
+        JSON.stringify({ success: true, created: false, message: "Nenhuma novidade no período.", items_used: 0 }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
+
 
     // 3. Sumariza via IA
     const inputForAI = fresh.map((i) => ({
