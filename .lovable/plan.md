@@ -1,125 +1,72 @@
+## Release v1.34.0 — Inteligência de Perdas, OTE Auditável & Receita Líquida
 
-# Inteligência Semântica das Perdas — Motor da Visão Geral do Win/Loss Hub
+**Data:** 31/05/2026 · **Tipo:** Major (`is_major = true`) · **Tabela:** `release_notes`
 
-A IA semântica é o motor invisível da Visão Geral. Não cria aba nova. Alimenta os blocos executivos para o gestor responder em 30s: por que perdemos, o que é inconsistente, quanto isso vale, o que fazer agora.
+Próxima versão após a 1.33.0 (15/05/2026). Cobre os avanços das últimas duas semanas.
 
-## Backend (inalterado vs. plano anterior)
+### Título e descrição
 
-### Migration
-- Tabela `loss_semantic_analyses` (1 linha por oportunidade perdida), com:
-  - `source_texts jsonb` (vendedor + cliente + free_text, com origem)
-  - `ai_detected_loss_category`, `ai_detected_loss_reason`, `ai_detected_competitor`
-  - `ai_confidence_score` (0-100), `diagnosis_quality_score` (0-100)
-  - `seller_customer_gap bool`, `gap_explanation text`
-  - `recommended_action text`, `ai_summary_short text` (≤160c, LGPD)
-  - `model_used`, `rule_version`, `context_signature`, timestamps
-  - GRANTs + RLS por organização
-- Coluna `opportunities.is_recoverable boolean`
+- **version:** `1.34.0`
+- **title:** `Inteligência de Perdas, OTE Auditável & Receita Líquida`
+- **description:** `Win/Loss Hub ganha motor semântico invisível com IA, relatório OTE com Excel auditável fim-a-fim, Forecast e Dashboard passam a refletir cancelamentos, governança unificada com MCP Catalog e aprovações via Slack.`
 
-### View `v_loss_semantic_v2`
-Join `v_loss_classification_v2` + `loss_semantic_analyses` + excerpts truncados de `loss_comment` e `proposals.declined_reason` (≤160c). Esta é a única fonte usada pelos blocos da Visão Geral.
+### Changes (jsonb)
 
-### Edge function `ai-loss-semantic-analyzer`
-- OpenAI direto (`gpt-5-mini`), wrapper `_shared/ai-client.ts`.
-- Cache via `context_signature`; reprocessa só com `force_refresh`.
-- `diagnosis_quality_score` calculado deterministicamente (sem custo de IA), critérios já listados no enunciado original.
-- Nunca escreve em `loss_reason_id`, `client_loss_reason_id` ou `win_loss_records`.
+**🧠 Win/Loss — Inteligência Semântica (feature)**
 
-### Helpers TS
-- `src/lib/winloss/diagnosisQuality.ts` (puro + testes)
-- `src/services/winloss/lossSemantic.ts`
-- `src/hooks/useLossSemantic.ts` (período + filtros do Hub)
-- `useWinLossData.ts` passa a expor `semantic` (não-quebra de consumidores).
+- Diagnóstico Executivo da IA agora compara o motivo declarado pelo vendedor com a causa real detectada nos textos livres, sinalizando quando há divergência.
+- Novo CRM Trust Score (0–100) que mede a qualidade dos diagnósticos de perda e a cobertura textual da operação.
+- Bloco "Motivos Ocultos" mostra ranking declarado × inferido pela IA, expondo causas que viraram caixa-preta.
+- Bloco "Gap Vendedor × Cliente" identifica os pares mais frequentes onde o time interno diverge do feedback do cliente.
+- Novo Radar Competitivo consolida concorrentes citados por humanos e detectados pela IA, com valor perdido, motivo dominante e nível de confiança.
+- Novo bloco "Drivers de Vitória" agrega motivos, diferenciais decisivos e voz do cliente nas oportunidades ganhas.
+- Alertas Inteligentes ganharam regras semânticas: trust score baixo, diagnóstico fraco em ≥30% das perdas, gap dominante, receita recuperável e motivo oculto.
+- Tendência de Motivos de Perda agora tem toggle Declarado/IA.
+- Detalhe da oportunidade perdida tem novo card "Análise Semântica da IA" com texto completo, categoria detectada, concorrente, ação recomendada e botão Reprocessar.
+- A IA nunca sobrescreve o motivo humano nem o registro de Win/Loss — apenas enriquece o diagnóstico.
 
-## Frontend — Visão Geral (única superfície)
+**📊 Resultados / OTE (feature + improvement)**
 
-Sem aba nova. Sem poluição. Ordem dos blocos na Visão Geral:
+- Sprint OTE 1.4: o botão Excel do relatório OTE agora exporta um workbook auditável fim-a-fim, com Visão Geral, Closers, Pré-Vendas, Por Vendedor, Detalhamento de Vendas, Itens Elegíveis e Não Elegíveis, e Oportunidades Qualificadas por Pré-Vendas — refletindo exatamente o que aparece na tela.
+- Valores monetários, datas e horas exportados em formato numérico/data nativo, prontos para análise em planilhas.
+- Cálculos canônicos preservados: regra item a item, `historicalQualifications` e atribuição histórica continuam intactos.
 
-```text
-1. Diagnóstico Executivo da IA   (existente, reforçado)
-2. Alertas Inteligentes          (subir para o topo)
-3. CRM Trust Score + Receita Recuperável  (linha de 2 KPIs compactos)
-4. Motivos Ocultos               (declarado vs inferido)
-5. Top Motivos de Perda          (existente, com badge Gap)
-6. Gap Vendedor x Cliente        (bloco compacto)
-7. Radar Competitivo             (existente "Perdas por Concorrente" enriquecido)
-8. Drivers de Vitória            (novo, lado dos ganhos)
-9. Pulso Mensal                  (existente, sem filtro Mês)
-10. Análise de Perdas / Ganhos / Ciclo  (mantidos)
-11. Tendência ou Sinais do Mês   (toggle Declarado vs Inferido IA)
-```
+**💰 Receita Líquida em Forecast e Dashboard (fix + improvement)**
 
-### 1. Diagnóstico Executivo da IA — `AIDiagnosisCard.tsx` (reforçar)
-Substituir o gerador atual por uma síntese que cruza humano × IA:
-- principal motivo declarado vs principal motivo inferido
-- valor perdido associado ao gap
-- maior gap vendedor × cliente do período
-- recomendação principal (mais frequente em `recommended_action`)
-- severidade já existente (baixo/médio/alto/crítico) recalculada por valor + gap%
-Copy: "No período, o CRM registra X como principal motivo, mas a IA identificou Y como causa real dominante. Esse gap representa R$ N. Recomendação: …"
+- Forecast "Fechado" e Dashboard CEO (Receita Avulsa, MRR, Run Rate e contagem de vendas) agora descontam vendas canceladas, lendo `valid_revenue_amount` em vez do valor bruto.
+- Alinha o Forecast e o Dashboard ao Relatório de Vendas Realizadas como fonte única — sem o gestor ver valor maior do que o efetivamente realizado.
+- `commercial_won_revenue_view` reforçada como fonte oficial de receita realizada (Forecast, Dashboard, BI, Relatórios, Ranking, Comissão).
+- Guardrail `REVENUE_SOURCE_MISMATCH` em `/admin/revenue-integrity` para detectar divergências > R$ 0,01 automaticamente.
 
-### 2. Alertas Inteligentes — `SmartAlertsCard.tsx`
-Subir para logo após o Diagnóstico. Adicionar regras semânticas:
-- `qualidade média < 40` em ≥30% das perdas → "X% das perdas estão com diagnóstico fraco"
-- gap dominante (ex.: Preço declarado, Timing inferido) acima de 20% → alerta
-- concorrente em alta vs período anterior
-- "R$ X em receita recuperável detectada"
-- "CRM Trust Score abaixo de 70%"
+**🔌 Governança & MCP (feature)**
 
-### 3. CRM Trust Score + Receita Recuperável — novo `CrmTrustAndRecoverableStrip.tsx`
-Uma linha, dois cards compactos:
-- **CRM Trust Score 0-100** = média ponderada de: qualidade média do diagnóstico (30) + % perdas com texto suficiente (20) + (100 - % gap) (20) + % perdas com IA alta confiança (15) + cobertura de análise (15).
-- **Receita Recuperável**: soma de `valor_previsto` (líquido) onde `is_recoverable=true` OR IA detectou recuperabilidade + qtd oportunidades + principal causa + ação recomendada.
+- Action Registry: catálogo único `action_registry` + log `action_executions` centralizando toda ação sensível da plataforma (hook `useAction`).
+- Auditoria e Aprovações Unificadas: nova view `unified_audit_view` consolida 5 fontes de auditoria; tabela `approval_requests` genérica unifica filas de aprovação.
+- MCP Catalog: `mcp_action_catalog_view` expõe o Action Registry como tools MCP, abrindo o caminho para automações externas governadas.
+- Aprovações via Slack: novo edge `notify-approval-request` envia cards Block Kit ao canal de aprovações em tempo real.
+- Dispatcher genérico `execute-action` resolve qualquer ação do registry e despacha para RPC ou edge function, com `useAction.runServer()` no front.
 
-### 4. Motivos Ocultos — novo `HiddenReasonsBlock.tsx`
-Duas colunas lado a lado: ranking "Declarado" (a partir de `loss_reasons` selecionados) × ranking "Inferido pela IA" (a partir de `ai_detected_loss_category` agregado), com % e valor. Mostra explicitamente quando o time está resolvendo o problema errado.
+**⚡ Performance & Confiabilidade (improvement)**
 
-### 5. Top Motivos de Perda — `LossAnalysisSection.tsx` (estender)
-Por motivo: qtd, %, valor perdido, motivo declarado × motivo inferido quando divergente, badge "Gap" quando aplicável.
+- Filtros e selects de usuários agora leem de `crm_active_users_view`, eliminando inativos das listas operacionais e reduzindo o payload das telas.
+- Sugestões de IA por oportunidade têm cache determinístico via `context_signature` — só rodam OpenAI em clique manual com `force_refresh`, cortando latência e custo.
+- Realtime do Win/Loss Hub e do detalhe da oportunidade revisado para evitar re-renderizações desnecessárias.
 
-### 6. Gap Vendedor × Cliente — novo `SellerCustomerGapBlock.tsx`
-Compacto:
-- qtd de perdas com gap, % sobre analisadas, top 3 gaps mais comuns (par "declarado → inferido"), valor perdido associado.
+**🔒 Segurança (security)**
 
-### 7. Radar Competitivo — substitui o atual "Perdas por Concorrente"
-`CompetitiveRadarBlock.tsx`. Por concorrente (mescla `win_loss_records.competitor` + `ai_detected_competitor`):
-- qtd perdas, valor perdido, motivo dominante (do bloco semântico), tendência vs período anterior, confiança da IA.
+- Validação server-side em `updateOpportunity` bloqueia atribuição a usuários inativos ou fora da organização.
+- Função `delete-user-with-transfer` reforçada: não transfere oportunidades fechadas nem `created_by` histórico, preservando atribuição imutável de comissão e OTE.
+- LGPD no Win/Loss: dashboards lêem apenas excerpts ≤160 caracteres; texto completo só no escopo autenticado da oportunidade.
+- Edge functions de IA padronizadas em `_shared/ai-client.ts` com `search_path` fixado e guard anti-time-travel para qualquer prompt que sugira datas.
 
-### 8. Drivers de Vitória — novo `WinDriversBlock.tsx`
-Usa `win_loss_records` de outcome `won` + `win_reason_id` + `customer_feedback` + `strengths_mentioned`:
-- principais fatores (top 5) que fazem ganhar, valor ganho associado, recorrência por vendedor/pipeline, recomendação para repetir o padrão (ex.: "Ganhos mencionam agilidade e suporte 3,2× mais que perdas").
+### Execução
 
-### 9. Tendência / Sinais do Mês — `LossReasonsTrendChart.tsx` (estender)
-Adicionar toggle "Motivo informado / Motivo inferido pela IA". Regra de filtro já existente (Mês → MonthSignalsCard; demais → tendência) mantida.
+1. **(migração obrigatória)** `INSERT` na tabela `release_notes` com `version='1.34.0'`, `release_date='2026-05-31'`, `is_major=true`, `changes` como JSONB array de `{type, description}` usando os tipos `feature | improvement | fix | security`.
+2. Validar exibição em `/release-notes` (a página já ordena por versão semântica e auto-scroll para a última).
+3. Sem mudanças de código no front — a página `ReleaseNotes.tsx` já consome a tabela.
 
-### 10. Detalhe da oportunidade — `OpportunityHistoryTab.tsx`
-Único lugar com texto completo (LGPD):
-- texto original completo + origem (vendedor / cliente)
-- motivo humano vs motivo inferido pela IA
-- confiança, gap, ação recomendada
-- botão "Reprocessar análise" (`force_refresh`)
+### Fora de escopo
 
-### LGPD
-Dashboards do Hub só renderizam `ai_summary_short` / `seller_diagnosis_excerpt` / `customer_comment_excerpt` (≤160c). `loss_semantic_analyses.source_texts` só é lido em escopo autenticado da própria oportunidade (RLS).
-
-## Não fazer (reforço)
-- Não criar aba "Inteligência Semântica".
-- Não substituir motivo humano nem alterar `loss_reason_id` / `client_loss_reason_id`.
-- Não alterar `win_loss_records`.
-- Não tocar em OTE, Forecast, Vendas Realizadas, `commercial_won_revenue_view`.
-- Sem cards redundantes; cada bloco responde a uma das 4 perguntas do gestor.
-
-## Ordem de execução
-1. Migration (`loss_semantic_analyses`, `is_recoverable`, view `v_loss_semantic_v2`, GRANTs, RLS)
-2. `diagnosisQuality.ts` + testes
-3. Edge function `ai-loss-semantic-analyzer` com cache por `context_signature`
-4. `lossSemantic` service + `useLossSemantic` hook + extensão de `useWinLossData`
-5. Reforço de `AIDiagnosisCard` e `SmartAlertsCard`
-6. Novos blocos: CRM Trust + Recuperável, Motivos Ocultos, Gap, Radar Competitivo, Drivers de Vitória
-7. Estender Top Motivos e Tendência (toggle)
-8. Bloco "Análise Semântica da Perda" no detalhe da oportunidade + botão Reprocessar
-9. Memória `mem://business-rules/winloss/semantic-loss-intelligence` + index
-10. `tsc --noEmit` limpo
-
-## Resultado
-A Visão Geral entrega resposta executiva em 30s, com IA semântica como motor invisível. Nenhum dado humano é apagado; tudo é enriquecimento rastreável.
+- Não altera `commercial_won_revenue_view`, regras de OTE, `historicalQualifications` nem `win_loss_records`.
+- Não cria aba nova de "Inteligência Semântica" — o motor permanece invisível dentro da Visão Geral.
+- Não mexe em motivos humanos selecionados (`loss_reason_id`, `client_loss_reason_id`).

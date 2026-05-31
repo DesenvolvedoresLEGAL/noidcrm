@@ -1,0 +1,40 @@
+DELETE FROM public.release_notes WHERE version = '1.34.0';
+INSERT INTO public.release_notes (version, title, description, release_date, is_major, changes)
+VALUES (
+  '1.34.0',
+  'Inteligência de Perdas, OTE Auditável & Receita Líquida',
+  'Win/Loss Hub ganha motor semântico invisível com IA, relatório OTE com Excel auditável fim-a-fim, Forecast e Dashboard passam a refletir cancelamentos, governança unificada com MCP Catalog e aprovações via Slack.',
+  '2026-05-31',
+  true,
+  '[
+    {"type":"feature","description":"Win/Loss: Diagnóstico Executivo da IA compara o motivo declarado pelo vendedor com a causa real detectada nos textos livres, sinalizando divergências."},
+    {"type":"feature","description":"Win/Loss: novo CRM Trust Score (0–100) mede a qualidade dos diagnósticos de perda e a cobertura textual da operação."},
+    {"type":"feature","description":"Win/Loss: bloco Motivos Ocultos mostra ranking declarado × inferido pela IA, expondo causas que viraram caixa-preta."},
+    {"type":"feature","description":"Win/Loss: bloco Gap Vendedor × Cliente identifica os pares mais frequentes onde o time interno diverge do feedback do cliente."},
+    {"type":"feature","description":"Win/Loss: novo Radar Competitivo consolida concorrentes citados por humanos e detectados pela IA, com valor perdido, motivo dominante e nível de confiança."},
+    {"type":"feature","description":"Win/Loss: novo bloco Drivers de Vitória agrega motivos, diferenciais decisivos e voz do cliente nas oportunidades ganhas."},
+    {"type":"feature","description":"Win/Loss: Alertas Inteligentes ganharam regras semânticas — trust score baixo, diagnóstico fraco em ≥30% das perdas, gap dominante, receita recuperável e motivo oculto."},
+    {"type":"improvement","description":"Win/Loss: gráfico de Tendência de Motivos de Perda agora tem toggle Declarado/IA."},
+    {"type":"feature","description":"Win/Loss: detalhe da oportunidade perdida tem novo card Análise Semântica da IA com texto completo, categoria detectada, concorrente, ação recomendada e botão Reprocessar."},
+    {"type":"improvement","description":"Win/Loss: a IA nunca sobrescreve o motivo humano nem o registro de Win/Loss — apenas enriquece o diagnóstico."},
+    {"type":"feature","description":"Resultados/OTE: novo Excel auditável fim-a-fim com Visão Geral, Closers, Pré-Vendas, Por Vendedor, Detalhamento de Vendas, Itens Elegíveis/Não Elegíveis e Oportunidades Qualificadas por Pré-Vendas — refletindo exatamente o que aparece na tela."},
+    {"type":"improvement","description":"Resultados/OTE: valores monetários, datas e horas exportados em formato numérico/data nativo, prontos para análise em planilhas."},
+    {"type":"improvement","description":"Resultados/OTE: cálculos canônicos preservados — regra item a item, qualificações históricas e atribuição imutável continuam intactos."},
+    {"type":"fix","description":"Forecast Fechado e Dashboard CEO (Receita Avulsa, MRR, Run Rate e contagem de vendas) agora descontam vendas canceladas, lendo o valor líquido em vez do bruto. Antes, um cancelamento no mês fazia o gestor ver mais receita do que a efetivamente realizada."},
+    {"type":"improvement","description":"Forecast e Dashboard alinhados ao Relatório de Vendas Realizadas como fonte única de receita realizada."},
+    {"type":"improvement","description":"View canônica commercial_won_revenue_view reforçada como fonte oficial em Forecast, Dashboard, BI, Relatórios, Ranking e Comissão."},
+    {"type":"security","description":"Novo guardrail REVENUE_SOURCE_MISMATCH em /admin/revenue-integrity detecta automaticamente qualquer divergência de receita acima de R$ 0,01 entre as superfícies."},
+    {"type":"feature","description":"Governança: novo Action Registry centraliza toda ação sensível da plataforma em um catálogo único, com log de execução completo e hook useAction no front."},
+    {"type":"feature","description":"Governança: Auditoria e Aprovações Unificadas — nova view consolida 5 fontes de auditoria e uma tabela genérica unifica todas as filas de aprovação."},
+    {"type":"feature","description":"MCP Catalog: o Action Registry passa a ser exposto como catálogo de tools MCP, abrindo caminho para automações externas governadas."},
+    {"type":"feature","description":"Aprovações via Slack: novo serviço envia cards Block Kit ao canal de aprovações em tempo real, com rastreabilidade fim-a-fim."},
+    {"type":"feature","description":"Dispatcher genérico execute-action resolve qualquer ação do registry e despacha para RPC ou edge function, padronizando chamadas server-side no front."},
+    {"type":"improvement","description":"Performance: filtros e selects de usuários agora leem da view crm_active_users_view, eliminando inativos das listas operacionais e reduzindo o payload das telas."},
+    {"type":"improvement","description":"Performance: sugestões de IA por oportunidade têm cache determinístico — só rodam OpenAI em clique manual com refresh forçado, cortando latência e custo."},
+    {"type":"improvement","description":"Performance: realtime do Win/Loss Hub e do detalhe da oportunidade revisado para evitar re-renderizações desnecessárias."},
+    {"type":"security","description":"Validação server-side em updateOpportunity bloqueia atribuição a usuários inativos ou fora da organização."},
+    {"type":"security","description":"Função de exclusão de usuário com transferência reforçada: não transfere oportunidades fechadas nem o created_by histórico, preservando atribuição imutável de comissão e OTE."},
+    {"type":"security","description":"LGPD no Win/Loss: dashboards lêem apenas excerpts ≤160 caracteres dos textos livres; o conteúdo completo só aparece no escopo autenticado da oportunidade."},
+    {"type":"security","description":"Edge functions de IA padronizadas no wrapper compartilhado com search_path fixado e guard anti-time-travel para qualquer prompt que sugira datas."}
+  ]'::jsonb
+);
