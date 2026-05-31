@@ -185,14 +185,14 @@ export function useOwnerDashboard() {
       const [ssotMonthRes, ssotYearRes] = await Promise.all([
         (supabase as any)
           .from('commercial_won_revenue_view')
-          .select('opportunity_id, commercial_amount, one_shot_amount, mrr_amount, won_at, pipeline_type')
+          .select('opportunity_id, commercial_amount, one_shot_amount, mrr_amount, valid_revenue_amount, cancelled_amount, is_cancelled_sale, won_at, pipeline_type')
           .eq('organization_id', organizationId)
           .eq('pipeline_type', 'sales')
           .gte('won_at', startOfCurrentMonth.toISOString())
           .lte('won_at', endOfMonth(now).toISOString()),
         (supabase as any)
           .from('commercial_won_revenue_view')
-          .select('commercial_amount')
+          .select('valid_revenue_amount, commercial_amount, is_cancelled_sale')
           .eq('organization_id', organizationId)
           .eq('pipeline_type', 'sales')
           .gte('won_at', startOfYearDate.toISOString())
@@ -205,26 +205,37 @@ export function useOwnerDashboard() {
       if (ssotYearRes.error) {
         console.error('[useOwnerDashboard] commercial_won_revenue_view (ytd) failed:', ssotYearRes.error);
       }
+      // Totais líquidos de cancelamento — alinhados a Relatórios → Vendas Realizadas.
       const ssotTotals = (ssotRows ?? []).reduce(
         (acc: any, r: any) => {
-          acc.commercial += Number(r.commercial_amount) || 0;
-          acc.one_shot += Number(r.one_shot_amount) || 0;
-          acc.mrr += Number(r.mrr_amount) || 0;
+          const isCancelled = r.is_cancelled_sale === true;
+          const commercial = Number(r.commercial_amount) || 0;
+          const validAmt = Number(r.valid_revenue_amount ?? (isCancelled ? 0 : commercial)) || 0;
+          acc.valid += validAmt;
+          if (!isCancelled) {
+            acc.valid_one_shot += Number(r.one_shot_amount) || 0;
+            acc.valid_mrr += Number(r.mrr_amount) || 0;
+            acc.valid_count += 1;
+          }
           return acc;
         },
-        { commercial: 0, one_shot: 0, mrr: 0 },
+        { valid: 0, valid_one_shot: 0, valid_mrr: 0, valid_count: 0 },
       );
-      // SSoT-aligned count for current month (fonte única — bate com Vendas Realizadas).
-      const ssotWonCountThisMonth = ssotRows.length;
-      // YTD commercial revenue from SSoT (run rate alinhado à SSoT, não a valor_previsto).
+      // Contagem alinhada à SSoT líquida (bate com "Vendas Válidas" de Vendas Realizadas).
+      const ssotWonCountThisMonth = ssotTotals.valid_count;
+      // Run Rate YTD usa receita válida (líquida de cancelamentos).
       const ssotYearlyRevenue = ((ssotYearRes.data ?? []) as any[]).reduce(
-        (sum, r) => sum + (Number(r.commercial_amount) || 0),
+        (sum, r) => {
+          const isCancelled = r.is_cancelled_sale === true;
+          const commercial = Number(r.commercial_amount) || 0;
+          return sum + (Number(r.valid_revenue_amount ?? (isCancelled ? 0 : commercial)) || 0);
+        },
         0,
       );
 
-      const closedRevenueThisMonth = ssotTotals.commercial;
-      const closedMRRThisMonth = ssotTotals.mrr;
-      const closedOneTimeThisMonth = ssotTotals.one_shot;
+      const closedRevenueThisMonth = ssotTotals.valid;
+      const closedMRRThisMonth = ssotTotals.valid_mrr;
+      const closedOneTimeThisMonth = ssotTotals.valid_one_shot;
 
       // Mantém estrutura `recurringMRRByOpportunity` para outras seções legadas que dependem dela.
       const opportunityIdsWithRecurring = new Set<string>();

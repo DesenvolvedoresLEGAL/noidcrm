@@ -1,75 +1,85 @@
-# Patch: Atribuição Histórica no OTE
+## Problema
 
-## Causa raiz confirmada
+`commercial_won_revenue_view` expõe duas leituras para a mesma venda ganha:
 
-`commercial_won_revenue_view.seller_id = opportunities.owner_user_id` (dono atual). Em maio/2026, 10 das 84 oportunidades atribuídas ao Wagner eram do Leandro André antes do `closed_at` (transferidas após o ganho). É isso que infla Wagner para R$ 506.722,07.
+- **Bruta (aprovado):** `commercial_amount`, `one_shot_amount`, `mrr_amount`, `approved_amount` → soma vendas mesmo depois de canceladas.
+- **Líquida (válida):** `valid_revenue_amount` (= aprovado − cancelado), `cancelled_amount`, flag `is_cancelled_sale`.
 
-`opportunity_owner_history` cobre 100% das oportunidades do período — temos como resolver vendedor histórico sem snapshot novo nem backfill.
+Hoje:
 
-## Princípios
+- **Relatórios → Vendas Realizadas** já usa **líquida** → R$ 153.449,59 (correto).
+- **Forecast → Fechado** lê `summary.total` = soma de `commercial_amount` em `revenueSsotService.getClosedRevenueSummary` → R$ 158.443,59 (inclui a venda cancelada).
+- **Dashboard CEO → Receita Avulsa / MRR / 60 negócios / Run Rate** lê `commercial_amount`, `one_shot_amount`, `mrr_amount` em `useOwnerDashboard` → idem, infla 60 vendas e R$ 154.058,59.
+- **Relatórios V2 (`v_report_forecast_v2`)** usa `sum(net_revenue_final) FILTER (status='won')` da `v_reporting_opportunities_v2`, sem deduzir cancelados.
 
-- **Não alterar** `commercial_won_revenue_view` nem o Relatório de Vendas Realizadas.
-- **Não alterar** a regra item a item (`aggregateEligible`).
-- Toda mudança fica numa camada nova de "atribuição histórica" reaproveitando `opportunity_owner_history` e `opportunity_qualification_history`.
+A regra SSoT já existe e está documentada na memória (`commercial_won_revenue_view` é a única fonte oficial), só não está sendo aplicada na coluna líquida. Esta sprint é um ajuste fino para passar a usar **sempre** as colunas líquidas (`valid_revenue_amount` / equivalentes), sem mexer em regra item‑a‑item, comissão ou OTE.
 
-## Escopo
+## Definição única de "receita fechada"
 
-### 1. Banco (migration única, sem destrutivo)
+Para todas as superfícies executivas (Forecast, Dashboard, Run Rate, Cenários):
 
-1. Função SQL `public.resolve_historical_seller_at(p_opportunity_id uuid, p_at timestamptz) returns uuid` — retorna `to_owner_user_id` da última linha de `opportunity_owner_history` com `changed_at <= p_at`; fallback: primeiro `from_owner_user_id` da história; fallback final: `opportunities.owner_user_id`. `STABLE`, `SECURITY DEFINER`, `search_path = public`.
-2. View `public.commercial_won_revenue_historical_view` — `SELECT * EXCLUDE (seller_id, seller_name), resolve_historical_seller_at(opportunity_id, won_at) AS seller_id, prof.full_name AS seller_name, original_seller_id (= seller_id da view base), attribution_source ('owner_history' | 'fallback_current_owner'), attribution_confidence ('high' | 'low')` por cima de `commercial_won_revenue_view`. GRANT SELECT para `authenticated` e `service_role`. (Nenhuma alteração na view base.)
-3. Função SQL `public.resolve_historical_qualifier(p_opportunity_id uuid) returns uuid` — `qualified_by_user_id` mais antigo em `opportunity_qualification_history`; fallback: `opportunities.owner_user_id`.
+```
+receita_fechada (líquida) = SUM(valid_revenue_amount) WHERE won_at ∈ [start,end] AND pipeline_type='sales'
+receita_avulsa_liquida   = SUM(one_shot_amount) FILTER (is_cancelled_sale = false)
+receita_mrr_liquida      = SUM(mrr_amount)      FILTER (is_cancelled_sale = false)
+vendas_validas_count     = COUNT(*) FILTER (is_cancelled_sale = false)
+```
 
-### 2. Serviço e hooks de receita
+Cancelado segue **visível** em telas analíticas, mas não entra em totalizadores executivos nem em cenários de forecast.
 
-- `src/services/revenue/revenueSsotService.ts`:
-  - Adicionar `getHistoricalRevenueBySeller(p)` lendo `commercial_won_revenue_historical_view` (mesma assinatura do `getRevenueBySeller`).
-  - Não modificar funções existentes.
-- `src/hooks/revenue/useRevenueSsot.ts`:
-  - Novo `useHistoricalRevenueBySeller(p)`.
+## Mudanças
 
-### 3. Helper central de atribuição
+### 1. `src/services/revenue/revenueSsotService.ts`
 
-- Novo `src/lib/results/historicalAttribution.ts`:
-  - `getHistoricalSellerId(row)` / `getHistoricalSellerName(row)` lendo a view histórica.
-  - `isUserInactiveOrDeleted(profile)` — usa `crm_active_users_view` (já é fonte oficial) para marcar histórico.
-  - `buildClosersRowsHistorical({ oteResults, historicalGroups, activeUsers })` — produz linhas mescladas: cada vendedor histórico do período aparece, com badge "Inativo"/"Excluído" quando aplicável, mesmo sem `ote_monthly_results`.
+- `ClosedRevenueRow`: incluir `valid_revenue_amount`, `cancelled_amount`, `is_cancelled_sale`.
+- `ClosedRevenueSummary`: adicionar `validTotal`, `validAvulsa`, `validMRR`, `validCount`, `cancelledTotal`, `cancelledCount`.
+- `fetchRows`: passar a selecionar essas colunas (continua `select('*')`, só tipar).
+- `getClosedRevenueSummary`: calcular os novos campos a partir de `valid_revenue_amount` e da flag `is_cancelled_sale` (mesma regra de `useVendasRealizadas.ts` linhas 211‑223, evitando divergência).
+- Manter `total`, `avulsa`, `mrr`, `count` (bruto) para back‑compat de consumidores que ainda dependem deles (Reconciliação, Revenue Integrity), mas eles não serão mais usados em superfícies executivas.
 
-### 4. UI — Tabela Closers (somente OTE Overview)
+### 2. `src/hooks/useForecastData.ts`
 
-Em `src/components/ote/OTEOverviewTab.tsx`:
-- Substituir `useRevenueBySeller` por `useHistoricalRevenueBySeller` na coluna "Comissão elegível comercial".
-- Linhas da tabela passam a ser a união de `revenueResults` ∪ vendedores históricos com receita no período sem `ote_monthly_results`. Sintéticos exibem badge "Inativo" / "Excluído" e zeram somente campos OTE (multiplicador, base, acelerador, variável final) — mantêm `Comissão elegível comercial` e `Receita elegível OTE` reais.
-- Subtotal Closers continua = soma SSoT histórica (que já bate com o total comercial do período).
-- Card "Comissão elegível comercial" continua puxando do summary SSoT geral (não muda total agregado, só a distribuição por vendedor).
+- `closedRevenue` passa a ler `ssotSummary.validTotal` (com fallback `ssotSummary.total` se `validTotal` indefinido para máxima segurança).
+- `wonCount` passa a usar `ssotSummary.validCount` (alinha "Win Rate" e tickets ao líquido).
+- Cenários (commit, best case, pessimista, realista, otimista) recalculam em cima do novo `closedRevenue` automaticamente.
 
-### 5. UI — Tabela Pré-vendas
+### 3. `src/hooks/useOwnerDashboard.ts`
 
-- `leadsResults` recebe rows sintéticas equivalentes para SDRs históricos com qualificação no período mas sem `ote_monthly_results` (lendo `opportunity_qualification_history` no período, agrupado por `qualified_by_user_id`).
-- Novo pequeno serviço `src/services/results/historicalQualifications.ts` que conta leads qualificados por SDR histórico no período (usado apenas para a tabela).
+- Reduce do `ssotMonthRes` passa a também acumular `valid_amount`, `valid_one_shot`, `valid_mrr`, `valid_count` aplicando filtro `is_cancelled_sale === false` na composição de avulsa/MRR/count, e somando `valid_revenue_amount` direto para o total.
+- `closedRevenueThisMonth`, `closedOneTimeThisMonth`, `closedMRRThisMonth`, `ssotWonCountThisMonth` passam a usar os campos líquidos.
+- `ssotYearlyRevenue` (Run Rate / Meta vs Run Rate) passa a somar `valid_revenue_amount` no select YTD.
 
-### 6. Transferência operacional na exclusão de usuário
+### 4. View V2 `v_report_forecast_v2` (migração SQL)
 
-- Localizar a rotina atual de exclusão/transferência e garantir que ela:
-  - **NÃO** mexe em `opportunity_owner_history`, `opportunity_qualification_history`, `ote_monthly_results`, `ote_sales_records`.
-  - Continua atualizando `opportunities.owner_user_id` apenas para registros operacionais (abertos), nunca para `won`/`lost` retroativamente.
-- Acrescentar evento de auditoria `user_transferred_operational_ownership` em `system_events` / `audit_log` com `historical_results_preserved: true`.
-- Esta etapa entra como mudança defensiva mínima; o problema histórico já está coberto pela camada de leitura.
+- Redefinir `closed_revenue` para vir de `commercial_won_revenue_view.valid_revenue_amount` com `pipeline_type='sales'` e `won_at` no mês corrente do row, em vez de `sum(net_revenue_final) FILTER (status='won')` de `v_reporting_opportunities_v2`. Mantém demais colunas como hoje.
+- Garante que Relatórios V2 → Forecast bata exatamente com o card "Fechado" do Forecast clássico e com Vendas Realizadas.
+- Sem mudar grants nem RLS (view já existe com `security_invoker=true`).
 
-### 7. Fora de escopo (explícito)
+### 5. Banner / tooltip
 
-- `calculate-ote` edge function, `ote_sales_records`, regra item a item, view comercial base, Relatório Vendas Realizadas, Comissão Padrão e Metas Simples (já cobertos por sprints anteriores).
+- Atualizar o banner do Forecast e o subtítulo do card "Fechado" para deixar explícito: *"líquido de cancelamentos — alinhado a Vendas Realizadas"*. Sem nova lógica.
 
-## Testes manuais
+## Fora de escopo (não mexer)
 
-1. Wagner em maio/2026: subtotal "Comissão elegível comercial" cai dos R$ 506.722,07 para o valor real dele (esperado: ~R$ 467k, com R$ ~39k indo para Leandro André).
-2. Leandro André aparece na tabela Closers com seu valor histórico e badge "Inativo/Excluído".
-3. Ana aparece na tabela Pré-vendas com seus leads qualificados; Gustavo não herda.
-4. `npx tsc --noEmit` passa limpo.
-5. Total agregado de "Comissão elegível comercial" em maio/2026 permanece igual ao Relatório de Vendas Realizadas (apenas a distribuição por vendedor muda).
+- `commercial_won_revenue_view` (não alteramos a view oficial).
+- Regras item‑a‑item de elegibilidade OTE / `calculate-ote` / `commission_eligibility_view`.
+- Relatório de Vendas Realizadas (já está correto).
+- Win/Loss Hub (usa `status='won'`, independente).
+- Atribuição histórica (`commercial_won_revenue_historical_view`).
+
+## Validação
+
+Após deploy, para Mai/2026 (org HumanoidOS):
+
+- Forecast → card **Fechado** = R$ 153.449,59 e 59 deals (mesma base de Vendas Realizadas).
+- Cenários Pessimista/Realista/Otimista recalculados a partir do novo `closed` (devem cair ≈ R$ 4.994 cada).
+- Dashboard CEO → **Receita Avulsa (mês)** alinhada ao valor de Vendas Realizadas, **60 negócios** vira **59**, Run Rate recalcula sem o cancelado.
+- Relatórios V2 → Forecast também mostra R$ 153.449,59.
+- Aba Vendas Realizadas continua intacta.
+- `npx tsc --noEmit` sem erros.
 
 ## Riscos
 
-- View nova adiciona um JOIN lateral em `opportunity_owner_history` por linha — ok dado o índice `idx_ooh_org_opportunity_changed_at`.
-- Se houver oportunidades sem `opportunity_owner_history` (não foi o caso na amostra), cai para `owner_user_id` atual marcado como `attribution_confidence='low'`.
-- Nada do que muda toca a view base nem o pipeline de comissão/forecast; reversível removendo a view nova.
+- Consumidores que ainda leem `summary.total` (Reconciliação, Revenue Integrity): mantemos o campo, então continuam funcionando — só não recebem o novo valor líquido a não ser que sejam atualizados depois.
+- Forecast confidence usa `forecast_reliability_pct` da view; não muda.
+- Multi-tenant / RLS: nenhuma mudança em grants ou políticas. View V2 segue `security_invoker=true`.

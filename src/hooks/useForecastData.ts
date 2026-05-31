@@ -570,11 +570,11 @@ export function useForecastData(filters: ForecastFilters) {
       ? individualSellerGoalQuery.data 
       : (orgGoalQuery.data || sellerGoalsQuery.data || salesGoalsTotal || 0);
 
-    // P0 Revenue SSoT — Receita Fechada vem de commercial_won_revenue_view.
-    // Fallback para soma legada apenas se SSoT ainda não retornou.
+    // P0 Revenue SSoT — Receita Fechada vem de commercial_won_revenue_view,
+    // líquida de cancelamentos (mesma base de Relatórios → Vendas Realizadas).
     const ssotSummary = closedSsotQuery.data?.summary;
     const closedRevenue = ssotSummary
-      ? ssotSummary.total
+      ? (ssotSummary.validTotal ?? ssotSummary.total)
       : closedOpps.reduce((sum, o) => sum + (o.valor_previsto ?? 0), 0);
     const totalPipeline = opportunities.reduce((sum, o) => sum + o.valor_previsto, 0);
     const weightedPipeline = opportunities.reduce((sum, o) => sum + (o.valor_previsto * o.prob / 100), 0);
@@ -592,14 +592,15 @@ export function useForecastData(filters: ForecastFilters) {
 
     const velocityPerDay = daysElapsed > 0 ? closedRevenue / daysElapsed : 0;
 
-    const wonCount = closedOpps.length;
+    // Win Rate / ticket médio alinhados ao líquido (exclui vendas canceladas).
+    const wonCount = ssotSummary?.validCount ?? closedOpps.length;
     const lostCount = lostOpps.length;
     const winRate = wonCount + lostCount > 0 ? (wonCount / (wonCount + lostCount)) * 100 : 0;
 
     const pipelineCoverage = totalGoal > 0 ? totalPipeline / totalGoal : 0;
 
-    const avgDealSize = closedOpps.length > 0
-      ? closedRevenue / closedOpps.length
+    const avgDealSize = wonCount > 0
+      ? closedRevenue / wonCount
       : opportunities.length > 0
         ? totalPipeline / opportunities.length
         : 0;
