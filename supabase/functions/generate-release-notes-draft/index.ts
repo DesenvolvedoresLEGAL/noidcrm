@@ -113,7 +113,7 @@ async function collectGitHubPRs(opts: {
 }
 
 async function collectSystemSignals(
-  supa: ReturnType<typeof createClient>,
+  supa: any,
   periodDays: number,
 ): Promise<IngestionItem[]> {
   const since = new Date(Date.now() - periodDays * 86400_000).toISOString();
@@ -232,7 +232,7 @@ function deterministicDraft(items: IngestionItem[], period_days: number) {
 }
 
 async function logSystemEvent(
-  supa: ReturnType<typeof createClient>,
+  supa: any,
   event_type: string,
   payload: Record<string, unknown>,
   actor_id?: string,
