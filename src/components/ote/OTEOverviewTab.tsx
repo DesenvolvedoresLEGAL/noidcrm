@@ -1,8 +1,5 @@
-import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { OTEMonthlyResult } from '@/hooks/useOTEData';
 import { useSalesConfig } from '@/hooks/useSalesConfig';
 import type { OTESalesRecord } from '@/hooks/useOTESalesRecords';
@@ -22,8 +19,6 @@ import {
   UserCheck,
   Wallet,
   Ban,
-  ChevronDown,
-  ChevronUp,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
