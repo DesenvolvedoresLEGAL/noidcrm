@@ -153,6 +153,9 @@ export function OTESellerDetailTab({ results, isLoading, isOTEMode = true, perio
                         const sellerRecords = allRecords.filter((r) => r.ote_result_id === result.id);
                         const { eligibleTotal } = aggregateEligible(sellerRecords);
                         const isLeads = result.goal_type === 'leads';
+                        // Fonte única (mesma da Visão Geral): qualifierMap por user_id histórico.
+                        const histLeads = qualifierMap.get(result.user_id);
+                        const qualifiedLeads = typeof histLeads === 'number' ? histLeads : Number(result.total_sales || 0);
                         return (
                           <div className="grid grid-cols-2 gap-4 text-sm">
                             <div>
@@ -165,7 +168,7 @@ export function OTESellerDetailTab({ results, isLoading, isOTEMode = true, perio
                               </p>
                               <p className="font-semibold">
                                 {isLeads
-                                  ? formatGoalValue(Number(result.total_sales || 0), 'leads')
+                                  ? formatGoalValue(qualifiedLeads, 'leads')
                                   : formatCurrency(eligibleTotal)}
                               </p>
                             </div>
