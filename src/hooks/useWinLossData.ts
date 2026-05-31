@@ -8,7 +8,7 @@ export interface DateRange {
   to: Date;
 }
 
-export type TimeframePreset = 'month' | 'quarter' | 'semester' | 'year' | 'custom';
+export type TimeframePreset = 'today' | '7d' | '15d' | 'month' | 'quarter' | 'semester' | 'year' | 'custom';
 
 export interface WinLossDeal {
   id: string;
