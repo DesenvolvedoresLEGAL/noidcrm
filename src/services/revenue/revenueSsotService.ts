@@ -62,6 +62,20 @@ export interface RevenueGroup {
   total: number;
   count: number;
   avgTicket: number;
+  attributionSource?: string | null;
+  attributionConfidence?: string | null;
+}
+
+function officialSalesPeriodFilter(q: any, p: RevenueSsotParams) {
+  return q.or([
+    `and(approved_at.gte.${p.start},approved_at.lte.${p.end})`,
+    `and(approved_at.is.null,accepted_at.gte.${p.start},accepted_at.lte.${p.end})`,
+    `and(is_cancelled_sale.eq.true,cancelled_at.gte.${p.start},cancelled_at.lte.${p.end})`,
+  ].join(','));
+}
+
+function officialEligibleAmount(r: any): number {
+  return Number(r.commission_eligible_amount ?? r.valid_revenue_amount ?? 0) || 0;
 }
 
 async function fetchRows(p: RevenueSsotParams): Promise<ClosedRevenueRow[]> {
@@ -125,6 +139,34 @@ export async function getClosedRevenueSummary(p: RevenueSsotParams): Promise<Clo
   return summary;
 }
 
+/** Mesma janela/fórmula dos KPIs de Relatórios → Vendas Realizadas. */
+export async function getOfficialEligibleRevenueSummary(p: RevenueSsotParams): Promise<ClosedRevenueSummary> {
+  let q = (supabase as any)
+    .from('commercial_won_revenue_view')
+    .select('opportunity_id, approved_amount, cancelled_amount, valid_revenue_amount, commission_eligible_amount, one_shot_amount, mrr_amount')
+    .eq('organization_id', p.organizationId);
+
+  q = officialSalesPeriodFilter(q, p);
+  if (p.pipelineIds?.length) q = q.in('pipeline_id', p.pipelineIds);
+  if (p.sellerIds?.length) q = q.in('seller_id', p.sellerIds);
+
+  const { data, error } = await q;
+  if (error) throw error;
+
+  const rows = (data ?? []) as any[];
+  const summary = rows.reduce<ClosedRevenueSummary>((acc, r) => {
+    const eligible = officialEligibleAmount(r);
+    acc.total += eligible;
+    acc.eligible += eligible;
+    acc.avulsa += Number(r.one_shot_amount) || 0;
+    acc.mrr += Number(r.mrr_amount) || 0;
+    acc.count += eligible > 0 ? 1 : 0;
+    return acc;
+  }, { total: 0, avulsa: 0, mrr: 0, count: 0, avgTicket: 0, eligible: 0, pendingSettlement: 0, pendingReview: 0 });
+  summary.avgTicket = summary.count > 0 ? summary.eligible / summary.count : 0;
+  return summary;
+}
+
 function groupBy(rows: ClosedRevenueRow[], keyFn: (r: ClosedRevenueRow) => { key: string; label: string }): RevenueGroup[] {
   const map = new Map<string, RevenueGroup>();
   for (const r of rows) {
@@ -173,6 +215,37 @@ export async function getHistoricalRevenueBySeller(p: RevenueSsotParams): Promis
   return Array.from(map.values()).sort((a, b) => b.total - a.total);
 }
 
+export async function getOfficialHistoricalRevenueBySeller(p: RevenueSsotParams): Promise<RevenueGroup[]> {
+  let q = (supabase as any)
+    .from('commercial_won_revenue_historical_view')
+    .select('seller_id, seller_name, commission_eligible_amount, valid_revenue_amount, attribution_source, attribution_confidence')
+    .eq('organization_id', p.organizationId);
+  q = officialSalesPeriodFilter(q, p);
+  if (p.pipelineIds?.length) q = q.in('pipeline_id', p.pipelineIds);
+  if (p.sellerIds?.length) q = q.in('seller_id', p.sellerIds);
+  const { data, error } = await q;
+  if (error) throw error;
+  const map = new Map<string, RevenueGroup>();
+  for (const r of (data ?? []) as any[]) {
+    const key = r.seller_id ?? '__pending__';
+    const cur = map.get(key) ?? {
+      key,
+      label: r.seller_name ?? 'Sem closer histórico identificado',
+      total: 0,
+      count: 0,
+      avgTicket: 0,
+      attributionSource: r.attribution_source ?? null,
+      attributionConfidence: r.attribution_confidence ?? null,
+    };
+    cur.total += officialEligibleAmount(r);
+    cur.count += 1;
+    if (!cur.label || cur.label === 'Sem closer histórico identificado') cur.label = r.seller_name ?? cur.label;
+    map.set(key, cur);
+  }
+  for (const g of map.values()) g.avgTicket = g.count > 0 ? g.total / g.count : 0;
+  return Array.from(map.values()).sort((a, b) => b.total - a.total);
+}
+
 
 export async function getRevenueByPipeline(p: RevenueSsotParams): Promise<RevenueGroup[]> {
   const rows = await fetchRows(p);
@@ -202,8 +275,10 @@ export async function getRevenueByType(p: RevenueSsotParams): Promise<{ mrr: num
 export const revenueSsotService = {
   getClosedRevenueRows,
   getClosedRevenueSummary,
+  getOfficialEligibleRevenueSummary,
   getRevenueBySeller,
   getHistoricalRevenueBySeller,
+  getOfficialHistoricalRevenueBySeller,
   getRevenueByPipeline,
   getRevenueByStage,
   getRevenueByType,
