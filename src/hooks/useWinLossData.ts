@@ -141,7 +141,7 @@ export function useWinLossData(organizationId: string | undefined, pipelineId: s
 
       const fromISO = dateRange.from.toISOString();
 
-      // 1. If specific pipeline selected, use it; otherwise default to sales pipelines only
+      // 1. If specific pipeline selected, use it; otherwise default to commercial pipelines (sales + qualification)
       let pipelineIds: string[] = [];
       if (pipelineId) {
         pipelineIds = [pipelineId];
@@ -150,7 +150,7 @@ export function useWinLossData(organizationId: string | undefined, pipelineId: s
           .from('pipelines')
           .select('id')
           .eq('organization_id', organizationId)
-          .eq('pipeline_type', 'sales');
+          .in('pipeline_type', ['sales', 'qualification']);
         if (pipeErr) {
           console.error('[useWinLossData] Pipeline fetch error:', pipeErr);
           throw pipeErr;
