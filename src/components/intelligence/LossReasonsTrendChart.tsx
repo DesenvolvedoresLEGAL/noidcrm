@@ -126,11 +126,39 @@ export function LossReasonsTrendChart({ losses, isLoading, semantic }: LossReaso
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <TrendingUp className="h-5 w-5 text-primary" />
-          Tendência de Motivos de Perda
-        </CardTitle>
-        <CardDescription>Evolução mensal dos principais motivos de perda</CardDescription>
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-primary" />
+              Tendência de Motivos de Perda
+            </CardTitle>
+            <CardDescription>
+              {mode === 'inferred'
+                ? 'Evolução mensal das categorias inferidas pela IA'
+                : 'Evolução mensal dos motivos declarados pelo vendedor'}
+            </CardDescription>
+          </div>
+          {hasInferred && (
+            <div className="flex gap-1">
+              <Button
+                size="sm"
+                variant={mode === 'declared' ? 'default' : 'outline'}
+                className="h-7 text-xs"
+                onClick={() => setMode('declared')}
+              >
+                <User className="h-3 w-3 mr-1" /> Declarado
+              </Button>
+              <Button
+                size="sm"
+                variant={mode === 'inferred' ? 'default' : 'outline'}
+                className="h-7 text-xs"
+                onClick={() => setMode('inferred')}
+              >
+                <Brain className="h-3 w-3 mr-1" /> IA
+              </Button>
+            </div>
+          )}
+        </div>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={250}>
