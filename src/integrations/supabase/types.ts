@@ -30671,13 +30671,16 @@ export type Database = {
       }
       commercial_won_revenue_historical_view: {
         Row: {
+          accepted_at: string | null
           accepted_proposal_id: string | null
           account_id: string | null
           account_name: string | null
           approved_amount: number | null
+          approved_at: string | null
           attribution_confidence: string | null
           attribution_source: string | null
           cancelled_amount: number | null
+          cancelled_at: string | null
           commercial_amount: number | null
           commercial_amount_source: string | null
           commercial_status: string | null
