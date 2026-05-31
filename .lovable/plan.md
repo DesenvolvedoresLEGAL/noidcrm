@@ -1,85 +1,125 @@
-## Problema
 
-`commercial_won_revenue_view` expõe duas leituras para a mesma venda ganha:
+# Inteligência Semântica das Perdas — Motor da Visão Geral do Win/Loss Hub
 
-- **Bruta (aprovado):** `commercial_amount`, `one_shot_amount`, `mrr_amount`, `approved_amount` → soma vendas mesmo depois de canceladas.
-- **Líquida (válida):** `valid_revenue_amount` (= aprovado − cancelado), `cancelled_amount`, flag `is_cancelled_sale`.
+A IA semântica é o motor invisível da Visão Geral. Não cria aba nova. Alimenta os blocos executivos para o gestor responder em 30s: por que perdemos, o que é inconsistente, quanto isso vale, o que fazer agora.
 
-Hoje:
+## Backend (inalterado vs. plano anterior)
 
-- **Relatórios → Vendas Realizadas** já usa **líquida** → R$ 153.449,59 (correto).
-- **Forecast → Fechado** lê `summary.total` = soma de `commercial_amount` em `revenueSsotService.getClosedRevenueSummary` → R$ 158.443,59 (inclui a venda cancelada).
-- **Dashboard CEO → Receita Avulsa / MRR / 60 negócios / Run Rate** lê `commercial_amount`, `one_shot_amount`, `mrr_amount` em `useOwnerDashboard` → idem, infla 60 vendas e R$ 154.058,59.
-- **Relatórios V2 (`v_report_forecast_v2`)** usa `sum(net_revenue_final) FILTER (status='won')` da `v_reporting_opportunities_v2`, sem deduzir cancelados.
+### Migration
+- Tabela `loss_semantic_analyses` (1 linha por oportunidade perdida), com:
+  - `source_texts jsonb` (vendedor + cliente + free_text, com origem)
+  - `ai_detected_loss_category`, `ai_detected_loss_reason`, `ai_detected_competitor`
+  - `ai_confidence_score` (0-100), `diagnosis_quality_score` (0-100)
+  - `seller_customer_gap bool`, `gap_explanation text`
+  - `recommended_action text`, `ai_summary_short text` (≤160c, LGPD)
+  - `model_used`, `rule_version`, `context_signature`, timestamps
+  - GRANTs + RLS por organização
+- Coluna `opportunities.is_recoverable boolean`
 
-A regra SSoT já existe e está documentada na memória (`commercial_won_revenue_view` é a única fonte oficial), só não está sendo aplicada na coluna líquida. Esta sprint é um ajuste fino para passar a usar **sempre** as colunas líquidas (`valid_revenue_amount` / equivalentes), sem mexer em regra item‑a‑item, comissão ou OTE.
+### View `v_loss_semantic_v2`
+Join `v_loss_classification_v2` + `loss_semantic_analyses` + excerpts truncados de `loss_comment` e `proposals.declined_reason` (≤160c). Esta é a única fonte usada pelos blocos da Visão Geral.
 
-## Definição única de "receita fechada"
+### Edge function `ai-loss-semantic-analyzer`
+- OpenAI direto (`gpt-5-mini`), wrapper `_shared/ai-client.ts`.
+- Cache via `context_signature`; reprocessa só com `force_refresh`.
+- `diagnosis_quality_score` calculado deterministicamente (sem custo de IA), critérios já listados no enunciado original.
+- Nunca escreve em `loss_reason_id`, `client_loss_reason_id` ou `win_loss_records`.
 
-Para todas as superfícies executivas (Forecast, Dashboard, Run Rate, Cenários):
+### Helpers TS
+- `src/lib/winloss/diagnosisQuality.ts` (puro + testes)
+- `src/services/winloss/lossSemantic.ts`
+- `src/hooks/useLossSemantic.ts` (período + filtros do Hub)
+- `useWinLossData.ts` passa a expor `semantic` (não-quebra de consumidores).
 
+## Frontend — Visão Geral (única superfície)
+
+Sem aba nova. Sem poluição. Ordem dos blocos na Visão Geral:
+
+```text
+1. Diagnóstico Executivo da IA   (existente, reforçado)
+2. Alertas Inteligentes          (subir para o topo)
+3. CRM Trust Score + Receita Recuperável  (linha de 2 KPIs compactos)
+4. Motivos Ocultos               (declarado vs inferido)
+5. Top Motivos de Perda          (existente, com badge Gap)
+6. Gap Vendedor x Cliente        (bloco compacto)
+7. Radar Competitivo             (existente "Perdas por Concorrente" enriquecido)
+8. Drivers de Vitória            (novo, lado dos ganhos)
+9. Pulso Mensal                  (existente, sem filtro Mês)
+10. Análise de Perdas / Ganhos / Ciclo  (mantidos)
+11. Tendência ou Sinais do Mês   (toggle Declarado vs Inferido IA)
 ```
-receita_fechada (líquida) = SUM(valid_revenue_amount) WHERE won_at ∈ [start,end] AND pipeline_type='sales'
-receita_avulsa_liquida   = SUM(one_shot_amount) FILTER (is_cancelled_sale = false)
-receita_mrr_liquida      = SUM(mrr_amount)      FILTER (is_cancelled_sale = false)
-vendas_validas_count     = COUNT(*) FILTER (is_cancelled_sale = false)
-```
 
-Cancelado segue **visível** em telas analíticas, mas não entra em totalizadores executivos nem em cenários de forecast.
+### 1. Diagnóstico Executivo da IA — `AIDiagnosisCard.tsx` (reforçar)
+Substituir o gerador atual por uma síntese que cruza humano × IA:
+- principal motivo declarado vs principal motivo inferido
+- valor perdido associado ao gap
+- maior gap vendedor × cliente do período
+- recomendação principal (mais frequente em `recommended_action`)
+- severidade já existente (baixo/médio/alto/crítico) recalculada por valor + gap%
+Copy: "No período, o CRM registra X como principal motivo, mas a IA identificou Y como causa real dominante. Esse gap representa R$ N. Recomendação: …"
 
-## Mudanças
+### 2. Alertas Inteligentes — `SmartAlertsCard.tsx`
+Subir para logo após o Diagnóstico. Adicionar regras semânticas:
+- `qualidade média < 40` em ≥30% das perdas → "X% das perdas estão com diagnóstico fraco"
+- gap dominante (ex.: Preço declarado, Timing inferido) acima de 20% → alerta
+- concorrente em alta vs período anterior
+- "R$ X em receita recuperável detectada"
+- "CRM Trust Score abaixo de 70%"
 
-### 1. `src/services/revenue/revenueSsotService.ts`
+### 3. CRM Trust Score + Receita Recuperável — novo `CrmTrustAndRecoverableStrip.tsx`
+Uma linha, dois cards compactos:
+- **CRM Trust Score 0-100** = média ponderada de: qualidade média do diagnóstico (30) + % perdas com texto suficiente (20) + (100 - % gap) (20) + % perdas com IA alta confiança (15) + cobertura de análise (15).
+- **Receita Recuperável**: soma de `valor_previsto` (líquido) onde `is_recoverable=true` OR IA detectou recuperabilidade + qtd oportunidades + principal causa + ação recomendada.
 
-- `ClosedRevenueRow`: incluir `valid_revenue_amount`, `cancelled_amount`, `is_cancelled_sale`.
-- `ClosedRevenueSummary`: adicionar `validTotal`, `validAvulsa`, `validMRR`, `validCount`, `cancelledTotal`, `cancelledCount`.
-- `fetchRows`: passar a selecionar essas colunas (continua `select('*')`, só tipar).
-- `getClosedRevenueSummary`: calcular os novos campos a partir de `valid_revenue_amount` e da flag `is_cancelled_sale` (mesma regra de `useVendasRealizadas.ts` linhas 211‑223, evitando divergência).
-- Manter `total`, `avulsa`, `mrr`, `count` (bruto) para back‑compat de consumidores que ainda dependem deles (Reconciliação, Revenue Integrity), mas eles não serão mais usados em superfícies executivas.
+### 4. Motivos Ocultos — novo `HiddenReasonsBlock.tsx`
+Duas colunas lado a lado: ranking "Declarado" (a partir de `loss_reasons` selecionados) × ranking "Inferido pela IA" (a partir de `ai_detected_loss_category` agregado), com % e valor. Mostra explicitamente quando o time está resolvendo o problema errado.
 
-### 2. `src/hooks/useForecastData.ts`
+### 5. Top Motivos de Perda — `LossAnalysisSection.tsx` (estender)
+Por motivo: qtd, %, valor perdido, motivo declarado × motivo inferido quando divergente, badge "Gap" quando aplicável.
 
-- `closedRevenue` passa a ler `ssotSummary.validTotal` (com fallback `ssotSummary.total` se `validTotal` indefinido para máxima segurança).
-- `wonCount` passa a usar `ssotSummary.validCount` (alinha "Win Rate" e tickets ao líquido).
-- Cenários (commit, best case, pessimista, realista, otimista) recalculam em cima do novo `closedRevenue` automaticamente.
+### 6. Gap Vendedor × Cliente — novo `SellerCustomerGapBlock.tsx`
+Compacto:
+- qtd de perdas com gap, % sobre analisadas, top 3 gaps mais comuns (par "declarado → inferido"), valor perdido associado.
 
-### 3. `src/hooks/useOwnerDashboard.ts`
+### 7. Radar Competitivo — substitui o atual "Perdas por Concorrente"
+`CompetitiveRadarBlock.tsx`. Por concorrente (mescla `win_loss_records.competitor` + `ai_detected_competitor`):
+- qtd perdas, valor perdido, motivo dominante (do bloco semântico), tendência vs período anterior, confiança da IA.
 
-- Reduce do `ssotMonthRes` passa a também acumular `valid_amount`, `valid_one_shot`, `valid_mrr`, `valid_count` aplicando filtro `is_cancelled_sale === false` na composição de avulsa/MRR/count, e somando `valid_revenue_amount` direto para o total.
-- `closedRevenueThisMonth`, `closedOneTimeThisMonth`, `closedMRRThisMonth`, `ssotWonCountThisMonth` passam a usar os campos líquidos.
-- `ssotYearlyRevenue` (Run Rate / Meta vs Run Rate) passa a somar `valid_revenue_amount` no select YTD.
+### 8. Drivers de Vitória — novo `WinDriversBlock.tsx`
+Usa `win_loss_records` de outcome `won` + `win_reason_id` + `customer_feedback` + `strengths_mentioned`:
+- principais fatores (top 5) que fazem ganhar, valor ganho associado, recorrência por vendedor/pipeline, recomendação para repetir o padrão (ex.: "Ganhos mencionam agilidade e suporte 3,2× mais que perdas").
 
-### 4. View V2 `v_report_forecast_v2` (migração SQL)
+### 9. Tendência / Sinais do Mês — `LossReasonsTrendChart.tsx` (estender)
+Adicionar toggle "Motivo informado / Motivo inferido pela IA". Regra de filtro já existente (Mês → MonthSignalsCard; demais → tendência) mantida.
 
-- Redefinir `closed_revenue` para vir de `commercial_won_revenue_view.valid_revenue_amount` com `pipeline_type='sales'` e `won_at` no mês corrente do row, em vez de `sum(net_revenue_final) FILTER (status='won')` de `v_reporting_opportunities_v2`. Mantém demais colunas como hoje.
-- Garante que Relatórios V2 → Forecast bata exatamente com o card "Fechado" do Forecast clássico e com Vendas Realizadas.
-- Sem mudar grants nem RLS (view já existe com `security_invoker=true`).
+### 10. Detalhe da oportunidade — `OpportunityHistoryTab.tsx`
+Único lugar com texto completo (LGPD):
+- texto original completo + origem (vendedor / cliente)
+- motivo humano vs motivo inferido pela IA
+- confiança, gap, ação recomendada
+- botão "Reprocessar análise" (`force_refresh`)
 
-### 5. Banner / tooltip
+### LGPD
+Dashboards do Hub só renderizam `ai_summary_short` / `seller_diagnosis_excerpt` / `customer_comment_excerpt` (≤160c). `loss_semantic_analyses.source_texts` só é lido em escopo autenticado da própria oportunidade (RLS).
 
-- Atualizar o banner do Forecast e o subtítulo do card "Fechado" para deixar explícito: *"líquido de cancelamentos — alinhado a Vendas Realizadas"*. Sem nova lógica.
+## Não fazer (reforço)
+- Não criar aba "Inteligência Semântica".
+- Não substituir motivo humano nem alterar `loss_reason_id` / `client_loss_reason_id`.
+- Não alterar `win_loss_records`.
+- Não tocar em OTE, Forecast, Vendas Realizadas, `commercial_won_revenue_view`.
+- Sem cards redundantes; cada bloco responde a uma das 4 perguntas do gestor.
 
-## Fora de escopo (não mexer)
+## Ordem de execução
+1. Migration (`loss_semantic_analyses`, `is_recoverable`, view `v_loss_semantic_v2`, GRANTs, RLS)
+2. `diagnosisQuality.ts` + testes
+3. Edge function `ai-loss-semantic-analyzer` com cache por `context_signature`
+4. `lossSemantic` service + `useLossSemantic` hook + extensão de `useWinLossData`
+5. Reforço de `AIDiagnosisCard` e `SmartAlertsCard`
+6. Novos blocos: CRM Trust + Recuperável, Motivos Ocultos, Gap, Radar Competitivo, Drivers de Vitória
+7. Estender Top Motivos e Tendência (toggle)
+8. Bloco "Análise Semântica da Perda" no detalhe da oportunidade + botão Reprocessar
+9. Memória `mem://business-rules/winloss/semantic-loss-intelligence` + index
+10. `tsc --noEmit` limpo
 
-- `commercial_won_revenue_view` (não alteramos a view oficial).
-- Regras item‑a‑item de elegibilidade OTE / `calculate-ote` / `commission_eligibility_view`.
-- Relatório de Vendas Realizadas (já está correto).
-- Win/Loss Hub (usa `status='won'`, independente).
-- Atribuição histórica (`commercial_won_revenue_historical_view`).
-
-## Validação
-
-Após deploy, para Mai/2026 (org HumanoidOS):
-
-- Forecast → card **Fechado** = R$ 153.449,59 e 59 deals (mesma base de Vendas Realizadas).
-- Cenários Pessimista/Realista/Otimista recalculados a partir do novo `closed` (devem cair ≈ R$ 4.994 cada).
-- Dashboard CEO → **Receita Avulsa (mês)** alinhada ao valor de Vendas Realizadas, **60 negócios** vira **59**, Run Rate recalcula sem o cancelado.
-- Relatórios V2 → Forecast também mostra R$ 153.449,59.
-- Aba Vendas Realizadas continua intacta.
-- `npx tsc --noEmit` sem erros.
-
-## Riscos
-
-- Consumidores que ainda leem `summary.total` (Reconciliação, Revenue Integrity): mantemos o campo, então continuam funcionando — só não recebem o novo valor líquido a não ser que sejam atualizados depois.
-- Forecast confidence usa `forecast_reliability_pct` da view; não muda.
-- Multi-tenant / RLS: nenhuma mudança em grants ou políticas. View V2 segue `security_invoker=true`.
+## Resultado
+A Visão Geral entrega resposta executiva em 30s, com IA semântica como motor invisível. Nenhum dado humano é apagado; tudo é enriquecimento rastreável.
