@@ -43,6 +43,9 @@ export interface ClosedRevenueRow {
   commercial_status?: string | null;
   fulfillment_status?: string | null;
   financial_settlement_status?: string | null;
+  valid_revenue_amount?: number | null;
+  cancelled_amount?: number | null;
+  is_cancelled_sale?: boolean | null;
 }
 
 export interface ClosedRevenueSummary {
@@ -54,6 +57,16 @@ export interface ClosedRevenueSummary {
   eligible: number;
   pendingSettlement: number;
   pendingReview: number;
+  /**
+   * Receita líquida de cancelamentos — fonte oficial p/ Forecast/Dashboard executivos.
+   * Calculada a partir de `valid_revenue_amount` (mesma base de Vendas Realizadas).
+   */
+  validTotal: number;
+  validAvulsa: number;
+  validMRR: number;
+  validCount: number;
+  cancelledTotal: number;
+  cancelledCount: number;
 }
 
 export interface RevenueGroup {
