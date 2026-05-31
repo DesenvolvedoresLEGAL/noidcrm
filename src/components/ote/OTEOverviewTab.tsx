@@ -555,14 +555,26 @@ export function OTEOverviewTab({ results, records = [], isLoading, period, isOTE
                 </tbody>
 
                 <tfoot>
-                  <tr className="bg-muted/30 font-semibold">
-                    <td colSpan={3} className="py-3 px-2">SUBTOTAL PRÉ-VENDAS</td>
-                    <td className="py-3 px-2 text-right">{leadsResults.reduce((sum, r) => sum + r.total_sales, 0)} leads</td>
-                    <td colSpan={5} className="py-3 px-2"></td>
-                    <td className="py-3 px-2 text-right text-primary">
-                      {formatCurrency(leadsResults.reduce((sum, r) => sum + r.final_variable_amount, 0))}
-                    </td>
-                  </tr>
+                  {(() => {
+                    const configuredLeadsSubtotal = leadsResults.reduce((sum, r) => {
+                      const histLeads = qualifierMap.get(r.user_id);
+                      return sum + (typeof histLeads === 'number' ? histLeads : r.total_sales);
+                    }, 0);
+                    const syntheticLeadsSubtotal = Array.from(qualifierMap.entries())
+                      .filter(([uid]) => !leadsResults.some((r) => r.user_id === uid))
+                      .filter(([uid]) => !revenueResults.some((r) => r.user_id === uid))
+                      .reduce((s, [, n]) => s + (n || 0), 0);
+                    return (
+                      <tr className="bg-muted/30 font-semibold">
+                        <td colSpan={3} className="py-3 px-2">SUBTOTAL PRÉ-VENDAS</td>
+                        <td className="py-3 px-2 text-right">{configuredLeadsSubtotal + syntheticLeadsSubtotal} leads</td>
+                        <td colSpan={5} className="py-3 px-2"></td>
+                        <td className="py-3 px-2 text-right text-primary">
+                          {formatCurrency(leadsResults.reduce((sum, r) => sum + r.final_variable_amount, 0))}
+                        </td>
+                      </tr>
+                    );
+                  })()}
                 </tfoot>
               </table>
             </div>
