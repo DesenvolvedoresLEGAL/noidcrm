@@ -1,8 +1,5 @@
-import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { OTEMonthlyResult } from '@/hooks/useOTEData';
 import { useSalesConfig } from '@/hooks/useSalesConfig';
 import type { OTESalesRecord } from '@/hooks/useOTESalesRecords';
@@ -22,8 +19,6 @@ import {
   UserCheck,
   Wallet,
   Ban,
-  ChevronDown,
-  ChevronUp,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -52,7 +47,7 @@ function isPreSalesRole(r: OTEMonthlyResult) {
 export function OTEOverviewTab({ results, records = [], isLoading, period, isOTEMode = true }: OTEOverviewTabProps) {
   const { config } = useSalesConfig();
   const { organization } = useCurrentOrganization();
-  const [showReconciliation, setShowReconciliation] = useState(false);
+  
 
   const flagBlueThreshold = config?.flag_blue_threshold ?? 70;
   const flagYellowMinThreshold = config?.flag_yellow_min_threshold ?? 50;
@@ -261,44 +256,7 @@ export function OTEOverviewTab({ results, records = [], isLoading, period, isOTE
         </Card>
       </div>
 
-      {/* Reconciliação OTE — colapsável (visão executiva limpa). */}
-      <Collapsible open={showReconciliation} onOpenChange={setShowReconciliation}>
-        <div className="flex items-center gap-2 text-sm">
-          <CollapsibleTrigger asChild>
-            <Button variant="link" size="sm" className="px-0 h-auto text-muted-foreground hover:text-foreground">
-              {showReconciliation ? <ChevronUp className="h-4 w-4 mr-1" /> : <ChevronDown className="h-4 w-4 mr-1" />}
-              {showReconciliation ? 'Ocultar reconciliação' : 'Ver reconciliação OTE'}
-            </Button>
-          </CollapsibleTrigger>
-          {hasReconciliationIssue && (
-            <span className="inline-flex items-center gap-1 text-destructive text-xs">
-              <AlertTriangle className="h-3 w-3" />
-              Divergência detectada
-            </span>
-          )}
-        </div>
-        <CollapsibleContent>
-          <Card className={cn('mt-2', hasReconciliationIssue && 'border-destructive/40 bg-destructive/5')}>
-            <CardContent className="py-3 text-sm flex flex-wrap items-center gap-2">
-              <span className="font-medium">Reconciliação OTE:</span>
-              <span>{formatCurrency(commercialEligible)}</span>
-              <span className="text-muted-foreground">(comercial)</span>
-              <span>−</span>
-              <span>{formatCurrency(itemsOutOfGoal)}</span>
-              <span className="text-muted-foreground">(fora da meta)</span>
-              <span>=</span>
-              <span className="font-semibold">{formatCurrency(oteEligible)}</span>
-              <span className="text-muted-foreground">(elegível OTE)</span>
-              {hasReconciliationIssue && (
-                <span className="ml-2 inline-flex items-center gap-1 text-destructive">
-                  <AlertTriangle className="h-4 w-4" />
-                  Recalcule o período ou revise itens sem regra de meta.
-                </span>
-              )}
-            </CardContent>
-          </Card>
-        </CollapsibleContent>
-      </Collapsible>
+
 
       {(pendingAttributionTotal > 0 || impossibleSellerTotal) && (
         <Card className="border-destructive/40 bg-destructive/5">

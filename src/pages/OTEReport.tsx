@@ -168,7 +168,7 @@ export default function OTEReport() {
               ) : isSimpleMode ? (
                 <SimpleGoalsSellerDetailTab results={results || []} isLoading={loading} />
               ) : (
-                <OTESellerDetailTab results={results || []} isLoading={loading} isOTEMode={isOTEMode} />
+                <OTESellerDetailTab results={results || []} isLoading={loading} isOTEMode={isOTEMode} period={selectedPeriod} />
               )}
             </TabsContent>
 
