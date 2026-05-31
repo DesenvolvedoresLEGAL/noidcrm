@@ -63,7 +63,8 @@ export default function ReleaseNotes() {
   const { isSuperAdmin, isPlatformAdmin } = usePlatformAdmin();
   const canManageDrafts = isPlatformAdmin || isSuperAdmin;
   const [activeView, setActiveView] = useState<'published' | 'drafts'>('published');
-  const { data: drafts = [] } = useReleaseDrafts();
+  // Só busca drafts para admins — non-admin não dispara round-trip (RLS já bloqueia).
+  const { data: drafts = [] } = useReleaseDrafts(canManageDrafts);
 
   const { data: releases = [], isLoading } = useQuery({
     queryKey: ['release-notes', 'published'],
