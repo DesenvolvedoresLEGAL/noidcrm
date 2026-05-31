@@ -58,13 +58,28 @@ export default function WinLossHub() {
     dateRange
   );
 
+  // Pipelines comerciais (sales + qualification) — único escopo do Win/Loss.
+  const commercialPipelineIds = useMemo(
+    () =>
+      pipelines
+        .filter((p) => p.pipeline_type === 'sales' || p.pipeline_type === 'qualification')
+        .map((p) => p.id),
+    [pipelines],
+  );
+
   // P0 Revenue SSoT — monetários ganhos vêm de commercial_won_revenue_view.
+  // "Todos" = pipelines comerciais; caso contrário restringe ao pipeline escolhido.
+  const ssotPipelineIds = selectedPipelineId
+    ? [selectedPipelineId]
+    : commercialPipelineIds.length > 0
+      ? commercialPipelineIds
+      : null;
   const { data: ssotWonSummary } = useClosedRevenueSummary({
     surface: 'winloss-hub',
     organizationId: organization?.id,
     start: dateRange.from.toISOString(),
     end: dateRange.to.toISOString(),
-    pipelineIds: selectedPipelineId ? [selectedPipelineId] : null,
+    pipelineIds: ssotPipelineIds,
   });
 
   // Log errors for debugging
@@ -90,15 +105,6 @@ export default function WinLossHub() {
       toast({ title: 'Erro na análise', description: error instanceof Error ? error.message : 'Erro', variant: 'destructive' });
     },
   });
-
-  // Pipelines comerciais (sales + qualification) — único escopo do Win/Loss.
-  const commercialPipelineIds = useMemo(
-    () =>
-      pipelines
-        .filter((p) => p.pipeline_type === 'sales' || p.pipeline_type === 'qualification')
-        .map((p) => p.id),
-    [pipelines],
-  );
 
   return (
     <Layout>
