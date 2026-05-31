@@ -28,25 +28,30 @@ export function SalesCycleSection({ data, isLoading }: Props) {
             <CardTitle className="text-sm">Ciclo Médio: Won vs Lost</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="text-center p-4 rounded-lg bg-emerald-500/10">
-                <TrendingUp className="h-5 w-5 text-emerald-500 mx-auto mb-1" />
-                <p className="text-2xl font-bold text-emerald-500">{avgCycleWon ?? '—'}</p>
-                <p className="text-xs text-muted-foreground">dias (ganhos)</p>
-                <p className="text-[10px] text-muted-foreground mt-1">{validWinCyclesCount} deals</p>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="text-center p-3 rounded-lg bg-emerald-500/10">
+                <TrendingUp className="h-4 w-4 text-emerald-500 mx-auto mb-1" />
+                <p className="text-xl font-bold text-emerald-500">{avgCycleWon ?? '—'}</p>
+                <p className="text-[11px] text-muted-foreground">dias (ganhos)</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">{validWinCyclesCount} deals</p>
               </div>
-              <div className="text-center p-4 rounded-lg bg-red-500/10">
-                <TrendingDown className="h-5 w-5 text-red-500 mx-auto mb-1" />
-                <p className="text-2xl font-bold text-red-500">{avgCycleLost ?? '—'}</p>
-                <p className="text-xs text-muted-foreground">dias (perdidos)</p>
-                <p className="text-[10px] text-muted-foreground mt-1">{validLossCyclesCount} deals</p>
+              <div className="text-center p-3 rounded-lg bg-red-500/10">
+                <TrendingDown className="h-4 w-4 text-red-500 mx-auto mb-1" />
+                <p className="text-xl font-bold text-red-500">{avgCycleLost ?? '—'}</p>
+                <p className="text-[11px] text-muted-foreground">dias (perdidos)</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">{validLossCyclesCount} deals</p>
+              </div>
+              <div className="text-center p-3 rounded-lg bg-violet-500/10">
+                <Clock className="h-4 w-4 text-violet-500 mx-auto mb-1" />
+                <p className="text-xl font-bold text-violet-500">
+                  {avgCycleWon != null && avgCycleLost != null
+                    ? `${avgCycleLost - avgCycleWon > 0 ? '+' : ''}${avgCycleLost - avgCycleWon}`
+                    : '—'}
+                </p>
+                <p className="text-[11px] text-muted-foreground">diferença</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">lost − won</p>
               </div>
             </div>
-            {avgCycleWon && avgCycleLost && avgCycleLost > avgCycleWon && (
-              <p className="text-xs text-muted-foreground mt-3 text-center">
-                Deals perdidos levam <strong>{avgCycleLost - avgCycleWon} dias</strong> a mais — identifique deals estagnados mais cedo
-              </p>
-            )}
           </CardContent>
         </Card>
 
