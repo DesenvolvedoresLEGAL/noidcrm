@@ -6,6 +6,10 @@ import { AIDiagnosisCard } from '../AIDiagnosisCard';
 import { MonthSignalsCard } from '../MonthSignalsCard';
 import { SmartAlertsCard } from '@/components/intelligence/SmartAlertsCard';
 import { LossReasonsTrendChart } from '@/components/intelligence/LossReasonsTrendChart';
+import { CrmTrustAndRecoverableStrip } from '../CrmTrustAndRecoverableStrip';
+import { HiddenReasonsBlock } from '../HiddenReasonsBlock';
+import { SellerCustomerGapBlock } from '../SellerCustomerGapBlock';
+import { useLossSemantic } from '@/hooks/useLossSemantic';
 import type { WinLossDataResult, TimeframePreset, DateRange } from '@/hooks/useWinLossData';
 
 interface Props {
@@ -16,11 +20,14 @@ interface Props {
   terminology: { lostPlural: string };
   timeframe: TimeframePreset;
   dateRange: DateRange;
+  pipelineId?: string | null;
 }
 
-export function WinLossOverviewTab({ data, isLoading, pipelineContext, terminology, timeframe, dateRange }: Props) {
+export function WinLossOverviewTab({ data, isLoading, organizationId, terminology, timeframe, dateRange, pipelineId = null }: Props) {
   const showMonthlyPulse = timeframe !== 'month';
   const showTrend = timeframe !== 'month';
+
+  const { data: semantic } = useLossSemantic(organizationId, pipelineId, dateRange);
 
   return (
     <div className="space-y-6">
@@ -35,12 +42,13 @@ export function WinLossOverviewTab({ data, isLoading, pipelineContext, terminolo
         contextLabel={terminology.lostPlural}
       />
 
-      {/* 3. Pulso Mensal (oculto no filtro Mês) */}
-      {showMonthlyPulse && data && data.monthlyPulse.length > 0 && (
-        <MonthlyPulseCards data={data.monthlyPulse} />
-      )}
+      {/* 3. CRM Trust Score + Receita Recuperável */}
+      <CrmTrustAndRecoverableStrip semantic={semantic} isLoading={isLoading} />
 
-      {/* 4. Análise de Perdas */}
+      {/* 4. Motivos Ocultos (declarado vs inferido pela IA) */}
+      <HiddenReasonsBlock semantic={semantic} />
+
+      {/* 5. Top Motivos de Perda */}
       <LossAnalysisSection
         data={data}
         isLoading={isLoading}
@@ -48,13 +56,21 @@ export function WinLossOverviewTab({ data, isLoading, pipelineContext, terminolo
         dateRange={dateRange}
       />
 
-      {/* 5. Análise de Ganhos */}
+      {/* 6. Gap Vendedor × Cliente */}
+      <SellerCustomerGapBlock semantic={semantic} />
+
+      {/* 7. Pulso Mensal (oculto no filtro Mês) */}
+      {showMonthlyPulse && data && data.monthlyPulse.length > 0 && (
+        <MonthlyPulseCards data={data.monthlyPulse} />
+      )}
+
+      {/* 8. Análise de Ganhos */}
       <WinAnalysisSection data={data} isLoading={isLoading} />
 
-      {/* 6. Ciclo de Venda */}
+      {/* 9. Ciclo de Venda */}
       <SalesCycleSection data={data} isLoading={isLoading} />
 
-      {/* 7. Tendência ou Sinais do Mês */}
+      {/* 10. Tendência ou Sinais do Mês */}
       {showTrend ? (
         <LossReasonsTrendChart losses={data?.losses || []} isLoading={isLoading} />
       ) : (
