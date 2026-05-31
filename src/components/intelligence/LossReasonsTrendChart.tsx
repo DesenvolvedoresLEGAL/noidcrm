@@ -1,7 +1,11 @@
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { TrendingUp } from 'lucide-react';
+import { TrendingUp, Brain, User } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { getLossCategoryLabel } from '@/utils/category-labels';
+import type { LossSemanticAggregates } from '@/hooks/useLossSemantic';
 
 interface LossReasonsTrendChartProps {
   losses: Array<{
@@ -12,11 +16,17 @@ interface LossReasonsTrendChartProps {
     reason_seller?: string;
   }>;
   isLoading: boolean;
+  semantic?: LossSemanticAggregates;
 }
+
+type ViewMode = 'declared' | 'inferred';
 
 const COLORS = ['hsl(var(--destructive))', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6'];
 
-export function LossReasonsTrendChart({ losses, isLoading }: LossReasonsTrendChartProps) {
+export function LossReasonsTrendChart({ losses, isLoading, semantic }: LossReasonsTrendChartProps) {
+  const [mode, setMode] = useState<ViewMode>('declared');
+  const hasInferred = !!semantic && semantic.rows.length > 0;
+
   // Group losses by month and reason
   const trendData = (() => {
     if (!losses || losses.length === 0) return [];
