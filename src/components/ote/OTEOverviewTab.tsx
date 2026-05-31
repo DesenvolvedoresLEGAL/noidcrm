@@ -5,7 +5,7 @@ import { useSalesConfig } from '@/hooks/useSalesConfig';
 import type { OTESalesRecord } from '@/hooks/useOTESalesRecords';
 import { aggregateEligible } from './oteEligibility';
 import { FLAG_LABELS } from '@/lib/results/resultsMode';
-import { useClosedRevenueSummary, useHistoricalRevenueBySeller } from '@/hooks/revenue/useRevenueSsot';
+import { useOfficialEligibleRevenueSummary, useOfficialHistoricalRevenueBySeller } from '@/hooks/revenue/useRevenueSsot';
 import { useHistoricalQualifiers } from '@/hooks/results/useHistoricalQualifiers';
 import { useActiveUsers } from '@/hooks/users/useActiveUsers';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
@@ -49,11 +49,11 @@ export function OTEOverviewTab({ results, records = [], isLoading, period, isOTE
     start: periodStart,
     end: periodEnd,
   };
-  const { data: ssotSummary, isError: ssotError } = useClosedRevenueSummary(ssotParams as any);
+  const { data: ssotSummary, isError: ssotError } = useOfficialEligibleRevenueSummary(ssotParams as any);
   // Atribuição histórica imutável: vendedor no momento do ganho (não dono atual).
-  const { data: ssotBySeller = [] } = useHistoricalRevenueBySeller(ssotParams as any);
-  const ssotBySellerMap = new Map<string, { total: number; name: string }>(
-    ssotBySeller.map((g) => [g.key, { total: g.total, name: g.label }]),
+  const { data: ssotBySeller = [] } = useOfficialHistoricalRevenueBySeller(ssotParams as any);
+  const ssotBySellerMap = new Map<string, { total: number; name: string; confidence?: string | null }>(
+    ssotBySeller.map((g) => [g.key, { total: g.total, name: g.label, confidence: g.attributionConfidence }]),
   );
   // SDR histórico por qualificação (não dono atual do lead).
   const { data: historicalQualifiers = [] } = useHistoricalQualifiers({
@@ -96,7 +96,7 @@ export function OTEOverviewTab({ results, records = [], isLoading, period, isOTE
   const revenueRecords = records.filter((r) => revenueResultIds.has(r.ote_result_id));
   const { eligibleTotal: oteEligible } = aggregateEligible(revenueRecords);
   const ssotAvailable = !!ssotSummary && !ssotError;
-  const commercialEligible = ssotAvailable ? Number(ssotSummary!.eligible || ssotSummary!.total || 0) : 0;
+  const commercialEligible = ssotAvailable ? Number(ssotSummary!.eligible || 0) : 0;
   const itemsOutOfGoal = Math.max(0, commercialEligible - oteEligible);
 
   // Eligible per seller (para a coluna "Receita elegível OTE" da tabela Closers).
