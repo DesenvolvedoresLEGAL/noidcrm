@@ -260,7 +260,7 @@ export function SmartAlertsCard({ losses, lossReasons, isLoading, contextLabel, 
       </CardHeader>
       <CardContent>
         <div className="space-y-3">
-          {alerts.map((alert, index) => (
+          {sortedAlerts.map((alert, index) => (
             <div 
               key={index}
               className={`p-3 rounded-lg border flex items-start gap-3 ${
