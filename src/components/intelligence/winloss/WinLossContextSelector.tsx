@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Badge } from '@/components/ui/badge';
@@ -16,17 +17,15 @@ interface WinLossContextSelectorProps {
 const PIPELINE_TYPE_LABELS: Record<string, string> = {
   sales: 'Vendas',
   qualification: 'Pré-Vendas',
-  onboarding: 'Operacional',
-  renewal: 'Renovação',
-  cs: 'CS',
 };
 
 const PIPELINE_TYPE_COLORS: Record<string, string> = {
   sales: 'bg-blue-500/10 text-blue-600 border-blue-500/30',
   qualification: 'bg-purple-500/10 text-purple-600 border-purple-500/30',
-  onboarding: 'bg-amber-500/10 text-amber-600 border-amber-500/30',
-  renewal: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30',
 };
+
+// Win/Loss é inteligência comercial — somente pipelines comerciais aparecem aqui.
+const ALLOWED_TYPES = new Set(['sales', 'qualification']);
 
 export function WinLossContextSelector({
   pipelines,
@@ -35,6 +34,11 @@ export function WinLossContextSelector({
   timeframe,
   onTimeframeChange,
 }: WinLossContextSelectorProps) {
+  const commercialPipelines = useMemo(
+    () => pipelines.filter((p) => p.pipeline_type && ALLOWED_TYPES.has(p.pipeline_type)),
+    [pipelines],
+  );
+
   return (
     <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 p-4 rounded-lg border bg-card">
       {/* Pipeline Selector */}
@@ -45,16 +49,16 @@ export function WinLossContextSelector({
           onValueChange={(val) => onPipelineChange(val === 'all' ? null : val)}
         >
           <SelectTrigger className="w-full sm:w-[260px]">
-            <SelectValue placeholder="Todos os pipelines" />
+            <SelectValue placeholder="Pré-Vendas + Vendas" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">
               <span className="flex items-center gap-2">
                 <Filter className="h-3.5 w-3.5" />
-                Todos os Pipelines
+                Todos (Pré-Vendas + Vendas)
               </span>
             </SelectItem>
-            {pipelines.map((p) => (
+            {commercialPipelines.map((p) => (
               <SelectItem key={p.id} value={p.id}>
                 <span className="flex items-center gap-2">
                   {p.name}
@@ -74,7 +78,7 @@ export function WinLossContextSelector({
       </div>
 
       {/* Timeframe Selector */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 overflow-x-auto">
         <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
         <ToggleGroup
           type="single"
@@ -82,6 +86,9 @@ export function WinLossContextSelector({
           onValueChange={(val) => val && onTimeframeChange(val as TimeframePreset)}
           className="justify-start"
         >
+          <ToggleGroupItem value="today" className="text-xs px-2.5 h-8">Hoje</ToggleGroupItem>
+          <ToggleGroupItem value="7d" className="text-xs px-2.5 h-8">7d</ToggleGroupItem>
+          <ToggleGroupItem value="15d" className="text-xs px-2.5 h-8">15d</ToggleGroupItem>
           <ToggleGroupItem value="month" className="text-xs px-2.5 h-8">Mês</ToggleGroupItem>
           <ToggleGroupItem value="quarter" className="text-xs px-2.5 h-8">Trimestre</ToggleGroupItem>
           <ToggleGroupItem value="semester" className="text-xs px-2.5 h-8">Semestre</ToggleGroupItem>
