@@ -1,7 +1,9 @@
+// Sprint WL-UI-02 — Cockpit executivo: 3 blocos escaneáveis.
+// Principal Vazamento · Ação Recomendada · Impacto Estimado.
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Brain, AlertTriangle, Clock, DollarSign, Eye, RotateCcw } from 'lucide-react';
-import { buildExecutiveDiagnosis, type Severity } from '@/lib/winloss/diagnosis';
+import { Brain, AlertTriangle, Clock, DollarSign, Eye, RotateCcw, Lightbulb, TrendingUp } from 'lucide-react';
+import { buildExecutiveDiagnosis, buildImpactEstimate, type Severity } from '@/lib/winloss/diagnosis';
 import { getLossCategoryLabel } from '@/utils/category-labels';
 import type { WinLossDataResult } from '@/hooks/useWinLossData';
 import type { LossSemanticAggregates } from '@/hooks/useLossSemantic';
@@ -27,15 +29,16 @@ export function AIDiagnosisCard({ data, dateRange, semantic }: Props) {
   const diag = buildExecutiveDiagnosis(data, dateRange);
   if (!diag) return null;
   const sev = SEVERITY_STYLES[diag.severity];
+  const impact = buildImpactEstimate(data, diag, dateRange);
 
-  // Síntese humano × IA: categoria mais reportada pelo vendedor (top do diag) vs categoria mais inferida pela IA
   const declaredTop = diag.topCategory;
   const inferredTop = semantic?.inferredRanking?.[0]?.category;
   const hasMismatch = !!inferredTop && inferredTop !== declaredTop;
 
   return (
     <Card className={`${sev.border} ${sev.bg}`}>
-      <CardContent className="pt-4 pb-4 space-y-3">
+      <CardContent className="pt-4 pb-4 space-y-4">
+        {/* Header */}
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2">
             <Brain className="h-4 w-4 text-purple-500" />
@@ -54,7 +57,52 @@ export function AIDiagnosisCard({ data, dateRange, semantic }: Props) {
           </div>
         </div>
 
-        <p className="text-sm leading-relaxed">{diag.copy}</p>
+        {/* 3 blocos cockpit */}
+        <div className="grid md:grid-cols-3 gap-3">
+          {/* Principal Vazamento */}
+          <div className="rounded-lg border bg-background/60 p-3 space-y-1">
+            <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+              <AlertTriangle className="h-3.5 w-3.5 text-red-500" />
+              Principal vazamento
+            </div>
+            <p className="text-sm font-semibold leading-tight">{diag.topLabel}</p>
+            <p className="text-xs text-muted-foreground">
+              {diag.topCount} {diag.topCount === 1 ? 'deal' : 'deals'}
+            </p>
+            <p className="text-base font-bold text-red-600">{fmtBRL(diag.topLostValue)} <span className="text-[11px] font-normal text-muted-foreground">perdidos</span></p>
+          </div>
+
+          {/* Ação Recomendada */}
+          <div className="rounded-lg border bg-background/60 p-3 space-y-1">
+            <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+              <Lightbulb className="h-3.5 w-3.5 text-amber-500" />
+              Ação recomendada
+            </div>
+            <p className="text-sm leading-snug">{diag.shortRecommendation}</p>
+          </div>
+
+          {/* Impacto Estimado */}
+          <div className="rounded-lg border bg-background/60 p-3 space-y-1">
+            <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+              <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
+              Impacto estimado
+            </div>
+            {impact.available && impact.winRatePotentialPp != null && impact.monthlyRevenuePotential != null ? (
+              <>
+                <p className="text-base font-bold text-emerald-600 leading-tight">
+                  +{impact.winRatePotentialPp}pp <span className="text-[11px] font-normal text-muted-foreground">Win Rate potencial</span>
+                </p>
+                <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">
+                  +{fmtBRL(impact.monthlyRevenuePotential)}<span className="text-[11px] font-normal text-muted-foreground">/mês estimados</span>
+                </p>
+              </>
+            ) : (
+              <p className="text-xs text-muted-foreground leading-snug">
+                Impacto estimado indisponível por falta de histórico confiável.
+              </p>
+            )}
+          </div>
+        </div>
 
         {hasMismatch && (
           <div className="flex items-start gap-2 text-xs p-2 rounded-md border border-amber-500/30 bg-amber-500/5">
@@ -67,18 +115,19 @@ export function AIDiagnosisCard({ data, dateRange, semantic }: Props) {
           </div>
         )}
 
-        <div className="grid sm:grid-cols-3 gap-2 pt-1">
-          <div className="flex items-center gap-2 text-xs">
+        {/* Footer: severidade + ciclo + valor perdido + motivo */}
+        <div className="grid sm:grid-cols-3 gap-2 pt-1 border-t border-border/40">
+          <div className="flex items-center gap-2 text-xs pt-2">
             <AlertTriangle className="h-3.5 w-3.5 text-red-500" />
             <span className="text-muted-foreground">Top motivo:</span>
-            <span className="font-semibold">{diag.topLabel}</span>
+            <span className="font-semibold truncate">{diag.topLabel}</span>
           </div>
-          <div className="flex items-center gap-2 text-xs">
+          <div className="flex items-center gap-2 text-xs pt-2">
             <DollarSign className="h-3.5 w-3.5 text-yellow-500" />
             <span className="text-muted-foreground">Valor perdido:</span>
             <span className="font-semibold">{fmtBRL(diag.topLostValue)}</span>
           </div>
-          <div className="flex items-center gap-2 text-xs">
+          <div className="flex items-center gap-2 text-xs pt-2">
             <Clock className="h-3.5 w-3.5 text-violet-500" />
             <span className="text-muted-foreground">Δ ciclo (perda − ganho):</span>
             <span className="font-semibold">

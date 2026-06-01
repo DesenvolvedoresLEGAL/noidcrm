@@ -24,12 +24,39 @@ export const RECOMMENDATIONS: Record<string, string> = {
   other: 'Aprofundar entrevistas de perda para mapear motivos atualmente não classificados.',
 };
 
+/** Ações curtas e diretas para o cockpit executivo (Sprint WL-UI-02). */
+export const SHORT_RECOMMENDATIONS: Record<string, string> = {
+  timing: 'Ativar alerta automático após 7 dias sem interação.',
+  competition: 'Atualizar battlecards dos concorrentes recorrentes.',
+  price: 'Revisar política de desconto e faixas aprovadas.',
+  no_fit: 'Refinar ICP e qualificação no topo do funil.',
+  operational: 'Acionar CS para reduzir atritos pós-venda.',
+  internal: 'Criar checklist de pré-envio de propostas.',
+  sales_process: 'Reforçar cadência e SLA de follow-up.',
+  other: 'Aprofundar entrevistas de perda.',
+};
+
+/**
+ * Categorias consideradas falha comercial/processual (mapeamento local frontend).
+ * Não altera taxonomia global no banco.
+ */
+export const COMMERCIAL_FAILURE_CATEGORIES = new Set([
+  'timing',
+  'sales_process',
+  'internal',
+  'operational',
+]);
+
 export function getCategoryLabel(category: string): string {
   return LOSS_CATEGORY_LABELS[category] || category;
 }
 
 export function getRecommendation(category: string): string {
   return RECOMMENDATIONS[category] || RECOMMENDATIONS.other;
+}
+
+export function getShortRecommendation(category: string): string {
+  return SHORT_RECOMMENDATIONS[category] || SHORT_RECOMMENDATIONS.other;
 }
 
 /**
@@ -104,10 +131,12 @@ export function calcSeverity(lostValue: number, wonValue: number, topShare: numb
 export interface ExecutiveDiagnosis {
   topCategory: string;
   topLabel: string;
+  topCount: number;
   topLostValue: number;
   topShare: number; // 0..1
   cycleDelta: number | null; // dias (lost - won)
   recommendation: string;
+  shortRecommendation: string;
   severity: Severity;
   copy: string;
 }
@@ -129,17 +158,141 @@ export function buildExecutiveDiagnosis(data: WinLossDataResult, dateRange?: { f
     cycleDelta != null && cycleDelta > 0
       ? `Os deals perdidos levam ${cycleDelta} dias a mais que os ganhos e `
       : '';
-  const copy = `No período analisado, o principal vazamento de receita está em ${top.label}. ${cyclePart}concentram ${fmtBRL(top.lostValue)} em receita não capturada. Recomendação: ${top.recommendation.toLowerCase()}`;
+  const copy = `No período analisado, o principal vazamento de receita está em ${top.label}. ${cyclePart}concentram ${fmtBRL(top.lostValue)} em receita não capturada.`;
 
   return {
     topCategory: top.category,
     topLabel: top.label,
+    topCount: top.count,
     topLostValue: top.lostValue,
     topShare,
     cycleDelta,
     recommendation: top.recommendation,
+    shortRecommendation: getShortRecommendation(top.category),
     severity,
     copy,
+  };
+}
+
+export interface ImpactEstimate {
+  available: boolean;
+  winRatePotentialPp: number | null;
+  monthlyRevenuePotential: number | null;
+  reason?: string;
+}
+
+/**
+ * Estima impacto de eliminar o principal motivo de perda.
+ * Critérios: >= 10 perdas e janela >= 30 dias para considerar significativo.
+ */
+export function buildImpactEstimate(
+  data: WinLossDataResult,
+  diagnosis: ExecutiveDiagnosis,
+  dateRange?: { from: Date; to: Date },
+): ImpactEstimate {
+  const wins = data.wins.length;
+  const losses = data.losses.length;
+  const totalDeals = wins + losses;
+  if (totalDeals === 0 || losses < 10) {
+    return { available: false, winRatePotentialPp: null, monthlyRevenuePotential: null };
+  }
+  if (!dateRange) {
+    return { available: false, winRatePotentialPp: null, monthlyRevenuePotential: null };
+  }
+  const days = Math.max(
+    1,
+    Math.round((dateRange.to.getTime() - dateRange.from.getTime()) / 86_400_000),
+  );
+  if (days < 30) {
+    return { available: false, winRatePotentialPp: null, monthlyRevenuePotential: null };
+  }
+
+  const currentWR = wins / totalDeals;
+  const potentialWR = (wins + diagnosis.topCount) / totalDeals;
+  const winRatePotentialPp = Math.round((potentialWR - currentWR) * 100);
+
+  const monthlyRevenuePotential = Math.round((diagnosis.topLostValue / days) * 30);
+
+  return {
+    available: true,
+    winRatePotentialPp,
+    monthlyRevenuePotential,
+  };
+}
+
+export interface CommercialFailureSummary {
+  available: boolean;
+  totalLostValue: number;
+  commercialLostValue: number;
+  commercialCount: number;
+  pctOfLostValue: number; // 0..100
+  topCategory: string | null;
+  topCategoryLabel: string | null;
+  topAction: string | null;
+}
+
+/**
+ * Mapeamento local (frontend) — separa perda inevitável de falha comercial/processual.
+ * Não altera taxonomia global.
+ */
+export function buildCommercialFailureSummary(data: WinLossDataResult): CommercialFailureSummary {
+  if (!data || data.losses.length === 0) {
+    return {
+      available: false,
+      totalLostValue: 0,
+      commercialLostValue: 0,
+      commercialCount: 0,
+      pctOfLostValue: 0,
+      topCategory: null,
+      topCategoryLabel: null,
+      topAction: null,
+    };
+  }
+
+  const byCat = new Map<string, { count: number; value: number }>();
+  let totalLostValue = 0;
+  let commercialLostValue = 0;
+  let commercialCount = 0;
+
+  for (const l of data.losses) {
+    const cat = ((l.reason as any)?.category as string) || 'other';
+    const value = Number(l.final_value) || 0;
+    totalLostValue += value;
+    if (COMMERCIAL_FAILURE_CATEGORIES.has(cat)) {
+      commercialLostValue += value;
+      commercialCount++;
+      const e = byCat.get(cat) || { count: 0, value: 0 };
+      e.count++;
+      e.value += value;
+      byCat.set(cat, e);
+    }
+  }
+
+  if (commercialCount === 0) {
+    return {
+      available: true,
+      totalLostValue,
+      commercialLostValue: 0,
+      commercialCount: 0,
+      pctOfLostValue: 0,
+      topCategory: null,
+      topCategoryLabel: null,
+      topAction: null,
+    };
+  }
+
+  const top = [...byCat.entries()].sort((a, b) => b[1].value - a[1].value)[0];
+  const topCat = top?.[0] || null;
+
+  return {
+    available: true,
+    totalLostValue,
+    commercialLostValue,
+    commercialCount,
+    pctOfLostValue: totalLostValue > 0 ? Math.round((commercialLostValue / totalLostValue) * 100) : 0,
+    topCategory: topCat,
+    topCategoryLabel: topCat ? getCategoryLabel(topCat) : null,
+    topAction: topCat ? getShortRecommendation(topCat) : null,
   };
 }
 

@@ -1,8 +1,7 @@
-// Sprint WL-UI-01 — Cockpit executivo de Win/Loss.
-// Estrutura final: KPIs → Diagnóstico IA → Alertas (max 3) → Trust+Recuperável
-// → Drivers de Vitória (compacto) → Pulso do Período → Ciclo de Venda.
-// Blocos movidos: Análise de Perdas, Top Motivos, Concorrentes, Por que estamos perdendo,
-// Radar Competitivo, Feedback dos Clientes, Tendência → migrados para outras abas.
+// Sprint WL-UI-02 — Cockpit executivo de Win/Loss (ajuste fino).
+// Ordem: Diagnóstico IA → Alertas → Trust + Recuperável + Falha Comercial
+// → O que mais gera vitória → Pulso do Período → Ciclo de Venda.
+import { useMemo } from 'react';
 import { SalesCycleSection } from './SalesCycleSection';
 import { MonthlyPulseCards } from '../MonthlyPulseCards';
 import { AIDiagnosisCard } from '../AIDiagnosisCard';
@@ -10,6 +9,7 @@ import { SmartAlertsCard } from '@/components/intelligence/SmartAlertsCard';
 import { CrmTrustAndRecoverableStrip } from '../CrmTrustAndRecoverableStrip';
 import { WinDriversBlock } from '../WinDriversBlock';
 import { useLossSemantic } from '@/hooks/useLossSemantic';
+import { buildCommercialFailureSummary } from '@/lib/winloss/diagnosis';
 import type { WinLossDataResult, TimeframePreset, DateRange } from '@/hooks/useWinLossData';
 
 interface Props {
@@ -32,15 +32,19 @@ export function WinLossOverviewTab({
   dateRange,
   pipelineId = null,
 }: Props) {
-  // Pulso só aparece quando o período é maior que "mês" e existem dados de pulso.
   const showMonthlyPulse =
     timeframe !== 'today' && timeframe !== '7d' && timeframe !== '15d' && timeframe !== 'month';
 
   const { data: semantic } = useLossSemantic(organizationId, pipelineId, dateRange);
 
+  const commercialFailure = useMemo(
+    () => (data ? buildCommercialFailureSummary(data) : undefined),
+    [data],
+  );
+
   return (
     <div className="space-y-6">
-      {/* 1. Diagnóstico Executivo da IA — bloco principal */}
+      {/* 1. Diagnóstico Executivo da IA — cockpit (3 blocos + footer) */}
       <AIDiagnosisCard data={data} dateRange={dateRange} semantic={semantic} />
 
       {/* 2. Alertas Inteligentes (máx 3, ordenados por severidade) */}
@@ -52,10 +56,14 @@ export function WinLossOverviewTab({
         semantic={semantic}
       />
 
-      {/* 3. CRM Trust Score + Receita Recuperável */}
-      <CrmTrustAndRecoverableStrip semantic={semantic} isLoading={isLoading} />
+      {/* 3. CRM Trust + Receita Recuperável + Perda por Falha Comercial */}
+      <CrmTrustAndRecoverableStrip
+        semantic={semantic}
+        commercialFailure={commercialFailure}
+        isLoading={isLoading}
+      />
 
-      {/* 4. Drivers de Vitória (compacto: top 3 motivos + top 3 diferenciais) */}
+      {/* 4. O que mais gera vitória (compacto) */}
       <WinDriversBlock data={data} />
 
       {/* 5. Pulso do Período */}
@@ -63,7 +71,7 @@ export function WinLossOverviewTab({
         <MonthlyPulseCards data={data.monthlyPulse} />
       )}
 
-      {/* 6. Ciclo de Venda (Ganhos × Perdidos × Diferença + Time-to-Loss compacto) */}
+      {/* 6. Ciclo de Venda */}
       <SalesCycleSection data={data} isLoading={isLoading} />
     </div>
   );
