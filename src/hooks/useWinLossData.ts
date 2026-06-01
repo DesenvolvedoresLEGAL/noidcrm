@@ -170,7 +170,7 @@ export function useWinLossData(organizationId: string | undefined, pipelineId: s
           competitor, final_value, original_value, sales_cycle_days, 
           win_reason_id, key_differentiator, customer_feedback, 
           recorded_by_customer, acceptor_name, created_at,
-          loss_reason:loss_reasons!win_loss_records_reason_id_fkey(name, category)
+          loss_reason:loss_reasons!win_loss_records_reason_id_fkey(name, category, loss_accountability)
         `)
         .eq('organization_id', organizationId)
         .gte('created_at', fromISO)
