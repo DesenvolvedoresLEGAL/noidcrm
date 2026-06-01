@@ -44,5 +44,5 @@ export function useScoringRealtime(organizationId: string | undefined | null) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [organizationId, queryClient]);
+  }, [organizationId, hasSession, sessionChecked, queryClient]);
 }
