@@ -1,15 +1,15 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Search, Building2, Download, Filter, X } from 'lucide-react';
+import { Plus, Search, Building2, Download, Filter, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AccountRFMIntelligencePage } from '@/components/accounts/rfm/AccountRFMIntelligencePage';
 import { PageHeader } from '@/components/ui/page-header';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { listAccounts, deleteAccount, getAccountsPorteSummary, type Account } from '@/services/supabase/accounts';
 import { supabase } from '@/integrations/supabase/client';
 import { AccountModalTabs } from '@/components/accounts/AccountModalTabs';
