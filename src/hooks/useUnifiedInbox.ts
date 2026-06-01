@@ -304,9 +304,11 @@ export function useUnifiedInbox(options: { active?: boolean } = {}) {
     onSuccess: invalidate,
   });
 
-  // Realtime invalidation
+  // Realtime invalidation — só assina quando inbox está ativa (Sheet aberta).
+  // Quando o Sheet abre, o canal monta e invalida; quando fecha, desmonta o WS.
+  // O badge continua reagindo via refetchOnFocus + staleTime do v2.
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || !active) return;
     const channel = supabase
       .channel(`unified-inbox-${userId}`)
       .on(
@@ -324,7 +326,7 @@ export function useUnifiedInbox(options: { active?: boolean } = {}) {
       supabase.removeChannel(channel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId]);
+  }, [userId, active]);
 
   return {
     items,
