@@ -1,11 +1,38 @@
 import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useNotificationSettings } from '@/hooks/useNotificationSettings';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { trackNotificationClick } from '@/lib/notifications/trackClick';
+
+// Sprint PERF 0.2 — defense-in-depth: o Layout já só monta este componente
+// dentro de /app/* protegido, mas garantimos aqui que rotas públicas nunca
+// abrem WS de notificação caso o componente seja reutilizado no futuro.
+const PUBLIC_ROUTE_PREFIXES = [
+  '/login',
+  '/signup',
+  '/forgot-password',
+  '/reset-password',
+  '/onboarding',
+  '/accept-invitation',
+  '/public/',
+  '/p/',
+  '/f/',
+  '/proposta-publica',
+  '/terms',
+  '/privacy',
+  '/agendar-demo',
+  '/docs',
+  '/status/auth',
+  '/admin/login',
+];
+
+function isPublicRoute(pathname: string): boolean {
+  if (pathname === '/') return true;
+  return PUBLIC_ROUTE_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + '/') || pathname.startsWith(p));
+}
 
 // Priority event types that trigger browser push
 const PUSH_PRIORITY_TYPES = new Set([
