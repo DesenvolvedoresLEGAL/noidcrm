@@ -21,23 +21,22 @@ interface DeletionAlert {
 
 export function useDeletionAlerts(organizationId?: string) {
   const queryClient = useQueryClient();
+  // Sprint PERF 0.2 — exige organizationId. Sem org → nenhuma query, nenhum WS.
+  // Evita canal realtime global e queries com `is_read=false` sem filtro de tenant.
+  const enabled = !!organizationId;
 
   // Fetch unread alerts
   const { data: alerts = [], isLoading, refetch } = useQuery({
     queryKey: ['deletion-alerts', organizationId],
+    enabled,
     queryFn: async () => {
-      let query = supabase
+      const { data, error } = await supabase
         .from('deletion_alerts')
         .select('*')
+        .eq('organization_id', organizationId!)
         .eq('is_read', false)
         .order('created_at', { ascending: false })
         .limit(50);
-
-      if (organizationId) {
-        query = query.eq('organization_id', organizationId);
-      }
-
-      const { data, error } = await query;
 
       if (error) {
         console.error('Error fetching deletion alerts:', error);
@@ -90,20 +89,22 @@ export function useDeletionAlerts(organizationId?: string) {
     },
   });
 
-  // Subscribe to realtime updates
+  // Subscribe to realtime updates — só com organizationId e canal filtrado por tenant.
   useEffect(() => {
+    if (!organizationId) return;
     const channel = supabase
-      .channel('deletion-alerts-realtime')
+      .channel(`deletion-alerts-${organizationId}`)
       .on(
         'postgres_changes',
         {
           event: 'INSERT',
           schema: 'public',
           table: 'deletion_alerts',
+          filter: `organization_id=eq.${organizationId}`,
         },
         (payload) => {
           const newAlert = payload.new as DeletionAlert;
-          
+
           // Show toast for high/critical severity
           if (newAlert.severity === 'high' || newAlert.severity === 'critical') {
             toast.warning('Alerta de exclusão crítica', {
@@ -113,7 +114,7 @@ export function useDeletionAlerts(organizationId?: string) {
           }
 
           // Invalidate query to refetch
-          queryClient.invalidateQueries({ queryKey: ['deletion-alerts'] });
+          queryClient.invalidateQueries({ queryKey: ['deletion-alerts', organizationId] });
         }
       )
       .subscribe();
@@ -121,7 +122,7 @@ export function useDeletionAlerts(organizationId?: string) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [queryClient]);
+  }, [organizationId, queryClient]);
 
   const unreadCount = alerts.filter((a) => !a.is_read).length;
   const criticalCount = alerts.filter((a) => a.severity === 'critical' || a.severity === 'high').length;

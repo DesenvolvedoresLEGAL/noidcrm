@@ -72,7 +72,14 @@ export function usePersistedInboxTab(defaultTab: InboxCategory = 'priority') {
   return [tab, setTab] as const;
 }
 
-export function useUnifiedInbox() {
+/**
+ * Sprint PERF 0.2 — `active` controla quais subqueries pesadas + canal realtime montam.
+ * - active=false (sidebar fechada): apenas v2 + news ficam ativas (necessárias para o badge).
+ * - active=true (Sheet aberta): liga v1 legacy, digest e canal realtime.
+ * Não altera nenhuma regra de negócio — apenas reduz tráfego quando a inbox não está em uso.
+ */
+export function useUnifiedInbox(options: { active?: boolean } = {}) {
+  const { active = true } = options;
   const { user } = useCurrentUser();
   const userId = user?.id;
   const queryClient = useQueryClient();
@@ -115,11 +122,11 @@ export function useUnifiedInbox() {
       }
       return data ?? [];
     },
-    enabled: !!userId,
+    enabled: !!userId && active,
     staleTime: 1000 * 60,
   });
 
-  // Source 3: release notes (Novidades)
+  // Source 3: release notes (Novidades) — leve e usado pelo badge, sempre ativo.
   const newsQuery = useQuery({
     queryKey: ['unified-inbox', 'release-notes'],
     queryFn: async () => {
@@ -137,7 +144,7 @@ export function useUnifiedInbox() {
     staleTime: 1000 * 60 * 5,
   });
 
-  // Source 4: daily digest (sticky resumo)
+  // Source 4: daily digest (sticky resumo) — só quando inbox está aberta.
   const digestQuery = useQuery({
     queryKey: ['unified-inbox', 'digest', userId],
     queryFn: async () => {
@@ -151,7 +158,7 @@ export function useUnifiedInbox() {
         .maybeSingle();
       return data ?? null;
     },
-    enabled: !!userId,
+    enabled: !!userId && active,
     staleTime: 1000 * 60 * 15,
   });
 
@@ -297,9 +304,11 @@ export function useUnifiedInbox() {
     onSuccess: invalidate,
   });
 
-  // Realtime invalidation
+  // Realtime invalidation — só assina quando inbox está ativa (Sheet aberta).
+  // Quando o Sheet abre, o canal monta e invalida; quando fecha, desmonta o WS.
+  // O badge continua reagindo via refetchOnFocus + staleTime do v2.
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || !active) return;
     const channel = supabase
       .channel(`unified-inbox-${userId}`)
       .on(
@@ -317,7 +326,7 @@ export function useUnifiedInbox() {
       supabase.removeChannel(channel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId]);
+  }, [userId, active]);
 
   return {
     items,

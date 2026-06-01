@@ -21,7 +21,8 @@ export function useApprovalQueueCount() {
       if (error) throw error;
       return count || 0;
     },
-    refetchInterval: 60_000,
+    // Sprint PERF 0.2 — realtime já invalida abaixo. Polling longo só como fallback de reconexão.
+    refetchInterval: 5 * 60_000,
   });
 
   // Realtime updates
