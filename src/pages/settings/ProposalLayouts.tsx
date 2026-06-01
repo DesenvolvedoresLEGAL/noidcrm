@@ -65,11 +65,16 @@ export default function ProposalLayouts() {
   const { data: layouts = [], isLoading: loadingLayouts } = useQuery({
     queryKey: ['proposal-layouts'],
     queryFn: listLayouts,
+    // SPRINT PERF 0.4 — catálogo raramente alterado; mutations invalidam a key.
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const { data: templates = [], isLoading: loadingTemplates } = useQuery({
     queryKey: ['proposal-templates'],
     queryFn: listTemplates,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const createLayoutMutation = useMutation({

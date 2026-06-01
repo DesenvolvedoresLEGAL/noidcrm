@@ -1,34 +1,28 @@
-import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
+// SPRINT PERF 0.4 — catálogo estável (produtos ativos).
+// Cache 10min, sem refetchOnWindowFocus. Mutations em /products invalidam ['organization-products'].
 export function useOrganizationProducts() {
-  const [products, setProducts] = useState<Array<{ id: string; name: string }>>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
+  const query = useQuery({
+    queryKey: ['organization-products'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('products')
+        .select('id, name')
+        .eq('active', true)
+        .order('name');
+      if (error) throw error;
+      return (data || []) as Array<{ id: string; name: string }>;
+    },
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
 
-  useEffect(() => {
-    async function fetchProducts() {
-      try {
-        setLoading(true);
-        const { data, error: fetchError } = await supabase
-          .from('products')
-          .select('id, name')
-          .eq('active', true)
-          .order('name');
-        
-        if (fetchError) throw fetchError;
-        
-        setProducts(data || []);
-      } catch (err) {
-        setError(err as Error);
-        console.error('Error fetching products:', err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    
-    fetchProducts();
-  }, []);
-
-  return { products, loading, error };
+  return {
+    products: query.data ?? [],
+    loading: query.isLoading,
+    error: (query.error as Error | null) ?? null,
+  };
 }

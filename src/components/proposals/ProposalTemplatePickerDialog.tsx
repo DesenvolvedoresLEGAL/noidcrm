@@ -31,6 +31,10 @@ export function ProposalTemplatePickerDialog({
     queryKey: ['proposal-templates'],
     queryFn: listTemplates,
     enabled: open,
+    // SPRINT PERF 0.4 — templates raramente mudam; mutations invalidam ['proposal-templates'].
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const defaultId = useMemo(
