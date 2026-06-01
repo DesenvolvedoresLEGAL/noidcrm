@@ -150,11 +150,42 @@ export default function Proposals() {
                     </div>
                   ))}
                 </div>
+
+                {/* Pagination */}
+                <div className="flex items-center justify-between pt-4 mt-4 border-t">
+                  <p className="text-xs text-muted-foreground">
+                    {total === 0
+                      ? 'Nenhum resultado'
+                      : `Exibindo ${fromRow}–${toRow} de ${total}`}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      disabled={page <= 1 || isLoading}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <span className="text-xs text-muted-foreground">
+                      Página {page} de {totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={page >= totalPages || isLoading}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
               </>
             )}
           </CardContent>
         </Card>
       </div>
+
 
       <ProposalEditorModal
         open={editorModalOpen}
