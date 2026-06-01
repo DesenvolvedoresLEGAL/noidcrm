@@ -58,29 +58,34 @@ export default function WinLossHub() {
     dateRange
   );
 
-  // Pipelines comerciais (sales + qualification) — único escopo do Win/Loss.
-  const commercialPipelineIds = useMemo(
-    () =>
-      pipelines
-        .filter((p) => p.pipeline_type === 'sales' || p.pipeline_type === 'qualification')
-        .map((p) => p.id),
-    [pipelines],
-  );
+
+
 
   // P0 Revenue SSoT — monetários ganhos vêm de commercial_won_revenue_view.
-  // "Todos" = pipelines comerciais; caso contrário restringe ao pipeline escolhido.
-  const ssotPipelineIds = selectedPipelineId
-    ? [selectedPipelineId]
-    : commercialPipelineIds.length > 0
-      ? commercialPipelineIds
-      : null;
+  // ⚠️ Só aplica em pipelines de VENDAS. Pré-Vendas (qualification) não gera receita
+  // comercial (não há proposta aceita), então o SSoT retornaria zero e mascararia
+  // os Leads Qualificados/Desqualificados reais do useWinLossData.
+  // "Todos" = pipelines comerciais de vendas; caso contrário restringe ao pipeline escolhido.
+  // Só aplica quando o usuário restringe explicitamente a um pipeline de vendas.
+  // No modo "Todos (Pré-Vendas + Vendas)" o dataset mistura qualification, e o SSoT
+  // (que cobre apenas vendas) divergiria do useWinLossData → inconsistência de KPIs.
+  const isSalesContext = pipelineType === 'sales' && !!selectedPipelineId;
+
+  const salesPipelineIds = useMemo(
+    () => pipelines.filter((p) => p.pipeline_type === 'sales').map((p) => p.id),
+    [pipelines],
+  );
+  const ssotPipelineIds = isSalesContext
+    ? (selectedPipelineId ? [selectedPipelineId] : salesPipelineIds.length > 0 ? salesPipelineIds : null)
+    : null;
   const { data: ssotWonSummary } = useClosedRevenueSummary({
     surface: 'winloss-hub',
-    organizationId: organization?.id,
+    organizationId: isSalesContext ? organization?.id : undefined,
     start: dateRange.from.toISOString(),
     end: dateRange.to.toISOString(),
     pipelineIds: ssotPipelineIds,
   });
+
 
   // Log errors for debugging
   if (winLossError) {
