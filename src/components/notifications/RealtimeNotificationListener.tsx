@@ -69,9 +69,12 @@ export function RealtimeNotificationListener() {
   const { settings } = useNotificationSettings();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const location = useLocation();
   const userId = user?.id;
+  const onPublicRoute = isPublicRoute(location.pathname);
 
   useEffect(() => {
+    if (onPublicRoute) return;
     if (!userId || !settings?.realtime_in_app_enabled) return;
 
     const channel = supabase
