@@ -25,13 +25,11 @@ import { useClosedRevenueSummary } from '@/hooks/revenue/useRevenueSsot';
 
 export default function WinLossHub() {
   const { organization } = useCurrentUser();
-  const { toast } = useToast();
   const { pipelines } = useOrganizationPipelines();
 
   // State
   const [selectedPipelineId, setSelectedPipelineId] = useState<string | null>(null);
   const [timeframe, setTimeframe] = useState<TimeframePreset>('year');
-  const [aiInsights, setAiInsights] = useState<any>(null);
 
   // Derived — stabilize dateRange so it doesn't change on every render
   const dateRange = useMemo(() => getDateRangeFromPreset(timeframe), [timeframe]);
@@ -52,17 +50,8 @@ export default function WinLossHub() {
     dateRange
   );
 
-
-
-
   // P0 Revenue SSoT — monetários ganhos vêm de commercial_won_revenue_view.
-  // ⚠️ Só aplica em pipelines de VENDAS. Pré-Vendas (qualification) não gera receita
-  // comercial (não há proposta aceita), então o SSoT retornaria zero e mascararia
-  // os Leads Qualificados/Desqualificados reais do useWinLossData.
-  // "Todos" = pipelines comerciais de vendas; caso contrário restringe ao pipeline escolhido.
   // Só aplica quando o usuário restringe explicitamente a um pipeline de vendas.
-  // No modo "Todos (Pré-Vendas + Vendas)" o dataset mistura qualification, e o SSoT
-  // (que cobre apenas vendas) divergiria do useWinLossData → inconsistência de KPIs.
   const isSalesContext = pipelineType === 'sales' && !!selectedPipelineId;
 
   const salesPipelineIds = useMemo(
@@ -80,58 +69,31 @@ export default function WinLossHub() {
     pipelineIds: ssotPipelineIds,
   });
 
-
   // Log errors for debugging
   if (winLossError) {
     console.error('[WinLossHub] Data loading error:', winLossError);
   }
 
-  // AI Analysis
-  const analyzeWinLossMutation = useMutation({
-    mutationFn: async () => {
-      if (!organization?.id) throw new Error('Organization not found');
-      const { data, error } = await supabase.functions.invoke('analyze-winloss-batch', {
-        body: { organizationId: organization.id, dateRange: 'year' }
-      });
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: (data) => {
-      setAiInsights(data);
-      toast({ title: 'Análise concluída', description: `${data.insights?.length || 0} insights gerados` });
-    },
-    onError: (error) => {
-      toast({ title: 'Erro na análise', description: error instanceof Error ? error.message : 'Erro', variant: 'destructive' });
-    },
-  });
+  // NOTE (Sprint WL-UX-04): Análise efêmera "Analisar com IA" removida da Visão Geral.
+  // Toda informação exibida agora é persistente e reproduzível (KPIs, Diagnóstico,
+  // Alertas, CRM Trust, Receita Recuperável, Falha Comercial, Drivers, Pulso, Ciclo).
+  // Pontos de extensão futuros de IA (sem implementação ainda):
+  //   - Aba Recomendações: persistir sugestões via ai_suggestions/optimization_recommendations
+  //   - Aba Competitivo: análise persistida por competitor
+  //   - Aba Entrevistas: síntese persistida por entrevista
+  //   - Aba Vendedores: coaching insights persistidos por seller_id
 
   return (
     <Layout>
       <div className="p-4 md:p-6 space-y-4">
-        {/* Header limpo — sem badge PRIME, sem banners SSoT */}
+        {/* Header limpo — sem badge PRIME, sem botão de análise efêmera */}
         <PageHeader
           icon={Activity}
           title="Win/Loss Intelligence Hub"
           subtitle="Análise avançada de motivos de ganho e perda — inteligência acionável"
           variant="rose"
-          actions={
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => analyzeWinLossMutation.mutate()}
-                disabled={analyzeWinLossMutation.isPending}
-              >
-                {analyzeWinLossMutation.isPending ? (
-                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Sparkles className="h-4 w-4 mr-2" />
-                )}
-                Analisar com IA
-              </Button>
-            </div>
-          }
         />
+
 
         {/* Context Selector (filtros comerciais + período expandido) */}
         <WinLossContextSelector
