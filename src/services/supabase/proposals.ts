@@ -72,7 +72,7 @@ function isProposalTerminal(proposal?: {
 export async function sendProposal(id: string): Promise<Proposal> {
   const { data: currentProposal, error: currentProposalError } = await supabase
     .from('proposals')
-    .select('*')
+    .select('id, status, accepted_at, declined_at')
     .eq('id', id)
     .single();
 
