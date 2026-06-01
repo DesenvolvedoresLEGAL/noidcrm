@@ -21,23 +21,22 @@ interface DeletionAlert {
 
 export function useDeletionAlerts(organizationId?: string) {
   const queryClient = useQueryClient();
+  // Sprint PERF 0.2 — exige organizationId. Sem org → nenhuma query, nenhum WS.
+  // Evita canal realtime global e queries com `is_read=false` sem filtro de tenant.
+  const enabled = !!organizationId;
 
   // Fetch unread alerts
   const { data: alerts = [], isLoading, refetch } = useQuery({
     queryKey: ['deletion-alerts', organizationId],
+    enabled,
     queryFn: async () => {
-      let query = supabase
+      const { data, error } = await supabase
         .from('deletion_alerts')
         .select('*')
+        .eq('organization_id', organizationId!)
         .eq('is_read', false)
         .order('created_at', { ascending: false })
         .limit(50);
-
-      if (organizationId) {
-        query = query.eq('organization_id', organizationId);
-      }
-
-      const { data, error } = await query;
 
       if (error) {
         console.error('Error fetching deletion alerts:', error);
