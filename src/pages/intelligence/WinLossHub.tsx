@@ -1,21 +1,15 @@
 import { useState, useMemo } from 'react';
-import { useMutation } from '@tanstack/react-query';
 import { Layout } from '@/components/Layout';
-import { supabase } from '@/integrations/supabase/client';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useOrganizationPipelines } from '@/hooks/useOrganizationPipelines';
 import { useWinLossData, getDateRangeFromPreset, getPipelineTerminology, type TimeframePreset } from '@/hooks/useWinLossData';
 import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PageHeader } from '@/components/ui/page-header';
 import {
-  Sparkles, RefreshCw,
   Activity, Swords, Trophy, MessageSquare, DollarSign, Lightbulb,
-  AlertTriangle, Target, Zap, ArrowRight, FileCheck
+  AlertTriangle, FileCheck
 } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
 
 // Components
 import { WinLossContextSelector } from '@/components/intelligence/winloss/WinLossContextSelector';
