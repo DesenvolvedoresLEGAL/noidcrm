@@ -90,7 +90,7 @@ export function UnifiedNotificationInbox({ collapsed = false }: Props) {
   const [tab, setTab] = usePersistedInboxTab('priority');
   const navigate = useNavigate();
   const { items, counts, digest, isLoading, markRead, dismiss, snooze, markAllRead } =
-    useUnifiedInbox();
+    useUnifiedInbox({ active: open });
 
   const visible = filterByTab(items, tab);
 
