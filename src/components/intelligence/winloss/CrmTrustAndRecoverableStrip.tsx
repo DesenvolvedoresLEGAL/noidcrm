@@ -1,20 +1,23 @@
+// Sprint WL-UI-02 — Strip executivo: CRM Trust + Receita Recuperável + Perda por Falha Comercial.
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { ShieldCheck, Recycle } from 'lucide-react';
+import { ShieldCheck, Recycle, Sparkles } from 'lucide-react';
 import { LOSS_CATEGORY_LABELS } from '@/utils/category-labels';
 import type { LossSemanticAggregates } from '@/hooks/useLossSemantic';
-import { RECOMMENDATIONS } from '@/lib/winloss/diagnosis';
+import { SHORT_RECOMMENDATIONS, type CommercialFailureSummary } from '@/lib/winloss/diagnosis';
+import { CommercialFailureCard } from './CommercialFailureCard';
 
 const fmtBRL = (v: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v);
 
 interface Props {
   semantic: LossSemanticAggregates | undefined;
+  commercialFailure?: CommercialFailureSummary;
   isLoading?: boolean;
 }
 
-export function CrmTrustAndRecoverableStrip({ semantic, isLoading }: Props) {
+export function CrmTrustAndRecoverableStrip({ semantic, commercialFailure, isLoading }: Props) {
   if (isLoading || !semantic || semantic.total === 0) return null;
 
   const trust = semantic.crmTrustScore;
@@ -29,11 +32,12 @@ export function CrmTrustAndRecoverableStrip({ semantic, isLoading }: Props) {
     ? LOSS_CATEGORY_LABELS[semantic.recoverableTopCause] || semantic.recoverableTopCause
     : null;
   const recoverableAction = semantic.recoverableTopCause
-    ? RECOMMENDATIONS[semantic.recoverableTopCause] || RECOMMENDATIONS.other
+    ? SHORT_RECOMMENDATIONS[semantic.recoverableTopCause] || SHORT_RECOMMENDATIONS.other
     : null;
 
   return (
-    <div className="grid sm:grid-cols-2 gap-3">
+    <div className="grid lg:grid-cols-3 sm:grid-cols-2 gap-3">
+      {/* CRM Trust Score */}
       <Card>
         <CardContent className="pt-4 pb-4 space-y-2">
           <div className="flex items-center justify-between gap-2">
@@ -56,26 +60,42 @@ export function CrmTrustAndRecoverableStrip({ semantic, isLoading }: Props) {
         </CardContent>
       </Card>
 
+      {/* Receita Recuperável — estado vazio inteligente quando 0 */}
       <Card>
         <CardContent className="pt-4 pb-4 space-y-2">
           <div className="flex items-center gap-2">
             <Recycle className="h-4 w-4 text-emerald-500" />
             <h4 className="text-sm font-semibold">Receita Recuperável</h4>
           </div>
-          <div className="text-3xl font-bold text-emerald-600">{fmtBRL(semantic.recoverableRevenue)}</div>
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            {semantic.recoverableCount > 0 ? (
-              <>
-                {semantic.recoverableCount} oportunidade{semantic.recoverableCount > 1 ? 's' : ''} recuperáve{semantic.recoverableCount > 1 ? 'is' : 'l'} detectada{semantic.recoverableCount > 1 ? 's' : ''}.
-                {causeLabel ? <> Principal causa: <span className="font-medium">{causeLabel}</span>.</> : null}
-                {recoverableAction ? <> {recoverableAction}</> : null}
-              </>
-            ) : (
-              <>Nenhuma oportunidade marcada como recuperável no período.</>
-            )}
-          </p>
+
+          {semantic.recoverableRevenue > 0 ? (
+            <>
+              <div className="text-3xl font-bold text-emerald-600">{fmtBRL(semantic.recoverableRevenue)}</div>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                {semantic.recoverableCount} {semantic.recoverableCount > 1 ? 'oportunidades recuperáveis' : 'oportunidade recuperável'}.
+                {causeLabel && (
+                  <> Principal causa: <span className="font-medium text-foreground">{causeLabel}</span>.</>
+                )}
+                {recoverableAction && (
+                  <> Ação: <span className="font-medium text-foreground">{recoverableAction}</span></>
+                )}
+              </p>
+            </>
+          ) : (
+            <div className="flex items-start gap-2 pt-1">
+              <Sparkles className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Nenhuma receita recuperável marcada no período.
+                <br />
+                <span className="text-foreground/80">Sugestão:</span> revise perdas com motivo Timing, Preço ou Concorrência para identificar oportunidades de reativação.
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      {/* Perda por Falha Comercial */}
+      <CommercialFailureCard summary={commercialFailure} />
     </div>
   );
 }
