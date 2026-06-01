@@ -58,14 +58,8 @@ export default function WinLossHub() {
     dateRange
   );
 
-  // Pipelines comerciais (sales + qualification) — único escopo do Win/Loss.
-  const commercialPipelineIds = useMemo(
-    () =>
-      pipelines
-        .filter((p) => p.pipeline_type === 'sales' || p.pipeline_type === 'qualification')
-        .map((p) => p.id),
-    [pipelines],
-  );
+
+
 
   // P0 Revenue SSoT — monetários ganhos vêm de commercial_won_revenue_view.
   // ⚠️ Só aplica em pipelines de VENDAS. Pré-Vendas (qualification) não gera receita
