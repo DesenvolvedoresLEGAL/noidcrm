@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AccountRFMIntelligencePage } from '@/components/accounts/rfm/AccountRFMIntelligencePage';
 import { PageHeader } from '@/components/ui/page-header';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { listAccounts, deleteAccount, getAccountsPorteSummary, type Account } from '@/services/supabase/accounts';
+import { listAccounts, deleteAccount, getAccountsPorteSummary, type Account, type ScoreFinanceiroFilter } from '@/services/supabase/accounts';
 import { supabase } from '@/integrations/supabase/client';
 import { AccountModalTabs } from '@/components/accounts/AccountModalTabs';
 import { AccountCard } from '@/components/accounts/AccountCard';
