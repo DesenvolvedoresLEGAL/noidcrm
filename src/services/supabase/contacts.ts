@@ -237,7 +237,7 @@ export async function searchContacts(query: string, accountId?: string): Promise
 
   let dbQuery = supabase
     .from('contacts')
-    .select('*')
+    .select('id, account_id, nome, primeiro_nome, ultimo_nome, cargo, departamento, linkedin, observacoes, emails, telefones, organization_id, created_at, updated_at')
     .eq('organization_id', orgId)
     .ilike('nome', `%${query}%`)
     .limit(10);
