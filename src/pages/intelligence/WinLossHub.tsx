@@ -68,19 +68,26 @@ export default function WinLossHub() {
   );
 
   // P0 Revenue SSoT — monetários ganhos vêm de commercial_won_revenue_view.
-  // "Todos" = pipelines comerciais; caso contrário restringe ao pipeline escolhido.
-  const ssotPipelineIds = selectedPipelineId
-    ? [selectedPipelineId]
-    : commercialPipelineIds.length > 0
-      ? commercialPipelineIds
-      : null;
+  // ⚠️ Só aplica em pipelines de VENDAS. Pré-Vendas (qualification) não gera receita
+  // comercial (não há proposta aceita), então o SSoT retornaria zero e mascararia
+  // os Leads Qualificados/Desqualificados reais do useWinLossData.
+  // "Todos" = pipelines comerciais de vendas; caso contrário restringe ao pipeline escolhido.
+  const isSalesContext = pipelineType === 'sales';
+  const salesPipelineIds = useMemo(
+    () => pipelines.filter((p) => p.pipeline_type === 'sales').map((p) => p.id),
+    [pipelines],
+  );
+  const ssotPipelineIds = isSalesContext
+    ? (selectedPipelineId ? [selectedPipelineId] : salesPipelineIds.length > 0 ? salesPipelineIds : null)
+    : null;
   const { data: ssotWonSummary } = useClosedRevenueSummary({
     surface: 'winloss-hub',
-    organizationId: organization?.id,
+    organizationId: isSalesContext ? organization?.id : undefined,
     start: dateRange.from.toISOString(),
     end: dateRange.to.toISOString(),
     pipelineIds: ssotPipelineIds,
   });
+
 
   // Log errors for debugging
   if (winLossError) {
