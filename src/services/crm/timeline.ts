@@ -23,7 +23,7 @@ export async function getUnifiedTimeline(params: {
 } = {}): Promise<TimelineEvent[]> {
   let query = supabase
     .from('unified_timeline')
-    .select('*');
+    .select('type, id, timestamp, title, activity_type, owner_user_id, opportunity_id, account_id, contact_id, organization_id, deleted_at, metadata');
 
   if (params.opportunity_id) {
     query = query.eq('opportunity_id', params.opportunity_id);

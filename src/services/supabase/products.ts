@@ -86,7 +86,7 @@ export async function listProducts(params?: { active?: boolean; q?: string }) {
 export async function getProduct(id: string): Promise<Product | null> {
   const { data, error } = await supabase
     .from('products')
-    .select('*')
+    .select('id, organization_id, name, code, description, price, active, created_at, updated_at, type, category_id, reference, cost, unit, ipi_percent, image_url, billing_type, billing_cycle, monthly_price, minimum_contract_months, default_unit_price_point_day, default_billing_days, default_quantity_points, counts_for_commission, external_id, external_source, last_synced_at')
     .eq('id', id)
     .maybeSingle();
 
