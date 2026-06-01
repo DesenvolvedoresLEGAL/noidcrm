@@ -9,10 +9,15 @@ import { z } from 'zod';
 import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { createProposal, updateProposal, generateProposalPDF } from '@/services/supabase/proposals';
-import { listOpportunities } from '@/services/supabase/opportunities';
+import { searchOpportunitiesForProposalPicker } from '@/services/supabase/opportunities';
 import { proposalKeys } from '@/lib/query-keys';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Check, ChevronsUpDown, Loader2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { useDebounce } from '@/hooks/useDebounce';
 import { useState } from 'react';
+
 
 const proposalSchema = z.object({
   opportunity_id: z.string().uuid('Selecione uma oportunidade'),
