@@ -15669,6 +15669,7 @@ export type Database = {
           created_at: string
           id: string
           is_active: boolean
+          loss_accountability: string
           name: string
           organization_id: string
           pipeline_ids: string[] | null
@@ -15680,6 +15681,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_active?: boolean
+          loss_accountability?: string
           name: string
           organization_id: string
           pipeline_ids?: string[] | null
@@ -15691,6 +15693,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_active?: boolean
+          loss_accountability?: string
           name?: string
           organization_id?: string
           pipeline_ids?: string[] | null
