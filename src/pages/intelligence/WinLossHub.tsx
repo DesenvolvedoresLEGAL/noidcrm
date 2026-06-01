@@ -8,13 +8,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PageHeader } from '@/components/ui/page-header';
 import {
   Activity, Swords, Trophy, MessageSquare, DollarSign, Lightbulb,
-  AlertTriangle, FileCheck
+  AlertTriangle, FileCheck, TrendingDown
 } from 'lucide-react';
 
 // Components
 import { WinLossContextSelector } from '@/components/intelligence/winloss/WinLossContextSelector';
 import { WinLossKPIStrip } from '@/components/intelligence/winloss/WinLossKPIStrip';
 import { WinLossOverviewTab } from '@/components/intelligence/winloss/tabs/WinLossOverviewTab';
+import { WinLossWinsTab } from '@/components/intelligence/winloss/tabs/WinLossWinsTab';
 import { WinLossCompetitiveTab } from '@/components/intelligence/winloss/tabs/WinLossCompetitiveTab';
 import { WinLossSellerTab } from '@/components/intelligence/winloss/tabs/WinLossSellerTab';
 import { WinLossInterviewsTab } from '@/components/intelligence/winloss/tabs/WinLossInterviewsTab';
