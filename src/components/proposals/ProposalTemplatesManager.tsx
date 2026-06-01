@@ -51,6 +51,9 @@ export function ProposalTemplatesManager({
   const { data: templates, isLoading } = useQuery({
     queryKey: ['proposal-templates'],
     queryFn: listTemplates,
+    // SPRINT PERF 0.4 — catálogo de configuração. Mutations locais invalidam a key.
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const createMutation = useMutation({

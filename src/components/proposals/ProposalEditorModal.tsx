@@ -117,6 +117,10 @@ export function ProposalEditorModal({
     queryKey: ['proposal-layouts'],
     queryFn: listLayouts,
     enabled: open,
+    // SPRINT PERF 0.4 — layouts/templates raramente mudam; mutations invalidam as keys.
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   // Load available templates
@@ -124,6 +128,9 @@ export function ProposalEditorModal({
     queryKey: ['proposal-templates'],
     queryFn: listTemplates,
     enabled: open,
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   // Handle template selection

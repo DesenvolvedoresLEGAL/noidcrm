@@ -36,6 +36,10 @@ export function useIndustries() {
       return data as Industry[];
     },
     enabled: !!organizationId,
+    // SPRINT PERF 0.4 — catálogo raramente alterado. Mutations abaixo invalidam ['industries'].
+    staleTime: 15 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   // Fetch only system defaults (for onboarding when user has no org yet)
@@ -53,6 +57,10 @@ export function useIndustries() {
       if (error) throw error;
       return data as Industry[];
     },
+    // SPRINT PERF 0.4 — defaults do sistema praticamente imutáveis.
+    staleTime: 30 * 60 * 1000,
+    gcTime: 60 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   // Create org-specific industry
