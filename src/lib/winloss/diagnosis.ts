@@ -228,8 +228,8 @@ export interface CommercialFailureSummary {
 }
 
 /**
- * Mapeamento local (frontend) — separa perda inevitável de falha comercial/processual.
- * Não altera taxonomia global.
+ * Sprint WL-UI-03 — Lê accountability oficial do banco (loss_reasons.loss_accountability).
+ * Sem regras hardcoded no frontend. "Falha comercial" = motivos com accountability='commercial'.
  */
 export function buildCommercialFailureSummary(data: WinLossDataResult): CommercialFailureSummary {
   if (!data || data.losses.length === 0) {
@@ -251,10 +251,12 @@ export function buildCommercialFailureSummary(data: WinLossDataResult): Commerci
   let commercialCount = 0;
 
   for (const l of data.losses) {
-    const cat = ((l.reason as any)?.category as string) || 'other';
+    const reason = (l.reason as any) || null;
+    const accountability = (reason?.loss_accountability as LossAccountability | undefined) || 'unknown';
+    const cat = (reason?.category as string) || 'other';
     const value = Number(l.final_value) || 0;
     totalLostValue += value;
-    if (COMMERCIAL_FAILURE_CATEGORIES.has(cat)) {
+    if (accountability === 'commercial') {
       commercialLostValue += value;
       commercialCount++;
       const e = byCat.get(cat) || { count: 0, value: 0 };
@@ -263,6 +265,7 @@ export function buildCommercialFailureSummary(data: WinLossDataResult): Commerci
       byCat.set(cat, e);
     }
   }
+
 
   if (commercialCount === 0) {
     return {
