@@ -117,7 +117,8 @@ export function ProposalItemsManager({ items, onChange, paymentDiscountPercent =
         .from('products')
         .select('*')
         .eq('organization_id', organization.id)
-        .eq('active', true);
+        .eq('active', true)
+        .order('name', { ascending: true });
       return data || [];
     },
     enabled: !!organization?.id,
