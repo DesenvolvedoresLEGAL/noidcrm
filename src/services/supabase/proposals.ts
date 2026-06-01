@@ -283,6 +283,8 @@ export async function listProposals(params?: {
   opportunityId?: string;
   status?: string;
   q?: string;
+  page?: number;
+  pageSize?: number;
 }): Promise<{ data: Proposal[]; total: number }> {
   let query = supabase
     .from('proposals')
@@ -307,6 +309,17 @@ export async function listProposals(params?: {
 
   if (params?.q) {
     query = query.ilike('title', `%${params.q}%`);
+  }
+
+  // Server-side pagination (opt-in: only applied when page/pageSize are provided).
+  // Opportunity-scoped lists keep current behavior (no range) since they are
+  // naturally small and tied to a single opportunity.
+  if (params?.page !== undefined || params?.pageSize !== undefined) {
+    const pageSize = Math.max(1, params?.pageSize ?? 50);
+    const page = Math.max(1, params?.page ?? 1);
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize - 1;
+    query = query.range(from, to);
   }
 
   const { data, error, count } = await query;
