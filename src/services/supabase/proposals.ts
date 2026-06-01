@@ -979,7 +979,7 @@ export async function getProposalStats(proposalId: string): Promise<ProposalStat
   // Get ONLY external views (from clients, not internal CRM users)
   const { data: views } = await supabase
     .from('proposal_views')
-    .select('*')
+    .select('viewer_ip, duration_seconds, viewed_at')
     .eq('proposal_id', proposalId)
     .eq('viewer_type', 'external')
     .order('viewed_at', { ascending: true });
