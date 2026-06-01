@@ -140,6 +140,7 @@ export function RealtimeNotificationListener() {
       supabase.removeChannel(channel);
     };
   }, [
+    onPublicRoute,
     userId,
     settings?.realtime_in_app_enabled,
     settings?.realtime_browser_push_enabled,
