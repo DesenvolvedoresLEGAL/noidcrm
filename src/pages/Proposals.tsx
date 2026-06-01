@@ -1,31 +1,45 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Eye, Pencil, MoreVertical } from 'lucide-react';
-import { useIsMobile } from '@/hooks/use-mobile';
-import { useQuery } from '@tanstack/react-query';
+import { Eye, Pencil, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { listProposals } from '@/services/supabase/proposals';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { proposalKeys } from '@/lib/query-keys';
 import { ProposalViewModal } from '@/components/proposals/ProposalViewModal';
 import { ProposalEditorModal } from '@/components/proposals/ProposalEditorModal';
 import { formatDateBR } from '@/lib/dateUtils';
+import { useDebounce } from '@/hooks/useDebounce';
+
+const PAGE_SIZE = 50;
 
 export default function Proposals() {
   const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearch = useDebounce(searchQuery, 300);
+  const [page, setPage] = useState(1);
   const [editorModalOpen, setEditorModalOpen] = useState(false);
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [selectedProposal, setSelectedProposal] = useState<any>(null);
 
+  // Reset to first page whenever search changes
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch]);
+
   const { data: proposalsData, isLoading } = useQuery({
-    queryKey: [...proposalKeys.lists(), searchQuery],
-    queryFn: () => listProposals({ q: searchQuery }),
+    queryKey: [...proposalKeys.lists(), { q: debouncedSearch, page, pageSize: PAGE_SIZE }],
+    queryFn: () => listProposals({ q: debouncedSearch, page, pageSize: PAGE_SIZE }),
+    placeholderData: keepPreviousData,
   });
 
   const proposals = proposalsData?.data || [];
+  const total = proposalsData?.total || 0;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const fromRow = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const toRow = Math.min(page * PAGE_SIZE, total);
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, any> = {
