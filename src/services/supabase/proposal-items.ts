@@ -32,7 +32,7 @@ export interface ProposalItem {
 export async function listProposalItems(proposalId: string): Promise<ProposalItem[]> {
   const { data, error } = await supabase
     .from('proposal_items')
-    .select('*')
+    .select('id, proposal_id, organization_id, product_id, order_index, name, description, quantity, unit_cost, markup_percent, unit_price, ipi_percent, discount_percent, total, image_url, characteristics, measurement_unit_id, billing_type, counts_for_commission, minimum_contract_months, quantity_points, billing_days, unit_price_point_day, created_at, updated_at')
     .eq('proposal_id', proposalId)
     .order('order_index', { ascending: true });
 
