@@ -1,15 +1,15 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Search, Building2, Download, Filter, X } from 'lucide-react';
+import { Plus, Search, Building2, Download, Filter, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AccountRFMIntelligencePage } from '@/components/accounts/rfm/AccountRFMIntelligencePage';
 import { PageHeader } from '@/components/ui/page-header';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { listAccounts, deleteAccount, getAccountsPorteSummary, type Account } from '@/services/supabase/accounts';
 import { supabase } from '@/integrations/supabase/client';
 import { AccountModalTabs } from '@/components/accounts/AccountModalTabs';
@@ -49,16 +49,29 @@ export default function Accounts() {
   const [editingAccount, setEditingAccount] = useState<Account | undefined>();
   const [deleteDialog, setDeleteDialog] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [page, setPage] = useState(1);
   const debouncedSearchQuery = useDebounce(searchQuery.trim(), 300);
 
+  // Quando há filtros client-side ativos (score/tag), usamos um page_size maior
+  // para preservar o comportamento atual de filtragem em memória.
+  // Caso contrário, paginação server-side padrão de 50.
+  const hasClientSideFilters = scoreFinanceiroFilter !== 'all' || tagFilter !== 'all';
+  const PAGE_SIZE = hasClientSideFilters ? 200 : 50;
+
+  // Reset page quando filtros/busca mudam
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearchQuery, segmentoFilter, porteFilter, origemFilter, scoreFinanceiroFilter, tagFilter]);
+
   // Buscar contas com tratamento de erro (porte/segmento/origem agora server-side)
-  const { data: accountsData, isLoading, error: accountsError } = useQuery({
-    queryKey: [...accountKeys.lists(), debouncedSearchQuery, segmentoFilter, porteFilter, origemFilter],
+  const { data: accountsData, isLoading, isFetching, error: accountsError } = useQuery({
+    queryKey: [...accountKeys.lists(), debouncedSearchQuery, segmentoFilter, porteFilter, origemFilter, page, PAGE_SIZE],
     queryFn: async () => {
       try {
         const result = await listAccounts({
           q: debouncedSearchQuery,
-          page_size: debouncedSearchQuery ? 200 : 200,
+          page: hasClientSideFilters ? 1 : page,
+          page_size: PAGE_SIZE,
           segmento: segmentoFilter !== 'all' ? segmentoFilter : undefined,
           porte: porteFilter !== 'all' ? porteFilter : undefined,
           origem_principal: origemFilter !== 'all' ? origemFilter : undefined,
@@ -68,6 +81,8 @@ export default function Accounts() {
           console.log('[Accounts] Query successful:', {
             count: result.data.length,
             total: result.total,
+            page,
+            pageSize: PAGE_SIZE,
             query: debouncedSearchQuery,
             filters: { segmentoFilter, porteFilter, origemFilter },
           });
@@ -79,6 +94,7 @@ export default function Accounts() {
         throw error;
       }
     },
+    placeholderData: keepPreviousData,
     retry: 2,
     retryDelay: 1000,
   });
@@ -632,7 +648,7 @@ export default function Accounts() {
                 {/* Grid de Cards de Contas */}
                 <div>
                   <h3 className="text-sm font-semibold mb-3 text-muted-foreground">
-                    Contas ({filteredAccounts.length})
+                    Contas ({filteredAccounts.length}{!hasClientSideFilters && accountsData?.total ? ` de ${accountsData.total}` : ''})
                   </h3>
                   <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                     {filteredAccounts.map((account) => (
@@ -651,6 +667,47 @@ export default function Accounts() {
                       />
                     ))}
                   </div>
+
+                  {/* Paginação server-side (desabilitada quando há filtros client-side ativos) */}
+                  {!hasClientSideFilters && (accountsData?.total ?? 0) > PAGE_SIZE && (
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mt-6 pt-4 border-t">
+                      <p className="text-sm text-muted-foreground">
+                        Mostrando {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, accountsData?.total ?? 0)} de {accountsData?.total ?? 0}
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setPage((p) => Math.max(1, p - 1))}
+                          disabled={page <= 1 || isFetching}
+                        >
+                          <ChevronLeft className="h-4 w-4 mr-1" />
+                          Anterior
+                        </Button>
+                        <span className="text-sm text-muted-foreground tabular-nums">
+                          Página {page} de {Math.max(1, Math.ceil((accountsData?.total ?? 0) / PAGE_SIZE))}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const totalPages = Math.max(1, Math.ceil((accountsData?.total ?? 0) / PAGE_SIZE));
+                            setPage((p) => Math.min(totalPages, p + 1));
+                          }}
+                          disabled={page >= Math.ceil((accountsData?.total ?? 0) / PAGE_SIZE) || isFetching}
+                        >
+                          Próxima
+                          <ChevronRight className="h-4 w-4 ml-1" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {hasClientSideFilters && (
+                    <p className="text-xs text-muted-foreground mt-4">
+                      Filtros de Score/Tag aplicados em até {PAGE_SIZE} contas carregadas. Para resultados completos, remova esses filtros.
+                    </p>
+                  )}
                 </div>
               </>
             )}

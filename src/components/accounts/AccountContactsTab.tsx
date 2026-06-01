@@ -1,9 +1,9 @@
-import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
-import { Plus, Search, Users } from 'lucide-react';
+import { Plus, Search, Users, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { listContacts, deleteContact, type Contact } from '@/services/supabase/contacts';
@@ -20,24 +20,34 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { contactKeys, accountKeys } from '@/lib/query-keys';
+import { useDebounce } from '@/hooks/useDebounce';
 
 interface AccountContactsTabProps {
   accountId: string;
   accountName: string;
 }
 
+const PAGE_SIZE = 50;
+
 export function AccountContactsTab({ accountId, accountName }: AccountContactsTabProps) {
   const { toast } = useToast();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearch = useDebounce(searchQuery.trim(), 300);
+  const [page, setPage] = useState(1);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | undefined>();
   const [deleteDialog, setDeleteDialog] = useState<string | null>(null);
 
-  const { data: contactsData, isLoading } = useQuery({
-    queryKey: [...contactKeys.lists(), accountId, searchQuery],
-    queryFn: () => listContacts({ account_id: accountId, q: searchQuery }),
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, accountId]);
+
+  const { data: contactsData, isLoading, isFetching } = useQuery({
+    queryKey: [...contactKeys.lists(), accountId, debouncedSearch, page],
+    queryFn: () => listContacts({ account_id: accountId, q: debouncedSearch, page, page_size: PAGE_SIZE }),
+    placeholderData: keepPreviousData,
   });
 
   const deleteMutation = useMutation({
@@ -54,6 +64,10 @@ export function AccountContactsTab({ accountId, accountName }: AccountContactsTa
   });
 
   const contacts = contactsData?.data || [];
+  const total = contactsData?.total || 0;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const rangeFrom = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const rangeTo = Math.min(page * PAGE_SIZE, total);
 
   const handleEmail = (email: string) => {
     window.location.href = `mailto:${email}`;
@@ -64,7 +78,6 @@ export function AccountContactsTab({ accountId, accountName }: AccountContactsTa
   };
 
   const handleSchedule = (contact: Contact) => {
-    // Navigate to activities with pre-filled contact
     navigate('/app/activities', {
       state: {
         createActivity: true,
@@ -93,7 +106,7 @@ export function AccountContactsTab({ accountId, accountName }: AccountContactsTa
         <div>
           <h2 className="text-xl font-bold text-foreground">Contatos</h2>
           <p className="text-sm text-muted-foreground">
-            {contacts.length} contato{contacts.length !== 1 ? 's' : ''} em {accountName}
+            {total} contato{total !== 1 ? 's' : ''} em {accountName}
           </p>
         </div>
         <Button onClick={() => handleOpenModal()}>
@@ -148,19 +161,52 @@ export function AccountContactsTab({ accountId, accountName }: AccountContactsTa
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {contacts.map((contact) => (
-            <ContactCard
-              key={contact.id}
-              contact={contact}
-              onEdit={handleOpenModal}
-              onDelete={setDeleteDialog}
-              onEmail={handleEmail}
-              onCall={handleCall}
-              onSchedule={handleSchedule}
-            />
-          ))}
-        </div>
+        <>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {contacts.map((contact) => (
+              <ContactCard
+                key={contact.id}
+                contact={contact}
+                onEdit={handleOpenModal}
+                onDelete={setDeleteDialog}
+                onEmail={handleEmail}
+                onCall={handleCall}
+                onSchedule={handleSchedule}
+              />
+            ))}
+          </div>
+
+          {total > PAGE_SIZE && (
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 pt-2">
+              <p className="text-sm text-muted-foreground">
+                Mostrando {rangeFrom}–{rangeTo} de {total}
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page <= 1 || isFetching}
+                >
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  Anterior
+                </Button>
+                <span className="text-sm text-muted-foreground tabular-nums">
+                  Página {page} de {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page >= totalPages || isFetching}
+                >
+                  Próxima
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* Contact Modal */}
