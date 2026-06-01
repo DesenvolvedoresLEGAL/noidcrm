@@ -8,13 +8,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PageHeader } from '@/components/ui/page-header';
 import {
   Activity, Swords, Trophy, MessageSquare, DollarSign, Lightbulb,
-  AlertTriangle, FileCheck
+  AlertTriangle, FileCheck, TrendingDown
 } from 'lucide-react';
 
 // Components
 import { WinLossContextSelector } from '@/components/intelligence/winloss/WinLossContextSelector';
 import { WinLossKPIStrip } from '@/components/intelligence/winloss/WinLossKPIStrip';
 import { WinLossOverviewTab } from '@/components/intelligence/winloss/tabs/WinLossOverviewTab';
+import { WinLossWinsTab } from '@/components/intelligence/winloss/tabs/WinLossWinsTab';
 import { WinLossCompetitiveTab } from '@/components/intelligence/winloss/tabs/WinLossCompetitiveTab';
 import { WinLossSellerTab } from '@/components/intelligence/winloss/tabs/WinLossSellerTab';
 import { WinLossInterviewsTab } from '@/components/intelligence/winloss/tabs/WinLossInterviewsTab';
@@ -138,10 +139,17 @@ export default function WinLossHub() {
         {/* Sprint WL-UX-04: banners "AI Insights" e "Insights da IA" removidos. */}
 
 
-        {/* Tabs */}
+        {/* Tabs — ordem: Visão Geral → Wins → Losses → Competitivo → Vendedores →
+            Entrevistas → Revenue Impact → Recomendações → Relatórios */}
         <Tabs defaultValue="overview" className="space-y-4">
           <TabsList className="flex-wrap h-auto gap-1">
             <TabsTrigger value="overview" className="text-xs">Visão Geral</TabsTrigger>
+            <TabsTrigger value="wins" className="text-xs flex items-center gap-1">
+              <Trophy className="h-3 w-3" /> Wins
+            </TabsTrigger>
+            <TabsTrigger value="losses" className="text-xs flex items-center gap-1">
+              <TrendingDown className="h-3 w-3" /> Losses
+            </TabsTrigger>
             <TabsTrigger value="competitive" className="text-xs flex items-center gap-1">
               <Swords className="h-3 w-3" /> Competitivo
             </TabsTrigger>
@@ -154,11 +162,11 @@ export default function WinLossHub() {
             <TabsTrigger value="revenue" className="text-xs flex items-center gap-1">
               <DollarSign className="h-3 w-3" /> Revenue Impact
             </TabsTrigger>
-            <TabsTrigger value="approvals" className="text-xs flex items-center gap-1">
-              <FileCheck className="h-3 w-3" /> Relatório
-            </TabsTrigger>
             <TabsTrigger value="recommendations" className="text-xs flex items-center gap-1">
               <Lightbulb className="h-3 w-3" /> Recomendações
+            </TabsTrigger>
+            <TabsTrigger value="approvals" className="text-xs flex items-center gap-1">
+              <FileCheck className="h-3 w-3" /> Relatórios
             </TabsTrigger>
           </TabsList>
 
@@ -172,6 +180,31 @@ export default function WinLossHub() {
               timeframe={timeframe}
               dateRange={dateRange}
             />
+          </TabsContent>
+
+          <TabsContent value="wins">
+            <WinLossWinsTab
+              data={winLossData}
+              isLoading={isLoading}
+              ssotWon={
+                ssotWonSummary
+                  ? {
+                      wonCount: ssotWonSummary.count,
+                      wonValue: ssotWonSummary.total,
+                      avgTicketWon: ssotWonSummary.avgTicket,
+                    }
+                  : undefined
+              }
+            />
+          </TabsContent>
+
+          <TabsContent value="losses">
+            <Card>
+              <CardContent className="py-12 text-center text-sm text-muted-foreground">
+                A aba <strong>Losses</strong> será implementada em breve com análise dedicada
+                de perdas, padrões de derrota e ações de recuperação.
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="competitive">
@@ -195,6 +228,10 @@ export default function WinLossHub() {
             {organization?.id && <WinLossRevenueTab organizationId={organization.id} />}
           </TabsContent>
 
+          <TabsContent value="recommendations">
+            <WinLossRecommendationsTab data={winLossData} />
+          </TabsContent>
+
           <TabsContent value="approvals">
             {organization?.id && (
               <ProposalApprovalsTab
@@ -203,10 +240,6 @@ export default function WinLossHub() {
                 dateRange={dateRange}
               />
             )}
-          </TabsContent>
-
-          <TabsContent value="recommendations">
-            <WinLossRecommendationsTab data={winLossData} />
           </TabsContent>
         </Tabs>
       </div>
