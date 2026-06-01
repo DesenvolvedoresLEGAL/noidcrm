@@ -648,7 +648,7 @@ export default function Accounts() {
                 {/* Grid de Cards de Contas */}
                 <div>
                   <h3 className="text-sm font-semibold mb-3 text-muted-foreground">
-                    Contas ({filteredAccounts.length})
+                    Contas ({filteredAccounts.length}{!hasClientSideFilters && accountsData?.total ? ` de ${accountsData.total}` : ''})
                   </h3>
                   <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                     {filteredAccounts.map((account) => (
@@ -667,6 +667,47 @@ export default function Accounts() {
                       />
                     ))}
                   </div>
+
+                  {/* Paginação server-side (desabilitada quando há filtros client-side ativos) */}
+                  {!hasClientSideFilters && (accountsData?.total ?? 0) > PAGE_SIZE && (
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mt-6 pt-4 border-t">
+                      <p className="text-sm text-muted-foreground">
+                        Mostrando {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, accountsData?.total ?? 0)} de {accountsData?.total ?? 0}
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setPage((p) => Math.max(1, p - 1))}
+                          disabled={page <= 1 || isFetching}
+                        >
+                          <ChevronLeft className="h-4 w-4 mr-1" />
+                          Anterior
+                        </Button>
+                        <span className="text-sm text-muted-foreground tabular-nums">
+                          Página {page} de {Math.max(1, Math.ceil((accountsData?.total ?? 0) / PAGE_SIZE))}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const totalPages = Math.max(1, Math.ceil((accountsData?.total ?? 0) / PAGE_SIZE));
+                            setPage((p) => Math.min(totalPages, p + 1));
+                          }}
+                          disabled={page >= Math.ceil((accountsData?.total ?? 0) / PAGE_SIZE) || isFetching}
+                        >
+                          Próxima
+                          <ChevronRight className="h-4 w-4 ml-1" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {hasClientSideFilters && (
+                    <p className="text-xs text-muted-foreground mt-4">
+                      Filtros de Score/Tag aplicados em até {PAGE_SIZE} contas carregadas. Para resultados completos, remova esses filtros.
+                    </p>
+                  )}
                 </div>
               </>
             )}
