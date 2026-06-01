@@ -49,16 +49,29 @@ export default function Accounts() {
   const [editingAccount, setEditingAccount] = useState<Account | undefined>();
   const [deleteDialog, setDeleteDialog] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [page, setPage] = useState(1);
   const debouncedSearchQuery = useDebounce(searchQuery.trim(), 300);
 
+  // Quando há filtros client-side ativos (score/tag), usamos um page_size maior
+  // para preservar o comportamento atual de filtragem em memória.
+  // Caso contrário, paginação server-side padrão de 50.
+  const hasClientSideFilters = scoreFinanceiroFilter !== 'all' || tagFilter !== 'all';
+  const PAGE_SIZE = hasClientSideFilters ? 200 : 50;
+
+  // Reset page quando filtros/busca mudam
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearchQuery, segmentoFilter, porteFilter, origemFilter, scoreFinanceiroFilter, tagFilter]);
+
   // Buscar contas com tratamento de erro (porte/segmento/origem agora server-side)
-  const { data: accountsData, isLoading, error: accountsError } = useQuery({
-    queryKey: [...accountKeys.lists(), debouncedSearchQuery, segmentoFilter, porteFilter, origemFilter],
+  const { data: accountsData, isLoading, isFetching, error: accountsError } = useQuery({
+    queryKey: [...accountKeys.lists(), debouncedSearchQuery, segmentoFilter, porteFilter, origemFilter, page, PAGE_SIZE],
     queryFn: async () => {
       try {
         const result = await listAccounts({
           q: debouncedSearchQuery,
-          page_size: debouncedSearchQuery ? 200 : 200,
+          page: hasClientSideFilters ? 1 : page,
+          page_size: PAGE_SIZE,
           segmento: segmentoFilter !== 'all' ? segmentoFilter : undefined,
           porte: porteFilter !== 'all' ? porteFilter : undefined,
           origem_principal: origemFilter !== 'all' ? origemFilter : undefined,
@@ -68,6 +81,8 @@ export default function Accounts() {
           console.log('[Accounts] Query successful:', {
             count: result.data.length,
             total: result.total,
+            page,
+            pageSize: PAGE_SIZE,
             query: debouncedSearchQuery,
             filters: { segmentoFilter, porteFilter, origemFilter },
           });
@@ -79,6 +94,7 @@ export default function Accounts() {
         throw error;
       }
     },
+    placeholderData: keepPreviousData,
     retry: 2,
     retryDelay: 1000,
   });
