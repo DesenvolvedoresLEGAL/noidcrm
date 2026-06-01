@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AccountRFMIntelligencePage } from '@/components/accounts/rfm/AccountRFMIntelligencePage';
 import { PageHeader } from '@/components/ui/page-header';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { listAccounts, deleteAccount, getAccountsPorteSummary, type Account } from '@/services/supabase/accounts';
+import { listAccounts, deleteAccount, getAccountsPorteSummary, type Account, type ScoreFinanceiroFilter } from '@/services/supabase/accounts';
 import { supabase } from '@/integrations/supabase/client';
 import { AccountModalTabs } from '@/components/accounts/AccountModalTabs';
 import { AccountCard } from '@/components/accounts/AccountCard';
@@ -52,29 +52,49 @@ export default function Accounts() {
   const [page, setPage] = useState(1);
   const debouncedSearchQuery = useDebounce(searchQuery.trim(), 300);
 
-  // Quando há filtros client-side ativos (score/tag), usamos um page_size maior
-  // para preservar o comportamento atual de filtragem em memória.
-  // Caso contrário, paginação server-side padrão de 50.
-  const hasClientSideFilters = scoreFinanceiroFilter !== 'all' || tagFilter !== 'all';
-  const PAGE_SIZE = hasClientSideFilters ? 200 : 50;
+  const PAGE_SIZE = 50;
+
+  // Tag → account_ids server-side resolvido antes da query principal
+  const { data: tagAccountIdsSet, isLoading: tagIdsLoading } = useAccountIdsByTag(
+    tagFilter !== 'all' ? tagFilter : undefined,
+  );
+  const tagAccountIds = useMemo(
+    () => (tagAccountIdsSet ? Array.from(tagAccountIdsSet) : undefined),
+    [tagAccountIdsSet],
+  );
+  const tagFilterReady = tagFilter === 'all' || tagAccountIds !== undefined;
 
   // Reset page quando filtros/busca mudam
   useEffect(() => {
     setPage(1);
   }, [debouncedSearchQuery, segmentoFilter, porteFilter, origemFilter, scoreFinanceiroFilter, tagFilter]);
 
-  // Buscar contas com tratamento de erro (porte/segmento/origem agora server-side)
+  // Buscar contas — todos os filtros server-side, page_size fixo em 50
   const { data: accountsData, isLoading, isFetching, error: accountsError } = useQuery({
-    queryKey: [...accountKeys.lists(), debouncedSearchQuery, segmentoFilter, porteFilter, origemFilter, page, PAGE_SIZE],
+    queryKey: [
+      ...accountKeys.lists(),
+      debouncedSearchQuery,
+      segmentoFilter,
+      porteFilter,
+      origemFilter,
+      scoreFinanceiroFilter,
+      tagFilter,
+      // Hash leve da lista de ids para invalidar quando muda
+      tagAccountIds ? `${tagAccountIds.length}` : 'no-tag',
+      page,
+    ],
     queryFn: async () => {
       try {
         const result = await listAccounts({
           q: debouncedSearchQuery,
-          page: hasClientSideFilters ? 1 : page,
+          page,
           page_size: PAGE_SIZE,
           segmento: segmentoFilter !== 'all' ? segmentoFilter : undefined,
           porte: porteFilter !== 'all' ? porteFilter : undefined,
           origem_principal: origemFilter !== 'all' ? origemFilter : undefined,
+          score_financeiro:
+            scoreFinanceiroFilter !== 'all' ? (scoreFinanceiroFilter as ScoreFinanceiroFilter) : undefined,
+          account_ids: tagFilter !== 'all' ? tagAccountIds : undefined,
         });
 
         if (import.meta.env.DEV) {
@@ -84,7 +104,7 @@ export default function Accounts() {
             page,
             pageSize: PAGE_SIZE,
             query: debouncedSearchQuery,
-            filters: { segmentoFilter, porteFilter, origemFilter },
+            filters: { segmentoFilter, porteFilter, origemFilter, scoreFinanceiroFilter, tagFilter },
           });
         }
 
@@ -94,6 +114,7 @@ export default function Accounts() {
         throw error;
       }
     },
+    enabled: tagFilterReady,
     placeholderData: keepPreviousData,
     retry: 2,
     retryDelay: 1000,
@@ -196,29 +217,9 @@ export default function Accounts() {
     enabled: accountIds.length > 0,
     staleTime: 30_000,
   });
-  // Server-side: todos os account_ids vinculados à tag selecionada (paginado, sem limite de 1000)
-  const { data: tagAccountIdsSet } = useAccountIdsByTag(tagFilter !== 'all' ? tagFilter : undefined);
-
-  // Filtrar contas localmente apenas para filtros que ainda não são server-side
-  const filteredAccounts = useMemo(() => {
-    return accounts.filter(account => {
-      if (scoreFinanceiroFilter !== 'all') {
-        const score = (account as Account & { score_financeiro?: number | null }).score_financeiro;
-        if (scoreFinanceiroFilter === 'none') {
-          if (score !== null && score !== undefined) return false;
-        } else if (score === null || score === undefined) {
-          return false;
-        } else if (scoreFinanceiroFilter === 'excellent' && (score < 80 || score > 100)) return false;
-        else if (scoreFinanceiroFilter === 'good' && (score < 60 || score >= 80)) return false;
-        else if (scoreFinanceiroFilter === 'regular' && (score < 40 || score >= 60)) return false;
-        else if (scoreFinanceiroFilter === 'bad' && (score < 0 || score >= 40)) return false;
-      }
-      if (tagFilter !== 'all') {
-        if (!tagAccountIdsSet || !tagAccountIdsSet.has(account.id)) return false;
-      }
-      return true;
-    });
-  }, [accounts, scoreFinanceiroFilter, tagFilter, tagAccountIdsSet]);
+  // Todos os filtros (score/tag inclusive) já são aplicados server-side em listAccounts.
+  // A página exibe diretamente o que vem do banco.
+  const filteredAccounts = accounts;
 
   // Extrair valores únicos para filtros
   const uniqueSegmentos = useMemo(() =>
@@ -648,7 +649,7 @@ export default function Accounts() {
                 {/* Grid de Cards de Contas */}
                 <div>
                   <h3 className="text-sm font-semibold mb-3 text-muted-foreground">
-                    Contas ({filteredAccounts.length}{!hasClientSideFilters && accountsData?.total ? ` de ${accountsData.total}` : ''})
+                    Contas ({filteredAccounts.length}{accountsData?.total ? ` de ${accountsData.total}` : ''})
                   </h3>
                   <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                     {filteredAccounts.map((account) => (
@@ -668,8 +669,8 @@ export default function Accounts() {
                     ))}
                   </div>
 
-                  {/* Paginação server-side (desabilitada quando há filtros client-side ativos) */}
-                  {!hasClientSideFilters && (accountsData?.total ?? 0) > PAGE_SIZE && (
+                  {/* Paginação server-side — sempre que houver mais que PAGE_SIZE resultados */}
+                  {(accountsData?.total ?? 0) > PAGE_SIZE && (
                     <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mt-6 pt-4 border-t">
                       <p className="text-sm text-muted-foreground">
                         Mostrando {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, accountsData?.total ?? 0)} de {accountsData?.total ?? 0}
@@ -701,12 +702,6 @@ export default function Accounts() {
                         </Button>
                       </div>
                     </div>
-                  )}
-
-                  {hasClientSideFilters && (
-                    <p className="text-xs text-muted-foreground mt-4">
-                      Filtros de Score/Tag aplicados em até {PAGE_SIZE} contas carregadas. Para resultados completos, remova esses filtros.
-                    </p>
                   )}
                 </div>
               </>

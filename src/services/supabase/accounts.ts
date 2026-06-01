@@ -104,11 +104,15 @@ const PORTE_VARIANTS: Record<string, string[]> = {
   'Grande Porte': ['GRANDE', 'GRANDE PORTE', 'EMPRESA DE GRANDE PORTE', 'DEMAIS'],
 };
 
+export type ScoreFinanceiroFilter = 'excellent' | 'good' | 'regular' | 'bad' | 'none';
+
 export async function listAccounts(params?: {
   segmento?: string;
   tamanho?: string;
   porte?: string;
   origem_principal?: string;
+  score_financeiro?: ScoreFinanceiroFilter;
+  account_ids?: string[]; // Filtro server-side por ids (ex.: contas vinculadas a uma tag)
   q?: string;
   page?: number;
   page_size?: number;
@@ -149,6 +153,36 @@ export async function listAccounts(params?: {
     query = query.or(orFilter);
   }
 
+  // Score Financeiro: filtro server-side por faixas (ou ausência de score)
+  if (params?.score_financeiro) {
+    switch (params.score_financeiro) {
+      case 'excellent':
+        query = query.gte('score_financeiro', 80).lte('score_financeiro', 100);
+        break;
+      case 'good':
+        query = query.gte('score_financeiro', 60).lt('score_financeiro', 80);
+        break;
+      case 'regular':
+        query = query.gte('score_financeiro', 40).lt('score_financeiro', 60);
+        break;
+      case 'bad':
+        query = query.gte('score_financeiro', 0).lt('score_financeiro', 40);
+        break;
+      case 'none':
+        query = query.is('score_financeiro', null);
+        break;
+    }
+  }
+
+  // Tag: lista pré-resolvida de account_ids (server-side via .in)
+  if (params?.account_ids) {
+    if (params.account_ids.length === 0) {
+      // Nenhuma conta com a tag selecionada — retorna vazio direto
+      return { data: [] as Account[], total: 0 };
+    }
+    query = query.in('id', params.account_ids);
+  }
+
   if (params?.q) {
     query = query.or(`razao_social.ilike.%${params.q}%,nome_fantasia.ilike.%${params.q}%,cnpj.ilike.%${params.q}%`);
   }
@@ -165,6 +199,7 @@ export async function listAccounts(params?: {
   if (error) throw error;
   return { data: data as Account[], total: count || 0 };
 }
+
 
 export async function getAccountsPorteSummary() {
   const { data: orgId, error: orgError } = await supabase.rpc('get_user_organization_id');
