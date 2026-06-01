@@ -217,29 +217,9 @@ export default function Accounts() {
     enabled: accountIds.length > 0,
     staleTime: 30_000,
   });
-  // Server-side: todos os account_ids vinculados à tag selecionada (paginado, sem limite de 1000)
-  const { data: tagAccountIdsSet } = useAccountIdsByTag(tagFilter !== 'all' ? tagFilter : undefined);
-
-  // Filtrar contas localmente apenas para filtros que ainda não são server-side
-  const filteredAccounts = useMemo(() => {
-    return accounts.filter(account => {
-      if (scoreFinanceiroFilter !== 'all') {
-        const score = (account as Account & { score_financeiro?: number | null }).score_financeiro;
-        if (scoreFinanceiroFilter === 'none') {
-          if (score !== null && score !== undefined) return false;
-        } else if (score === null || score === undefined) {
-          return false;
-        } else if (scoreFinanceiroFilter === 'excellent' && (score < 80 || score > 100)) return false;
-        else if (scoreFinanceiroFilter === 'good' && (score < 60 || score >= 80)) return false;
-        else if (scoreFinanceiroFilter === 'regular' && (score < 40 || score >= 60)) return false;
-        else if (scoreFinanceiroFilter === 'bad' && (score < 0 || score >= 40)) return false;
-      }
-      if (tagFilter !== 'all') {
-        if (!tagAccountIdsSet || !tagAccountIdsSet.has(account.id)) return false;
-      }
-      return true;
-    });
-  }, [accounts, scoreFinanceiroFilter, tagFilter, tagAccountIdsSet]);
+  // Todos os filtros (score/tag inclusive) já são aplicados server-side em listAccounts.
+  // A página exibe diretamente o que vem do banco.
+  const filteredAccounts = accounts;
 
   // Extrair valores únicos para filtros
   const uniqueSegmentos = useMemo(() =>
