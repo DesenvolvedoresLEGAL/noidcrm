@@ -72,7 +72,14 @@ export function usePersistedInboxTab(defaultTab: InboxCategory = 'priority') {
   return [tab, setTab] as const;
 }
 
-export function useUnifiedInbox() {
+/**
+ * Sprint PERF 0.2 — `active` controla quais subqueries pesadas + canal realtime montam.
+ * - active=false (sidebar fechada): apenas v2 + news ficam ativas (necessárias para o badge).
+ * - active=true (Sheet aberta): liga v1 legacy, digest e canal realtime.
+ * Não altera nenhuma regra de negócio — apenas reduz tráfego quando a inbox não está em uso.
+ */
+export function useUnifiedInbox(options: { active?: boolean } = {}) {
+  const { active = true } = options;
   const { user } = useCurrentUser();
   const userId = user?.id;
   const queryClient = useQueryClient();
