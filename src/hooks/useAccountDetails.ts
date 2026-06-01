@@ -97,7 +97,7 @@ export function useAccountDetails(accountId: string) {
       // Buscar dados da conta
       const { data: account, error: accountError } = await supabase
         .from('accounts')
-        .select('*')
+        .select('id, organization_id, razao_social, nome_fantasia, cnpj, segmento, tamanho, cnae, origem_principal, created_at, updated_at, inscricao_estadual, inscricao_municipal, natureza_juridica, porte, situacao_cadastral, data_situacao_cadastral, data_fundacao, capital_social, matriz_filial, cnaes_secundarios, opcao_simples, opcao_mei, logradouro, numero, complemento, bairro, cidade, uf, cep, latitude, longitude, telefones, emails, website, linkedin, instagram, facebook, owner_user_id, cs_user_id, pre_sales_user_id, tipo_empresa, data_tornou_cliente, pontuacao_nps, email_nota_fiscal, codigo_externo, logo_url, observacoes, lead_score, fit_score, intent_score, lead_grade, score_updated_at, scoring_factors, score_financeiro, risco_financeiro, score_fatores, score_calculado_em, total_titulos, titulos_pagos, titulos_vencidos, taxa_pagamento_pct, valor_total, valor_vencido, erp_sync_at')
         .eq('id', accountId)
         .maybeSingle();
 
