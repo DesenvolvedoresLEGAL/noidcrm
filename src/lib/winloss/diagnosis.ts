@@ -37,15 +37,11 @@ export const SHORT_RECOMMENDATIONS: Record<string, string> = {
 };
 
 /**
- * Categorias consideradas falha comercial/processual (mapeamento local frontend).
- * Não altera taxonomia global no banco.
+ * Sprint WL-UI-03 — Classificação oficial vinda do banco (loss_reasons.loss_accountability).
+ * Valores possíveis: commercial | client | operations | market | unknown.
+ * NÃO mais hardcoded no frontend. O catálogo de motivos define o accountability.
  */
-export const COMMERCIAL_FAILURE_CATEGORIES = new Set([
-  'timing',
-  'sales_process',
-  'internal',
-  'operational',
-]);
+export type LossAccountability = 'commercial' | 'client' | 'operations' | 'market' | 'unknown';
 
 export function getCategoryLabel(category: string): string {
   return LOSS_CATEGORY_LABELS[category] || category;
