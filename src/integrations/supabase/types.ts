@@ -35806,6 +35806,7 @@ export type Database = {
         Args: { p_proposal_id: string; p_reason?: string }
         Returns: Json
       }
+      perf_apply_retention_policies: { Args: never; Returns: Json }
       preview_next_proposal_number: {
         Args: { p_org_id: string; p_prefix?: string }
         Returns: string
