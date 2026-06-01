@@ -126,7 +126,25 @@ export function useUnifiedInbox(options: { active?: boolean } = {}) {
     staleTime: 1000 * 60,
   });
 
-  // Source 4: daily digest (sticky resumo)
+  // Source 3: release notes (Novidades) — leve e usado pelo badge, sempre ativo.
+  const newsQuery = useQuery({
+    queryKey: ['unified-inbox', 'release-notes'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('release_notes')
+        .select('id, version, title, description, release_date, is_major, changes')
+        .order('release_date', { ascending: false })
+        .limit(10);
+      if (error) {
+        console.warn('[unified-inbox] release notes fetch failed', error);
+        return [];
+      }
+      return data ?? [];
+    },
+    staleTime: 1000 * 60 * 5,
+  });
+
+  // Source 4: daily digest (sticky resumo) — só quando inbox está aberta.
   const digestQuery = useQuery({
     queryKey: ['unified-inbox', 'digest', userId],
     queryFn: async () => {
@@ -140,7 +158,7 @@ export function useUnifiedInbox(options: { active?: boolean } = {}) {
         .maybeSingle();
       return data ?? null;
     },
-    enabled: !!userId,
+    enabled: !!userId && active,
     staleTime: 1000 * 60 * 15,
   });
 
