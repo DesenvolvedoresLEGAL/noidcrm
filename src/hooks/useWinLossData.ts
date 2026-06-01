@@ -170,7 +170,7 @@ export function useWinLossData(organizationId: string | undefined, pipelineId: s
           competitor, final_value, original_value, sales_cycle_days, 
           win_reason_id, key_differentiator, customer_feedback, 
           recorded_by_customer, acceptor_name, created_at,
-          loss_reason:loss_reasons!win_loss_records_reason_id_fkey(name, category)
+          loss_reason:loss_reasons!win_loss_records_reason_id_fkey(name, category, loss_accountability)
         `)
         .eq('organization_id', organizationId)
         .gte('created_at', fromISO)
@@ -197,7 +197,7 @@ export function useWinLossData(organizationId: string | undefined, pipelineId: s
       // 3. Fetch opportunities directly
       const { data: directOpps, error: oppsErr } = await supabase
         .from('opportunities')
-        .select(`id, title, valor_previsto, status, pipeline_id, created_at, updated_at, closed_at, loss_reason_id, loss_comment, owner_user_id, account:accounts(segmento, porte), loss_reason:loss_reasons!opportunities_loss_reason_id_fkey(name, category)`)
+        .select(`id, title, valor_previsto, status, pipeline_id, created_at, updated_at, closed_at, loss_reason_id, loss_comment, owner_user_id, account:accounts(segmento, porte), loss_reason:loss_reasons!opportunities_loss_reason_id_fkey(name, category, loss_accountability)`)
         .eq('organization_id', organizationId)
         .in('status', ['won', 'lost'])
         .in('pipeline_id', pipelineIds);

@@ -37,15 +37,11 @@ export const SHORT_RECOMMENDATIONS: Record<string, string> = {
 };
 
 /**
- * Categorias consideradas falha comercial/processual (mapeamento local frontend).
- * Não altera taxonomia global no banco.
+ * Sprint WL-UI-03 — Classificação oficial vinda do banco (loss_reasons.loss_accountability).
+ * Valores possíveis: commercial | client | operations | market | unknown.
+ * NÃO mais hardcoded no frontend. O catálogo de motivos define o accountability.
  */
-export const COMMERCIAL_FAILURE_CATEGORIES = new Set([
-  'timing',
-  'sales_process',
-  'internal',
-  'operational',
-]);
+export type LossAccountability = 'commercial' | 'client' | 'operations' | 'market' | 'unknown';
 
 export function getCategoryLabel(category: string): string {
   return LOSS_CATEGORY_LABELS[category] || category;
@@ -232,8 +228,8 @@ export interface CommercialFailureSummary {
 }
 
 /**
- * Mapeamento local (frontend) — separa perda inevitável de falha comercial/processual.
- * Não altera taxonomia global.
+ * Sprint WL-UI-03 — Lê accountability oficial do banco (loss_reasons.loss_accountability).
+ * Sem regras hardcoded no frontend. "Falha comercial" = motivos com accountability='commercial'.
  */
 export function buildCommercialFailureSummary(data: WinLossDataResult): CommercialFailureSummary {
   if (!data || data.losses.length === 0) {
@@ -255,10 +251,12 @@ export function buildCommercialFailureSummary(data: WinLossDataResult): Commerci
   let commercialCount = 0;
 
   for (const l of data.losses) {
-    const cat = ((l.reason as any)?.category as string) || 'other';
+    const reason = (l.reason as any) || null;
+    const accountability = (reason?.loss_accountability as LossAccountability | undefined) || 'unknown';
+    const cat = (reason?.category as string) || 'other';
     const value = Number(l.final_value) || 0;
     totalLostValue += value;
-    if (COMMERCIAL_FAILURE_CATEGORIES.has(cat)) {
+    if (accountability === 'commercial') {
       commercialLostValue += value;
       commercialCount++;
       const e = byCat.get(cat) || { count: 0, value: 0 };
@@ -267,6 +265,7 @@ export function buildCommercialFailureSummary(data: WinLossDataResult): Commerci
       byCat.set(cat, e);
     }
   }
+
 
   if (commercialCount === 0) {
     return {
