@@ -215,7 +215,59 @@ export async function listOpportunities(params: {
   };
 }
 
+/**
+ * Lightweight server-side search for the proposal opportunity picker.
+ * Returns at most `limit` open opportunities matching `q` by title.
+ * Used exclusively by `ProposalModal` — does NOT replace `listOpportunities`
+ * used by the Kanban. Always filters out soft-deleted and closed (won/lost)
+ * opportunities to keep the picker focused on actionable deals.
+ */
+export async function searchOpportunitiesForProposalPicker(params: {
+  q?: string;
+  limit?: number;
+  includeId?: string; // ensures the currently selected opportunity is included (edit mode)
+} = {}): Promise<Array<{ id: string; title: string | null; status: string | null }>> {
+  const limit = Math.min(Math.max(params.limit ?? 50, 1), 100);
+  const q = (params.q ?? '').trim();
+
+  let query = supabase
+    .from('opportunities')
+    .select('id, title, status, created_at')
+    .is('deleted_at', null)
+    .not('status', 'in', '("won","lost")')
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (q.length > 0) {
+    // Escape PostgREST wildcards in user input
+    const safe = q.replace(/[%_]/g, (m) => `\\${m}`);
+    query = query.ilike('title', `%${safe}%`);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  const results = (data || []) as Array<{ id: string; title: string | null; status: string | null }>;
+
+  // Ensure the currently selected opportunity is present (edit mode), even if
+  // it doesn't match the current search or has been closed since.
+  if (params.includeId && !results.some((r) => r.id === params.includeId)) {
+    const { data: extra } = await supabase
+      .from('opportunities')
+      .select('id, title, status')
+      .eq('id', params.includeId)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (extra) {
+      results.unshift(extra as { id: string; title: string | null; status: string | null });
+    }
+  }
+
+  return results;
+}
+
 export async function getOpportunity(id: string): Promise<Opportunity | null> {
+
   const { data, error } = await supabase
     .from('opportunities')
     .select(`
