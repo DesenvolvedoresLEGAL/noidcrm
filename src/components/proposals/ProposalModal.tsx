@@ -47,11 +47,24 @@ export function ProposalModal({ open, onOpenChange, proposal }: ProposalModalPro
   const isEditing = !!proposal;
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
-  const { data: opportunitiesData } = useQuery({
-    queryKey: ['opportunities-for-proposals'],
-    queryFn: () => listOpportunities({}),
+  // Server-side opportunity search (50 max, open only, debounced)
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearch = useDebounce(searchTerm, 300);
+  const includeId: string | undefined = proposal?.opportunity_id || undefined;
+
+  const { data: opportunities = [], isFetching: oppsFetching } = useQuery({
+    queryKey: ['opportunities-picker', { q: debouncedSearch, includeId }],
+    queryFn: () =>
+      searchOpportunitiesForProposalPicker({
+        q: debouncedSearch,
+        limit: 50,
+        includeId,
+      }),
     enabled: open,
+    staleTime: 30_000,
   });
+
 
   const { register, handleSubmit, control, formState: { errors }, watch } = useForm<ProposalFormData>({
     resolver: zodResolver(proposalSchema),
