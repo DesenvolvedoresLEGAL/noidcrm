@@ -133,8 +133,6 @@ export function ProposalModal({ open, onOpenChange, proposal }: ProposalModalPro
     }
   };
 
-  const opportunities = opportunitiesData?.data || [];
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -148,25 +146,78 @@ export function ProposalModal({ open, onOpenChange, proposal }: ProposalModalPro
             <Controller
               name="opportunity_id"
               control={control}
-              render={({ field }) => (
-                <Select value={field.value} onValueChange={field.onChange}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione uma oportunidade" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {opportunities.map((opp: any) => (
-                      <SelectItem key={opp.id} value={opp.id}>
-                        {opp.title || opp.id}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
+              render={({ field }) => {
+                const selected = opportunities.find((o) => o.id === field.value);
+                return (
+                  <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={pickerOpen}
+                        className={cn(
+                          'w-full justify-between font-normal',
+                          !field.value && 'text-muted-foreground'
+                        )}
+                      >
+                        <span className="truncate">
+                          {selected ? selected.title || selected.id : 'Selecione uma oportunidade'}
+                        </span>
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                      <Command shouldFilter={false}>
+                        <CommandInput
+                          placeholder="Buscar oportunidade..."
+                          value={searchTerm}
+                          onValueChange={setSearchTerm}
+                        />
+                        <CommandList>
+                          {oppsFetching ? (
+                            <div className="flex items-center justify-center py-6 text-sm text-muted-foreground">
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Buscando...
+                            </div>
+                          ) : (
+                            <>
+                              <CommandEmpty>Nenhuma oportunidade encontrada.</CommandEmpty>
+                              <CommandGroup>
+                                {opportunities.map((opp) => (
+                                  <CommandItem
+                                    key={opp.id}
+                                    value={opp.id}
+                                    onSelect={() => {
+                                      field.onChange(opp.id);
+                                      setPickerOpen(false);
+                                    }}
+                                  >
+                                    <Check
+                                      className={cn(
+                                        'mr-2 h-4 w-4',
+                                        field.value === opp.id ? 'opacity-100' : 'opacity-0'
+                                      )}
+                                    />
+                                    <span className="truncate">{opp.title || opp.id}</span>
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </>
+                          )}
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                );
+              }}
             />
             {errors.opportunity_id && (
               <p className="text-sm text-destructive">{errors.opportunity_id.message}</p>
             )}
           </div>
+
+
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
