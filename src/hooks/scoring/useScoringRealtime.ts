@@ -5,15 +5,17 @@
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { invalidateScoreRelatedQueries } from '@/lib/scoring/invalidateScoreQueries';
 
 const SCORE_FIELDS = ['lead_score', 'fit_score', 'intent_score', 'lead_grade'] as const;
 
 export function useScoringRealtime(organizationId: string | undefined | null) {
   const queryClient = useQueryClient();
+  const { hasSession, sessionChecked } = useCurrentUser();
 
   useEffect(() => {
-    if (!organizationId) return;
+    if (!sessionChecked || !hasSession || !organizationId) return;
 
     const channel = supabase
       .channel(`scoring-org-${organizationId}`)
