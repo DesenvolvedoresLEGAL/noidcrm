@@ -52,29 +52,49 @@ export default function Accounts() {
   const [page, setPage] = useState(1);
   const debouncedSearchQuery = useDebounce(searchQuery.trim(), 300);
 
-  // Quando há filtros client-side ativos (score/tag), usamos um page_size maior
-  // para preservar o comportamento atual de filtragem em memória.
-  // Caso contrário, paginação server-side padrão de 50.
-  const hasClientSideFilters = scoreFinanceiroFilter !== 'all' || tagFilter !== 'all';
-  const PAGE_SIZE = hasClientSideFilters ? 200 : 50;
+  const PAGE_SIZE = 50;
+
+  // Tag → account_ids server-side resolvido antes da query principal
+  const { data: tagAccountIdsSet, isLoading: tagIdsLoading } = useAccountIdsByTag(
+    tagFilter !== 'all' ? tagFilter : undefined,
+  );
+  const tagAccountIds = useMemo(
+    () => (tagAccountIdsSet ? Array.from(tagAccountIdsSet) : undefined),
+    [tagAccountIdsSet],
+  );
+  const tagFilterReady = tagFilter === 'all' || tagAccountIds !== undefined;
 
   // Reset page quando filtros/busca mudam
   useEffect(() => {
     setPage(1);
   }, [debouncedSearchQuery, segmentoFilter, porteFilter, origemFilter, scoreFinanceiroFilter, tagFilter]);
 
-  // Buscar contas com tratamento de erro (porte/segmento/origem agora server-side)
+  // Buscar contas — todos os filtros server-side, page_size fixo em 50
   const { data: accountsData, isLoading, isFetching, error: accountsError } = useQuery({
-    queryKey: [...accountKeys.lists(), debouncedSearchQuery, segmentoFilter, porteFilter, origemFilter, page, PAGE_SIZE],
+    queryKey: [
+      ...accountKeys.lists(),
+      debouncedSearchQuery,
+      segmentoFilter,
+      porteFilter,
+      origemFilter,
+      scoreFinanceiroFilter,
+      tagFilter,
+      // Hash leve da lista de ids para invalidar quando muda
+      tagAccountIds ? `${tagAccountIds.length}` : 'no-tag',
+      page,
+    ],
     queryFn: async () => {
       try {
         const result = await listAccounts({
           q: debouncedSearchQuery,
-          page: hasClientSideFilters ? 1 : page,
+          page,
           page_size: PAGE_SIZE,
           segmento: segmentoFilter !== 'all' ? segmentoFilter : undefined,
           porte: porteFilter !== 'all' ? porteFilter : undefined,
           origem_principal: origemFilter !== 'all' ? origemFilter : undefined,
+          score_financeiro:
+            scoreFinanceiroFilter !== 'all' ? (scoreFinanceiroFilter as ScoreFinanceiroFilter) : undefined,
+          account_ids: tagFilter !== 'all' ? tagAccountIds : undefined,
         });
 
         if (import.meta.env.DEV) {
@@ -84,7 +104,7 @@ export default function Accounts() {
             page,
             pageSize: PAGE_SIZE,
             query: debouncedSearchQuery,
-            filters: { segmentoFilter, porteFilter, origemFilter },
+            filters: { segmentoFilter, porteFilter, origemFilter, scoreFinanceiroFilter, tagFilter },
           });
         }
 
@@ -94,6 +114,7 @@ export default function Accounts() {
         throw error;
       }
     },
+    enabled: tagFilterReady,
     placeholderData: keepPreviousData,
     retry: 2,
     retryDelay: 1000,
