@@ -72,7 +72,11 @@ export default function WinLossHub() {
   // comercial (não há proposta aceita), então o SSoT retornaria zero e mascararia
   // os Leads Qualificados/Desqualificados reais do useWinLossData.
   // "Todos" = pipelines comerciais de vendas; caso contrário restringe ao pipeline escolhido.
-  const isSalesContext = pipelineType === 'sales';
+  // Só aplica quando o usuário restringe explicitamente a um pipeline de vendas.
+  // No modo "Todos (Pré-Vendas + Vendas)" o dataset mistura qualification, e o SSoT
+  // (que cobre apenas vendas) divergiria do useWinLossData → inconsistência de KPIs.
+  const isSalesContext = pipelineType === 'sales' && !!selectedPipelineId;
+
   const salesPipelineIds = useMemo(
     () => pipelines.filter((p) => p.pipeline_type === 'sales').map((p) => p.id),
     [pipelines],
