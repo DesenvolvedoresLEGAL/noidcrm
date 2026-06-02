@@ -97,7 +97,26 @@ export interface WinLossDataResult {
   validLossCyclesCount: number;
   monthlyPulse: MonthlyPulse[];
   timeToLossDistribution: Array<{ week: string; count: number }>;
+  lossMortality: LossMortality;
 }
+
+export interface LossMortalityBucket {
+  key: '0-3' | '4-7' | '8-14' | '15-30' | '31-60' | '61+';
+  label: string;
+  count: number;
+  lostValue: number;
+  pct: number;
+}
+
+export interface LossMortality {
+  buckets: LossMortalityBucket[];
+  totalLosses: number;
+  totalValue: number;
+  peak: LossMortalityBucket | null;
+  avgDays: number | null;
+  p90Days: number | null;
+}
+
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 export function getDateRangeFromPreset(preset: TimeframePreset, custom?: DateRange): DateRange {
