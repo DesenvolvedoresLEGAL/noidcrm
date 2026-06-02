@@ -513,21 +513,51 @@ export function WinLossLossesTab({
       )}
 
       {/* 9. Time-to-Loss */}
-      {data.timeToLossDistribution.some((b) => b.count > 0) && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-1.5">
-              <Clock className="h-4 w-4" /> Time-to-Loss
-            </CardTitle>
-            <CardDescription className="text-xs">
-              Em qual semana de vida os negócios morrem.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <TimeToLossBar data={data.timeToLossDistribution} />
-          </CardContent>
-        </Card>
-      )}
+      {(() => {
+        const dist = data.timeToLossDistribution.filter((b) => b.count > 0);
+        const totalLossesInWeeks = dist.reduce((s, b) => s + b.count, 0);
+        const hasRelevant = dist.length >= 2 && totalLossesInWeeks >= 3;
+        const topBucket = dist.length > 0
+          ? dist.reduce((a, b) => (b.count > a.count ? b : a))
+          : null;
+        // Valor perdido aproximado da semana de pico (best-effort via opportunity.created_at + weeks).
+        // Mantemos somente count para não inventar números.
+        return (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-1.5">
+                <Clock className="h-4 w-4" /> Time-to-Loss
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Em qual semana de vida os negócios morrem.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {!hasRelevant ? (
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">
+                    Sem concentração relevante de perdas por semana neste período.
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Use períodos maiores para identificar em qual momento do ciclo os negócios costumam morrer.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <TimeToLossBar data={data.timeToLossDistribution} />
+                  {topBucket && (
+                    <p className="text-[11px] text-muted-foreground">
+                      Maior concentração: <span className="font-medium text-foreground">{topBucket.week}</span>
+                      {' · '}
+                      {topBucket.count} {topBucket.count === 1 ? 'perda' : 'perdas'}
+                    </p>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {/* 10. Tendência ou Sinais Recentes */}
       {showShortSignals ? (
