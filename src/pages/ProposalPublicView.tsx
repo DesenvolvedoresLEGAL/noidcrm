@@ -184,7 +184,10 @@ export default function ProposalPublicView() {
       }
 
       if (data?.reasons && data.reasons.length > 0) {
-        setWinReasons(data.reasons);
+        const sorted = [...data.reasons].sort((a: any, b: any) =>
+          String(a.label || '').localeCompare(String(b.label || ''), 'pt-BR', { sensitivity: 'base' })
+        );
+        setWinReasons(sorted);
       }
     } catch (error) {
       console.error('Error loading win reasons:', error);
