@@ -409,11 +409,11 @@ export function WinLossLossesTab({
         </CardContent>
       </Card>
 
-      {/* 7. Motivo Declarado vs Motivo Inferido pela IA */}
+      {/* 7. Motivo Declarado x Motivo Inferido pela IA */}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm flex items-center gap-1.5">
-            <GitCompareArrows className="h-4 w-4 text-purple-600" /> Declarado × Inferido pela IA
+            <GitCompareArrows className="h-4 w-4 text-purple-600" /> Motivo Declarado x Motivo Inferido pela IA
           </CardTitle>
           <CardDescription className="text-xs">
             A IA compara o motivo registrado pelo time com o que detecta nas evidências. Nunca sobrescreve.
@@ -422,7 +422,7 @@ export function WinLossLossesTab({
         <CardContent>
           {!semantic || semantic.total === 0 || semantic.topGapPairs.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              Sem volume suficiente de análise semântica para detectar gaps com confiança.
+              Sem volume suficiente de análise semântica para detectar divergências com confiança.
             </p>
           ) : (
             <div className="space-y-3">
