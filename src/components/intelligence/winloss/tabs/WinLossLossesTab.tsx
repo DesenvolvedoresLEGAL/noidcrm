@@ -685,24 +685,6 @@ export function WinLossLossesTab({
           </CardContent>
         </Card>
       )}
-
-      {/* CRM Trust visual (compact) */}
-      {semantic && semantic.total > 0 && (
-        <Card>
-          <CardContent className="pt-4 pb-4 space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="h-4 w-4 text-blue-500" />
-                <h4 className="text-sm font-semibold">CRM Trust Score</h4>
-              </div>
-              <span className="text-xs text-muted-foreground">
-                Qualidade {semantic.avgQuality}/100 · Cobertura {semantic.coveragePct}% · Gap {semantic.gapPct}%
-              </span>
-            </div>
-            <Progress value={crmTrust} className="h-1.5" />
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }
