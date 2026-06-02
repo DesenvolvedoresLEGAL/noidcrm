@@ -9,7 +9,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
+
 import {
   TrendingDown, DollarSign, AlertOctagon, ShieldCheck, Recycle, Crown,
   AlertTriangle, Layers, Clock, GitCompareArrows, MessageSquareQuote,
@@ -216,37 +216,42 @@ export function WinLossLossesTab({
         />
       </div>
 
-      {/* 3. Principal Vazamento */}
-      {principalReason && (
-        <Card className="border-red-500/30 bg-red-500/5">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-1.5">
-              <AlertTriangle className="h-4 w-4 text-red-600" />
-              Principal vazamento
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="flex items-end justify-between gap-3 flex-wrap">
-              <div className="min-w-0">
-                <p className="text-lg font-bold leading-tight">{principalReason.reason}</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {principalReason.count} {principalReason.count === 1 ? 'perda' : 'perdas'} ·{' '}
-                  <span className="font-semibold text-red-700 dark:text-red-400">
-                    {fmtBRL(principalReason.lostValue)} perdidos
-                  </span>{' '}
-                  · {principalReason.pct}% das perdas
-                </p>
+      {/* 3. Principal Vazamento por valor perdido */}
+      {principalReason && (() => {
+        const valuePct = lostValue > 0
+          ? Math.round((principalReason.lostValue / lostValue) * 100)
+          : 0;
+        return (
+          <Card className="border-red-500/30 bg-red-500/5">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-1.5">
+                <AlertTriangle className="h-4 w-4 text-red-600" />
+                Principal vazamento por valor perdido
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="flex items-end justify-between gap-3 flex-wrap">
+                <div className="min-w-0">
+                  <p className="text-lg font-bold leading-tight">{principalReason.reason}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {principalReason.count} {principalReason.count === 1 ? 'perda' : 'perdas'} ·{' '}
+                    <span className="font-semibold text-red-700 dark:text-red-400">
+                      {fmtBRL(principalReason.lostValue)} perdidos
+                    </span>{' '}
+                    · {valuePct}% do valor perdido
+                  </p>
+                </div>
+                <Badge variant="outline" className="bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30">
+                  {valuePct}%
+                </Badge>
               </div>
-              <Badge variant="outline" className="bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30">
-                {principalReason.pct}%
-              </Badge>
-            </div>
-            <p className="text-xs text-muted-foreground border-t border-red-500/20 pt-2 italic">
-              Ação: {getShortRecommendation(principalReason.category)}
-            </p>
-          </CardContent>
-        </Card>
-      )}
+              <p className="text-xs text-muted-foreground border-t border-red-500/20 pt-2 italic">
+                Ação: {getShortRecommendation(principalReason.category)}
+              </p>
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {/* 4. Top Motivos de Perda */}
       {topReasons.length > 0 && (
@@ -256,7 +261,7 @@ export function WinLossLossesTab({
               <TrendingDown className="h-4 w-4" /> Top motivos de perda
             </CardTitle>
             <CardDescription className="text-xs">
-              Motivos com maior frequência e maior valor perdido no período.
+              Motivos ordenados por valor perdido, com frequência, categoria e responsabilidade da perda.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -307,7 +312,7 @@ export function WinLossLossesTab({
         <Card className="border-red-500/20">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-1.5">
-              <AlertOctagon className="h-4 w-4 text-red-600" /> Perda por falha comercial
+              <AlertOctagon className="h-4 w-4 text-red-600" /> Perda por Falha Comercial
             </CardTitle>
             <CardDescription className="text-xs">
               Perdas classificadas oficialmente como responsabilidade comercial (banco · loss_accountability).
@@ -365,6 +370,18 @@ export function WinLossLossesTab({
               Nenhuma perda recuperável marcada no período. Revise perdas de Timing, Preço e Concorrência para
               identificar oportunidades de reativação.
             </p>
+          ) : recoverableValue === 0 ? (
+            <div className="space-y-2">
+              <p className="text-sm text-amber-700 dark:text-amber-400">
+                Existem perdas marcadas como recuperáveis, mas sem valor recuperável estimado.
+              </p>
+              <p className="text-xs text-muted-foreground italic">
+                Próxima ação: revise o valor das oportunidades recuperáveis para priorizar reativação.
+              </p>
+              <div className="text-xs text-muted-foreground border-t pt-2">
+                {recoverableCount} {recoverableCount === 1 ? 'oportunidade' : 'oportunidades'} sem valor estimado.
+              </div>
+            </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
               <PatternCell
@@ -392,11 +409,11 @@ export function WinLossLossesTab({
         </CardContent>
       </Card>
 
-      {/* 7. Motivo Declarado vs Motivo Inferido pela IA */}
+      {/* 7. Motivo Declarado x Motivo Inferido pela IA */}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm flex items-center gap-1.5">
-            <GitCompareArrows className="h-4 w-4 text-purple-600" /> Declarado × Inferido pela IA
+            <GitCompareArrows className="h-4 w-4 text-purple-600" /> Motivo Declarado x Motivo Inferido pela IA
           </CardTitle>
           <CardDescription className="text-xs">
             A IA compara o motivo registrado pelo time com o que detecta nas evidências. Nunca sobrescreve.
@@ -405,7 +422,7 @@ export function WinLossLossesTab({
         <CardContent>
           {!semantic || semantic.total === 0 || semantic.topGapPairs.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              Sem volume suficiente de análise semântica para detectar gaps com confiança.
+              Sem volume suficiente de análise semântica para detectar divergências com confiança.
             </p>
           ) : (
             <div className="space-y-3">
@@ -496,21 +513,51 @@ export function WinLossLossesTab({
       )}
 
       {/* 9. Time-to-Loss */}
-      {data.timeToLossDistribution.some((b) => b.count > 0) && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-1.5">
-              <Clock className="h-4 w-4" /> Time-to-Loss
-            </CardTitle>
-            <CardDescription className="text-xs">
-              Em qual semana de vida os negócios morrem.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <TimeToLossBar data={data.timeToLossDistribution} />
-          </CardContent>
-        </Card>
-      )}
+      {(() => {
+        const dist = data.timeToLossDistribution.filter((b) => b.count > 0);
+        const totalLossesInWeeks = dist.reduce((s, b) => s + b.count, 0);
+        const hasRelevant = dist.length >= 2 && totalLossesInWeeks >= 3;
+        const topBucket = dist.length > 0
+          ? dist.reduce((a, b) => (b.count > a.count ? b : a))
+          : null;
+        // Valor perdido aproximado da semana de pico (best-effort via opportunity.created_at + weeks).
+        // Mantemos somente count para não inventar números.
+        return (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-1.5">
+                <Clock className="h-4 w-4" /> Time-to-Loss
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Em qual semana de vida os negócios morrem.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {!hasRelevant ? (
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">
+                    Sem concentração relevante de perdas por semana neste período.
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Use períodos maiores para identificar em qual momento do ciclo os negócios costumam morrer.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <TimeToLossBar data={data.timeToLossDistribution} />
+                  {topBucket && (
+                    <p className="text-[11px] text-muted-foreground">
+                      Maior concentração: <span className="font-medium text-foreground">{topBucket.week}</span>
+                      {' · '}
+                      {topBucket.count} {topBucket.count === 1 ? 'perda' : 'perdas'}
+                    </p>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {/* 10. Tendência ou Sinais Recentes */}
       {showShortSignals ? (
@@ -635,24 +682,6 @@ export function WinLossLossesTab({
                 </li>
               ))}
             </ul>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* CRM Trust visual (compact) */}
-      {semantic && semantic.total > 0 && (
-        <Card>
-          <CardContent className="pt-4 pb-4 space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="h-4 w-4 text-blue-500" />
-                <h4 className="text-sm font-semibold">CRM Trust Score</h4>
-              </div>
-              <span className="text-xs text-muted-foreground">
-                Qualidade {semantic.avgQuality}/100 · Cobertura {semantic.coveragePct}% · Gap {semantic.gapPct}%
-              </span>
-            </div>
-            <Progress value={crmTrust} className="h-1.5" />
           </CardContent>
         </Card>
       )}
@@ -894,42 +923,47 @@ function buildLossPlaybooks(
   commercialFailure: ReturnType<typeof buildCommercialFailureSummary> | undefined,
   semantic: LossSemanticAggregates | undefined,
 ): string[] {
+  // Ordem de prioridade executiva (máx. 5):
+  // 1) falha comercial · 2) maior valor perdido (top categoria) · 3) concorrência
+  // 4) preço/valor · 5) trust score baixo
   const out: string[] = [];
-  const top3 = categories.slice(0, 3).map((c) => c.category);
 
-  if (top3.includes('timing')) {
-    out.push('Criar alerta de cadência para oportunidades sem interação há mais de 7 dias.');
-  }
-  if (top3.includes('competition')) {
-    out.push('Reforçar battlecards para os concorrentes que mais aparecem nas perdas.');
-  }
-  if (top3.includes('price')) {
-    out.push('Revisar política de desconto e faixas aprovadas — Preço / Valor está entre os principais motivos.');
-  }
-  if (top3.includes('no_fit')) {
-    out.push('Refinar ICP e qualificação no topo do funil para reduzir deals fora do perfil.');
-  }
-  if (top3.includes('internal')) {
-    out.push('Auditar propostas com erro interno antes do envio (checklist de pré-envio).');
-  }
-  if (top3.includes('sales_process')) {
-    out.push('Reforçar treinamento de processo comercial e SLA de follow-up.');
-  }
-  if (top3.includes('operational')) {
-    out.push('Acionar CS/Operações para reduzir atritos pós-venda mencionados pelo cliente.');
-  }
-
+  // 1. Falha comercial
   if (commercialFailure?.commercialCount && commercialFailure.pctOfLostValue >= 25) {
     out.push(`Falha comercial representa ${commercialFailure.pctOfLostValue}% do valor perdido — promover review semanal de pipeline ativo.`);
   }
 
+  // 2. Maior valor perdido (top categoria por valor)
+  const topByValue = [...categories].sort((a, b) => (b.lostValue ?? 0) - (a.lostValue ?? 0))[0];
+  if (topByValue) {
+    const topMap: Record<string, string> = {
+      timing: 'Criar alerta de cadência para oportunidades sem interação há mais de 7 dias.',
+      no_fit: 'Refinar ICP e qualificação no topo do funil para reduzir deals fora do perfil.',
+      internal: 'Auditar propostas com erro interno antes do envio (checklist de pré-envio).',
+      sales_process: 'Reforçar treinamento de processo comercial e SLA de follow-up.',
+      operational: 'Acionar CS/Operações para reduzir atritos pós-venda mencionados pelo cliente.',
+    };
+    const action = topMap[topByValue.category];
+    if (action && !out.some((o) => o === action)) {
+      out.push(action);
+    }
+  }
+
+  // 3. Concorrência
+  const top3 = categories.slice(0, 3).map((c) => c.category);
+  if (top3.includes('competition')) {
+    out.push('Reforçar battlecards para os concorrentes que mais aparecem nas perdas.');
+  }
+
+  // 4. Preço / Valor
+  if (top3.includes('price')) {
+    out.push('Revisar política de desconto e faixas aprovadas — Preço / Valor está entre os principais motivos.');
+  }
+
+  // 5. Trust score baixo
   if (semantic && semantic.total > 0 && semantic.crmTrustScore < 60) {
     out.push('Tornar obrigatório o preenchimento de diagnóstico de perda — CRM Trust Score abaixo do ideal.');
   }
 
-  if (semantic && semantic.gapPct >= 25) {
-    out.push('Auditar perdas com gap entre motivo declarado e inferido — calibrar diagnóstico do time comercial.');
-  }
-
-  return out.slice(0, 6);
+  return out.slice(0, 5);
 }
