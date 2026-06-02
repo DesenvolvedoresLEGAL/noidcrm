@@ -216,37 +216,42 @@ export function WinLossLossesTab({
         />
       </div>
 
-      {/* 3. Principal Vazamento */}
-      {principalReason && (
-        <Card className="border-red-500/30 bg-red-500/5">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-1.5">
-              <AlertTriangle className="h-4 w-4 text-red-600" />
-              Principal vazamento
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="flex items-end justify-between gap-3 flex-wrap">
-              <div className="min-w-0">
-                <p className="text-lg font-bold leading-tight">{principalReason.reason}</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {principalReason.count} {principalReason.count === 1 ? 'perda' : 'perdas'} ·{' '}
-                  <span className="font-semibold text-red-700 dark:text-red-400">
-                    {fmtBRL(principalReason.lostValue)} perdidos
-                  </span>{' '}
-                  · {principalReason.pct}% das perdas
-                </p>
+      {/* 3. Principal Vazamento por valor perdido */}
+      {principalReason && (() => {
+        const valuePct = lostValue > 0
+          ? Math.round((principalReason.lostValue / lostValue) * 100)
+          : 0;
+        return (
+          <Card className="border-red-500/30 bg-red-500/5">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-1.5">
+                <AlertTriangle className="h-4 w-4 text-red-600" />
+                Principal vazamento por valor perdido
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="flex items-end justify-between gap-3 flex-wrap">
+                <div className="min-w-0">
+                  <p className="text-lg font-bold leading-tight">{principalReason.reason}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {principalReason.count} {principalReason.count === 1 ? 'perda' : 'perdas'} ·{' '}
+                    <span className="font-semibold text-red-700 dark:text-red-400">
+                      {fmtBRL(principalReason.lostValue)} perdidos
+                    </span>{' '}
+                    · {valuePct}% do valor perdido
+                  </p>
+                </div>
+                <Badge variant="outline" className="bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30">
+                  {valuePct}%
+                </Badge>
               </div>
-              <Badge variant="outline" className="bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30">
-                {principalReason.pct}%
-              </Badge>
-            </div>
-            <p className="text-xs text-muted-foreground border-t border-red-500/20 pt-2 italic">
-              Ação: {getShortRecommendation(principalReason.category)}
-            </p>
-          </CardContent>
-        </Card>
-      )}
+              <p className="text-xs text-muted-foreground border-t border-red-500/20 pt-2 italic">
+                Ação: {getShortRecommendation(principalReason.category)}
+              </p>
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {/* 4. Top Motivos de Perda */}
       {topReasons.length > 0 && (
