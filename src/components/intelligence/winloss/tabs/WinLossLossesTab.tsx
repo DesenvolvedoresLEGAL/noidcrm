@@ -923,42 +923,47 @@ function buildLossPlaybooks(
   commercialFailure: ReturnType<typeof buildCommercialFailureSummary> | undefined,
   semantic: LossSemanticAggregates | undefined,
 ): string[] {
+  // Ordem de prioridade executiva (máx. 5):
+  // 1) falha comercial · 2) maior valor perdido (top categoria) · 3) concorrência
+  // 4) preço/valor · 5) trust score baixo
   const out: string[] = [];
-  const top3 = categories.slice(0, 3).map((c) => c.category);
 
-  if (top3.includes('timing')) {
-    out.push('Criar alerta de cadência para oportunidades sem interação há mais de 7 dias.');
-  }
-  if (top3.includes('competition')) {
-    out.push('Reforçar battlecards para os concorrentes que mais aparecem nas perdas.');
-  }
-  if (top3.includes('price')) {
-    out.push('Revisar política de desconto e faixas aprovadas — Preço / Valor está entre os principais motivos.');
-  }
-  if (top3.includes('no_fit')) {
-    out.push('Refinar ICP e qualificação no topo do funil para reduzir deals fora do perfil.');
-  }
-  if (top3.includes('internal')) {
-    out.push('Auditar propostas com erro interno antes do envio (checklist de pré-envio).');
-  }
-  if (top3.includes('sales_process')) {
-    out.push('Reforçar treinamento de processo comercial e SLA de follow-up.');
-  }
-  if (top3.includes('operational')) {
-    out.push('Acionar CS/Operações para reduzir atritos pós-venda mencionados pelo cliente.');
-  }
-
+  // 1. Falha comercial
   if (commercialFailure?.commercialCount && commercialFailure.pctOfLostValue >= 25) {
     out.push(`Falha comercial representa ${commercialFailure.pctOfLostValue}% do valor perdido — promover review semanal de pipeline ativo.`);
   }
 
+  // 2. Maior valor perdido (top categoria por valor)
+  const topByValue = [...categories].sort((a, b) => (b.lostValue ?? 0) - (a.lostValue ?? 0))[0];
+  if (topByValue) {
+    const topMap: Record<string, string> = {
+      timing: 'Criar alerta de cadência para oportunidades sem interação há mais de 7 dias.',
+      no_fit: 'Refinar ICP e qualificação no topo do funil para reduzir deals fora do perfil.',
+      internal: 'Auditar propostas com erro interno antes do envio (checklist de pré-envio).',
+      sales_process: 'Reforçar treinamento de processo comercial e SLA de follow-up.',
+      operational: 'Acionar CS/Operações para reduzir atritos pós-venda mencionados pelo cliente.',
+    };
+    const action = topMap[topByValue.category];
+    if (action && !out.some((o) => o === action)) {
+      out.push(action);
+    }
+  }
+
+  // 3. Concorrência
+  const top3 = categories.slice(0, 3).map((c) => c.category);
+  if (top3.includes('competition')) {
+    out.push('Reforçar battlecards para os concorrentes que mais aparecem nas perdas.');
+  }
+
+  // 4. Preço / Valor
+  if (top3.includes('price')) {
+    out.push('Revisar política de desconto e faixas aprovadas — Preço / Valor está entre os principais motivos.');
+  }
+
+  // 5. Trust score baixo
   if (semantic && semantic.total > 0 && semantic.crmTrustScore < 60) {
     out.push('Tornar obrigatório o preenchimento de diagnóstico de perda — CRM Trust Score abaixo do ideal.');
   }
 
-  if (semantic && semantic.gapPct >= 25) {
-    out.push('Auditar perdas com gap entre motivo declarado e inferido — calibrar diagnóstico do time comercial.');
-  }
-
-  return out.slice(0, 6);
+  return out.slice(0, 5);
 }
