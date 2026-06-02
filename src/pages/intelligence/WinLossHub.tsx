@@ -206,13 +206,16 @@ export default function WinLossHub() {
           </TabsContent>
 
           <TabsContent value="losses">
-            <Card>
-              <CardContent className="py-12 text-center text-sm text-muted-foreground">
-                A aba <strong>Losses</strong> será implementada em breve com análise dedicada
-                de perdas, padrões de derrota e ações de recuperação.
-              </CardContent>
-            </Card>
+            <WinLossLossesTab
+              data={winLossData}
+              isLoading={isLoading}
+              semantic={semantic}
+              timeframe={timeframe}
+              dateRange={dateRange}
+              organizationId={organization?.id || ''}
+            />
           </TabsContent>
+
 
           <TabsContent value="competitive">
             <WinLossCompetitiveTab
