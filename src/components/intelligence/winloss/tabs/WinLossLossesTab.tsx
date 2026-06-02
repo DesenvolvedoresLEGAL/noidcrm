@@ -370,6 +370,18 @@ export function WinLossLossesTab({
               Nenhuma perda recuperável marcada no período. Revise perdas de Timing, Preço e Concorrência para
               identificar oportunidades de reativação.
             </p>
+          ) : recoverableValue === 0 ? (
+            <div className="space-y-2">
+              <p className="text-sm text-amber-700 dark:text-amber-400">
+                Existem perdas marcadas como recuperáveis, mas sem valor recuperável estimado.
+              </p>
+              <p className="text-xs text-muted-foreground italic">
+                Próxima ação: revise o valor das oportunidades recuperáveis para priorizar reativação.
+              </p>
+              <div className="text-xs text-muted-foreground border-t pt-2">
+                {recoverableCount} {recoverableCount === 1 ? 'oportunidade' : 'oportunidades'} sem valor estimado.
+              </div>
+            </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
               <PatternCell
