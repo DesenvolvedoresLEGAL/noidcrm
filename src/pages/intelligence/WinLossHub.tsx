@@ -16,6 +16,8 @@ import { WinLossContextSelector } from '@/components/intelligence/winloss/WinLos
 import { WinLossKPIStrip } from '@/components/intelligence/winloss/WinLossKPIStrip';
 import { WinLossOverviewTab } from '@/components/intelligence/winloss/tabs/WinLossOverviewTab';
 import { WinLossWinsTab } from '@/components/intelligence/winloss/tabs/WinLossWinsTab';
+import { WinLossLossesTab } from '@/components/intelligence/winloss/tabs/WinLossLossesTab';
+import { useLossSemantic } from '@/hooks/useLossSemantic';
 import { WinLossCompetitiveTab } from '@/components/intelligence/winloss/tabs/WinLossCompetitiveTab';
 import { WinLossSellerTab } from '@/components/intelligence/winloss/tabs/WinLossSellerTab';
 import { WinLossInterviewsTab } from '@/components/intelligence/winloss/tabs/WinLossInterviewsTab';
