@@ -502,5 +502,51 @@ function emptyResult(): WinLossDataResult {
     factors: {}, avgCycleWon: null, avgCycleLost: null,
     validWinCyclesCount: 0, validLossCyclesCount: 0,
     monthlyPulse: [], timeToLossDistribution: [],
+    lossMortality: { buckets: [], totalLosses: 0, totalValue: 0, peak: null, avgDays: null, p90Days: null },
   };
 }
+
+// ─── Curva de Mortalidade Comercial ─────────────────────────────────
+const MORTALITY_BUCKET_DEFS: Array<{ key: LossMortalityBucket['key']; label: string; min: number; max: number }> = [
+  { key: '0-3', label: '0 a 3 dias', min: 0, max: 3 },
+  { key: '4-7', label: '4 a 7 dias', min: 4, max: 7 },
+  { key: '8-14', label: '8 a 14 dias', min: 8, max: 14 },
+  { key: '15-30', label: '15 a 30 dias', min: 15, max: 30 },
+  { key: '31-60', label: '31 a 60 dias', min: 31, max: 60 },
+  { key: '61+', label: '61+ dias', min: 61, max: Infinity },
+];
+
+function buildLossMortality(losses: WinLossDeal[]): LossMortality {
+  const valid = losses.filter(l => Number.isFinite(l.sales_cycle_days) && l.sales_cycle_days >= 0);
+  const buckets: LossMortalityBucket[] = MORTALITY_BUCKET_DEFS.map(def => ({
+    key: def.key, label: def.label, count: 0, lostValue: 0, pct: 0,
+  }));
+  let totalValue = 0;
+  valid.forEach(l => {
+    const days = l.sales_cycle_days;
+    const idx = MORTALITY_BUCKET_DEFS.findIndex(d => days >= d.min && days <= d.max);
+    if (idx >= 0) {
+      buckets[idx].count++;
+      buckets[idx].lostValue += l.final_value || 0;
+      totalValue += l.final_value || 0;
+    }
+  });
+  const totalLosses = valid.length;
+  buckets.forEach(b => {
+    b.pct = totalLosses > 0 ? Math.round((b.count / totalLosses) * 100) : 0;
+  });
+  const peak = totalLosses > 0
+    ? buckets.reduce((a, b) => (b.count > a.count ? b : a))
+    : null;
+  const avgDays = totalLosses > 0
+    ? Math.round(valid.reduce((s, l) => s + l.sales_cycle_days, 0) / totalLosses)
+    : null;
+  let p90Days: number | null = null;
+  if (totalLosses > 0) {
+    const sorted = [...valid].map(l => l.sales_cycle_days).sort((a, b) => a - b);
+    const idx = Math.min(sorted.length - 1, Math.ceil(sorted.length * 0.9) - 1);
+    p90Days = sorted[Math.max(0, idx)];
+  }
+  return { buckets, totalLosses, totalValue, peak, avgDays, p90Days };
+}
+
