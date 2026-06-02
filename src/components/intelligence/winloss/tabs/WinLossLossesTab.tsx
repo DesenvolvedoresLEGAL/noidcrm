@@ -94,7 +94,7 @@ export function WinLossLossesTab({
     enabled: !!organizationId && stageIds.length > 0,
     staleTime: 5 * 60_000,
     queryFn: async () => {
-      const { data: stages } = await supabase
+      const { data: stages } = await (supabase as any)
         .from('pipeline_stages')
         .select('id, name')
         .in('id', stageIds);
