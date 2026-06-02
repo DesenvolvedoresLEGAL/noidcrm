@@ -16,6 +16,8 @@ import { WinLossContextSelector } from '@/components/intelligence/winloss/WinLos
 import { WinLossKPIStrip } from '@/components/intelligence/winloss/WinLossKPIStrip';
 import { WinLossOverviewTab } from '@/components/intelligence/winloss/tabs/WinLossOverviewTab';
 import { WinLossWinsTab } from '@/components/intelligence/winloss/tabs/WinLossWinsTab';
+import { WinLossLossesTab } from '@/components/intelligence/winloss/tabs/WinLossLossesTab';
+import { useLossSemantic } from '@/hooks/useLossSemantic';
 import { WinLossCompetitiveTab } from '@/components/intelligence/winloss/tabs/WinLossCompetitiveTab';
 import { WinLossSellerTab } from '@/components/intelligence/winloss/tabs/WinLossSellerTab';
 import { WinLossInterviewsTab } from '@/components/intelligence/winloss/tabs/WinLossInterviewsTab';
@@ -69,6 +71,11 @@ export default function WinLossHub() {
     end: dateRange.to.toISOString(),
     pipelineIds: ssotPipelineIds,
   });
+
+  // Semantic aggregates compartilhados entre Visão Geral e Losses.
+  const { data: semantic } = useLossSemantic(organization?.id, selectedPipelineId, dateRange);
+
+
 
   // Log errors for debugging
   if (winLossError) {
@@ -199,13 +206,16 @@ export default function WinLossHub() {
           </TabsContent>
 
           <TabsContent value="losses">
-            <Card>
-              <CardContent className="py-12 text-center text-sm text-muted-foreground">
-                A aba <strong>Losses</strong> será implementada em breve com análise dedicada
-                de perdas, padrões de derrota e ações de recuperação.
-              </CardContent>
-            </Card>
+            <WinLossLossesTab
+              data={winLossData}
+              isLoading={isLoading}
+              semantic={semantic}
+              timeframe={timeframe}
+              dateRange={dateRange}
+              organizationId={organization?.id || ''}
+            />
           </TabsContent>
+
 
           <TabsContent value="competitive">
             <WinLossCompetitiveTab
