@@ -481,8 +481,9 @@ export function useWinLossData(organizationId: string | undefined, pipelineId: s
         competitorStats, sellerStats, factors,
         avgCycleWon, avgCycleLost,
         validWinCyclesCount: validWinCycles.length, validLossCyclesCount: validLossCycles.length,
-        monthlyPulse, timeToLossDistribution,
+        monthlyPulse, timeToLossDistribution, lossMortality,
       };
+
     },
     enabled: !!organizationId,
     retry: 1,
