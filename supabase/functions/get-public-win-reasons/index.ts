@@ -33,7 +33,7 @@ serve(async (req) => {
       .eq('organization_id', organizationId)
       .eq('is_active', true)
       .in('audience', ['client', 'both'])
-      .order('display_order', { ascending: true });
+      .order('name', { ascending: true });
 
     const { data: reasons, error } = await query;
 

@@ -220,13 +220,15 @@ export default function WinLossReasons() {
     return matchesSearch && matchesPipeline;
   });
 
-  const filteredWinReasons = winReasons.filter(reason => {
-    const matchesSearch = reason.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesPipeline = selectedPipeline === 'all' ||
-      !reason.pipeline_ids ||
-      reason.pipeline_ids.includes(selectedPipeline);
-    return matchesSearch && matchesPipeline;
-  });
+  const filteredWinReasons = winReasons
+    .filter(reason => {
+      const matchesSearch = reason.name.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesPipeline = selectedPipeline === 'all' ||
+        !reason.pipeline_ids ||
+        reason.pipeline_ids.includes(selectedPipeline);
+      return matchesSearch && matchesPipeline;
+    })
+    .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' }));
 
   return (
     <Layout>
