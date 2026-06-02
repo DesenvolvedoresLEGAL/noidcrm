@@ -435,7 +435,7 @@ export function useWinLossData(organizationId: string | undefined, pipelineId: s
         })
         .sort((a, b) => b.winRate - a.winRate);
 
-      // 10. Time-to-Loss Distribution (by week)
+      // 10. Time-to-Loss Distribution (legacy, by week) — mantido para Visão Geral
       const weekBuckets: Record<string, number> = {};
       losses.forEach(l => {
         if (l.sales_cycle_days > 0) {
@@ -448,6 +448,10 @@ export function useWinLossData(organizationId: string | undefined, pipelineId: s
         const label = i < 12 ? `Sem ${i + 1}` : '13+';
         return { week: label, count: weekBuckets[label] || 0 };
       }).filter(b => b.count > 0 || true); // keep all weeks for histogram shape
+
+      // 10b. Curva de Mortalidade Comercial — agrupamento executivo por faixas de dias
+      const lossMortality = buildLossMortality(losses);
+
 
       const lossReasonsByMacro: LossMacroGroup[] = [...macroMap.entries()]
         .map(([category, data]) => ({
