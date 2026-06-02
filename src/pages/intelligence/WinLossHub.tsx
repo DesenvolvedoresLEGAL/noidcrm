@@ -72,6 +72,11 @@ export default function WinLossHub() {
     pipelineIds: ssotPipelineIds,
   });
 
+  // Semantic aggregates compartilhados entre Visão Geral e Losses.
+  const { data: semantic } = useLossSemantic(organization?.id, selectedPipelineId, dateRange);
+
+
+
   // Log errors for debugging
   if (winLossError) {
     console.error('[WinLossHub] Data loading error:', winLossError);
