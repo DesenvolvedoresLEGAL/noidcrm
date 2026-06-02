@@ -312,7 +312,7 @@ export function WinLossLossesTab({
         <Card className="border-red-500/20">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-1.5">
-              <AlertOctagon className="h-4 w-4 text-red-600" /> Perda por falha comercial
+              <AlertOctagon className="h-4 w-4 text-red-600" /> Perda por Falha Comercial
             </CardTitle>
             <CardDescription className="text-xs">
               Perdas classificadas oficialmente como responsabilidade comercial (banco · loss_accountability).
