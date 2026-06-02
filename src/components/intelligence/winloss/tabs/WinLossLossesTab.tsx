@@ -261,7 +261,7 @@ export function WinLossLossesTab({
               <TrendingDown className="h-4 w-4" /> Top motivos de perda
             </CardTitle>
             <CardDescription className="text-xs">
-              Motivos com maior frequência e maior valor perdido no período.
+              Motivos ordenados por valor perdido, com frequência, categoria e responsabilidade da perda.
             </CardDescription>
           </CardHeader>
           <CardContent>
