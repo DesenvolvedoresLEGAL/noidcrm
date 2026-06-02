@@ -512,52 +512,9 @@ export function WinLossLossesTab({
         </Card>
       )}
 
-      {/* 9. Time-to-Loss */}
-      {(() => {
-        const dist = data.timeToLossDistribution.filter((b) => b.count > 0);
-        const totalLossesInWeeks = dist.reduce((s, b) => s + b.count, 0);
-        const hasRelevant = dist.length >= 2 && totalLossesInWeeks >= 3;
-        const topBucket = dist.length > 0
-          ? dist.reduce((a, b) => (b.count > a.count ? b : a))
-          : null;
-        // Valor perdido aproximado da semana de pico (best-effort via opportunity.created_at + weeks).
-        // Mantemos somente count para não inventar números.
-        return (
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm flex items-center gap-1.5">
-                <Clock className="h-4 w-4" /> Time-to-Loss
-              </CardTitle>
-              <CardDescription className="text-xs">
-                Em qual semana de vida os negócios morrem.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {!hasRelevant ? (
-                <div className="space-y-1">
-                  <p className="text-sm text-muted-foreground">
-                    Sem concentração relevante de perdas por semana neste período.
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Use períodos maiores para identificar em qual momento do ciclo os negócios costumam morrer.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <TimeToLossBar data={data.timeToLossDistribution} />
-                  {topBucket && (
-                    <p className="text-[11px] text-muted-foreground">
-                      Maior concentração: <span className="font-medium text-foreground">{topBucket.week}</span>
-                      {' · '}
-                      {topBucket.count} {topBucket.count === 1 ? 'perda' : 'perdas'}
-                    </p>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        );
-      })()}
+      {/* 9. Onde os Negócios Morrem — Curva de Mortalidade Comercial */}
+      <LossMortalityBlock mortality={data.lossMortality} />
+
 
       {/* 10. Tendência ou Sinais Recentes */}
       {showShortSignals ? (
@@ -754,26 +711,98 @@ function TrendCell({ delta }: { delta: number | null }) {
   );
 }
 
-function TimeToLossBar({ data }: { data: Array<{ week: string; count: number }> }) {
-  const max = Math.max(1, ...data.map((d) => d.count));
+function LossMortalityBlock({ mortality }: { mortality: WinLossDataResult['lossMortality'] }) {
+  const { buckets, totalLosses, peak, avgDays, p90Days } = mortality;
+  const hasData = totalLosses >= 3 && peak != null;
+
+  const insight = (() => {
+    if (!peak) return null;
+    if (peak.key === '0-3' || peak.key === '4-7') {
+      return 'As perdas estão concentradas no início do ciclo. Revise qualificação, velocidade de resposta e primeira abordagem.';
+    }
+    if (peak.key === '8-14' || peak.key === '15-30') {
+      return 'As perdas estão concentradas no meio do ciclo. Revise follow-up, proposta, objeções e comparação com concorrentes.';
+    }
+    return 'As perdas estão concentradas em ciclos longos. Revise estagnação, governança de follow-up e critérios de prioridade.';
+  })();
+
+  const maxCount = Math.max(1, ...buckets.map(b => b.count));
+
   return (
-    <div className="flex items-end gap-1 h-16">
-      {data.map((d) => {
-        const h = Math.round((d.count / max) * 100);
-        return (
-          <div key={d.week} className="flex-1 flex flex-col items-center gap-1">
-            <div
-              className="w-full rounded-t bg-red-500/40 hover:bg-red-500/60 transition-colors min-h-[2px]"
-              style={{ height: `${h}%` }}
-              title={`${d.week}: ${d.count}`}
-            />
-            <span className="text-[9px] text-muted-foreground truncate w-full text-center">{d.week}</span>
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm flex items-center gap-1.5">
+          <Clock className="h-4 w-4" /> Onde os Negócios Morrem
+        </CardTitle>
+        <CardDescription className="text-xs">
+          Em que fase do ciclo comercial as perdas se concentram.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {!hasData ? (
+          <div className="space-y-1 py-2">
+            <p className="text-sm text-muted-foreground">
+              Sem dados suficientes para identificar o momento da perda.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Use períodos maiores ou registre datas de perda com consistência para calcular a curva de mortalidade comercial.
+            </p>
           </div>
-        );
-      })}
+        ) : (
+          <div className="space-y-3">
+            {/* Mini KPIs */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              <MortalityKpi label="Pico de mortalidade" value={peak.label} />
+              <MortalityKpi label="Perdas no pico" value={`${peak.count} ${peak.count === 1 ? 'perda' : 'perdas'}`} />
+              <MortalityKpi label="Tempo médio até perda" value={avgDays != null ? `${avgDays} ${avgDays === 1 ? 'dia' : 'dias'}` : '—'} />
+              <MortalityKpi label="90% das perdas até" value={p90Days != null ? `${p90Days} ${p90Days === 1 ? 'dia' : 'dias'}` : '—'} />
+            </div>
+
+            {/* Faixas */}
+            <div className="space-y-1.5">
+              {buckets.map(b => {
+                const w = Math.round((b.count / maxCount) * 100);
+                const isPeak = peak && b.key === peak.key;
+                return (
+                  <div key={b.key} className="grid grid-cols-[110px_1fr_auto] items-center gap-2 text-xs">
+                    <span className={`tabular-nums ${isPeak ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>
+                      {b.label}
+                    </span>
+                    <div className="h-3 rounded bg-muted/40 overflow-hidden">
+                      <div
+                        className={`h-full rounded ${isPeak ? 'bg-red-500/70' : 'bg-red-500/35'}`}
+                        style={{ width: `${Math.max(b.count > 0 ? 4 : 0, w)}%` }}
+                      />
+                    </div>
+                    <span className="tabular-nums text-muted-foreground whitespace-nowrap">
+                      {b.count} · {b.pct}%{b.lostValue > 0 ? ` · ${fmtBRL(b.lostValue)}` : ''}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {insight && (
+              <p className="text-[11px] text-muted-foreground leading-relaxed border-l-2 border-red-500/40 pl-2">
+                <span className="font-medium text-foreground">{peak.pct}% das perdas</span> acontecem em <span className="font-medium text-foreground">{peak.label.toLowerCase()}</span>. {insight}
+              </p>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function MortalityKpi({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border border-border/40 bg-muted/20 px-2 py-1.5">
+      <p className="text-[10px] uppercase tracking-wider text-muted-foreground truncate">{label}</p>
+      <p className="text-sm font-semibold tabular-nums truncate">{value}</p>
     </div>
   );
 }
+
 
 // ── Aggregation helpers ──────────────────────────────────────────────
 interface TopReasonRow {
