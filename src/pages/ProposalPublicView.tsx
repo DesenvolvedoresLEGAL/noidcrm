@@ -1044,10 +1044,11 @@ export default function ProposalPublicView() {
     ? calculateInstallments(oneTimeTerm, baseForSchedule, {
         proposalExpiresAt: proposal?.expires_at ?? null,
         approvedAmount: proposal?.status === 'accepted' ? Number(proposal?.approved_amount ?? effectiveOneTimeAmount) : null,
-        dynamicPricingCurrentEndsAt:
-          (proposal as any)?.dynamic_pricing_enabled && dpSnapPublic?.current_ends_at
-            ? dpSnapPublic.current_ends_at
-            : null,
+        dynamicPricingCurrentEndsAt: dynamicPricingEndForInstallments(
+          proposal,
+          oneTimeTerm,
+          { snapshot: dpSnapPublic },
+        ),
       })
     : [];
 
