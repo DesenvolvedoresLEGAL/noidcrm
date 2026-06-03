@@ -321,10 +321,11 @@ export default function ProposalPublicView() {
               ((proposal as any)?.status === 'accepted' || oneTimeTerm?.discount_percent)
                 ? Number((proposal as any)?.approved_amount ?? oneTimeAmountForPdf)
                 : null,
-            dynamicPricingCurrentEndsAt:
-              (proposal as any)?.dynamic_pricing_enabled && dpSnapForPdf?.current_ends_at
-                ? dpSnapForPdf.current_ends_at
-                : null,
+            dynamicPricingCurrentEndsAt: dynamicPricingEndForInstallments(
+              proposal,
+              oneTimeTerm,
+              { snapshot: dpSnapForPdf },
+            ),
           })
         : [];
       
