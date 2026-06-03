@@ -478,6 +478,9 @@ export function useWinLossData(organizationId: string | undefined, pipelineId: s
         }))
         .sort((a, b) => b.count - a.count);
 
+      // 11. Won by stage at acceptance — fonte: snapshot via opportunity_stage_history + proposals.accepted_at
+      const wonStageBreakdown = await buildWonStageBreakdown(wins);
+
       return {
         wins, losses, allDeals,
         wonCount: wins.length, lostCount: losses.length,
@@ -495,6 +498,7 @@ export function useWinLossData(organizationId: string | undefined, pipelineId: s
         avgCycleWon, avgCycleLost,
         validWinCyclesCount: validWinCycles.length, validLossCyclesCount: validLossCycles.length,
         monthlyPulse, timeToLossDistribution, lossMortality,
+        wonStageBreakdown,
       };
 
     },
@@ -516,8 +520,138 @@ function emptyResult(): WinLossDataResult {
     validWinCyclesCount: 0, validLossCyclesCount: 0,
     monthlyPulse: [], timeToLossDistribution: [],
     lossMortality: { buckets: [], totalLosses: 0, totalValue: 0, peak: null, avgDays: null, p90Days: null },
+    wonStageBreakdown: [],
   };
 }
+
+// ─── Won by stage at acceptance ─────────────────────────────────────
+// Sprint WL-WINS-02. Prioridade: (1) última mudança de etapa <= accepted_at
+// da proposta aceita; (2) última mudança de etapa registrada; (3) stage_id
+// atual da oportunidade (marcado como fallback).
+async function buildWonStageBreakdown(wins: WinLossDeal[]): Promise<WonStageRow[]> {
+  if (!wins || wins.length === 0) return [];
+
+  const wonOppIds = wins.map(w => w.opportunity_id);
+  const acceptedProposalIds = wins
+    .map(w => (w.opportunity as any)?.accepted_proposal_id)
+    .filter(Boolean) as string[];
+
+  // accepted_at per opportunity
+  const acceptedAtMap = new Map<string, string>();
+  if (acceptedProposalIds.length > 0) {
+    const { data: props } = await supabase
+      .from('proposals')
+      .select('id, opportunity_id, accepted_at')
+      .in('id', acceptedProposalIds);
+    props?.forEach(p => {
+      if (p.opportunity_id && p.accepted_at) acceptedAtMap.set(p.opportunity_id, p.accepted_at);
+    });
+  }
+
+  // stage history per opportunity (asc by changed_at)
+  const stageHistoryByOpp = new Map<string, Array<{ stage_id: string; changed_at: string }>>();
+  const { data: history } = await supabase
+    .from('opportunity_stage_history')
+    .select('opportunity_id, to_stage_id, changed_at')
+    .in('opportunity_id', wonOppIds)
+    .order('changed_at', { ascending: true });
+  history?.forEach(h => {
+    const arr = stageHistoryByOpp.get(h.opportunity_id) || [];
+    arr.push({ stage_id: h.to_stage_id, changed_at: h.changed_at });
+    stageHistoryByOpp.set(h.opportunity_id, arr);
+  });
+
+  // collect candidate stage ids
+  const stageIds = new Set<string>();
+  wins.forEach(w => {
+    const sid = (w.opportunity as any)?.stage_id;
+    if (sid) stageIds.add(sid);
+  });
+  stageHistoryByOpp.forEach(arr => arr.forEach(e => { if (e.stage_id) stageIds.add(e.stage_id); }));
+
+  const stageNameMap = new Map<string, string>();
+  if (stageIds.size > 0) {
+    const { data: stages } = await supabase
+      .from('stages')
+      .select('id, name')
+      .in('id', [...stageIds] as string[]);
+    stages?.forEach(s => stageNameMap.set(s.id, s.name));
+  }
+
+  interface StageAgg {
+    stageId: string;
+    stageName: string;
+    count: number;
+    value: number;
+    cycles: number[];
+    reasons: Map<string, number>;
+    fallbackCount: number;
+  }
+  const aggMap = new Map<string, StageAgg>();
+
+  for (const w of wins) {
+    const opp = w.opportunity || {};
+    const acceptedAt = acceptedAtMap.get(w.opportunity_id);
+    const hist = stageHistoryByOpp.get(w.opportunity_id) || [];
+    let resolvedStageId: string | null = null;
+    let isFallback = false;
+
+    if (acceptedAt && hist.length > 0) {
+      const acceptedTs = new Date(acceptedAt).getTime();
+      for (let i = hist.length - 1; i >= 0; i--) {
+        if (new Date(hist[i].changed_at).getTime() <= acceptedTs) {
+          resolvedStageId = hist[i].stage_id;
+          break;
+        }
+      }
+    }
+    if (!resolvedStageId && hist.length > 0) {
+      resolvedStageId = hist[hist.length - 1].stage_id;
+    }
+    if (!resolvedStageId && opp.stage_id) {
+      resolvedStageId = opp.stage_id;
+      isFallback = true;
+    }
+
+    const key = resolvedStageId || '__unknown__';
+    const name = resolvedStageId
+      ? (stageNameMap.get(resolvedStageId) || 'Etapa não informada')
+      : 'Etapa não informada';
+    const e = aggMap.get(key) || {
+      stageId: key,
+      stageName: name,
+      count: 0,
+      value: 0,
+      cycles: [],
+      reasons: new Map(),
+      fallbackCount: 0,
+    };
+    e.count++;
+    e.value += Number(w.final_value) || 0;
+    if (w.sales_cycle_days > 0) e.cycles.push(w.sales_cycle_days);
+    const reason = w.win_reason_name
+      || (w.acceptor_name && !w.win_reason_id ? 'Sem motivo selecionado' : 'Não informado');
+    e.reasons.set(reason, (e.reasons.get(reason) || 0) + 1);
+    if (isFallback) e.fallbackCount++;
+    aggMap.set(key, e);
+  }
+
+  return [...aggMap.values()]
+    .map(e => ({
+      stageId: e.stageId,
+      stageName: e.stageName,
+      count: e.count,
+      value: e.value,
+      avgTicket: e.count > 0 ? Math.round(e.value / e.count) : 0,
+      avgCycle: e.cycles.length > 0
+        ? Math.round(e.cycles.reduce((s, c) => s + c, 0) / e.cycles.length)
+        : 0,
+      topDriver: [...e.reasons.entries()].sort((a, b) => b[1] - a[1])[0]?.[0],
+      fallbackCount: e.fallbackCount,
+    }))
+    .sort((a, b) => b.value - a.value || b.count - a.count);
+}
+
 
 // ─── Curva de Mortalidade Comercial ─────────────────────────────────
 const MORTALITY_BUCKET_DEFS: Array<{ key: LossMortalityBucket['key']; label: string; min: number; max: number }> = [
