@@ -43,6 +43,9 @@ export default function Forecast() {
     pipelineFound,
     requiresConfiguration,
     isLoading: salesPipelineLoading,
+    isFetching: salesPipelineFetching,
+    isResolved: salesPipelineResolved,
+    isError: salesPipelineError,
   } = useForecastSalesPipeline({ organizationId: organization?.id ?? null });
 
   // Trava filters.pipelineId no pipeline oficial assim que resolvido
@@ -57,8 +60,16 @@ export default function Forecast() {
     [filters, salesPipelineId],
   );
 
+  // F2.10.2 — só rodar useForecastData quando pipeline oficial estiver resolvido
+  // e existir (evita disparar com pipelineId null e gerar empty state indevido)
+  const forecastEnabled = salesPipelineResolved && Boolean(salesPipelineId);
   const { kpis, scenarios, opportunities, sellerForecasts, isLoading, isFetching, dataUpdatedAt, refetch } =
-    useForecastData(effectiveFilters);
+    useForecastData(effectiveFilters, { enabled: forecastEnabled });
+
+  // F2.10.2 — estados de renderização do pipeline oficial
+  const showPipelineLoading = salesPipelineLoading || (!salesPipelineResolved && salesPipelineFetching);
+  const showPipelineError = salesPipelineResolved && salesPipelineError;
+  const showPipelineMissing = salesPipelineResolved && !salesPipelineError && requiresConfiguration;
 
   return (
     <Layout>
