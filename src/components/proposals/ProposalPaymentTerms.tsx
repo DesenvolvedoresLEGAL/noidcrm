@@ -40,6 +40,7 @@ import { formatDateBR } from '@/lib/dateUtils';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { useProposalDynamicPricingSnapshot } from '@/hooks/proposals/useProposalDynamicPricing';
+import { dynamicPricingEndForInstallments } from '@/lib/proposals/resolvePaymentDueDate';
 import { DynamicPricingMismatchAlert } from './DynamicPricingMismatchAlert';
 
 const PAYMENT_METHODS = [
