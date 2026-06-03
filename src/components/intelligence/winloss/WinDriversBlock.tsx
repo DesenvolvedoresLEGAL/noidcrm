@@ -73,13 +73,13 @@ export function WinDriversBlock({ data }: Props) {
         value,
         pct: totalWins > 0 ? Math.round((count / totalWins) * 100) : 0,
       }))
-      .sort((a, b) => b.count - a.count);
+      .sort((a, b) => b.count - a.count || b.value - a.value);
 
     return {
       totalRevenue,
       totalWins,
       principal: rankedReasons[0] || null,
-      top3: rankedReasons.slice(0, 3),
+      topDrivers: rankedReasons.slice(0, 6),
       differentiators: [...diffMap.entries()]
         .map(([label, count]) => ({ label, count }))
         .sort((a, b) => b.count - a.count)
@@ -87,7 +87,7 @@ export function WinDriversBlock({ data }: Props) {
     };
   }, [data]);
 
-  if (!aggregates || aggregates.top3.length === 0) return null;
+  if (!aggregates || aggregates.topDrivers.length === 0) return null;
 
   const principal = aggregates.principal;
 
@@ -145,10 +145,10 @@ export function WinDriversBlock({ data }: Props) {
           {/* Top 3 drivers */}
           <div>
             <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-2">
-              Top 3 drivers
+              Top 6 drivers
             </p>
             <div className="space-y-2">
-              {aggregates.top3.map((r) => (
+              {aggregates.topDrivers.map((r) => (
                 <div
                   key={r.reason}
                   className="flex items-center justify-between gap-2 text-sm rounded-md border border-border/60 bg-background/40 px-2.5 py-1.5"
