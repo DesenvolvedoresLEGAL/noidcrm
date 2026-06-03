@@ -1426,7 +1426,7 @@ export default function ProposalPublicView() {
                                     {(item as any).quantity_points} {(item as any).quantity_points === 1 ? 'pt' : 'pts'} × {(item as any).billing_days} {(item as any).billing_days === 1 ? 'diária' : 'diárias'}
                                   </span>
                                 ) : (
-                                  item.quantity
+                                  <span className="whitespace-nowrap">{formatProposalQuantity(item.quantity, (item as any).measurement_unit)}</span>
                                 )}
                               </td>
                               <td className="text-right py-3 px-2 md:py-4 md:px-4 text-sm hidden sm:table-cell">
