@@ -51,6 +51,7 @@ import { getProposalByToken, declineProposal, trackView } from '@/services/crm/p
 import { getProposalPricingSummary } from '@/lib/proposals/pricingLedger';
 import { ProposalPricingBreakdown } from '@/components/proposals/ProposalPricingBreakdown';
 import { listProposalItems } from '@/services/crm/proposal-items';
+import { formatProposalQuantity } from '@/lib/proposals/formatProposalQuantity';
 import { getPaymentTerms, calculateInstallments } from '@/services/crm/proposal-payment-terms';
 import { PublicProposalApprovedScreen } from '@/components/proposals/PublicProposalApprovedScreen';
 import { supabase } from '@/integrations/supabase/client';
