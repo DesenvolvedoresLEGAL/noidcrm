@@ -266,25 +266,20 @@ export function WinLossWinsTab({ data, isLoading, ssotWon }: Props) {
         </Card>
       )}
 
-      {/* 7. Vitórias por Segmento / Pipeline */}
-      {(agg.segmentBreakdown.length > 0 || agg.pipelineBreakdown.length > 0) && (
-        <div className="grid md:grid-cols-2 gap-4">
-          {agg.segmentBreakdown.length > 0 && (
-            <BreakdownCard
-              title="Vitórias por segmento"
-              icon={Layers}
-              rows={agg.segmentBreakdown}
-            />
-          )}
-          {agg.pipelineBreakdown.length > 0 && (
-            <BreakdownCard
-              title="Vitórias por pipeline"
-              icon={Layers}
-              rows={agg.pipelineBreakdown}
-            />
-          )}
+      {/* 7. Vitórias por Segmento */}
+      {agg.segmentBreakdown.length > 0 && (
+        <div className="grid md:grid-cols-1 gap-4">
+          <BreakdownCard
+            title="Vitórias por segmento"
+            icon={Layers}
+            rows={agg.segmentBreakdown}
+          />
         </div>
       )}
+
+      {/* 7b. Vitórias por etapa do pipeline (Sprint WL-WINS-02) */}
+      <WonByStageCard rows={data.wonStageBreakdown} />
+
 
       {/* 8. Padrões de Proposta Vencedora */}
       <Card>
@@ -323,8 +318,8 @@ export function WinLossWinsTab({ data, isLoading, ssotWon }: Props) {
               }
             />
             <PatternCell
-              label="Pipeline líder"
-              value={agg.pipelineBreakdown[0]?.label || '—'}
+              label="Etapa líder no aceite"
+              value={data.wonStageBreakdown[0]?.stageName || '—'}
             />
           </div>
         </CardContent>
