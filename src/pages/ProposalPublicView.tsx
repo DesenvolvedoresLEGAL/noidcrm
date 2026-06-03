@@ -1576,7 +1576,7 @@ export default function ProposalPublicView() {
                                   )}
                                 </div>
                               </td>
-                              <td className="text-center py-3 px-2 md:py-4 md:px-4 text-sm">{item.quantity}</td>
+                              <td className="text-center py-3 px-2 md:py-4 md:px-4 text-sm whitespace-nowrap">{formatProposalQuantity(item.quantity, (item as any).measurement_unit)}</td>
                               <td className="text-right py-3 px-2 md:py-4 md:px-4 text-sm hidden sm:table-cell">{formatCurrency(item.unit_price)}/mês</td>
                               {hasRecurringItemDiscounts && (
                                 <td className="text-right py-3 px-2 md:py-4 md:px-4 text-sm hidden sm:table-cell">
