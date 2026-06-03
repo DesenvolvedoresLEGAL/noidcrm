@@ -40,6 +40,7 @@ import { formatDateBR } from '@/lib/dateUtils';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { useProposalDynamicPricingSnapshot } from '@/hooks/proposals/useProposalDynamicPricing';
+import { dynamicPricingEndForInstallments } from '@/lib/proposals/resolvePaymentDueDate';
 import { DynamicPricingMismatchAlert } from './DynamicPricingMismatchAlert';
 
 const PAYMENT_METHODS = [
@@ -440,7 +441,13 @@ export function ProposalPaymentTerms({
   };
 
   const installments = calculateInstallments(oneTimeTerm as PaymentTerm, effectiveOneTimeTotal, {
-    dynamicPricingCurrentEndsAt: dynamicCurrentEndsAt,
+    dynamicPricingCurrentEndsAt: dynamicPricingEndForInstallments(
+      // Não temos o objeto completo da proposta aqui; passamos um shape mínimo
+      // com a flag + snapshot vivo para o helper resolver via tier vigente.
+      { dynamic_pricing_enabled: !!(dpSnapshot as any)?.enabled, dynamic_pricing_snapshot: dpSnapshot ?? null },
+      oneTimeTerm,
+      { snapshot: dpSnapshot as any },
+    ) ?? dynamicCurrentEndsAt,
   });
 
   const formatCurrency = (value: number) => {

@@ -9,6 +9,7 @@ import { FileText, Eye, Package, CreditCard } from 'lucide-react';
 import { ProposalItem } from '@/services/crm/proposal-items';
 import { formatProposalQuantity } from '@/lib/proposals/formatProposalQuantity';
 import { PaymentTerm, calculateInstallments } from '@/services/crm/proposal-payment-terms';
+import { dynamicPricingEndForInstallments } from '@/lib/proposals/resolvePaymentDueDate';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { PublicProposalDynamicPricingBanner } from './PublicProposalDynamicPricingBanner';
@@ -450,8 +451,11 @@ export function ProposalPreview({
                       const dpSnap: any = (dynamicPricing as any)?.dynamic_pricing_snapshot ?? null;
                       const dpEnabled = !!(dynamicPricing as any)?.dynamic_pricing_enabled;
                       const schedule = calculateInstallments(term, effectiveOneTimeBase, {
-                        dynamicPricingCurrentEndsAt:
-                          dpEnabled && dpSnap?.current_ends_at ? dpSnap.current_ends_at : null,
+                        dynamicPricingCurrentEndsAt: dynamicPricingEndForInstallments(
+                          { ...(dynamicPricing as any), dynamic_pricing_enabled: dpEnabled, dynamic_pricing_snapshot: dpSnap },
+                          term,
+                          { snapshot: dpSnap },
+                        ),
                       });
                       return (
                         <div className="space-y-2">

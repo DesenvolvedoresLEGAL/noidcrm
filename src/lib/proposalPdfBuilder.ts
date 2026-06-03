@@ -1,5 +1,6 @@
 import { ProposalItem } from '@/services/crm/proposal-items';
 import { PaymentTerm, calculateInstallments } from '@/services/crm/proposal-payment-terms';
+import { dynamicPricingEndForInstallments } from '@/lib/proposals/resolvePaymentDueDate';
 import { extractEmail, extractPhone } from '@/lib/contactFormat';
 
 export interface ProposalPDFData {
@@ -168,10 +169,11 @@ export function buildProposalPDFData(
     const calc = calculateInstallments(oneTimeTerm, effectiveOneTimeAmount, {
       proposalExpiresAt: proposal?.expires_at ?? null,
       approvedAmount: isAccepted ? Number(proposal?.approved_amount ?? effectiveOneTimeAmount) : null,
-      dynamicPricingCurrentEndsAt:
-        (proposal as any)?.dynamic_pricing_enabled && dpSnap?.current_ends_at
-          ? dpSnap.current_ends_at
-          : null,
+      dynamicPricingCurrentEndsAt: dynamicPricingEndForInstallments(
+        proposal,
+        oneTimeTerm,
+        { snapshot: dpSnap },
+      ),
     });
     for (const inst of calc) {
       installments.push({
