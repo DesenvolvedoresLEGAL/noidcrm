@@ -65,6 +65,7 @@ import { useProposalEngagementTracker } from '@/hooks/useProposalEngagementTrack
 import { PublicProposalDynamicPricingBanner } from '@/components/proposals/PublicProposalDynamicPricingBanner';
 import { getDynamicPricingBreakdown, formatDateTime as formatDpDateTime } from '@/lib/proposals/dynamicPricing';
 import { getEffectiveAmount } from '@/lib/proposals/effectiveAmount';
+import { dynamicPricingEndForInstallments } from '@/lib/proposals/resolvePaymentDueDate';
 
 // Fallback decline reasons (used if organization has none configured)
 const FALLBACK_DECLINE_REASONS = [
