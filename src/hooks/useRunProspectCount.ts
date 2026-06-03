@@ -1,15 +1,31 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useVisibilityAwareInterval } from '@/lib/visibilityPolling';
 
 /**
  * Returns the REAL count of prospects persisted for a given playbook_run_id.
  * This is more reliable than reading the cached `stats.persisted_prospects` field,
  * which may be stale if the run was interrupted mid-batch.
+ *
+ * SPRINT PERF 0.6B:
+ *  - Polling interval raised from 5s → 15s for live runs.
+ *  - Polling pauses when the tab is hidden (document.hidden=true) and
+ *    refetches immediately on visibilitychange→visible.
  */
 export function useRunProspectCount(runId: string | null | undefined, isLive: boolean = false) {
+  const queryClient = useQueryClient();
+  const queryKey = ['run-prospect-count', runId];
+
+  const interval = useVisibilityAwareInterval(15_000, {
+    enabled: isLive,
+    onVisible: () => {
+      if (runId) queryClient.invalidateQueries({ queryKey });
+    },
+  });
+
   return useQuery({
-    queryKey: ['run-prospect-count', runId],
+    queryKey,
     queryFn: async () => {
       if (!runId) return 0;
       const { count, error } = await supabase
@@ -23,8 +39,7 @@ export function useRunProspectCount(runId: string | null | undefined, isLive: bo
       return count ?? 0;
     },
     enabled: !!runId,
-    // Refetch every 5s for live runs so the user sees real progress
-    refetchInterval: isLive ? 5000 : false,
+    refetchInterval: interval,
     staleTime: isLive ? 0 : 30_000,
   });
 }
