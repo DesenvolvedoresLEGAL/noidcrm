@@ -73,13 +73,13 @@ export function WinDriversBlock({ data }: Props) {
         value,
         pct: totalWins > 0 ? Math.round((count / totalWins) * 100) : 0,
       }))
-      .sort((a, b) => b.count - a.count);
+      .sort((a, b) => b.count - a.count || b.value - a.value);
 
     return {
       totalRevenue,
       totalWins,
       principal: rankedReasons[0] || null,
-      top3: rankedReasons.slice(0, 3),
+      topDrivers: rankedReasons.slice(0, 6),
       differentiators: [...diffMap.entries()]
         .map(([label, count]) => ({ label, count }))
         .sort((a, b) => b.count - a.count)
@@ -87,7 +87,7 @@ export function WinDriversBlock({ data }: Props) {
     };
   }, [data]);
 
-  if (!aggregates || aggregates.top3.length === 0) return null;
+  if (!aggregates || aggregates.topDrivers.length === 0) return null;
 
   const principal = aggregates.principal;
 
