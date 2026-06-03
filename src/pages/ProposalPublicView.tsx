@@ -51,6 +51,7 @@ import { getProposalByToken, declineProposal, trackView } from '@/services/crm/p
 import { getProposalPricingSummary } from '@/lib/proposals/pricingLedger';
 import { ProposalPricingBreakdown } from '@/components/proposals/ProposalPricingBreakdown';
 import { listProposalItems } from '@/services/crm/proposal-items';
+import { formatProposalQuantity } from '@/lib/proposals/formatProposalQuantity';
 import { getPaymentTerms, calculateInstallments } from '@/services/crm/proposal-payment-terms';
 import { PublicProposalApprovedScreen } from '@/components/proposals/PublicProposalApprovedScreen';
 import { supabase } from '@/integrations/supabase/client';
@@ -1426,7 +1427,7 @@ export default function ProposalPublicView() {
                                     {(item as any).quantity_points} {(item as any).quantity_points === 1 ? 'pt' : 'pts'} × {(item as any).billing_days} {(item as any).billing_days === 1 ? 'diária' : 'diárias'}
                                   </span>
                                 ) : (
-                                  item.quantity
+                                  <span className="whitespace-nowrap">{formatProposalQuantity(item.quantity, (item as any).measurement_unit)}</span>
                                 )}
                               </td>
                               <td className="text-right py-3 px-2 md:py-4 md:px-4 text-sm hidden sm:table-cell">
@@ -1575,7 +1576,7 @@ export default function ProposalPublicView() {
                                   )}
                                 </div>
                               </td>
-                              <td className="text-center py-3 px-2 md:py-4 md:px-4 text-sm">{item.quantity}</td>
+                              <td className="text-center py-3 px-2 md:py-4 md:px-4 text-sm whitespace-nowrap">{formatProposalQuantity(item.quantity, (item as any).measurement_unit)}</td>
                               <td className="text-right py-3 px-2 md:py-4 md:px-4 text-sm hidden sm:table-cell">{formatCurrency(item.unit_price)}/mês</td>
                               {hasRecurringItemDiscounts && (
                                 <td className="text-right py-3 px-2 md:py-4 md:px-4 text-sm hidden sm:table-cell">

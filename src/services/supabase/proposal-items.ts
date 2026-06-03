@@ -18,6 +18,7 @@ export interface ProposalItem {
   image_url?: string;
   characteristics?: string[];
   measurement_unit_id?: string;
+  measurement_unit?: { id: string; name: string; abbreviation: string } | null;
   billing_type?: 'one_time' | 'recurring' | 'point_day';
   counts_for_commission?: boolean;
   // Point-day fields
@@ -32,7 +33,7 @@ export interface ProposalItem {
 export async function listProposalItems(proposalId: string): Promise<ProposalItem[]> {
   const { data, error } = await supabase
     .from('proposal_items')
-    .select('id, proposal_id, organization_id, product_id, order_index, name, description, quantity, unit_cost, markup_percent, unit_price, ipi_percent, discount_percent, total, image_url, characteristics, measurement_unit_id, billing_type, counts_for_commission, minimum_contract_months, quantity_points, billing_days, unit_price_point_day, created_at, updated_at')
+    .select('id, proposal_id, organization_id, product_id, order_index, name, description, quantity, unit_cost, markup_percent, unit_price, ipi_percent, discount_percent, total, image_url, characteristics, measurement_unit_id, billing_type, counts_for_commission, minimum_contract_months, quantity_points, billing_days, unit_price_point_day, created_at, updated_at, measurement_unit:measurement_units(id, name, abbreviation)')
     .eq('proposal_id', proposalId)
     .order('order_index', { ascending: true });
 
