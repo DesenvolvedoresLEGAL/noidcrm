@@ -307,6 +307,13 @@ export function useUnifiedInbox(options: { active?: boolean } = {}) {
   // Realtime invalidation — só assina quando inbox está ativa (Sheet aberta).
   // Quando o Sheet abre, o canal monta e invalida; quando fecha, desmonta o WS.
   // O badge continua reagindo via refetchOnFocus + staleTime do v2.
+  //
+  // SPRINT PERF 0.6B:
+  //  - Removida assinatura redundante da tabela legada `notifications` (v1);
+  //    v2 é a fonte canônica (Unified Inbox single source). v1 raramente
+  //    recebe writes novos e ainda é lido por refetchOnFocus.
+  //  - Invalida também `notif-history` para que a página de histórico
+  //    reaja quando a Sheet do inbox estiver aberta sem manter dois canais.
   useEffect(() => {
     if (!userId || !active) return;
     const channel = supabase
@@ -314,12 +321,10 @@ export function useUnifiedInbox(options: { active?: boolean } = {}) {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'notifications_v2', filter: `user_id=eq.${userId}` },
-        () => invalidate(),
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` },
-        () => invalidate(),
+        () => {
+          invalidate();
+          queryClient.invalidateQueries({ queryKey: ['notif-history'] });
+        },
       )
       .subscribe();
     return () => {

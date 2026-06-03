@@ -59,6 +59,7 @@ export default function Opportunities() {
     queryFn: () => listOpportunities({
       pipeline_id: selectedPipelineId,
       owner_user_ids: visibleUserIds || undefined,
+      projection: 'kanban', // SPRINT PERF 0.6B — payload menor para o board
     }),
     enabled: !!selectedPipelineId && (visibleUserIds !== undefined || visibleUserIds === null),
   });

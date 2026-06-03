@@ -417,7 +417,9 @@ export function useNotificationsHistory(filters: HistoryFilters) {
     },
   });
 
-  // Realtime
+  // Realtime — único canal v2 mantido para a página de histórico.
+  // SPRINT PERF 0.6B: invalida também `unified-inbox` para evitar que
+  // outro consumidor precise manter canal próprio em paralelo.
   useEffect(() => {
     if (!userId) return;
     const channel = supabase
@@ -425,7 +427,10 @@ export function useNotificationsHistory(filters: HistoryFilters) {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'notifications_v2', filter: `user_id=eq.${userId}` },
-        () => invalidate(),
+        () => {
+          invalidate();
+          invalidateInbox();
+        },
       )
       .subscribe();
     return () => {
