@@ -16,6 +16,8 @@ import { useOrganizationUsers } from '@/hooks/useOrganizationUsers';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useRealtimeOpportunities } from '@/hooks/useRealtimeOpportunities';
 import { opportunityKeys } from '@/lib/query-keys';
+// SPRINT PERF 0.6B.1 — registra `window.__kanbanProjectionAudit()` em dev p/ diff de shape
+import '@/lib/devKanbanProjectionAudit';
 
 export default function Opportunities() {
   const navigate = useNavigate();
@@ -54,14 +56,17 @@ export default function Opportunities() {
   });
 
   // React Query: opportunities
-  // P0 rollback: projection:'kanban' removida temporariamente — alguma coluna
-  // não enumerada estava sendo lida por filtro/grupo do Kanban e fazia os
-  // cards sumirem. Voltamos ao select('*') seguro enquanto reavaliamos.
+  // SPRINT PERF 0.6B.1 — `projection:'kanban'` reativada após validar todas as 28
+  // colunas contra information_schema (P0 caiu por `stage_entered_at` que não existe).
+  // Diff completo: src/lib/devKanbanProjectionAudit.ts (window.__kanbanProjectionAudit).
+  // Campos derivados (account_name/contact_*/owner_*/pending_activities_count/
+  // days_in_stage/stagnation_alert_days) seguem populados pelo mapper de listOpportunities.
   const { data: opportunitiesData, isLoading: oppsLoading } = useQuery({
     queryKey: opportunitiesQueryKey,
     queryFn: () => listOpportunities({
       pipeline_id: selectedPipelineId,
       owner_user_ids: visibleUserIds || undefined,
+      projection: 'kanban',
     }),
     enabled: !!selectedPipelineId && (visibleUserIds !== undefined || visibleUserIds === null),
   });
