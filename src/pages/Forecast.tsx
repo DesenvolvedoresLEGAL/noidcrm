@@ -122,13 +122,34 @@ export default function Forecast() {
           isFetching={isFetching}
           dataUpdatedAt={dataUpdatedAt}
           salesPipelineName={salesPipelineName}
-          salesPipelineMissing={!salesPipelineLoading && requiresConfiguration}
+          salesPipelineMissing={showPipelineMissing}
+          salesPipelineLoading={showPipelineLoading}
         />
 
         <RevenueSsotBanner variant="migrated" surface="Forecast — Receita Fechada líquida de cancelamentos (commercial_won_revenue_view), alinhada a Relatórios → Vendas Realizadas" />
 
-        {/* Sprint F2.10 — Estado vazio quando não há pipeline oficial de vendas */}
-        {!salesPipelineLoading && !pipelineFound ? (
+        {/* F2.10.2 — Loading premium do pipeline oficial (evita flash falso de "não configurado") */}
+        {showPipelineLoading ? (
+          <Card className="border-border/50">
+            <CardContent className="py-10 text-center space-y-3">
+              <div className="h-10 w-10 mx-auto rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
+              <h3 className="text-lg font-semibold">Carregando Forecast de Vendas</h3>
+              <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                Localizando o pipeline oficial de vendas e preparando os dados do período.
+              </p>
+            </CardContent>
+          </Card>
+        ) : showPipelineError ? (
+          <Card className="border-amber-500/30 bg-amber-500/5">
+            <CardContent className="py-10 text-center space-y-2">
+              <AlertTriangle className="h-10 w-10 mx-auto text-amber-500" />
+              <h3 className="text-lg font-semibold">Não foi possível localizar o pipeline de vendas agora</h3>
+              <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                Tente recarregar a página. Se o problema persistir, contate o suporte.
+              </p>
+            </CardContent>
+          </Card>
+        ) : showPipelineMissing || !pipelineFound ? (
           <Card className="border-amber-500/30 bg-amber-500/5">
             <CardContent className="py-10 text-center space-y-2">
               <AlertTriangle className="h-10 w-10 mx-auto text-amber-500" />
