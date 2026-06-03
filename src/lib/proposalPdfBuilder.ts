@@ -1,5 +1,6 @@
 import { ProposalItem } from '@/services/crm/proposal-items';
 import { PaymentTerm, calculateInstallments } from '@/services/crm/proposal-payment-terms';
+import { dynamicPricingEndForInstallments } from '@/lib/proposals/resolvePaymentDueDate';
 import { extractEmail, extractPhone } from '@/lib/contactFormat';
 
 export interface ProposalPDFData {
