@@ -19,11 +19,13 @@ interface Params {
 }
 
 export function useForecastSalesPipeline({ organizationId, enabled = true }: Params) {
+  const queryEnabled = Boolean(enabled && organizationId);
   const query = useQuery({
     queryKey: ['forecast-sales-pipeline-v2', organizationId],
-    enabled: Boolean(enabled && organizationId),
+    enabled: queryEnabled,
     staleTime: 10 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
+    placeholderData: (prev) => prev,
     queryFn: async (): Promise<ForecastSalesPipelineInfo> => {
       const { data, error } = await supabase.rpc(
         'get_forecast_sales_pipeline_v2' as never,
@@ -42,14 +44,21 @@ export function useForecastSalesPipeline({ organizationId, enabled = true }: Par
   });
 
   const info = query.data ?? null;
+  // F2.10.2 — isResolved só vira true após a RPC concluir.
+  // Enquanto loading inicial, requiresConfiguration permanece false para
+  // evitar flash falso de "Pipeline de vendas não configurado".
+  const isResolved = queryEnabled && !query.isLoading && (query.isSuccess || query.isError);
 
   return {
     salesPipelineId: info?.pipeline_id ?? null,
     salesPipelineName: info?.pipeline_name ?? null,
     pipelineFound: info?.pipeline_found ?? false,
-    requiresConfiguration: info?.requires_configuration ?? false,
+    requiresConfiguration: isResolved ? Boolean(info?.requires_configuration) : false,
     resolutionReason: info?.resolution_reason ?? null,
     isLoading: query.isLoading,
+    isFetching: query.isFetching,
+    isResolved,
+    isError: query.isError,
     error: query.error as Error | null,
     refetch: query.refetch,
   };
