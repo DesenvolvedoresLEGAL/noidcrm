@@ -18,8 +18,10 @@ interface ForecastFiltersProps {
   dataUpdatedAt?: number;
   /** Sprint F2.10 — official sales pipeline (read-only badge) */
   salesPipelineName?: string | null;
-  /** Sprint F2.10 — true when no sales pipeline could be resolved */
+  /** Sprint F2.10 — true when no sales pipeline could be resolved (post-resolution only) */
   salesPipelineMissing?: boolean;
+  /** F2.10.2 — true while resolving the official sales pipeline */
+  salesPipelineLoading?: boolean;
 }
 
 export function ForecastFilters({
@@ -31,6 +33,7 @@ export function ForecastFilters({
   dataUpdatedAt,
   salesPipelineName,
   salesPipelineMissing,
+  salesPipelineLoading,
 }: ForecastFiltersProps) {
   const { data: team } = useQuery({
     queryKey: ['team-members-sales-cs'],
