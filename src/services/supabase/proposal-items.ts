@@ -18,6 +18,7 @@ export interface ProposalItem {
   image_url?: string;
   characteristics?: string[];
   measurement_unit_id?: string;
+  measurement_unit?: { id: string; name: string; abbreviation: string } | null;
   billing_type?: 'one_time' | 'recurring' | 'point_day';
   counts_for_commission?: boolean;
   // Point-day fields
