@@ -9,6 +9,7 @@ import { FileText, Eye, Package, CreditCard } from 'lucide-react';
 import { ProposalItem } from '@/services/crm/proposal-items';
 import { formatProposalQuantity } from '@/lib/proposals/formatProposalQuantity';
 import { PaymentTerm, calculateInstallments } from '@/services/crm/proposal-payment-terms';
+import { dynamicPricingEndForInstallments } from '@/lib/proposals/resolvePaymentDueDate';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { PublicProposalDynamicPricingBanner } from './PublicProposalDynamicPricingBanner';
