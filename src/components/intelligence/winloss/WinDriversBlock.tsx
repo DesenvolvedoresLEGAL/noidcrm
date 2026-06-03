@@ -145,10 +145,10 @@ export function WinDriversBlock({ data }: Props) {
           {/* Top 3 drivers */}
           <div>
             <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-2">
-              Top 3 drivers
+              Top 6 drivers
             </p>
             <div className="space-y-2">
-              {aggregates.top3.map((r) => (
+              {aggregates.topDrivers.map((r) => (
                 <div
                   key={r.reason}
                   className="flex items-center justify-between gap-2 text-sm rounded-md border border-border/60 bg-background/40 px-2.5 py-1.5"
