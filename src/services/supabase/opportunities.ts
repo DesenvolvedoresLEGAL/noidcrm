@@ -22,6 +22,21 @@ const opportunitySchema = z.object({
   owner_user_id: z.string().uuid('ID de proprietário inválido').optional(),
 }).passthrough();
 
+// SPRINT PERF 0.6B — Explicit column list used by the Kanban (and any
+// consumer that opts-in via `projection: 'kanban'`). Covers every field
+// read by OpportunityCard/KanbanColumn/KanbanBoard plus the FKs and
+// timestamps required by the mapping below. Backward-compatible default
+// remains '*' for callers that haven't opted in.
+const KANBAN_OPPORTUNITY_COLUMNS = [
+  'id', 'title', 'status', 'pipeline_id', 'stage_id', 'owner_user_id',
+  'account_id', 'contact_id', 'produto', 'valor_previsto', 'prob',
+  'temperature', 'temperatura', 'close_date_prevista', 'stage_entered_at',
+  'created_at', 'updated_at', 'deleted_at',
+  'engagement_score', 'velocity_score', 'risk_score',
+  'opportunity_score', 'win_probability_ai',
+  'nrhs_score', 'nrhs_tier', 'nrhs_issues_count', 'nrhs_blockers',
+].join(', ');
+
 export async function listOpportunities(params: {
   pipeline_id?: string;
   stage_id?: string;
@@ -31,6 +46,8 @@ export async function listOpportunities(params: {
   exclude_closed?: boolean;
   limit?: number;
   offset?: number;
+  /** SPRINT PERF 0.6B — opt-in narrow projection. Defaults to '*' for backward compatibility. */
+  projection?: 'kanban' | 'full';
 } = {}): Promise<{ data: Opportunity[]; total: number }> {
   // Performance: avoid `count: 'exact'` (full second pass) and cap rows.
   // The Kanban can render thousands of cards; with an unbounded query the
@@ -38,10 +55,12 @@ export async function listOpportunities(params: {
   const limit = Math.min(Math.max(params.limit ?? 500, 1), 1000);
   const offset = Math.max(params.offset ?? 0, 0);
 
+  const oppColumns = params.projection === 'kanban' ? KANBAN_OPPORTUNITY_COLUMNS : '*';
+
   let query = supabase
     .from('opportunities')
     .select(`
-      *,
+      ${oppColumns},
       account:accounts(razao_social, nome_fantasia, lead_score, lead_grade, fit_score, intent_score, cidade, uf, origem_principal, score_financeiro, risco_financeiro, score_fatores),
       contact:contacts(nome, cargo, emails, telefones)
     `, { count: 'estimated' })
