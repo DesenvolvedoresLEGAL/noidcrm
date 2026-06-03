@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { FileText, Eye, Package, CreditCard } from 'lucide-react';
 import { ProposalItem } from '@/services/crm/proposal-items';
+import { formatProposalQuantity } from '@/lib/proposals/formatProposalQuantity';
 import { PaymentTerm, calculateInstallments } from '@/services/crm/proposal-payment-terms';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
