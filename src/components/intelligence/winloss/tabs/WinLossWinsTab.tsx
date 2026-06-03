@@ -8,9 +8,9 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   Trophy, Crown, Sparkles, DollarSign, Target, Clock, TrendingUp,
-  Users, Layers, MessageSquareQuote, BookOpen,
+  Users, Layers, MessageSquareQuote, BookOpen, GitBranch,
 } from 'lucide-react';
-import type { WinLossDataResult } from '@/hooks/useWinLossData';
+import type { WinLossDataResult, WonStageRow } from '@/hooks/useWinLossData';
 
 interface Props {
   data: WinLossDataResult | undefined;
@@ -476,6 +476,90 @@ interface DriverAgg {
   count: number;
   value: number;
   pct: number;
+}
+
+// ── Won by stage at acceptance (Sprint WL-WINS-02) ──────────────────
+function WonByStageCard({ rows }: { rows: WonStageRow[] }) {
+  const hasData = rows && rows.length > 0;
+  const totalFallback = hasData ? rows.reduce((s, r) => s + r.fallbackCount, 0) : 0;
+  const totalCount = hasData ? rows.reduce((s, r) => s + r.count, 0) : 0;
+  const fallbackRatio = totalCount > 0 ? Math.round((totalFallback / totalCount) * 100) : 0;
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm flex items-center gap-1.5">
+          <GitBranch className="h-4 w-4" /> Vitórias por etapa do pipeline
+        </CardTitle>
+        <CardDescription className="text-xs">
+          Etapa em que a oportunidade estava no momento da aprovação da proposta.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {!hasData ? (
+          <div className="rounded-md border border-dashed bg-muted/30 p-4 text-sm">
+            <p className="font-medium">Não há histórico suficiente para identificar a etapa de aceite.</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              A partir dos próximos aceites, o sistema deve registrar a etapa no momento da aprovação
+              da proposta para melhorar esta análise.
+            </p>
+          </div>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-[11px] uppercase tracking-wider text-muted-foreground border-b">
+                    <th className="text-left font-medium py-2 pr-3">Etapa</th>
+                    <th className="text-right font-medium py-2 px-2">Ganhos</th>
+                    <th className="text-right font-medium py-2 px-2">Receita</th>
+                    <th className="text-right font-medium py-2 px-2">Ticket médio</th>
+                    <th className="text-right font-medium py-2 px-2">Ciclo médio</th>
+                    <th className="text-left font-medium py-2 pl-3">Principal driver</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((r) => (
+                    <tr key={r.stageId} className="border-b border-border/40 last:border-0">
+                      <td className="py-2 pr-3">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="truncate">{r.stageName}</span>
+                          {r.fallbackCount > 0 && r.fallbackCount === r.count && (
+                            <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-4">
+                              etapa atual
+                            </Badge>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-2 px-2 text-right tabular-nums">{r.count}</td>
+                      <td className="py-2 px-2 text-right tabular-nums text-emerald-700 dark:text-emerald-400 font-medium">
+                        {fmtBRL(r.value)}
+                      </td>
+                      <td className="py-2 px-2 text-right tabular-nums text-muted-foreground">
+                        {fmtBRL(r.avgTicket)}
+                      </td>
+                      <td className="py-2 px-2 text-right tabular-nums text-muted-foreground">
+                        {r.avgCycle > 0 ? `${r.avgCycle}d` : '—'}
+                      </td>
+                      <td className="py-2 pl-3 text-xs text-muted-foreground truncate max-w-[220px]">
+                        {r.topDriver || '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {fallbackRatio >= 30 && (
+              <p className="mt-2 text-[11px] text-muted-foreground italic">
+                {fallbackRatio}% das vitórias não possuem histórico de etapa — usando etapa atual como fallback.
+                Próximos aceites passarão a registrar a etapa no momento da aprovação.
+              </p>
+            )}
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
 }
 
 function buildWinsAggregates(data: WinLossDataResult | undefined) {
