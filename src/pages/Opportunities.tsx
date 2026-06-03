@@ -54,12 +54,14 @@ export default function Opportunities() {
   });
 
   // React Query: opportunities
+  // P0 rollback: projection:'kanban' removida temporariamente — alguma coluna
+  // não enumerada estava sendo lida por filtro/grupo do Kanban e fazia os
+  // cards sumirem. Voltamos ao select('*') seguro enquanto reavaliamos.
   const { data: opportunitiesData, isLoading: oppsLoading } = useQuery({
     queryKey: opportunitiesQueryKey,
     queryFn: () => listOpportunities({
       pipeline_id: selectedPipelineId,
       owner_user_ids: visibleUserIds || undefined,
-      projection: 'kanban', // SPRINT PERF 0.6B — payload menor para o board
     }),
     enabled: !!selectedPipelineId && (visibleUserIds !== undefined || visibleUserIds === null),
   });
