@@ -115,7 +115,12 @@ export function ForecastFilters({
       </div>
 
       {/* Sprint F2.10 — Pipeline de vendas é resolvido automaticamente, não editável */}
-      {salesPipelineMissing ? (
+      {salesPipelineLoading ? (
+        <Badge variant="outline" className="gap-1.5 px-3 py-1.5 border-border bg-muted text-muted-foreground">
+          <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+          Pipeline de Vendas: carregando...
+        </Badge>
+      ) : salesPipelineMissing ? (
         <Badge variant="outline" className="gap-1.5 px-3 py-1.5 border-red-500/40 bg-red-500/10 text-red-600">
           <AlertTriangle className="h-3.5 w-3.5" />
           Pipeline de vendas não configurado
