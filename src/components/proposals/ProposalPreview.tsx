@@ -383,7 +383,7 @@ export function ProposalPreview({
                         </div>
                       </td>
                       <td className="text-center py-3">
-                        {isPointDay && points && days ? `${points}×${days}` : item.quantity}
+                        {isPointDay && points && days ? `${points}×${days}` : formatProposalQuantity(item.quantity, (item as any).measurement_unit)}
                       </td>
                       <td className="text-right py-3">
                         {isPointDay && ppd
