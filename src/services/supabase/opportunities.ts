@@ -22,15 +22,18 @@ const opportunitySchema = z.object({
   owner_user_id: z.string().uuid('ID de proprietário inválido').optional(),
 }).passthrough();
 
-// SPRINT PERF 0.6B — Explicit column list used by the Kanban (and any
-// consumer that opts-in via `projection: 'kanban'`). Covers every field
-// read by OpportunityCard/KanbanColumn/KanbanBoard plus the FKs and
-// timestamps required by the mapping below. Backward-compatible default
-// remains '*' for callers that haven't opted in.
+// SPRINT PERF 0.6B (corrigida pós-P0) — Lista explícita usada quando o
+// caller pede `projection:'kanban'`. Mantida correta contra o schema real
+// para evitar 400 do PostgREST (colunas inexistentes derrubam toda a
+// query, fazendo cards sumirem). Reaplicar somente após comparar payload.
+//
+// IMPORTANTE: `stage_entered_at` e `meta` NÃO existem em `opportunities`.
+// `days_in_stage` cai automaticamente para `updated_at || created_at`.
 const KANBAN_OPPORTUNITY_COLUMNS = [
   'id', 'title', 'status', 'pipeline_id', 'stage_id', 'owner_user_id',
   'account_id', 'contact_id', 'produto', 'valor_previsto', 'prob',
-  'temperature', 'temperatura', 'close_date_prevista', 'stage_entered_at',
+  'temperature', 'temperatura', 'close_date_prevista',
+  'closed_at', 'accepted_proposal_id',
   'created_at', 'updated_at', 'deleted_at',
   'engagement_score', 'velocity_score', 'risk_score',
   'opportunity_score', 'win_probability_ai',
