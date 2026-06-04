@@ -110,6 +110,16 @@ export async function getProposal(id: string): Promise<Proposal | null> {
 
 // Get proposal with all related data for PDF generation
 export async function getProposalWithDetails(id: string): Promise<Proposal | null> {
+  // DYNAMIC PRICING AUTO-REFRESH — garante tier vigente antes de hidratar
+  // editor/preview. Idempotente, no-op em propostas aceitas/congeladas.
+  try {
+    await (supabase as any).rpc('ensure_proposal_dynamic_pricing_current', {
+      p_proposal_id: id,
+    });
+  } catch (e) {
+    console.warn('[getProposalWithDetails] dynamic refresh skipped:', (e as any)?.message ?? e);
+  }
+
   const { data, error } = await supabase
     .from('proposals')
     .select(`
