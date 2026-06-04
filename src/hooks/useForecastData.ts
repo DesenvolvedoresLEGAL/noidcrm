@@ -799,6 +799,7 @@ export function useForecastData(filters: ForecastFilters) {
       closedSsotQuery.dataUpdatedAt || 0,
     ),
     refetch: async () => {
+      if (!queryEnabled) return;
       await queryClient.invalidateQueries({ queryKey: forecastKeys.opportunitiesAll() });
       await queryClient.invalidateQueries({ queryKey: forecastKeys.closedAll() });
       await queryClient.invalidateQueries({ queryKey: forecastKeys.closedSsotAll() });
