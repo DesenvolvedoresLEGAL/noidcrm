@@ -28,6 +28,20 @@ import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { RevenueSsotBanner } from '@/components/revenue/RevenueSsotBanner';
 
+function ForecastLoadingState() {
+  return (
+    <Card className="border-border/50">
+      <CardContent className="py-10 text-center space-y-3">
+        <div className="h-10 w-10 mx-auto rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
+        <h3 className="text-lg font-semibold">Carregando Forecast de Vendas</h3>
+        <p className="text-sm text-muted-foreground max-w-md mx-auto">
+          Localizando o pipeline oficial de vendas e preparando os dados do período.
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function Forecast() {
   const defaultFilters = useDefaultFilters();
   const [filters, setFilters] = useState<FilterType>(defaultFilters);
@@ -38,35 +52,26 @@ export default function Forecast() {
 
   // Sprint F2.10 — Forecast V2 é exclusivo do pipeline oficial de vendas
   const {
+    salesPipelineStatus,
     salesPipelineId,
     salesPipelineName,
-    pipelineFound,
-    requiresConfiguration,
-    isLoading: salesPipelineLoading,
-    isFetching: salesPipelineFetching,
-    isResolved: salesPipelineResolved,
-    isError: salesPipelineError,
   } = useForecastSalesPipeline({ organizationId: organization?.id ?? null });
+  const isSalesPipelineResolved = salesPipelineStatus === 'resolved' && Boolean(salesPipelineId);
 
   // Trava filters.pipelineId no pipeline oficial assim que resolvido
   useEffect(() => {
-    if (salesPipelineId && filters.pipelineId !== salesPipelineId) {
+    if (isSalesPipelineResolved && salesPipelineId && filters.pipelineId !== salesPipelineId) {
       setFilters((prev) => ({ ...prev, pipelineId: salesPipelineId }));
     }
-  }, [salesPipelineId, filters.pipelineId]);
+  }, [isSalesPipelineResolved, salesPipelineId, filters.pipelineId]);
 
   const effectiveFilters: FilterType = useMemo(
-    () => ({ ...filters, pipelineId: salesPipelineId ?? filters.pipelineId }),
-    [filters, salesPipelineId],
+    () => ({ ...filters, pipelineId: isSalesPipelineResolved ? salesPipelineId ?? undefined : undefined, enabled: isSalesPipelineResolved }),
+    [filters, isSalesPipelineResolved, salesPipelineId],
   );
 
   const { kpis, scenarios, opportunities, sellerForecasts, isLoading, isFetching, dataUpdatedAt, refetch } =
     useForecastData(effectiveFilters);
-
-  // F2.10.2 — estados de renderização do pipeline oficial
-  const showPipelineLoading = salesPipelineLoading || (!salesPipelineResolved && salesPipelineFetching);
-  const showPipelineError = salesPipelineResolved && salesPipelineError;
-  const showPipelineMissing = salesPipelineResolved && !salesPipelineError && requiresConfiguration;
 
   return (
     <Layout>
@@ -122,24 +127,15 @@ export default function Forecast() {
           isFetching={isFetching}
           dataUpdatedAt={dataUpdatedAt}
           salesPipelineName={salesPipelineName}
-          salesPipelineMissing={showPipelineMissing}
-          salesPipelineLoading={showPipelineLoading}
+          salesPipelineStatus={salesPipelineStatus}
         />
 
         <RevenueSsotBanner variant="migrated" surface="Forecast — Receita Fechada líquida de cancelamentos (commercial_won_revenue_view), alinhada a Relatórios → Vendas Realizadas" />
 
-        {/* F2.10.2 — Loading premium do pipeline oficial (evita flash falso de "não configurado") */}
-        {showPipelineLoading ? (
-          <Card className="border-border/50">
-            <CardContent className="py-10 text-center space-y-3">
-              <div className="h-10 w-10 mx-auto rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
-              <h3 className="text-lg font-semibold">Carregando Forecast de Vendas</h3>
-              <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                Localizando o pipeline oficial de vendas e preparando os dados do período.
-              </p>
-            </CardContent>
-          </Card>
-        ) : showPipelineError ? (
+        {/* F2.10.3 — renderização exclusivamente por estado discriminado do pipeline oficial */}
+        {salesPipelineStatus === 'idle' || salesPipelineStatus === 'loading' ? (
+          <ForecastLoadingState />
+        ) : salesPipelineStatus === 'error' ? (
           <Card className="border-amber-500/30 bg-amber-500/5">
             <CardContent className="py-10 text-center space-y-2">
               <AlertTriangle className="h-10 w-10 mx-auto text-amber-500" />
@@ -149,7 +145,7 @@ export default function Forecast() {
               </p>
             </CardContent>
           </Card>
-        ) : showPipelineMissing || !pipelineFound ? (
+        ) : salesPipelineStatus === 'not_configured' ? (
           <Card className="border-amber-500/30 bg-amber-500/5">
             <CardContent className="py-10 text-center space-y-2">
               <AlertTriangle className="h-10 w-10 mx-auto text-amber-500" />

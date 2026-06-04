@@ -31,7 +31,7 @@ export function useForecastSnapshots(params: UseForecastSnapshotsParams) {
       periodEnd,
       sellerId,
     ],
-    enabled: enabled && !!organizationId,
+    enabled: enabled && !!organizationId && !!pipelineId,
     staleTime: 5 * 60 * 1000,
     queryFn: async (): Promise<ForecastDailySnapshot[]> => {
       try {

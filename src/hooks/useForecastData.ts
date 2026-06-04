@@ -12,6 +12,7 @@ export interface ForecastFilters {
   periodEnd: Date;
   pipelineId?: string;
   userId?: string;
+  enabled?: boolean;
 }
 
 export interface ForecastKPIs {
@@ -126,6 +127,7 @@ export interface ForecastScenario {
 
 export function useForecastData(filters: ForecastFilters) {
   const { periodStart, periodEnd, pipelineId, userId, periodType } = filters;
+  const queryEnabled = Boolean(filters.enabled ?? true) && Boolean(pipelineId);
   const queryClient = useQueryClient();
 
   // F2.9.2: months in the selected period (used to scale monthly goals)
@@ -139,6 +141,7 @@ export function useForecastData(filters: ForecastFilters) {
   // Fetch sales goals from sales_goals table
   const goalsQuery = useQuery({
     queryKey: salesGoalKeys.list(periodStart.toISOString(), periodEnd.toISOString(), pipelineId),
+    enabled: queryEnabled,
     queryFn: async () => {
       const { data: orgData } = await supabase.rpc('get_user_organization_id');
       if (!orgData) return null;
@@ -158,6 +161,7 @@ export function useForecastData(filters: ForecastFilters) {
   // F2.9.2: Fetch org-wide goal from sales_config selecting the right column per period
   const orgGoalQuery = useQuery({
     queryKey: salesGoalKeys.orgGoal(periodType),
+    enabled: queryEnabled,
     queryFn: async () => {
       const { data: orgData } = await supabase.rpc('get_user_organization_id');
       if (!orgData) return 0;
@@ -181,6 +185,7 @@ export function useForecastData(filters: ForecastFilters) {
   // Fetch seller goals from OTE (sum of active sellers' monthly goals × period months)
   const sellerGoalsQuery = useQuery({
     queryKey: salesGoalKeys.sellerOteGoals(periodType),
+    enabled: queryEnabled,
     queryFn: async () => {
       const { data: orgData } = await supabase.rpc('get_user_organization_id');
       if (!orgData) return 0;
@@ -227,12 +232,13 @@ export function useForecastData(filters: ForecastFilters) {
       const monthly = Number((data as any).custom_goal_override || (data as any).ote_levels?.monthly_goal || 0);
       return monthly * periodMonthsMultiplier;
     },
-    enabled: !!userId,
+    enabled: queryEnabled && !!userId,
   });
 
   // Fetch open opportunities
   const opportunitiesQuery = useQuery({
     queryKey: forecastKeys.opportunities({ start: periodStart.toISOString(), end: periodEnd.toISOString(), pipelineId, userId }),
+    enabled: queryEnabled,
     queryFn: async () => {
       // Get primary pipeline for forecast (is_primary = true)
       let forecastPipelineIds: string[] = [];
@@ -414,6 +420,7 @@ export function useForecastData(filters: ForecastFilters) {
   // Fetch closed won opportunities this period (using closed_at for accurate date tracking)
   const closedQuery = useQuery({
     queryKey: forecastKeys.closed({ start: periodStart.toISOString(), end: periodEnd.toISOString(), pipelineId, userId }),
+    enabled: queryEnabled,
     queryFn: async () => {
       // Get primary pipeline for forecast
       let forecastPipelineIds: string[] = [];
@@ -471,6 +478,7 @@ export function useForecastData(filters: ForecastFilters) {
   // Fetch lost opportunities for win rate (using closed_at for accurate date tracking)
   const lostQuery = useQuery({
     queryKey: forecastKeys.lost({ start: periodStart.toISOString(), end: periodEnd.toISOString(), pipelineId, userId }),
+    enabled: queryEnabled,
     queryFn: async () => {
       // Get primary pipeline for forecast
       let forecastPipelineIds: string[] = [];
@@ -523,6 +531,7 @@ export function useForecastData(filters: ForecastFilters) {
       pipelineId,
       userId,
     }),
+    enabled: queryEnabled,
     queryFn: async () => {
       const { data: orgId } = await supabase.rpc('get_user_organization_id');
       if (!orgId) return null;
@@ -545,6 +554,7 @@ export function useForecastData(filters: ForecastFilters) {
   // Fetch team members for seller breakdown
   const teamQuery = useQuery({
     queryKey: forecastKeys.team(),
+    enabled: queryEnabled,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('profiles')
@@ -789,6 +799,7 @@ export function useForecastData(filters: ForecastFilters) {
       closedSsotQuery.dataUpdatedAt || 0,
     ),
     refetch: async () => {
+      if (!queryEnabled) return;
       await queryClient.invalidateQueries({ queryKey: forecastKeys.opportunitiesAll() });
       await queryClient.invalidateQueries({ queryKey: forecastKeys.closedAll() });
       await queryClient.invalidateQueries({ queryKey: forecastKeys.closedSsotAll() });
