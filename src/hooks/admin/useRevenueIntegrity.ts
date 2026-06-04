@@ -70,6 +70,16 @@ export interface FulfillmentPersistenceCheck {
   mismatch: boolean;
 }
 
+export interface DynamicPricingStaleRow {
+  proposal_id: string;
+  proposal_number: string | null;
+  status: string;
+  current_amount: number | null;
+  snapshot_ends_at: string | null;
+  /** 'DYNAMIC_PRICING_STALE' quando snapshot vencido */
+  diagnostic: 'DYNAMIC_PRICING_STALE';
+}
+
 export interface RevenueIntegrityResult {
   period: { start: string; end: string };
   ssotTotals: {
@@ -85,6 +95,8 @@ export interface RevenueIntegrityResult {
   fulfillmentPersistence: FulfillmentPersistenceCheck[];
   /** Diferenças por venda entre v_opportunity_amounts_v2 (relatórios legados) e SSoT. */
   perSaleDiffs: PerSaleDiff[];
+  /** Propostas abertas com snapshot de dynamic pricing vencido. Resolve-se sozinho ao abrir/link público. */
+  dynamicPricingStale: DynamicPricingStaleRow[];
   anyMismatch: boolean;
 }
 
