@@ -245,7 +245,7 @@ Deno.serve(async (req) => {
         [opp.owner_user_id, seller?.manager_id].filter(Boolean) as string[],
       )];
 
-      // Mensagem elegante
+      // Mensagem elegante — comunica atualização AUTOMÁTICA (não exige ação manual).
       const horizonText =
         windowKey === "72h"
           ? "em 72 horas"
@@ -253,14 +253,14 @@ Deno.serve(async (req) => {
             ? "em 48 horas"
             : "em 24 horas";
 
-      const titleText = `Tabela dinâmica vira ${horizonText}`;
+      const titleText = `Condição comercial atualiza automaticamente ${horizonText}`;
       const variation = delta > 0 ? `↑ ${BRL(delta)}` : delta < 0 ? `↓ ${BRL(Math.abs(delta))}` : "";
       const transitionLabel = formatTransitionDate(currentTier.ends_at);
 
       const messageParts = [
         `${proposalLabel} · ${companyName}`,
         `Vigente: ${BRL(currentAmount)}${nextAmount > 0 ? ` → ${BRL(nextAmount)}` : ""}${variation ? ` (${variation})` : ""}`,
-        `Virada: ${transitionLabel}`,
+        `Atualização automática em: ${transitionLabel}`,
       ];
       const messageText = messageParts.join(" · ");
 
