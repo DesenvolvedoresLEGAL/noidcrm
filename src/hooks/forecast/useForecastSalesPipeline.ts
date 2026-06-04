@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 export type ForecastSalesPipelineStatus = 'idle' | 'loading' | 'resolved' | 'not_configured' | 'error';
 
 export interface ForecastSalesPipelineInfo {
+  organization_id: string | null;
   pipeline_id: string | null;
   pipeline_name: string | null;
   pipeline_found: boolean;
@@ -20,7 +21,7 @@ interface Params {
   enabled?: boolean;
 }
 
-function parseForecastSalesPipelineResponse(data: unknown): ForecastSalesPipelineInfo {
+function parseForecastSalesPipelineResponse(data: unknown, organizationId: string | null | undefined): ForecastSalesPipelineInfo {
   const v = (data ?? {}) as Record<string, unknown>;
   const pipelineId = typeof (v.pipeline_id ?? v.pipelineId) === 'string'
     ? ((v.pipeline_id ?? v.pipelineId) as string)
@@ -33,6 +34,7 @@ function parseForecastSalesPipelineResponse(data: unknown): ForecastSalesPipelin
   const resolutionReasonValue = v.resolution_reason ?? v.resolutionReason;
 
   return {
+    organization_id: organizationId ?? null,
     pipeline_id: pipelineId,
     pipeline_name: pipelineName,
     pipeline_found: pipelineFound,
@@ -55,17 +57,18 @@ export function useForecastSalesPipeline({ organizationId, enabled = true }: Par
         { p_organization_id: organizationId } as never,
       );
       if (error) throw error;
-      return parseForecastSalesPipelineResponse(data);
+      return parseForecastSalesPipelineResponse(data, organizationId);
     },
   });
 
   const info = query.data ?? null;
-  const hasPreviousData = Boolean(info);
-  const pipelineFound = info?.pipeline_found === true;
-  const pipelineId = info?.pipeline_id ?? null;
-  const pipelineName = info?.pipeline_name ?? null;
-  const requiresConfiguration = info?.requires_configuration === true;
-  const resolutionReason = info?.resolution_reason ?? null;
+  const infoMatchesOrganization = Boolean(info && info.organization_id === (organizationId ?? null));
+  const hasPreviousData = Boolean(info && infoMatchesOrganization);
+  const pipelineFound = infoMatchesOrganization && info?.pipeline_found === true;
+  const pipelineId = infoMatchesOrganization ? (info?.pipeline_id ?? null) : null;
+  const pipelineName = infoMatchesOrganization ? (info?.pipeline_name ?? null) : null;
+  const requiresConfiguration = infoMatchesOrganization && info?.requires_configuration === true;
+  const resolutionReason = infoMatchesOrganization ? (info?.resolution_reason ?? null) : null;
   const isResolved = queryEnabled && query.isSuccess && pipelineFound && Boolean(pipelineId);
   const status: ForecastSalesPipelineStatus = !queryEnabled
     ? 'idle'
