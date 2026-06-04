@@ -478,6 +478,7 @@ export function useForecastData(filters: ForecastFilters) {
   // Fetch lost opportunities for win rate (using closed_at for accurate date tracking)
   const lostQuery = useQuery({
     queryKey: forecastKeys.lost({ start: periodStart.toISOString(), end: periodEnd.toISOString(), pipelineId, userId }),
+    enabled: queryEnabled,
     queryFn: async () => {
       // Get primary pipeline for forecast
       let forecastPipelineIds: string[] = [];
@@ -530,6 +531,7 @@ export function useForecastData(filters: ForecastFilters) {
       pipelineId,
       userId,
     }),
+    enabled: queryEnabled,
     queryFn: async () => {
       const { data: orgId } = await supabase.rpc('get_user_organization_id');
       if (!orgId) return null;
@@ -552,6 +554,7 @@ export function useForecastData(filters: ForecastFilters) {
   // Fetch team members for seller breakdown
   const teamQuery = useQuery({
     queryKey: forecastKeys.team(),
+    enabled: queryEnabled,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('profiles')
