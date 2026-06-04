@@ -12,6 +12,7 @@ export interface ForecastFilters {
   periodEnd: Date;
   pipelineId?: string;
   userId?: string;
+  enabled?: boolean;
 }
 
 export interface ForecastKPIs {
@@ -126,6 +127,7 @@ export interface ForecastScenario {
 
 export function useForecastData(filters: ForecastFilters) {
   const { periodStart, periodEnd, pipelineId, userId, periodType } = filters;
+  const queryEnabled = Boolean(filters.enabled ?? true) && Boolean(pipelineId);
   const queryClient = useQueryClient();
 
   // F2.9.2: months in the selected period (used to scale monthly goals)
