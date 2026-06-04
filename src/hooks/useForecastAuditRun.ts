@@ -43,9 +43,10 @@ export function useForecastAuditRun(args: UseForecastAuditRunArgs) {
   const mutation = useMutation({
     mutationFn: async (): Promise<ForecastAuditRunResult> => {
       if (!args.organizationId) throw new Error('organization missing');
+      if (!args.pipelineId) throw new Error('sales pipeline missing');
       const { data, error } = await supabase.rpc('calculate_forecast_audit_v2' as any, {
         p_organization_id: args.organizationId,
-        p_pipeline_id: args.pipelineId ?? null,
+        p_pipeline_id: args.pipelineId,
         p_period_start: args.periodStart,
         p_period_end: args.periodEnd,
         p_seller_id: args.sellerId ?? null,
