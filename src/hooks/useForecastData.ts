@@ -141,6 +141,7 @@ export function useForecastData(filters: ForecastFilters) {
   // Fetch sales goals from sales_goals table
   const goalsQuery = useQuery({
     queryKey: salesGoalKeys.list(periodStart.toISOString(), periodEnd.toISOString(), pipelineId),
+    enabled: queryEnabled,
     queryFn: async () => {
       const { data: orgData } = await supabase.rpc('get_user_organization_id');
       if (!orgData) return null;
@@ -160,6 +161,7 @@ export function useForecastData(filters: ForecastFilters) {
   // F2.9.2: Fetch org-wide goal from sales_config selecting the right column per period
   const orgGoalQuery = useQuery({
     queryKey: salesGoalKeys.orgGoal(periodType),
+    enabled: queryEnabled,
     queryFn: async () => {
       const { data: orgData } = await supabase.rpc('get_user_organization_id');
       if (!orgData) return 0;
@@ -183,6 +185,7 @@ export function useForecastData(filters: ForecastFilters) {
   // Fetch seller goals from OTE (sum of active sellers' monthly goals × period months)
   const sellerGoalsQuery = useQuery({
     queryKey: salesGoalKeys.sellerOteGoals(periodType),
+    enabled: queryEnabled,
     queryFn: async () => {
       const { data: orgData } = await supabase.rpc('get_user_organization_id');
       if (!orgData) return 0;
