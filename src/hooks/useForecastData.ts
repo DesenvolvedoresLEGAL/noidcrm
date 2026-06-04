@@ -232,12 +232,13 @@ export function useForecastData(filters: ForecastFilters) {
       const monthly = Number((data as any).custom_goal_override || (data as any).ote_levels?.monthly_goal || 0);
       return monthly * periodMonthsMultiplier;
     },
-    enabled: !!userId,
+    enabled: queryEnabled && !!userId,
   });
 
   // Fetch open opportunities
   const opportunitiesQuery = useQuery({
     queryKey: forecastKeys.opportunities({ start: periodStart.toISOString(), end: periodEnd.toISOString(), pipelineId, userId }),
+    enabled: queryEnabled,
     queryFn: async () => {
       // Get primary pipeline for forecast (is_primary = true)
       let forecastPipelineIds: string[] = [];
@@ -419,6 +420,7 @@ export function useForecastData(filters: ForecastFilters) {
   // Fetch closed won opportunities this period (using closed_at for accurate date tracking)
   const closedQuery = useQuery({
     queryKey: forecastKeys.closed({ start: periodStart.toISOString(), end: periodEnd.toISOString(), pipelineId, userId }),
+    enabled: queryEnabled,
     queryFn: async () => {
       // Get primary pipeline for forecast
       let forecastPipelineIds: string[] = [];
