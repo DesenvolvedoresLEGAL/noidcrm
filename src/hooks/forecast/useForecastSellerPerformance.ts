@@ -25,7 +25,7 @@ export function useForecastSellerPerformance({
       periodStart,
       periodEnd,
     ],
-    enabled: Boolean(enabled && organizationId && periodStart && periodEnd),
+    enabled: Boolean(enabled && organizationId && pipelineId && periodStart && periodEnd),
     queryFn: async () => {
       const { data, error } = await supabase.rpc(
         'get_forecast_seller_performance_v2' as never,

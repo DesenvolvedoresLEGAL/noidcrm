@@ -21,7 +21,7 @@ export function useForecastRiskCenter({
 }: UseForecastRiskCenterParams) {
   const query = useQuery({
     queryKey: ['forecast-risk-center-v2', organizationId, pipelineId ?? null, periodStart, periodEnd, sellerId ?? null],
-    enabled: !!organizationId && !!periodStart && !!periodEnd && enabled,
+    enabled: !!organizationId && !!pipelineId && !!periodStart && !!periodEnd && enabled,
     staleTime: 60_000,
     queryFn: async (): Promise<ForecastRiskCenterV2 | null> => {
       const { data, error } = await supabase.rpc('get_forecast_risk_center_v2' as any, {

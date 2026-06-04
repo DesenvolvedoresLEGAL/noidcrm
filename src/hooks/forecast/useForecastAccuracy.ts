@@ -23,7 +23,7 @@ export function useForecastAccuracy({
   enabled = true,
 }: UseForecastAccuracyParams) {
   const qc = useQueryClient();
-  const ready = Boolean(enabled && organizationId && periodStart && periodEnd);
+  const ready = Boolean(enabled && organizationId && pipelineId && periodStart && periodEnd);
 
   const summaryKey = [
     'forecast-accuracy-v2',
