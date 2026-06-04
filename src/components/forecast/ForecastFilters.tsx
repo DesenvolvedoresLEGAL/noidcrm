@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { format, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear, formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { ForecastFilters as FilterType } from '@/hooks/useForecastData';
+import type { ForecastSalesPipelineStatus } from '@/hooks/forecast/useForecastSalesPipeline';
 import { toast } from 'sonner';
 
 interface ForecastFiltersProps {
@@ -18,10 +19,8 @@ interface ForecastFiltersProps {
   dataUpdatedAt?: number;
   /** Sprint F2.10 — official sales pipeline (read-only badge) */
   salesPipelineName?: string | null;
-  /** Sprint F2.10 — true when no sales pipeline could be resolved (post-resolution only) */
-  salesPipelineMissing?: boolean;
-  /** F2.10.2 — true while resolving the official sales pipeline */
-  salesPipelineLoading?: boolean;
+  /** F2.10.3 — explicit resolver status for the official sales pipeline */
+  salesPipelineStatus: ForecastSalesPipelineStatus;
 }
 
 export function ForecastFilters({
@@ -32,8 +31,7 @@ export function ForecastFilters({
   isFetching,
   dataUpdatedAt,
   salesPipelineName,
-  salesPipelineMissing,
-  salesPipelineLoading,
+  salesPipelineStatus,
 }: ForecastFiltersProps) {
   const { data: team } = useQuery({
     queryKey: ['team-members-sales-cs'],
@@ -115,20 +113,25 @@ export function ForecastFilters({
       </div>
 
       {/* Sprint F2.10 — Pipeline de vendas é resolvido automaticamente, não editável */}
-      {salesPipelineLoading ? (
+      {salesPipelineStatus === 'idle' || salesPipelineStatus === 'loading' ? (
         <Badge variant="outline" className="gap-1.5 px-3 py-1.5 border-border bg-muted text-muted-foreground">
           <RefreshCw className="h-3.5 w-3.5 animate-spin" />
           Pipeline de Vendas: carregando...
         </Badge>
-      ) : salesPipelineMissing ? (
+      ) : salesPipelineStatus === 'not_configured' ? (
         <Badge variant="outline" className="gap-1.5 px-3 py-1.5 border-red-500/40 bg-red-500/10 text-red-600">
           <AlertTriangle className="h-3.5 w-3.5" />
           Pipeline de vendas não configurado
         </Badge>
+      ) : salesPipelineStatus === 'error' ? (
+        <Badge variant="outline" className="gap-1.5 px-3 py-1.5 border-amber-500/40 bg-amber-500/10 text-amber-600">
+          <AlertTriangle className="h-3.5 w-3.5" />
+          Erro ao localizar pipeline
+        </Badge>
       ) : (
         <Badge variant="outline" className="gap-1.5 px-3 py-1.5 border-emerald-500/30 bg-emerald-500/10 text-emerald-700">
           <Star className="h-3.5 w-3.5 fill-current" />
-          Pipeline de Vendas: {salesPipelineName ?? '—'}
+          Pipeline de Vendas: {salesPipelineName}
         </Badge>
       )}
 
