@@ -34874,6 +34874,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      ensure_proposal_dynamic_pricing_current: {
+        Args: { p_proposal_id: string }
+        Returns: Json
+      }
       ensure_proposal_pricing_ready: {
         Args: { p_proposal_id: string }
         Returns: Json
