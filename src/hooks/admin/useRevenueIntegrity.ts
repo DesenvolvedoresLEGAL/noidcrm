@@ -70,6 +70,16 @@ export interface FulfillmentPersistenceCheck {
   mismatch: boolean;
 }
 
+export interface DynamicPricingStaleRow {
+  proposal_id: string;
+  proposal_number: string | null;
+  status: string;
+  current_amount: number | null;
+  snapshot_ends_at: string | null;
+  /** 'DYNAMIC_PRICING_STALE' quando snapshot vencido */
+  diagnostic: 'DYNAMIC_PRICING_STALE';
+}
+
 export interface RevenueIntegrityResult {
   period: { start: string; end: string };
   ssotTotals: {
@@ -85,6 +95,8 @@ export interface RevenueIntegrityResult {
   fulfillmentPersistence: FulfillmentPersistenceCheck[];
   /** Diferenças por venda entre v_opportunity_amounts_v2 (relatórios legados) e SSoT. */
   perSaleDiffs: PerSaleDiff[];
+  /** Propostas abertas com snapshot de dynamic pricing vencido. Resolve-se sozinho ao abrir/link público. */
+  dynamicPricingStale: DynamicPricingStaleRow[];
   anyMismatch: boolean;
 }
 
@@ -352,10 +364,46 @@ export function useRevenueIntegrity(organizationId?: string | null, start?: stri
         })
         .filter((c) => c.mismatch || c.fulfillment_status === 'removed' || c.fulfillment_status === 'cancelled');
 
+      // DYNAMIC_PRICING_STALE — propostas draft/sent com snapshot vencido.
+      // Diagnóstico desaparece sozinho ao abrir a proposta (RPC
+      // `ensure_proposal_dynamic_pricing_current` é chamada no carregamento).
+      const dynamicPricingStale: DynamicPricingStaleRow[] = [];
+      try {
+        const { data: dynRows } = await (supabase as any)
+          .from('proposals')
+          .select('id, proposal_number, status, dynamic_pricing_current_amount, dynamic_pricing_snapshot')
+          .eq('organization_id', organizationId)
+          .in('status', ['draft', 'sent'])
+          .eq('dynamic_pricing_enabled', true)
+          .eq('dynamic_pricing_applicability', 'automatic')
+          .neq('price_frozen_on_approval', true)
+          .is('deleted_at', null)
+          .limit(500);
+        const nowMs = Date.now();
+        for (const p of (dynRows ?? []) as any[]) {
+          const ends = p?.dynamic_pricing_snapshot?.current_ends_at
+            ? new Date(p.dynamic_pricing_snapshot.current_ends_at).getTime()
+            : null;
+          if (ends !== null && ends < nowMs) {
+            dynamicPricingStale.push({
+              proposal_id: p.id,
+              proposal_number: p.proposal_number ?? null,
+              status: p.status,
+              current_amount: Number(p.dynamic_pricing_current_amount ?? 0) || null,
+              snapshot_ends_at: p.dynamic_pricing_snapshot.current_ends_at,
+              diagnostic: 'DYNAMIC_PRICING_STALE',
+            });
+          }
+        }
+      } catch (e) {
+        console.warn('[useRevenueIntegrity] dynamic stale query failed', e);
+      }
+
       const anyMismatch =
         surfaces.some((s) => s.status === 'mismatch') ||
         fulfillmentPersistence.some((c) => c.mismatch) ||
-        perSaleDiffs.length > 0;
+        perSaleDiffs.length > 0 ||
+        dynamicPricingStale.length > 0;
 
       return {
         period: { start, end },
@@ -365,6 +413,7 @@ export function useRevenueIntegrity(organizationId?: string | null, start?: stri
         reviewRows: rows.filter((r) => r.review_required),
         fulfillmentPersistence,
         perSaleDiffs,
+        dynamicPricingStale,
         anyMismatch,
       };
     },
