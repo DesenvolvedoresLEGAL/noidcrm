@@ -701,11 +701,28 @@ export async function getProposalByToken(token: string): Promise<(Proposal & { i
 
   if (!bundle?.proposal?.id) return null;
 
+  // DYNAMIC PRICING AUTO-REFRESH — priority absoluta no link público.
+  // Antes de qualquer outra coisa, garantimos que o tier vigente em server now()
+  // está aplicado. Idempotente: no-op para propostas aceitas/congeladas/sem regra.
+  let dynamicRefreshed = false;
+  try {
+    const { data: dynRes, error: dynErr } = await (supabase as any).rpc(
+      'ensure_proposal_dynamic_pricing_current',
+      { p_proposal_id: bundle.proposal.id },
+    );
+    if (dynErr) {
+      console.warn('[getProposalByToken] dynamic refresh skipped:', dynErr.message);
+    } else if (dynRes?.refreshed) {
+      dynamicRefreshed = true;
+    }
+  } catch (e) {
+    console.warn('[getProposalByToken] dynamic refresh error:', (e as any)?.message ?? e);
+  }
+
   // PRICE CORE 2.0 — make sure the public link reads a fresh pricing
   // ledger (header, "Condições de Pagamento" e "Forma e prazo do pagamento").
   // ensure_proposal_pricing_ready is SECURITY DEFINER and no-op on frozen
-  // accepted proposals. We only trigger it for editable statuses to avoid
-  // unnecessary writes; if the snapshot is stale we re-fetch the bundle.
+  // accepted proposals. We force refresh quando o dinâmico foi reaplicado.
   try {
     const proposalSnapshot = bundle.proposal;
     const status = proposalSnapshot?.status;
@@ -714,8 +731,10 @@ export async function getProposalByToken(token: string): Promise<(Proposal & { i
     const snapCalculatedAt = snap?.calculated_at ? new Date(snap.calculated_at).getTime() : 0;
     const proposalUpdatedAt = proposalSnapshot?.updated_at ? new Date(proposalSnapshot.updated_at).getTime() : 0;
     const stale = !snap || !snap.version || snapCalculatedAt < proposalUpdatedAt;
-    if (editable && stale) {
-      await (supabase as any).rpc('ensure_proposal_pricing_ready', { p_proposal_id: proposalSnapshot.id });
+    if (editable && (stale || dynamicRefreshed)) {
+      if (stale) {
+        await (supabase as any).rpc('ensure_proposal_pricing_ready', { p_proposal_id: proposalSnapshot.id });
+      }
       // Re-fetch the bundle so flattened result carries the fresh snapshot
       for (const candidate of candidates) {
         const { data, error } = await supabase.rpc('get_proposal_by_public_token', { p_token: candidate });
