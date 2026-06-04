@@ -14,7 +14,7 @@ interface UseHealthParams {
 export function useForecastV2Health({ organizationId, pipelineId, periodStart, periodEnd, enabled = true }: UseHealthParams) {
   const query = useQuery({
     queryKey: ['forecast-v2-health', organizationId, pipelineId ?? null, periodStart, periodEnd],
-    enabled: !!organizationId && !!periodStart && !!periodEnd && enabled,
+    enabled: !!organizationId && !!pipelineId && !!periodStart && !!periodEnd && enabled,
     staleTime: 60_000,
     queryFn: async (): Promise<ForecastV2HealthCheck | null> => {
       const { data, error } = await supabase.rpc('get_forecast_v2_health_check' as any, {

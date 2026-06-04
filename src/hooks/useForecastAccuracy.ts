@@ -88,6 +88,7 @@ export function useForecastAccuracyMetrics(pipelineId?: string, userId?: string)
       if (error) throw error;
       return data as AccuracyMetrics[];
     },
+    enabled: !!pipelineId,
     staleTime: 5 * 60 * 1000,
   });
 }
@@ -233,6 +234,7 @@ export function useAccuracyComparison(pipelineId?: string, userId?: string) {
         humanTotal: data.human.total
       }));
     },
+    enabled: !!pipelineId,
     staleTime: 5 * 60 * 1000,
   });
 }
