@@ -341,7 +341,8 @@ export function OTESellerDetailTab({ results, isLoading, isOTEMode = true, perio
             </CollapsibleContent>
           </Collapsible>
         </Card>
-      ))}
+        );
+      })}
     </div>
   );
 }
