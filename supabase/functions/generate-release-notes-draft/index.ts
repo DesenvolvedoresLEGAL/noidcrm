@@ -301,11 +301,14 @@ function deterministicDraft(items: IngestionItem[], period_days: number) {
     changes.push({ type: "improvement", description: a.summary.slice(0, 240) });
   }
   if (changes.length === 0) {
-    changes.push({ type: "improvement", description: `Atualizações internas dos últimos ${period_days} dias.` });
+    changes.push({ type: "improvement", description: `Atualizações internas dos últimos ${period_days} dias entregues pela equipe de produto.` });
   }
+  const hasGh = ghItems.length > 0;
   return {
-    title: `Atualizações dos últimos ${period_days} dias`,
-    description: `Rascunho gerado sem sumarização IA (fallback determinístico). Revise antes de publicar.`,
+    title: hasGh
+      ? `Release semanal NOID CRM`
+      : `Atualizações dos últimos ${period_days} dias`,
+    description: `Rascunho gerado sem sumarização de IA (fallback determinístico). Revise antes de publicar.`,
     is_major: false,
     changes: changes.slice(0, 40),
   };
