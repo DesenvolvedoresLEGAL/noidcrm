@@ -329,13 +329,15 @@ export function OTESellerDetailTab({
     if (!period) return '—';
     const [yy, mm] = period.split('-').map(Number);
     if (!yy || !mm) return period;
-    const dt = new Date(Date.UTC(yy, mm - 1, 1));
-    return dt.toLocaleDateString('pt-BR', {
-      month: 'long',
-      year: 'numeric',
-      timeZone: 'UTC',
-    });
+    const months = [
+      'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+      'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
+    ];
+    return `${months[mm - 1]} ${yy}`;
   }, [period]);
+
+  const formatPct = (n: number) => n.toFixed(1).replace('.', ',');
+
 
   if (isLoading) {
     return (
