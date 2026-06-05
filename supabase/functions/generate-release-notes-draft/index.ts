@@ -57,28 +57,50 @@ function incrementVersion(last: string | null | undefined, isMajor: boolean): st
   return parts.join(".");
 }
 
-async function collectGitHubPRs(opts: {
-  periodDays: number;
-  owner?: string;
-  repo?: string;
-}): Promise<IngestionItem[]> {
+const DEFAULT_GH_OWNER = "DesenvolvedoresLEGAL";
+const DEFAULT_GH_REPO = "noidcrm";
+
+// Commits genéricos do bot — incluídos mas com peso menor na sumarização.
+const GENERIC_COMMIT_RE = /^(changes|update|wip|fix typo|chore|merge( branch)?|initial commit|lovable[-\s]?dev)/i;
+
+function isGenericCommit(msg: string): boolean {
+  const first = (msg || "").split("\n")[0].trim();
+  return first.length < 8 || GENERIC_COMMIT_RE.test(first);
+}
+
+async function ghFetch(path: string, hasGateway: boolean): Promise<Response> {
   const lovableKey = Deno.env.get("LOVABLE_API_KEY");
   const githubKey = Deno.env.get("GITHUB_API_KEY");
-  if (!lovableKey || !githubKey || !opts.owner || !opts.repo) {
-    console.log("[release-draft] GitHub skipped (no connector or owner/repo missing)");
-    return [];
-  }
-  const since = new Date(Date.now() - opts.periodDays * 86400_000);
-  const url = `https://connector-gateway.lovable.dev/github/repos/${opts.owner}/${opts.repo}/pulls?state=closed&base=main&per_page=100&sort=updated&direction=desc`;
-  try {
-    const res = await fetch(url, {
+  if (hasGateway && lovableKey && githubKey) {
+    return fetch(`https://connector-gateway.lovable.dev/github${path}`, {
       headers: {
         Authorization: `Bearer ${lovableKey}`,
         "X-Connection-Api-Key": githubKey,
+        Accept: "application/vnd.github+json",
       },
     });
+  }
+  return fetch(`https://api.github.com${path}`, {
+    headers: { Accept: "application/vnd.github+json" },
+  });
+}
+
+async function collectGitHubPRs(opts: {
+  periodDays: number;
+  owner: string;
+  repo: string;
+}): Promise<IngestionItem[]> {
+  const hasGateway = !!(Deno.env.get("LOVABLE_API_KEY") && Deno.env.get("GITHUB_API_KEY"));
+  const since = new Date(Date.now() - opts.periodDays * 86400_000);
+  const path = `/repos/${opts.owner}/${opts.repo}/pulls?state=closed&base=main&per_page=100&sort=updated&direction=desc`;
+  try {
+    let res = await ghFetch(path, hasGateway);
+    if (!res.ok && hasGateway) {
+      // fallback público
+      res = await ghFetch(path, false);
+    }
     if (!res.ok) {
-      console.error("[release-draft] GitHub fetch failed", res.status, await res.text());
+      console.error("[release-draft] GitHub PRs fetch failed", res.status);
       return [];
     }
     const prs = (await res.json()) as Array<{
@@ -90,13 +112,14 @@ async function collectGitHubPRs(opts: {
       user: { login: string };
       labels: Array<{ name: string }>;
     }>;
-    return prs
+    return (Array.isArray(prs) ? prs : [])
       .filter((pr) => pr.merged_at && new Date(pr.merged_at) >= since)
       .map((pr) => ({
         source: "github" as const,
         external_id: `pr-${pr.number}`,
         summary: pr.title,
         payload: {
+          kind: "pr",
           number: pr.number,
           title: pr.title,
           body: (pr.body || "").slice(0, 800),
@@ -104,10 +127,58 @@ async function collectGitHubPRs(opts: {
           author: pr.user?.login,
           labels: pr.labels?.map((l) => l.name) || [],
           url: pr.html_url,
+          weight: 2,
         },
       }));
   } catch (e) {
-    console.error("[release-draft] GitHub error", e);
+    console.error("[release-draft] GitHub PRs error", e);
+    return [];
+  }
+}
+
+async function collectGitHubCommits(opts: {
+  periodDays: number;
+  owner: string;
+  repo: string;
+}): Promise<IngestionItem[]> {
+  const hasGateway = !!(Deno.env.get("LOVABLE_API_KEY") && Deno.env.get("GITHUB_API_KEY"));
+  const since = new Date(Date.now() - opts.periodDays * 86400_000).toISOString();
+  const path = `/repos/${opts.owner}/${opts.repo}/commits?sha=main&since=${since}&per_page=100`;
+  try {
+    let res = await ghFetch(path, hasGateway);
+    if (!res.ok && hasGateway) res = await ghFetch(path, false);
+    if (!res.ok) {
+      console.error("[release-draft] GitHub commits fetch failed", res.status);
+      return [];
+    }
+    const commits = (await res.json()) as Array<{
+      sha: string;
+      html_url: string;
+      commit: { message: string; author: { name: string; date: string } };
+      author: { login: string } | null;
+    }>;
+    return (Array.isArray(commits) ? commits : []).map((c) => {
+      const msg = c.commit?.message || "";
+      const first = msg.split("\n")[0].trim();
+      const generic = isGenericCommit(first);
+      return {
+        source: "github" as const,
+        external_id: `commit-${c.sha}`,
+        summary: first.slice(0, 200),
+        payload: {
+          kind: "commit",
+          sha: c.sha.slice(0, 7),
+          message: first.slice(0, 240),
+          author: c.author?.login || c.commit?.author?.name,
+          at: c.commit?.author?.date,
+          url: c.html_url,
+          generic,
+          weight: generic ? 1 : 3,
+        },
+      };
+    });
+  } catch (e) {
+    console.error("[release-draft] GitHub commits error", e);
     return [];
   }
 }
