@@ -7,6 +7,8 @@ import { OTESellerQualifiedLeadsDrilldown } from './OTESellerQualifiedLeadsDrill
 import { useHistoricalQualifiers } from '@/hooks/results/useHistoricalQualifiers';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { aggregateEligible } from './oteEligibility';
+import { computeOteAchievementPercentage, computeOteFlagColor } from './oteAchievement';
+import { useSalesConfig } from '@/hooks/useSalesConfig';
 import {
   User,
   Target,
