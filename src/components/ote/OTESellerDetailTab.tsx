@@ -7,6 +7,8 @@ import { OTESellerQualifiedLeadsDrilldown } from './OTESellerQualifiedLeadsDrill
 import { useHistoricalQualifiers } from '@/hooks/results/useHistoricalQualifiers';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { aggregateEligible } from './oteEligibility';
+import { computeOteAchievementPercentage, computeOteFlagColor } from './oteAchievement';
+import { useSalesConfig } from '@/hooks/useSalesConfig';
 import {
   User,
   Target,
@@ -36,6 +38,9 @@ export function OTESellerDetailTab({ results, isLoading, isOTEMode = true, perio
   const resultIds = results.map((r) => r.id);
   const { data: allRecords = [], isLoading: recordsLoading } = useOTESalesRecords(resultIds);
   const { organization } = useCurrentOrganization();
+  const { config } = useSalesConfig();
+  const flagBlueThreshold = config?.flag_blue_threshold ?? 70;
+  const flagYellowMinThreshold = config?.flag_yellow_min_threshold ?? 50;
 
   // Fonte ÚNICA de leads qualificados (mesma do Visão Geral / Win-Loss):
   // opportunities won em pipeline qualification + atribuição histórica.
@@ -81,7 +86,25 @@ export function OTESellerDetailTab({ results, isLoading, isOTEMode = true, perio
 
   return (
     <div className="space-y-4">
-      {results.map((result) => (
+      {results.map((result) => {
+        // PATCH OTE 1.4.1 — % Meta deriva da mesma base exibida (Receita elegível OTE
+        // para closers, Leads qualificados para pré-vendas). Nunca usa
+        // achievement_percentage bruto do backend.
+        const sellerRecords = allRecords.filter((r) => r.ote_result_id === result.id);
+        const { eligibleTotal: sellerEligible } = aggregateEligible(sellerRecords);
+        const histLeadsForPct = qualifierMap.get(result.user_id);
+        const qualifiedLeadsForPct = typeof histLeadsForPct === 'number'
+          ? histLeadsForPct
+          : Number(result.total_sales || 0);
+        const pctMeta = computeOteAchievementPercentage({
+          result,
+          eligibleRevenue: sellerEligible,
+          qualifiedLeads: qualifiedLeadsForPct,
+        });
+        const flagColor = result.is_team_target
+          ? result.flag_color
+          : computeOteFlagColor(pctMeta, flagBlueThreshold, flagYellowMinThreshold);
+        return (
         <Card key={result.id}>
           <Collapsible
             open={expandedSeller === result.id}
@@ -105,7 +128,7 @@ export function OTESellerDetailTab({ results, isLoading, isOTEMode = true, perio
                   <div className="flex items-center gap-6">
                     <div className="text-right">
                       <p className="text-sm text-muted-foreground">% Meta</p>
-                      <p className="font-semibold">{result.achievement_percentage.toFixed(1)}%</p>
+                      <p className="font-semibold">{pctMeta.toFixed(1)}%</p>
                     </div>
                     <div className="text-right">
                       <p className="text-sm text-muted-foreground">Variável Final</p>
@@ -113,9 +136,9 @@ export function OTESellerDetailTab({ results, isLoading, isOTEMode = true, perio
                     </div>
                     <span className={cn(
                       "inline-flex items-center justify-center w-8 h-8 rounded-full",
-                      result.flag_color === 'blue' && "bg-blue-500",
-                      result.flag_color === 'yellow' && "bg-yellow-500",
-                      result.flag_color === 'red' && "bg-red-500"
+                      flagColor === 'blue' && "bg-blue-500",
+                      flagColor === 'yellow' && "bg-yellow-500",
+                      flagColor === 'red' && "bg-red-500"
                     )}>
                       <Flag className="h-4 w-4 text-white" />
                     </span>
@@ -142,10 +165,10 @@ export function OTESellerDetailTab({ results, isLoading, isOTEMode = true, perio
                       <div>
                         <div className="flex justify-between text-sm mb-1">
                           <span>Progresso da Meta</span>
-                          <span>{result.achievement_percentage.toFixed(1)}%</span>
+                          <span>{pctMeta.toFixed(1)}%</span>
                         </div>
-                        <Progress 
-                          value={Math.min(result.achievement_percentage, 100)} 
+                        <Progress
+                          value={Math.min(pctMeta, 100)}
                           className="h-2"
                         />
                       </div>
@@ -318,7 +341,8 @@ export function OTESellerDetailTab({ results, isLoading, isOTEMode = true, perio
             </CollapsibleContent>
           </Collapsible>
         </Card>
-      ))}
+        );
+      })}
     </div>
   );
 }
