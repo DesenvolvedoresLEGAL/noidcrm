@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { startOfMonth, startOfQuarter, startOfDay, subDays, subMonths, startOfYear, format } from 'date-fns';
+import { computeCrmTrust, computeDeclaredVsInferred } from '@/lib/winloss/lossDiagnosticScore';
 
 // ─── Types ───────────────────────────────────────────────────────────
 export interface DateRange {
@@ -81,6 +82,17 @@ export interface WonStageRow {
   fallbackCount: number;
 }
 
+export interface LostStageRow {
+  stageId: string;
+  stageName: string;
+  count: number;
+  lostValue: number;
+  avgTicket: number;
+  avgCycle: number;
+  topReason?: string;
+  fallbackCount: number;
+}
+
 export interface WinLossDataResult {
   wins: WinLossDeal[];
   losses: WinLossDeal[];
@@ -110,6 +122,9 @@ export interface WinLossDataResult {
   timeToLossDistribution: Array<{ week: string; count: number }>;
   lossMortality: LossMortality;
   wonStageBreakdown: WonStageRow[];
+  lostStageBreakdown: LostStageRow[];
+  crmTrustDeterministic: import('@/lib/winloss/lossDiagnosticScore').CrmTrustResult;
+  declaredVsInferred: import('@/lib/winloss/lossDiagnosticScore').DeclaredVsInferred;
 }
 
 
@@ -487,6 +502,16 @@ export function useWinLossData(organizationId: string | undefined, pipelineId: s
       // 11. Won by stage at acceptance — fonte: snapshot via opportunity_stage_history + proposals.accepted_at
       const wonStageBreakdown = await buildWonStageBreakdown(wins);
 
+      // 11b. Lost by stage at moment of loss — Sprint WL-LOSS-04.
+      // Fonte: snapshot via opportunity_stage_history em closed_at; fallback = stage atual.
+      const lostStageBreakdown = await buildLostStageBreakdown(losses);
+
+      // 11c. CRM Trust Score determinístico e divergência declarado×inferido (Sprint WL-LOSS-04).
+      // Não depende de loss_semantic_analyses. Lê opportunities.loss_reason_id + loss_comment
+      // (espelhados em win_loss_records.reason_id + reason_seller) já materializados em `losses`.
+      const crmTrustDeterministic = computeCrmTrust(losses);
+      const declaredVsInferred = computeDeclaredVsInferred(losses);
+
       return {
         wins, losses, allDeals,
         wonCount: wins.length, lostCount: losses.length,
@@ -505,6 +530,9 @@ export function useWinLossData(organizationId: string | undefined, pipelineId: s
         validWinCyclesCount: validWinCycles.length, validLossCyclesCount: validLossCycles.length,
         monthlyPulse, timeToLossDistribution, lossMortality,
         wonStageBreakdown,
+        lostStageBreakdown,
+        crmTrustDeterministic,
+        declaredVsInferred,
       };
 
     },
@@ -527,6 +555,9 @@ function emptyResult(): WinLossDataResult {
     monthlyPulse: [], timeToLossDistribution: [],
     lossMortality: { buckets: [], totalLosses: 0, totalValue: 0, peak: null, avgDays: null, p90Days: null },
     wonStageBreakdown: [],
+    lostStageBreakdown: [],
+    crmTrustDeterministic: computeCrmTrust([]),
+    declaredVsInferred: computeDeclaredVsInferred([]),
   };
 }
 
@@ -657,6 +688,113 @@ async function buildWonStageBreakdown(wins: WinLossDeal[]): Promise<WonStageRow[
     }))
     .sort((a, b) => b.value - a.value || b.count - a.count);
 }
+
+
+// ─── Lost by stage at moment of loss ────────────────────────────────
+// Sprint WL-LOSS-04. Prioridade: (1) última mudança de etapa <= closed_at;
+// (2) última mudança registrada; (3) stage_id atual (marcado como fallback).
+async function buildLostStageBreakdown(losses: WinLossDeal[]): Promise<LostStageRow[]> {
+  if (!losses || losses.length === 0) return [];
+
+  const lostOppIds = losses.map(l => l.opportunity_id);
+
+  const stageHistoryByOpp = new Map<string, Array<{ stage_id: string; changed_at: string }>>();
+  const { data: history } = await supabase
+    .from('opportunity_stage_history')
+    .select('opportunity_id, to_stage_id, changed_at')
+    .in('opportunity_id', lostOppIds)
+    .order('changed_at', { ascending: true });
+  history?.forEach(h => {
+    const arr = stageHistoryByOpp.get(h.opportunity_id) || [];
+    arr.push({ stage_id: h.to_stage_id, changed_at: h.changed_at });
+    stageHistoryByOpp.set(h.opportunity_id, arr);
+  });
+
+  const stageIds = new Set<string>();
+  losses.forEach(l => {
+    const sid = (l.opportunity as any)?.stage_id;
+    if (sid) stageIds.add(sid);
+  });
+  stageHistoryByOpp.forEach(arr => arr.forEach(e => { if (e.stage_id) stageIds.add(e.stage_id); }));
+
+  const stageNameMap = new Map<string, string>();
+  if (stageIds.size > 0) {
+    const { data: stages } = await supabase
+      .from('stages')
+      .select('id, name')
+      .in('id', [...stageIds] as string[]);
+    stages?.forEach(s => stageNameMap.set(s.id, s.name));
+  }
+
+  interface Agg {
+    stageId: string; stageName: string;
+    count: number; value: number;
+    cycles: number[];
+    reasons: Map<string, number>;
+    fallbackCount: number;
+  }
+  const aggMap = new Map<string, Agg>();
+
+  for (const l of losses) {
+    const opp = l.opportunity || {};
+    const closedAt = (opp.closed_at || opp.updated_at) as string | undefined;
+    const hist = stageHistoryByOpp.get(l.opportunity_id) || [];
+    let resolvedStageId: string | null = null;
+    let isFallback = false;
+
+    if (closedAt && hist.length > 0) {
+      const closedTs = new Date(closedAt).getTime();
+      for (let i = hist.length - 1; i >= 0; i--) {
+        if (new Date(hist[i].changed_at).getTime() <= closedTs) {
+          resolvedStageId = hist[i].stage_id;
+          break;
+        }
+      }
+    }
+    if (!resolvedStageId && hist.length > 0) {
+      resolvedStageId = hist[hist.length - 1].stage_id;
+    }
+    if (!resolvedStageId && opp.stage_id) {
+      resolvedStageId = opp.stage_id;
+      isFallback = true;
+    }
+
+    const key = resolvedStageId || '__unknown__';
+    const name = resolvedStageId
+      ? (stageNameMap.get(resolvedStageId) || 'Etapa não informada')
+      : 'Etapa não informada';
+    const e = aggMap.get(key) || {
+      stageId: key, stageName: name,
+      count: 0, value: 0,
+      cycles: [],
+      reasons: new Map(),
+      fallbackCount: 0,
+    };
+    e.count++;
+    e.value += Number(l.final_value) || 0;
+    if (l.sales_cycle_days > 0) e.cycles.push(l.sales_cycle_days);
+    const reason = (l.reason as any)?.name || 'Não informado';
+    e.reasons.set(reason, (e.reasons.get(reason) || 0) + 1);
+    if (isFallback) e.fallbackCount++;
+    aggMap.set(key, e);
+  }
+
+  return [...aggMap.values()]
+    .map(e => ({
+      stageId: e.stageId,
+      stageName: e.stageName,
+      count: e.count,
+      lostValue: e.value,
+      avgTicket: e.count > 0 ? Math.round(e.value / e.count) : 0,
+      avgCycle: e.cycles.length > 0
+        ? Math.round(e.cycles.reduce((s, c) => s + c, 0) / e.cycles.length)
+        : 0,
+      topReason: [...e.reasons.entries()].sort((a, b) => b[1] - a[1])[0]?.[0],
+      fallbackCount: e.fallbackCount,
+    }))
+    .sort((a, b) => b.lostValue - a.lostValue || b.count - a.count);
+}
+
 
 
 // ─── Curva de Mortalidade Comercial ─────────────────────────────────
