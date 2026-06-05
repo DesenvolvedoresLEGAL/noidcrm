@@ -430,10 +430,12 @@ Deno.serve(async (req) => {
             role: "system",
             content:
               `Hoje é ${today} (America/Sao_Paulo). Você é um redator técnico de release notes do NOID RevenueOS (CRM brasileiro). ` +
-              `Receberá uma lista bruta de PRs do GitHub mergeados e eventos internos das últimas ${period_days} dias. ` +
-              `Sua tarefa: agrupar tematicamente, eliminar ruído técnico, e produzir um rascunho executivo em pt-BR. ` +
-              `Cada item de 'changes' deve ser uma frase clara para usuário final (não jargão de commit). ` +
-              `Não inclua tokens, IDs internos, nomes de tabelas, stack traces, dados pessoais ou metadados sensíveis. ` +
+              `Receberá itens do GitHub (commits da branch main + PRs mergeados) e eventos internos das últimas ${period_days} dias. ` +
+              `Cada item GitHub traz payload.weight (3 = commit semântico, 2 = PR, 1 = commit genérico tipo "Changes"/"chore"). ` +
+              `Priorize itens com weight ≥ 2. Itens com weight=1 (genéricos do lovable-dev[bot]) só devem aparecer quando agregados em um tema visível (ex: "diversas correções de UI"). ` +
+              `Agrupe tematicamente, deduplique mensagens similares, elimine ruído técnico, produza rascunho executivo em pt-BR. ` +
+              `Cada item de 'changes' deve ser uma frase clara para usuário final (não jargão de commit cru). ` +
+              `Não inclua tokens, IDs internos, SHAs, nomes de tabelas, stack traces, dados pessoais. ` +
               `Tipos permitidos: feature, fix, improvement, security. ` +
               `Marque is_major=true APENAS se houver mudança grande (nova área, refactor significativo, breaking change). ` +
               `Saída APENAS JSON válido: { title, description, is_major, changes: [{type, description}] }.`,
