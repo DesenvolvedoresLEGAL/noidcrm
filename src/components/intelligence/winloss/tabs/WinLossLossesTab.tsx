@@ -384,108 +384,95 @@ export function WinLossLossesTab({
         </CardContent>
       </Card>
 
-      {/* 7. Motivo Declarado x Motivo Inferido pela IA */}
+      {/* 7. Perdas por Etapa do Pipeline (Sprint WL-LOSS-04)
+           Espelha o bloco de Wins. Snapshot da etapa em closed_at via
+           opportunity_stage_history; fallback = stage atual. */}
+      <LostByStageCard rows={lostStageBreakdown} />
+
+      {/* 8. Motivo Declarado x Motivo Inferido (Sprint WL-LOSS-04 — determinístico)
+           Antes dependia exclusivamente de loss_semantic_analyses (IA). Agora usa
+           inferência por palavras-chave sobre opportunities.loss_comment vs
+           opportunities.loss_reason_id.category. IA fica como camada extra. */}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm flex items-center gap-1.5">
-            <GitCompareArrows className="h-4 w-4 text-purple-600" /> Motivo Declarado x Motivo Inferido pela IA
+            <GitCompareArrows className="h-4 w-4 text-purple-600" /> Motivo Declarado x Motivo Inferido
           </CardTitle>
           <CardDescription className="text-xs">
-            A IA compara o motivo registrado pelo time com o que detecta nas evidências. Nunca sobrescreve.
+            Compara o motivo registrado pelo time com o tema dominante na descrição. Análise determinística — nunca sobrescreve o motivo humano.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {!semantic || semantic.total === 0 || semantic.topGapPairs.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Sem volume suficiente de análise semântica para detectar divergências com confiança.
-            </p>
+          {!declaredVsInferred.hasMinimumVolume ? (
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">
+                Volume insuficiente para análise semântica.
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                {declaredVsInferred.analyzed} perda(s) com motivo + descrição ≥ 30 caracteres no período. Mínimo: 5.
+              </p>
+            </div>
           ) : (
             <div className="space-y-3">
               <div className="flex items-center gap-3 text-xs flex-wrap">
                 <Badge variant="outline" className="bg-purple-500/15 text-purple-600 border-purple-500/30">
-                  {Math.round((semantic.gapPct / 100) * semantic.total)} perdas com gap
+                  {declaredVsInferred.analyzed} analisadas
                 </Badge>
+                <Badge variant="outline" className="bg-emerald-500/15 text-emerald-700 border-emerald-500/30">
+                  {declaredVsInferred.coherent} coerentes
+                </Badge>
+                <Badge variant="outline" className="bg-red-500/15 text-red-700 border-red-500/30">
+                  {declaredVsInferred.divergent} divergentes
+                </Badge>
+                {declaredVsInferred.inconclusive > 0 && (
+                  <Badge variant="outline" className="bg-muted text-muted-foreground">
+                    {declaredVsInferred.inconclusive} inconclusivas
+                  </Badge>
+                )}
                 <span className="text-muted-foreground">·</span>
-                <span className="text-muted-foreground">{semantic.gapPct}% das perdas com análise</span>
+                <span className="text-muted-foreground">
+                  Taxa de divergência: <span className="font-semibold text-foreground">{declaredVsInferred.divergenceRate}%</span>
+                </span>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-[11px] uppercase tracking-wider text-muted-foreground border-b">
-                      <th className="text-left font-medium py-2 pr-3">Declarado</th>
-                      <th className="text-left font-medium py-2 px-2">Inferido pela IA</th>
-                      <th className="text-right font-medium py-2 px-2">Perdas</th>
-                      <th className="text-right font-medium py-2 pl-2">Valor perdido</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {semantic.topGapPairs.slice(0, 5).map((p, i) => (
-                      <tr key={i} className="border-b border-border/40 last:border-0">
-                        <td className="py-2 pr-3">
-                          {LOSS_CATEGORY_LABELS[p.declared] || p.declared}
-                        </td>
-                        <td className="py-2 px-2 font-medium">
-                          {LOSS_CATEGORY_LABELS[p.inferred] || p.inferred}
-                        </td>
-                        <td className="py-2 px-2 text-right tabular-nums">{p.count}</td>
-                        <td className="py-2 pl-2 text-right tabular-nums text-red-700 dark:text-red-400">
-                          {fmtBRL(p.value)}
-                        </td>
+              {declaredVsInferred.pairs.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Nenhuma divergência relevante detectada. Motivos declarados estão alinhados às descrições.
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-[11px] uppercase tracking-wider text-muted-foreground border-b">
+                        <th className="text-left font-medium py-2 pr-3">Declarado</th>
+                        <th className="text-left font-medium py-2 px-2">Inferido pela descrição</th>
+                        <th className="text-right font-medium py-2 px-2">Perdas</th>
+                        <th className="text-right font-medium py-2 pl-2">Valor perdido</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {declaredVsInferred.pairs.map((p, i) => (
+                        <tr key={i} className="border-b border-border/40 last:border-0">
+                          <td className="py-2 pr-3">
+                            {LOSS_CATEGORY_LABELS[p.declared] || p.declared}
+                          </td>
+                          <td className="py-2 px-2 font-medium">
+                            {LOSS_CATEGORY_LABELS[p.inferred] || p.inferred}
+                          </td>
+                          <td className="py-2 px-2 text-right tabular-nums">{p.count}</td>
+                          <td className="py-2 pl-2 text-right tabular-nums text-red-700 dark:text-red-400">
+                            {fmtBRL(p.value)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* 8. Perdas por Etapa do Funil */}
-      {stageBreakdown.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-1.5">
-              <Layers className="h-4 w-4" /> Perdas por etapa do funil
-            </CardTitle>
-            <CardDescription className="text-xs">
-              Onde os negócios morrem. Identifique gargalos no processo.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-[11px] uppercase tracking-wider text-muted-foreground border-b">
-                    <th className="text-left font-medium py-2 pr-3">Etapa</th>
-                    <th className="text-right font-medium py-2 px-2">Perdas</th>
-                    <th className="text-right font-medium py-2 px-2">Valor perdido</th>
-                    <th className="text-right font-medium py-2 px-2">Ciclo médio</th>
-                    <th className="text-left font-medium py-2 pl-2">Principal motivo</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {stageBreakdown.map((s) => (
-                    <tr key={s.stageId} className="border-b border-border/40 last:border-0">
-                      <td className="py-2 pr-3 truncate max-w-[220px]">{s.stageName}</td>
-                      <td className="py-2 px-2 text-right tabular-nums">{s.count}</td>
-                      <td className="py-2 px-2 text-right tabular-nums text-red-700 dark:text-red-400 font-medium">
-                        {fmtBRL(s.lostValue)}
-                      </td>
-                      <td className="py-2 px-2 text-right tabular-nums text-muted-foreground">
-                        {s.avgCycle != null ? `${s.avgCycle}d` : '—'}
-                      </td>
-                      <td className="py-2 pl-2 text-xs text-muted-foreground truncate max-w-[200px]">
-                        {s.topReason || '—'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* 9. Onde os Negócios Morrem — Curva de Mortalidade Comercial */}
       <LossMortalityBlock mortality={data.lossMortality} />
