@@ -38,6 +38,7 @@ function formatPeriod(start?: string, end?: string) {
 export function ReleaseNotesAutomationCard({ enabled = true }: { enabled?: boolean }) {
   const navigate = useNavigate();
   const { data, isLoading } = useReleaseNotesAdminStatus(enabled);
+  const { data: gh, isLoading: ghLoading } = useGithubReleaseStatus(enabled);
 
   const statusBadge = (() => {
     if (!data?.lastGeneration) {
