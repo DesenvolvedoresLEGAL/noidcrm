@@ -367,42 +367,81 @@ export function OTESellerDetailTab({
 
   return (
     <div className="space-y-6">
-      {/* ===== Header: Campeonato Comercial ===== */}
+      {/* ===== Faixa compacta: Campeonato Comercial ===== */}
       <Card className="overflow-hidden border-primary/20 bg-gradient-to-br from-primary/5 via-background to-background">
-        <CardContent className="p-5">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <CardContent className="p-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="flex items-center gap-3">
-              <div className="rounded-lg bg-primary/10 p-2.5">
-                <Trophy className="h-6 w-6 text-primary" />
+              <div className="rounded-lg bg-primary/10 p-2">
+                <Trophy className="h-5 w-5 text-primary" />
               </div>
               <div>
-                <h2 className="text-lg font-semibold leading-tight">Campeonato Comercial</h2>
-                <p className="text-sm text-muted-foreground capitalize">
-                  Ranking do período por atingimento de meta · {periodLabel}
+                <h2 className="text-sm font-semibold leading-tight">Campeonato Comercial</h2>
+                <p className="text-xs text-muted-foreground">
+                  Ranking do período por atingimento de meta
                 </p>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-6 md:gap-6">
-              <SummaryStat label="Participantes" value={String(summary.total)} />
-              <SummaryStat
-                label="Líder"
-                value={
-                  summary.leader
-                    ? `${summary.leader.fullName.split(' ')[0]} · ${summary.leader.pctMeta.toFixed(1)}%`
-                    : '—'
-                }
-              />
-              <SummaryStat label="Alta performance" value={String(summary.highCount)} />
-              <SummaryStat label="Zona de atenção" value={String(summary.midCount)} />
-              <SummaryStat label="Abaixo do mínimo" value={String(summary.lowCount)} />
-              <SummaryStat label="Período" value={periodLabel} />
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+              <span className="capitalize text-foreground/80">{periodLabel}</span>
+              <span aria-hidden>·</span>
+              <span>
+                <span className="font-semibold text-foreground">{summary.total}</span> participantes
+              </span>
+              {summary.leader && (
+                <>
+                  <span aria-hidden>·</span>
+                  <span>
+                    Líder:{' '}
+                    <span className="font-semibold text-foreground">
+                      {summary.leader.fullName.split(' ')[0]}
+                    </span>{' '}
+                    <span className="text-foreground/80">
+                      ({summary.leader.pctMeta.toFixed(1)}%)
+                    </span>
+                  </span>
+                </>
+              )}
+              {summary.highCount > 0 && (
+                <>
+                  <span aria-hidden>·</span>
+                  <span>
+                    <span className="font-semibold text-blue-600 dark:text-blue-400">
+                      {summary.highCount}
+                    </span>{' '}
+                    em alta performance
+                  </span>
+                </>
+              )}
+              {summary.midCount > 0 && (
+                <>
+                  <span aria-hidden>·</span>
+                  <span>
+                    <span className="font-semibold text-yellow-600 dark:text-yellow-400">
+                      {summary.midCount}
+                    </span>{' '}
+                    em zona de atenção
+                  </span>
+                </>
+              )}
+              {summary.lowCount > 0 && (
+                <>
+                  <span aria-hidden>·</span>
+                  <span>
+                    <span className="font-semibold text-red-600 dark:text-red-400">
+                      {summary.lowCount}
+                    </span>{' '}
+                    abaixo do mínimo
+                  </span>
+                </>
+              )}
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* ===== Pódio do mês ===== */}
-      {podium.length > 0 && (
+      {/* ===== Pódio do mês — somente com 4+ participantes ===== */}
+      {ranking.length >= 4 && podium.length > 0 && (
         <div className="space-y-3">
           <div className="flex items-center gap-2">
             <Medal className="h-4 w-4 text-primary" />
@@ -417,6 +456,7 @@ export function OTESellerDetailTab({
           </div>
         </div>
       )}
+
 
       {/* ===== Filtros + Ordenação ===== */}
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
