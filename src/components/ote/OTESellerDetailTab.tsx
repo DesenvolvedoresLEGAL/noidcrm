@@ -315,13 +315,14 @@ export function OTESellerDetailTab({
     return sorted;
   }, [ranking, filter, sortBy]);
 
-  // Resumo do Campeonato Comercial.
+  // Resumo do Campeonato Comercial (somente leitura competitiva — sem
+  // duplicar dinheiro com o bloco "Resumo financeiro do OTE").
   const summary = useMemo(() => {
-    const totalToPay = ranking.reduce((s, r) => s + r.variableAmount, 0);
     const highCount = ranking.filter((r) => r.status === 'high').length;
+    const midCount = ranking.filter((r) => r.status === 'mid').length;
     const lowCount = ranking.filter((r) => r.status === 'low').length;
     const leader = ranking[0];
-    return { totalToPay, highCount, lowCount, leader, total: ranking.length };
+    return { highCount, midCount, lowCount, leader, total: ranking.length };
   }, [ranking]);
 
   const periodLabel = useMemo(() => {
@@ -381,7 +382,7 @@ export function OTESellerDetailTab({
                 </p>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-5 md:gap-6">
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-6 md:gap-6">
               <SummaryStat label="Participantes" value={String(summary.total)} />
               <SummaryStat
                 label="Líder"
@@ -391,9 +392,10 @@ export function OTESellerDetailTab({
                     : '—'
                 }
               />
-              <SummaryStat label="Total a pagar" value={formatCurrency(summary.totalToPay)} />
               <SummaryStat label="Alta performance" value={String(summary.highCount)} />
+              <SummaryStat label="Zona de atenção" value={String(summary.midCount)} />
               <SummaryStat label="Abaixo do mínimo" value={String(summary.lowCount)} />
+              <SummaryStat label="Período" value={periodLabel} />
             </div>
           </div>
         </CardContent>
