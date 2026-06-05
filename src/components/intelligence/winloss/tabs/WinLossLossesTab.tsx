@@ -93,8 +93,8 @@ export function WinLossLossesTab({
   // Recomendações determinísticas para reduzir perdas.
   // CRM Trust Score calculado pelo motor determinístico WL-LOSS-04.
   const playbooks = useMemo(
-    () => buildLossPlaybooks(categoryAgg, commercialFailure, semantic, crmTrust),
-    [categoryAgg, commercialFailure, semantic, crmTrust],
+    () => buildLossPlaybooks(categoryAgg, commercialFailure, semantic, data?.crmTrustDeterministic.score),
+    [categoryAgg, commercialFailure, semantic, data?.crmTrustDeterministic.score],
   );
 
   // Sinais recentes vs tendência (dependendo do período).
