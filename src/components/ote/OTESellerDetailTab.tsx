@@ -86,7 +86,25 @@ export function OTESellerDetailTab({ results, isLoading, isOTEMode = true, perio
 
   return (
     <div className="space-y-4">
-      {results.map((result) => (
+      {results.map((result) => {
+        // PATCH OTE 1.4.1 — % Meta deriva da mesma base exibida (Receita elegível OTE
+        // para closers, Leads qualificados para pré-vendas). Nunca usa
+        // achievement_percentage bruto do backend.
+        const sellerRecords = allRecords.filter((r) => r.ote_result_id === result.id);
+        const { eligibleTotal: sellerEligible } = aggregateEligible(sellerRecords);
+        const histLeadsForPct = qualifierMap.get(result.user_id);
+        const qualifiedLeadsForPct = typeof histLeadsForPct === 'number'
+          ? histLeadsForPct
+          : Number(result.total_sales || 0);
+        const pctMeta = computeOteAchievementPercentage({
+          result,
+          eligibleRevenue: sellerEligible,
+          qualifiedLeads: qualifiedLeadsForPct,
+        });
+        const flagColor = result.is_team_target
+          ? result.flag_color
+          : computeOteFlagColor(pctMeta, flagBlueThreshold, flagYellowMinThreshold);
+        return (
         <Card key={result.id}>
           <Collapsible
             open={expandedSeller === result.id}
