@@ -690,9 +690,21 @@ async function buildWonStageBreakdown(wins: WinLossDeal[]): Promise<WonStageRow[
 }
 
 
-// ─── Lost by stage at moment of loss ────────────────────────────────
-// Sprint WL-LOSS-04. Prioridade: (1) última mudança de etapa <= closed_at;
-// (2) última mudança registrada; (3) stage_id atual (marcado como fallback).
+// ─── Lost by ORIGIN stage (etapa imediatamente ANTERIOR ao LOST) ────
+// Sprint WL-LOSS-05. A etapa atual e a última entrada do histórico
+// frequentemente refletem o destino operacional da automação (ex.: "Perdemos",
+// "Desqualificado", "Churn"). Esses estágios distorcem a análise de onde a
+// oportunidade realmente foi perdida. Por isso ignoramos estágios cujo
+// nome bate o padrão de destino de perda e procuramos a última etapa
+// válida ANTES da marcação como LOST.
+const LOSS_DESTINATION_NAME_REGEX =
+  /(perdemos|perdido|perdida|desqualific|churn|\blost\b|cancelad)/i;
+
+const isLossDestinationStageName = (name: string | undefined | null): boolean => {
+  if (!name) return false;
+  return LOSS_DESTINATION_NAME_REGEX.test(name);
+};
+
 async function buildLostStageBreakdown(losses: WinLossDeal[]): Promise<LostStageRow[]> {
   if (!losses || losses.length === 0) return [];
 
@@ -726,6 +738,9 @@ async function buildLostStageBreakdown(losses: WinLossDeal[]): Promise<LostStage
     stages?.forEach(s => stageNameMap.set(s.id, s.name));
   }
 
+  const isLossDestinationStageId = (sid: string | null | undefined): boolean =>
+    !!sid && isLossDestinationStageName(stageNameMap.get(sid));
+
   interface Agg {
     stageId: string; stageName: string;
     count: number; value: number;
@@ -742,18 +757,27 @@ async function buildLostStageBreakdown(losses: WinLossDeal[]): Promise<LostStage
     let resolvedStageId: string | null = null;
     let isFallback = false;
 
+    // 1) Última etapa NÃO-destino-de-perda anterior (ou igual) ao closed_at
     if (closedAt && hist.length > 0) {
       const closedTs = new Date(closedAt).getTime();
       for (let i = hist.length - 1; i >= 0; i--) {
-        if (new Date(hist[i].changed_at).getTime() <= closedTs) {
+        if (new Date(hist[i].changed_at).getTime() <= closedTs
+            && !isLossDestinationStageId(hist[i].stage_id)) {
           resolvedStageId = hist[i].stage_id;
           break;
         }
       }
     }
+    // 2) Última etapa NÃO-destino-de-perda do histórico (qualquer momento)
     if (!resolvedStageId && hist.length > 0) {
-      resolvedStageId = hist[hist.length - 1].stage_id;
+      for (let i = hist.length - 1; i >= 0; i--) {
+        if (!isLossDestinationStageId(hist[i].stage_id)) {
+          resolvedStageId = hist[i].stage_id;
+          break;
+        }
+      }
     }
+    // 3) Fallback: stage_id atual da oportunidade (mesmo que seja destino de perda)
     if (!resolvedStageId && opp.stage_id) {
       resolvedStageId = opp.stage_id;
       isFallback = true;
