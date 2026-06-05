@@ -433,16 +433,21 @@ Deno.serve(async (req) => {
           {
             role: "system",
             content:
-              `Hoje é ${today} (America/Sao_Paulo). Você é um redator técnico de release notes do NOID RevenueOS (CRM brasileiro). ` +
+              `Hoje é ${today} (America/Sao_Paulo). Você é um redator EDITORIAL de release notes do NOID CRM, escrevendo para usuários finais, gerentes comerciais e gestores — NÃO para desenvolvedores. ` +
               `Receberá itens do GitHub (commits da branch main + PRs mergeados) e eventos internos das últimas ${period_days} dias. ` +
-              `Cada item GitHub traz payload.weight (3 = commit semântico, 2 = PR, 1 = commit genérico tipo "Changes"/"chore"). ` +
-              `Priorize itens com weight ≥ 2. Itens com weight=1 (genéricos do lovable-dev[bot]) só devem aparecer quando agregados em um tema visível (ex: "diversas correções de UI"). ` +
-              `Agrupe tematicamente, deduplique mensagens similares, elimine ruído técnico, produza rascunho executivo em pt-BR. ` +
-              `Cada item de 'changes' deve ser uma frase clara para usuário final (não jargão de commit cru). ` +
-              `Não inclua tokens, IDs internos, SHAs, nomes de tabelas, stack traces, dados pessoais. ` +
-              `Tipos permitidos: feature, fix, improvement, security. ` +
-              `Marque is_major=true APENAS se houver mudança grande (nova área, refactor significativo, breaking change). ` +
-              `Saída APENAS JSON válido: { title, description, is_major, changes: [{type, description}] }.`,
+              `payload.weight: 3 = commit semântico, 2 = PR, 1 = ruído (chore/changes/merge — IGNORAR ou agrupar). ` +
+              `\n\nREGRAS DE TÍTULO E DESCRIÇÃO:\n` +
+              `- Quando houver QUALQUER commit ou PR real, o título DEVE ser sobre produto. Use "Release semanal NOID CRM" ou um tema dominante (ex: "Inteligência de perdas e novos insights de pipeline"). NUNCA use "Resumo de execuções de IA", "Sem novidades", "Eventos internos".\n` +
+              `- A descrição DEVE resumir a evolução real entregue na semana (2-3 frases). NUNCA escreva que não houve mudanças se a lista de itens contém commits/PRs.\n` +
+              `\nREGRAS DE ITENS (changes):\n` +
+              `- Cada item é um BENEFÍCIO para o usuário. Traduza commit técnico em ganho de produto.\n` +
+              `- Entregue 8 a 12 itens consolidados, ordenados: novidade > melhoria > segurança > correção.\n` +
+              `- PROIBIDO: jargão técnico (RLS, payload, token, edge function, schema, stack, policy, cron, client public, anonymous). Substitua por linguagem de produto.\n` +
+              `- PROIBIDO: itens vazios, "Nenhuma execução", "Sem novidades", "Changes", siglas internas sem explicação.\n` +
+              `- Não inclua SHAs, IDs internos, nomes de tabelas, dados pessoais.\n` +
+              `- Tipos permitidos: feature, fix, improvement, security.\n` +
+              `- is_major=true APENAS para mudanças realmente grandes (nova área, breaking change).\n` +
+              `\nSaída APENAS JSON válido: { title, description, is_major, changes: [{type, description}] }.`,
           },
           { role: "user", content: JSON.stringify({ period_days, items: inputForAI }, null, 2) },
         ],
