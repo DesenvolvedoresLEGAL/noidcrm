@@ -165,10 +165,10 @@ export function OTESellerDetailTab({ results, isLoading, isOTEMode = true, perio
                       <div>
                         <div className="flex justify-between text-sm mb-1">
                           <span>Progresso da Meta</span>
-                          <span>{result.achievement_percentage.toFixed(1)}%</span>
+                          <span>{pctMeta.toFixed(1)}%</span>
                         </div>
-                        <Progress 
-                          value={Math.min(result.achievement_percentage, 100)} 
+                        <Progress
+                          value={Math.min(pctMeta, 100)}
                           className="h-2"
                         />
                       </div>
