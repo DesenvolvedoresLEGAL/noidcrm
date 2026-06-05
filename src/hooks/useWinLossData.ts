@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { startOfMonth, startOfQuarter, startOfDay, subDays, subMonths, startOfYear, format } from 'date-fns';
+import { computeCrmTrust, computeDeclaredVsInferred } from '@/lib/winloss/lossDiagnosticScore';
 
 // ─── Types ───────────────────────────────────────────────────────────
 export interface DateRange {
