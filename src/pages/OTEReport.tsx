@@ -3,14 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { OTEOverviewTab } from '@/components/ote/OTEOverviewTab';
-import { OTESellerDetailTab } from '@/components/ote/OTESellerDetailTab';
 import { OTEHistoryTab } from '@/components/ote/OTEHistoryTab';
 import { CommissionOverviewTab } from '@/components/results/commission/CommissionOverviewTab';
-import { CommissionSellerDetailTab } from '@/components/results/commission/CommissionSellerDetailTab';
 import { CommissionHistoryTab } from '@/components/results/commission/CommissionHistoryTab';
 import { SimpleGoalsOverviewTab } from '@/components/results/simple/SimpleGoalsOverviewTab';
-import { SimpleGoalsSellerDetailTab } from '@/components/results/simple/SimpleGoalsSellerDetailTab';
 import { SimpleGoalsHistoryTab } from '@/components/results/simple/SimpleGoalsHistoryTab';
+
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calculator, RefreshCw, FileSpreadsheet, Target, Settings, DollarSign, Wallet } from 'lucide-react';
