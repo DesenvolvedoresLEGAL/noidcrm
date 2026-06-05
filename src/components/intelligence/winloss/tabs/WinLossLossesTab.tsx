@@ -5,8 +5,6 @@
 // + diagnosis helpers. Accountability vem de loss_reasons.loss_accountability
 // (oficial, banco) — nunca hardcoded no frontend.
 import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 
