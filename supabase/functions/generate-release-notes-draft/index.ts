@@ -486,11 +486,15 @@ Deno.serve(async (req) => {
         ...((openDraft.changes as Array<{ type: string; description: string }>) || []),
         ...ai.changes,
       ];
-      const prev = (openDraft.source_summary as Record<string, number>) || {};
+      const prev = (openDraft.source_summary as Record<string, unknown>) || {};
       const newSummary = {
-        github_prs: (prev.github_prs || 0) + ghItems.length,
-        system_events: (prev.system_events || 0) + sysItems.length,
-        period_start: prev.period_start || periodStart.toISOString(),
+        ...prev,
+        github_prs: ((prev.github_prs as number) || 0) + ghPRs.length,
+        github_commits: ((prev.github_commits as number) || 0) + ghCommits.length,
+        github_owner: ghOwner,
+        github_repo: ghRepo,
+        system_events: ((prev.system_events as number) || 0) + sysItems.length,
+        period_start: (prev.period_start as string) || periodStart.toISOString(),
         period_end: periodEnd.toISOString(),
       };
       const { data: upd, error: updErr } = await supa
