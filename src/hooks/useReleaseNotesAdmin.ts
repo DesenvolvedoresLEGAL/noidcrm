@@ -58,6 +58,18 @@ export function useReleaseDrafts(enabled: boolean = true) {
  *
  * Só faz sentido chamar para platform admins — passe `enabled` apropriado.
  */
+export type GithubReleaseStatus = {
+  configured: boolean;
+  mode?: "gateway" | "public" | "none";
+  owner?: string;
+  repo?: string;
+  commits_last_7d?: number;
+  prs_last_7d?: number;
+  missing: string[];
+  last_check_at?: string;
+  last_error?: string;
+};
+
 export function useGithubReleaseStatus(enabled: boolean) {
   return useQuery({
     queryKey: ["release-notes", "github-status"],
@@ -68,7 +80,7 @@ export function useGithubReleaseStatus(enabled: boolean) {
         body: {},
       });
       if (error) throw error;
-      return data as { configured: boolean; missing: string[] };
+      return data as GithubReleaseStatus;
     },
   });
 }
