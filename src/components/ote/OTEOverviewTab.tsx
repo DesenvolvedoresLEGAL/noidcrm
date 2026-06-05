@@ -378,7 +378,8 @@ export function OTEOverviewTab({ results, records = [], isLoading, period, isOTE
                     const eligible = eligiblePerSeller.get(result.id) ?? 0;
                     const sellerCommercial = ssotBySellerMap.get(result.user_id)?.total ?? 0;
                     const isActive = activeUserIds.has(result.user_id);
-                    return (
+                    const pctMeta = revenuePctPerSeller.get(result.id) ?? 0;
+                    const flagColor = revenueFlagPerSeller.get(result.id) ?? result.flag_color;
                       <tr key={result.id} className="border-b hover:bg-muted/50">
                         <td className="py-3 px-2 font-medium">
                           <span className="inline-flex items-center gap-2">
