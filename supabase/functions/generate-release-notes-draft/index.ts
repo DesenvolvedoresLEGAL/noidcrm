@@ -481,20 +481,48 @@ Deno.serve(async (req) => {
     // 4. Idempotência: se já houver draft aberto, anexa ao invés de criar novo
     const { data: openDraft } = await supa
       .from("release_notes")
-      .select("id, version, changes, source_summary")
+      .select("id, version, changes, source_summary, title, description")
       .eq("status", "draft")
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
 
-    let releaseId: string;
+    // 4b. Versão (preliminar) para o policy editorial usar no título padrão
     let version: string;
+    if (openDraft) {
+      version = openDraft.version;
+    } else {
+      const { data: last } = await supa
+        .from("release_notes")
+        .select("version")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      version = incrementVersion(last?.version, ai.is_major);
+    }
+
+    // 4c. Pós-processamento editorial (sempre, mesmo no fallback determinístico)
+    const editorial = applyEditorialPolicy(ai, {
+      version,
+      periodDays: period_days,
+      githubCommits: ghCommits.length,
+      githubPRs: ghPRs.length,
+      systemEvents: sysItems.length,
+    });
+    if (editorial.notes.length) {
+      console.log(`[release-draft] editorial notes:`, editorial.notes.join(" | "));
+    }
+
+    let releaseId: string;
 
     if (openDraft) {
-      const mergedChanges = [
-        ...((openDraft.changes as Array<{ type: string; description: string }>) || []),
-        ...ai.changes,
-      ];
+      const prevChanges = (openDraft.changes as Array<{ type: ChangeTypeLocal; description: string }>) || [];
+      const mergedRaw = [...prevChanges, ...editorial.changes];
+      // Re-roda editorial só para dedup/ordenar/limitar a 12 (não substitui título existente)
+      const reEdit = applyEditorialPolicy(
+        { title: openDraft.title || editorial.title, description: openDraft.description || editorial.description, is_major: editorial.is_major, changes: mergedRaw },
+        { version, periodDays: period_days, githubCommits: ghCommits.length, githubPRs: ghPRs.length, systemEvents: sysItems.length },
+      );
       const prev = (openDraft.source_summary as Record<string, unknown>) || {};
       const newSummary = {
         ...prev,
@@ -509,7 +537,9 @@ Deno.serve(async (req) => {
       const { data: upd, error: updErr } = await supa
         .from("release_notes")
         .update({
-          changes: mergedChanges,
+          title: reEdit.title,
+          description: reEdit.description,
+          changes: reEdit.changes,
           source_summary: newSummary,
         })
         .eq("id", openDraft.id)
@@ -519,24 +549,15 @@ Deno.serve(async (req) => {
       releaseId = upd.id;
       version = upd.version;
     } else {
-      // 5. Próxima versão
-      const { data: last } = await supa
-        .from("release_notes")
-        .select("version")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      version = incrementVersion(last?.version, ai.is_major);
-
       const { data: ins, error: insErr } = await supa
         .from("release_notes")
         .insert({
           version,
-          title: ai.title,
-          description: ai.description || `Rascunho gerado ${trigger === "scheduled" ? "automaticamente" : "manualmente"} a partir de ${fresh.length} sinais.`,
+          title: editorial.title,
+          description: editorial.description,
           release_date: today,
-          is_major: ai.is_major,
-          changes: ai.changes,
+          is_major: editorial.is_major,
+          changes: editorial.changes,
           status: "draft",
           generated_by: trigger,
           source_summary: {
@@ -547,6 +568,7 @@ Deno.serve(async (req) => {
             system_events: sysItems.length,
             period_start: periodStart.toISOString(),
             period_end: periodEnd.toISOString(),
+            editorial_notes: editorial.notes,
           },
         })
         .select("id")
