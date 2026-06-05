@@ -58,6 +58,18 @@ export function useReleaseDrafts(enabled: boolean = true) {
  *
  * Só faz sentido chamar para platform admins — passe `enabled` apropriado.
  */
+export type GithubReleaseStatus = {
+  configured: boolean;
+  mode?: "gateway" | "public" | "none";
+  owner?: string;
+  repo?: string;
+  commits_last_7d?: number;
+  prs_last_7d?: number;
+  missing: string[];
+  last_check_at?: string;
+  last_error?: string;
+};
+
 export function useGithubReleaseStatus(enabled: boolean) {
   return useQuery({
     queryKey: ["release-notes", "github-status"],
@@ -68,7 +80,7 @@ export function useGithubReleaseStatus(enabled: boolean) {
         body: {},
       });
       if (error) throw error;
-      return data as { configured: boolean; missing: string[] };
+      return data as GithubReleaseStatus;
     },
   });
 }
@@ -89,6 +101,7 @@ export function useGenerateDraft() {
         version?: string;
         items_used?: number;
         github_prs?: number;
+        github_commits?: number;
         system_events?: number;
       };
     },
@@ -98,7 +111,7 @@ export function useGenerateDraft() {
         toast.info("Sem novidades no período — nada a gerar.");
       } else {
         toast.success(
-          `${r.appended ? "Anexado ao rascunho" : "Rascunho criado"} v${r.version} · ${r.items_used} itens (${r.github_prs || 0} PRs, ${r.system_events || 0} eventos)`,
+          `${r.appended ? "Anexado ao rascunho" : "Rascunho criado"} v${r.version} · ${r.items_used} itens (${r.github_commits || 0} commits, ${r.github_prs || 0} PRs, ${r.system_events || 0} eventos)`,
         );
       }
     },

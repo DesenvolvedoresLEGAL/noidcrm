@@ -57,28 +57,50 @@ function incrementVersion(last: string | null | undefined, isMajor: boolean): st
   return parts.join(".");
 }
 
-async function collectGitHubPRs(opts: {
-  periodDays: number;
-  owner?: string;
-  repo?: string;
-}): Promise<IngestionItem[]> {
+const DEFAULT_GH_OWNER = "DesenvolvedoresLEGAL";
+const DEFAULT_GH_REPO = "noidcrm";
+
+// Commits genéricos do bot — incluídos mas com peso menor na sumarização.
+const GENERIC_COMMIT_RE = /^(changes|update|wip|fix typo|chore|merge( branch)?|initial commit|lovable[-\s]?dev)/i;
+
+function isGenericCommit(msg: string): boolean {
+  const first = (msg || "").split("\n")[0].trim();
+  return first.length < 8 || GENERIC_COMMIT_RE.test(first);
+}
+
+async function ghFetch(path: string, hasGateway: boolean): Promise<Response> {
   const lovableKey = Deno.env.get("LOVABLE_API_KEY");
   const githubKey = Deno.env.get("GITHUB_API_KEY");
-  if (!lovableKey || !githubKey || !opts.owner || !opts.repo) {
-    console.log("[release-draft] GitHub skipped (no connector or owner/repo missing)");
-    return [];
-  }
-  const since = new Date(Date.now() - opts.periodDays * 86400_000);
-  const url = `https://connector-gateway.lovable.dev/github/repos/${opts.owner}/${opts.repo}/pulls?state=closed&base=main&per_page=100&sort=updated&direction=desc`;
-  try {
-    const res = await fetch(url, {
+  if (hasGateway && lovableKey && githubKey) {
+    return fetch(`https://connector-gateway.lovable.dev/github${path}`, {
       headers: {
         Authorization: `Bearer ${lovableKey}`,
         "X-Connection-Api-Key": githubKey,
+        Accept: "application/vnd.github+json",
       },
     });
+  }
+  return fetch(`https://api.github.com${path}`, {
+    headers: { Accept: "application/vnd.github+json" },
+  });
+}
+
+async function collectGitHubPRs(opts: {
+  periodDays: number;
+  owner: string;
+  repo: string;
+}): Promise<IngestionItem[]> {
+  const hasGateway = !!(Deno.env.get("LOVABLE_API_KEY") && Deno.env.get("GITHUB_API_KEY"));
+  const since = new Date(Date.now() - opts.periodDays * 86400_000);
+  const path = `/repos/${opts.owner}/${opts.repo}/pulls?state=closed&base=main&per_page=100&sort=updated&direction=desc`;
+  try {
+    let res = await ghFetch(path, hasGateway);
+    if (!res.ok && hasGateway) {
+      // fallback público
+      res = await ghFetch(path, false);
+    }
     if (!res.ok) {
-      console.error("[release-draft] GitHub fetch failed", res.status, await res.text());
+      console.error("[release-draft] GitHub PRs fetch failed", res.status);
       return [];
     }
     const prs = (await res.json()) as Array<{
@@ -90,13 +112,14 @@ async function collectGitHubPRs(opts: {
       user: { login: string };
       labels: Array<{ name: string }>;
     }>;
-    return prs
+    return (Array.isArray(prs) ? prs : [])
       .filter((pr) => pr.merged_at && new Date(pr.merged_at) >= since)
       .map((pr) => ({
         source: "github" as const,
         external_id: `pr-${pr.number}`,
         summary: pr.title,
         payload: {
+          kind: "pr",
           number: pr.number,
           title: pr.title,
           body: (pr.body || "").slice(0, 800),
@@ -104,10 +127,58 @@ async function collectGitHubPRs(opts: {
           author: pr.user?.login,
           labels: pr.labels?.map((l) => l.name) || [],
           url: pr.html_url,
+          weight: 2,
         },
       }));
   } catch (e) {
-    console.error("[release-draft] GitHub error", e);
+    console.error("[release-draft] GitHub PRs error", e);
+    return [];
+  }
+}
+
+async function collectGitHubCommits(opts: {
+  periodDays: number;
+  owner: string;
+  repo: string;
+}): Promise<IngestionItem[]> {
+  const hasGateway = !!(Deno.env.get("LOVABLE_API_KEY") && Deno.env.get("GITHUB_API_KEY"));
+  const since = new Date(Date.now() - opts.periodDays * 86400_000).toISOString();
+  const path = `/repos/${opts.owner}/${opts.repo}/commits?sha=main&since=${since}&per_page=100`;
+  try {
+    let res = await ghFetch(path, hasGateway);
+    if (!res.ok && hasGateway) res = await ghFetch(path, false);
+    if (!res.ok) {
+      console.error("[release-draft] GitHub commits fetch failed", res.status);
+      return [];
+    }
+    const commits = (await res.json()) as Array<{
+      sha: string;
+      html_url: string;
+      commit: { message: string; author: { name: string; date: string } };
+      author: { login: string } | null;
+    }>;
+    return (Array.isArray(commits) ? commits : []).map((c) => {
+      const msg = c.commit?.message || "";
+      const first = msg.split("\n")[0].trim();
+      const generic = isGenericCommit(first);
+      return {
+        source: "github" as const,
+        external_id: `commit-${c.sha}`,
+        summary: first.slice(0, 200),
+        payload: {
+          kind: "commit",
+          sha: c.sha.slice(0, 7),
+          message: first.slice(0, 240),
+          author: c.author?.login || c.commit?.author?.name,
+          at: c.commit?.author?.date,
+          url: c.html_url,
+          generic,
+          weight: generic ? 1 : 3,
+        },
+      };
+    });
+  } catch (e) {
+    console.error("[release-draft] GitHub commits error", e);
     return [];
   }
 }
@@ -201,17 +272,25 @@ function sanitizePayload(p: Record<string, unknown>): Record<string, unknown> {
 
 function deterministicDraft(items: IngestionItem[], period_days: number) {
   const changes: Array<{ type: "feature" | "fix" | "improvement" | "security"; description: string }> = [];
-  const ghItems = items.filter((i) => i.source === "github");
+  const ghItems = items
+    .filter((i) => i.source === "github")
+    .sort((a, b) => ((b.payload as any)?.weight || 0) - ((a.payload as any)?.weight || 0));
   const sysItems = items.filter((i) => i.source === "system_events");
   const actItems = items.filter((i) => i.source === "action_executions");
-  for (const pr of ghItems.slice(0, 30)) {
-    const labels = (pr.payload as any)?.labels as string[] | undefined;
+  const seen = new Set<string>();
+  for (const it of ghItems.slice(0, 40)) {
+    const desc = it.summary.slice(0, 240);
+    const norm = desc.toLowerCase();
+    if (seen.has(norm)) continue;
+    seen.add(norm);
+    const labels = (it.payload as any)?.labels as string[] | undefined;
+    const msg = desc.toLowerCase();
     const type: "feature" | "fix" | "improvement" | "security" =
-      labels?.includes("security") ? "security"
-      : labels?.includes("bug") || labels?.includes("fix") ? "fix"
-      : labels?.includes("feature") ? "feature"
+      labels?.includes("security") || /security|vulnerab|auth/.test(msg) ? "security"
+      : labels?.includes("bug") || labels?.includes("fix") || /^(fix|corrig|bug)/.test(msg) ? "fix"
+      : labels?.includes("feature") || /^(add|adicion|implement|nov[ao])/.test(msg) ? "feature"
       : "improvement";
-    changes.push({ type, description: pr.summary.slice(0, 240) });
+    changes.push({ type, description: desc });
   }
   for (const ev of sysItems.slice(0, 20)) {
     const cat = (ev.payload as any)?.category as string | undefined;
@@ -298,15 +377,16 @@ Deno.serve(async (req) => {
     const periodEnd = new Date();
     const periodStart = new Date(Date.now() - period_days * 86400_000);
 
-    const [ghItems, sysItems, migItems] = await Promise.all([
-      collectGitHubPRs({
-        periodDays: period_days,
-        owner: github_owner || Deno.env.get("GITHUB_DEFAULT_OWNER") || undefined,
-        repo: github_repo || Deno.env.get("GITHUB_DEFAULT_REPO") || undefined,
-      }),
+    const ghOwner = (github_owner || Deno.env.get("GITHUB_DEFAULT_OWNER") || DEFAULT_GH_OWNER).trim();
+    const ghRepo = (github_repo || Deno.env.get("GITHUB_DEFAULT_REPO") || DEFAULT_GH_REPO).trim();
+
+    const [ghPRs, ghCommits, sysItems, migItems] = await Promise.all([
+      collectGitHubPRs({ periodDays: period_days, owner: ghOwner, repo: ghRepo }),
+      collectGitHubCommits({ periodDays: period_days, owner: ghOwner, repo: ghRepo }),
       collectSystemSignals(supa, period_days),
       collectMigrations(period_days),
     ]);
+    const ghItems = [...ghPRs, ...ghCommits];
     const all: IngestionItem[] = [...ghItems, ...sysItems, ...migItems]
       .map((i) => ({ ...i, payload: sanitizePayload(i.payload) }));
 
@@ -350,10 +430,12 @@ Deno.serve(async (req) => {
             role: "system",
             content:
               `Hoje é ${today} (America/Sao_Paulo). Você é um redator técnico de release notes do NOID RevenueOS (CRM brasileiro). ` +
-              `Receberá uma lista bruta de PRs do GitHub mergeados e eventos internos das últimas ${period_days} dias. ` +
-              `Sua tarefa: agrupar tematicamente, eliminar ruído técnico, e produzir um rascunho executivo em pt-BR. ` +
-              `Cada item de 'changes' deve ser uma frase clara para usuário final (não jargão de commit). ` +
-              `Não inclua tokens, IDs internos, nomes de tabelas, stack traces, dados pessoais ou metadados sensíveis. ` +
+              `Receberá itens do GitHub (commits da branch main + PRs mergeados) e eventos internos das últimas ${period_days} dias. ` +
+              `Cada item GitHub traz payload.weight (3 = commit semântico, 2 = PR, 1 = commit genérico tipo "Changes"/"chore"). ` +
+              `Priorize itens com weight ≥ 2. Itens com weight=1 (genéricos do lovable-dev[bot]) só devem aparecer quando agregados em um tema visível (ex: "diversas correções de UI"). ` +
+              `Agrupe tematicamente, deduplique mensagens similares, elimine ruído técnico, produza rascunho executivo em pt-BR. ` +
+              `Cada item de 'changes' deve ser uma frase clara para usuário final (não jargão de commit cru). ` +
+              `Não inclua tokens, IDs internos, SHAs, nomes de tabelas, stack traces, dados pessoais. ` +
               `Tipos permitidos: feature, fix, improvement, security. ` +
               `Marque is_major=true APENAS se houver mudança grande (nova área, refactor significativo, breaking change). ` +
               `Saída APENAS JSON válido: { title, description, is_major, changes: [{type, description}] }.`,
@@ -404,11 +486,15 @@ Deno.serve(async (req) => {
         ...((openDraft.changes as Array<{ type: string; description: string }>) || []),
         ...ai.changes,
       ];
-      const prev = (openDraft.source_summary as Record<string, number>) || {};
+      const prev = (openDraft.source_summary as Record<string, unknown>) || {};
       const newSummary = {
-        github_prs: (prev.github_prs || 0) + ghItems.length,
-        system_events: (prev.system_events || 0) + sysItems.length,
-        period_start: prev.period_start || periodStart.toISOString(),
+        ...prev,
+        github_prs: ((prev.github_prs as number) || 0) + ghPRs.length,
+        github_commits: ((prev.github_commits as number) || 0) + ghCommits.length,
+        github_owner: ghOwner,
+        github_repo: ghRepo,
+        system_events: ((prev.system_events as number) || 0) + sysItems.length,
+        period_start: (prev.period_start as string) || periodStart.toISOString(),
         period_end: periodEnd.toISOString(),
       };
       const { data: upd, error: updErr } = await supa
@@ -445,7 +531,10 @@ Deno.serve(async (req) => {
           status: "draft",
           generated_by: trigger,
           source_summary: {
-            github_prs: ghItems.length,
+            github_prs: ghPRs.length,
+            github_commits: ghCommits.length,
+            github_owner: ghOwner,
+            github_repo: ghRepo,
             system_events: sysItems.length,
             period_start: periodStart.toISOString(),
             period_end: periodEnd.toISOString(),
@@ -480,7 +569,10 @@ Deno.serve(async (req) => {
         version,
         items_collected: all.length,
         items_used: fresh.length,
-        github_prs: ghItems.length,
+        github_prs: ghPRs.length,
+        github_commits: ghCommits.length,
+        github_owner: ghOwner,
+        github_repo: ghRepo,
         system_events: sysItems.length,
         ai_fallback_used: aiFallbackUsed,
       }),
