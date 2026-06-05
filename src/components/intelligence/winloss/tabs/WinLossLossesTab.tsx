@@ -186,7 +186,7 @@ export function WinLossLossesTab({
           icon={ShieldCheck}
           label="CRM Trust Score"
           value={`${crmTrust}/100`}
-          subtitle={crmTrust >= 80 ? 'Confiável' : crmTrust >= 60 ? 'Atenção' : 'Frágil'}
+          subtitle={crmTrustBucket === 'confiável' ? 'Confiável' : crmTrustBucket === 'atenção' ? 'Atenção' : 'Frágil'}
           tone={crmTrust >= 80 ? 'positive' : crmTrust >= 60 ? 'warn' : 'loss'}
         />
       </div>
