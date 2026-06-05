@@ -554,7 +554,7 @@ export function OTESellerDetailTab({
                               <CardTitle className="text-base">{row.fullName}</CardTitle>
                               {isLeader && (
                                 <Badge className="border-amber-400/50 bg-amber-500/15 text-amber-700 hover:bg-amber-500/15 dark:text-amber-300">
-                                  <Crown className="mr-1 h-3 w-3" /> Líder do período
+                                  <Crown className="mr-1 h-3 w-3" /> Líder parcial do mês
                                 </Badge>
                               )}
                               {row.isInactive && (
