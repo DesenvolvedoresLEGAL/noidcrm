@@ -6,6 +6,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { z } from "https://esm.sh/zod@3.23.8";
 import { callAI } from "../_shared/ai-client.ts";
+import { applyEditorialPolicy } from "../_shared/release-notes-editorial.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -300,11 +301,14 @@ function deterministicDraft(items: IngestionItem[], period_days: number) {
     changes.push({ type: "improvement", description: a.summary.slice(0, 240) });
   }
   if (changes.length === 0) {
-    changes.push({ type: "improvement", description: `Atualizações internas dos últimos ${period_days} dias.` });
+    changes.push({ type: "improvement", description: `Atualizações internas dos últimos ${period_days} dias entregues pela equipe de produto.` });
   }
+  const hasGh = ghItems.length > 0;
   return {
-    title: `Atualizações dos últimos ${period_days} dias`,
-    description: `Rascunho gerado sem sumarização IA (fallback determinístico). Revise antes de publicar.`,
+    title: hasGh
+      ? `Release semanal NOID CRM`
+      : `Atualizações dos últimos ${period_days} dias`,
+    description: `Rascunho gerado sem sumarização de IA (fallback determinístico). Revise antes de publicar.`,
     is_major: false,
     changes: changes.slice(0, 40),
   };
@@ -429,16 +433,21 @@ Deno.serve(async (req) => {
           {
             role: "system",
             content:
-              `Hoje é ${today} (America/Sao_Paulo). Você é um redator técnico de release notes do NOID RevenueOS (CRM brasileiro). ` +
+              `Hoje é ${today} (America/Sao_Paulo). Você é um redator EDITORIAL de release notes do NOID CRM, escrevendo para usuários finais, gerentes comerciais e gestores — NÃO para desenvolvedores. ` +
               `Receberá itens do GitHub (commits da branch main + PRs mergeados) e eventos internos das últimas ${period_days} dias. ` +
-              `Cada item GitHub traz payload.weight (3 = commit semântico, 2 = PR, 1 = commit genérico tipo "Changes"/"chore"). ` +
-              `Priorize itens com weight ≥ 2. Itens com weight=1 (genéricos do lovable-dev[bot]) só devem aparecer quando agregados em um tema visível (ex: "diversas correções de UI"). ` +
-              `Agrupe tematicamente, deduplique mensagens similares, elimine ruído técnico, produza rascunho executivo em pt-BR. ` +
-              `Cada item de 'changes' deve ser uma frase clara para usuário final (não jargão de commit cru). ` +
-              `Não inclua tokens, IDs internos, SHAs, nomes de tabelas, stack traces, dados pessoais. ` +
-              `Tipos permitidos: feature, fix, improvement, security. ` +
-              `Marque is_major=true APENAS se houver mudança grande (nova área, refactor significativo, breaking change). ` +
-              `Saída APENAS JSON válido: { title, description, is_major, changes: [{type, description}] }.`,
+              `payload.weight: 3 = commit semântico, 2 = PR, 1 = ruído (chore/changes/merge — IGNORAR ou agrupar). ` +
+              `\n\nREGRAS DE TÍTULO E DESCRIÇÃO:\n` +
+              `- Quando houver QUALQUER commit ou PR real, o título DEVE ser sobre produto. Use "Release semanal NOID CRM" ou um tema dominante (ex: "Inteligência de perdas e novos insights de pipeline"). NUNCA use "Resumo de execuções de IA", "Sem novidades", "Eventos internos".\n` +
+              `- A descrição DEVE resumir a evolução real entregue na semana (2-3 frases). NUNCA escreva que não houve mudanças se a lista de itens contém commits/PRs.\n` +
+              `\nREGRAS DE ITENS (changes):\n` +
+              `- Cada item é um BENEFÍCIO para o usuário. Traduza commit técnico em ganho de produto.\n` +
+              `- Entregue 8 a 12 itens consolidados, ordenados: novidade > melhoria > segurança > correção.\n` +
+              `- PROIBIDO: jargão técnico (RLS, payload, token, edge function, schema, stack, policy, cron, client public, anonymous). Substitua por linguagem de produto.\n` +
+              `- PROIBIDO: itens vazios, "Nenhuma execução", "Sem novidades", "Changes", siglas internas sem explicação.\n` +
+              `- Não inclua SHAs, IDs internos, nomes de tabelas, dados pessoais.\n` +
+              `- Tipos permitidos: feature, fix, improvement, security.\n` +
+              `- is_major=true APENAS para mudanças realmente grandes (nova área, breaking change).\n` +
+              `\nSaída APENAS JSON válido: { title, description, is_major, changes: [{type, description}] }.`,
           },
           { role: "user", content: JSON.stringify({ period_days, items: inputForAI }, null, 2) },
         ],
@@ -472,20 +481,48 @@ Deno.serve(async (req) => {
     // 4. Idempotência: se já houver draft aberto, anexa ao invés de criar novo
     const { data: openDraft } = await supa
       .from("release_notes")
-      .select("id, version, changes, source_summary")
+      .select("id, version, changes, source_summary, title, description")
       .eq("status", "draft")
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
 
-    let releaseId: string;
+    // 4b. Versão (preliminar) para o policy editorial usar no título padrão
     let version: string;
+    if (openDraft) {
+      version = openDraft.version;
+    } else {
+      const { data: last } = await supa
+        .from("release_notes")
+        .select("version")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      version = incrementVersion(last?.version, ai.is_major);
+    }
+
+    // 4c. Pós-processamento editorial (sempre, mesmo no fallback determinístico)
+    const editorial = applyEditorialPolicy(ai, {
+      version,
+      periodDays: period_days,
+      githubCommits: ghCommits.length,
+      githubPRs: ghPRs.length,
+      systemEvents: sysItems.length,
+    });
+    if (editorial.notes.length) {
+      console.log(`[release-draft] editorial notes:`, editorial.notes.join(" | "));
+    }
+
+    let releaseId: string;
 
     if (openDraft) {
-      const mergedChanges = [
-        ...((openDraft.changes as Array<{ type: string; description: string }>) || []),
-        ...ai.changes,
-      ];
+      const prevChanges = (openDraft.changes as Array<{ type: "feature"|"fix"|"improvement"|"security"; description: string }>) || [];
+      const mergedRaw = [...prevChanges, ...editorial.changes];
+      // Re-roda editorial só para dedup/ordenar/limitar a 12 (não substitui título existente)
+      const reEdit = applyEditorialPolicy(
+        { title: openDraft.title || editorial.title, description: openDraft.description || editorial.description, is_major: editorial.is_major, changes: mergedRaw },
+        { version, periodDays: period_days, githubCommits: ghCommits.length, githubPRs: ghPRs.length, systemEvents: sysItems.length },
+      );
       const prev = (openDraft.source_summary as Record<string, unknown>) || {};
       const newSummary = {
         ...prev,
@@ -500,7 +537,9 @@ Deno.serve(async (req) => {
       const { data: upd, error: updErr } = await supa
         .from("release_notes")
         .update({
-          changes: mergedChanges,
+          title: reEdit.title,
+          description: reEdit.description,
+          changes: reEdit.changes,
           source_summary: newSummary,
         })
         .eq("id", openDraft.id)
@@ -510,24 +549,15 @@ Deno.serve(async (req) => {
       releaseId = upd.id;
       version = upd.version;
     } else {
-      // 5. Próxima versão
-      const { data: last } = await supa
-        .from("release_notes")
-        .select("version")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      version = incrementVersion(last?.version, ai.is_major);
-
       const { data: ins, error: insErr } = await supa
         .from("release_notes")
         .insert({
           version,
-          title: ai.title,
-          description: ai.description || `Rascunho gerado ${trigger === "scheduled" ? "automaticamente" : "manualmente"} a partir de ${fresh.length} sinais.`,
+          title: editorial.title,
+          description: editorial.description,
           release_date: today,
-          is_major: ai.is_major,
-          changes: ai.changes,
+          is_major: editorial.is_major,
+          changes: editorial.changes,
           status: "draft",
           generated_by: trigger,
           source_summary: {
@@ -538,6 +568,7 @@ Deno.serve(async (req) => {
             system_events: sysItems.length,
             period_start: periodStart.toISOString(),
             period_end: periodEnd.toISOString(),
+            editorial_notes: editorial.notes,
           },
         })
         .select("id")
