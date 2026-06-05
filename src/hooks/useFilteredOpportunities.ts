@@ -73,16 +73,15 @@ export function useFilteredOpportunities() {
       }
 
       // Buscar dados em paralelo. `stages` vai pelo cache de módulo (TTL 10m).
+      const stagesResult = await fetchStagesCached();
       const [
         opportunitiesResult,
         pipelinesResult,
-        stagesResult,
         lossReasonsResult,
         usersResult,
       ] = await Promise.all([
         opportunitiesQuery,
         supabase.from('pipelines').select('id, name, pipeline_type'),
-        fetchStagesCached(),
         supabase.from('loss_reasons').select('id, name'),
         supabase.from('profiles').select('id, full_name'),
       ]);

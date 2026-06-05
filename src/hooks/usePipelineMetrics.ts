@@ -251,10 +251,10 @@ export function useStageConversionMetrics() {
         query = query.in('pipeline_id', filters.pipelines);
       }
 
-      const [oppsResult, pipelinesResult, stagesResult] = await Promise.all([
+      const stagesResult = await fetchStagesCached();
+      const [oppsResult, pipelinesResult] = await Promise.all([
         query,
         supabase.from('pipelines').select('id, name, pipeline_type, organization_id'),
-        fetchStagesCached(),
       ]);
 
       if (oppsResult.error) throw oppsResult.error;
