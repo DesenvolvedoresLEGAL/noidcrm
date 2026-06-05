@@ -134,7 +134,12 @@ export function WinLossLossesTab({
   const commercialPctOfLost = commercialFailure?.pctOfLostValue ?? 0;
   const recoverableValue = semantic?.recoverableRevenue ?? 0;
   const recoverableCount = semantic?.recoverableCount ?? 0;
-  const crmTrust = semantic?.crmTrustScore ?? 0;
+  // CRM Trust Score determinístico (Sprint WL-LOSS-04) — calculado a partir do
+  // preenchimento real (opportunities.loss_reason_id + loss_comment).
+  // O score semântico (AI) fica como referência adicional quando disponível.
+  const crmTrust = data.crmTrustDeterministic.score;
+  const crmTrustBucket = data.crmTrustDeterministic.bucket;
+  const declaredVsInferred = data.declaredVsInferred;
 
   return (
     <div className="space-y-6">
