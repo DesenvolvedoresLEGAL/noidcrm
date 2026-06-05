@@ -502,6 +502,16 @@ export function useWinLossData(organizationId: string | undefined, pipelineId: s
       // 11. Won by stage at acceptance — fonte: snapshot via opportunity_stage_history + proposals.accepted_at
       const wonStageBreakdown = await buildWonStageBreakdown(wins);
 
+      // 11b. Lost by stage at moment of loss — Sprint WL-LOSS-04.
+      // Fonte: snapshot via opportunity_stage_history em closed_at; fallback = stage atual.
+      const lostStageBreakdown = await buildLostStageBreakdown(losses);
+
+      // 11c. CRM Trust Score determinístico e divergência declarado×inferido (Sprint WL-LOSS-04).
+      // Não depende de loss_semantic_analyses. Lê opportunities.loss_reason_id + loss_comment
+      // (espelhados em win_loss_records.reason_id + reason_seller) já materializados em `losses`.
+      const crmTrustDeterministic = computeCrmTrust(losses);
+      const declaredVsInferred = computeDeclaredVsInferred(losses);
+
       return {
         wins, losses, allDeals,
         wonCount: wins.length, lostCount: losses.length,
@@ -520,6 +530,9 @@ export function useWinLossData(organizationId: string | undefined, pipelineId: s
         validWinCyclesCount: validWinCycles.length, validLossCyclesCount: validLossCycles.length,
         monthlyPulse, timeToLossDistribution, lossMortality,
         wonStageBreakdown,
+        lostStageBreakdown,
+        crmTrustDeterministic,
+        declaredVsInferred,
       };
 
     },
