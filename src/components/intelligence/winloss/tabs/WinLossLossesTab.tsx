@@ -76,36 +76,8 @@ export function WinLossLossesTab({
   // Top motivos específicos (nome do motivo) com accountability + tendência prévia.
   const topReasons = useMemo(() => buildTopReasons(losses, dateRange), [losses, dateRange]);
 
-  // Perdas por etapa — buscar nomes dos stages a partir dos opportunity.stage_id.
-  // Fazemos uma query leve isolada para não tocar em useWinLossData.
-  const stageIds = useMemo(() => {
-    const ids = new Set<string>();
-    for (const l of losses) {
-      const sid = (l.opportunity as any)?.stage_id;
-      if (sid) ids.add(sid);
-    }
-    return [...ids];
-  }, [losses]);
-
-  const { data: stageNameMap } = useQuery({
-    queryKey: ['winloss-losses-stage-names', organizationId, stageIds.sort().join(',')],
-    enabled: !!organizationId && stageIds.length > 0,
-    staleTime: 5 * 60_000,
-    queryFn: async () => {
-      const { data: stages } = await (supabase as any)
-        .from('pipeline_stages')
-        .select('id, name')
-        .in('id', stageIds);
-      const map = new Map<string, string>();
-      stages?.forEach((s: any) => map.set(s.id, s.name));
-      return map;
-    },
-  });
-
-  const stageBreakdown = useMemo(
-    () => buildStageBreakdown(losses, stageNameMap),
-    [losses, stageNameMap],
-  );
+  // Perdas por etapa — agora vem do hook (snapshot histórico em closed_at, fallback = stage atual).
+  const lostStageBreakdown = data?.lostStageBreakdown || [];
 
   // Voz do cliente (lossFeedbacks já preparado pelo hook, limitamos a 5 e a 160c).
   const lossSnippets = useMemo(() => {
