@@ -849,7 +849,7 @@ function LostByStageCard({ rows }: { rows: import('@/hooks/useWinLossData').Lost
           <Layers className="h-4 w-4" /> Perdas por Etapa do Pipeline
         </CardTitle>
         <CardDescription className="text-xs">
-          Etapa em que a oportunidade estava no momento da perda.
+          As perdas são atribuídas à última etapa antes da marcação como perdida.
         </CardDescription>
       </CardHeader>
       <CardContent>
