@@ -101,6 +101,7 @@ export function useGenerateDraft() {
         version?: string;
         items_used?: number;
         github_prs?: number;
+        github_commits?: number;
         system_events?: number;
       };
     },
@@ -110,7 +111,7 @@ export function useGenerateDraft() {
         toast.info("Sem novidades no período — nada a gerar.");
       } else {
         toast.success(
-          `${r.appended ? "Anexado ao rascunho" : "Rascunho criado"} v${r.version} · ${r.items_used} itens (${r.github_prs || 0} PRs, ${r.system_events || 0} eventos)`,
+          `${r.appended ? "Anexado ao rascunho" : "Rascunho criado"} v${r.version} · ${r.items_used} itens (${r.github_commits || 0} commits, ${r.github_prs || 0} PRs, ${r.system_events || 0} eventos)`,
         );
       }
     },
