@@ -135,7 +135,7 @@ export function OTEOverviewTab({
     {
       label: 'Total a pagar',
       value: formatCurrency(totalToPay),
-      hint: 'Variável final do período',
+      hint: totalToPay > 0 ? 'Variável final do período' : 'Nenhuma variável liberada',
       emphasize: true,
     },
   ];
