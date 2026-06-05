@@ -34882,6 +34882,10 @@ export type Database = {
         Args: { p_proposal_id: string }
         Returns: Json
       }
+      ensure_public_proposal_dynamic_pricing_current: {
+        Args: { p_token: string }
+        Returns: Json
+      }
       expire_old_payment_intents: { Args: never; Returns: number }
       find_inventory_allocation_candidates: {
         Args: { p_pre_reservation_item_id: string }
