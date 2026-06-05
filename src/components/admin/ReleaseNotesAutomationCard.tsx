@@ -148,7 +148,7 @@ export function ReleaseNotesAutomationCard({ enabled = true }: { enabled?: boole
                 size="sm"
                 variant="outline"
                 className="gap-1.5"
-                onClick={() => navigate("/release-notes")}
+                onClick={() => navigate("/app/release-notes")}
               >
                 <ExternalLink className="h-3.5 w-3.5" />
                 Abrir Release Notes
