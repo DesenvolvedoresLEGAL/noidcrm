@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { AlertTriangle, RefreshCw, Loader2 } from 'lucide-react';
@@ -8,6 +8,8 @@ import {
   useApplyProposalDynamicPrice,
   useProposalDynamicPricingSnapshot,
 } from '@/hooks/proposals/useProposalDynamicPricing';
+import { ensureProposalDynamicPricingCurrent } from '@/services/proposals/ensureProposalDynamicPricingCurrent';
+import { invalidateProposalCaches } from '@/hooks/proposals/useProposalOrchestrator';
 
 interface Props {
   proposalId: string;
@@ -32,6 +34,7 @@ export function DynamicPricingMismatchAlert({
   className,
 }: Props) {
   const { data: snapshot } = useProposalDynamicPricingSnapshot(proposalId);
+  const queryClient = useQueryClient();
 
   const { data: proposalRow } = useQuery({
     queryKey: ['proposal-mismatch-row', proposalId],
@@ -75,8 +78,61 @@ export function DynamicPricingMismatchAlert({
     return { mismatch: diff > 0.01, displayed: candidate, vigent };
   }, [snapshot, proposalRow, displayedAmount]);
 
+  // AUTO-REFRESH: ao detectar divergência, dispara a RPC idempotente uma
+  // única vez. O botão manual continua existindo como fallback caso falhe.
+  const [autoSyncing, setAutoSyncing] = useState(false);
+  const [autoFailed, setAutoFailed] = useState(false);
+  const triedRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!mismatch || vigent == null || displayed == null) return;
+    const key = `${proposalId}:${vigent}:${displayed}`;
+    if (triedRef.current === key) return;
+    triedRef.current = key;
+    setAutoSyncing(true);
+    setAutoFailed(false);
+    ensureProposalDynamicPricingCurrent(proposalId)
+      .then((res) => {
+        if (res?.refreshed) {
+          invalidateProposalCaches(queryClient, proposalId);
+          queryClient.invalidateQueries({ queryKey: ['proposal-mismatch-row', proposalId] });
+          queryClient.invalidateQueries({ queryKey: ['proposal-dynamic-pricing-snapshot', proposalId] });
+          queryClient.invalidateQueries({ queryKey: ['proposal', proposalId] });
+        } else {
+          // Sem refresh: provavelmente o snapshot já está correto e a divergência
+          // está num cache; forçamos uma reavaliação invalidando as queries.
+          queryClient.invalidateQueries({ queryKey: ['proposal-mismatch-row', proposalId] });
+          queryClient.invalidateQueries({ queryKey: ['proposal-dynamic-pricing-snapshot', proposalId] });
+        }
+      })
+      .catch(() => setAutoFailed(true))
+      .finally(() => setAutoSyncing(false));
+  }, [mismatch, vigent, displayed, proposalId, queryClient]);
+
   if (!mismatch || vigent == null || displayed == null) return null;
 
+  // Enquanto o auto-sync está rodando ou ainda não falhou, mostramos só o loading
+  // discreto — sem o botão manual.
+  if (autoSyncing) {
+    return (
+      <Alert
+        className={
+          'border-amber-400/60 bg-amber-50 text-amber-900 dark:bg-amber-950/30 dark:text-amber-200 dark:border-amber-700 ' +
+          (className ?? '')
+        }
+      >
+        <Loader2 className="h-4 w-4 animate-spin" />
+        <AlertTitle className="text-sm font-semibold">
+          Atualizando condição comercial vigente…
+        </AlertTitle>
+        <AlertDescription className="text-sm">
+          Sincronizando o valor da proposta com a tabela dinâmica atual.
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
+  // Auto-sync rodou e não resolveu (ou falhou): mantém alerta + botão manual.
   return (
     <Alert
       variant="destructive"
@@ -93,6 +149,11 @@ export function DynamicPricingMismatchAlert({
         <div>
           O valor atual da proposta ({formatBRL(displayed)}) está diferente do
           valor vigente da tabela dinâmica ({formatBRL(vigent)}).
+          {autoFailed && (
+            <span className="block text-xs mt-1 opacity-80">
+              A sincronização automática falhou. Use o botão abaixo para tentar novamente.
+            </span>
+          )}
         </div>
         <div className="pt-1">
           <Button
