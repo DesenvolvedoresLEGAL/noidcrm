@@ -47,11 +47,11 @@ export async function fetchStagesCached(opts: Options = {}): Promise<CachedStage
     const columns = opts.withExtras
       ? 'id, name, pipeline_id, order_index, probability, stagnation_alert_days'
       : 'id, name, pipeline_id, order_index';
-    let q = supabase.from('stages').select(columns).order('order_index');
+    let q: any = supabase.from('stages').select(columns).order('order_index');
     if (opts.organizationId) q = q.eq('organization_id', opts.organizationId);
     const { data, error } = await q;
     if (error) throw error;
-    const rows = (data ?? []) as CachedStage[];
+    const rows = (data ?? []) as unknown as CachedStage[];
     cache.set(key, { ts: Date.now(), data: rows });
     return rows;
   })();
