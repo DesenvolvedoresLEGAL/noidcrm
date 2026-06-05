@@ -531,7 +531,10 @@ Deno.serve(async (req) => {
           status: "draft",
           generated_by: trigger,
           source_summary: {
-            github_prs: ghItems.length,
+            github_prs: ghPRs.length,
+            github_commits: ghCommits.length,
+            github_owner: ghOwner,
+            github_repo: ghRepo,
             system_events: sysItems.length,
             period_start: periodStart.toISOString(),
             period_end: periodEnd.toISOString(),
