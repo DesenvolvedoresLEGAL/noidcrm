@@ -954,18 +954,15 @@ function buildLossPlaybooks(
   categories: ReturnType<typeof aggregateLossesByCategory>,
   commercialFailure: ReturnType<typeof buildCommercialFailureSummary> | undefined,
   semantic: LossSemanticAggregates | undefined,
+  // CRM Trust Score calculado pelo motor determinístico WL-LOSS-04 (SSoT oficial).
+  crmTrustScore?: number,
 ): string[] {
-  // Ordem de prioridade executiva (máx. 5):
-  // 1) falha comercial · 2) maior valor perdido (top categoria) · 3) concorrência
-  // 4) preço/valor · 5) trust score baixo
   const out: string[] = [];
 
-  // 1. Falha comercial
   if (commercialFailure?.commercialCount && commercialFailure.pctOfLostValue >= 25) {
     out.push(`Falha comercial representa ${commercialFailure.pctOfLostValue}% do valor perdido — promover review semanal de pipeline ativo.`);
   }
 
-  // 2. Maior valor perdido (top categoria por valor)
   const topByValue = [...categories].sort((a, b) => (b.lostValue ?? 0) - (a.lostValue ?? 0))[0];
   if (topByValue) {
     const topMap: Record<string, string> = {
@@ -981,19 +978,18 @@ function buildLossPlaybooks(
     }
   }
 
-  // 3. Concorrência
   const top3 = categories.slice(0, 3).map((c) => c.category);
   if (top3.includes('competition')) {
     out.push('Reforçar battlecards para os concorrentes que mais aparecem nas perdas.');
   }
 
-  // 4. Preço / Valor
   if (top3.includes('price')) {
     out.push('Revisar política de desconto e faixas aprovadas — Preço / Valor está entre os principais motivos.');
   }
 
-  // 5. Trust score baixo
-  if (semantic && semantic.total > 0 && semantic.crmTrustScore < 60) {
+  // 5. Trust score baixo — usa SSoT determinístico (WL-LOSS-04), fallback no legado semântico.
+  const trust = crmTrustScore ?? (semantic && semantic.total > 0 ? semantic.crmTrustScore : undefined);
+  if (trust !== undefined && trust < 60) {
     out.push('Tornar obrigatório o preenchimento de diagnóstico de perda — CRM Trust Score abaixo do ideal.');
   }
 
