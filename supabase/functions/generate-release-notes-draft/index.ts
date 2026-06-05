@@ -516,7 +516,7 @@ Deno.serve(async (req) => {
     let releaseId: string;
 
     if (openDraft) {
-      const prevChanges = (openDraft.changes as Array<{ type: ChangeTypeLocal; description: string }>) || [];
+      const prevChanges = (openDraft.changes as Array<{ type: "feature"|"fix"|"improvement"|"security"; description: string }>) || [];
       const mergedRaw = [...prevChanges, ...editorial.changes];
       // Re-roda editorial só para dedup/ordenar/limitar a 12 (não substitui título existente)
       const reEdit = applyEditorialPolicy(
