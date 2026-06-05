@@ -22,6 +22,8 @@ interface SmartAlertsCardProps {
   isLoading: boolean;
   contextLabel: string;
   semantic?: LossSemanticAggregates;
+  /** SSoT CRM Trust Score (motor determinístico WL-LOSS-04). Sobrescreve o legado de loss_semantic_analyses. */
+  crmTrustScore?: number;
 }
 
 interface Alert {
