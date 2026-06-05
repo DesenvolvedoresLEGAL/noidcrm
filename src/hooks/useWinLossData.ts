@@ -81,6 +81,17 @@ export interface WonStageRow {
   fallbackCount: number;
 }
 
+export interface LostStageRow {
+  stageId: string;
+  stageName: string;
+  count: number;
+  lostValue: number;
+  avgTicket: number;
+  avgCycle: number;
+  topReason?: string;
+  fallbackCount: number;
+}
+
 export interface WinLossDataResult {
   wins: WinLossDeal[];
   losses: WinLossDeal[];
@@ -110,6 +121,9 @@ export interface WinLossDataResult {
   timeToLossDistribution: Array<{ week: string; count: number }>;
   lossMortality: LossMortality;
   wonStageBreakdown: WonStageRow[];
+  lostStageBreakdown: LostStageRow[];
+  crmTrustDeterministic: import('@/lib/winloss/lossDiagnosticScore').CrmTrustResult;
+  declaredVsInferred: import('@/lib/winloss/lossDiagnosticScore').DeclaredVsInferred;
 }
 
 
