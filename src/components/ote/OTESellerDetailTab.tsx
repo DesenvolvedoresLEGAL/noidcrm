@@ -529,12 +529,8 @@ export function OTESellerDetailTab({
                             <p className="text-xs text-muted-foreground">
                               {row.levelName} · {positionLabel(officialIdx)}
                             </p>
-                            {isLeader && (
-                              <p className="text-[11px] italic text-muted-foreground">
-                                Melhor desempenho do período até agora.
-                              </p>
-                            )}
                           </div>
+
                         </div>
 
                         {/* Centro: % Meta grande + progresso */}
