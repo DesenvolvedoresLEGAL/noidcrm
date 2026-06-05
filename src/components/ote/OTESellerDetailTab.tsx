@@ -38,6 +38,9 @@ export function OTESellerDetailTab({ results, isLoading, isOTEMode = true, perio
   const resultIds = results.map((r) => r.id);
   const { data: allRecords = [], isLoading: recordsLoading } = useOTESalesRecords(resultIds);
   const { organization } = useCurrentOrganization();
+  const { config } = useSalesConfig();
+  const flagBlueThreshold = config?.flag_blue_threshold ?? 70;
+  const flagYellowMinThreshold = config?.flag_yellow_min_threshold ?? 50;
 
   // Fonte ÚNICA de leads qualificados (mesma do Visão Geral / Win-Loss):
   // opportunities won em pipeline qualification + atribuição histórica.
