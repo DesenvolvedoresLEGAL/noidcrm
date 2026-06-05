@@ -143,7 +143,6 @@ export default function OTEReport() {
           <Tabs defaultValue="overview" className="space-y-4">
             <TabsList>
               <TabsTrigger value="overview">Visão Geral</TabsTrigger>
-              <TabsTrigger value="sellers">Por Vendedor</TabsTrigger>
               <TabsTrigger value="history">Histórico</TabsTrigger>
             </TabsList>
 
@@ -153,26 +152,15 @@ export default function OTEReport() {
               ) : isSimpleMode ? (
                 <SimpleGoalsOverviewTab results={results || []} records={records} isLoading={loading} />
               ) : (
-                <OTEOverviewTab 
-                  results={results || []} 
+                <OTEOverviewTab
+                  results={results || []}
                   records={records}
-                  isLoading={loading} 
+                  isLoading={loading}
                   period={selectedPeriod}
                   isOTEMode={isOTEMode}
                 />
               )}
             </TabsContent>
-
-            <TabsContent value="sellers">
-              {isCommissionMode ? (
-                <CommissionSellerDetailTab results={results || []} isLoading={loading} />
-              ) : isSimpleMode ? (
-                <SimpleGoalsSellerDetailTab results={results || []} isLoading={loading} />
-              ) : (
-                <OTESellerDetailTab results={results || []} isLoading={loading} isOTEMode={isOTEMode} period={selectedPeriod} />
-              )}
-            </TabsContent>
-
 
             <TabsContent value="history">
               {isCommissionMode ? (
@@ -184,6 +172,7 @@ export default function OTEReport() {
               )}
             </TabsContent>
           </Tabs>
+
         </div>
       </div>
     </Layout>
