@@ -385,7 +385,7 @@ export function OTESellerDetailTab({
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-              <span className="capitalize text-foreground/80">{periodLabel}</span>
+              <span className="text-foreground/80">{periodLabel}</span>
               <span aria-hidden>·</span>
               <span>
                 <span className="font-semibold text-foreground">{summary.total}</span> participantes
@@ -394,13 +394,11 @@ export function OTESellerDetailTab({
                 <>
                   <span aria-hidden>·</span>
                   <span>
-                    Líder:{' '}
+                    Líder parcial:{' '}
                     <span className="font-semibold text-foreground">
-                      {summary.leader.fullName.split(' ')[0]}
-                    </span>{' '}
-                    <span className="text-foreground/80">
-                      ({summary.leader.pctMeta.toFixed(1)}%)
+                      {summary.leader.fullName}
                     </span>
+                    , {formatPct(summary.leader.pctMeta)}%
                   </span>
                 </>
               )}
