@@ -33,12 +33,22 @@ Deno.serve(async (req) => {
     // Marcamos como candidatas quando:
     //  - snapshot ausente OU
     //  - dynamic_pricing_snapshot->>'current_ends_at' já no passado.
+    // Cobre TODOS os status comerciais ainda editáveis (não-congelados).
+    // A RPC interna trata frozen/accepted/rejected como no-op.
+    const FROZEN_STATUSES = [
+      "accepted",
+      "rejected",
+      "cancelled",
+      "archived",
+      "expired",
+    ];
+
     const { data: candidates, error } = await supabase
       .from("proposals")
       .select(
-        "id, dynamic_pricing_snapshot, dynamic_pricing_last_calculated_at",
+        "id, status, dynamic_pricing_snapshot, dynamic_pricing_last_calculated_at, dynamic_pricing_current_amount, total_amount, payment_expected_amount",
       )
-      .in("status", ["draft", "sent"])
+      .not("status", "in", `(${FROZEN_STATUSES.join(",")})`)
       .eq("dynamic_pricing_enabled", true)
       .eq("dynamic_pricing_applicability", "automatic")
       .neq("price_frozen_on_approval", true)
@@ -60,12 +70,17 @@ Deno.serve(async (req) => {
     const stale = (candidates ?? []).filter((p: any) => {
       const snap = p?.dynamic_pricing_snapshot;
       if (!snap || typeof snap !== "object") return true;
+      if (!p.dynamic_pricing_last_calculated_at) return true;
       const ends = snap?.current_ends_at
         ? new Date(snap.current_ends_at).getTime()
         : null;
       if (ends !== null && ends < nowMs) return true;
-      // Snapshot que nunca foi recalculado também é candidato.
-      if (!p.dynamic_pricing_last_calculated_at) return true;
+      // Drift detectado entre snapshot/card e current_amount persistido.
+      const snapAmt = snap?.current_amount != null ? Number(snap.current_amount) : null;
+      const cardAmt = p.payment_expected_amount ?? p.total_amount;
+      const persisted = p.dynamic_pricing_current_amount;
+      if (snapAmt != null && persisted != null && Math.abs(Number(persisted) - snapAmt) > 0.01) return true;
+      if (snapAmt != null && cardAmt != null && Math.abs(Number(cardAmt) - snapAmt) > 0.01) return true;
       return false;
     });
 
