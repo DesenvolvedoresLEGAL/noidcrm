@@ -100,11 +100,16 @@ export function useOwnerDashboard() {
         expiringProposalsResult,
       ] = await Promise.all([
         supabase.from('opportunities').select('id, account_id, owner_user_id, pipeline_id, stage_id, status, valor_previsto, prob, close_date_prevista, closed_at, updated_at, created_at, produto, deleted_at, title, nrhs_score, pipelines!inner(pipeline_type)').eq('organization_id', organizationId).is('deleted_at', null),
-        supabase.from('accounts').select('id, razao_social, nome_fantasia, pontuacao_nps, data_tornou_cliente, lifecycle_stage').eq('organization_id', organizationId),
-        supabase.from('profiles').select('id, user_id, full_name, monthly_goal').eq('organization_id', organizationId),
-        supabase.from('stages').select('id, name, pipeline_id, order_index, probability, stagnation_alert_days').eq('organization_id', organizationId),
-        supabase.from('workflow_executions').select('id, workflow_rule_id, status, error_message, trigger_type, created_at').eq('organization_id', organizationId).eq('status', 'failed').limit(100),
-        supabase.from('activities').select('id, opportunity_id, account_id, type, status, created_at').eq('organization_id', organizationId).gte('created_at', last12Months.toISOString()),
+        // PERF 0.6D — `data_tornou_cliente` não é consumido aqui.
+        supabase.from('accounts').select('id, razao_social, nome_fantasia, pontuacao_nps, lifecycle_stage').eq('organization_id', organizationId),
+        // PERF 0.6D — `id` do profile não é usado (chaveamos por user_id).
+        supabase.from('profiles').select('user_id, full_name, monthly_goal').eq('organization_id', organizationId),
+        // PERF 0.6D — `probability` e `stagnation_alert_days` não são lidos no dashboard owner.
+        supabase.from('stages').select('id, name, pipeline_id, order_index').eq('organization_id', organizationId),
+        // PERF 0.6D — só `trigger_type` é consumido para o card de erros críticos.
+        supabase.from('workflow_executions').select('trigger_type').eq('organization_id', organizationId).eq('status', 'failed').limit(100),
+        // PERF 0.6D — só `account_id` e `created_at` são usados para inatividade/churn.
+        supabase.from('activities').select('account_id, created_at').eq('organization_id', organizationId).gte('created_at', last12Months.toISOString()),
         supabase.from('pipelines').select('id, name, pipeline_type').eq('organization_id', organizationId),
         supabase.from('organization_members').select('user_id, org_role').eq('organization_id', organizationId).eq('status', 'active'),
         // MRR real de propostas aceitas - use IDs já filtrados
