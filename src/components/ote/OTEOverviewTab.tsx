@@ -1,36 +1,27 @@
 /**
- * SPRINT OTE 1.6 — Visão Geral unificada (cockpit OTE).
+ * PATCH OTE 1.6.1 — Refinamento premium da Visão Geral.
  *
- * Esta tela consolida o que antes era dividido entre "Visão Geral" e
- * "Por Vendedor". A composição segue a ordem oficial da sprint:
+ * Ordem oficial:
+ *   1) Resumo financeiro do OTE (bloco único horizontal com 4 métricas).
+ *   2) Campeonato Comercial + Pódio + Filtros + Ranking expansível
+ *      (delegado ao OTESellerDetailTab).
  *
- *   1) Cards financeiros de comprovação (Total a pagar, Comissão elegível
- *      comercial, Receita elegível OTE, Itens fora da meta, Vendedores no
- *      cálculo).
- *   2) Campeonato Comercial + Pódio do mês + Filtros + Ranking expansível
- *      (delegado ao OTESellerDetailTab, que já implementa pódio, filtros,
- *      ordenação e drill-down por vendedor — SPRINT OTE 1.5).
- *   3) Total geral a pagar como resumo financeiro final.
+ * Removido nesta revisão:
+ *   - Card separado "Vendedores no cálculo" (passa a viver como
+ *     "Participantes" dentro do Campeonato Comercial).
+ *   - Card separado "Total a pagar" duplicado (mantido apenas no resumo
+ *     financeiro).
+ *   - Rodapé "Total geral a pagar" (redundante com o bloco financeiro).
  *
- * NÃO altera nenhum cálculo OTE/comissão/elegibilidade/qualificação.
- * Apenas reorganiza a UI e remove tabelas antigas e bloco de reconciliação.
+ * NÃO altera nenhum cálculo OTE/comissão/elegibilidade.
  */
 import { Card, CardContent } from '@/components/ui/card';
 import { OTEMonthlyResult } from '@/hooks/useOTEData';
 import type { OTESalesRecord } from '@/hooks/useOTESalesRecords';
 import { aggregateEligible } from './oteEligibility';
-import {
-  useOfficialEligibleRevenueSummary,
-} from '@/hooks/revenue/useRevenueSsot';
+import { useOfficialEligibleRevenueSummary } from '@/hooks/revenue/useRevenueSsot';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
-import {
-  DollarSign,
-  TrendingUp,
-  Users,
-  AlertTriangle,
-  Wallet,
-  Ban,
-} from 'lucide-react';
+import { AlertTriangle, Wallet } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { OTESellerDetailTab } from './OTESellerDetailTab';
 
@@ -65,8 +56,6 @@ export function OTEOverviewTab({
 }: OTEOverviewTabProps) {
   const { organization } = useCurrentOrganization();
 
-  // SSoT oficial — mesma fonte do Relatório Vendas Realizadas
-  // (commercial_won_revenue_view). Não recalcular aqui.
   const [py, pm] = (period || '').split('-').map(Number);
   const periodStart =
     py && pm ? new Date(Date.UTC(py, pm - 1, 1)).toISOString() : undefined;
@@ -81,10 +70,8 @@ export function OTEOverviewTab({
   const { data: ssotSummary, isError: ssotError } =
     useOfficialEligibleRevenueSummary(ssotParams as any);
 
-  const individualResults = results.filter((r) => !r.is_team_target);
-  const revenueResults = individualResults.filter(isRevenueRole);
+  const revenueResults = results.filter((r) => !r.is_team_target).filter(isRevenueRole);
 
-  // KPIs financeiros (mesma lógica anterior, intacta).
   const totalToPay = results.reduce(
     (sum, r) => sum + Number(r.final_variable_amount || 0),
     0,
@@ -120,123 +107,96 @@ export function OTEOverviewTab({
     );
   }
 
+  const financialMetrics: Array<{
+    label: string;
+    value: string;
+    hint: string;
+    emphasize?: boolean;
+    warn?: boolean;
+  }> = [
+    {
+      label: 'Comissão elegível comercial',
+      value: ssotAvailable ? formatCurrency(commercialEligible) : '—',
+      hint: ssotAvailable
+        ? 'Fonte: Vendas Realizadas'
+        : 'Não foi possível carregar a base comercial oficial.',
+      warn: !ssotAvailable,
+    },
+    {
+      label: 'Receita elegível OTE',
+      value: formatCurrency(oteEligible),
+      hint: 'Após excluir itens fora da meta',
+    },
+    {
+      label: 'Itens fora da meta',
+      value: formatCurrency(itemsOutOfGoal),
+      hint: 'Produtos, serviços, logística e taxas',
+    },
+    {
+      label: 'Total a pagar',
+      value: formatCurrency(totalToPay),
+      hint: 'Variável final do período',
+      emphasize: true,
+    },
+  ];
+
   return (
     <div className="space-y-6">
-      {/* ===== Bloco 1: Cards financeiros de comprovação ===== */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Total a pagar</p>
-                <p className="text-2xl font-bold text-primary">{formatCurrency(totalToPay)}</p>
-                <p className="text-xs text-muted-foreground">Variável final do período</p>
-              </div>
-              <Wallet className="h-8 w-8 text-primary/20" />
+      {/* ===== Bloco 1: Resumo financeiro do OTE (card único) ===== */}
+      <Card className="overflow-hidden border-primary/20 bg-gradient-to-br from-primary/5 via-background to-background">
+        <CardContent className="p-5">
+          <div className="mb-4 flex items-center gap-3">
+            <div className="rounded-lg bg-primary/10 p-2.5">
+              <Wallet className="h-5 w-5 text-primary" />
             </div>
-          </CardContent>
-        </Card>
-
-        <Card className={cn(!ssotAvailable && 'border-destructive/40 bg-destructive/5')}>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Comissão elegível comercial</p>
-                <p className="text-2xl font-bold">
-                  {ssotAvailable ? formatCurrency(commercialEligible) : '—'}
+            <div>
+              <h2 className="text-base font-semibold leading-tight">Resumo financeiro do OTE</h2>
+              <p className="text-xs text-muted-foreground">
+                A Receita elegível OTE é calculada após excluir itens configurados fora da meta.
+              </p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-4 md:gap-6">
+            {financialMetrics.map((m) => (
+              <div
+                key={m.label}
+                className={cn(
+                  'rounded-lg border bg-background/40 p-4',
+                  m.emphasize && 'border-primary/40 bg-primary/5',
+                )}
+              >
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                  {m.label}
                 </p>
                 <p
                   className={cn(
-                    'text-xs',
-                    ssotAvailable ? 'text-muted-foreground' : 'text-destructive',
+                    'mt-1 text-2xl font-bold tabular-nums',
+                    m.emphasize && 'text-primary',
                   )}
                 >
-                  {ssotAvailable
-                    ? 'Fonte: Vendas Realizadas'
-                    : 'Não foi possível carregar a base comercial oficial.'}
+                  {m.value}
+                </p>
+                <p
+                  className={cn(
+                    'mt-1 text-[11px]',
+                    m.warn ? 'text-destructive' : 'text-muted-foreground',
+                  )}
+                >
+                  {m.hint}
                 </p>
               </div>
-              <DollarSign className="h-8 w-8 text-muted-foreground/20" />
-            </div>
-          </CardContent>
-        </Card>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Receita elegível OTE</p>
-                <p className="text-2xl font-bold">{formatCurrency(oteEligible)}</p>
-                <p className="text-xs text-muted-foreground">
-                  Após excluir itens fora da meta
-                </p>
-              </div>
-              <TrendingUp className="h-8 w-8 text-muted-foreground/20" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Itens fora da meta</p>
-                <p className="text-2xl font-bold">{formatCurrency(itemsOutOfGoal)}</p>
-                <p className="text-xs text-muted-foreground">
-                  Produtos, serviços, logística e taxas
-                </p>
-              </div>
-              <Ban className="h-8 w-8 text-muted-foreground/20" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Vendedores no cálculo</p>
-                <div className="flex items-baseline gap-2">
-                  <p className="text-2xl font-bold">{individualResults.length}</p>
-                  <span className="text-sm text-muted-foreground">vendedores</span>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Closers, pré-vendas e funções configuradas
-                </p>
-              </div>
-              <Users className="h-8 w-8 text-muted-foreground/20" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* ===== Bloco 2: Campeonato Comercial + Pódio + Ranking expansível =====
-          Toda a experiência premium da antiga aba "Por Vendedor" é renderizada
-          aqui, sem duplicar lógica nem cálculos (SPRINT OTE 1.5). */}
+      {/* ===== Bloco 2: Campeonato Comercial + Pódio + Ranking expansível ===== */}
       <OTESellerDetailTab
         results={results}
         isLoading={false}
         isOTEMode={isOTEMode}
         period={period}
       />
-
-      {/* ===== Bloco 3: Total geral a pagar ===== */}
-      <Card className="border-primary/30 bg-gradient-to-br from-primary/5 via-background to-background">
-        <CardContent className="flex flex-col gap-2 py-5 md:flex-row md:items-center md:justify-between">
-          <div className="flex items-center gap-3">
-            <div className="rounded-lg bg-primary/10 p-2.5">
-              <Wallet className="h-6 w-6 text-primary" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Resumo financeiro final</p>
-              <h3 className="text-base font-semibold">Total geral a pagar</h3>
-            </div>
-          </div>
-          <p className="text-3xl font-bold text-primary tabular-nums">
-            {formatCurrency(totalToPay)}
-          </p>
-        </CardContent>
-      </Card>
     </div>
   );
 }
