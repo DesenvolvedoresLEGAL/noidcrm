@@ -329,13 +329,15 @@ export function OTESellerDetailTab({
     if (!period) return '—';
     const [yy, mm] = period.split('-').map(Number);
     if (!yy || !mm) return period;
-    const dt = new Date(Date.UTC(yy, mm - 1, 1));
-    return dt.toLocaleDateString('pt-BR', {
-      month: 'long',
-      year: 'numeric',
-      timeZone: 'UTC',
-    });
+    const months = [
+      'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+      'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
+    ];
+    return `${months[mm - 1]} ${yy}`;
   }, [period]);
+
+  const formatPct = (n: number) => n.toFixed(1).replace('.', ',');
+
 
   if (isLoading) {
     return (
@@ -383,7 +385,7 @@ export function OTESellerDetailTab({
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-              <span className="capitalize text-foreground/80">{periodLabel}</span>
+              <span className="text-foreground/80">{periodLabel}</span>
               <span aria-hidden>·</span>
               <span>
                 <span className="font-semibold text-foreground">{summary.total}</span> participantes
@@ -392,13 +394,11 @@ export function OTESellerDetailTab({
                 <>
                   <span aria-hidden>·</span>
                   <span>
-                    Líder:{' '}
+                    Líder parcial:{' '}
                     <span className="font-semibold text-foreground">
-                      {summary.leader.fullName.split(' ')[0]}
-                    </span>{' '}
-                    <span className="text-foreground/80">
-                      ({summary.leader.pctMeta.toFixed(1)}%)
+                      {summary.leader.fullName}
                     </span>
+                    , {formatPct(summary.leader.pctMeta)}%
                   </span>
                 </>
               )}
