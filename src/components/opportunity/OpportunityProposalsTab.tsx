@@ -244,6 +244,46 @@ export function OpportunityProposalsTab({
   });
   const proposals = data?.data || [];
 
+  // DYNAMIC PRICING AUTO-REFRESH — ao abrir a aba Propostas, garantimos que cada
+  // proposta dinâmica não congelada esteja com o tier vigente aplicado. Idempotente.
+  const autoRefreshedRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!proposals.length) return;
+    const FROZEN = new Set(['accepted', 'rejected', 'cancelled', 'archived', 'expired']);
+    const targets = (proposals as any[]).filter((p) => {
+      if (!p?.id) return false;
+      if (autoRefreshedRef.current.has(p.id)) return false;
+      if (p.deleted_at) return false;
+      if (p.price_frozen_on_approval) return false;
+      if (FROZEN.has(p.status)) return false;
+      if (p.dynamic_pricing_enabled !== true) return false;
+      if (p.dynamic_pricing_applicability && p.dynamic_pricing_applicability === 'none') return false;
+      return true;
+    });
+    if (!targets.length) return;
+    let cancelled = false;
+    (async () => {
+      let anyRefreshed = false;
+      for (const p of targets) {
+        autoRefreshedRef.current.add(p.id);
+        try {
+          const res = await ensureProposalDynamicPricingCurrent(p.id);
+          if (res?.refreshed) anyRefreshed = true;
+        } catch {
+          /* idempotente — segue o jogo */
+        }
+      }
+      if (cancelled) return;
+      if (anyRefreshed) {
+        queryClient.invalidateQueries({ queryKey: [...proposalKeys.lists(), opportunityId] });
+        queryClient.invalidateQueries({ queryKey: proposalDetailsKey(opportunityId) });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [proposals, opportunityId, queryClient]);
+
   const { data: proposalDetails } = useQuery({
     queryKey: proposalDetailsKey(opportunityId),
     queryFn: async () => {
