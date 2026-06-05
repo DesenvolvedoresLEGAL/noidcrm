@@ -380,6 +380,7 @@ export function OTEOverviewTab({ results, records = [], isLoading, period, isOTE
                     const isActive = activeUserIds.has(result.user_id);
                     const pctMeta = revenuePctPerSeller.get(result.id) ?? 0;
                     const flagColor = revenueFlagPerSeller.get(result.id) ?? result.flag_color;
+                    return (
                       <tr key={result.id} className="border-b hover:bg-muted/50">
                         <td className="py-3 px-2 font-medium">
                           <span className="inline-flex items-center gap-2">
@@ -395,10 +396,10 @@ export function OTEOverviewTab({ results, records = [], isLoading, period, isOTE
                         <td className="py-3 px-2 text-right">{formatCurrency(result.goal_amount)}</td>
                         <td className="py-3 px-2 text-right hidden lg:table-cell text-muted-foreground">{formatCurrency(sellerCommercial)}</td>
                         <td className="py-3 px-2 text-right">{formatCurrency(eligible)}</td>
-                        <td className="py-3 px-2 text-right">{result.achievement_percentage.toFixed(1)}%</td>
+                        <td className="py-3 px-2 text-right">{pctMeta.toFixed(1)}%</td>
                         <td className="py-3 px-2 text-center">{result.ote_multiplier}x</td>
                         <td className="py-3 px-2 text-right">{formatCurrency(result.base_variable)}</td>
-                        <td className="py-3 px-2 text-center">{renderFlagBadge(result.flag_color)}</td>
+                        <td className="py-3 px-2 text-center">{renderFlagBadge(flagColor)}</td>
                         <td className="py-3 px-2 text-right">{renderAdjustment(result.final_adjustment_percentage)}</td>
                         <td className="py-3 px-2 text-right font-semibold text-primary">
                           {formatCurrency(result.final_variable_amount)}
