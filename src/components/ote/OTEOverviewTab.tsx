@@ -100,9 +100,6 @@ export function OTEOverviewTab({ results, records = [], isLoading, period, isOTE
 
   // KPIs
   const totalToPay = results.reduce((sum, r) => sum + r.final_variable_amount, 0);
-  const avgRevenueAchievement = revenueResults.length > 0
-    ? revenueResults.reduce((sum, r) => sum + r.achievement_percentage, 0) / revenueResults.length
-    : 0;
 
   // Reconciliação OTE:
   //   Comissão elegível comercial = Receita Válida do Relatório (SSoT oficial)
@@ -121,9 +118,45 @@ export function OTEOverviewTab({ results, records = [], isLoading, period, isOTE
     eligiblePerSeller.set(r.id, aggregateEligible(recs).eligibleTotal);
   }
 
-  const blueFlags = results.filter(r => r.flag_color === 'blue').length;
-  const yellowFlags = results.filter(r => r.flag_color === 'yellow').length;
-  const redFlags = results.filter(r => r.flag_color === 'red').length;
+  // PATCH OTE 1.4.1 — % Meta oficial deriva da Receita elegível OTE (closers)
+  // ou Leads qualificados (pré-vendas). Nunca do achievement_percentage bruto
+  // do backend, que pode ter sido calculado com a base comercial errada.
+  const revenuePctPerSeller = new Map<string, number>();
+  for (const r of revenueResults) {
+    revenuePctPerSeller.set(
+      r.id,
+      computeOteAchievementPercentage({ result: r, eligibleRevenue: eligiblePerSeller.get(r.id) ?? 0 }),
+    );
+  }
+  const leadsPctPerSeller = new Map<string, number>();
+  for (const r of leadsResults) {
+    const histLeads = qualifierMap.get(r.user_id);
+    const qualifiedLeads = typeof histLeads === 'number' ? histLeads : Number(r.total_sales || 0);
+    leadsPctPerSeller.set(r.id, computeOteAchievementPercentage({ result: r, qualifiedLeads }));
+  }
+
+  const avgRevenueAchievement = revenueResults.length > 0
+    ? Array.from(revenuePctPerSeller.values()).reduce((s, v) => s + v, 0) / revenueResults.length
+    : 0;
+
+  // Flag recalculada na UI a partir da MESMA base do % Meta exibido.
+  const revenueFlagPerSeller = new Map<string, 'blue' | 'yellow' | 'red'>();
+  for (const [id, pct] of revenuePctPerSeller.entries()) {
+    revenueFlagPerSeller.set(id, computeOteFlagColor(pct, flagBlueThreshold, flagYellowMinThreshold));
+  }
+  const leadsFlagPerSeller = new Map<string, 'blue' | 'yellow' | 'red'>();
+  for (const [id, pct] of leadsPctPerSeller.entries()) {
+    leadsFlagPerSeller.set(id, computeOteFlagColor(pct, flagBlueThreshold, flagYellowMinThreshold));
+  }
+
+  const recomputedFlags = (color: 'blue' | 'yellow' | 'red') =>
+    Array.from(revenueFlagPerSeller.values()).filter((c) => c === color).length +
+    Array.from(leadsFlagPerSeller.values()).filter((c) => c === color).length +
+    teamResults.filter((r) => r.flag_color === color).length;
+
+  const blueFlags = recomputedFlags('blue');
+  const yellowFlags = recomputedFlags('yellow');
+  const redFlags = recomputedFlags('red');
 
   if (isLoading) {
     return (
