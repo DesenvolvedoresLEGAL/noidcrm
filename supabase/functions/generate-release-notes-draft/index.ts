@@ -272,17 +272,25 @@ function sanitizePayload(p: Record<string, unknown>): Record<string, unknown> {
 
 function deterministicDraft(items: IngestionItem[], period_days: number) {
   const changes: Array<{ type: "feature" | "fix" | "improvement" | "security"; description: string }> = [];
-  const ghItems = items.filter((i) => i.source === "github");
+  const ghItems = items
+    .filter((i) => i.source === "github")
+    .sort((a, b) => ((b.payload as any)?.weight || 0) - ((a.payload as any)?.weight || 0));
   const sysItems = items.filter((i) => i.source === "system_events");
   const actItems = items.filter((i) => i.source === "action_executions");
-  for (const pr of ghItems.slice(0, 30)) {
-    const labels = (pr.payload as any)?.labels as string[] | undefined;
+  const seen = new Set<string>();
+  for (const it of ghItems.slice(0, 40)) {
+    const desc = it.summary.slice(0, 240);
+    const norm = desc.toLowerCase();
+    if (seen.has(norm)) continue;
+    seen.add(norm);
+    const labels = (it.payload as any)?.labels as string[] | undefined;
+    const msg = desc.toLowerCase();
     const type: "feature" | "fix" | "improvement" | "security" =
-      labels?.includes("security") ? "security"
-      : labels?.includes("bug") || labels?.includes("fix") ? "fix"
-      : labels?.includes("feature") ? "feature"
+      labels?.includes("security") || /security|vulnerab|auth/.test(msg) ? "security"
+      : labels?.includes("bug") || labels?.includes("fix") || /^(fix|corrig|bug)/.test(msg) ? "fix"
+      : labels?.includes("feature") || /^(add|adicion|implement|nov[ao])/.test(msg) ? "feature"
       : "improvement";
-    changes.push({ type, description: pr.summary.slice(0, 240) });
+    changes.push({ type, description: desc });
   }
   for (const ev of sysItems.slice(0, 20)) {
     const cat = (ev.payload as any)?.category as string | undefined;
