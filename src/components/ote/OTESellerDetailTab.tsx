@@ -128,7 +128,7 @@ export function OTESellerDetailTab({ results, isLoading, isOTEMode = true, perio
                   <div className="flex items-center gap-6">
                     <div className="text-right">
                       <p className="text-sm text-muted-foreground">% Meta</p>
-                      <p className="font-semibold">{result.achievement_percentage.toFixed(1)}%</p>
+                      <p className="font-semibold">{pctMeta.toFixed(1)}%</p>
                     </div>
                     <div className="text-right">
                       <p className="text-sm text-muted-foreground">Variável Final</p>
@@ -136,9 +136,9 @@ export function OTESellerDetailTab({ results, isLoading, isOTEMode = true, perio
                     </div>
                     <span className={cn(
                       "inline-flex items-center justify-center w-8 h-8 rounded-full",
-                      result.flag_color === 'blue' && "bg-blue-500",
-                      result.flag_color === 'yellow' && "bg-yellow-500",
-                      result.flag_color === 'red' && "bg-red-500"
+                      flagColor === 'blue' && "bg-blue-500",
+                      flagColor === 'yellow' && "bg-yellow-500",
+                      flagColor === 'red' && "bg-red-500"
                     )}>
                       <Flag className="h-4 w-4 text-white" />
                     </span>
