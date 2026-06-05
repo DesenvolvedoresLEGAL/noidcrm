@@ -555,6 +555,9 @@ function emptyResult(): WinLossDataResult {
     monthlyPulse: [], timeToLossDistribution: [],
     lossMortality: { buckets: [], totalLosses: 0, totalValue: 0, peak: null, avgDays: null, p90Days: null },
     wonStageBreakdown: [],
+    lostStageBreakdown: [],
+    crmTrustDeterministic: computeCrmTrust([]),
+    declaredVsInferred: computeDeclaredVsInferred([]),
   };
 }
 
