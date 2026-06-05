@@ -22,6 +22,8 @@ interface SmartAlertsCardProps {
   isLoading: boolean;
   contextLabel: string;
   semantic?: LossSemanticAggregates;
+  /** SSoT CRM Trust Score (motor determinístico WL-LOSS-04). Sobrescreve o legado de loss_semantic_analyses. */
+  crmTrustScore?: number;
 }
 
 interface Alert {
@@ -34,7 +36,7 @@ interface Alert {
 const fmtBRL = (v: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v);
 
-export function SmartAlertsCard({ losses, lossReasons, isLoading, contextLabel, semantic }: SmartAlertsCardProps) {
+export function SmartAlertsCard({ losses, lossReasons, isLoading, contextLabel, semantic, crmTrustScore }: SmartAlertsCardProps) {
   const alerts: Alert[] = [];
 
   // Sprint WL-UI-02 — Mensagens curtas, executivas, sem emojis.
@@ -124,12 +126,14 @@ export function SmartAlertsCard({ losses, lossReasons, isLoading, contextLabel, 
 
   // === Alertas semânticos (motor invisível da IA) ===
   if (semantic && semantic.total > 0) {
-    if (semantic.crmTrustScore < 60) {
+    // CRM Trust Score calculado pelo motor determinístico WL-LOSS-04.
+    const trust = crmTrustScore ?? semantic.crmTrustScore;
+    if (trust < 60) {
       alerts.push({
         type: 'warning',
         icon: <Brain className="h-4 w-4" />,
-        message: `Trust Score ${semantic.crmTrustScore}/100. Diagnósticos de perda pouco confiáveis.`,
-        severity: semantic.crmTrustScore < 40 ? 'high' : 'medium',
+        message: `Trust Score ${trust}/100. Diagnósticos de perda pouco confiáveis.`,
+        severity: trust < 40 ? 'high' : 'medium',
       });
     }
 

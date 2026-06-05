@@ -15,12 +15,15 @@ interface Props {
   semantic: LossSemanticAggregates | undefined;
   commercialFailure?: CommercialFailureSummary;
   isLoading?: boolean;
+  /** SSoT CRM Trust Score (motor determinístico WL-LOSS-04). Sobrescreve o legado de loss_semantic_analyses. */
+  crmTrustScore?: number;
 }
 
-export function CrmTrustAndRecoverableStrip({ semantic, commercialFailure, isLoading }: Props) {
+export function CrmTrustAndRecoverableStrip({ semantic, commercialFailure, isLoading, crmTrustScore }: Props) {
   if (isLoading || !semantic || semantic.total === 0) return null;
 
-  const trust = semantic.crmTrustScore;
+  // CRM Trust Score calculado pelo motor determinístico WL-LOSS-04.
+  const trust = crmTrustScore ?? semantic.crmTrustScore;
   const trustTone =
     trust >= 80 ? 'text-emerald-600' : trust >= 60 ? 'text-yellow-600' : 'text-red-600';
   const trustBadge =

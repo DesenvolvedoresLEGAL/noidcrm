@@ -54,6 +54,7 @@ export function WinLossOverviewTab({
         isLoading={isLoading}
         contextLabel={terminology.lostPlural}
         semantic={semantic}
+        crmTrustScore={data?.crmTrustDeterministic.score}
       />
 
       {/* 3. CRM Trust + Receita Recuperável + Perda por Falha Comercial */}
@@ -61,6 +62,7 @@ export function WinLossOverviewTab({
         semantic={semantic}
         commercialFailure={commercialFailure}
         isLoading={isLoading}
+        crmTrustScore={data?.crmTrustDeterministic.score}
       />
 
       {/* 4. O que mais gera vitória (compacto) */}
