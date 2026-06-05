@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useTeamVisibility } from './useTeamVisibility';
 import { useReportFiltersContext } from '@/contexts/ReportFiltersContext';
+import { fetchStagesCached } from '@/lib/stagesCache';
 
 export interface FilteredOpportunity {
   id: string;
@@ -71,7 +72,7 @@ export function useFilteredOpportunities() {
         opportunitiesQuery = opportunitiesQuery.in('pipeline_id', filters.pipelines);
       }
 
-      // Buscar dados em paralelo
+      // Buscar dados em paralelo. `stages` vai pelo cache de módulo (TTL 10m).
       const [
         opportunitiesResult,
         pipelinesResult,
@@ -81,21 +82,20 @@ export function useFilteredOpportunities() {
       ] = await Promise.all([
         opportunitiesQuery,
         supabase.from('pipelines').select('id, name, pipeline_type'),
-        supabase.from('stages').select('id, name, pipeline_id, order_index').order('order_index'),
+        fetchStagesCached(),
         supabase.from('loss_reasons').select('id, name'),
         supabase.from('profiles').select('id, full_name'),
       ]);
 
       if (opportunitiesResult.error) throw opportunitiesResult.error;
       if (pipelinesResult.error) throw pipelinesResult.error;
-      if (stagesResult.error) throw stagesResult.error;
       if (lossReasonsResult.error) throw lossReasonsResult.error;
       if (usersResult.error) throw usersResult.error;
 
       return {
         opportunities: opportunitiesResult.data || [],
         pipelines: pipelinesResult.data || [],
-        stages: stagesResult.data || [],
+        stages: stagesResult || [],
         lossReasons: lossReasonsResult.data || [],
         users: usersResult.data || [],
       };
