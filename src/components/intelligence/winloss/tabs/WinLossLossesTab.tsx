@@ -835,45 +835,85 @@ function buildTopReasons(
     .sort((a, b) => b.lostValue - a.lostValue || b.count - a.count);
 }
 
-interface StageRow {
-  stageId: string;
-  stageName: string;
-  count: number;
-  lostValue: number;
-  avgCycle: number | null;
-  topReason: string | null;
+// Sprint WL-LOSS-04 — Card "Perdas por Etapa do Pipeline" (espelha Wins).
+function LostByStageCard({ rows }: { rows: import('@/hooks/useWinLossData').LostStageRow[] }) {
+  const hasData = rows && rows.length > 0;
+  const totalCount = hasData ? rows.reduce((s, r) => s + r.count, 0) : 0;
+  const totalFallback = hasData ? rows.reduce((s, r) => s + r.fallbackCount, 0) : 0;
+  const fallbackRatio = totalCount > 0 ? Math.round((totalFallback / totalCount) * 100) : 0;
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm flex items-center gap-1.5">
+          <Layers className="h-4 w-4" /> Perdas por Etapa do Pipeline
+        </CardTitle>
+        <CardDescription className="text-xs">
+          Etapa em que a oportunidade estava no momento da perda.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {!hasData ? (
+          <div className="rounded-md border border-dashed bg-muted/30 p-4 text-sm">
+            <p className="font-medium">Não há perdas no período para detalhar por etapa.</p>
+          </div>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-[11px] uppercase tracking-wider text-muted-foreground border-b">
+                    <th className="text-left font-medium py-2 pr-3">Etapa</th>
+                    <th className="text-right font-medium py-2 px-2">Perdas</th>
+                    <th className="text-right font-medium py-2 px-2">Valor Perdido</th>
+                    <th className="text-right font-medium py-2 px-2">Ticket Médio</th>
+                    <th className="text-right font-medium py-2 px-2">Ciclo Médio</th>
+                    <th className="text-left font-medium py-2 pl-3">Principal Motivo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((r) => (
+                    <tr key={r.stageId} className="border-b border-border/40 last:border-0">
+                      <td className="py-2 pr-3">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="truncate">{r.stageName}</span>
+                          {r.fallbackCount > 0 && r.fallbackCount === r.count && (
+                            <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-4">
+                              etapa atual
+                            </Badge>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-2 px-2 text-right tabular-nums">{r.count}</td>
+                      <td className="py-2 px-2 text-right tabular-nums text-red-700 dark:text-red-400 font-medium">
+                        {fmtBRL(r.lostValue)}
+                      </td>
+                      <td className="py-2 px-2 text-right tabular-nums text-muted-foreground">
+                        {fmtBRL(r.avgTicket)}
+                      </td>
+                      <td className="py-2 px-2 text-right tabular-nums text-muted-foreground">
+                        {r.avgCycle > 0 ? `${r.avgCycle}d` : '—'}
+                      </td>
+                      <td className="py-2 pl-3 text-xs text-muted-foreground truncate max-w-[220px]">
+                        {r.topReason || '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {fallbackRatio >= 30 && (
+              <p className="mt-2 text-[11px] text-muted-foreground italic">
+                {fallbackRatio}% das perdas não possuem histórico de etapa — usando etapa atual como fallback.
+              </p>
+            )}
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
 }
 
-function buildStageBreakdown(
-  losses: WinLossDataResult['losses'],
-  stageNameMap: Map<string, string> | undefined,
-): StageRow[] {
-  if (!stageNameMap || stageNameMap.size === 0) return [];
-  const map = new Map<string, { count: number; lostValue: number; cycles: number[]; reasons: Map<string, number> }>();
-  for (const l of losses) {
-    const sid = (l.opportunity as any)?.stage_id;
-    if (!sid) continue;
-    const e = map.get(sid) || { count: 0, lostValue: 0, cycles: [], reasons: new Map() };
-    e.count++;
-    e.lostValue += Number(l.final_value) || 0;
-    if (l.sales_cycle_days > 0) e.cycles.push(l.sales_cycle_days);
-    const reason = (l.reason as any)?.name || 'Não informado';
-    e.reasons.set(reason, (e.reasons.get(reason) || 0) + 1);
-    map.set(sid, e);
-  }
-  return [...map.entries()]
-    .map(([sid, e]) => ({
-      stageId: sid,
-      stageName: stageNameMap.get(sid) || 'Etapa desconhecida',
-      count: e.count,
-      lostValue: e.lostValue,
-      avgCycle: e.cycles.length > 0
-        ? Math.round(e.cycles.reduce((s, c) => s + c, 0) / e.cycles.length)
-        : null,
-      topReason: [...e.reasons.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || null,
-    }))
-    .sort((a, b) => b.lostValue - a.lostValue);
-}
 
 interface ReasonTrend {
   months: string[];
