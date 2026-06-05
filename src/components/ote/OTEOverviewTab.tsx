@@ -4,6 +4,7 @@ import { OTEMonthlyResult } from '@/hooks/useOTEData';
 import { useSalesConfig } from '@/hooks/useSalesConfig';
 import type { OTESalesRecord } from '@/hooks/useOTESalesRecords';
 import { aggregateEligible } from './oteEligibility';
+import { computeOteAchievementPercentage, computeOteFlagColor } from './oteAchievement';
 import { FLAG_LABELS } from '@/lib/results/resultsMode';
 import { useOfficialEligibleRevenueSummary, useOfficialHistoricalRevenueBySeller } from '@/hooks/revenue/useRevenueSsot';
 import { useHistoricalQualifiers } from '@/hooks/results/useHistoricalQualifiers';
