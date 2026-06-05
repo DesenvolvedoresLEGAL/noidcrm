@@ -3,9 +3,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { FileText, AlertTriangle, CheckCircle2, ExternalLink, Calendar, Clock } from "lucide-react";
+import { FileText, AlertTriangle, CheckCircle2, ExternalLink, Calendar, Clock, Github } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useReleaseNotesAdminStatus } from "@/hooks/useReleaseNotesAdminStatus";
+import { useGithubReleaseStatus } from "@/hooks/useReleaseNotesAdmin";
 import { GenerateReleaseDraftButton } from "@/components/admin/release-notes/GenerateReleaseDraftButton";
 
 function formatDateTime(iso?: string) {
