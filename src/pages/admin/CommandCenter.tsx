@@ -17,6 +17,7 @@ import { AdminKPICard } from "@/components/admin/AdminKPICard";
 import { AlertFeed } from "@/components/admin/AlertFeed";
 import { useAdminMetrics, useAdminAlerts } from "@/hooks/admin/useAdminMetrics";
 import { useAdminCharts } from "@/hooks/admin/useAdminCharts";
+import { ReleaseNotesAutomationCard } from "@/components/admin/ReleaseNotesAutomationCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -383,6 +384,11 @@ export default function CommandCenter() {
 
         {/* Alerts */}
         <AlertFeed alerts={alerts} loading={alertsLoading} />
+      </div>
+
+      {/* Operações da Plataforma */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <ReleaseNotesAutomationCard />
       </div>
 
       {/* Organization Status & MRR by Channel */}
