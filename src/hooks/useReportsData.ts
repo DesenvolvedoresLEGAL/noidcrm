@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { fetchStagesCached } from '@/lib/stagesCache';
 import { getPipelineMetrics, getStageConversionMetrics } from '@/services/crm/pipeline-metrics';
 import { useTeamVisibility } from './useTeamVisibility';
 import { useReportFiltersContext } from '@/contexts/ReportFiltersContext';
@@ -300,19 +301,18 @@ export function useConversionRateData() {
         query = query.in('pipeline_id', filters.pipelines);
       }
 
-      const [oppsResult, pipelinesResult, stagesResult] = await Promise.all([
+      const stagesResult = await fetchStagesCached();
+      const [oppsResult, pipelinesResult] = await Promise.all([
         query,
         supabase.from('pipelines').select('id, name, pipeline_type'),
-        supabase.from('stages').select('id, name, pipeline_id, order_index').order('order_index'),
       ]);
 
       if (oppsResult.error) throw oppsResult.error;
       if (pipelinesResult.error) throw pipelinesResult.error;
-      if (stagesResult.error) throw stagesResult.error;
 
       const opportunities = oppsResult.data || [];
       const pipelines = pipelinesResult.data || [];
-      const stages = stagesResult.data || [];
+      const stages = stagesResult || [];
 
       // Agrupar por pipeline e stage
       const stageMap = new Map<string, { 

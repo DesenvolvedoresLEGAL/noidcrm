@@ -226,13 +226,19 @@ export function useWinLossData(organizationId: string | undefined, pipelineId: s
       }
 
 
-      // 3. Fetch opportunities directly
+      // 3. Fetch opportunities directly.
+      // PERF 0.6D — server-side filter por `updated_at >= dateRange.from`.
+      // Em deals fechados, `updated_at >= closed_at` (status muda dispara update),
+      // logo nada que tenha `closed_at` dentro da janela é descartado, e cortamos
+      // payload de deals antigos que não pertencem ao período. Mantemos o filtro
+      // client-side em seguida como rede de segurança.
       const { data: directOpps, error: oppsErr } = await supabase
         .from('opportunities')
         .select(`id, title, valor_previsto, status, pipeline_id, stage_id, accepted_proposal_id, created_at, updated_at, closed_at, loss_reason_id, loss_comment, owner_user_id, account:accounts(segmento, porte), loss_reason:loss_reasons!opportunities_loss_reason_id_fkey(name, category, loss_accountability)`)
         .eq('organization_id', organizationId)
         .in('status', ['won', 'lost'])
-        .in('pipeline_id', pipelineIds);
+        .in('pipeline_id', pipelineIds)
+        .gte('updated_at', fromISO);
 
       if (oppsErr) {
         console.error('[useWinLossData] Opportunities fetch error:', oppsErr);

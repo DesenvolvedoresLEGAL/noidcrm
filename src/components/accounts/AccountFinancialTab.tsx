@@ -198,7 +198,7 @@ export function AccountFinancialTab({ account }: AccountFinancialTabProps) {
               <FinancialScoreBadge
                 score={account.score_financeiro}
                 riskLevel={account.risco_financeiro}
-                factors={account.score_fatores}
+                factors={scoreFatores}
               />
               <Progress
                 value={account.score_financeiro ?? 0}
