@@ -3,14 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { OTEOverviewTab } from '@/components/ote/OTEOverviewTab';
-import { OTESellerDetailTab } from '@/components/ote/OTESellerDetailTab';
 import { OTEHistoryTab } from '@/components/ote/OTEHistoryTab';
 import { CommissionOverviewTab } from '@/components/results/commission/CommissionOverviewTab';
-import { CommissionSellerDetailTab } from '@/components/results/commission/CommissionSellerDetailTab';
 import { CommissionHistoryTab } from '@/components/results/commission/CommissionHistoryTab';
 import { SimpleGoalsOverviewTab } from '@/components/results/simple/SimpleGoalsOverviewTab';
-import { SimpleGoalsSellerDetailTab } from '@/components/results/simple/SimpleGoalsSellerDetailTab';
 import { SimpleGoalsHistoryTab } from '@/components/results/simple/SimpleGoalsHistoryTab';
+
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calculator, RefreshCw, FileSpreadsheet, Target, Settings, DollarSign, Wallet } from 'lucide-react';
@@ -143,7 +141,6 @@ export default function OTEReport() {
           <Tabs defaultValue="overview" className="space-y-4">
             <TabsList>
               <TabsTrigger value="overview">Visão Geral</TabsTrigger>
-              <TabsTrigger value="sellers">Por Vendedor</TabsTrigger>
               <TabsTrigger value="history">Histórico</TabsTrigger>
             </TabsList>
 
@@ -153,26 +150,15 @@ export default function OTEReport() {
               ) : isSimpleMode ? (
                 <SimpleGoalsOverviewTab results={results || []} records={records} isLoading={loading} />
               ) : (
-                <OTEOverviewTab 
-                  results={results || []} 
+                <OTEOverviewTab
+                  results={results || []}
                   records={records}
-                  isLoading={loading} 
+                  isLoading={loading}
                   period={selectedPeriod}
                   isOTEMode={isOTEMode}
                 />
               )}
             </TabsContent>
-
-            <TabsContent value="sellers">
-              {isCommissionMode ? (
-                <CommissionSellerDetailTab results={results || []} isLoading={loading} />
-              ) : isSimpleMode ? (
-                <SimpleGoalsSellerDetailTab results={results || []} isLoading={loading} />
-              ) : (
-                <OTESellerDetailTab results={results || []} isLoading={loading} isOTEMode={isOTEMode} period={selectedPeriod} />
-              )}
-            </TabsContent>
-
 
             <TabsContent value="history">
               {isCommissionMode ? (
@@ -184,6 +170,7 @@ export default function OTEReport() {
               )}
             </TabsContent>
           </Tabs>
+
         </div>
       </div>
     </Layout>
