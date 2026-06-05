@@ -170,6 +170,9 @@ export function useAccountDetails(accountId: string) {
 
       return {
         ...account,
+        // PERF 0.6D: JSONBs pesados resolvidos via `useAccountFinancialDetails` sob demanda.
+        scoring_factors: null,
+        score_fatores: null,
         origem_principal: hydratedOrigem,
         pre_sales_user_id: hydratedPreSales,
         opportunities_count: (opportunities?.length || 0),
@@ -195,3 +198,4 @@ export function useAccountDetails(accountId: string) {
     refetchOnMount: 'always',
   });
 }
+
