@@ -36,7 +36,7 @@ interface Alert {
 const fmtBRL = (v: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v);
 
-export function SmartAlertsCard({ losses, lossReasons, isLoading, contextLabel, semantic }: SmartAlertsCardProps) {
+export function SmartAlertsCard({ losses, lossReasons, isLoading, contextLabel, semantic, crmTrustScore }: SmartAlertsCardProps) {
   const alerts: Alert[] = [];
 
   // Sprint WL-UI-02 — Mensagens curtas, executivas, sem emojis.
