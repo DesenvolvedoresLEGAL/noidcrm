@@ -88,7 +88,8 @@ export function LeadScoreDashboard() {
 
   const isAIBatchRunning = aiBatchMutation.isPending;
 
-  // Poll job status while recalculation runs
+  // Poll job status while recalculation runs.
+  // PERF 0.6D: 3s → 30s, pause when document.hidden, refetch immediately on visibility change.
   useEffect(() => {
     if (!activeJobId) return;
 
@@ -117,13 +118,36 @@ export function LeadScoreDashboard() {
       }
     };
 
-    tick();
-    pollRef.current = window.setInterval(tick, 3000);
+    const startPolling = () => {
+      if (pollRef.current) return;
+      pollRef.current = window.setInterval(tick, 30000);
+    };
+    const stopPolling = () => {
+      if (pollRef.current) {
+        window.clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    };
+
+    const handleVisibility = () => {
+      if (document.hidden) {
+        stopPolling();
+      } else {
+        void tick();
+        startPolling();
+      }
+    };
+
+    void tick();
+    if (!document.hidden) startPolling();
+    document.addEventListener('visibilitychange', handleVisibility);
+
     return () => {
-      if (pollRef.current) window.clearInterval(pollRef.current);
-      pollRef.current = null;
+      stopPolling();
+      document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [activeJobId, queryClient]);
+
 
   const isRecalculating = recalculateMutation.isPending || !!activeJobId;
   const progressLabel = jobProgress && jobProgress.total > 0
