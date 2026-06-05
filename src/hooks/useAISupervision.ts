@@ -47,9 +47,10 @@ export function usePendingApprovals() {
   return useQuery<AIAction[]>({
     queryKey: aiSupervisionKeys.pendingApprovals(),
     queryFn: getPendingApprovals,
-    refetchInterval: 10000, // mantido: aprovações de IA são críticas
+    refetchInterval: 30000, // PERF 0.6D: 10s → 30s (mantém percepção quase-realtime sem flood)
   });
 }
+
 
 export function useActiveAlerts() {
   return useQuery<AIAlert[]>({

@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { FinancialScoreBadge } from '@/components/ui/financial-score-badge';
 import { AccountDetails } from '@/hooks/useAccountDetails';
+import { useAccountFinancialDetails } from '@/hooks/useAccountFinancialDetails';
 import { formatDateBR } from '@/lib/dateUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
@@ -29,9 +30,13 @@ interface AccountFinancialTabProps {
 export function AccountFinancialTab({ account }: AccountFinancialTabProps) {
   const [isSyncing, setIsSyncing] = useState(false);
   const queryClient = useQueryClient();
+  // PERF 0.6D: JSONBs pesados carregados apenas quando a aba Financeiro está visível.
+  const { data: financialDetails } = useAccountFinancialDetails(account.id);
+  const scoreFatores = financialDetails?.score_fatores ?? account.score_fatores;
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+
 
   const handleSyncFromErp = async () => {
     setIsSyncing(true);
