@@ -369,15 +369,16 @@ Deno.serve(async (req) => {
     const periodEnd = new Date();
     const periodStart = new Date(Date.now() - period_days * 86400_000);
 
-    const [ghItems, sysItems, migItems] = await Promise.all([
-      collectGitHubPRs({
-        periodDays: period_days,
-        owner: github_owner || Deno.env.get("GITHUB_DEFAULT_OWNER") || undefined,
-        repo: github_repo || Deno.env.get("GITHUB_DEFAULT_REPO") || undefined,
-      }),
+    const ghOwner = (github_owner || Deno.env.get("GITHUB_DEFAULT_OWNER") || DEFAULT_GH_OWNER).trim();
+    const ghRepo = (github_repo || Deno.env.get("GITHUB_DEFAULT_REPO") || DEFAULT_GH_REPO).trim();
+
+    const [ghPRs, ghCommits, sysItems, migItems] = await Promise.all([
+      collectGitHubPRs({ periodDays: period_days, owner: ghOwner, repo: ghRepo }),
+      collectGitHubCommits({ periodDays: period_days, owner: ghOwner, repo: ghRepo }),
       collectSystemSignals(supa, period_days),
       collectMigrations(period_days),
     ]);
+    const ghItems = [...ghPRs, ...ghCommits];
     const all: IngestionItem[] = [...ghItems, ...sysItems, ...migItems]
       .map((i) => ({ ...i, payload: sanitizePayload(i.payload) }));
 
