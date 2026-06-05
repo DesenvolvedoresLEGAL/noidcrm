@@ -126,12 +126,14 @@ export function SmartAlertsCard({ losses, lossReasons, isLoading, contextLabel, 
 
   // === Alertas semânticos (motor invisível da IA) ===
   if (semantic && semantic.total > 0) {
-    if (semantic.crmTrustScore < 60) {
+    // CRM Trust Score calculado pelo motor determinístico WL-LOSS-04.
+    const trust = crmTrustScore ?? semantic.crmTrustScore;
+    if (trust < 60) {
       alerts.push({
         type: 'warning',
         icon: <Brain className="h-4 w-4" />,
-        message: `Trust Score ${semantic.crmTrustScore}/100. Diagnósticos de perda pouco confiáveis.`,
-        severity: semantic.crmTrustScore < 40 ? 'high' : 'medium',
+        message: `Trust Score ${trust}/100. Diagnósticos de perda pouco confiáveis.`,
+        severity: trust < 40 ? 'high' : 'medium',
       });
     }
 
