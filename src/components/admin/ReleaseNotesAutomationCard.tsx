@@ -113,6 +113,57 @@ export function ReleaseNotesAutomationCard({ enabled = true }: { enabled?: boole
               </div>
             </div>
 
+            {/* GitHub integration status */}
+            <div className="rounded-md border bg-muted/20 p-3 text-sm space-y-1.5">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Github className="h-3.5 w-3.5" />
+                  Integração GitHub
+                </div>
+                {ghLoading ? (
+                  <Skeleton className="h-4 w-16" />
+                ) : gh?.configured ? (
+                  <Badge variant="outline" className="gap-1 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 text-[10px]">
+                    <CheckCircle2 className="h-3 w-3" />
+                    {gh.mode === "gateway" ? "Gateway" : "Público"}
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="gap-1 text-[10px]">
+                    <AlertTriangle className="h-3 w-3" />
+                    Indisponível
+                  </Badge>
+                )}
+              </div>
+              {gh && (
+                <>
+                  <div className="text-xs font-mono">
+                    {gh.owner || "—"}/{gh.repo || "—"}
+                  </div>
+                  <div className="text-[11px] text-muted-foreground">
+                    Últimos 7d: <span className="font-medium text-foreground">{gh.commits_last_7d ?? 0}</span> commits ·{" "}
+                    <span className="font-medium text-foreground">{gh.prs_last_7d ?? 0}</span> PRs
+                  </div>
+                  {gh.last_check_at && (
+                    <div className="text-[10px] text-muted-foreground">
+                      Verificado em {formatDateTime(gh.last_check_at)}
+                    </div>
+                  )}
+                  {!gh.configured && (
+                    <div className="text-[11px] text-amber-600 dark:text-amber-400">
+                      Repositório existe no Lovable, mas a leitura GitHub para Release Notes ainda não foi
+                      configurada nas Edge Functions.
+                    </div>
+                  )}
+                  {gh.last_error && (
+                    <div className="text-[10px] text-destructive truncate" title={gh.last_error}>
+                      {gh.last_error}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+
             {data?.lastDraft && (
               <div className="rounded-md border bg-muted/30 p-3 text-sm space-y-1">
                 <div className="text-xs text-muted-foreground">Último draft</div>
