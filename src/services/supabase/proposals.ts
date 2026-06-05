@@ -714,16 +714,26 @@ export async function getProposalByToken(token: string): Promise<(Proposal & { i
   // DYNAMIC PRICING AUTO-REFRESH — priority absoluta no link público.
   // Antes de qualquer outra coisa, garantimos que o tier vigente em server now()
   // está aplicado. Idempotente: no-op para propostas aceitas/congeladas/sem regra.
+  //
+  // SEGURANÇA: usamos a RPC token-gated `ensure_public_proposal_dynamic_pricing_current`.
+  // Anon NUNCA passa proposal_id direto — o servidor valida o public_token e
+  // só então delega para a RPC interna (restrita a authenticated/service_role).
   let dynamicRefreshed = false;
   try {
-    const { data: dynRes, error: dynErr } = await (supabase as any).rpc(
-      'ensure_proposal_dynamic_pricing_current',
-      { p_proposal_id: bundle.proposal.id },
-    );
-    if (dynErr) {
-      console.warn('[getProposalByToken] dynamic refresh skipped:', dynErr.message);
-    } else if (dynRes?.refreshed) {
-      dynamicRefreshed = true;
+    // Tenta cada candidato de token (raw / sha256) até um resolver.
+    for (const candidate of candidates) {
+      const { data: dynRes, error: dynErr } = await (supabase as any).rpc(
+        'ensure_public_proposal_dynamic_pricing_current',
+        { p_token: candidate },
+      );
+      if (dynErr) {
+        console.warn('[getProposalByToken] dynamic refresh skipped:', dynErr.message);
+        continue;
+      }
+      if (dynRes && dynRes.source !== 'not_found' && dynRes.source !== 'invalid_token') {
+        if (dynRes.refreshed) dynamicRefreshed = true;
+        break;
+      }
     }
   } catch (e) {
     console.warn('[getProposalByToken] dynamic refresh error:', (e as any)?.message ?? e);
