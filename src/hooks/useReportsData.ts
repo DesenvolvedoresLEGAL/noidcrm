@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { fetchStagesCached } from '@/lib/stagesCache';
 import { getPipelineMetrics, getStageConversionMetrics } from '@/services/crm/pipeline-metrics';
 import { useTeamVisibility } from './useTeamVisibility';
 import { useReportFiltersContext } from '@/contexts/ReportFiltersContext';
