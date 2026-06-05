@@ -60,6 +60,7 @@ import { formatDateBR } from '@/lib/dateUtils';
 import { toast } from 'sonner';
 import { proposalKeys } from '@/lib/query-keys';
 import { orchestrateProposalFinancials } from '@/services/proposals/proposalOrchestrator';
+import { ensureProposalDynamicPricingCurrent } from '@/services/proposals/ensureProposalDynamicPricingCurrent';
 import {
   getEffectiveAmount,
   getDynamicAdjustment,
