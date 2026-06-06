@@ -554,6 +554,31 @@ serve(async (req) => {
         oteMultiplier = matchedMultiplier?.multiplier ?? 0;
       }
 
+      // PATCH OTE 1.7.4 — Guarda de coerência: % Meta, faixa e multiplicador
+      // têm que vir da MESMA cadeia. Loga alerta crítico se incoerente.
+      if (multipliers?.length && achievementPercentage > 0) {
+        const sorted = [...multipliers].sort(
+          (a, b) => Number(a.min_percentage) - Number(b.min_percentage),
+        );
+        const expectedMatch = sorted.find((m, idx) => {
+          const next = sorted[idx + 1]?.min_percentage;
+          const lower = achievementPercentage >= Number(m.min_percentage || 0);
+          const upper = next != null
+            ? achievementPercentage < Number(next)
+            : achievementPercentage <= Number(m.max_percentage ?? Infinity);
+          return lower && upper;
+        });
+        const expected = Number(expectedMatch?.multiplier ?? 0);
+        if (Math.abs(expected - oteMultiplier) > 0.001) {
+          console.error(
+            `[calculate-ote] INCONSISTÊNCIA MULTIPLICADOR seller=${config.user_id} ` +
+            `pct=${achievementPercentage.toFixed(2)} aplicado=${oteMultiplier} esperado=${expected}. ` +
+            `Forçando esperado.`,
+          );
+          oteMultiplier = expected;
+        }
+      }
+
       // Calculate base variable
       const baseVariable = variableTarget * oteMultiplier;
 
