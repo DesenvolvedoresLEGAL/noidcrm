@@ -247,6 +247,7 @@ function filterByRange(periods: string[], range: RangeKey): string[] {
 
 export function OTEHistoryTab() {
   const { loading: isLoadingOrg } = useCurrentOrganization();
+  const queryClient = useQueryClient();
   const { data: allResults, isLoading, isPending } = useOTEMonthlyResults();
   const { isAdmin, isManager } = useUserRole();
   const calculateOTE = useCalculateOTE();
@@ -257,13 +258,23 @@ export function OTEHistoryTab() {
   const resultIds = useMemo(() => (allResults || []).map((r) => r.id), [allResults]);
   const { data: salesAgg } = useAllOTESalesAgg(resultIds);
 
-  const handleRecalc = (row: PeriodRow) => {
+  const handleRecalc = async (row: PeriodRow) => {
     if (!canRecalc) {
       toast.error('Apenas admin ou gestor pode recalcular um período.');
       return;
     }
-    toast.info(`Recalculando ${row.periodFull}…`);
-    calculateOTE.mutate({ periodMonth: `${row.period}-01` });
+    try {
+      await calculateOTE.mutateAsync({ periodMonth: row.period, suppressToast: true });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: oteKeys.monthlyResultsAll() }),
+        queryClient.invalidateQueries({ queryKey: ['ote-history-sales-agg'] }),
+        queryClient.invalidateQueries({ queryKey: ['ote-sales-records'] }),
+      ]);
+      toast.success(`${row.periodFull} recalculado com sucesso.`);
+    } catch (error) {
+      console.error('[OTEHistoryTab] Recalculation failed:', error);
+      toast.error(`Não foi possível recalcular ${row.periodFull}. Verifique logs do cálculo OTE.`);
+    }
   };
 
   const handleExport = (row: PeriodRow) => {
