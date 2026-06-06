@@ -237,6 +237,16 @@ export function OTEHistoryTab() {
         if (pct < 50) lowCount += 1;
       }
 
+      const status: PeriodRow['status'] = calculatedAt ? 'Calculado' : 'Aberto';
+      const { version, reason, needsRecalc } = classifySnapshot({
+        calculatedAt,
+        status,
+        commercialEligible: saleSum,
+        eligibleOte,
+        itemsOutOfGoal: nonElig,
+        totalPaid,
+      });
+
       rows.push({
         period,
         periodLabel: format(parseISO(period + '-01'), 'MMM/yy', { locale: ptBR }),
@@ -252,7 +262,10 @@ export function OTEHistoryTab() {
         highCount,
         lowCount,
         calculatedAt,
-        status: calculatedAt ? 'Calculado' : 'Aberto',
+        status,
+        version,
+        versionReason: reason,
+        needsRecalc,
         results: items,
       });
     }
