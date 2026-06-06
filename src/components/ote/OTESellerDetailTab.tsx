@@ -9,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { OTEMonthlyResult } from '@/hooks/useOTEData';
+import { OTEMonthlyResult, useOTEMultipliers } from '@/hooks/useOTEData';
 import { useOTESalesRecords } from '@/hooks/useOTESalesRecords';
 import { OTESellerSalesDrilldown } from './OTESellerSalesDrilldown';
 import { OTESellerQualifiedLeadsDrilldown } from './OTESellerQualifiedLeadsDrilldown';
@@ -21,6 +21,12 @@ import {
   computeOteFlagColor,
 } from './oteAchievement';
 import { useSalesConfig } from '@/hooks/useSalesConfig';
+import {
+  resolveOteMultiplierFromPercent,
+  detectMultiplierMismatch,
+} from '@/lib/ote/multiplier';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { AlertTriangle } from 'lucide-react';
 import {
   User,
   Target,
@@ -70,6 +76,12 @@ interface RankRow {
   isInactive: boolean;
   hasGoal: boolean;
   variableAmount: number;
+  // PATCH OTE 1.7.4 — derivações coerentes com o % Meta exibido
+  displayMultiplier: number;
+  displayVariableTarget: number;
+  displayBaseVariable: number;
+  displayFinalVariable: number;
+  multiplierMismatch: { expected: number; actual: number } | null;
   fullName: string;
   levelName: string;
   status: 'high' | 'mid' | 'low' | 'nogoal';
@@ -215,16 +227,19 @@ export function OTESellerDetailTab({
     start: periodStart,
     end: periodEnd,
   });
+  const { data: multipliersList = [] } = useOTEMultipliers();
   const qualifierMap = useMemo(
     () => new Map(qualifiers.map((q) => [q.qualifierUserId, q.qualifiedLeads])),
     [qualifiers],
   );
 
   /**
-   * SPRINT OTE 1.5 — Ranking competitivo. Toda métrica é DERIVADA dos cálculos
-   * já validados (PATCH OTE 1.4.1): receita_elegivel_ote para closers e
-   * leads_qualificados (atribuição histórica) para pré-vendas. Esta sprint
-   * NÃO altera nenhum cálculo — apenas reorganiza visualmente.
+   * PATCH OTE 1.7.4 — Cadeia única de cálculo por linha:
+   *   métrica realizada → meta → % Meta → faixa do multiplicador → variável final.
+   *
+   * O multiplicador exibido (e a variável) DEVEM ser derivados do mesmo
+   * `pctMeta` que aparece na tela. Se o snapshot persistido divergir, marcamos
+   * `multiplierMismatch` e exibimos badge "Divergência no multiplicador".
    */
   const rows: RankRow[] = useMemo(() => {
     return results
@@ -249,6 +264,23 @@ export function OTESellerDetailTab({
         const hasGoal = Number(result.goal_amount || 0) > 0;
         const profileAny = result.profile as { full_name?: string; is_active?: boolean } | undefined;
         const isInactive = profileAny?.is_active === false;
+
+        // Derivação coerente com pctMeta exibido.
+        const displayMultiplier = resolveOteMultiplierFromPercent(
+          pctMeta,
+          multipliersList,
+        ).multiplier;
+        const variableTarget = Number(result.ote_level?.variable_target || 0);
+        const displayBaseVariable = variableTarget * displayMultiplier;
+        // Mantém ajuste final (aceleradores/desaceleradores) do snapshot.
+        const adjustmentPct = Number(result.final_adjustment_percentage || 0);
+        const displayFinalVariable = displayBaseVariable * (1 + adjustmentPct / 100);
+        const multiplierMismatch = detectMultiplierMismatch({
+          displayedPercent: pctMeta,
+          snapshotMultiplier: Number(result.ote_multiplier || 0),
+          multipliers: multipliersList,
+        });
+
         return {
           result,
           pctMeta,
@@ -258,13 +290,18 @@ export function OTESellerDetailTab({
           isLeads,
           isInactive,
           hasGoal,
-          variableAmount: Number(result.final_variable_amount || 0),
+          variableAmount: displayFinalVariable,
+          displayMultiplier,
+          displayVariableTarget: variableTarget,
+          displayBaseVariable,
+          displayFinalVariable,
+          multiplierMismatch,
           fullName: result.profile?.full_name || result.level_name_snapshot || 'Vendedor',
           levelName: result.level_name_snapshot || '-',
           status: statusFromPct(pctMeta, hasGoal),
         };
       });
-  }, [results, allRecords, qualifierMap, flagBlueThreshold, flagYellowMinThreshold]);
+  }, [results, allRecords, qualifierMap, flagBlueThreshold, flagYellowMinThreshold, multipliersList]);
 
   // Ranking oficial: sempre por % Meta (maior para menor) para definir podium e posições.
   const ranking = useMemo(
@@ -671,13 +708,45 @@ export function OTESellerDetailTab({
                             Cálculo OTE
                           </h4>
                           <div className="space-y-3 text-sm">
-                            <div className="flex justify-between">
+                            <div className="flex items-center justify-between">
                               <span className="text-muted-foreground">Multiplicador</span>
-                              <span className="font-semibold">{row.result.ote_multiplier}x</span>
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold">
+                                  {row.displayMultiplier.toLocaleString('pt-BR', {
+                                    minimumFractionDigits: 0,
+                                    maximumFractionDigits: 2,
+                                  })}
+                                  x
+                                </span>
+                                {row.multiplierMismatch && (
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Badge
+                                          variant="destructive"
+                                          className="flex items-center gap-1 text-[10px]"
+                                        >
+                                          <AlertTriangle className="h-3 w-3" />
+                                          Divergência
+                                        </Badge>
+                                      </TooltipTrigger>
+                                      <TooltipContent className="max-w-xs">
+                                        <p>
+                                          Snapshot persistido tem{' '}
+                                          <strong>{row.multiplierMismatch.actual}x</strong>, mas o
+                                          % Meta atual ({row.pctMeta.toFixed(1)}%) corresponde a{' '}
+                                          <strong>{row.multiplierMismatch.expected}x</strong>.
+                                          Recalcule o período para alinhar a memória histórica.
+                                        </p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                )}
+                              </div>
                             </div>
                             <div className="flex justify-between">
                               <span className="text-muted-foreground">Variável Base</span>
-                              <span>{formatCurrency(row.result.base_variable)}</span>
+                              <span>{formatCurrency(row.displayBaseVariable)}</span>
                             </div>
                             <div className="flex justify-between">
                               <span className="text-muted-foreground">Ajuste Final</span>
@@ -694,11 +763,19 @@ export function OTESellerDetailTab({
                             <div className="flex justify-between border-t pt-2">
                               <span className="font-semibold">Variável Final</span>
                               <span className="font-bold text-primary">
-                                {formatCurrency(row.result.final_variable_amount)}
+                                {formatCurrency(row.displayFinalVariable)}
                               </span>
                             </div>
+                            {row.multiplierMismatch && (
+                              <p className="text-[11px] text-destructive">
+                                Snapshot persistido: multiplicador {row.multiplierMismatch.actual}x
+                                · variável {formatCurrency(Number(row.result.final_variable_amount || 0))}.
+                                Recalcule o período.
+                              </p>
+                            )}
                           </div>
                         </div>
+
 
                         {/* Performance / aceleradores */}
                         <div className="space-y-4">
