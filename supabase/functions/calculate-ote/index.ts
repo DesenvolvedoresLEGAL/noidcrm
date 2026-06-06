@@ -187,6 +187,31 @@ serve(async (req) => {
       console.log(`Processing seller: ${config.user_id}`);
 
       const isTeamTarget = config.ote_level?.is_team_target || false;
+      // PATCH OTE 1.7.5 — Fonte ÚNICA do nível OTE é a configuração ativa do
+      // vendedor (ote_seller_config -> ote_levels). Snapshots antigos NUNCA
+      // podem sobrescrever isso. Se houver divergência com snapshot persistido,
+      // logamos para auditoria e seguimos com o nível ativo.
+      const activeLevelName = config.ote_level?.level_name || null;
+      const activeLevelId = config.ote_level_id || null;
+      const { data: prevSnapshot } = await supabase
+        .from('ote_monthly_results')
+        .select('level_name_snapshot, ote_level_id, goal_type')
+        .eq('organization_id', organizationId)
+        .eq('user_id', config.user_id)
+        .eq('period_month', periodMonth)
+        .maybeSingle();
+      if (
+        prevSnapshot &&
+        activeLevelId &&
+        prevSnapshot.ote_level_id &&
+        prevSnapshot.ote_level_id !== activeLevelId
+      ) {
+        console.warn(
+          `[OTE 1.7.5] Divergência de nível OTE para user=${config.user_id} period=${periodMonth}: ` +
+          `snapshot=${prevSnapshot.level_name_snapshot} -> ativo=${activeLevelName}. ` +
+          `Atualizando snapshot para refletir configuração ativa.`
+        );
+      }
       // Determine goal_type early so we can filter opportunities correctly
       const goalType = config.ote_level?.goal_type || 'revenue';
       const relevantPipelineIds = goalType === 'leads' ? qualificationPipelineIds : salesPipelineIds;

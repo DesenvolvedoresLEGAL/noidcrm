@@ -107,6 +107,21 @@ function SellerOTEConfig() {
     }).format(value);
   };
 
+  // PATCH OTE 1.7.5 — formatação por tipo de meta do nível OTE.
+  // Nunca formatar meta de leads como moeda.
+  const formatGoalByType = (value: number | null | undefined, goalType?: string | null) => {
+    if (value == null) return '-';
+    if (goalType === 'leads') {
+      return `${Math.round(Number(value))} leads`;
+    }
+    return formatCurrency(Number(value));
+  };
+
+  // Nível selecionado no modal (para alternar labels de meta por tipo).
+  const selectedLevel = levels?.find((l) => l.id === formData.ote_level_id);
+  const selectedGoalType: 'revenue' | 'leads' =
+    ((selectedLevel as any)?.goal_type === 'leads' ? 'leads' : 'revenue');
+
   const handleOpenDialog = (userId?: string, existingConfig?: any) => {
     if (existingConfig) {
       setSelectedUserId(existingConfig.user_id);
@@ -207,12 +222,12 @@ function SellerOTEConfig() {
                     </TableCell>
                     <TableCell>{level?.level_name || '-'}</TableCell>
                     <TableCell className="text-right">
-                      {config.custom_goal_override 
-                        ? formatCurrency(config.custom_goal_override) 
-                        : level?.monthly_goal 
-                          ? formatCurrency(level.monthly_goal)
-                          : '-'
-                      }
+                      {(() => {
+                        const goalType = (level as any)?.goal_type || 'revenue';
+                        const effectiveGoal =
+                          config.custom_goal_override ?? level?.monthly_goal ?? null;
+                        return formatGoalByType(effectiveGoal, goalType);
+                      })()}
                     </TableCell>
                     <TableCell className="text-center">{(config as any).daily_calls_target ?? 15}</TableCell>
                     <TableCell className="text-center">{(config as any).daily_leads_target ?? 4}</TableCell>
@@ -320,15 +335,30 @@ function SellerOTEConfig() {
               </h4>
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <Label>Meta de Receita (R$)</Label>
+                  <Label>
+                    {selectedGoalType === 'leads'
+                      ? 'Meta de Leads'
+                      : 'Meta de Receita (R$)'}
+                  </Label>
                   <Input
                     type="number"
-                    value={formData.custom_goal_override || ''}
-                    onChange={(e) => setFormData({ 
-                      ...formData, 
-                      custom_goal_override: e.target.value ? Number(e.target.value) : null 
+                    step={selectedGoalType === 'leads' ? '1' : 'any'}
+                    value={formData.custom_goal_override ?? ''}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      custom_goal_override: e.target.value
+                        ? (selectedGoalType === 'leads'
+                            ? Math.round(Number(e.target.value))
+                            : Number(e.target.value))
+                        : null
                     })}
-                    placeholder="Usar do nível"
+                    placeholder={
+                      selectedLevel
+                        ? (selectedGoalType === 'leads'
+                            ? `Usar do nível (${selectedLevel.monthly_goal} leads)`
+                            : `Usar do nível (${formatCurrency(selectedLevel.monthly_goal)})`)
+                        : 'Usar do nível'
+                    }
                   />
                 </div>
                 <div className="space-y-2">
