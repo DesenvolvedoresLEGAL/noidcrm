@@ -65,12 +65,15 @@ serve(async (req) => {
       .eq('organization_id', organizationId)
       .order('min_percentage');
 
-    // Get seller configs
+    // Get seller configs vigente no período calculado. Histórico não pode usar
+    // apenas end_date IS NULL, senão vendedores removidos após o mês somem do
+    // snapshot e o fechamento recalculado fica incompleto.
     let configQuery = supabase
       .from('ote_seller_config')
       .select('*, ote_level:ote_levels(*, is_team_target)')
       .eq('organization_id', organizationId)
-      .is('end_date', null);
+      .lte('effective_date', endDate.split('T')[0])
+      .or(`end_date.is.null,end_date.gte.${startDate.split('T')[0]}`);
 
     if (userId) {
       configQuery = configQuery.eq('user_id', userId);
