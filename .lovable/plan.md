@@ -1,100 +1,63 @@
-## Release Notes Automáticos — GitHub + Eventos do Sistema, com revisão humana
+# PATCH OTE 1.7.6 — Membros desligados não podem aparecer em períodos futuros sem produção
 
-Reusa a infraestrutura existente (`pending_release_changes` + edge `generate-daily-release-notes`) e adiciona ingestão híbrida, rascunho com revisão, geração via IA e disparo manual + agendado.
+## Problema
 
-### Decisões aplicadas
-- **Fonte:** GitHub (PRs mergeados) + eventos internos (migrações, action_executions críticas, system_events relevantes, ai_runs).
-- **Disparo:** botão manual em `/release-notes` (super_admin) + cron semanal (sexta 18h America/Sao_Paulo).
-- **Publicação:** sempre como `status='draft'` — gestor revisa e clica em "Publicar". Nada vai pra timeline pública sem revisão.
+Ana Paula (Hunter) foi removida da organização em **2026-05-26** (soft delete em `organization_members.deleted_at`, com `transferred_to` = Gustavo Lacerda). Mesmo assim, ela aparece no **Campeonato Comercial de Junho/2026** como 4º colocado, "Abaixo do mínimo", 0%.
 
-### 1. Banco (migration)
+Motivo: o `ote_seller_config` dela ficou com `end_date = 2026-06-06` e a edge `calculate-ote` só consulta `ote_seller_config`, sem cruzar com `organization_members.deleted_at`. Resultado: foi gerada uma linha em `ote_monthly_results` para 2026-06 com 0% (sem nenhuma venda ou lead qualificado).
 
-**Tabela `release_notes`** — novas colunas (todas opcionais, backward compatible):
-- `status text` default `'published'` (`draft|published|discarded`)
-- `published_at timestamptz`
-- `generated_by text` (`manual|scheduled`)
-- `source_summary jsonb` — `{ github_prs: n, system_events: n, period_start, period_end }`
+Pela regra da memória ("usuários inativos com produção no período aparecem com badge Inativo"), ela não pode aparecer em Junho/2026 — foi desligada antes do início do período e não tem nenhuma produção/qualificação.
 
-Backfill: registros existentes ficam `status='published'`, `published_at = created_at`.
+Maio/2026 (último mês ativo) é histórico imutável e **não deve ser alterado**.
 
-**Tabela `release_notes_ingestion_log`** (nova) — auditoria de cada execução do gerador:
-- `source` (`github|system_events|action_executions|migrations|ai_runs`)
-- `external_id text` (ex.: número do PR, id do evento) — único por source
-- `payload jsonb`, `included_in_release uuid` (FK draft criado), `ingested_at`
-- Índice único `(source, external_id)` para evitar reingestão. GRANTs padrão + RLS (super_admin only).
+## Princípios
 
-**View pública `v_release_notes_public`** (substitui leitura direta no front): exibe apenas `status='published'`. Painel de revisão (admin) lê a tabela bruta.
+- Histórico de períodos com produção real continua imutável (Maio e anteriores).
+- Períodos posteriores ao desligamento, sem produção, não geram linha.
+- A correção da fonte (config) precisa ser aplicada quando o membro é desligado, não só por patch único.
+- Nenhuma alteração em `ote_levels`, `ote_multipliers` ou fórmulas.
 
-**RLS:** mantém policies atuais; adiciona policy para super_admin ler/atualizar rascunhos.
+## Mudanças
 
-### 2. Edge function `generate-release-notes-draft` (substitui a antiga)
+### 1. Edge `delete-user-with-transfer` (correção da fonte)
 
-POST `{ period_days?: number, trigger: 'manual'|'scheduled' }`. Fluxo:
+Quando soft-deletar o membro, encerrar também o `ote_seller_config`:
 
-1. **Coleta GitHub (opcional):** se conector GitHub linkado, lista PRs mergeados em `main` no período via gateway (`/repos/{owner}/{repo}/pulls?state=closed&base=main`). Filtra `merged_at >= now() - period_days`. Persiste em `release_notes_ingestion_log`.
-2. **Coleta system events:**
-   - `action_executions` com `risk_level >= medium` ou `status='failed'` agrupados por `action_key`
-   - `system_events` com `event_category in ('release','feature_flag','migration','security')`
-   - `ai_runs` agregados por agente (contagem, taxa de sucesso)
-   - Migrações: lê `supabase_migrations.schema_migrations` (via service role) — pega só `name`, agrupa por dia.
-3. **Dedupe:** ignora qualquer item já presente em `release_notes_ingestion_log` (chave `source+external_id`).
-4. **Sumarização via OpenAI** (`_shared/ai-client.ts`, modelo `gpt-5-mini`, com `dateContextPrompt()`):
-   - Prompt recebe lista bruta agrupada por fonte + instruções de categorização (`feature|fix|improvement|security`).
-   - Saída em JSON: `{ version, title, description, changes: [{type, description}], is_major }`.
-   - Validação Zod no edge antes de inserir.
-5. **Versão:** lê última `release_notes.version`, incrementa `minor` (ou `major` se IA marcar `is_major=true`).
-6. **Insert:** `release_notes` com `status='draft'`, `generated_by`, `source_summary`. Marca todos os logs como `included_in_release = <novo id>`.
-7. **Idempotência:** se já existir um rascunho não publicado, anexa novos itens a ele em vez de criar outro.
-8. **Resposta:** retorna `{ release_id, version, items_collected, items_used }`.
+- Para cada config do `user_id` na org com `end_date IS NULL` OU `end_date > deleted_at::date`:
+  - `UPDATE ote_seller_config SET end_date = LEAST(COALESCE(end_date, deleted_at::date), deleted_at::date), updated_at = now()`
+- Log em `system_events` (`ote_seller_config_closed_on_member_delete`).
 
-Erros, validação Zod e CORS conforme padrão do projeto. Sem dependência obrigatória de GitHub — se conector ausente, log warning e segue só com eventos do sistema.
+### 2. Edge `calculate-ote` (guardrail)
 
-### 3. Cron semanal
+Após carregar `sellerConfigs`, cruzar com `organization_members` da mesma org:
 
-Via `pg_cron` + `pg_net` (insert tool, não migration, pois usa anon key específica do projeto):
-```sql
-select cron.schedule(
-  'generate-release-notes-weekly',
-  '0 21 * * 5', -- 18h BRT = 21h UTC, toda sexta
-  $$ select net.http_post(
-       url:='https://<ref>.supabase.co/functions/v1/generate-release-notes-draft',
-       headers:='{"Content-Type":"application/json","apikey":"<anon>"}'::jsonb,
-       body:='{"trigger":"scheduled","period_days":7}'::jsonb
-     ); $$
-);
-```
+- Se `organization_members.status = 'deleted'` e `deleted_at < startDate` (início do período) E o vendedor **não tem nenhuma produção ou lead qualificado no período**, pular o vendedor (não gera linha em `ote_monthly_results`, não conta como participante).
+- "Tem produção" = `eligibleTotal > 0` OU `qualifiedLeads > 0` no período (mesma fonte já usada na função).
+- Log `[OTE 1.7.6] Vendedor desligado sem produção ignorado` com `user_id` e `period`.
+- Mantém a regra atual de **não filtrar** desligados que tenham produção — eles continuam aparecendo (badge "Inativo").
 
-### 4. UI — painel de revisão em `/release-notes`
+### 3. Backfill único
 
-- **Botão "Gerar próxima release (rascunho)"** visível só pra super_admin (usa `usePlatformAdmin`). Abre modal com seletor de período (7/14/30 dias) e chama o edge via `supabase.functions.invoke`.
-- **Aba "Rascunhos"** (admin only) lista releases com `status='draft'`:
-  - Edição inline de `title`, `description`, e lista de `changes` (add/remove/edit, tipo + texto).
-  - Mostra `source_summary` (badge "X PRs · Y eventos").
-  - Botões **Publicar** (`status='published'`, `published_at=now()`) e **Descartar** (`status='discarded'`).
-- Timeline pública (`status='published'`) inalterada para todos os outros usuários.
-- `ReleaseNotes.tsx` migra leitura pública para `v_release_notes_public` (filtra drafts no servidor).
+- `UPDATE ote_seller_config sc SET end_date = LEAST(COALESCE(sc.end_date, om.deleted_at::date), om.deleted_at::date) FROM organization_members om WHERE om.user_id = sc.user_id AND om.organization_id = sc.organization_id AND om.status = 'deleted' AND om.deleted_at IS NOT NULL AND (sc.end_date IS NULL OR sc.end_date > om.deleted_at::date);`
+- `DELETE FROM ote_monthly_results r USING organization_members om WHERE r.user_id = om.user_id AND r.organization_id = om.organization_id AND om.status = 'deleted' AND r.period_month::date > om.deleted_at::date AND COALESCE(r.total_sales, 0) = 0 AND COALESCE(r.final_variable_amount, 0) = 0;`
+  - Remove apenas linhas de períodos posteriores ao desligamento e sem produção. Mantém qualquer linha com produção (badge Inativo).
 
-### 5. Arquivos
+### 4. UI (`OTESellerDetailTab.tsx`)
 
-**Criar:**
-- Migration: nova coluna `status` + tabela `release_notes_ingestion_log` + view `v_release_notes_public`.
-- `supabase/functions/generate-release-notes-draft/index.ts`
-- `src/components/admin/release-notes/GenerateReleaseDraftButton.tsx`
-- `src/components/admin/release-notes/ReleaseDraftEditor.tsx`
-- `src/components/admin/release-notes/DraftsTab.tsx`
-- `src/hooks/useReleaseNotesAdmin.ts`
+- Nada além de não exibir as linhas que deixarão de existir após o backfill.
+- O badge "Inativo" já existe e continua sendo aplicado para casos legítimos (desligado com produção).
 
-**Editar:**
-- `src/pages/ReleaseNotes.tsx` — adiciona tab de rascunhos (gated por super_admin) + botão gerar; troca query pra view pública.
-- `supabase/functions/generate-daily-release-notes/index.ts` — descontinuar/redirecionar pra nova function (manter backward compat até cron antigo, se houver, sumir).
-- `mem://index.md` — adicionar entrada de Release Notes Automation.
+## Validação
 
-### 6. Conectores
+- Após backfill, recálculo de Junho/2026 não recria a linha de Ana Paula.
+- Maio/2026 continua intacto (Ana Paula ausente — ela não tinha resultado em Maio também).
+- Campeonato Comercial Junho/2026 passa a ter **3 participantes** (Bruno, Wagner, Gustavo).
+- Pódio reaparece somente quando atingir 4+ participantes ativos (regra já existente em `OTESellerDetailTab`).
+- Soft delete novo: ao desligar um membro hoje, futuros recálculos do mês seguinte não criam linha vazia.
+- `npx tsc --noEmit` limpo.
 
-GitHub não está linkado no workspace. Após aprovar o plano, vou chamar `standard_connectors--connect` com `connector_id=github` pra abrir o seletor — sem isso, a função opera só com eventos internos (modo degradado) e o front mostra um banner "Conecte GitHub pra enriquecer com PRs".
+## Não-objetivos
 
-### 7. Fora de escopo
-- Não auto-publica nada (sempre draft).
-- Não envia notificação Slack/email automática (pode ser sprint 2).
-- Não toca em `commercial_won_revenue_view`, OTE, Forecast.
-- Não remove a edge antiga até a nova estar ativa (toggle no cron).
+- Não alterar faixas de multiplicadores, valores de `ote_levels`, nem fórmulas.
+- Não reescrever histórico de meses com produção real.
+- Não mexer em `crm_active_users_view` nem nas regras de atribuição histórica de vendas/leads.

@@ -90,6 +90,24 @@ serve(async (req) => {
     // com configuração OTE vigente no período precisam continuar no cálculo histórico.
     const sellerConfigs = rawSellerConfigs || [];
 
+    // PATCH OTE 1.7.6 — Mapa de membros desligados antes do início do período.
+    // Usado para pular vendedores soft-deletados que não tenham produção alguma
+    // no período (evita "fantasma" no Campeonato Comercial).
+    const memberUserIds = sellerConfigs.map((c: any) => c.user_id);
+    const deletedBeforePeriod = new Set<string>();
+    if (memberUserIds.length > 0) {
+      const { data: members } = await supabase
+        .from('organization_members')
+        .select('user_id, status, deleted_at')
+        .eq('organization_id', organizationId)
+        .in('user_id', memberUserIds);
+      for (const m of (members || []) as any[]) {
+        if (m.status === 'deleted' && m.deleted_at && new Date(m.deleted_at) < new Date(startDate)) {
+          deletedBeforePeriod.add(m.user_id);
+        }
+      }
+    }
+
     if (!sellerConfigs || sellerConfigs.length === 0) {
       console.log('No seller configs found');
       return new Response(JSON.stringify({ 
@@ -339,6 +357,27 @@ serve(async (req) => {
             account: { razao_social: row.account_name, nome_fantasia: row.nome_fantasia },
           }));
         }
+      }
+
+      // PATCH OTE 1.7.6 — Vendedor desligado antes do período e sem nenhuma
+      // produção/qualificação no período NÃO entra no ranking. Mantém-se a
+      // regra de "Inativo com produção" (continua aparecendo com badge).
+      if (
+        !isTeamTarget &&
+        deletedBeforePeriod.has(config.user_id) &&
+        opportunities.length === 0
+      ) {
+        console.log(
+          `[OTE 1.7.6] Vendedor desligado sem produção ignorado: user=${config.user_id} period=${periodMonth}`,
+        );
+        // Limpa qualquer linha "fantasma" pré-existente do período para este vendedor.
+        await supabase
+          .from('ote_monthly_results')
+          .delete()
+          .eq('organization_id', organizationId)
+          .eq('user_id', config.user_id)
+          .eq('period_month', periodMonth);
+        continue;
       }
 
       // === SSoT enrichment (revenue only) ===

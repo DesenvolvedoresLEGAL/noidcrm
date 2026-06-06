@@ -225,11 +225,13 @@ Deno.serve(async (req) => {
     transferResults.sellers_deactivated = sellerCount || 0;
 
     // Mark member as deleted
+    const deletedAtIso = new Date().toISOString();
+    const deletedDate = deletedAtIso.split("T")[0];
     const { error: updateError } = await supabaseAdmin
       .from("organization_members")
       .update({
         status: "deleted",
-        deleted_at: new Date().toISOString(),
+        deleted_at: deletedAtIso,
         deleted_by: caller.id,
         transferred_to: transfer_to_user_id,
       })
@@ -242,6 +244,48 @@ Deno.serve(async (req) => {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    // PATCH OTE 1.7.6 — Encerrar ote_seller_config no dia do desligamento.
+    // Sem isso, calculate-ote continua tratando o vendedor como vigente em
+    // períodos posteriores ao desligamento e gera linhas vazias no ranking.
+    try {
+      const { data: openConfigs } = await supabaseAdmin
+        .from("ote_seller_config")
+        .select("id, end_date")
+        .eq("organization_id", organization_id)
+        .eq("user_id", user_id_to_delete);
+      const toClose = (openConfigs || []).filter(
+        (c: any) => !c.end_date || c.end_date > deletedDate,
+      );
+      if (toClose.length > 0) {
+        const { error: closeErr } = await supabaseAdmin
+          .from("ote_seller_config")
+          .update({ end_date: deletedDate, updated_at: deletedAtIso })
+          .in(
+            "id",
+            toClose.map((c: any) => c.id),
+          );
+        if (closeErr) {
+          console.error("[OTE 1.7.6] Failed to close ote_seller_config:", closeErr);
+        } else {
+          (transferResults as any).ote_seller_configs_closed = toClose.length;
+          await supabaseAdmin.from("system_events").insert({
+            organization_id,
+            event_type: "ote_seller_config_closed_on_member_delete",
+            entity_type: "user",
+            entity_id: user_id_to_delete,
+            actor_user_id: caller.id,
+            metadata: {
+              closed_count: toClose.length,
+              end_date: deletedDate,
+              config_ids: toClose.map((c: any) => c.id),
+            },
+          });
+        }
+      }
+    } catch (e) {
+      console.error("[OTE 1.7.6] ote_seller_config closure failed:", e);
     }
 
     // Audit log — includes both what moved AND what was preserved for historical integrity
