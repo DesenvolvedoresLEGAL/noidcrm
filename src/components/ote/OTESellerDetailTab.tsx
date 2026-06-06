@@ -76,6 +76,12 @@ interface RankRow {
   isInactive: boolean;
   hasGoal: boolean;
   variableAmount: number;
+  // PATCH OTE 1.7.4 — derivações coerentes com o % Meta exibido
+  displayMultiplier: number;
+  displayVariableTarget: number;
+  displayBaseVariable: number;
+  displayFinalVariable: number;
+  multiplierMismatch: { expected: number; actual: number } | null;
   fullName: string;
   levelName: string;
   status: 'high' | 'mid' | 'low' | 'nogoal';
