@@ -750,6 +750,31 @@ export function OTEHistoryTab() {
         open={!!selectedRow}
         onClose={() => setSelectedPeriod(null)}
       />
+
+      <AlertDialog open={!!recalcCandidate} onOpenChange={(v) => !v && setRecalcCandidate(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Recalcular {recalcCandidate?.periodFull} com a regra atual?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Este período possui cálculo histórico. Recalcular usando a regra atual pode alterar o valor do OTE.
+              O valor histórico será preservado para auditoria como <strong>Total pago histórico</strong> e o novo
+              cálculo aparecerá como <strong>Total recalculado</strong>.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                const target = recalcCandidate;
+                setRecalcCandidate(null);
+                if (target) void handleRecalc(target);
+              }}
+            >
+              Recalcular com regra atual
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
