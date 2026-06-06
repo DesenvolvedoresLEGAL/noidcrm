@@ -701,12 +701,22 @@ function PeriodDetailDrawer({
         </SheetHeader>
 
         <div className="space-y-4 mt-6">
+          {row.needsRecalc && (
+            <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive flex gap-2">
+              <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+              <div>
+                <p className="font-medium">Snapshot desatualizado</p>
+                <p className="mt-0.5 text-destructive/80">{row.versionReason}</p>
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-3">
             <MiniStat label="Total pago" value={fmtBRL(row.totalPaid)} highlight />
             <MiniStat label="% médio de meta" value={fmtPct(row.avgAchievement)} />
             <MiniStat label="Comissão elegível comercial" value={fmtBRL(row.commercialEligible)} />
             <MiniStat label="Receita elegível OTE" value={fmtBRL(row.eligibleOte)} />
-            <MiniStat label="Itens fora da meta" value={fmtBRL(row.itemsOutOfGoal)} warn />
+            <MiniStat label="Itens fora da meta" value={fmtBRL(row.itemsOutOfGoal)} />
             <MiniStat label="Vendedores no cálculo" value={String(row.sellers)} />
           </div>
 
@@ -729,7 +739,11 @@ function PeriodDetailDrawer({
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-0 text-xs text-muted-foreground space-y-1">
-              <p><span className="text-foreground font-medium">Status:</span> {row.status}</p>
+              <p className="flex items-center gap-2">
+                <span className="text-foreground font-medium">Versão do cálculo:</span>
+                <VersionBadge row={row} />
+              </p>
+              <p><span className="text-foreground font-medium">Status do snapshot:</span> {row.status}</p>
               <p><span className="text-foreground font-medium">Calculado em:</span> {fmtDateTime(row.calculatedAt)}</p>
               <p><span className="text-foreground font-medium">Fonte das vendas:</span> Relatório Vendas Realizadas (ote_sales_records).</p>
               <p><span className="text-foreground font-medium">Fonte das qualificações:</span> historicalQualifications (responsável histórico no momento da qualificação).</p>
