@@ -278,10 +278,23 @@ export function OTEHistoryTab() {
         queryClient.invalidateQueries({ queryKey: ['ote-history-sales-agg'] }),
         queryClient.invalidateQueries({ queryKey: ['ote-sales-records'] }),
       ]);
-      toast.success(`${row.periodFull} recalculado com sucesso.`);
+      toast.success(`${row.periodFull} recalculado. Valor histórico preservado para auditoria.`);
     } catch (error) {
       console.error('[OTEHistoryTab] Recalculation failed:', error);
       toast.error(`Não foi possível recalcular ${row.periodFull}. Verifique logs do cálculo OTE.`);
+    }
+  };
+
+  const requestRecalc = (row: PeriodRow) => {
+    if (!canRecalc) {
+      toast.error('Apenas admin ou gestor pode recalcular um período.');
+      return;
+    }
+    // Períodos com cálculo prévio exigem confirmação para preservar memória
+    if (row.calculatedAt || row.totalPaid > 0) {
+      setRecalcCandidate(row);
+    } else {
+      void handleRecalc(row);
     }
   };
 
