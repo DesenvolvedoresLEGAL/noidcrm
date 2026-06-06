@@ -143,6 +143,59 @@ function periodFullLabel(period: string): string {
   return `${monthLabelMap[m - 1]} ${y}`;
 }
 
+/**
+ * Classifica a versão do snapshot OTE para o histórico.
+ * Não recalcula nada — apenas inspeciona o snapshot persistido vs. heurísticas
+ * de consistência (cutoff temporal + split item-a-item presente).
+ */
+function classifySnapshot(args: {
+  calculatedAt: string | null;
+  status: PeriodRow['status'];
+  commercialEligible: number;
+  eligibleOte: number;
+  itemsOutOfGoal: number;
+  totalPaid: number;
+}): { version: SnapshotVersion; reason: string; needsRecalc: boolean } {
+  const { calculatedAt, status, commercialEligible, eligibleOte, itemsOutOfGoal, totalPaid } = args;
+  if (!calculatedAt) {
+    return { version: 'Aberto', reason: 'Período ainda não foi calculado.', needsRecalc: false };
+  }
+  const hasSplit = eligibleOte > 0.01 || itemsOutOfGoal > 0.01;
+  const hasSales = commercialEligible > 0.01;
+
+  // Sem split item-a-item mas com vendas → snapshot anterior à regra atual.
+  if (hasSales && !hasSplit) {
+    if (totalPaid > 0.01) {
+      return {
+        version: 'Manual',
+        reason: 'Pagamento registrado sem Receita elegível OTE — provavelmente ajuste manual ou snapshot anterior à regra item-a-item. Recalcule para auditar.',
+        needsRecalc: true,
+      };
+    }
+    return {
+      version: 'Desatualizado',
+      reason: 'Snapshot sem split item-a-item. Recalcule o período para gerar Receita elegível OTE e Itens fora da meta.',
+      needsRecalc: true,
+    };
+  }
+
+  // Snapshot antigo (antes da correção oficial da regra).
+  if (calculatedAt < RULE_CUTOFF_ISO) {
+    return {
+      version: 'Legado',
+      reason: 'Calculado em versão anterior da regra OTE. Recalcule para alinhar com a Receita Válida oficial.',
+      needsRecalc: true,
+    };
+  }
+
+  return {
+    version: status === 'Calculado' ? 'Atual' : 'Recalculado',
+    reason: 'Snapshot gerado com a regra atual do OTE.',
+    needsRecalc: false,
+  };
+}
+
+
 function useAllOTESalesAgg(resultIds: string[]) {
   const { organization } = useCurrentOrganization();
   const ids = useMemo(() => [...resultIds].sort(), [resultIds]);
