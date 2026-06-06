@@ -109,6 +109,13 @@ interface PeriodRow {
   periodFull: string;
   sellers: number;
   totalPaid: number;
+  // SPRINT OTE 1.7.3 — memória histórica vs recálculo pela regra atual
+  originalTotalPaid: number;
+  recalculatedTotalPaid: number;
+  hasHistorical: boolean;
+  hasRecalc: boolean;
+  paidDifference: number;
+  recalculatedAt: string | null;
   totalGoal: number;
   totalSales: number;
   eligibleOte: number;
