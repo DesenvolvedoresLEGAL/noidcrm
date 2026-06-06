@@ -359,6 +359,27 @@ serve(async (req) => {
         }
       }
 
+      // PATCH OTE 1.7.6 — Vendedor desligado antes do período e sem nenhuma
+      // produção/qualificação no período NÃO entra no ranking. Mantém-se a
+      // regra de "Inativo com produção" (continua aparecendo com badge).
+      if (
+        !isTeamTarget &&
+        deletedBeforePeriod.has(config.user_id) &&
+        opportunities.length === 0
+      ) {
+        console.log(
+          `[OTE 1.7.6] Vendedor desligado sem produção ignorado: user=${config.user_id} period=${periodMonth}`,
+        );
+        // Limpa qualquer linha "fantasma" pré-existente do período para este vendedor.
+        await supabase
+          .from('ote_monthly_results')
+          .delete()
+          .eq('organization_id', organizationId)
+          .eq('user_id', config.user_id)
+          .eq('period_month', periodMonth);
+        continue;
+      }
+
       // === SSoT enrichment (revenue only) ===
       // REGRA OFICIAL (correção emergencial — restaura regra de produto e exclui
       // propostas reabertas/perdidas):
