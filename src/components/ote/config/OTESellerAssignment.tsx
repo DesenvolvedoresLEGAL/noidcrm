@@ -222,12 +222,12 @@ function SellerOTEConfig() {
                     </TableCell>
                     <TableCell>{level?.level_name || '-'}</TableCell>
                     <TableCell className="text-right">
-                      {config.custom_goal_override 
-                        ? formatCurrency(config.custom_goal_override) 
-                        : level?.monthly_goal 
-                          ? formatCurrency(level.monthly_goal)
-                          : '-'
-                      }
+                      {(() => {
+                        const goalType = (level as any)?.goal_type || 'revenue';
+                        const effectiveGoal =
+                          config.custom_goal_override ?? level?.monthly_goal ?? null;
+                        return formatGoalByType(effectiveGoal, goalType);
+                      })()}
                     </TableCell>
                     <TableCell className="text-center">{(config as any).daily_calls_target ?? 15}</TableCell>
                     <TableCell className="text-center">{(config as any).daily_leads_target ?? 4}</TableCell>
