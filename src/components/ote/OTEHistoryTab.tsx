@@ -310,9 +310,31 @@ export function OTEHistoryTab() {
       let eligibleOte = 0;
       let nonElig = 0;
       let saleSum = 0;
+      let originalSum = 0;
+      let recalcSum = 0;
+      let hasHistorical = false;
+      let hasRecalc = false;
+      let recalculatedAt: string | null = null;
 
       for (const r of items) {
-        totalPaid += Number(r.final_variable_amount || 0);
+        const current = Number(r.final_variable_amount || 0);
+        totalPaid += current;
+        const orig = r.original_total_paid != null ? Number(r.original_total_paid) : null;
+        const rec = r.recalculated_total_paid != null ? Number(r.recalculated_total_paid) : null;
+        if (orig != null) {
+          originalSum += orig;
+          hasHistorical = true;
+        } else {
+          // sem original registrado: o atual é o histórico
+          originalSum += current;
+        }
+        if (rec != null) {
+          recalcSum += rec;
+          hasRecalc = true;
+        }
+        if (r.recalculated_at && (!recalculatedAt || r.recalculated_at > recalculatedAt)) {
+          recalculatedAt = r.recalculated_at;
+        }
         const agg = salesAgg?.get(r.id);
         if (agg) {
           eligibleOte += agg.eligible;
@@ -348,6 +370,12 @@ export function OTEHistoryTab() {
         periodFull: periodFullLabel(period),
         sellers: individuals.length,
         totalPaid,
+        originalTotalPaid: originalSum,
+        recalculatedTotalPaid: recalcSum,
+        hasHistorical,
+        hasRecalc,
+        paidDifference: hasRecalc && hasHistorical ? recalcSum - originalSum : 0,
+        recalculatedAt,
         totalGoal,
         totalSales,
         eligibleOte,
