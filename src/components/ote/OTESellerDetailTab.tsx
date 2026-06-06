@@ -9,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { OTEMonthlyResult } from '@/hooks/useOTEData';
+import { OTEMonthlyResult, useOTEMultipliers } from '@/hooks/useOTEData';
 import { useOTESalesRecords } from '@/hooks/useOTESalesRecords';
 import { OTESellerSalesDrilldown } from './OTESellerSalesDrilldown';
 import { OTESellerQualifiedLeadsDrilldown } from './OTESellerQualifiedLeadsDrilldown';
@@ -21,6 +21,12 @@ import {
   computeOteFlagColor,
 } from './oteAchievement';
 import { useSalesConfig } from '@/hooks/useSalesConfig';
+import {
+  resolveOteMultiplierFromPercent,
+  detectMultiplierMismatch,
+} from '@/lib/ote/multiplier';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { AlertTriangle } from 'lucide-react';
 import {
   User,
   Target,
