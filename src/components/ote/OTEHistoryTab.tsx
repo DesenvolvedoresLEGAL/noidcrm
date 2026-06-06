@@ -241,11 +241,28 @@ function filterByRange(periods: string[], range: RangeKey): string[] {
 export function OTEHistoryTab() {
   const { loading: isLoadingOrg } = useCurrentOrganization();
   const { data: allResults, isLoading, isPending } = useOTEMonthlyResults();
+  const { isAdmin, isManager } = useUserRole();
+  const calculateOTE = useCalculateOTE();
+  const canRecalc = isAdmin || isManager;
   const [range, setRange] = useState<RangeKey>('6m');
   const [selectedPeriod, setSelectedPeriod] = useState<string | null>(null);
 
   const resultIds = useMemo(() => (allResults || []).map((r) => r.id), [allResults]);
   const { data: salesAgg } = useAllOTESalesAgg(resultIds);
+
+  const handleRecalc = (row: PeriodRow) => {
+    if (!canRecalc) {
+      toast.error('Apenas admin ou gestor pode recalcular um período.');
+      return;
+    }
+    toast.info(`Recalculando ${row.periodFull}…`);
+    calculateOTE.mutate({ periodMonth: `${row.period}-01` });
+  };
+
+  const handleExport = (row: PeriodRow) => {
+    toast.info('Exportação Excel disponível na Visão Geral. Selecione o período correspondente para gerar a planilha completa.');
+    void row;
+  };
 
   const allRows = useMemo<PeriodRow[]>(() => {
     if (!allResults || allResults.length === 0) return [];
