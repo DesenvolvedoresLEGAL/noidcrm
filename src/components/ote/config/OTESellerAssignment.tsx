@@ -107,6 +107,21 @@ function SellerOTEConfig() {
     }).format(value);
   };
 
+  // PATCH OTE 1.7.5 — formatação por tipo de meta do nível OTE.
+  // Nunca formatar meta de leads como moeda.
+  const formatGoalByType = (value: number | null | undefined, goalType?: string | null) => {
+    if (value == null) return '-';
+    if (goalType === 'leads') {
+      return `${Math.round(Number(value))} leads`;
+    }
+    return formatCurrency(Number(value));
+  };
+
+  // Nível selecionado no modal (para alternar labels de meta por tipo).
+  const selectedLevel = levels?.find((l) => l.id === formData.ote_level_id);
+  const selectedGoalType: 'revenue' | 'leads' =
+    ((selectedLevel as any)?.goal_type === 'leads' ? 'leads' : 'revenue');
+
   const handleOpenDialog = (userId?: string, existingConfig?: any) => {
     if (existingConfig) {
       setSelectedUserId(existingConfig.user_id);
