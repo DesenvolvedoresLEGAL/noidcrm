@@ -335,15 +335,30 @@ function SellerOTEConfig() {
               </h4>
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <Label>Meta de Receita (R$)</Label>
+                  <Label>
+                    {selectedGoalType === 'leads'
+                      ? 'Meta de Leads'
+                      : 'Meta de Receita (R$)'}
+                  </Label>
                   <Input
                     type="number"
-                    value={formData.custom_goal_override || ''}
-                    onChange={(e) => setFormData({ 
-                      ...formData, 
-                      custom_goal_override: e.target.value ? Number(e.target.value) : null 
+                    step={selectedGoalType === 'leads' ? '1' : 'any'}
+                    value={formData.custom_goal_override ?? ''}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      custom_goal_override: e.target.value
+                        ? (selectedGoalType === 'leads'
+                            ? Math.round(Number(e.target.value))
+                            : Number(e.target.value))
+                        : null
                     })}
-                    placeholder="Usar do nível"
+                    placeholder={
+                      selectedLevel
+                        ? (selectedGoalType === 'leads'
+                            ? `Usar do nível (${selectedLevel.monthly_goal} leads)`
+                            : `Usar do nível (${formatCurrency(selectedLevel.monthly_goal)})`)
+                        : 'Usar do nível'
+                    }
                   />
                 </div>
                 <div className="space-y-2">
