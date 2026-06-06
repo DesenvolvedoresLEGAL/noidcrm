@@ -665,6 +665,8 @@ export function OTEHistoryTab() {
                 <th className="text-right py-3 px-2 font-medium">Itens fora da meta</th>
                 <th className="text-right py-3 px-2 font-medium">% médio de meta</th>
                 <th className="text-right py-3 px-2 font-medium">Total pago</th>
+                <th className="text-right py-3 px-2 font-medium">Total recalculado</th>
+                <th className="text-right py-3 px-2 font-medium">Diferença</th>
                 <th className="text-right py-3 px-2 font-medium">Ações</th>
               </tr>
             </thead>
@@ -686,7 +688,29 @@ export function OTEHistoryTab() {
                   <td className="py-3 px-2 text-right">{fmtBRL(row.eligibleOte)}</td>
                   <td className="py-3 px-2 text-right text-muted-foreground">{fmtBRL(row.itemsOutOfGoal)}</td>
                   <td className="py-3 px-2 text-right">{fmtPct(row.avgAchievement)}</td>
-                  <td className="py-3 px-2 text-right font-semibold text-primary">{fmtBRL(row.totalPaid)}</td>
+                  <td className="py-3 px-2 text-right font-semibold text-primary">
+                    {fmtBRL(row.hasHistorical ? row.originalTotalPaid : row.totalPaid)}
+                  </td>
+                  <td className="py-3 px-2 text-right">
+                    {row.hasRecalc ? (
+                      <span className="font-medium">{fmtBRL(row.recalculatedTotalPaid)}</span>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </td>
+                  <td className="py-3 px-2 text-right">
+                    {row.hasRecalc && row.hasHistorical ? (
+                      <span className={cn(
+                        'font-medium',
+                        row.paidDifference > 0 && 'text-amber-600 dark:text-amber-400',
+                        row.paidDifference < 0 && 'text-destructive',
+                      )}>
+                        {row.paidDifference > 0 ? '+' : ''}{fmtBRL(row.paidDifference)}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </td>
                   <td className="py-3 px-2 text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
