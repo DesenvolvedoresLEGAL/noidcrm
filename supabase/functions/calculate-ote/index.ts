@@ -366,7 +366,12 @@ serve(async (req) => {
         for (const opp of opportunities) {
           const ssot: any = ssotMap.get(opp.id);
           const commercial = Number(
-            ssot?.commercial_amount ?? opp.commission_value ?? opp.valor_previsto ?? 0,
+            ssot?.commission_eligible_amount
+              ?? ssot?.valid_revenue_amount
+              ?? ssot?.commercial_amount
+              ?? opp.commission_value
+              ?? opp.valor_previsto
+              ?? 0,
           );
           const mrr = Number(ssot?.mrr_amount ?? 0);
           const oneShot = Number(ssot?.one_shot_amount ?? (ssot ? 0 : commercial));
@@ -376,6 +381,7 @@ serve(async (req) => {
           const fulfillment = (ssot?.fulfillment_status ?? '').toLowerCase();
           const commercialSt = (ssot?.commercial_status ?? '').toLowerCase();
           const saleExcluded =
+            ssot?.is_cancelled_sale === true ||
             fulfillment === 'removed' ||
             fulfillment === 'cancelled' ||
             commercialSt === 'lost';
@@ -811,6 +817,8 @@ serve(async (req) => {
               proposal_id: enr?.proposalId || null,
               client_name: acc?.nome_fantasia || acc?.razao_social || opp.title,
               sale_value: commercial,
+              commercial_commission_base: commercial,
+              eligible_ote_amount: eligible,
               mrr_amount: enr?.mrr ?? 0,
               one_shot_amount: enr?.oneShot ?? commercial,
               eligible_amount: eligible,
