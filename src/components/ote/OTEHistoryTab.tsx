@@ -447,10 +447,13 @@ export function OTEHistoryTab() {
             <LineChartIcon className="h-5 w-5 text-primary" />
             Evolução do valor pago
           </CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Meses sem barra representam R$ 0,00 pago.
+          </p>
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={chartRows} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
+            <BarChart data={chartRows} margin={{ top: 20, right: 16, left: 0, bottom: 8 }}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis dataKey="periodLabel" fontSize={12} />
               <YAxis tickFormatter={fmtBRLShort} fontSize={12} />
@@ -467,12 +470,20 @@ export function OTEHistoryTab() {
                       <div className="text-muted-foreground">
                         Vendedores no cálculo: {r.sellers}
                       </div>
-                      <div className="text-muted-foreground">Status: {r.status}</div>
+                      <div className="text-muted-foreground">Versão: {r.version}</div>
                     </div>
                   );
                 }}
               />
-              <Bar dataKey="totalPaid" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="totalPaid" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]}>
+                <LabelList
+                  dataKey="totalPaid"
+                  position="top"
+                  fontSize={11}
+                  formatter={(v: number) => (v > 0 ? fmtBRLShort(v) : 'R$ 0,00')}
+                  className="fill-muted-foreground"
+                />
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         </CardContent>
