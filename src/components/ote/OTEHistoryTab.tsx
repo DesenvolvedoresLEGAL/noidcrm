@@ -580,6 +580,7 @@ export function OTEHistoryTab() {
               <tr className="border-b text-muted-foreground">
                 <th className="text-left py-3 px-2 font-medium">Período</th>
                 <th className="text-left py-3 px-2 font-medium">Status</th>
+                <th className="text-left py-3 px-2 font-medium">Versão / Origem</th>
                 <th className="text-left py-3 px-2 font-medium">Calculado em</th>
                 <th className="text-right py-3 px-2 font-medium">Vendedores</th>
                 <th className="text-right py-3 px-2 font-medium">Comissão elegível comercial</th>
@@ -592,24 +593,49 @@ export function OTEHistoryTab() {
             </thead>
             <tbody>
               {tableRows.map((row) => (
-                <tr key={row.period} className="border-b hover:bg-muted/40">
+                <tr key={row.period} className={cn('border-b hover:bg-muted/40', row.needsRecalc && 'bg-destructive/[0.03]')}>
                   <td className="py-3 px-2 font-medium">{row.periodFull}</td>
                   <td className="py-3 px-2">
                     <Badge variant={row.status === 'Calculado' ? 'secondary' : 'outline'}>
                       {row.status}
                     </Badge>
                   </td>
+                  <td className="py-3 px-2">
+                    <VersionBadge row={row} />
+                  </td>
                   <td className="py-3 px-2 text-muted-foreground">{fmtDateTime(row.calculatedAt)}</td>
                   <td className="py-3 px-2 text-right">{row.sellers}</td>
                   <td className="py-3 px-2 text-right">{fmtBRL(row.commercialEligible)}</td>
                   <td className="py-3 px-2 text-right">{fmtBRL(row.eligibleOte)}</td>
-                  <td className="py-3 px-2 text-right text-destructive">{fmtBRL(row.itemsOutOfGoal)}</td>
+                  <td className="py-3 px-2 text-right text-muted-foreground">{fmtBRL(row.itemsOutOfGoal)}</td>
                   <td className="py-3 px-2 text-right">{fmtPct(row.avgAchievement)}</td>
                   <td className="py-3 px-2 text-right font-semibold text-primary">{fmtBRL(row.totalPaid)}</td>
                   <td className="py-3 px-2 text-right">
-                    <Button variant="ghost" size="sm" onClick={() => setSelectedPeriod(row.period)}>
-                      Ver detalhe
-                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm" aria-label="Ações do período">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-52">
+                        <DropdownMenuLabel>{row.periodFull}</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => setSelectedPeriod(row.period)}>
+                          <History className="h-4 w-4 mr-2" /> Ver detalhe
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleExport(row)}>
+                          <FileSpreadsheet className="h-4 w-4 mr-2" /> Exportar Excel
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => handleRecalc(row)}
+                          disabled={!canRecalc || calculateOTE.isPending}
+                        >
+                          <RefreshCw className={cn('h-4 w-4 mr-2', calculateOTE.isPending && 'animate-spin')} />
+                          Recalcular período
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </td>
                 </tr>
               ))}
