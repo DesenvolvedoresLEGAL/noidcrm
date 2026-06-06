@@ -18,6 +18,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  LabelList,
   Legend,
   Line,
   LineChart,
@@ -30,14 +31,19 @@ import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
   Activity,
+  AlertTriangle,
   CalendarClock,
+  FileSpreadsheet,
   History,
   Layers,
   LineChart as LineChartIcon,
+  MoreHorizontal,
+  RefreshCw,
   Trophy,
   Users,
   Wallet,
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -56,14 +62,38 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Tooltip as UITooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { EmptyState } from '@/components/EmptyState';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
-import { useOTEMonthlyResults, type OTEMonthlyResult } from '@/hooks/useOTEData';
+import { useOTEMonthlyResults, useCalculateOTE, type OTEMonthlyResult } from '@/hooks/useOTEData';
+import { useUserRole } from '@/hooks/useUserRole';
 import { cn } from '@/lib/utils';
 
 type RangeKey = '3m' | '6m' | 'ytd' | 'lasty' | 'all';
+
+/**
+ * Snapshots calculados antes desta data foram gerados em versões anteriores
+ * da regra item-a-item / Receita Válida oficial. São marcados como "Legado"
+ * e devem ser recalculados para refletir a regra atual.
+ */
+const RULE_CUTOFF_ISO = '2026-06-01T00:00:00Z';
+
+type SnapshotVersion = 'Atual' | 'Recalculado' | 'Legado' | 'Desatualizado' | 'Manual' | 'Aberto';
 
 interface SalesAgg {
   ote_result_id: string;
@@ -88,6 +118,9 @@ interface PeriodRow {
   lowCount: number;
   calculatedAt: string | null;
   status: 'Aberto' | 'Calculado' | 'Fechado' | 'Recalculado' | 'Revisado';
+  version: SnapshotVersion;
+  versionReason: string;
+  needsRecalc: boolean;
   results: OTEMonthlyResult[];
 }
 
@@ -109,6 +142,59 @@ function periodFullLabel(period: string): string {
   if (!y || !m) return period;
   return `${monthLabelMap[m - 1]} ${y}`;
 }
+
+/**
+ * Classifica a versão do snapshot OTE para o histórico.
+ * Não recalcula nada — apenas inspeciona o snapshot persistido vs. heurísticas
+ * de consistência (cutoff temporal + split item-a-item presente).
+ */
+function classifySnapshot(args: {
+  calculatedAt: string | null;
+  status: PeriodRow['status'];
+  commercialEligible: number;
+  eligibleOte: number;
+  itemsOutOfGoal: number;
+  totalPaid: number;
+}): { version: SnapshotVersion; reason: string; needsRecalc: boolean } {
+  const { calculatedAt, status, commercialEligible, eligibleOte, itemsOutOfGoal, totalPaid } = args;
+  if (!calculatedAt) {
+    return { version: 'Aberto', reason: 'Período ainda não foi calculado.', needsRecalc: false };
+  }
+  const hasSplit = eligibleOte > 0.01 || itemsOutOfGoal > 0.01;
+  const hasSales = commercialEligible > 0.01;
+
+  // Sem split item-a-item mas com vendas → snapshot anterior à regra atual.
+  if (hasSales && !hasSplit) {
+    if (totalPaid > 0.01) {
+      return {
+        version: 'Manual',
+        reason: 'Pagamento registrado sem Receita elegível OTE — provavelmente ajuste manual ou snapshot anterior à regra item-a-item. Recalcule para auditar.',
+        needsRecalc: true,
+      };
+    }
+    return {
+      version: 'Desatualizado',
+      reason: 'Snapshot sem split item-a-item. Recalcule o período para gerar Receita elegível OTE e Itens fora da meta.',
+      needsRecalc: true,
+    };
+  }
+
+  // Snapshot antigo (antes da correção oficial da regra).
+  if (calculatedAt < RULE_CUTOFF_ISO) {
+    return {
+      version: 'Legado',
+      reason: 'Calculado em versão anterior da regra OTE. Recalcule para alinhar com a Receita Válida oficial.',
+      needsRecalc: true,
+    };
+  }
+
+  return {
+    version: status === 'Calculado' ? 'Atual' : 'Recalculado',
+    reason: 'Snapshot gerado com a regra atual do OTE.',
+    needsRecalc: false,
+  };
+}
+
 
 function useAllOTESalesAgg(resultIds: string[]) {
   const { organization } = useCurrentOrganization();
@@ -155,11 +241,28 @@ function filterByRange(periods: string[], range: RangeKey): string[] {
 export function OTEHistoryTab() {
   const { loading: isLoadingOrg } = useCurrentOrganization();
   const { data: allResults, isLoading, isPending } = useOTEMonthlyResults();
+  const { isAdmin, isManager } = useUserRole();
+  const calculateOTE = useCalculateOTE();
+  const canRecalc = isAdmin || isManager;
   const [range, setRange] = useState<RangeKey>('6m');
   const [selectedPeriod, setSelectedPeriod] = useState<string | null>(null);
 
   const resultIds = useMemo(() => (allResults || []).map((r) => r.id), [allResults]);
   const { data: salesAgg } = useAllOTESalesAgg(resultIds);
+
+  const handleRecalc = (row: PeriodRow) => {
+    if (!canRecalc) {
+      toast.error('Apenas admin ou gestor pode recalcular um período.');
+      return;
+    }
+    toast.info(`Recalculando ${row.periodFull}…`);
+    calculateOTE.mutate({ periodMonth: `${row.period}-01` });
+  };
+
+  const handleExport = (row: PeriodRow) => {
+    toast.info('Exportação Excel disponível na Visão Geral. Selecione o período correspondente para gerar a planilha completa.');
+    void row;
+  };
 
   const allRows = useMemo<PeriodRow[]>(() => {
     if (!allResults || allResults.length === 0) return [];
@@ -204,6 +307,16 @@ export function OTEHistoryTab() {
         if (pct < 50) lowCount += 1;
       }
 
+      const status: PeriodRow['status'] = calculatedAt ? 'Calculado' : 'Aberto';
+      const { version, reason, needsRecalc } = classifySnapshot({
+        calculatedAt,
+        status,
+        commercialEligible: saleSum,
+        eligibleOte,
+        itemsOutOfGoal: nonElig,
+        totalPaid,
+      });
+
       rows.push({
         period,
         periodLabel: format(parseISO(period + '-01'), 'MMM/yy', { locale: ptBR }),
@@ -219,7 +332,10 @@ export function OTEHistoryTab() {
         highCount,
         lowCount,
         calculatedAt,
-        status: calculatedAt ? 'Calculado' : 'Aberto',
+        status,
+        version,
+        versionReason: reason,
+        needsRecalc,
         results: items,
       });
     }
@@ -331,10 +447,13 @@ export function OTEHistoryTab() {
             <LineChartIcon className="h-5 w-5 text-primary" />
             Evolução do valor pago
           </CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Meses sem barra representam R$ 0,00 pago.
+          </p>
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={chartRows} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
+            <BarChart data={chartRows} margin={{ top: 20, right: 16, left: 0, bottom: 8 }}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis dataKey="periodLabel" fontSize={12} />
               <YAxis tickFormatter={fmtBRLShort} fontSize={12} />
@@ -351,12 +470,20 @@ export function OTEHistoryTab() {
                       <div className="text-muted-foreground">
                         Vendedores no cálculo: {r.sellers}
                       </div>
-                      <div className="text-muted-foreground">Status: {r.status}</div>
+                      <div className="text-muted-foreground">Versão: {r.version}</div>
                     </div>
                   );
                 }}
               />
-              <Bar dataKey="totalPaid" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="totalPaid" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]}>
+                <LabelList
+                  dataKey="totalPaid"
+                  position="top"
+                  fontSize={11}
+                  formatter={(v: number) => (v > 0 ? fmtBRLShort(v) : 'R$ 0,00')}
+                  className="fill-muted-foreground"
+                />
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         </CardContent>
@@ -433,7 +560,7 @@ export function OTEHistoryTab() {
               <Legend wrapperStyle={{ fontSize: 12 }} />
               <Bar dataKey="commercialEligible" name="Comissão elegível comercial" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
               <Bar dataKey="eligibleOte" name="Receita elegível OTE" fill="hsl(var(--chart-2, var(--primary)))" fillOpacity={0.7} radius={[4, 4, 0, 0]} />
-              <Bar dataKey="itemsOutOfGoal" name="Itens fora da meta" fill="hsl(var(--destructive))" fillOpacity={0.7} radius={[4, 4, 0, 0]} />
+              <Bar dataKey="itemsOutOfGoal" name="Itens fora da meta" fill="hsl(38 92% 50%)" fillOpacity={0.75} radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </CardContent>
@@ -453,6 +580,7 @@ export function OTEHistoryTab() {
               <tr className="border-b text-muted-foreground">
                 <th className="text-left py-3 px-2 font-medium">Período</th>
                 <th className="text-left py-3 px-2 font-medium">Status</th>
+                <th className="text-left py-3 px-2 font-medium">Versão / Origem</th>
                 <th className="text-left py-3 px-2 font-medium">Calculado em</th>
                 <th className="text-right py-3 px-2 font-medium">Vendedores</th>
                 <th className="text-right py-3 px-2 font-medium">Comissão elegível comercial</th>
@@ -465,24 +593,49 @@ export function OTEHistoryTab() {
             </thead>
             <tbody>
               {tableRows.map((row) => (
-                <tr key={row.period} className="border-b hover:bg-muted/40">
+                <tr key={row.period} className={cn('border-b hover:bg-muted/40', row.needsRecalc && 'bg-destructive/[0.03]')}>
                   <td className="py-3 px-2 font-medium">{row.periodFull}</td>
                   <td className="py-3 px-2">
                     <Badge variant={row.status === 'Calculado' ? 'secondary' : 'outline'}>
                       {row.status}
                     </Badge>
                   </td>
+                  <td className="py-3 px-2">
+                    <VersionBadge row={row} />
+                  </td>
                   <td className="py-3 px-2 text-muted-foreground">{fmtDateTime(row.calculatedAt)}</td>
                   <td className="py-3 px-2 text-right">{row.sellers}</td>
                   <td className="py-3 px-2 text-right">{fmtBRL(row.commercialEligible)}</td>
                   <td className="py-3 px-2 text-right">{fmtBRL(row.eligibleOte)}</td>
-                  <td className="py-3 px-2 text-right text-destructive">{fmtBRL(row.itemsOutOfGoal)}</td>
+                  <td className="py-3 px-2 text-right text-muted-foreground">{fmtBRL(row.itemsOutOfGoal)}</td>
                   <td className="py-3 px-2 text-right">{fmtPct(row.avgAchievement)}</td>
                   <td className="py-3 px-2 text-right font-semibold text-primary">{fmtBRL(row.totalPaid)}</td>
                   <td className="py-3 px-2 text-right">
-                    <Button variant="ghost" size="sm" onClick={() => setSelectedPeriod(row.period)}>
-                      Ver detalhe
-                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm" aria-label="Ações do período">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-52">
+                        <DropdownMenuLabel>{row.periodFull}</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => setSelectedPeriod(row.period)}>
+                          <History className="h-4 w-4 mr-2" /> Ver detalhe
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleExport(row)}>
+                          <FileSpreadsheet className="h-4 w-4 mr-2" /> Exportar Excel
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => handleRecalc(row)}
+                          disabled={!canRecalc || calculateOTE.isPending}
+                        >
+                          <RefreshCw className={cn('h-4 w-4 mr-2', calculateOTE.isPending && 'animate-spin')} />
+                          Recalcular período
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </td>
                 </tr>
               ))}
@@ -548,12 +701,22 @@ function PeriodDetailDrawer({
         </SheetHeader>
 
         <div className="space-y-4 mt-6">
+          {row.needsRecalc && (
+            <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive flex gap-2">
+              <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+              <div>
+                <p className="font-medium">Snapshot desatualizado</p>
+                <p className="mt-0.5 text-destructive/80">{row.versionReason}</p>
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-3">
             <MiniStat label="Total pago" value={fmtBRL(row.totalPaid)} highlight />
             <MiniStat label="% médio de meta" value={fmtPct(row.avgAchievement)} />
             <MiniStat label="Comissão elegível comercial" value={fmtBRL(row.commercialEligible)} />
             <MiniStat label="Receita elegível OTE" value={fmtBRL(row.eligibleOte)} />
-            <MiniStat label="Itens fora da meta" value={fmtBRL(row.itemsOutOfGoal)} warn />
+            <MiniStat label="Itens fora da meta" value={fmtBRL(row.itemsOutOfGoal)} />
             <MiniStat label="Vendedores no cálculo" value={String(row.sellers)} />
           </div>
 
@@ -576,7 +739,11 @@ function PeriodDetailDrawer({
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-0 text-xs text-muted-foreground space-y-1">
-              <p><span className="text-foreground font-medium">Status:</span> {row.status}</p>
+              <p className="flex items-center gap-2">
+                <span className="text-foreground font-medium">Versão do cálculo:</span>
+                <VersionBadge row={row} />
+              </p>
+              <p><span className="text-foreground font-medium">Status do snapshot:</span> {row.status}</p>
               <p><span className="text-foreground font-medium">Calculado em:</span> {fmtDateTime(row.calculatedAt)}</p>
               <p><span className="text-foreground font-medium">Fonte das vendas:</span> Relatório Vendas Realizadas (ote_sales_records).</p>
               <p><span className="text-foreground font-medium">Fonte das qualificações:</span> historicalQualifications (responsável histórico no momento da qualificação).</p>
@@ -643,5 +810,40 @@ function RankingSection({ title, items }: { title: string; items: OTEMonthlyResu
         ))}
       </ul>
     </div>
+  );
+}
+
+const VERSION_STYLES: Record<SnapshotVersion, { label: string; className: string }> = {
+  Atual:         { label: 'Atual',         className: 'bg-emerald-500/10 text-emerald-700 border-emerald-500/30 dark:text-emerald-400' },
+  Recalculado:   { label: 'Recalculado',   className: 'bg-emerald-500/10 text-emerald-700 border-emerald-500/30 dark:text-emerald-400' },
+  Legado:        { label: 'Legado',        className: 'bg-amber-500/10 text-amber-700 border-amber-500/30 dark:text-amber-400' },
+  Desatualizado: { label: 'Snapshot desatualizado', className: 'bg-destructive/10 text-destructive border-destructive/30' },
+  Manual:        { label: 'Manual',        className: 'bg-amber-500/10 text-amber-700 border-amber-500/30 dark:text-amber-400' },
+  Aberto:        { label: 'Aberto',        className: 'bg-muted text-muted-foreground border-border' },
+};
+
+function VersionBadge({ row }: { row: PeriodRow }) {
+  const cfg = VERSION_STYLES[row.version];
+  return (
+    <TooltipProvider delayDuration={150}>
+      <UITooltip>
+        <TooltipTrigger asChild>
+          <span
+            className={cn(
+              'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium cursor-help',
+              cfg.className,
+            )}
+          >
+            {row.needsRecalc && <AlertTriangle className="h-3 w-3" />}
+            {cfg.label}
+          </span>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-xs text-xs">
+          {row.needsRecalc
+            ? 'Este fechamento foi calculado antes da regra atual do OTE. Recalcule o período para atualizar Comissão elegível comercial, Receita elegível OTE e Itens fora da meta.'
+            : row.versionReason}
+        </TooltipContent>
+      </UITooltip>
+    </TooltipProvider>
   );
 }
