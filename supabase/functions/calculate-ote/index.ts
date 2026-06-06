@@ -701,6 +701,25 @@ serve(async (req) => {
       const baseVariableWithGates = baseVariable * gateMultiplier;
       const finalVariable = baseVariableWithGates * (1 + finalAdjustment / 100);
 
+      // SPRINT OTE 1.7.3 — Buscar snapshot existente para preservar memória histórica
+      const { data: existingResult } = await supabase
+        .from('ote_monthly_results')
+        .select('id, final_variable_amount, original_total_paid, calculation_origin, status, paid_at')
+        .eq('organization_id', organizationId)
+        .eq('user_id', config.user_id)
+        .eq('period_month', periodMonth)
+        .maybeSingle();
+
+      const newFinalVariable = Math.round(finalVariable * 100) / 100;
+      const isRecalc = !!existingResult;
+      // Preservar valor pago original. Se ainda não foi capturado, congelar o atual
+      // como histórico (somente quando havia pagamento > 0).
+      const preservedOriginal = existingResult?.original_total_paid != null
+        ? Number(existingResult.original_total_paid)
+        : (existingResult && Number(existingResult.final_variable_amount || 0) > 0
+            ? Number(existingResult.final_variable_amount)
+            : null);
+
       // Upsert result
       const resultData: any = {
         organization_id: organizationId,
@@ -724,10 +743,10 @@ serve(async (req) => {
         total_accelerator_percentage: Math.max(0, totalAccelerator),
         total_decelerator_percentage: totalDecelerator,
         final_adjustment_percentage: finalAdjustment,
-        final_variable_amount: Math.round(finalVariable * 100) / 100,
+        final_variable_amount: newFinalVariable,
         calculated_at: new Date().toISOString(),
         calculated_by: user.id,
-        status: 'pending',
+        status: existingResult?.status === 'paid' ? 'paid' : 'pending',
         is_team_target: isTeamTarget,
         team_member_count: isTeamTarget ? teamMemberIds.length : null,
         goal_type: goalType,
@@ -742,6 +761,12 @@ serve(async (req) => {
           ras: performanceScores.ras_final,
           ras_status: performanceScores.ras_status
         } : null,
+        // SPRINT OTE 1.7.3 — memória histórica vs recálculo pela regra atual
+        original_total_paid: preservedOriginal,
+        recalculated_total_paid: isRecalc ? newFinalVariable : null,
+        recalculated_at: isRecalc ? new Date().toISOString() : null,
+        recalculated_by: isRecalc ? user.id : null,
+        calculation_origin: isRecalc ? 'recalculated' : 'initial',
       };
 
       const { data: upsertedResult, error: upsertError } = await supabase
