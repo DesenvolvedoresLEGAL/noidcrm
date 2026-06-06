@@ -245,25 +245,55 @@ serve(async (req) => {
         }
       } else {
         if (goalType === 'leads') {
-          const { data: qualRows } = await supabase
-            .from('opportunity_qualification_history')
-            .select('opportunity_id, qualification_at')
+          // PATCH OTE 1.7.4 — Fonte ÚNICA de leads qualificados (mesma do
+          // Visão Geral / Win-Loss Hub / OTE UI):
+          //   opportunities won em pipeline pipeline_type='qualification'
+          //   com closed_at dentro do período (não soft-deletadas),
+          //   atribuídas via PRIMEIRO qualified_by_user_id em
+          //   opportunity_qualification_history (fallback owner_user_id).
+          // Sem isso, o snapshot persistido diverge do que a UI exibe e
+          // o multiplicador deixa de corresponder ao % Meta.
+          const { data: qualPipelines } = await supabase
+            .from('pipelines')
+            .select('id')
             .eq('organization_id', organizationId)
-            .eq('qualified_by_user_id', config.user_id)
-            .gte('qualification_at', startDate)
-            .lte('qualification_at', endDate);
-          const oppIds = Array.from(new Set((qualRows || []).map((r: any) => r.opportunity_id).filter(Boolean)));
-          if (oppIds.length > 0) {
-            const { data: qualOpps } = await supabase
+            .eq('pipeline_type', 'qualification');
+          const qualPipelineIds = (qualPipelines || []).map((p: any) => p.id);
+          if (qualPipelineIds.length > 0) {
+            const { data: wonOpps } = await supabase
               .from('opportunities')
-              .select('id, valor_previsto, commission_value, title, closed_at, updated_at, pipeline_id, account:accounts(razao_social, nome_fantasia)')
+              .select('id, valor_previsto, commission_value, title, owner_user_id, closed_at, updated_at, pipeline_id, account:accounts(razao_social, nome_fantasia)')
               .eq('organization_id', organizationId)
-              .in('id', oppIds);
-            const qualAtMap = new Map((qualRows || []).map((r: any) => [r.opportunity_id, r.qualification_at]));
-            opportunities = (qualOpps || []).map((opp: any) => ({
-              ...opp,
-              closed_at: qualAtMap.get(opp.id) || opp.closed_at || opp.updated_at,
-            }));
+              .eq('status', 'won')
+              .is('deleted_at', null)
+              .in('pipeline_id', qualPipelineIds)
+              .gte('closed_at', startDate)
+              .lte('closed_at', endDate);
+            const wonList = (wonOpps || []) as any[];
+            if (wonList.length > 0) {
+              const oppIds = wonList.map((o) => o.id);
+              const { data: hist } = await supabase
+                .from('opportunity_qualification_history')
+                .select('opportunity_id, qualified_by_user_id, qualification_at')
+                .eq('organization_id', organizationId)
+                .in('opportunity_id', oppIds);
+              // Primeira qualificação (mais antiga) por oportunidade.
+              const firstQualByOpp = new Map<string, { user: string | null; at: string }>();
+              for (const row of (hist || []) as any[]) {
+                const cur = firstQualByOpp.get(row.opportunity_id);
+                if (!cur || new Date(row.qualification_at) < new Date(cur.at)) {
+                  firstQualByOpp.set(row.opportunity_id, {
+                    user: row.qualified_by_user_id,
+                    at: row.qualification_at,
+                  });
+                }
+              }
+              opportunities = wonList.filter((opp) => {
+                const histUser = firstQualByOpp.get(opp.id)?.user ?? null;
+                const attributed = histUser || opp.owner_user_id;
+                return attributed === config.user_id;
+              });
+            }
           }
         } else {
         let histQuery = supabase
