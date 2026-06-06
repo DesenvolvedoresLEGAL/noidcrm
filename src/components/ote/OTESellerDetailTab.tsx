@@ -708,13 +708,45 @@ export function OTESellerDetailTab({
                             Cálculo OTE
                           </h4>
                           <div className="space-y-3 text-sm">
-                            <div className="flex justify-between">
+                            <div className="flex items-center justify-between">
                               <span className="text-muted-foreground">Multiplicador</span>
-                              <span className="font-semibold">{row.result.ote_multiplier}x</span>
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold">
+                                  {row.displayMultiplier.toLocaleString('pt-BR', {
+                                    minimumFractionDigits: 0,
+                                    maximumFractionDigits: 2,
+                                  })}
+                                  x
+                                </span>
+                                {row.multiplierMismatch && (
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Badge
+                                          variant="destructive"
+                                          className="flex items-center gap-1 text-[10px]"
+                                        >
+                                          <AlertTriangle className="h-3 w-3" />
+                                          Divergência
+                                        </Badge>
+                                      </TooltipTrigger>
+                                      <TooltipContent className="max-w-xs">
+                                        <p>
+                                          Snapshot persistido tem{' '}
+                                          <strong>{row.multiplierMismatch.actual}x</strong>, mas o
+                                          % Meta atual ({row.pctMeta.toFixed(1)}%) corresponde a{' '}
+                                          <strong>{row.multiplierMismatch.expected}x</strong>.
+                                          Recalcule o período para alinhar a memória histórica.
+                                        </p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                )}
+                              </div>
                             </div>
                             <div className="flex justify-between">
                               <span className="text-muted-foreground">Variável Base</span>
-                              <span>{formatCurrency(row.result.base_variable)}</span>
+                              <span>{formatCurrency(row.displayBaseVariable)}</span>
                             </div>
                             <div className="flex justify-between">
                               <span className="text-muted-foreground">Ajuste Final</span>
@@ -731,11 +763,19 @@ export function OTESellerDetailTab({
                             <div className="flex justify-between border-t pt-2">
                               <span className="font-semibold">Variável Final</span>
                               <span className="font-bold text-primary">
-                                {formatCurrency(row.result.final_variable_amount)}
+                                {formatCurrency(row.displayFinalVariable)}
                               </span>
                             </div>
+                            {row.multiplierMismatch && (
+                              <p className="text-[11px] text-destructive">
+                                Snapshot persistido: multiplicador {row.multiplierMismatch.actual}x
+                                · variável {formatCurrency(Number(row.result.final_variable_amount || 0))}.
+                                Recalcule o período.
+                              </p>
+                            )}
                           </div>
                         </div>
+
 
                         {/* Performance / aceleradores */}
                         <div className="space-y-4">
