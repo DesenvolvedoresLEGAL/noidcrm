@@ -13,7 +13,7 @@
  * Fonte: ote_monthly_results + ote_sales_records (snapshots oficiais).
  */
 import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Bar,
   BarChart,
@@ -82,6 +82,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { useOTEMonthlyResults, useCalculateOTE, type OTEMonthlyResult } from '@/hooks/useOTEData';
 import { useUserRole } from '@/hooks/useUserRole';
+import { oteKeys } from '@/lib/query-keys';
 import { cn } from '@/lib/utils';
 
 type RangeKey = '3m' | '6m' | 'ytd' | 'lasty' | 'all';
@@ -206,7 +207,7 @@ function useAllOTESalesAgg(resultIds: string[]) {
     queryFn: async (): Promise<Map<string, SalesAgg>> => {
       const { data, error } = await supabase
         .from('ote_sales_records')
-        .select('ote_result_id, sale_value, eligible_amount, non_eligible_amount')
+        .select('ote_result_id, sale_value, commercial_commission_base, eligible_amount, eligible_ote_amount, non_eligible_amount')
         .eq('organization_id', organization!.id)
         .in('ote_result_id', ids);
       if (error) throw error;
@@ -214,9 +215,15 @@ function useAllOTESalesAgg(resultIds: string[]) {
       for (const row of data || []) {
         const key = (row as any).ote_result_id as string;
         const prev = map.get(key) || { ote_result_id: key, eligible: 0, nonEligible: 0, saleTotal: 0 };
-        prev.eligible += Number((row as any).eligible_amount || 0);
-        prev.nonEligible += Number((row as any).non_eligible_amount || 0);
-        prev.saleTotal += Number((row as any).sale_value || 0);
+        const nonEligible = Number((row as any).non_eligible_amount || 0);
+        const eligibleOte = Number((row as any).eligible_ote_amount || 0);
+        prev.eligible += eligibleOte > 0 || nonEligible > 0
+          ? eligibleOte
+          : Number((row as any).eligible_amount || 0);
+        prev.nonEligible += nonEligible;
+        prev.saleTotal += Number((row as any).commercial_commission_base || 0) > 0
+          ? Number((row as any).commercial_commission_base || 0)
+          : Number((row as any).sale_value || 0);
         map.set(key, prev);
       }
       return map;
