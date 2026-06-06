@@ -261,6 +261,7 @@ export function OTEHistoryTab() {
   const canRecalc = isAdmin || isManager;
   const [range, setRange] = useState<RangeKey>('6m');
   const [selectedPeriod, setSelectedPeriod] = useState<string | null>(null);
+  const [recalcCandidate, setRecalcCandidate] = useState<PeriodRow | null>(null);
 
   const resultIds = useMemo(() => (allResults || []).map((r) => r.id), [allResults]);
   const { data: salesAgg } = useAllOTESalesAgg(resultIds);
