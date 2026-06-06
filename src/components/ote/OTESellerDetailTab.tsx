@@ -227,16 +227,19 @@ export function OTESellerDetailTab({
     start: periodStart,
     end: periodEnd,
   });
+  const { data: multipliersList = [] } = useOTEMultipliers();
   const qualifierMap = useMemo(
     () => new Map(qualifiers.map((q) => [q.qualifierUserId, q.qualifiedLeads])),
     [qualifiers],
   );
 
   /**
-   * SPRINT OTE 1.5 — Ranking competitivo. Toda métrica é DERIVADA dos cálculos
-   * já validados (PATCH OTE 1.4.1): receita_elegivel_ote para closers e
-   * leads_qualificados (atribuição histórica) para pré-vendas. Esta sprint
-   * NÃO altera nenhum cálculo — apenas reorganiza visualmente.
+   * PATCH OTE 1.7.4 — Cadeia única de cálculo por linha:
+   *   métrica realizada → meta → % Meta → faixa do multiplicador → variável final.
+   *
+   * O multiplicador exibido (e a variável) DEVEM ser derivados do mesmo
+   * `pctMeta` que aparece na tela. Se o snapshot persistido divergir, marcamos
+   * `multiplierMismatch` e exibimos badge "Divergência no multiplicador".
    */
   const rows: RankRow[] = useMemo(() => {
     return results
@@ -261,6 +264,23 @@ export function OTESellerDetailTab({
         const hasGoal = Number(result.goal_amount || 0) > 0;
         const profileAny = result.profile as { full_name?: string; is_active?: boolean } | undefined;
         const isInactive = profileAny?.is_active === false;
+
+        // Derivação coerente com pctMeta exibido.
+        const displayMultiplier = resolveOteMultiplierFromPercent(
+          pctMeta,
+          multipliersList,
+        ).multiplier;
+        const variableTarget = Number(result.ote_level?.variable_target || 0);
+        const displayBaseVariable = variableTarget * displayMultiplier;
+        // Mantém ajuste final (aceleradores/desaceleradores) do snapshot.
+        const adjustmentPct = Number(result.final_adjustment_percentage || 0);
+        const displayFinalVariable = displayBaseVariable * (1 + adjustmentPct / 100);
+        const multiplierMismatch = detectMultiplierMismatch({
+          displayedPercent: pctMeta,
+          snapshotMultiplier: Number(result.ote_multiplier || 0),
+          multipliers: multipliersList,
+        });
+
         return {
           result,
           pctMeta,
@@ -270,13 +290,18 @@ export function OTESellerDetailTab({
           isLeads,
           isInactive,
           hasGoal,
-          variableAmount: Number(result.final_variable_amount || 0),
+          variableAmount: displayFinalVariable,
+          displayMultiplier,
+          displayVariableTarget: variableTarget,
+          displayBaseVariable,
+          displayFinalVariable,
+          multiplierMismatch,
           fullName: result.profile?.full_name || result.level_name_snapshot || 'Vendedor',
           levelName: result.level_name_snapshot || '-',
           status: statusFromPct(pctMeta, hasGoal),
         };
       });
-  }, [results, allRecords, qualifierMap, flagBlueThreshold, flagYellowMinThreshold]);
+  }, [results, allRecords, qualifierMap, flagBlueThreshold, flagYellowMinThreshold, multipliersList]);
 
   // Ranking oficial: sempre por % Meta (maior para menor) para definir podium e posições.
   const ranking = useMemo(
