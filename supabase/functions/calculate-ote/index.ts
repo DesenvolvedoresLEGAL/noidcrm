@@ -28,9 +28,10 @@ serve(async (req) => {
       throw new Error('Unauthorized');
     }
 
-    const { periodMonth, userId } = await req.json();
+    const { periodMonth: rawPeriodMonth, userId } = await req.json();
+    const periodMonth = typeof rawPeriodMonth === 'string' ? rawPeriodMonth.slice(0, 7) : '';
     
-    if (!periodMonth) {
+    if (!/^\d{4}-\d{2}$/.test(periodMonth)) {
       throw new Error('periodMonth is required (format: YYYY-MM)');
     }
 
@@ -50,6 +51,11 @@ serve(async (req) => {
 
     const organizationId = membership.organization_id;
 
+    // Parse period
+    const [year, month] = periodMonth.split('-').map(Number);
+    const startDate = new Date(year, month - 1, 1).toISOString();
+    const endDate = new Date(year, month, 0, 23, 59, 59).toISOString();
+
     // Get OTE levels (including is_team_target)
     const { data: levels } = await supabase
       .from('ote_levels')
@@ -64,12 +70,15 @@ serve(async (req) => {
       .eq('organization_id', organizationId)
       .order('min_percentage');
 
-    // Get seller configs
+    // Get seller configs vigente no período calculado. Histórico não pode usar
+    // apenas end_date IS NULL, senão vendedores removidos após o mês somem do
+    // snapshot e o fechamento recalculado fica incompleto.
     let configQuery = supabase
       .from('ote_seller_config')
       .select('*, ote_level:ote_levels(*, is_team_target)')
       .eq('organization_id', organizationId)
-      .is('end_date', null);
+      .lte('effective_date', endDate.split('T')[0])
+      .or(`end_date.is.null,end_date.gte.${startDate.split('T')[0]}`);
 
     if (userId) {
       configQuery = configQuery.eq('user_id', userId);
@@ -136,11 +145,6 @@ serve(async (req) => {
       .from('team_members')
       .select('team_id, user_id')
       .eq('organization_id', organizationId);
-
-    // Parse period
-    const [year, month] = periodMonth.split('-').map(Number);
-    const startDate = new Date(year, month - 1, 1).toISOString();
-    const endDate = new Date(year, month, 0, 23, 59, 59).toISOString();
 
     // Reprocessamento limpo do período: remove detalhes antigos antes de recalcular,
     // evitando mistura/duplicação de regras antigas com a regra atual.
@@ -262,7 +266,7 @@ serve(async (req) => {
             }));
           }
         } else {
-          let histQuery = supabase
+        let histQuery = supabase
             .from('commercial_won_revenue_historical_view')
             .select('opportunity_id, account_name, nome_fantasia, seller_id, won_at, approved_at, accepted_at, cancelled_at, pipeline_id')
             .eq('organization_id', organizationId)
@@ -325,7 +329,7 @@ serve(async (req) => {
         // 1) SSoT amounts (única fonte de receita realizada)
         const { data: ssotRows } = await supabase
           .from('commercial_won_revenue_view')
-          .select('opportunity_id, accepted_proposal_id, commercial_amount, mrr_amount, one_shot_amount, revenue_confidence, commercial_status, fulfillment_status')
+          .select('opportunity_id, accepted_proposal_id, commercial_amount, valid_revenue_amount, commission_eligible_amount, mrr_amount, one_shot_amount, revenue_confidence, commercial_status, fulfillment_status, is_cancelled_sale, cancelled_at')
           .eq('organization_id', organizationId)
           .in('opportunity_id', oppIds);
         const ssotMap = new Map((ssotRows || []).map((r: any) => [r.opportunity_id, r]));
@@ -365,7 +369,12 @@ serve(async (req) => {
         for (const opp of opportunities) {
           const ssot: any = ssotMap.get(opp.id);
           const commercial = Number(
-            ssot?.commercial_amount ?? opp.commission_value ?? opp.valor_previsto ?? 0,
+            ssot?.commission_eligible_amount
+              ?? ssot?.valid_revenue_amount
+              ?? ssot?.commercial_amount
+              ?? opp.commission_value
+              ?? opp.valor_previsto
+              ?? 0,
           );
           const mrr = Number(ssot?.mrr_amount ?? 0);
           const oneShot = Number(ssot?.one_shot_amount ?? (ssot ? 0 : commercial));
@@ -375,6 +384,7 @@ serve(async (req) => {
           const fulfillment = (ssot?.fulfillment_status ?? '').toLowerCase();
           const commercialSt = (ssot?.commercial_status ?? '').toLowerCase();
           const saleExcluded =
+            ssot?.is_cancelled_sale === true ||
             fulfillment === 'removed' ||
             fulfillment === 'cancelled' ||
             commercialSt === 'lost';
@@ -783,13 +793,21 @@ serve(async (req) => {
                 one_shot_amount: 0,
                 eligible_amount: 0,
                 non_eligible_amount: 0,
+                commercial_commission_base: 0,
+                eligible_ote_amount: 0,
                 sale_date: closedDate,
                 closed_at: closedAt,
+                period_start: startDate.split('T')[0],
+                period_end: endDate.split('T')[0],
                 pipeline_id: opp.pipeline_id,
                 pipeline_name: pipelineInfo?.name || null,
                 payment_status: 'pending',
                 counts_toward_goal: true,
                 record_kind: 'qualified_lead',
+                pre_sales_user_id: config.user_id,
+                attribution_source: 'opportunity_qualification_history',
+                attribution_confidence: 'high',
+                qualified_leads_count: 1,
               },
             };
           }
@@ -810,12 +828,16 @@ serve(async (req) => {
               proposal_id: enr?.proposalId || null,
               client_name: acc?.nome_fantasia || acc?.razao_social || opp.title,
               sale_value: commercial,
+              commercial_commission_base: commercial,
+              eligible_ote_amount: eligible,
               mrr_amount: enr?.mrr ?? 0,
               one_shot_amount: enr?.oneShot ?? commercial,
               eligible_amount: eligible,
               non_eligible_amount: nonEligible,
               sale_date: closedDate,
               closed_at: closedAt,
+              period_start: startDate.split('T')[0],
+              period_end: endDate.split('T')[0],
               pipeline_id: opp.pipeline_id,
               pipeline_name: pipelineInfo?.name || null,
               payment_status: 'pending',
@@ -823,6 +845,9 @@ serve(async (req) => {
               exclusion_reason: enr?.exclusionReason ?? null,
               record_kind: 'sale',
               revenue_confidence: enr?.revenueConfidence || null,
+              seller_user_id: config.user_id,
+              attribution_source: 'opportunity_owner_history',
+              attribution_confidence: 'high',
             },
           };
         });
@@ -875,6 +900,45 @@ serve(async (req) => {
     }
 
     console.log(`OTE calculation completed. Processed ${results.length} sellers.`);
+
+    const totals = results.reduce((acc: any, r: any) => {
+      acc.total_paid += Number(r.final_variable_amount || 0);
+      if (!r.is_team_target) {
+        acc.participants_count += 1;
+        acc.average_goal_percentage += Number(r.achievement_percentage || 0);
+      }
+      return acc;
+    }, { total_paid: 0, participants_count: 0, average_goal_percentage: 0 });
+    if (totals.participants_count > 0) {
+      totals.average_goal_percentage = totals.average_goal_percentage / totals.participants_count;
+    }
+
+    const { error: auditError } = await supabase.from('system_events').insert({
+      trace_id: crypto.randomUUID(),
+      organization_id: organizationId,
+      actor_type: 'user',
+      actor_id: user.id,
+      event_type: 'ote_period_recalculated',
+      event_category: 'ote',
+      action: 'recalculate_period',
+      entity_type: 'ote_monthly_results',
+      payload: {
+        period_month: periodMonth,
+        user_id: userId ?? null,
+        results_count: results.length,
+        total_paid: totals.total_paid,
+        participants_count: totals.participants_count,
+        average_goal_percentage: totals.average_goal_percentage,
+        calculation_version: 'current_ote_rule',
+        calculation_source: 'calculate-ote',
+      },
+      metadata: {
+        source: 'calculate-ote',
+        requested_period_month: rawPeriodMonth,
+        normalized_period_month: periodMonth,
+      },
+    });
+    if (auditError) console.error('[calculate-ote] audit insert error:', auditError);
 
     return new Response(JSON.stringify({ 
       success: true, 

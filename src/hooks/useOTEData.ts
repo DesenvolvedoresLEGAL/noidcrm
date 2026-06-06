@@ -470,24 +470,26 @@ export function useOTERules() {
 }
 
 // Hook para calcular OTE
+type CalculateOTEParams = { periodMonth: string; userId?: string; suppressToast?: boolean };
+
 export function useCalculateOTE() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (params: { periodMonth: string; userId?: string }) => {
+    mutationFn: async (params: CalculateOTEParams) => {
       const { data, error } = await supabase.functions.invoke('calculate-ote', {
-        body: params,
+        body: { periodMonth: params.periodMonth, userId: params.userId },
       });
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: oteKeys.monthlyResultsAll() });
-      toast.success('Cálculo OTE concluído');
+      if (!variables.suppressToast) toast.success('Cálculo OTE concluído');
     },
-    onError: (error) => {
+    onError: (error, variables) => {
       console.error('OTE calculation error:', error);
-      toast.error('Erro ao calcular OTE');
+      if (!variables?.suppressToast) toast.error('Erro ao calcular OTE');
     },
   });
 }
