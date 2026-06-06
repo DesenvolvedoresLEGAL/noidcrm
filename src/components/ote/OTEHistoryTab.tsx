@@ -18,6 +18,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  LabelList,
   Legend,
   Line,
   LineChart,
@@ -30,14 +31,19 @@ import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
   Activity,
+  AlertTriangle,
   CalendarClock,
+  FileSpreadsheet,
   History,
   Layers,
   LineChart as LineChartIcon,
+  MoreHorizontal,
+  RefreshCw,
   Trophy,
   Users,
   Wallet,
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -56,14 +62,38 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Tooltip as UITooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { EmptyState } from '@/components/EmptyState';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
-import { useOTEMonthlyResults, type OTEMonthlyResult } from '@/hooks/useOTEData';
+import { useOTEMonthlyResults, useCalculateOTE, type OTEMonthlyResult } from '@/hooks/useOTEData';
+import { useUserRole } from '@/hooks/useUserRole';
 import { cn } from '@/lib/utils';
 
 type RangeKey = '3m' | '6m' | 'ytd' | 'lasty' | 'all';
+
+/**
+ * Snapshots calculados antes desta data foram gerados em versões anteriores
+ * da regra item-a-item / Receita Válida oficial. São marcados como "Legado"
+ * e devem ser recalculados para refletir a regra atual.
+ */
+const RULE_CUTOFF_ISO = '2026-06-01T00:00:00Z';
+
+type SnapshotVersion = 'Atual' | 'Recalculado' | 'Legado' | 'Desatualizado' | 'Manual' | 'Aberto';
 
 interface SalesAgg {
   ote_result_id: string;
@@ -88,6 +118,9 @@ interface PeriodRow {
   lowCount: number;
   calculatedAt: string | null;
   status: 'Aberto' | 'Calculado' | 'Fechado' | 'Recalculado' | 'Revisado';
+  version: SnapshotVersion;
+  versionReason: string;
+  needsRecalc: boolean;
   results: OTEMonthlyResult[];
 }
 
