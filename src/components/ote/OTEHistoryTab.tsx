@@ -729,7 +729,7 @@ export function OTEHistoryTab() {
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
-                          onClick={() => handleRecalc(row)}
+                          onClick={() => requestRecalc(row)}
                           disabled={!canRecalc || calculateOTE.isPending}
                         >
                           <RefreshCw className={cn('h-4 w-4 mr-2', calculateOTE.isPending && 'animate-spin')} />
