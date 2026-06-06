@@ -812,3 +812,38 @@ function RankingSection({ title, items }: { title: string; items: OTEMonthlyResu
     </div>
   );
 }
+
+const VERSION_STYLES: Record<SnapshotVersion, { label: string; className: string }> = {
+  Atual:         { label: 'Atual',         className: 'bg-emerald-500/10 text-emerald-700 border-emerald-500/30 dark:text-emerald-400' },
+  Recalculado:   { label: 'Recalculado',   className: 'bg-emerald-500/10 text-emerald-700 border-emerald-500/30 dark:text-emerald-400' },
+  Legado:        { label: 'Legado',        className: 'bg-amber-500/10 text-amber-700 border-amber-500/30 dark:text-amber-400' },
+  Desatualizado: { label: 'Snapshot desatualizado', className: 'bg-destructive/10 text-destructive border-destructive/30' },
+  Manual:        { label: 'Manual',        className: 'bg-amber-500/10 text-amber-700 border-amber-500/30 dark:text-amber-400' },
+  Aberto:        { label: 'Aberto',        className: 'bg-muted text-muted-foreground border-border' },
+};
+
+function VersionBadge({ row }: { row: PeriodRow }) {
+  const cfg = VERSION_STYLES[row.version];
+  return (
+    <TooltipProvider delayDuration={150}>
+      <UITooltip>
+        <TooltipTrigger asChild>
+          <span
+            className={cn(
+              'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium cursor-help',
+              cfg.className,
+            )}
+          >
+            {row.needsRecalc && <AlertTriangle className="h-3 w-3" />}
+            {cfg.label}
+          </span>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-xs text-xs">
+          {row.needsRecalc
+            ? 'Este fechamento foi calculado antes da regra atual do OTE. Recalcule o período para atualizar Comissão elegível comercial, Receita elegível OTE e Itens fora da meta.'
+            : row.versionReason}
+        </TooltipContent>
+      </UITooltip>
+    </TooltipProvider>
+  );
+}
