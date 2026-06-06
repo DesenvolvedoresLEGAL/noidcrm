@@ -28,9 +28,10 @@ serve(async (req) => {
       throw new Error('Unauthorized');
     }
 
-    const { periodMonth, userId } = await req.json();
+    const { periodMonth: rawPeriodMonth, userId } = await req.json();
+    const periodMonth = typeof rawPeriodMonth === 'string' ? rawPeriodMonth.slice(0, 7) : '';
     
-    if (!periodMonth) {
+    if (!/^\d{4}-\d{2}$/.test(periodMonth)) {
       throw new Error('periodMonth is required (format: YYYY-MM)');
     }
 
@@ -262,7 +263,7 @@ serve(async (req) => {
             }));
           }
         } else {
-          let histQuery = supabase
+        let histQuery = supabase
             .from('commercial_won_revenue_historical_view')
             .select('opportunity_id, account_name, nome_fantasia, seller_id, won_at, approved_at, accepted_at, cancelled_at, pipeline_id')
             .eq('organization_id', organizationId)
@@ -325,7 +326,7 @@ serve(async (req) => {
         // 1) SSoT amounts (única fonte de receita realizada)
         const { data: ssotRows } = await supabase
           .from('commercial_won_revenue_view')
-          .select('opportunity_id, accepted_proposal_id, commercial_amount, mrr_amount, one_shot_amount, revenue_confidence, commercial_status, fulfillment_status')
+          .select('opportunity_id, accepted_proposal_id, commercial_amount, valid_revenue_amount, commission_eligible_amount, mrr_amount, one_shot_amount, revenue_confidence, commercial_status, fulfillment_status, is_cancelled_sale, cancelled_at')
           .eq('organization_id', organizationId)
           .in('opportunity_id', oppIds);
         const ssotMap = new Map((ssotRows || []).map((r: any) => [r.opportunity_id, r]));
