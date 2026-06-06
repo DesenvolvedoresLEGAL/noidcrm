@@ -560,7 +560,7 @@ export function OTEHistoryTab() {
               <Legend wrapperStyle={{ fontSize: 12 }} />
               <Bar dataKey="commercialEligible" name="Comissão elegível comercial" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
               <Bar dataKey="eligibleOte" name="Receita elegível OTE" fill="hsl(var(--chart-2, var(--primary)))" fillOpacity={0.7} radius={[4, 4, 0, 0]} />
-              <Bar dataKey="itemsOutOfGoal" name="Itens fora da meta" fill="hsl(var(--destructive))" fillOpacity={0.7} radius={[4, 4, 0, 0]} />
+              <Bar dataKey="itemsOutOfGoal" name="Itens fora da meta" fill="hsl(38 92% 50%)" fillOpacity={0.75} radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </CardContent>
