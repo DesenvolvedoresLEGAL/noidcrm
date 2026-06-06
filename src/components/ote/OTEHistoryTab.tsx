@@ -838,13 +838,63 @@ function PeriodDetailDrawer({
           )}
 
           <div className="grid grid-cols-2 gap-3">
-            <MiniStat label="Total pago" value={fmtBRL(row.totalPaid)} highlight />
+            <MiniStat
+              label={row.hasHistorical ? 'Total pago histórico' : 'Total pago'}
+              value={fmtBRL(row.hasHistorical ? row.originalTotalPaid : row.totalPaid)}
+              highlight
+            />
             <MiniStat label="% médio de meta" value={fmtPct(row.avgAchievement)} />
             <MiniStat label="Comissão elegível comercial" value={fmtBRL(row.commercialEligible)} />
             <MiniStat label="Receita elegível OTE" value={fmtBRL(row.eligibleOte)} />
             <MiniStat label="Itens fora da meta" value={fmtBRL(row.itemsOutOfGoal)} />
             <MiniStat label="Vendedores no cálculo" value={String(row.sellers)} />
           </div>
+
+          {(row.hasRecalc || row.hasHistorical) && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <RefreshCw className="h-4 w-4 text-primary" /> Comparativo de cálculo
+                </CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  Memória oficial do pagamento × valor produzido pela regra atual de OTE.
+                </p>
+              </CardHeader>
+              <CardContent className="pt-0 space-y-2 text-xs">
+                <div className="grid grid-cols-2 gap-3">
+                  <MiniStat
+                    label="Total pago histórico"
+                    value={fmtBRL(row.originalTotalPaid)}
+                  />
+                  <MiniStat
+                    label="Total recalculado pela regra atual"
+                    value={row.hasRecalc ? fmtBRL(row.recalculatedTotalPaid) : '—'}
+                  />
+                </div>
+                {row.hasRecalc && row.hasHistorical && (
+                  <MiniStat
+                    label="Diferença (recálculo − histórico)"
+                    value={`${row.paidDifference > 0 ? '+' : ''}${fmtBRL(row.paidDifference)}`}
+                    warn={row.paidDifference !== 0}
+                  />
+                )}
+                <div className="text-muted-foreground space-y-0.5 pt-1">
+                  <p>
+                    <span className="text-foreground font-medium">Origem do cálculo atual:</span>{' '}
+                    {row.hasRecalc ? 'Recalculado com regra atual' : 'Cálculo inicial'}
+                  </p>
+                  <p>
+                    <span className="text-foreground font-medium">Data do recálculo:</span>{' '}
+                    {fmtDateTime(row.recalculatedAt)}
+                  </p>
+                  <p className="italic">
+                    O valor histórico é preservado para auditoria e nunca é sobrescrito por
+                    recálculos posteriores.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader className="pb-2">
