@@ -898,6 +898,45 @@ serve(async (req) => {
 
     console.log(`OTE calculation completed. Processed ${results.length} sellers.`);
 
+    const totals = results.reduce((acc: any, r: any) => {
+      acc.total_paid += Number(r.final_variable_amount || 0);
+      if (!r.is_team_target) {
+        acc.participants_count += 1;
+        acc.average_goal_percentage += Number(r.achievement_percentage || 0);
+      }
+      return acc;
+    }, { total_paid: 0, participants_count: 0, average_goal_percentage: 0 });
+    if (totals.participants_count > 0) {
+      totals.average_goal_percentage = totals.average_goal_percentage / totals.participants_count;
+    }
+
+    const { error: auditError } = await supabase.from('system_events').insert({
+      trace_id: crypto.randomUUID(),
+      organization_id: organizationId,
+      actor_type: 'user',
+      actor_id: user.id,
+      event_type: 'ote_period_recalculated',
+      event_category: 'ote',
+      action: 'recalculate_period',
+      entity_type: 'ote_monthly_results',
+      payload: {
+        period_month: periodMonth,
+        user_id: userId ?? null,
+        results_count: results.length,
+        total_paid: totals.total_paid,
+        participants_count: totals.participants_count,
+        average_goal_percentage: totals.average_goal_percentage,
+        calculation_version: 'current_ote_rule',
+        calculation_source: 'calculate-ote',
+      },
+      metadata: {
+        source: 'calculate-ote',
+        requested_period_month: rawPeriodMonth,
+        normalized_period_month: periodMonth,
+      },
+    });
+    if (auditError) console.error('[calculate-ote] audit insert error:', auditError);
+
     return new Response(JSON.stringify({ 
       success: true, 
       message: `OTE calculated for ${results.length} sellers`,
