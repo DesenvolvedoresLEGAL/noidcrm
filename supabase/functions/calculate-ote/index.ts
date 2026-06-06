@@ -51,6 +51,11 @@ serve(async (req) => {
 
     const organizationId = membership.organization_id;
 
+    // Parse period
+    const [year, month] = periodMonth.split('-').map(Number);
+    const startDate = new Date(year, month - 1, 1).toISOString();
+    const endDate = new Date(year, month, 0, 23, 59, 59).toISOString();
+
     // Get OTE levels (including is_team_target)
     const { data: levels } = await supabase
       .from('ote_levels')
@@ -140,11 +145,6 @@ serve(async (req) => {
       .from('team_members')
       .select('team_id, user_id')
       .eq('organization_id', organizationId);
-
-    // Parse period
-    const [year, month] = periodMonth.split('-').map(Number);
-    const startDate = new Date(year, month - 1, 1).toISOString();
-    const endDate = new Date(year, month, 0, 23, 59, 59).toISOString();
 
     // Reprocessamento limpo do período: remove detalhes antigos antes de recalcular,
     // evitando mistura/duplicação de regras antigas com a regra atual.
