@@ -78,6 +78,16 @@ import {
 } from '@/components/ui/tooltip';
 import { EmptyState } from '@/components/EmptyState';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { useOTEMonthlyResults, useCalculateOTE, type OTEMonthlyResult } from '@/hooks/useOTEData';
@@ -109,6 +119,13 @@ interface PeriodRow {
   periodFull: string;
   sellers: number;
   totalPaid: number;
+  // SPRINT OTE 1.7.3 — memória histórica vs recálculo pela regra atual
+  originalTotalPaid: number;
+  recalculatedTotalPaid: number;
+  hasHistorical: boolean;
+  hasRecalc: boolean;
+  paidDifference: number;
+  recalculatedAt: string | null;
   totalGoal: number;
   totalSales: number;
   eligibleOte: number;
@@ -254,6 +271,7 @@ export function OTEHistoryTab() {
   const canRecalc = isAdmin || isManager;
   const [range, setRange] = useState<RangeKey>('6m');
   const [selectedPeriod, setSelectedPeriod] = useState<string | null>(null);
+  const [recalcCandidate, setRecalcCandidate] = useState<PeriodRow | null>(null);
 
   const resultIds = useMemo(() => (allResults || []).map((r) => r.id), [allResults]);
   const { data: salesAgg } = useAllOTESalesAgg(resultIds);
@@ -270,10 +288,23 @@ export function OTEHistoryTab() {
         queryClient.invalidateQueries({ queryKey: ['ote-history-sales-agg'] }),
         queryClient.invalidateQueries({ queryKey: ['ote-sales-records'] }),
       ]);
-      toast.success(`${row.periodFull} recalculado com sucesso.`);
+      toast.success(`${row.periodFull} recalculado. Valor histórico preservado para auditoria.`);
     } catch (error) {
       console.error('[OTEHistoryTab] Recalculation failed:', error);
       toast.error(`Não foi possível recalcular ${row.periodFull}. Verifique logs do cálculo OTE.`);
+    }
+  };
+
+  const requestRecalc = (row: PeriodRow) => {
+    if (!canRecalc) {
+      toast.error('Apenas admin ou gestor pode recalcular um período.');
+      return;
+    }
+    // Períodos com cálculo prévio exigem confirmação para preservar memória
+    if (row.calculatedAt || row.totalPaid > 0) {
+      setRecalcCandidate(row);
+    } else {
+      void handleRecalc(row);
     }
   };
 
@@ -303,9 +334,31 @@ export function OTEHistoryTab() {
       let eligibleOte = 0;
       let nonElig = 0;
       let saleSum = 0;
+      let originalSum = 0;
+      let recalcSum = 0;
+      let hasHistorical = false;
+      let hasRecalc = false;
+      let recalculatedAt: string | null = null;
 
       for (const r of items) {
-        totalPaid += Number(r.final_variable_amount || 0);
+        const current = Number(r.final_variable_amount || 0);
+        totalPaid += current;
+        const orig = r.original_total_paid != null ? Number(r.original_total_paid) : null;
+        const rec = r.recalculated_total_paid != null ? Number(r.recalculated_total_paid) : null;
+        if (orig != null) {
+          originalSum += orig;
+          hasHistorical = true;
+        } else {
+          // sem original registrado: o atual é o histórico
+          originalSum += current;
+        }
+        if (rec != null) {
+          recalcSum += rec;
+          hasRecalc = true;
+        }
+        if (r.recalculated_at && (!recalculatedAt || r.recalculated_at > recalculatedAt)) {
+          recalculatedAt = r.recalculated_at;
+        }
         const agg = salesAgg?.get(r.id);
         if (agg) {
           eligibleOte += agg.eligible;
@@ -341,6 +394,12 @@ export function OTEHistoryTab() {
         periodFull: periodFullLabel(period),
         sellers: individuals.length,
         totalPaid,
+        originalTotalPaid: originalSum,
+        recalculatedTotalPaid: recalcSum,
+        hasHistorical,
+        hasRecalc,
+        paidDifference: hasRecalc && hasHistorical ? recalcSum - originalSum : 0,
+        recalculatedAt,
         totalGoal,
         totalSales,
         eligibleOte,
@@ -606,6 +665,8 @@ export function OTEHistoryTab() {
                 <th className="text-right py-3 px-2 font-medium">Itens fora da meta</th>
                 <th className="text-right py-3 px-2 font-medium">% médio de meta</th>
                 <th className="text-right py-3 px-2 font-medium">Total pago</th>
+                <th className="text-right py-3 px-2 font-medium">Total recalculado</th>
+                <th className="text-right py-3 px-2 font-medium">Diferença</th>
                 <th className="text-right py-3 px-2 font-medium">Ações</th>
               </tr>
             </thead>
@@ -627,7 +688,29 @@ export function OTEHistoryTab() {
                   <td className="py-3 px-2 text-right">{fmtBRL(row.eligibleOte)}</td>
                   <td className="py-3 px-2 text-right text-muted-foreground">{fmtBRL(row.itemsOutOfGoal)}</td>
                   <td className="py-3 px-2 text-right">{fmtPct(row.avgAchievement)}</td>
-                  <td className="py-3 px-2 text-right font-semibold text-primary">{fmtBRL(row.totalPaid)}</td>
+                  <td className="py-3 px-2 text-right font-semibold text-primary">
+                    {fmtBRL(row.hasHistorical ? row.originalTotalPaid : row.totalPaid)}
+                  </td>
+                  <td className="py-3 px-2 text-right">
+                    {row.hasRecalc ? (
+                      <span className="font-medium">{fmtBRL(row.recalculatedTotalPaid)}</span>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </td>
+                  <td className="py-3 px-2 text-right">
+                    {row.hasRecalc && row.hasHistorical ? (
+                      <span className={cn(
+                        'font-medium',
+                        row.paidDifference > 0 && 'text-amber-600 dark:text-amber-400',
+                        row.paidDifference < 0 && 'text-destructive',
+                      )}>
+                        {row.paidDifference > 0 ? '+' : ''}{fmtBRL(row.paidDifference)}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </td>
                   <td className="py-3 px-2 text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -646,7 +729,7 @@ export function OTEHistoryTab() {
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
-                          onClick={() => handleRecalc(row)}
+                          onClick={() => requestRecalc(row)}
                           disabled={!canRecalc || calculateOTE.isPending}
                         >
                           <RefreshCw className={cn('h-4 w-4 mr-2', calculateOTE.isPending && 'animate-spin')} />
@@ -667,6 +750,31 @@ export function OTEHistoryTab() {
         open={!!selectedRow}
         onClose={() => setSelectedPeriod(null)}
       />
+
+      <AlertDialog open={!!recalcCandidate} onOpenChange={(v) => !v && setRecalcCandidate(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Recalcular {recalcCandidate?.periodFull} com a regra atual?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Este período possui cálculo histórico. Recalcular usando a regra atual pode alterar o valor do OTE.
+              O valor histórico será preservado para auditoria como <strong>Total pago histórico</strong> e o novo
+              cálculo aparecerá como <strong>Total recalculado</strong>.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                const target = recalcCandidate;
+                setRecalcCandidate(null);
+                if (target) void handleRecalc(target);
+              }}
+            >
+              Recalcular com regra atual
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -730,13 +838,63 @@ function PeriodDetailDrawer({
           )}
 
           <div className="grid grid-cols-2 gap-3">
-            <MiniStat label="Total pago" value={fmtBRL(row.totalPaid)} highlight />
+            <MiniStat
+              label={row.hasHistorical ? 'Total pago histórico' : 'Total pago'}
+              value={fmtBRL(row.hasHistorical ? row.originalTotalPaid : row.totalPaid)}
+              highlight
+            />
             <MiniStat label="% médio de meta" value={fmtPct(row.avgAchievement)} />
             <MiniStat label="Comissão elegível comercial" value={fmtBRL(row.commercialEligible)} />
             <MiniStat label="Receita elegível OTE" value={fmtBRL(row.eligibleOte)} />
             <MiniStat label="Itens fora da meta" value={fmtBRL(row.itemsOutOfGoal)} />
             <MiniStat label="Vendedores no cálculo" value={String(row.sellers)} />
           </div>
+
+          {(row.hasRecalc || row.hasHistorical) && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <RefreshCw className="h-4 w-4 text-primary" /> Comparativo de cálculo
+                </CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  Memória oficial do pagamento × valor produzido pela regra atual de OTE.
+                </p>
+              </CardHeader>
+              <CardContent className="pt-0 space-y-2 text-xs">
+                <div className="grid grid-cols-2 gap-3">
+                  <MiniStat
+                    label="Total pago histórico"
+                    value={fmtBRL(row.originalTotalPaid)}
+                  />
+                  <MiniStat
+                    label="Total recalculado pela regra atual"
+                    value={row.hasRecalc ? fmtBRL(row.recalculatedTotalPaid) : '—'}
+                  />
+                </div>
+                {row.hasRecalc && row.hasHistorical && (
+                  <MiniStat
+                    label="Diferença (recálculo − histórico)"
+                    value={`${row.paidDifference > 0 ? '+' : ''}${fmtBRL(row.paidDifference)}`}
+                    warn={row.paidDifference !== 0}
+                  />
+                )}
+                <div className="text-muted-foreground space-y-0.5 pt-1">
+                  <p>
+                    <span className="text-foreground font-medium">Origem do cálculo atual:</span>{' '}
+                    {row.hasRecalc ? 'Recalculado com regra atual' : 'Cálculo inicial'}
+                  </p>
+                  <p>
+                    <span className="text-foreground font-medium">Data do recálculo:</span>{' '}
+                    {fmtDateTime(row.recalculatedAt)}
+                  </p>
+                  <p className="italic">
+                    O valor histórico é preservado para auditoria e nunca é sobrescrito por
+                    recálculos posteriores.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader className="pb-2">

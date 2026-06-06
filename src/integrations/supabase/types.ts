@@ -19944,6 +19944,7 @@ export type Database = {
           base_variable: number
           calculated_at: string
           calculated_by: string | null
+          calculation_origin: string
           created_at: string
           crm_accelerator: number | null
           crm_completion_score: number | null
@@ -19961,11 +19962,16 @@ export type Database = {
           level_name_snapshot: string | null
           notes: string | null
           organization_id: string
+          original_total_paid: number | null
           ote_level_id: string | null
           ote_multiplier: number
+          paid_at: string | null
           performance_gate_multiplier: number | null
           performance_scores: Json | null
           period_month: string
+          recalculated_at: string | null
+          recalculated_by: string | null
+          recalculated_total_paid: number | null
           roleplay_accelerator: number | null
           roleplay_score: number | null
           status: string
@@ -19986,6 +19992,7 @@ export type Database = {
           base_variable?: number
           calculated_at?: string
           calculated_by?: string | null
+          calculation_origin?: string
           created_at?: string
           crm_accelerator?: number | null
           crm_completion_score?: number | null
@@ -20003,11 +20010,16 @@ export type Database = {
           level_name_snapshot?: string | null
           notes?: string | null
           organization_id: string
+          original_total_paid?: number | null
           ote_level_id?: string | null
           ote_multiplier?: number
+          paid_at?: string | null
           performance_gate_multiplier?: number | null
           performance_scores?: Json | null
           period_month: string
+          recalculated_at?: string | null
+          recalculated_by?: string | null
+          recalculated_total_paid?: number | null
           roleplay_accelerator?: number | null
           roleplay_score?: number | null
           status?: string
@@ -20028,6 +20040,7 @@ export type Database = {
           base_variable?: number
           calculated_at?: string
           calculated_by?: string | null
+          calculation_origin?: string
           created_at?: string
           crm_accelerator?: number | null
           crm_completion_score?: number | null
@@ -20045,11 +20058,16 @@ export type Database = {
           level_name_snapshot?: string | null
           notes?: string | null
           organization_id?: string
+          original_total_paid?: number | null
           ote_level_id?: string | null
           ote_multiplier?: number
+          paid_at?: string | null
           performance_gate_multiplier?: number | null
           performance_scores?: Json | null
           period_month?: string
+          recalculated_at?: string | null
+          recalculated_by?: string | null
+          recalculated_total_paid?: number | null
           roleplay_accelerator?: number | null
           roleplay_score?: number | null
           status?: string

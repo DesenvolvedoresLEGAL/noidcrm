@@ -88,6 +88,13 @@ export interface OTEMonthlyResult {
   is_team_target?: boolean;
   team_member_count?: number;
   goal_type?: 'revenue' | 'leads';
+  // SPRINT OTE 1.7.3 — memória histórica vs recálculo pela regra atual
+  original_total_paid?: number | null;
+  recalculated_total_paid?: number | null;
+  calculation_origin?: 'initial' | 'recalculated' | 'historical' | 'manual';
+  recalculated_at?: string | null;
+  recalculated_by?: string | null;
+  paid_at?: string | null;
   profile?: {
     full_name: string;
     avatar_url?: string;
