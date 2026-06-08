@@ -29,7 +29,7 @@ serve(async (req) => {
       .from('proposals')
       .select(`
         *,
-        opportunity:opportunities(
+        opportunity:opportunities!proposals_opportunity_id_fkey(
           *,
           account:accounts(*),
           contact:contacts(*)
