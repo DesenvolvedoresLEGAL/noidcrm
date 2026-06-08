@@ -69,6 +69,7 @@ const ALL_MENU_ITEMS: MenuItem[] = [
   { path: '/app/activities', label: 'Atividades', icon: CheckSquare, section: 'gestao' },
   { path: '/app/accounts', label: 'Contas', icon: Building2, section: 'gestao' },
   { path: '/app/contracts', label: 'Contratos', icon: FileCheck, section: 'gestao' },
+  { path: '/app/proposals', label: 'Propostas', icon: FileText, section: 'gestao' },
   { path: '/app/forecast', label: 'Forecast', icon: TrendingUp, section: 'gestao' },
   { path: '/app/reports', label: 'Relatórios', icon: BarChart3, section: 'gestao' },
 
