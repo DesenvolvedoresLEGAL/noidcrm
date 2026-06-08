@@ -22,4 +22,6 @@ export {
   getProposalStats,
   updateProposalTotals,
   syncOpportunityValue,
+  searchProposalsGlobal,
+  type SearchProposalsGlobalParams,
 } from '../supabase/proposals';

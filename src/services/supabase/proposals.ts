@@ -354,6 +354,88 @@ export async function listProposals(params?: {
   return { data: proposalsWithItems as any[], total: count || 0 };
 }
 
+export interface SearchProposalsGlobalParams {
+  q?: string;
+  status?: string;
+  ownerId?: string;
+  minValue?: number;
+  maxValue?: number;
+  year?: number;
+  dateFrom?: string; // YYYY-MM-DD
+  dateTo?: string;   // YYYY-MM-DD
+  page?: number;
+  pageSize?: number;
+}
+
+/**
+ * Global proposal search across many fields (title, client, code, items, contacts, etc.).
+ * Independent of pipeline/opportunity status. Uses RPC `search_proposals_global` which
+ * applies unaccent + ILIKE under RLS, then hydrates rows via standard select.
+ */
+export async function searchProposalsGlobal(params: SearchProposalsGlobalParams = {}): Promise<{
+  data: any[];
+  total: number;
+}> {
+  const pageSize = Math.max(1, Math.min(params.pageSize ?? 50, 200));
+  const page = Math.max(1, params.page ?? 1);
+  const offset = (page - 1) * pageSize;
+
+  const { data: idRows, error: rpcError } = await (supabase as any).rpc('search_proposals_global', {
+    _q: params.q?.trim() || null,
+    _status: params.status || null,
+    _owner_id: params.ownerId || null,
+    _min_value: params.minValue ?? null,
+    _max_value: params.maxValue ?? null,
+    _year: params.year ?? null,
+    _date_from: params.dateFrom || null,
+    _date_to: params.dateTo || null,
+    _limit: pageSize,
+    _offset: offset,
+  });
+
+  if (rpcError) throw rpcError;
+
+  const rows = (idRows ?? []) as Array<{ id: string; total_count: number }>;
+  const total = rows.length > 0 ? Number(rows[0].total_count) : 0;
+  const ids = rows.map((r) => r.id);
+
+  if (ids.length === 0) {
+    return { data: [], total };
+  }
+
+  const { data, error } = await supabase
+    .from('proposals')
+    .select(`
+      *,
+      opportunity:opportunities!proposals_opportunity_id_fkey(
+        id,
+        title,
+        owner_user_id,
+        account:accounts(id, razao_social, nome_fantasia)
+      )
+    `)
+    .in('id', ids);
+
+  if (error) throw error;
+
+  // Preserve RPC order (most recent first) and fetch item counts in parallel.
+  const byId = new Map((data || []).map((p: any) => [p.id, p]));
+  const ordered = ids.map((id) => byId.get(id)).filter(Boolean) as any[];
+
+  const withCounts = await Promise.all(
+    ordered.map(async (proposal) => {
+      const { count: itemsCount } = await supabase
+        .from('proposal_items')
+        .select('*', { count: 'exact', head: true })
+        .eq('proposal_id', proposal.id);
+      return { ...proposal, items_count: itemsCount || 0 };
+    })
+  );
+
+  return { data: withCounts, total };
+}
+
+
 export async function updateProposal(id: string, dto: unknown): Promise<Proposal> {
   // Parse with partial schema to allow any subset of fields
   const validated = proposalSchema.partial().parse(dto);
