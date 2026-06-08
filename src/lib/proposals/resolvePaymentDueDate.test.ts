@@ -87,3 +87,25 @@ describe('resolvePaymentDueDateFromCommercialCondition', () => {
     expect(dynamicPricingEndForInstallments(proposal, {}, null)).toBeNull();
   });
 });
+
+describe('resolvePaymentDueDateFromCommercialCondition — freeze shapes', () => {
+  it('lê due_date do shape { schedule: [...] } (RPC freeze_proposal_approval)', () => {
+    const proposal = {
+      status: 'accepted',
+      approved_payment_schedule: { schedule: [{ due_date: '2026-07-04', amount: 895.5 }] },
+    };
+    const r = resolvePaymentDueDateFromCommercialCondition(proposal, {}, null);
+    expect(r.source).toBe('frozen_approved_payment_schedule');
+    expect(r.due_date).toBe('2026-07-04');
+  });
+
+  it('lê due_date do shape legado { payment_schedule: [...] }', () => {
+    const proposal = {
+      status: 'accepted',
+      approved_payment_schedule: { payment_schedule: [{ due_date: '2026-08-01', amount: 1 }] },
+    };
+    const r = resolvePaymentDueDateFromCommercialCondition(proposal, {}, null);
+    expect(r.source).toBe('frozen_approved_payment_schedule');
+    expect(r.due_date).toBe('2026-08-01');
+  });
+});

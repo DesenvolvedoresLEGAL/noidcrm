@@ -62,15 +62,21 @@ export function resolvePaymentDueDateFromCommercialCondition(
   paymentTerm: any | null | undefined,
   dynamicPricingContext?: DynamicPricingContext | null,
 ): ResolvedPaymentDueDate {
-  // 0. Frozen on approval — nunca recalcular após aceite
+  // 0. Frozen on approval — nunca recalcular após aceite.
+  // Suporta os 3 shapes históricos do snapshot:
+  //   { schedule: [...] }          ← shape atual do RPC freeze_proposal_approval
+  //   { payment_schedule: [...] }  ← legado
+  //   [...]                        ← legado mais antigo
   if (proposal?.status === 'accepted' || proposal?.status === 'approved') {
     const sched: any = proposal?.approved_payment_schedule;
-    const first = Array.isArray(sched)
-      ? sched[0]
+    const list = Array.isArray(sched?.schedule)
+      ? sched.schedule
       : Array.isArray(sched?.payment_schedule)
-        ? sched.payment_schedule[0]
-        : null;
-    const frozenDate = toIsoDate(first?.due_date);
+        ? sched.payment_schedule
+        : Array.isArray(sched)
+          ? sched
+          : null;
+    const frozenDate = toIsoDate(list?.[0]?.due_date);
     if (frozenDate) {
       return { due_date: frozenDate, source: 'frozen_approved_payment_schedule' };
     }
