@@ -1040,17 +1040,24 @@ export default function ProposalPublicView() {
     proposal?.status === 'accepted' && proposal?.approved_amount != null
       ? Number(proposal.approved_amount)
       : effectiveOneTimeBase;
-  const installments = oneTimeTerm
-    ? calculateInstallments(oneTimeTerm, baseForSchedule, {
-        proposalExpiresAt: proposal?.expires_at ?? null,
-        approvedAmount: proposal?.status === 'accepted' ? Number(proposal?.approved_amount ?? effectiveOneTimeAmount) : null,
-        dynamicPricingCurrentEndsAt: dynamicPricingEndForInstallments(
-          proposal,
-          oneTimeTerm,
-          { snapshot: dpSnapPublic },
-        ),
-      })
-    : [];
+  // FREEZE-ON-APPROVAL: quando a proposta está aprovada, o cronograma exibido
+  // ao cliente DEVE vir do snapshot congelado em `approved_payment_schedule`.
+  // Edições posteriores em `proposal_payment_terms` ou nos tiers dinâmicos
+  // jamais podem alterar o que o cliente já aprovou.
+  const frozenInstallments = readFrozenSchedule(proposal);
+  const installments = frozenInstallments
+    ? frozenInstallments
+    : oneTimeTerm
+      ? calculateInstallments(oneTimeTerm, baseForSchedule, {
+          proposalExpiresAt: proposal?.expires_at ?? null,
+          approvedAmount: proposal?.status === 'accepted' ? Number(proposal?.approved_amount ?? effectiveOneTimeAmount) : null,
+          dynamicPricingCurrentEndsAt: dynamicPricingEndForInstallments(
+            proposal,
+            oneTimeTerm,
+            { snapshot: dpSnapPublic },
+          ),
+        })
+      : [];
 
   // PRICE UX 1.0.3 — flag pública de pagamento (Pix/ERP)
   const publicPaymentEnabled = proposal?.public_payment_enabled === true;
