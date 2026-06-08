@@ -1,4 +1,4 @@
-import { AlertTriangle, CalendarClock, Clock, TrendingUp } from 'lucide-react';
+import { AlertTriangle, CalendarClock, CheckCircle2, Clock, Lock, TrendingUp } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -11,13 +11,110 @@ import {
 
 interface Props {
   snapshot?: DynamicPricingSnapshot | null;
-  variant?: 'public' | 'preview';
+  variant?: 'public' | 'preview' | 'frozen';
+  /** Snapshot congelado em `proposals.approval_snapshot` quando variant='frozen'. */
+  approvalSnapshot?: any | null;
+  /** Data de aceite formatada (ISO) — usada apenas em variant='frozen'. */
+  acceptedAt?: string | null;
 }
 
 const CLAUSE =
   'Pagamentos realizados após o vencimento da condição comercial serão considerados conforme o valor vigente na data efetiva do pagamento. Diferenças poderão gerar cobrança complementar.';
 
-export function PublicProposalDynamicPricingBanner({ snapshot, variant = 'public' }: Props) {
+const FROZEN_CLAUSE =
+  'Estes valores foram congelados no momento da aprovação. Qualquer ajuste depende de renegociação formal e nova aprovação.';
+
+function FrozenView({ approvalSnapshot, acceptedAt }: { approvalSnapshot: any; acceptedAt: string | null }) {
+  if (!approvalSnapshot) return null;
+
+  const base = Number(approvalSnapshot.base_amount ?? 0);
+  const finalAmount = Number(
+    approvalSnapshot.approval_amount ?? approvalSnapshot.effective_amount ?? 0,
+  );
+  const dyn = approvalSnapshot.dynamic_adjustment ?? {};
+  const adjustmentAmount = Number(dyn.amount ?? 0);
+  const adjustmentPercent = Number(dyn.percent ?? 0);
+  const tierLabel: string | null = dyn.tier_label ?? null;
+  const referenceDate: string | null = approvalSnapshot.reference_date ?? null;
+  const acceptedLabel = acceptedAt ? formatDateTime(acceptedAt) : null;
+
+  return (
+    <Card className="my-4 border-emerald-500/40 bg-emerald-50/30 dark:bg-emerald-950/10">
+      <CardContent className="p-5 space-y-3">
+        <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
+          <Lock className="h-4 w-4" />
+          Condição comercial aprovada
+          {acceptedLabel && (
+            <span className="font-normal normal-case text-xs text-muted-foreground">
+              em {acceptedLabel}
+            </span>
+          )}
+        </div>
+
+        {referenceDate && (
+          <div className="rounded-md border border-emerald-500/30 bg-white/60 dark:bg-emerald-950/20 p-3 text-xs flex items-start gap-2">
+            <CalendarClock className="h-4 w-4 mt-0.5 text-emerald-600 shrink-0" />
+            <div>
+              <div className="font-medium text-emerald-700 dark:text-emerald-400">
+                Data de referência usada na aprovação
+              </div>
+              <div className="text-muted-foreground">
+                {formatDateTime(referenceDate)}
+                {tierLabel ? ` — faixa: ${tierLabel}` : ''}
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <div className="text-xs text-muted-foreground">Valor base</div>
+            <div className="text-lg font-semibold">{formatBRL(base)}</div>
+          </div>
+
+          {adjustmentAmount !== 0 && (
+            <div>
+              <div className="text-xs text-muted-foreground">
+                Ajuste aplicado{adjustmentPercent ? ` (${adjustmentPercent > 0 ? '+' : ''}${adjustmentPercent}%)` : ''}
+              </div>
+              <div className={`text-lg font-semibold ${adjustmentAmount > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                {adjustmentAmount > 0 ? '+ ' : ''}{formatBRL(adjustmentAmount)}
+              </div>
+              {tierLabel && (
+                <div className="text-xs text-muted-foreground">{tierLabel}</div>
+              )}
+            </div>
+          )}
+
+          <div>
+            <div className="text-xs text-muted-foreground flex items-center gap-1">
+              <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+              Valor aprovado (congelado)
+            </div>
+            <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">
+              {formatBRL(finalAmount)}
+            </div>
+          </div>
+        </div>
+
+        <p className="text-xs text-muted-foreground border-t pt-3">{FROZEN_CLAUSE}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+export function PublicProposalDynamicPricingBanner({
+  snapshot,
+  variant = 'public',
+  approvalSnapshot = null,
+  acceptedAt = null,
+}: Props) {
+  // FREEZE-ON-APPROVAL: após o aceite, renderizamos o snapshot congelado,
+  // nunca o snapshot vivo (que pode ter mudado de tier).
+  if (variant === 'frozen') {
+    return <FrozenView approvalSnapshot={approvalSnapshot} acceptedAt={acceptedAt} />;
+  }
+
   if (!snapshot || snapshot.status === 'disabled') return null;
 
   if (snapshot.status === 'requires_requote' || snapshot.status === 'expired') {
