@@ -6,6 +6,7 @@ import {
   CheckSquare,
   Building2,
   FileCheck,
+  FileText,
   BarChart3,
   Lightbulb,
   Users,
