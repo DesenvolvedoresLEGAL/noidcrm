@@ -29,7 +29,7 @@ serve(async (req) => {
       .from('proposals')
       .select(`
         *,
-        opportunity:opportunities(
+        opportunity:opportunities!proposals_opportunity_id_fkey(
           *,
           account:accounts(*),
           contact:contacts(*)
@@ -164,9 +164,14 @@ serve(async (req) => {
 function getPdfPricingView(proposal: any) {
   const status = proposal?.status;
   const approvedAmount = proposal?.approved_amount;
-  const approvedSchedule = Array.isArray(proposal?.approved_payment_schedule)
-    ? proposal.approved_payment_schedule
-    : null;
+  const rawApprovedSchedule = proposal?.approved_payment_schedule;
+  const approvedSchedule = Array.isArray(rawApprovedSchedule?.schedule)
+    ? rawApprovedSchedule.schedule
+    : Array.isArray(rawApprovedSchedule?.payment_schedule)
+      ? rawApprovedSchedule.payment_schedule
+      : Array.isArray(rawApprovedSchedule)
+        ? rawApprovedSchedule
+        : null;
   const snap = proposal?.pricing_breakdown_snapshot;
   const hasSnap = snap && typeof snap === 'object' && snap.version && snap.effective_amount != null;
 
@@ -182,7 +187,7 @@ function getPdfPricingView(proposal: any) {
     return Number.isFinite(n) ? n : f;
   };
 
-  const isAcceptedFrozen = status === 'accepted' && approvedAmount != null;
+  const isAcceptedFrozen = (status === 'accepted' || status === 'approved') && approvedAmount != null;
   const effectiveAmount = isAcceptedFrozen ? num(approvedAmount) : num(snap.effective_amount);
   const paymentSchedule = isAcceptedFrozen && approvedSchedule && approvedSchedule.length
     ? approvedSchedule
