@@ -66,6 +66,7 @@ import { PublicProposalDynamicPricingBanner } from '@/components/proposals/Publi
 import { getDynamicPricingBreakdown, formatDateTime as formatDpDateTime } from '@/lib/proposals/dynamicPricing';
 import { getEffectiveAmount } from '@/lib/proposals/effectiveAmount';
 import { dynamicPricingEndForInstallments } from '@/lib/proposals/resolvePaymentDueDate';
+import { readFrozenSchedule } from '@/lib/proposals/frozenSchedule';
 
 // Fallback decline reasons (used if organization has none configured)
 const FALLBACK_DECLINE_REASONS = [
@@ -1635,10 +1636,16 @@ export default function ProposalPublicView() {
         })()}
         </div>
 
-        {/* Tabela de Preço Dinâmica — informa ao cliente o valor vigente,
-            condições anteriores expiradas e próxima virada de faixa. */}
-        {(proposal as any)?.dynamic_pricing_enabled && dpSnapPublic && (
-          <PublicProposalDynamicPricingBanner snapshot={dpSnapPublic} variant="public" />
+        {/* Tabela de Preço Dinâmica — informa ao cliente o valor vigente.
+            Quando a proposta está APROVADA, renderiza a condição congelada
+            (sem recalcular tier vivo). Caso contrário, mostra o snapshot atual. */}
+        {(proposal as any)?.dynamic_pricing_enabled && (dpSnapPublic || isAccepted) && (
+          <PublicProposalDynamicPricingBanner
+            snapshot={dpSnapPublic}
+            variant={isAccepted ? 'frozen' : 'public'}
+            approvalSnapshot={isAccepted ? (proposal as any)?.approval_snapshot ?? null : null}
+            acceptedAt={isAccepted ? (proposal as any)?.accepted_at ?? null : null}
+          />
         )}
 
         {/* Payment Terms */}
