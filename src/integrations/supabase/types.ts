@@ -36073,6 +36073,24 @@ export type Database = {
         }
         Returns: Json
       }
+      search_proposals_global: {
+        Args: {
+          _date_from?: string
+          _date_to?: string
+          _limit?: number
+          _max_value?: number
+          _min_value?: number
+          _offset?: number
+          _owner_id?: string
+          _q?: string
+          _status?: string
+          _year?: number
+        }
+        Returns: {
+          id: string
+          total_count: number
+        }[]
+      }
       seed_default_decision_rules: {
         Args: { _org_id: string }
         Returns: undefined
