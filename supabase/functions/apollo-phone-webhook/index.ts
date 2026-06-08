@@ -64,15 +64,19 @@ Deno.serve(async (req: Request) => {
     const url = new URL(req.url);
     const contactId = url.searchParams.get("contact_id");
     const token = url.searchParams.get("token");
-    const expectedToken = Deno.env.get("APOLLO_WEBHOOK_TOKEN") ?? "";
+    const expectedToken = Deno.env.get("APOLLO_WEBHOOK_TOKEN");
 
     if (!contactId) {
       return new Response(JSON.stringify({ error: "contact_id required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    if (expectedToken && token !== expectedToken) {
-      console.warn("apollo-phone-webhook invalid token", { contactId });
+    // Fail-closed: reject if the shared secret is not configured or doesn't match.
+    if (!expectedToken || !token || token !== expectedToken) {
+      console.warn("apollo-phone-webhook invalid/missing token", {
+        contactId,
+        secret_configured: !!expectedToken,
+      });
       return new Response(JSON.stringify({ error: "forbidden" }), {
         status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

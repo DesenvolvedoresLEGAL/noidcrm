@@ -91,27 +91,39 @@ serve(async (req) => {
         .eq('id', opportunityPublicForm.organization_id)
         .single();
 
-      // Fetch opportunity data for pre-filling
+      // Fetch opportunity data for pre-filling — SAFE FIELDS ONLY.
+      // Never expose CPF/CNPJ/RG/score_financeiro/risco_financeiro/etc.
       const { data: opportunity } = await supabase
         .from('opportunities')
-        .select('*, account:account_id(*), contact:contact_id(*)')
+        .select(`
+          id,
+          title,
+          pipeline_id,
+          stage_id,
+          status,
+          account:account_id(id, razao_social, nome_fantasia, cidade, uf, tipo_pessoa),
+          contact:contact_id(id, nome, cargo, emails, telefones)
+        `)
         .eq('id', opportunityPublicForm.opportunity_id)
         .single();
 
-      // Extract primary email and phone from contact arrays for pre-filling
-      let enrichedOpportunity = opportunity;
+      // Extract primary email and phone from contact arrays for pre-filling,
+      // then drop the raw arrays so we never leak secondary contacts.
+      let enrichedOpportunity: any = opportunity;
       if (opportunity?.contact) {
         const contact = opportunity.contact as any;
+        const primary_email = extractPrimaryEmail(contact.emails);
+        const primary_phone = extractPrimaryPhone(contact.telefones);
         enrichedOpportunity = {
           ...opportunity,
           contact: {
-            ...contact,
-            primary_email: extractPrimaryEmail(contact.emails),
-            primary_phone: extractPrimaryPhone(contact.telefones),
-          }
+            id: contact.id,
+            nome: contact.nome,
+            cargo: contact.cargo,
+            primary_email,
+            primary_phone,
+          },
         };
-        console.log('Enriched contact with primary_email:', enrichedOpportunity.contact.primary_email);
-        console.log('Enriched contact with primary_phone:', enrichedOpportunity.contact.primary_phone);
       }
 
       return new Response(

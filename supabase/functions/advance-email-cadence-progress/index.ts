@@ -10,9 +10,20 @@ Deno.serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
+  // Internal-only: invoked by ingest-email-delivery-event and other server jobs.
+  const internalSecret = req.headers.get("x-internal-secret");
+  const expectedSecret = Deno.env.get("INTERNAL_WORKFLOW_SECRET");
+  if (!expectedSecret || internalSecret !== expectedSecret) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabase = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+
 
     const { progress_id, event_type, email_message_id, run_id } = await req.json();
 
