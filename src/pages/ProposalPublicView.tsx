@@ -315,20 +315,23 @@ export default function ProposalPublicView() {
       const oneTimeTotal = oneTimeItems.reduce((sum, item) => sum + item.total, 0);
       const dpSnapForPdf: any = (proposal as any)?.dynamic_pricing_snapshot ?? null;
       const oneTimeAmountForPdf = resolveNetApprovedAmount(proposal, oneTimeTotal);
-      const pdfInstallments = oneTimeTerm
-        ? calculateInstallments(oneTimeTerm, oneTimeAmountForPdf, {
-            proposalExpiresAt: (proposal as any)?.expires_at ?? null,
-            approvedAmount:
-              ((proposal as any)?.status === 'accepted' || oneTimeTerm?.discount_percent)
-                ? Number((proposal as any)?.approved_amount ?? oneTimeAmountForPdf)
-                : null,
-            dynamicPricingCurrentEndsAt: dynamicPricingEndForInstallments(
-              proposal,
-              oneTimeTerm,
-              { snapshot: dpSnapForPdf },
-            ),
-          })
-        : [];
+      const frozenPdfInstallments = readFrozenSchedule(proposal);
+      const pdfInstallments = frozenPdfInstallments
+        ? frozenPdfInstallments
+        : oneTimeTerm
+          ? calculateInstallments(oneTimeTerm, oneTimeAmountForPdf, {
+              proposalExpiresAt: (proposal as any)?.expires_at ?? null,
+              approvedAmount:
+                ((proposal as any)?.status === 'accepted' || oneTimeTerm?.discount_percent)
+                  ? Number((proposal as any)?.approved_amount ?? oneTimeAmountForPdf)
+                  : null,
+              dynamicPricingCurrentEndsAt: dynamicPricingEndForInstallments(
+                proposal,
+                oneTimeTerm,
+                { snapshot: dpSnapForPdf },
+              ),
+            })
+          : [];
       
       // Build recurring payment data for PDF
       const recurringPaymentData = recurringTerm ? {
