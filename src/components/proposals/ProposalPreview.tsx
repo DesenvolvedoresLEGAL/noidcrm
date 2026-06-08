@@ -10,6 +10,7 @@ import { ProposalItem } from '@/services/crm/proposal-items';
 import { formatProposalQuantity } from '@/lib/proposals/formatProposalQuantity';
 import { PaymentTerm, calculateInstallments } from '@/services/crm/proposal-payment-terms';
 import { dynamicPricingEndForInstallments } from '@/lib/proposals/resolvePaymentDueDate';
+import { readFrozenSchedule } from '@/lib/proposals/frozenSchedule';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { PublicProposalDynamicPricingBanner } from './PublicProposalDynamicPricingBanner';
@@ -209,12 +210,14 @@ export function ProposalPreview({
   });
 
   // Load dynamic pricing snapshot + ledger snapshot for the preview
+  // Also fetch freeze fields so we can render the frozen cronograma/condition
+  // when the proposal is already approved.
   const { data: dynamicPricing } = useQuery({
     queryKey: ['proposal-dynamic-pricing-preview', proposalId],
     queryFn: async () => {
       const { data } = await supabase
         .from('proposals')
-        .select('dynamic_pricing_enabled, dynamic_pricing_snapshot, pricing_breakdown_snapshot, pricing_effective_amount, pricing_base_amount, pricing_manual_discount_amount, pricing_manual_discount_percent')
+        .select('status, accepted_at, approved_amount, approved_payment_schedule, approval_snapshot, dynamic_pricing_enabled, dynamic_pricing_snapshot, pricing_breakdown_snapshot, pricing_effective_amount, pricing_base_amount, pricing_manual_discount_amount, pricing_manual_discount_percent')
         .eq('id', proposalId!)
         .maybeSingle();
       return data;
@@ -450,7 +453,12 @@ export function ProposalPreview({
                     (() => {
                       const dpSnap: any = (dynamicPricing as any)?.dynamic_pricing_snapshot ?? null;
                       const dpEnabled = !!(dynamicPricing as any)?.dynamic_pricing_enabled;
-                      const schedule = calculateInstallments(term, effectiveOneTimeBase, {
+                      // FREEZE-ON-APPROVAL: se a proposta já foi aprovada, renderiza
+                      // o cronograma congelado em approved_payment_schedule. Nunca
+                      // recalcular — edições posteriores não podem mudar o que o
+                      // cliente aprovou.
+                      const frozen = readFrozenSchedule(dynamicPricing as any);
+                      const schedule = frozen ?? calculateInstallments(term, effectiveOneTimeBase, {
                         dynamicPricingCurrentEndsAt: dynamicPricingEndForInstallments(
                           { ...(dynamicPricing as any), dynamic_pricing_enabled: dpEnabled, dynamic_pricing_snapshot: dpSnap },
                           term,
@@ -487,7 +495,7 @@ export function ProposalPreview({
                               </div>
                             ))}
                           </div>
-                          {term.discount_percent > 0 && (
+                          {!frozen && term.discount_percent > 0 && (
                             <div className="text-xs text-muted-foreground">
                               Desconto aplicado: {term.discount_percent}%
                             </div>
