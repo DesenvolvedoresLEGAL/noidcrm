@@ -2,6 +2,7 @@
 // Resilient endpoint strategy: try multiple Apollo endpoints, gracefully fall back when
 // the API key does not have access to a given endpoint (403 API_INACCESSIBLE).
 import { createClient } from "npm:@supabase/supabase-js@2.45.0";
+import { isBlockedDomain, normalizeHostname } from "../_shared/domain-blocklist.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -273,6 +274,12 @@ Deno.serve(async (req: Request) => {
 
     const domain = pickDomain(prospect as Prospect);
     if (!domain) return await skip("no_domain", "no domain available");
+    if (isBlockedDomain(domain)) {
+      return await skip(
+        "blocked_domain",
+        `domain ${domain} is an aggregator/social/directory and must not be used for Apollo enrichment. Set the real company domain first.`,
+      );
+    }
 
     // 5. Create running job
     const { data: jobRow } = await sb.from("enrichment_jobs").insert({
@@ -399,8 +406,37 @@ Deno.serve(async (req: Request) => {
       }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // 7. Process contacts — accept everything, but score by relevance
-    const filtered = people.filter((p) => isRelevantTitle(p.title, titlesToUse) || p.email || p.linkedin_url);
+    // 7. Process contacts — accept everything, but score by relevance.
+    // SANITY CHECK: discard people whose Apollo organization domain does not
+    // match the prospect's domain (root cause of the JusBrasil/Luisa bug —
+    // wrong prospect domain returned employees of the aggregator itself).
+    const prospectDomain = normalizeHostname(domain) ?? domain;
+    let domainMismatchFiltered = 0;
+    const matched = people.filter((p) => {
+      const orgDomain =
+        normalizeHostname(p?.organization?.primary_domain) ??
+        normalizeHostname(p?.organization?.website_url) ??
+        normalizeHostname(p?.organization?.domain) ??
+        normalizeHostname(p?.account?.primary_domain) ??
+        normalizeHostname(p?.account?.website_url) ??
+        null;
+      if (!orgDomain) return true; // Apollo did not return org info — keep
+      const ok = orgDomain === prospectDomain ||
+        orgDomain.endsWith(`.${prospectDomain}`) ||
+        prospectDomain.endsWith(`.${orgDomain}`);
+      if (!ok) domainMismatchFiltered += 1;
+      return ok;
+    });
+    if (domainMismatchFiltered > 0) {
+      attempts.push({
+        endpoint: "domain_mismatch_filter",
+        status: 200, ok: true, inaccessible: false,
+        count: domainMismatchFiltered,
+        error: `Discarded ${domainMismatchFiltered} contact(s) whose Apollo org domain != ${prospectDomain}`,
+      });
+    }
+
+    const filtered = matched.filter((p) => isRelevantTitle(p.title, titlesToUse) || p.email || p.linkedin_url);
 
     let decisionMakers = 0;
     let emailsFound = 0;
@@ -415,7 +451,10 @@ Deno.serve(async (req: Request) => {
       const isDM = seniority === "c_level" || seniority === "vp" || seniority === "director";
       if (isDM) decisionMakers += 1;
       if (person.email) emailsFound += 1;
-      const phone = person.phone_numbers?.[0]?.sanitized_number ?? person.sanitized_phone ?? person.organization?.phone ?? person.account?.phone ?? null;
+      // IMPORTANT: never fall back to organization.phone / account.phone — that
+      // is the COMPANY phone, not the person's. Mixing the two produced false
+      // positives like Luisa carrying the JusBrasil switchboard number.
+      const phone = person.phone_numbers?.[0]?.sanitized_number ?? person.sanitized_phone ?? null;
       if (phone) phonesFound += 1;
       const rank = SENIORITY_RANK[seniority ?? "ic"] ?? 0;
       if (rank > topSeniorityRank) { topSeniorityRank = rank; topSeniority = seniority; }
