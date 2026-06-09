@@ -17,25 +17,14 @@ const RAW_CNPJ_REGEX = /\b\d{14}\b/g;
 const EMAIL_REGEX = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
 const PHONE_REGEX = /(?:\+?55\s?)?\(?\d{2}\)?[\s.-]?\d{4,5}[\s.-]?\d{4}/g;
 
-const BLOCKED_DOMAINS = [
-  "linkedin.com", "facebook.com", "instagram.com", "twitter.com", "x.com",
-  "youtube.com", "glassdoor.com", "reclameaqui.com.br", "wikipedia.org",
-  "indeed.com", "vagas.com.br", "catho.com.br", "google.com", "bing.com",
-  "yelp.com", "trustpilot.com", "g.co", "maps.google.com",
-];
+import { BLOCKED_DOMAINS, isBlockedDomain, normalizeHostname } from "../_shared/domain-blocklist.ts";
 
 function normalizeDomain(url: string): string | null {
-  try {
-    const u = new URL(url.startsWith("http") ? url : `https://${url}`);
-    return u.hostname.replace(/^www\./, "").toLowerCase();
-  } catch {
-    return null;
-  }
+  return normalizeHostname(url);
 }
 
-function isBlockedDomain(domain: string): boolean {
-  return BLOCKED_DOMAINS.some((b) => domain === b || domain.endsWith(`.${b}`));
-}
+// Re-export for any local readers that previously imported from this module.
+export { BLOCKED_DOMAINS, isBlockedDomain };
 
 function formatCnpj(raw: string): string {
   const digits = raw.replace(/\D/g, "");
