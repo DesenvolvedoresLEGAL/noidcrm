@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.76.0";
+import { sanitizeProspectDomain } from "../_shared/domain-blocklist.ts";
+
 
 
 const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY') ?? Deno.env.get('LOVABLE_API_KEY');
@@ -886,13 +888,13 @@ async function handleManualImport(
         source_id: source?.id || null,
         company_name: companyName,
         normalized_company_name: normalizedName,
-        website,
-        normalized_domain: domain,
+        website: sanitizeProspectDomain(domain) ? website : null,
+        normalized_domain: sanitizeProspectDomain(domain),
         status: "review_pending",
         confidence: score.confidence,
         source_label: "Lista Importada",
-        review_needed: grade === "C" || grade === "D" || dedupe.review_needed,
-        recommended_next_action: recommended,
+        review_needed: !sanitizeProspectDomain(domain) || grade === "C" || grade === "D" || dedupe.review_needed,
+        recommended_next_action: !sanitizeProspectDomain(domain) ? "verify_domain" : recommended,
         raw_data: { original_line: line },
         matched_account_id: dedupe.matched_account_id,
         dedupe_status: dedupe.dedupe_status,
@@ -2835,8 +2837,8 @@ ${chunk}`,
       source_id: source?.id || null,
       company_name: candidate.companyName,
       normalized_company_name: candidate.normalizedName,
-      website: candidate.website,
-      normalized_domain: candidate.domain,
+      website: sanitizeProspectDomain(candidate.domain) ? candidate.website : null,
+      normalized_domain: sanitizeProspectDomain(candidate.domain),
       industry: candidate.industry,
       country: candidate.country,
       city: candidate.city,
@@ -3167,8 +3169,8 @@ async function saveProspectsFromExtraction(
       source_id: sourceId,
       company_name: name,
       normalized_company_name: normalizedName,
-      website,
-      normalized_domain: domain,
+      website: sanitizeProspectDomain(domain) ? website : null,
+      normalized_domain: sanitizeProspectDomain(domain),
       industry: c.industry || null,
       city: c.city || null,
       state: c.state || null,
@@ -3181,7 +3183,7 @@ async function saveProspectsFromExtraction(
       matched_account_id: dedupe.matched_account_id,
       dedupe_status: dedupe.dedupe_status,
       duplicate_candidate: dedupe.duplicate_candidate,
-      review_needed: dedupe.review_needed,
+      review_needed: !sanitizeProspectDomain(domain) || dedupe.review_needed,
       approval_status: "pending",
     }).select().single();
 
