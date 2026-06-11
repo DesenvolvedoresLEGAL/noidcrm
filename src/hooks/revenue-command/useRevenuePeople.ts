@@ -1,14 +1,28 @@
 /**
  * Sprint REVOPS V3.4 — Hook agregador da aba "Pessoas" do Revenue Command Center.
  *
- * Consome SOMENTE fontes oficiais já existentes:
- *  - useRevenueBySeller / useClosedRevenueSummary (commercial_won_revenue_view SSoT)
- *  - useQualificationQualityV2 (Qualidade de Qualificação SDR)
- *  - useReportCloserV2 (Performance Closer V2)
- *  - useReportSDRV2 (Performance SDR V2)
+ * SPRINT RCC V3.4E — Reconciliação definitiva de fontes.
+ *
+ * Mapa oficial de fontes (não recalcular do zero — reutilizar):
+ *
+ *   Métrica                 | Fonte oficial                                | Hook usado
+ *   ────────────────────────|──────────────────────────────────────────────|─────────────────────────────
+ *   Receita válida (total)  | commercial_won_revenue_view (SSoT)           | useClosedRevenueSummary
+ *   Receita por vendedor    | commercial_won_revenue_view (SSoT)           | useRevenueBySeller  ← PRIMÁRIA p/ Closer revenue/won/ticket
+ *   Ganhos (Closer)         | bySeller.count (SSoT) | CloserV2.wonCount    | useRevenueBySeller > useReportCloserV2
+ *   Perdidos (Closer)       | report_closer_v2.lost_count                  | useReportCloserV2
+ *   Win Rate (Closer)       | CloserV2.win_rate_pct, ou won/(won+lost)     | useReportCloserV2 (fallback derivado)
+ *   Ticket médio (Closer)   | receita válida / ganhos                      | derivado (bySeller)
+ *   Pipeline ativo (Closer) | report_closer_v2.active_pipeline_value       | useReportCloserV2
+ *   Ciclo médio (Closer)    | report_closer_v2.avg_sales_cycle_days        | useReportCloserV2
+ *   SQLs (SDR)              | qualification_quality_v2 > SDR V2 > OTE leads| useQualificationQualityV2
+ *   c/ Proposta (SDR)       | qualification_quality_v2.with_proposal_count | useQualificationQualityV2
+ *   SQL → Proposta (SDR)    | qualification_quality_v2.sql_to_proposal_rate| useQualificationQualityV2 (mesma lógica do Gargalos)
+ *   SQL → Venda (SDR)       | qualification_quality_v2 > handoff.wonCount  | useQualificationQualityV2 > useReportHandoffV2
+ *   Receita atribuída (SDR) | qualification_quality_v2 > handoff.wonRevenue| useQualificationQualityV2 > useReportHandoffV2 > SDR V2
  *
  * Não cria nem altera qualquer view, edge function ou regra financeira.
- * Camada puramente de leitura — apenas síntese executiva.
+ * N/D só aparece quando NENHUMA fonte oficial retornou o dado para o usuário no período.
  */
 import { useMemo } from 'react';
 import { format, startOfMonth } from 'date-fns';
@@ -22,11 +36,13 @@ import {
 import { useQualificationQualityV2 } from '@/hooks/reports/useQualificationQualityV2';
 import { useReportCloserV2 } from '@/hooks/useReportCloserV2';
 import { useReportSDRV2 } from '@/hooks/useReportSDRV2';
+import { useReportHandoffV2 } from '@/hooks/useReportHandoffV2';
 import { useOTEMonthlyResults, type OTEMonthlyResult } from '@/hooks/useOTEData';
 import { useActiveUsers } from '@/hooks/users/useActiveUsers';
 import { buildReportV2RequestFromFilters } from '@/lib/reports/buildReportV2Request';
 import { mapCloserV2 } from '@/lib/reports/mappers/mapCloserV2';
 import { mapSdrV2 } from '@/lib/reports/mappers/mapSdrV2';
+import { mapHandoffV2 } from '@/lib/reports/mappers/mapHandoffV2';
 
 export type PeopleClassification =
   | 'high'
@@ -256,6 +272,13 @@ export function useRevenuePeople() {
     request: closerRequest,
   });
 
+  // Handoff V2 — SDR→Closer (won/lost/wonRevenue) para derivar SQL→Venda e
+  // receita atribuída ao SDR quando Qualidade de Qualificação não retornou linhas.
+  const handoffReport = useReportHandoffV2({
+    organizationId: orgId,
+    request: closerRequest,
+  });
+
   // 4) Qualidade de qualificação — SDR volume vs qualidade
   const qualification = useQualificationQualityV2({
     proposalStatus: 'any',
@@ -277,6 +300,7 @@ export function useRevenuePeople() {
       bySeller.isLoading ||
       closerReport.isLoading ||
       sdrReport.isLoading ||
+      handoffReport.isLoading ||
       qualification.isLoading ||
       oteResultsQuery.isLoading ||
       activeUsersQuery.isLoading ||
@@ -287,6 +311,7 @@ export function useRevenuePeople() {
     if (bySeller.error) partialSources.push('Receita por vendedor');
     if (closerReport.error) partialSources.push('Performance Closer');
     if (sdrReport.error) partialSources.push('Performance SDR');
+    if (handoffReport.error) partialSources.push('Handoff SDR→Closer');
     if (qualification.error) partialSources.push('Qualidade de Qualificação');
     if (oteResultsQuery.error) partialSources.push('OTE / Resultados');
 
@@ -522,6 +547,89 @@ export function useRevenuePeople() {
     const sdrFull: SdrFull[] = Array.from(sdrMap.values());
     const closerFull: CloserFull[] = Array.from(closerMap.values());
 
+    // ── V3.4E · Normalização Closer: bySeller (SSoT) é PRIMÁRIA para
+    //    revenue/won/ticket. CloserV2 mantém lost/winRate/pipeline/ciclo.
+    const sellerById = new Map(sellerRows.map((s) => [s.key, s]));
+    closerFull.forEach((r) => {
+      const s = sellerById.get(r.userId);
+      if (s) {
+        // SSoT sempre vence em receita e ganhos quando disponível.
+        if (s.total > 0) r.revenue = s.total;
+        if (s.count > 0) r.won = s.count;
+      }
+      // Ticket médio = receita válida / ganhos (regra explícita do briefing).
+      if (r.revenue !== null && r.revenue > 0 && r.won !== null && r.won > 0) {
+        r.avgTicket = r.revenue / r.won;
+      }
+      // Win Rate derivado quando há won + lost suficientes e CloserV2 não trouxe.
+      if (
+        r.winRatePct === null &&
+        r.won !== null &&
+        r.lost !== null &&
+        r.won + r.lost >= 3
+      ) {
+        const p = r.won + r.lost;
+        r.winRatePct = p > 0 ? (r.won / p) * 100 : null;
+      }
+      const cls = classifyCloser(r);
+      r.classification = cls.c;
+      r.classificationLabel = cls.label;
+    });
+
+    // ── V3.4E · Handoff por SDR (won/lost/wonRevenue agregados).
+    //    Usado para preencher SQL→Venda e receita atribuída quando Qualidade
+    //    de Qualificação não retornou linhas para o SDR.
+    const handoffView = mapHandoffV2(handoffReport.data);
+    interface HandoffAggBySdr {
+      name: string;
+      won: number;
+      lost: number;
+      revenue: number;
+    }
+    const handoffBySdr = new Map<string, HandoffAggBySdr>();
+    handoffView.rows.forEach((h) => {
+      if (!isActiveEligibleUser(h.sdrUserId)) return;
+      const cur =
+        handoffBySdr.get(h.sdrUserId) ??
+        ({ name: h.sdrName, won: 0, lost: 0, revenue: 0 } as HandoffAggBySdr);
+      cur.won += h.wonCount;
+      cur.lost += h.lostCount;
+      cur.revenue += h.wonRevenue;
+      handoffBySdr.set(h.sdrUserId, cur);
+    });
+
+    sdrFull.forEach((r) => {
+      const h = handoffBySdr.get(r.userId);
+      if (!h) return;
+      if ((r.revenue === null || r.revenue === 0) && h.revenue > 0) {
+        r.revenue = h.revenue;
+      }
+      const q = num(r.qualified);
+      if (r.sqlToWonPct === null && q > 0 && h.won > 0) {
+        r.sqlToWonPct = (h.won / q) * 100;
+      }
+      const cls = classifySdr(r);
+      r.classification = cls.c;
+      r.classificationLabel = cls.label;
+    });
+
+    // SDRs que existem em Handoff mas nenhuma outra fonte retornou — inclui.
+    handoffBySdr.forEach((h, sdrId) => {
+      if (sdrFull.some((r) => r.userId === sdrId)) return;
+      const base = {
+        userId: sdrId,
+        name: h.name,
+        qualified: null,
+        withProposal: null,
+        withoutProposal: null,
+        sqlToProposalPct: null,
+        sqlToWonPct: null,
+        revenue: h.revenue > 0 ? h.revenue : null,
+      };
+      const cls = classifySdr(base);
+      sdrFull.push({ ...base, classification: cls.c, classificationLabel: cls.label });
+    });
+
     const sdrSnapshot: PeopleSdrSnapshotRow[] = [...sdrFull]
       .sort((a, b) => num(b.qualified) - num(a.qualified))
       .slice(0, 5);
@@ -581,30 +689,47 @@ export function useRevenuePeople() {
 
     if (typeof window !== 'undefined' && (window as any).__DEV_RCC_PEOPLE__) {
       // eslint-disable-next-line no-console
-      console.debug('[RCC V3.4D] Pessoas', {
+      console.debug('[RCC V3.4E] Pessoas — reconciliação de fontes', {
         period: { start, end, periodMonth },
         activeUsers: activeUserIds.size,
-        sellerRows: sellerRows.length,
-        closerSourceRows: closerRowsAll.length,
-        sdrSourceRows: sdrSourceRows.length,
-        qualRowsAll: qualRowsAll.length,
-        oteRows: oteRows.length,
-        sdrFull: sdrFull.length,
-        closerFull: closerFull.length,
-        winsByCloser: closerFull
-          .filter((r) => r.won !== null)
-          .map((r) => ({ name: r.name, won: r.won, revenue: r.revenue })),
-        lossesByCloser: closerFull
-          .filter((r) => r.lost !== null)
-          .map((r) => ({ name: r.name, lost: r.lost })),
-        pipelineByCloser: closerFull
-          .filter((r) => r.activePipeline !== null)
-          .map((r) => ({ name: r.name, pipeline: r.activePipeline })),
+        sourceCounts: {
+          bySeller: sellerRows.length,
+          closerV2: closerRowsAll.length,
+          sdrV2: sdrSourceRows.length,
+          qualificationQuality: qualRowsAll.length,
+          handoffV2: handoffView.rows.length,
+          ote: oteRows.length,
+        },
+        closerByUser: closerFull.map((r) => ({
+          name: r.name,
+          revenue: r.revenue,
+          won: r.won,
+          lost: r.lost,
+          winRatePct: r.winRatePct,
+          avgTicket: r.avgTicket,
+          activePipeline: r.activePipeline,
+          avgCycleDays: r.avgCycleDays,
+          fromBySeller: sellerById.has(r.userId),
+          fromCloserV2: closerRowsAll.some((c) => c.closerUserId === r.userId),
+        })),
+        sdrByUser: sdrFull.map((r) => ({
+          name: r.name,
+          qualified: r.qualified,
+          withProposal: r.withProposal,
+          sqlToProposalPct: r.sqlToProposalPct,
+          sqlToWonPct: r.sqlToWonPct,
+          revenue: r.revenue,
+          fromQuality: qualRowsAll.some((q) => q.sdr_user_id === r.userId),
+          fromSdrV2: sdrSourceRows.some((s) => s.sdrUserId === r.userId),
+          fromHandoff: handoffBySdr.has(r.userId),
+          fromOte: oteRows.some((o) => o.userId === r.userId && o.role === 'SDR'),
+        })),
         partialSources,
         errors: {
           qualification: qualification.error?.message ?? null,
           closer: closerReport.error?.message ?? null,
           sdr: sdrReport.error?.message ?? null,
+          handoff: handoffReport.error?.message ?? null,
           ote: oteResultsQuery.error?.message ?? null,
           bySeller: bySeller.error?.message ?? null,
         },
@@ -816,9 +941,11 @@ export function useRevenuePeople() {
 
     const sources = [
       'Resultados/Auditoria',
-      'Receita por vendedor',
-      'Performance Closer',
-      'Qualidade de Qualificação',
+      'Receita por vendedor (SSoT)',
+      'Performance Closer V2',
+      'Performance SDR V2',
+      'Handoff SDR→Closer V2',
+      'Qualidade de Qualificação V2',
       'OTE / Resultados',
     ];
 
@@ -865,6 +992,9 @@ export function useRevenuePeople() {
     sdrReport.data,
     sdrReport.isLoading,
     sdrReport.error,
+    handoffReport.data,
+    handoffReport.isLoading,
+    handoffReport.error,
     qualification.data,
     qualification.isLoading,
     qualification.error,
