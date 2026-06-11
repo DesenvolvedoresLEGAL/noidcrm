@@ -224,10 +224,12 @@ export default function RevenueCommandPage() {
 
   return (
     <Layout>
-      <PageContainer>
-        <RevenueCommandHeader />
-        <RevenueCommandTabs tabs={tabs} value={activeTab} onValueChange={setActiveTab} />
-      </PageContainer>
+      <ReportFiltersProvider>
+        <PageContainer>
+          <RevenueCommandHeader />
+          <RevenueCommandTabs tabs={tabs} value={activeTab} onValueChange={setActiveTab} />
+        </PageContainer>
+      </ReportFiltersProvider>
     </Layout>
   );
 }
