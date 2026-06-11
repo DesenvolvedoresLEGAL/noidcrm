@@ -259,86 +259,103 @@ export function useRevenuePeople() {
       .filter((s) => s.total > 0 && s.key && s.key !== '—')
       .sort((a, b) => b.total - a.total);
 
-    const closerRows = mapCloserV2(closerReport.data).filter(
-      (r) => r.closerName && r.closerName !== 'Sem nome',
+    const closerRowsRaw = mapCloserV2(closerReport.data);
+    const closerRowsAll = closerRowsRaw.filter(
+      (r) =>
+        r.closerUserId &&
+        r.closerName &&
+        r.closerName !== 'Sem nome' &&
+        r.closerName !== 'Desconhecido',
     );
 
     const sdrView = mapSdrV2(sdrReport.data);
-    const sdrSourceRows = sdrView.rows.filter((r) => r.sdrName && r.sdrName !== 'Sem nome');
-    const qualRows = (qualification.data?.rows ?? []).filter((r) => r.sdr_user_id);
+    const sdrSourceRows = sdrView.rows.filter(
+      (r) => r.sdrUserId && r.sdrName && r.sdrName !== 'Sem nome' && r.sdrName !== 'Desconhecido',
+    );
 
-    // ── SDR snapshot — preferir Qualidade de Qualificação (mais rica),
-    //    fallback para useReportSDRV2.
-    const sdrSnapshot: PeopleSdrSnapshotRow[] = (qualRows.length
-      ? qualRows.map((r) => ({
-          userId: r.sdr_user_id as string,
-          name: r.sdr_is_deleted ? `${r.sdr_name} (removido)` : r.sdr_name,
-          qualified: r.qualified_count,
-          withProposal: r.with_proposal_count,
-          withoutProposal: r.without_proposal_count,
-          sqlToProposalPct: r.sql_to_proposal_rate,
-          sqlToWonPct: r.sql_to_won_rate,
-          revenue: r.valid_revenue_amount,
-        }))
-      : sdrSourceRows.map((r) => ({
-          userId: r.sdrUserId,
-          name: r.sdrName,
-          qualified: r.sqlsGenerated,
-          withProposal: 0,
-          withoutProposal: r.sqlsGenerated,
-          sqlToProposalPct: 0,
-          sqlToWonPct: r.winRatePct ?? 0,
-          revenue: r.revenueAttributed,
-        }))
-    )
-      .map((r) => {
-        const cls = classifySdr(r);
-        return { ...r, classification: cls.c, classificationLabel: cls.label };
-      })
+    // Qualidade — preferida; fallback para useReportSDRV2 quando vazia/falha.
+    const qualRowsAll = (qualification.data?.rows ?? []).filter(
+      (r) => r.sdr_user_id && r.sdr_name && r.sdr_name !== 'Sem nome',
+    );
+
+    type SdrFull = PeopleSdrSnapshotRow;
+    const sdrFromQual: SdrFull[] = qualRowsAll.map((r) => {
+      const base = {
+        userId: r.sdr_user_id as string,
+        name: r.sdr_is_deleted ? `${r.sdr_name} (removido)` : r.sdr_name,
+        qualified: r.qualified_count,
+        withProposal: r.with_proposal_count,
+        withoutProposal: r.without_proposal_count,
+        sqlToProposalPct: r.sql_to_proposal_rate,
+        sqlToWonPct: r.sql_to_won_rate,
+        revenue: r.valid_revenue_amount,
+      };
+      const cls = classifySdr(base);
+      return { ...base, classification: cls.c, classificationLabel: cls.label };
+    });
+    const sdrFromV2: SdrFull[] = sdrSourceRows.map((r) => {
+      const base = {
+        userId: r.sdrUserId,
+        name: r.sdrName,
+        qualified: r.sqlsGenerated,
+        withProposal: 0,
+        withoutProposal: r.sqlsGenerated,
+        sqlToProposalPct: 0,
+        sqlToWonPct: r.winRatePct ?? 0,
+        revenue: r.revenueAttributed,
+      };
+      const cls = classifySdr(base);
+      return { ...base, classification: cls.c, classificationLabel: cls.label };
+    });
+    const sdrFull: SdrFull[] = sdrFromQual.length ? sdrFromQual : sdrFromV2;
+    const sdrSnapshot: PeopleSdrSnapshotRow[] = [...sdrFull]
       .sort((a, b) => b.qualified - a.qualified)
       .slice(0, 5);
 
-    // ── Closer snapshot
-    const closerSnapshot: PeopleCloserSnapshotRow[] = closerRows
-      .map((r) => {
-        const base = {
-          userId: r.closerUserId,
-          name: r.closerName ?? 'Sem responsável',
-          revenue: r.wonRevenue,
-          won: r.wonCount,
-          lost: r.lostCount,
-          winRatePct: r.winRatePct,
-          avgTicket: r.avgWonTicket,
-          activePipeline: r.activePipelineValue,
-          avgCycleDays: r.avgSalesCycleDays,
-        };
-        const cls = classifyCloser(base);
-        return { ...base, classification: cls.c, classificationLabel: cls.label };
-      })
-      .sort((a, b) => b.revenue - a.revenue)
+    // ── Closer full + snapshot
+    type CloserFull = PeopleCloserSnapshotRow;
+    const closerFull: CloserFull[] = closerRowsAll.map((r) => {
+      const base = {
+        userId: r.closerUserId,
+        name: r.closerName ?? 'Sem responsável',
+        revenue: r.wonRevenue,
+        won: r.wonCount,
+        lost: r.lostCount,
+        winRatePct: r.winRatePct,
+        avgTicket: r.avgWonTicket,
+        activePipeline: r.activePipelineValue,
+        avgCycleDays: r.avgSalesCycleDays,
+      };
+      const cls = classifyCloser(base);
+      return { ...base, classification: cls.c, classificationLabel: cls.label };
+    });
+    const closerSnapshot: PeopleCloserSnapshotRow[] = [...closerFull]
+      .sort((a, b) => b.revenue - a.revenue || b.won - a.won)
       .slice(0, 5);
 
-    // ── Scoreboard
+    // ── Scoreboard (derivado das listas COMPLETAS, não do top-5)
     const totalRevenue = closedSummary.data?.validTotal ?? 0;
     const top1 = sellerRows[0] ?? null;
     const top3Sum = sellerRows.slice(0, 3).reduce((s, r) => s + r.total, 0);
     const top1Pct = totalRevenue > 0 && top1 ? (top1.total / totalRevenue) * 100 : null;
     const top3Pct = totalRevenue > 0 ? (top3Sum / totalRevenue) * 100 : null;
 
-    const bestConverterRow = [...closerSnapshot]
+    const bestConverterRow = [...closerFull]
       .filter((r) => r.winRatePct !== null && r.won + r.lost >= 3)
       .sort((a, b) => (b.winRatePct ?? 0) - (a.winRatePct ?? 0))[0];
-    const topSqlVolumeRow = [...sdrSnapshot].sort((a, b) => b.qualified - a.qualified)[0];
-    const worstQualityRow = [...sdrSnapshot]
-      .filter((r) => r.qualified >= 10)
+    const topSqlVolumeRow = [...sdrFull].sort((a, b) => b.qualified - a.qualified)[0];
+    const worstQualityRow = [...sdrFull]
+      .filter((r) => r.qualified >= 5)
       .sort((a, b) => a.sqlToProposalPct - b.sqlToProposalPct)[0];
 
-    const activePeople =
-      new Set<string>([
-        ...sellerRows.map((s) => s.key),
-        ...closerSnapshot.map((r) => r.userId),
-        ...sdrSnapshot.map((r) => r.userId),
-      ]).size;
+    // Pessoas Ativas — qualquer sinal comercial no período (não só receita).
+    const activePeople = new Set<string>([
+      ...sellerRows.map((s) => s.key),
+      ...closerFull
+        .filter((r) => r.won + r.lost + (r.activePipeline > 0 ? 1 : 0) > 0)
+        .map((r) => r.userId),
+      ...sdrFull.filter((r) => r.qualified > 0).map((r) => r.userId),
+    ]).size;
 
     const scoreboard: PeopleScoreboard = {
       activePeople,
@@ -354,6 +371,20 @@ export function useRevenuePeople() {
         : null,
       concentrationTop1Pct: top1Pct,
     };
+
+    if (typeof window !== 'undefined' && (window as any).__DEV_RCC_PEOPLE__) {
+      // eslint-disable-next-line no-console
+      console.debug('[RCC V3.4A] Pessoas', {
+        period: { start, end },
+        sellerRows: sellerRows.length,
+        closerFull: closerFull.length,
+        sdrFromQual: sdrFromQual.length,
+        sdrFromV2: sdrFromV2.length,
+        qualificationError: !!qualification.error,
+        closerError: !!closerReport.error,
+        sdrError: !!sdrReport.error,
+      });
+    }
 
     // ── Top performers (até 5)
     const topPerformers: PeopleTopPerformer[] = [];
