@@ -53,12 +53,17 @@ export default function KairosHub() {
         />
 
         <Tabs value={activeTab} onValueChange={handleTabChange}>
-          <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 max-w-2xl">
+          <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 max-w-3xl">
+            <TabsTrigger value="icp">🎯 ICP Intelligence</TabsTrigger>
             <TabsTrigger value="sourcing">🧭 Sourcing</TabsTrigger>
             <TabsTrigger value="optimization">⚡ Optimization</TabsTrigger>
             <TabsTrigger value="experiments">🧪 Experiments</TabsTrigger>
             <TabsTrigger value="performance">📊 Performance</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="icp" className="space-y-4 md:space-y-6 mt-4">
+            <IcpIntelligencePanel />
+          </TabsContent>
 
           <TabsContent value="sourcing" className="space-y-4 md:space-y-6 mt-4">
             <LeadSourcingEngine />
