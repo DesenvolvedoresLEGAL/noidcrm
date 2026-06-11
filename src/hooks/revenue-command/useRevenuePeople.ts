@@ -494,11 +494,11 @@ export function useRevenuePeople() {
           userId: r.user_id,
           name,
           qualified: realized,
-          withProposal: 0,
-          withoutProposal: realized,
-          sqlToProposalPct: 0,
-          sqlToWonPct: 0,
-          revenue: 0,
+          withProposal: null,
+          withoutProposal: null,
+          sqlToProposalPct: null,
+          sqlToWonPct: null,
+          revenue: null,
         };
         const cls = classifySdr(base);
         upsertSdr({ ...base, classification: cls.c, classificationLabel: cls.label });
@@ -506,12 +506,12 @@ export function useRevenuePeople() {
         const base = {
           userId: r.user_id,
           name,
-          revenue: realized,
-          won: 0,
-          lost: 0,
+          revenue: realized > 0 ? realized : null,
+          won: null,
+          lost: null,
           winRatePct: null as number | null,
-          avgTicket: 0,
-          activePipeline: 0,
+          avgTicket: null,
+          activePipeline: null,
           avgCycleDays: null as number | null,
         };
         const cls = classifyCloser(base);
