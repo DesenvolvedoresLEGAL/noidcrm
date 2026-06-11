@@ -107,7 +107,7 @@ export function useRevenueBottlenecks() {
   });
 
   // 2) Forecast pipeline (necessário para Win/Loss e Forecast)
-  const { salesPipelineId, salesPipelineStatus } = useForecastSalesPipeline({
+  const { salesPipelineId, salesPipelineName, salesPipelineStatus } = useForecastSalesPipeline({
     organizationId: orgId,
   });
   const pipelineResolved = salesPipelineStatus === 'resolved' && !!salesPipelineId;
