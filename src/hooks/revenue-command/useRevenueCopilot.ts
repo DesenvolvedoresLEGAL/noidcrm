@@ -540,10 +540,10 @@ export function useRevenueCopilot() {
             tone: a.priority === 'critical' || a.priority === 'high' ? 'bad' : 'neutral',
           })
         );
-        impact = na.summary?.totalImpact ? fmtBRL(na.summary.totalImpact) : null;
+        impact = na.summary?.estimatedImpact ? fmtBRL(na.summary.estimatedImpact) : null;
         nextAction = top.title;
         addLink('Abrir Próximas Ações', '/app/revenue-command?tab=proximas-acoes');
-        if (top.cta?.to) addLink(top.cta.label ?? 'Abrir', top.cta.to);
+        if (top.primaryCta?.href) addLink(top.primaryCta.label ?? 'Abrir', top.primaryCta.href);
         break;
       }
       default: {
