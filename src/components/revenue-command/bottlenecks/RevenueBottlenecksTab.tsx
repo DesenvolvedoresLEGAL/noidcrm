@@ -21,12 +21,41 @@ export function RevenueBottlenecksTab() {
 
   return (
     <div className="space-y-6">
-      <header className="space-y-1">
-        <h2 className="text-lg font-semibold">Gargalos</h2>
-        <p className="text-sm text-muted-foreground">
-          Onde o funil trava, onde oportunidades morrem e onde a receita vaza.
-        </p>
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div className="space-y-1">
+          <h2 className="text-lg font-semibold">Gargalos</h2>
+          <p className="text-sm text-muted-foreground">
+            Onde o funil trava, onde oportunidades morrem e onde a receita vaza.
+          </p>
+        </div>
+        {data?.scope && (
+          <span
+            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/40 px-2.5 py-1 text-[11px] font-medium text-muted-foreground"
+            title={
+              data.scope.resolved
+                ? `Pipeline: ${data.scope.pipelineName ?? '—'}`
+                : 'Pipeline comercial não configurado'
+            }
+          >
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            Escopo: {data.scope.label}
+            {data.scope.pipelineName && (
+              <span className="text-muted-foreground/70">· {data.scope.pipelineName}</span>
+            )}
+          </span>
+        )}
       </header>
+
+      {data && !data.scope.resolved && (
+        <Alert variant="default" className="border-amber-500/40 bg-amber-500/5">
+          <AlertCircle className="h-4 w-4 text-amber-600" />
+          <AlertTitle className="text-sm">Pipeline comercial não configurado</AlertTitle>
+          <AlertDescription className="text-xs">
+            Defina o pipeline oficial de Vendas em Configurações &gt; Forecast para que o
+            Revenue Command Center calcule receita em risco apenas no escopo comercial.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {data?.meta.partial && (
         <Alert variant="default" className="border-amber-500/40 bg-amber-500/5">
