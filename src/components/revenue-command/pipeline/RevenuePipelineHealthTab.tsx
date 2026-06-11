@@ -55,6 +55,7 @@ const TRUST_COLOR: Record<string, string> = {
   Confiável: 'text-emerald-500',
   Atenção: 'text-amber-500',
   Crítico: 'text-red-500',
+  'Sem dados ativos': 'text-muted-foreground',
 };
 
 const STAGE_COLOR = {
@@ -136,14 +137,24 @@ export function RevenuePipelineHealthTab() {
       {/* Bloco 3 — Problemas críticos */}
       <RevenueSectionCard
         title="Problemas críticos"
-        description="Clique em um card para ver as oportunidades afetadas."
+        description={
+          data?.isEmpty
+            ? 'Sem oportunidades abertas para auditar.'
+            : 'Clique em um card para ver as oportunidades afetadas.'
+        }
         icon={ShieldAlert}
       >
-        <CriticalIssuesGrid
-          issues={data?.issues ?? []}
-          loading={isLoading}
-          onPick={setSelected}
-        />
+        {data?.isEmpty ? (
+          <p className="py-6 text-center text-sm text-muted-foreground">
+            Sem oportunidades abertas para auditar.
+          </p>
+        ) : (
+          <CriticalIssuesGrid
+            issues={data?.issues ?? []}
+            loading={isLoading}
+            onPick={setSelected}
+          />
+        )}
       </RevenueSectionCard>
 
       {/* Bloco 4 — Dinheiro em risco */}
@@ -213,6 +224,7 @@ function TrustScoreCard({
   data: ReturnType<typeof useRevenuePipelineHealth>['data'];
   loading: boolean;
 }) {
+  const isEmpty = !!data?.isEmpty;
   return (
     <Card className="border-primary/30">
       <CardHeader className="pb-2">
@@ -222,6 +234,10 @@ function TrustScoreCard({
         <CardTitle className="flex items-baseline gap-2">
           {loading || !data ? (
             <Skeleton className="h-10 w-28" />
+          ) : isEmpty ? (
+            <span className="text-3xl font-semibold text-muted-foreground">
+              N/A
+            </span>
           ) : (
             <>
               <span className="text-4xl font-bold tabular-nums">
@@ -235,6 +251,15 @@ function TrustScoreCard({
       <CardContent className="space-y-3">
         {loading || !data ? (
           <Skeleton className="h-3 w-32" />
+        ) : isEmpty ? (
+          <>
+            <span className="text-sm font-semibold text-muted-foreground">
+              Sem dados ativos
+            </span>
+            <p className="text-[11px] text-muted-foreground">
+              0 oportunidades abertas no Pipeline de Vendas
+            </p>
+          </>
         ) : (
           <>
             <span
@@ -243,11 +268,11 @@ function TrustScoreCard({
               {data.trustLabel}
             </span>
             <Progress
-              value={data.trustScore}
+              value={data.trustScore ?? 0}
               className={`h-2 ${
-                data.trustScore >= 80
+                (data.trustScore ?? 0) >= 80
                   ? '[&>div]:bg-emerald-500'
-                  : data.trustScore >= 70
+                  : (data.trustScore ?? 0) >= 70
                     ? '[&>div]:bg-amber-500'
                     : '[&>div]:bg-red-500'
               }`}
