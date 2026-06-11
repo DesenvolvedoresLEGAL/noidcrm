@@ -461,6 +461,8 @@ export function useRevenueBottlenecks() {
     winLoss.error,
     winLoss.isLoading,
     pipelineResolved,
+    salesPipelineId,
+    salesPipelineName,
     forecast.kpis,
     forecast.error,
     forecast.isLoading,
