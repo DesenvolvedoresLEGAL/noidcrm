@@ -129,6 +129,7 @@ const SDR_CTA = { label: 'Ver Desempenho SDR', to: '/app/objetivos/desempenho?ta
 const CLOSER_CTA = { label: 'Ver Desempenho Closer', to: '/app/objetivos/desempenho?tab=closer' };
 const QUALITY_CTA = { label: 'Ver Qualidade de Qualificação', to: '/app/objetivos/desempenho?tab=qualidade' };
 const PIPELINE_CTA = { label: 'Abrir Pipeline', to: '/app/opportunities' };
+const OTE_CTA = { label: 'Ver OTE', to: '/app/reports/ote' };
 
 function fmtBRL(v: number) {
   return `R$ ${Math.round(v).toLocaleString('pt-BR')}`;
