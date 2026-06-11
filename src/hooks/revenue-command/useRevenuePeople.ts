@@ -256,7 +256,7 @@ export function useRevenuePeople() {
     }
 
     const sellerRows = (bySeller.data ?? [])
-      .filter((s) => s.total > 0)
+      .filter((s) => s.total > 0 && s.key && s.key !== '—')
       .sort((a, b) => b.total - a.total);
 
     const closerRows = mapCloserV2(closerReport.data).filter(
