@@ -560,22 +560,37 @@ export function useRevenuePeople() {
           cta: CLOSER_CTA,
         }),
       );
-    sdrSnapshot
-      .filter(
-        (r) =>
-          (r.classification === 'high' || r.classification === 'good') && r.qualified >= 5,
-      )
-      .slice(0, 2)
-      .forEach((r) =>
+
+    // Fallback: garante que o Top Performer apareça em "Quem está carregando".
+    if (top1 && !topPerformers.some((p) => p.userId === top1.key)) {
+      topPerformers.unshift({
+        userId: top1.key,
+        name: top1.label,
+        role: 'Closer',
+        primaryMetric: `${fmtBRL(top1.total)} em receita válida`,
+        contribution: 'Maior contribuição em receita válida no período.',
+        cta: CLOSER_CTA,
+      });
+    }
+    // Fallback OTE: closers/SDRs com alta % de meta que ainda não entraram.
+    oteRows
+      .filter((o) => o.goal > 0 && o.pct >= 100)
+      .sort((a, b) => b.pct - a.pct)
+      .slice(0, 3)
+      .forEach((o) => {
+        if (topPerformers.some((p) => p.userId === o.userId)) return;
         topPerformers.push({
-          userId: r.userId,
-          name: r.name,
-          role: 'SDR',
-          primaryMetric: `${r.qualified} SQLs qualificados`,
-          contribution: `SQL→Proposta ${r.sqlToProposalPct.toFixed(0)}% · ${fmtBRL(r.revenue)} influenciados`,
-          cta: SDR_CTA,
-        }),
-      );
+          userId: o.userId,
+          name: o.name,
+          role: o.role,
+          primaryMetric:
+            o.goalType === 'revenue'
+              ? `${fmtBRL(o.realized)} · ${o.pct.toFixed(0)}% da meta`
+              : `${o.realized} leads · ${o.pct.toFixed(0)}% da meta`,
+          contribution: o.levelName ? `Nível ${o.levelName}` : 'Acima da meta OTE',
+          cta: OTE_CTA,
+        });
+      });
 
     // ── Quem precisa de ajuda (até 5)
     const needsHelp: PeopleNeedsHelpItem[] = [];
@@ -611,6 +626,27 @@ export function useRevenuePeople() {
           cta: QUALITY_CTA,
         }),
       );
+
+    // Sinais OTE — abaixo da meta / abaixo do mínimo (bandeira vermelha).
+    oteRows
+      .filter((o) => o.goal > 0 && (o.pct < 70 || o.flagColor === 'red'))
+      .sort((a, b) => a.pct - b.pct)
+      .slice(0, 4)
+      .forEach((o) => {
+        if (needsHelp.some((p) => p.userId === o.userId)) return;
+        const goalLabel = o.goalType === 'revenue' ? 'receita' : 'leads';
+        needsHelp.push({
+          userId: o.userId,
+          name: o.name,
+          role: o.role,
+          problem: `${o.pct.toFixed(0)}% da meta de ${goalLabel}${o.flagColor === 'red' ? ' · abaixo do mínimo' : ''}`,
+          impact:
+            o.goalType === 'revenue'
+              ? `Realizado ${fmtBRL(o.realized)} de ${fmtBRL(o.goal)}`
+              : `${o.realized} de ${o.goal} leads · variável ${fmtBRL(o.finalVariable)}`,
+          cta: o.role === 'SDR' ? QUALITY_CTA : OTE_CTA,
+        });
+      });
 
     // ── Concentração
     let level: PeopleConcentration['level'] = 'healthy';
