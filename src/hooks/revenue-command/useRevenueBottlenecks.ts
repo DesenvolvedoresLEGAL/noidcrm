@@ -191,6 +191,88 @@ export function useRevenueBottlenecks() {
     },
   });
 
+  // 7) Velocidade SQL → Proposta (cálculo direto a partir das tabelas oficiais)
+  //    Início:  opportunities.qualified_at   (quando o SDR qualificou)
+  //    Fim (em ordem de preferência):
+  //      a) MIN(proposals.created_at)  — primeira proposta criada
+  //      b) MIN(proposals.sent_at)     — primeira proposta enviada
+  //      c) opportunities.created_at   — criação da oportunidade comercial
+  //      d) MIN(proposals.viewed_at)   — primeira visualização do cliente
+  //    Escopo: somente Pipeline de Vendas oficial, qualified_at NOT NULL,
+  //    não soft-deleted. Nenhuma view/edge alterada.
+  const velocityAggr = useQuery({
+    queryKey: ['revenue-command:bottlenecks:velocity', orgId, salesPipelineId],
+    enabled: !!orgId && pipelineResolved,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('opportunities')
+        .select(
+          'id, qualified_at, created_at, proposals(created_at, sent_at, viewed_at)',
+        )
+        .eq('organization_id', orgId!)
+        .eq('pipeline_id', salesPipelineId!)
+        .is('deleted_at', null)
+        .not('qualified_at', 'is', null)
+        .limit(2000);
+      if (error) throw error;
+
+      const diffsHours = {
+        toProposalCreated: [] as number[],
+        toProposalSent: [] as number[],
+        toCommercialOpp: [] as number[],
+        toFirstView: [] as number[],
+      };
+
+      for (const row of (data ?? []) as any[]) {
+        const qAt = row.qualified_at ? new Date(row.qualified_at).getTime() : 0;
+        if (!qAt) continue;
+        const oppAt = row.created_at ? new Date(row.created_at).getTime() : 0;
+        const proposals: any[] = Array.isArray(row.proposals) ? row.proposals : [];
+        const minOf = (key: string) => {
+          const ts = proposals
+            .map((p) => (p?.[key] ? new Date(p[key]).getTime() : 0))
+            .filter((t) => t > 0);
+          return ts.length ? Math.min(...ts) : 0;
+        };
+        const firstProposalAt = minOf('created_at');
+        const firstSentAt = minOf('sent_at');
+        const firstViewAt = minOf('viewed_at');
+
+        if (firstProposalAt && firstProposalAt > qAt) {
+          diffsHours.toProposalCreated.push(
+            (firstProposalAt - qAt) / 3_600_000,
+          );
+        }
+        if (firstSentAt && firstSentAt > qAt) {
+          diffsHours.toProposalSent.push((firstSentAt - qAt) / 3_600_000);
+        }
+        if (oppAt && oppAt > qAt) {
+          diffsHours.toCommercialOpp.push((oppAt - qAt) / 3_600_000);
+        }
+        if (firstViewAt && firstViewAt > qAt) {
+          diffsHours.toFirstView.push((firstViewAt - qAt) / 3_600_000);
+        }
+      }
+
+      const avg = (arr: number[]) =>
+        arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
+
+      return {
+        qualifiedCount: (data ?? []).length,
+        avgHoursToProposalCreated: avg(diffsHours.toProposalCreated),
+        sampleToProposalCreated: diffsHours.toProposalCreated.length,
+        avgHoursToProposalSent: avg(diffsHours.toProposalSent),
+        sampleToProposalSent: diffsHours.toProposalSent.length,
+        avgHoursToCommercialOpp: avg(diffsHours.toCommercialOpp),
+        sampleToCommercialOpp: diffsHours.toCommercialOpp.length,
+        avgHoursToFirstView: avg(diffsHours.toFirstView),
+        sampleToFirstView: diffsHours.toFirstView.length,
+      };
+    },
+  });
+
+
   return useMemo<{ data: BottlenecksData | null; isLoading: boolean; error: Error | null }>(() => {
     const isLoading =
       qualification.isLoading ||
