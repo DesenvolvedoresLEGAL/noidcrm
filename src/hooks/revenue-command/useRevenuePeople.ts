@@ -809,6 +809,8 @@ export function useRevenuePeople() {
     oteResultsQuery.data,
     oteResultsQuery.isLoading,
     oteResultsQuery.error,
+    activeUsersQuery.data,
+    activeUsersQuery.isLoading,
     teamVisibility.loading,
   ]);
 }
