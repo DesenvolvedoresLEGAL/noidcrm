@@ -169,6 +169,7 @@ const VibeSelling = lazy(() => import("./pages/intelligence/VibeSelling"));
 const KnowledgeGraph = lazy(() => import("./pages/app/intelligence/KnowledgeGraph"));
 const Memories = lazy(() => import("./pages/app/intelligence/Memories"));
 const OTEReport = lazy(() => import("./pages/OTEReport"));
+const DesempenhoPage = lazy(() => import("./pages/DesempenhoPage"));
 
 // Admin Panel Routes
 const AdminLayout = lazy(() => import("./pages/admin/AdminLayout"));
@@ -626,6 +627,16 @@ const App = () => (
                   <ProtectedRoute>
                     <LazyRoute>
                       <OTEReport />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/objetivos/desempenho"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <DesempenhoPage />
                     </LazyRoute>
                   </ProtectedRoute>
                 }

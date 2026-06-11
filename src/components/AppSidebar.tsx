@@ -87,8 +87,9 @@ const ALL_MENU_ITEMS: MenuItem[] = [
   { path: '/app/intelligence/winloss', label: 'Win/Loss Hub', icon: Activity, section: 'inteligencia' },
   
   // OBJETIVOS
-  { path: '/app/settings/sales', label: 'Configurações', icon: Settings2, section: 'objetivos' },
   { path: '/app/reports/ote', label: 'Resultados', icon: DollarSign, section: 'objetivos' },
+  { path: '/app/objetivos/desempenho', label: 'Desempenho', icon: Trophy, section: 'objetivos' },
+  { path: '/app/settings/sales', label: 'Configurações', icon: Settings2, section: 'objetivos' },
   { path: '/app/roleplay', label: 'Roleplay', icon: Users, section: 'objetivos' },
   
   // GTM
