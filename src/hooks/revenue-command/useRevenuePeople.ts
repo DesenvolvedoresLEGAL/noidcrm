@@ -300,6 +300,7 @@ export function useRevenuePeople() {
       bySeller.isLoading ||
       closerReport.isLoading ||
       sdrReport.isLoading ||
+      handoffReport.isLoading ||
       qualification.isLoading ||
       oteResultsQuery.isLoading ||
       activeUsersQuery.isLoading ||
@@ -310,6 +311,7 @@ export function useRevenuePeople() {
     if (bySeller.error) partialSources.push('Receita por vendedor');
     if (closerReport.error) partialSources.push('Performance Closer');
     if (sdrReport.error) partialSources.push('Performance SDR');
+    if (handoffReport.error) partialSources.push('Handoff SDR→Closer');
     if (qualification.error) partialSources.push('Qualidade de Qualificação');
     if (oteResultsQuery.error) partialSources.push('OTE / Resultados');
 
