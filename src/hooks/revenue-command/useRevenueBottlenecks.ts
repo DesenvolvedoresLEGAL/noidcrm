@@ -141,11 +141,10 @@ export function useRevenueBottlenecks() {
   // referência usada pelo Forecast). Propostas/oportunidades de Pré-vendas,
   // Operacional, Remarketing etc. são excluídas do Revenue Command Center.
   const proposalsAggr = useQuery({
-    queryKey: ['revenue-command:bottlenecks:proposals', orgId, salesPipelineId, start, end],
+    queryKey: ['revenue-command:bottlenecks:proposals:v3.2c', orgId, salesPipelineId, start, end],
     enabled: !!orgId && pipelineResolved,
     staleTime: 60_000,
     queryFn: async () => {
-      // Abertas (sent) — qualquer data, somente pipeline de Vendas
       const openQ = await supabase
         .from('proposals')
         .select('id, total_amount, sent_at, created_at, opportunities!inner(pipeline_id)')
@@ -154,7 +153,6 @@ export function useRevenueBottlenecks() {
         .eq('opportunities.pipeline_id', salesPipelineId!);
       if (openQ.error) throw openQ.error;
 
-      // Rejeitadas no período — somente pipeline de Vendas
       const lostQ = await supabase
         .from('proposals')
         .select('id, total_amount, opportunities!inner(pipeline_id)')
@@ -165,11 +163,26 @@ export function useRevenueBottlenecks() {
         .lte('created_at', end);
       if (lostQ.error) throw lostQ.error;
 
+      // HOTFIX V3.2C: Oportunidades comerciais ABERTAS no Pipeline de Vendas
+      const openOppsQ = await supabase
+        .from('opportunities')
+        .select('id, valor_previsto, created_at')
+        .eq('organization_id', orgId!)
+        .eq('pipeline_id', salesPipelineId!)
+        .eq('status', 'open')
+        .is('deleted_at', null);
+      if (openOppsQ.error) throw openOppsQ.error;
+
       const open = openQ.data ?? [];
       const lost = lostQ.data ?? [];
+      const openOpps = openOppsQ.data ?? [];
 
       const openValue = open.reduce((s, p: any) => s + (Number(p.total_amount) || 0), 0);
       const lostValue = lost.reduce((s, p: any) => s + (Number(p.total_amount) || 0), 0);
+      const openOppsValue = openOpps.reduce(
+        (s, o: any) => s + (Number(o.valor_previsto) || 0),
+        0,
+      );
 
       const nowMs = now.getTime();
       const ages = open
@@ -181,12 +194,25 @@ export function useRevenueBottlenecks() {
         .filter((d): d is number => d != null);
       const avgAgeDays = ages.length ? ages.reduce((a, b) => a + b, 0) / ages.length : null;
 
+      const oppAges = openOpps
+        .map((o: any) => {
+          if (!o.created_at) return null;
+          return Math.max(0, (nowMs - new Date(o.created_at).getTime()) / 86_400_000);
+        })
+        .filter((d): d is number => d != null);
+      const avgOppAgeDays = oppAges.length
+        ? oppAges.reduce((a, b) => a + b, 0) / oppAges.length
+        : null;
+
       return {
         openCount: open.length,
         openValue,
         avgAgeDays,
         lostCount: lost.length,
         lostValue,
+        openOppsCount: openOpps.length,
+        openOppsValue,
+        avgOppAgeDays,
       };
     },
   });
@@ -360,61 +386,102 @@ export function useRevenueBottlenecks() {
       return { data: null, isLoading: true, error: null };
     }
 
+    // ── Seção 1: Vazamento do Funil
+    // HOTFIX V3.2C — origens consolidadas:
+    //   Card 1 (SQLs sem proposta): prefere velocityAggr (cruza Pré-vendas →
+    //     Vendas igual ao SQL→Proposta); fallback Qualidade de Qualificação.
+    //   Card 2 (Propostas sem fechamento): oportunidades abertas no Pipeline
+    //     de Vendas (não só proposals.status='sent').
+    //   Card 3 (Propostas perdidas): Win/Loss oficial — mesma base de
+    //     "Onde os negócios morrem" e "Motivos de perda".
+    //   Card 4 (Vendas canceladas): Auditoria (commercial_won_revenue_view).
+    const vel = velocityAggr.data ?? null;
     const qual = qualification.data ?? null;
     const closed = closedSummary.data ?? null;
     const props = proposalsAggr.data ?? null;
     const wl = winLoss.data ?? null;
     const fc = forecast.kpis ?? null;
 
-    // ── Seção 1: Vazamento do Funil
-    const withoutProposal = qual?.summary.without_proposal_count ?? 0;
-    const qualifiedCount = qual?.summary.qualified_count ?? 0;
-    const withoutProposalPct =
-      qualifiedCount > 0 ? (withoutProposal / qualifiedCount) * 100 : 0;
+    // Card 1
+    const velQualified = vel?.qualifiedCount ?? 0;
+    const velWithoutProposal = vel
+      ? Math.max(0, vel.qualifiedCount - vel.withProposalCreated)
+      : 0;
+    const qualQualified = qual?.summary.qualified_count ?? 0;
+    const qualWithoutProposal = qual?.summary.without_proposal_count ?? 0;
+
+    const useVelForSql = !!vel && velQualified > 0;
+    const sqlBaseAvailable = useVelForSql || !!qual;
+    const sqlQualifiedCount = useVelForSql ? velQualified : qualQualified;
+    const sqlWithoutProposal = useVelForSql ? velWithoutProposal : qualWithoutProposal;
+    const sqlWithoutProposalPct =
+      sqlQualifiedCount > 0 ? (sqlWithoutProposal / sqlQualifiedCount) * 100 : 0;
+    const sqlSource = useVelForSql
+      ? 'SQL→Proposta (Pré-vendas → Vendas)'
+      : 'Qualidade de Qualificação';
+    const sqlHelper = !sqlBaseAvailable
+      ? 'Dados parciais — fonte indisponível'
+      : sqlQualifiedCount > 0
+        ? `${sqlWithoutProposalPct.toFixed(0)}% dos ${sqlQualifiedCount} SQLs ainda sem proposta`
+        : 'SQLs qualificados que ainda não viraram proposta';
+
+    // Card 3 — perdidas via Win/Loss
+    const wlLostCount = wl?.lostCount ?? 0;
+    const wlLostValue = wl?.lostValue ?? 0;
+    const topLossReason = (wl?.lossReasons ?? [])[0]?.reason ?? null;
 
     const funnelLeaks: FunnelLeak[] = [
       {
         id: 'sqls_without_proposal',
         label: 'SQLs sem proposta',
-        count: withoutProposal,
+        count: sqlWithoutProposal,
         value: null,
-        helper:
-          qualifiedCount > 0
-            ? `${withoutProposalPct.toFixed(0)}% dos SQLs do período`
-            : 'Sem SQLs no período',
-        source: 'Qualidade de Qualificação',
+        helper: sqlHelper,
+        source: sqlSource,
         cta: { label: 'Abrir Qualidade', to: '/app/objetivos/desempenho' },
-        available: !!qual,
+        available: sqlBaseAvailable,
       },
       {
         id: 'open_proposals',
         label: 'Propostas sem fechamento',
-        count: props?.openCount ?? 0,
-        value: props?.openValue ?? 0,
+        count: props?.openOppsCount ?? 0,
+        value: props?.openOppsValue ?? 0,
         helper:
-          props?.avgAgeDays != null
-            ? `Tempo médio aberto: ${props.avgAgeDays.toFixed(0)} dias`
-            : 'Sem propostas abertas',
-        source: 'Propostas',
+          props && props.openOppsCount > 0
+            ? `Oportunidades comerciais abertas${
+                props.avgOppAgeDays != null
+                  ? ` · idade média ${props.avgOppAgeDays.toFixed(0)} dias`
+                  : ''
+              }`
+            : 'Sem oportunidades abertas no Pipeline de Vendas',
+        source: 'Pipeline de Vendas',
         cta: { label: 'Abrir Pipeline', to: '/app/pipeline' },
         available: !!props,
       },
       {
         id: 'lost_proposals',
         label: 'Propostas perdidas',
-        count: props?.lostCount ?? 0,
-        value: props?.lostValue ?? 0,
-        helper: 'no período',
-        source: 'Propostas',
+        count: wlLostCount,
+        value: wlLostValue,
+        helper:
+          wlLostCount > 0
+            ? topLossReason
+              ? `no período · principal motivo: ${topLossReason}`
+              : 'no período'
+            : 'sem perdas no período',
+        source: 'Win/Loss',
         cta: { label: 'Abrir Win/Loss', to: '/app/intelligence/winloss' },
-        available: !!props,
+        available: !!wl,
       },
       {
         id: 'cancelled_sales',
         label: 'Vendas canceladas',
         count: closed?.cancelledCount ?? 0,
         value: closed?.cancelledTotal ?? 0,
-        helper: 'no período',
+        helper:
+          (closed?.cancelledCount ?? 0) > 0
+            ? 'no período'
+            : 'sem cancelamentos no período',
         source: 'Resultados / Auditoria',
         cta: { label: 'Abrir Auditoria', to: '/app/objetivos/resultados' },
         available: !!closed,
@@ -453,7 +520,8 @@ export function useRevenueBottlenecks() {
     // ── Seção 4: Velocidade
     //  Cálculo direto (V3.2A): qualified_at → primeira proposta criada/enviada
     //  com fallback para criação da oportunidade comercial e visualização.
-    const vel = velocityAggr.data ?? null;
+    // `vel` already declared above
+
     const viewSqlToProposalHours = (qual?.rows ?? [])
       .map((r) => r.avg_hours_qualification_to_proposal)
       .filter((v): v is number => typeof v === 'number' && v > 0);
@@ -608,9 +676,9 @@ export function useRevenueBottlenecks() {
         `${fmtBRL(closed.cancelledTotal)} foram cancelados no período (${closed.cancelledCount} venda(s)).`,
       );
     }
-    if (withoutProposal > 0 && qualifiedCount > 0) {
+    if (sqlWithoutProposal > 0 && sqlQualifiedCount > 0) {
       summaryParts.push(
-        `${withoutProposalPct.toFixed(0)}% dos SQLs ainda não viraram proposta.`,
+        `${sqlWithoutProposalPct.toFixed(0)}% dos SQLs ainda não viraram proposta.`,
       );
     }
 
