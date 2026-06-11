@@ -15,9 +15,10 @@ import { ExperimentsFeed } from '@/components/intelligence/experiments/Experimen
 import { GuardrailsCard } from '@/components/intelligence/experiments/GuardrailsCard';
 import { IcpIntelligencePanel } from '@/components/intelligence/icp/IcpIntelligencePanel';
 import { QualifiedQueuePanel } from '@/components/intelligence/queue/QualifiedQueuePanel';
+import { AutopilotPanel } from '@/components/intelligence/autopilot/AutopilotPanel';
 import { Compass, Sparkles } from 'lucide-react';
 
-const VALID_TABS = ['icp', 'queue', 'sourcing', 'optimization', 'experiments', 'performance'] as const;
+const VALID_TABS = ['icp', 'queue', 'autopilot', 'sourcing', 'optimization', 'experiments', 'performance'] as const;
 type KairosTab = (typeof VALID_TABS)[number];
 
 export default function KairosHub() {
@@ -54,9 +55,10 @@ export default function KairosHub() {
         />
 
         <Tabs value={activeTab} onValueChange={handleTabChange}>
-          <TabsList className="grid w-full grid-cols-2 md:grid-cols-6 max-w-4xl">
+          <TabsList className="grid w-full grid-cols-2 md:grid-cols-7 max-w-5xl">
             <TabsTrigger value="icp">🎯 ICP Intelligence</TabsTrigger>
             <TabsTrigger value="queue">📥 Qualified Queue</TabsTrigger>
+            <TabsTrigger value="autopilot">🚀 Autopilot</TabsTrigger>
             <TabsTrigger value="sourcing">🧭 Sourcing</TabsTrigger>
             <TabsTrigger value="optimization">⚡ Optimization</TabsTrigger>
             <TabsTrigger value="experiments">🧪 Experiments</TabsTrigger>
@@ -70,6 +72,11 @@ export default function KairosHub() {
           <TabsContent value="queue" className="space-y-4 md:space-y-6 mt-4">
             <QualifiedQueuePanel />
           </TabsContent>
+
+          <TabsContent value="autopilot" className="space-y-4 md:space-y-6 mt-4">
+            <AutopilotPanel />
+          </TabsContent>
+
 
           <TabsContent value="sourcing" className="space-y-4 md:space-y-6 mt-4">
             <LeadSourcingEngine />

@@ -9,11 +9,12 @@ import {
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Check, X, AlertTriangle, Download, PackageCheck, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
+import { Check, X, AlertTriangle, Download, PackageCheck, ArrowUp, ArrowDown, ArrowUpDown, Rocket } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Prospect } from '@/hooks/useLeadSourcingV2';
 import { DecisionBadge } from '@/components/decision-engine/DecisionBadge';
 import { RelationshipBadge } from './RelationshipBadge';
+import { AutopilotConfigModal } from '@/components/intelligence/autopilot/AutopilotConfigModal';
 
 type FilterKey = 'all' | 'pending' | 'approved' | 'rejected' | 'imported' | 'duplicate' | 'tier_s' | 'tier_a' | 'tier_b' | 'tier_c' | 'high_score' | 'no_domain' | 'rel_customer' | 'rel_opportunity' | 'rel_account' | 'rel_new';
 
@@ -199,6 +200,7 @@ export function LeadResultsTable({
   };
 
   const selectedArray = Array.from(selectedIds);
+  const [autopilotOpen, setAutopilotOpen] = useState(false);
 
   // Get approved prospects from selection for bulk import
   const selectedApprovedProspects = useMemo(() => {
@@ -215,22 +217,38 @@ export function LeadResultsTable({
             Resultados
             <Badge variant="secondary">{filtered.length} de {prospects.length} leads</Badge>
           </CardTitle>
-          {selectedIds.size > 0 && (
-            <div className="flex gap-2 flex-wrap">
-              <Button size="sm" variant="outline" className="h-7 text-xs text-green-600" onClick={() => { onBulkApprove(selectedArray); setSelectedIds(new Set()); }} disabled={isUpdating}>
-                <Check className="h-3 w-3 mr-1" />Aprovar {selectedIds.size}
-              </Button>
-              <Button size="sm" variant="outline" className="h-7 text-xs text-red-600" onClick={() => { onBulkReject(selectedArray); setSelectedIds(new Set()); }} disabled={isUpdating}>
-                <X className="h-3 w-3 mr-1" />Rejeitar {selectedIds.size}
-              </Button>
-              {selectedApprovedProspects.length > 0 && (
-                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { onBulkImport(selectedApprovedProspects); setSelectedIds(new Set()); }} disabled={isImporting}>
-                  <Download className="h-3 w-3 mr-1" />Importar {selectedApprovedProspects.length}
+          <div className="flex gap-2 flex-wrap">
+            <Button size="sm" variant="default" className="h-7 text-xs"
+              onClick={() => setAutopilotOpen(true)}
+              disabled={prospects.length === 0}>
+              <Rocket className="h-3 w-3 mr-1" /> Executar Autopilot
+            </Button>
+            {selectedIds.size > 0 && (
+              <>
+                <Button size="sm" variant="outline" className="h-7 text-xs text-green-600" onClick={() => { onBulkApprove(selectedArray); setSelectedIds(new Set()); }} disabled={isUpdating}>
+                  <Check className="h-3 w-3 mr-1" />Aprovar {selectedIds.size}
                 </Button>
-              )}
-            </div>
-          )}
+                <Button size="sm" variant="outline" className="h-7 text-xs text-red-600" onClick={() => { onBulkReject(selectedArray); setSelectedIds(new Set()); }} disabled={isUpdating}>
+                  <X className="h-3 w-3 mr-1" />Rejeitar {selectedIds.size}
+                </Button>
+                {selectedApprovedProspects.length > 0 && (
+                  <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { onBulkImport(selectedApprovedProspects); setSelectedIds(new Set()); }} disabled={isImporting}>
+                    <Download className="h-3 w-3 mr-1" />Enviar para Triagem {selectedApprovedProspects.length}
+                  </Button>
+                )}
+              </>
+            )}
+          </div>
         </div>
+        <AutopilotConfigModal
+          open={autopilotOpen}
+          onClose={() => setAutopilotOpen(false)}
+          defaults={{
+            prospect_ids: (selectedIds.size > 0 ? selectedArray : prospects.map(p => p.id)),
+            run_name: `Autopilot ${new Date().toLocaleDateString('pt-BR')} (${selectedIds.size > 0 ? selectedIds.size : prospects.length})`,
+          }}
+        />
+
         {/* Filters */}
         <TooltipProvider>
           <div className="flex flex-wrap gap-1.5 pt-2">

@@ -1,108 +1,115 @@
-## KAI.13 — Qualified Queue
 
-Camada intermediária entre sourcing (Kairós) e CRM. Nenhum prospect entra no CRM sem passar pela fila de qualificação.
+# KAI.14 — Autopilot Batch
 
-### 1. Schema (migration)
+Primeiro agente operacional do Kairós: processa lotes de expositores (100/300/500+) sem intervenção humana, executando matching → enrichment → Apollo → decisor → brief → SDR Ready, entregando à Qualified Queue.
 
-**Enum novo** `qualification_status`:
-`captured | existing_customer | existing_account | duplicate | enriched | decision_maker_found | contact_revealed | approach_ready | ready_for_sdr | human_review | imported | discarded`
+## 1. Schema (migration única)
 
-**Tabela nova** `public.kairos_qualified_queue`:
-- `id uuid pk`, `organization_id uuid`, `event_id uuid null`, `prospect_id uuid fk prospects`
-- `company_name text`, `domain text`, `source text`, `source_type text`
-- `relationship_status text` (cliente/conta/oportunidade/novo — espelho de prospects)
-- `score int 0-100`, `grade text` (A/B/C/D), `confidence numeric`
-- `enrichment_status text`, `decision_maker_status text`, `contact_status text`
-- `qualification_status qualification_status default 'captured'`
-- `sdr_ready boolean default false`
-- `approach_brief jsonb null` (dores, hipóteses, ângulo, mensagem, CTA)
-- `owner_id uuid null`, `review_reason text null`, `discard_reason text null`
-- `imported_at timestamptz`, `imported_opportunity_id uuid`, `imported_account_id uuid`, `imported_contact_id uuid`
-- `created_at`, `updated_at` + trigger updated_at
-- GRANTs (authenticated + service_role), RLS por `organization_id` via `crm_user_contexts`
-- índices: `(organization_id, qualification_status)`, `(prospect_id)`, `(event_id)`
+### `kairos_batch_runs`
+- `id`, `organization_id`, `event_id` (nullable — pode ser lead_search), `run_name`, `run_type` (event/search/manual)
+- `status` enum `kairos_batch_status`: pending | running | paused | completed | failed | cancelled
+- `total_prospects`, `processed`, `skipped`, `failed` (int)
+- `credits_estimated`, `credits_used` (int)
+- `config` jsonb (icp, min_score, min_quality, max_apollo_credits, max_contacts_per_company, allow_enrichment, allow_apollo, generate_brief)
+- `started_at`, `completed_at`, `created_by`, `created_at`, `updated_at`
 
-**Trigger** `trg_kairos_queue_score`: recalcula `score`, `grade`, `sdr_ready` em INSERT/UPDATE conforme regras:
-- +20 ICP compatível, +15 domínio corp, +15 decisor, +15 email corp, +10 evento, +10 score IA, +10 confiança fonte, +5 sem duplicidade
-- grade: A≥80, B≥60, C≥40, D<40
-- `sdr_ready = true` quando: enriquecido + decisor + contato + score ≥ threshold (config 60) + sem duplicidade + sem relacionamento ativo
+### `kairos_batch_run_items`
+- `id`, `run_id` (FK cascade), `prospect_id`
+- `current_stage` enum `kairos_batch_stage`: matching | queue | enrichment | apollo | decision_maker | approach | ready | completed
+- `status` enum `kairos_batch_item_status`: pending | running | done | skipped | failed
+- `message` text, `priority_rank` int (1–100)
+- `started_at`, `completed_at`, `created_at`, `updated_at`
+- Index `(run_id, status)`, `(run_id, priority_rank desc)`
 
-### 2. Edge functions
+### `kairos_batch_logs`
+- `id`, `run_id`, `prospect_id` (nullable), `action`, `result`, `details` jsonb, `created_at`
+- Index `(run_id, created_at desc)`
 
-- `kairos-enqueue-prospect` — recebe `prospect_id`, calcula relationship via `kairos-match-company`, insere na fila com status inicial (`captured`, `existing_customer`, `duplicate`, `human_review`).
-- `kairos-generate-approach-brief` — IA (Lovable AI Gateway / OpenAI conforme padrão do projeto) gera `approach_brief` a partir de `enriched_company_profiles` + `commercial_briefs`; persiste em `kairos_qualified_queue.approach_brief` e marca `approach_ready`.
-- `kairos-promote-to-crm` — só aceita itens `ready_for_sdr`; reutiliza RPC `import_prospect_to_pipeline`; atualiza fila para `imported` com refs do CRM; cria activity (task SDR).
+RLS: `organization_id` via `organization_members` para todas. GRANT pattern padrão (authenticated + service_role).
 
-### 3. Hooks/services novos
+## 2. Edge Functions
 
-- `src/services/intelligence/qualifiedQueue.ts` — CRUD/listagem/filtros.
-- `src/hooks/intelligence/useQualifiedQueue.ts` — lista paginada + filtros (evento, ICP, status, relationship, score, com/sem decisor, sdr_ready, review).
-- `src/hooks/intelligence/useQualifiedQueueKpis.ts` — KPIs (capturados, qualificados, ready_for_sdr, em revisão, importados, descartados, taxa aproveitamento).
-- `src/hooks/intelligence/useQualifiedQueueActions.ts` — mutations: enriquecer, buscar decisores, revelar contato, gerar brief, enviar SDR (promote), descartar.
+### `kairos-autopilot-start`
+- Recebe `{ event_id?, lead_search_id?, config }`. Resolve lista de prospects elegíveis (filtro por evento/search + ICP).
+- Calcula `credits_estimated` (apollo_cost × eligible_count).
+- Valida saldo e limite configurado; retorna 402 se exceder.
+- Cria `kairos_batch_runs` (status=pending) + `kairos_batch_run_items` em massa.
+- Dispara `kairos-autopilot-process` via `EdgeRuntime.waitUntil`.
 
-### 4. UI nova — `Kairós > Qualified Queue`
+### `kairos-autopilot-process`
+- Background worker. Lê items `pending|running` em ordem `priority_rank desc`.
+- Para cada item executa pipeline (PASSOS 1–9). Reutiliza:
+  - `kairos-match-company` (já existe)
+  - `kairos-enqueue-prospect`
+  - `run-enrichment`
+  - `apollo-find-decision-makers`
+  - `kairos-generate-approach-brief`
+- Atualiza `current_stage`/`status`/`message` por item. Grava `kairos_batch_logs` em cada ação.
+- Respeita `config.max_apollo_credits` (interrompe Apollo quando atingir).
+- Verifica `runs.status='paused'|'cancelled'` entre items e sai gracefully.
+- Atualiza `processed/skipped/failed/credits_used`. Marca `completed` ao final.
 
-Arquivos:
-- `src/components/intelligence/queue/QualifiedQueuePanel.tsx` — container.
-- `QualifiedQueueKpiBar.tsx` — 7 KPIs.
-- `QualifiedQueueFilters.tsx` — barra de filtros.
-- `QualifiedQueueTable.tsx` — colunas: Empresa, Evento, ICP, Relacionamento (badge 🟢🟡🟠⚪), Score, Grade, Enriquecimento, Decisor, Contato, Status, Responsável, Data.
-- `QualifiedQueueRowActions.tsx` — menu de ações por linha.
-- `ApproachBriefDrawer.tsx` — exibe brief IA com botão "Enviar para SDR".
+### `kairos-autopilot-control`
+- `{ run_id, action: 'pause'|'resume'|'cancel' }`. Atualiza status e (em resume) re-dispara `kairos-autopilot-process`.
 
-Integração:
-- `src/pages/intelligence/KairosHub.tsx` — adicionar tab `📥 Qualified Queue` entre `Sourcing` e `Optimization`.
+## 3. Motor de priorização (DB function)
+`fn_kairos_batch_priority(prospect_id)` → 0–100 baseado em: ICP match (30) + score (20) + qualidade enrichment (15) + decisor (15) + contato (10) + ticket potencial (5) + evento estratégico (5). Calculado no insert do item e em recalcs entre estágios.
 
-### 5. Redirecionar fluxo de importação atual
+## 4. Serviços/hooks frontend
+- `src/services/intelligence/autopilot.ts` — list runs, get run + items + logs, estimate credits.
+- `src/hooks/intelligence/useAutopilotRuns.ts`, `useAutopilotRun.ts`, `useAutopilotItems.ts`, `useAutopilotLogs.ts`, `useAutopilotKpis.ts`.
+- `useAutopilotActions.ts` — start/pause/resume/cancel mutations (chamam edges).
+- Realtime subscribe em `kairos_batch_runs` e `kairos_batch_run_items` para atualizar UI live.
 
-- `src/hooks/useProspectImport.ts`:
-  - `useImportProspect` / `useBulkImportProspects` deixam de chamar `import_prospect_to_pipeline` direto. Passam a chamar `kairos-enqueue-prospect` (ou inserir na fila se já enriquecido).
-  - Toast novo: "Enviado para Qualified Queue".
-  - Atalho admin (`forcePromote: true`) só para platform_admin — mantém compat para testes.
-- `LeadResultsTable.tsx`: botão "Importar" vira "Enviar para Triagem". Badge de relacionamento já existe — mantém.
+## 5. UI (nova aba `Kairós > Autopilot`)
+- `src/components/intelligence/autopilot/AutopilotPanel.tsx` — wrap.
+- `AutopilotKpiBar.tsx` — execuções, prospects processados, decisores, SDR Ready, créditos, taxa de aproveitamento.
+- `AutopilotRunsTable.tsx` — lista de execuções com status badges, progresso, ações pausar/retomar/cancelar.
+- `AutopilotConfigModal.tsx` — modal "🚀 Executar Autopilot": evento (combobox lead_searches), ICP (cluster do `useIcpIntelligence`), score mínimo, qualidade mínima, max créditos Apollo, max contatos/empresa, switches (enrichment, Apollo, brief). Mostra `EligibilityPreview` (empresas elegíveis, créditos estimados, limite, saldo) antes de confirmar.
+- `AutopilotRunDrawer.tsx` — detalhes de uma execução: tabela items + filtros (status, SDR Ready, com/sem decisor, estágio) + aba logs.
+- Filtros: execução, evento, status, SDR Ready, com decisor, sem decisor.
+- Botão `🚀 Executar Autopilot` em `LeadResultsTable` e em `KairosHub` (header da aba).
 
-### 6. Dashboard executivo — Pipeline de Aquisição
+## 6. Integração KairosHub
+Adicionar tab `autopilot` em `KairosHub.tsx` (ordem: ICP → Queue → **Autopilot** → Sourcing → ...).
 
-- `src/components/intelligence/queue/AcquisitionPipelineCard.tsx` — funil: Capturados → Qualificados → SDR → Reuniões → Propostas → Vendas (usa `kairos_qualified_queue` + `opportunities` + `commercial_won_revenue_view`).
-- Adicionar no Revenue Command Center (`RevenueCommandPage.tsx`) na aba "Hoje na Operação" (ou criar bloco no topo da aba Pessoas) — read-only, não altera métricas oficiais.
+## 7. Alertas
+Toasts realtime via subscription:
+- "Execução concluída: X SDR Ready de Y processados"
+- "⚠️ Crédito próximo do limite (≥80%)"
+- "❌ Falha em lote: N items"
+- "⚠️ Taxa baixa de decisores (<30%)" no final
 
-### 7. Documentação
+## 8. Regras invioláveis
+- **Nunca** cria oportunidade/conta/CRM automaticamente. Saída = Qualified Queue.
+- Promoção CRM continua manual (já implementado em KAI.13).
+- Respeita `forcePromote` apenas para `platform_admin`.
 
-- `src/components/playbook/QUALIFIED_QUEUE.md` — explica fluxo, status, regras de score, SDR Ready, human review.
-- Atualizar `SOURCING_AUDIT.md` referenciando a nova camada.
+## 9. Docs
+- Novo: `src/components/playbook/AUTOPILOT.md`
+- Update: `SOURCING_AUDIT.md`, `QUALIFIED_QUEUE.md` (referência ao Autopilot).
 
-### Riscos
-- Fluxo de importação muda — usuários acostumados ao botão direto verão "Enviar para Triagem". Mitigar com toast explicativo + tooltip.
-- Score calculado em trigger; manter idempotente.
-- Sem mudanças em RLS de tabelas existentes, sem mudanças em receita, forecast ou regras financeiras.
-- `kairos-promote-to-crm` reutiliza RPC existente → comportamento de CRM intacto.
+## Arquivos
 
-### Fora do escopo
-- Cadências automáticas para SDR (só cria task inicial).
-- Reprocessamento histórico de prospects já importados.
-- ML para score (regras determinísticas nesta sprint).
+**Novos (~16):**
+- Migração (1)
+- 3 edge functions
+- 1 service + 6 hooks
+- 5 componentes UI
+- 1 doc
 
-### Arquivos criados
-- migration (tabela + enum + trigger + RLS + grants)
-- `supabase/functions/kairos-enqueue-prospect/index.ts`
-- `supabase/functions/kairos-generate-approach-brief/index.ts`
-- `supabase/functions/kairos-promote-to-crm/index.ts`
-- `src/services/intelligence/qualifiedQueue.ts`
-- `src/hooks/intelligence/useQualifiedQueue.ts`
-- `src/hooks/intelligence/useQualifiedQueueKpis.ts`
-- `src/hooks/intelligence/useQualifiedQueueActions.ts`
-- `src/components/intelligence/queue/QualifiedQueuePanel.tsx`
-- `src/components/intelligence/queue/QualifiedQueueKpiBar.tsx`
-- `src/components/intelligence/queue/QualifiedQueueFilters.tsx`
-- `src/components/intelligence/queue/QualifiedQueueTable.tsx`
-- `src/components/intelligence/queue/QualifiedQueueRowActions.tsx`
-- `src/components/intelligence/queue/ApproachBriefDrawer.tsx`
-- `src/components/intelligence/queue/AcquisitionPipelineCard.tsx`
-- `src/components/playbook/QUALIFIED_QUEUE.md`
-
-### Arquivos editados
-- `src/pages/intelligence/KairosHub.tsx`
-- `src/hooks/useProspectImport.ts`
-- `src/components/playbook/LeadResultsTable.tsx`
-- `src/pages/RevenueCommandPage.tsx`
+**Editados:**
+- `src/pages/intelligence/KairosHub.tsx` (nova tab)
+- `src/components/playbook/LeadResultsTable.tsx` (botão Autopilot em lote)
 - `src/components/playbook/SOURCING_AUDIT.md`
+
+## Riscos
+- Long-running jobs: mitigado por `EdgeRuntime.waitUntil` + processamento em batches pequenos com checkpoint via DB.
+- Custos Apollo: estimativa + hard cap por config; logs de cada chamada.
+- Concorrência: lock otimista via `status='running'` no item antes de processar.
+- Sem alterações em RLS de tabelas existentes, sem mudanças em regras financeiras/métricas.
+
+## Próximos passos (fora desta sprint)
+- Agendamento (cron por evento novo)
+- ML score para priorização
+- Multi-event autopilot
