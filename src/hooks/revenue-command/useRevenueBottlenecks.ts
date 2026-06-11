@@ -71,6 +71,12 @@ export interface BottlenecksData {
   speedMetrics: SpeedMetric[];
   revenueRisk: RevenueRiskItem[];
   executiveSummary: string;
+  scope: {
+    label: string;
+    pipelineId: string | null;
+    pipelineName: string | null;
+    resolved: boolean;
+  };
   meta: {
     generatedAt: string;
     period: { start: string; end: string };
