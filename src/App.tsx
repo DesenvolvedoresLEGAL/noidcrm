@@ -171,6 +171,7 @@ const Memories = lazy(() => import("./pages/app/intelligence/Memories"));
 const OTEReport = lazy(() => import("./pages/OTEReport"));
 const DesempenhoPage = lazy(() => import("./pages/DesempenhoPage"));
 const RevenueCommandPage = lazy(() => import("./pages/RevenueCommandPage"));
+const MigrationAuditPage = lazy(() => import("./pages/MigrationAuditPage"));
 
 // Admin Panel Routes
 const AdminLayout = lazy(() => import("./pages/admin/AdminLayout"));
