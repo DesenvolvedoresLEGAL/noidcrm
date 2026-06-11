@@ -196,6 +196,12 @@ export default function RevenueCommandPage() {
       content: <RevenueNextActionsTab />,
     },
     {
+      value: 'health-trust',
+      label: 'Health & Trust',
+      icon: ShieldCheck,
+      content: <RevenueHealthTrustTab />,
+    },
+    {
       value: 'ia',
       label: 'IA',
       icon: Bot,
