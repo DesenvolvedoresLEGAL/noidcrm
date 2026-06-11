@@ -20,6 +20,7 @@ import {
 } from '@/components/revenue-command/RevenueCommandTabs';
 import { RevenueSectionCard } from '@/components/revenue-command/RevenueSectionCard';
 import { RevenuePlaceholder } from '@/components/revenue-command/RevenuePlaceholder';
+import { RevenueTodayTab } from '@/components/revenue-command/today/RevenueTodayTab';
 
 /**
  * Sprint REVOPS V3.0 — Revenue Command Center
@@ -141,15 +142,7 @@ export default function RevenueCommandPage() {
       value: 'hoje',
       label: 'Hoje na Operação',
       icon: Activity,
-      content: (
-        <RevenueSectionCard
-          title="Hoje na Operação"
-          description="Visão diária do que importa agora. Conteúdo será conectado em sprints futuras."
-          icon={Activity}
-        >
-          <PlaceholderGrid items={PLACEHOLDER_SECTIONS.hoje} />
-        </RevenueSectionCard>
-      ),
+      content: <RevenueTodayTab />,
     },
     {
       value: 'gargalos',
