@@ -27,6 +27,7 @@ import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { RevenueSsotBanner } from '@/components/revenue/RevenueSsotBanner';
+import { RevenueCommandLegacyBanner } from '@/components/revenue-command/migration/RevenueCommandLegacyBanner';
 
 function ForecastLoadingState() {
   return (
@@ -76,6 +77,7 @@ export default function Forecast() {
   return (
     <Layout>
       <div className="p-4 md:p-6 space-y-4 md:space-y-6">
+        <RevenueCommandLegacyBanner rccTab="Hoje na Operação · Riscos · Pipeline Health" />
         {/* Header */}
         <PageHeader
           icon={TrendingUp}

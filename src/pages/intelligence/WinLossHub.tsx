@@ -25,6 +25,7 @@ import { WinLossRevenueTab } from '@/components/intelligence/winloss/tabs/WinLos
 import { WinLossRecommendationsTab } from '@/components/intelligence/winloss/tabs/WinLossRecommendationsTab';
 import { ProposalApprovalsTab } from '@/components/intelligence/winloss/tabs/ProposalApprovalsTab';
 import { useClosedRevenueSummary } from '@/hooks/revenue/useRevenueSsot';
+import { RevenueCommandLegacyBanner } from '@/components/revenue-command/migration/RevenueCommandLegacyBanner';
 
 export default function WinLossHub() {
   const { organization } = useCurrentUser();
@@ -94,6 +95,7 @@ export default function WinLossHub() {
   return (
     <Layout>
       <div className="p-4 md:p-6 space-y-4">
+        <RevenueCommandLegacyBanner rccTab="Gargalos · Riscos" />
         {/* Header limpo — sem badge PRIME, sem botão de análise efêmera */}
         <PageHeader
           icon={Activity}

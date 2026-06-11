@@ -11,7 +11,7 @@ import {
   Lightbulb,
   Users,
   Gauge,
-  TrendingUp,
+  
   Zap,
   Handshake,
   HeadphonesIcon,
@@ -22,7 +22,7 @@ import {
   Network,
   Brain,
   BookOpen,
-  Trophy,
+  
   Sparkles,
   Compass,
   Boxes,
@@ -74,7 +74,9 @@ const ALL_MENU_ITEMS: MenuItem[] = [
 
   // REVOPS
   { path: '/app/revenue-command', label: 'Revenue Command', icon: Radar, section: 'revops' },
-  { path: '/app/forecast', label: 'Forecast', icon: TrendingUp, section: 'revops' },
+  // Sprint RCC V3.9 — Forecast e Desempenho ocultados da navegação principal
+  // por já terem leitura executiva consolidada no Revenue Command.
+  // As rotas continuam acessíveis em /app/forecast e /app/objetivos/desempenho.
   { path: '/app/intelligence/winloss', label: 'Win/Loss Hub', icon: Activity, section: 'revops' },
   { path: '/app/scoring', label: 'Scoring', icon: Gauge, section: 'revops' },
 
@@ -93,7 +95,7 @@ const ALL_MENU_ITEMS: MenuItem[] = [
 
   // OBJETIVOS
   { path: '/app/reports/ote', label: 'Resultados', icon: DollarSign, section: 'objetivos' },
-  { path: '/app/objetivos/desempenho', label: 'Desempenho', icon: Trophy, section: 'objetivos' },
+  // Sprint RCC V3.9 — Desempenho ocultado da navegação principal (migrado para RCC → Pessoas).
   { path: '/app/settings/sales', label: 'Configurações', icon: Settings2, section: 'objetivos' },
 
   // OPERAÇÕES
