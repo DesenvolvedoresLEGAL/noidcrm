@@ -351,12 +351,21 @@ export function useRevenueBottlenecks() {
       const avg = (arr: number[]) =>
         arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
 
+      const sourcePipelines = Array.from(
+        new Set(qualified.map((q) => q.pipeline_id).filter(Boolean)),
+      ) as string[];
+
       const result = {
         qualifiedCount: qualified.length,
         salesOppsCount: salesOpps.length,
         proposalsCount: proposals.length,
         withCommercialLink,
         withProposalCreated,
+        withoutProposal: Math.max(0, qualified.length - withProposalCreated),
+        sourcePipelines,
+        periodStart: start,
+        periodEnd: end,
+        salesPipelineId: salesPipelineId!,
         avgHoursToProposalCreated: avg(diffsHours.toProposalCreated),
         sampleToProposalCreated: diffsHours.toProposalCreated.length,
         avgHoursToProposalSent: avg(diffsHours.toProposalSent),
@@ -369,7 +378,15 @@ export function useRevenueBottlenecks() {
 
       if (import.meta.env.DEV) {
         // eslint-disable-next-line no-console
-        console.debug('[RCC V3.2B] SQL→Proposta debug', result);
+        console.debug('[RCC V3.2D] SQLs sem proposta (período)', {
+          totalQualified: result.qualifiedCount,
+          withProposal: result.withProposalCreated,
+          withoutProposal: result.withoutProposal,
+          withCommercialLink: result.withCommercialLink,
+          dateRange: { start, end },
+          sourcePipelines,
+          salesPipelineId,
+        });
       }
       return result;
     },
