@@ -137,7 +137,7 @@ export function CloserPerformanceReport() {
                       {index > 2 && <span className="text-muted-foreground">{index + 1}</span>}
                     </TableCell>
                     <TableCell className="font-medium">
-                      {closer.closer_name || 'Usuário Desconhecido'}
+                      {closer.closer_name || 'Usuário removido'}
                     </TableCell>
                     <TableCell className="text-center">
                       <Badge variant="default" className="bg-green-600">

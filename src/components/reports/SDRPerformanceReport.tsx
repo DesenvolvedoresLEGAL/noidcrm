@@ -135,7 +135,7 @@ export function SDRPerformanceReport() {
                       {index > 2 && <span className="text-muted-foreground">{index + 1}</span>}
                     </TableCell>
                     <TableCell className="font-medium">
-                      {sdr.sdr_name || 'Usuário Desconhecido'}
+                      {sdr.sdr_name || 'Usuário removido'}
                     </TableCell>
                     <TableCell className="text-center">
                       <Badge variant="outline">{sdr.total_sqls_generated}</Badge>

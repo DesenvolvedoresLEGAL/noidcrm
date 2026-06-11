@@ -149,12 +149,12 @@ export function HandoffReport() {
                 {metrics.map((handoff, index) => (
                   <TableRow key={`${handoff.sdr_user_id}-${handoff.closer_user_id}-${index}`}>
                     <TableCell className="font-medium">
-                      {handoff.sdr_name || 'SDR Desconhecido'}
+                      {handoff.sdr_name || 'SDR removido'}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
                         <ArrowRight className="h-3 w-3 text-muted-foreground" />
-                        {handoff.closer_name || 'Closer Desconhecido'}
+                        {handoff.closer_name || 'Sem closer atribuído'}
                       </div>
                     </TableCell>
                     <TableCell className="text-center">
