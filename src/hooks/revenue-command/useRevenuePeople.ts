@@ -342,21 +342,21 @@ export function useRevenuePeople() {
         sdrMap.set(row.userId, row);
         return;
       }
-      // Merge — preserve maiores valores quando fontes divergem.
       const merged: SdrFull = {
         ...existing,
-        qualified: Math.max(existing.qualified, row.qualified),
-        withProposal: Math.max(existing.withProposal, row.withProposal),
-        withoutProposal: Math.max(existing.withoutProposal, row.withoutProposal),
-        sqlToProposalPct: Math.max(existing.sqlToProposalPct, row.sqlToProposalPct),
-        sqlToWonPct: Math.max(existing.sqlToWonPct, row.sqlToWonPct),
-        revenue: Math.max(existing.revenue, row.revenue),
+        qualified: maxN(existing.qualified, row.qualified),
+        withProposal: maxN(existing.withProposal, row.withProposal),
+        withoutProposal: maxN(existing.withoutProposal, row.withoutProposal),
+        sqlToProposalPct: maxN(existing.sqlToProposalPct, row.sqlToProposalPct),
+        sqlToWonPct: maxN(existing.sqlToWonPct, row.sqlToWonPct),
+        revenue: maxN(existing.revenue, row.revenue),
         name: existing.name?.includes('(removido)') ? row.name : existing.name,
       };
       const cls = classifySdr(merged);
       sdrMap.set(row.userId, { ...merged, classification: cls.c, classificationLabel: cls.label });
     };
 
+    // Fonte 1: Qualidade de Qualificação (preferida, traz proposta/venda/receita).
     qualRowsAll.forEach((r) => {
       const base = {
         userId: r.sdr_user_id as string,
@@ -371,16 +371,17 @@ export function useRevenuePeople() {
       const cls = classifySdr(base);
       upsertSdr({ ...base, classification: cls.c, classificationLabel: cls.label });
     });
+    // Fonte 2: SDR V2 — só volume e receita atribuída. Proposta/% ficam N/D.
     sdrSourceRows.forEach((r) => {
       const base = {
         userId: r.sdrUserId,
         name: r.sdrName,
         qualified: r.sqlsGenerated,
-        withProposal: 0,
-        withoutProposal: r.sqlsGenerated,
-        sqlToProposalPct: 0,
-        sqlToWonPct: r.winRatePct ?? 0,
-        revenue: r.revenueAttributed,
+        withProposal: null,
+        withoutProposal: null,
+        sqlToProposalPct: null,
+        sqlToWonPct: null,
+        revenue: r.revenueAttributed > 0 ? r.revenueAttributed : null,
       };
       const cls = classifySdr(base);
       upsertSdr({ ...base, classification: cls.c, classificationLabel: cls.label });
@@ -397,21 +398,20 @@ export function useRevenuePeople() {
       }
       const merged: CloserFull = {
         ...existing,
-        revenue: Math.max(existing.revenue, row.revenue),
-        won: Math.max(existing.won, row.won),
-        lost: Math.max(existing.lost, row.lost),
-        winRatePct:
-          existing.winRatePct !== null ? existing.winRatePct : row.winRatePct,
-        avgTicket: Math.max(existing.avgTicket, row.avgTicket),
-        activePipeline: Math.max(existing.activePipeline, row.activePipeline),
-        avgCycleDays:
-          existing.avgCycleDays !== null ? existing.avgCycleDays : row.avgCycleDays,
+        revenue: maxN(existing.revenue, row.revenue),
+        won: maxN(existing.won, row.won),
+        lost: maxN(existing.lost, row.lost),
+        winRatePct: pickFirst(existing.winRatePct, row.winRatePct),
+        avgTicket: maxN(existing.avgTicket, row.avgTicket),
+        activePipeline: maxN(existing.activePipeline, row.activePipeline),
+        avgCycleDays: pickFirst(existing.avgCycleDays, row.avgCycleDays),
         name: existing.name?.includes('(removido)') ? row.name : existing.name,
       };
       const cls = classifyCloser(merged);
       closerMap.set(row.userId, { ...merged, classification: cls.c, classificationLabel: cls.label });
     };
 
+    // Fonte 1: Closer V2 — métrica completa (won/lost/winRate/ticket/pipeline/ciclo).
     closerRowsAll.forEach((r) => {
       const base = {
         userId: r.closerUserId,
@@ -423,6 +423,24 @@ export function useRevenuePeople() {
         avgTicket: r.avgWonTicket,
         activePipeline: r.activePipelineValue,
         avgCycleDays: r.avgSalesCycleDays,
+      };
+      const cls = classifyCloser(base);
+      upsertCloser({ ...base, classification: cls.c, classificationLabel: cls.label });
+    });
+
+    // Fonte 2: Receita por vendedor (SSoT) — preenche revenue/won/ticket quando
+    // Closer V2 não trouxe o usuário. Lost/pipeline/ciclo ficam N/D.
+    sellerRows.forEach((s) => {
+      const base = {
+        userId: s.key,
+        name: s.label,
+        revenue: s.total,
+        won: s.count,
+        lost: null,
+        winRatePct: null as number | null,
+        avgTicket: s.avgTicket,
+        activePipeline: null,
+        avgCycleDays: null as number | null,
       };
       const cls = classifyCloser(base);
       upsertCloser({ ...base, classification: cls.c, classificationLabel: cls.label });
