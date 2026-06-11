@@ -484,6 +484,10 @@ export function useRevenueBottlenecks() {
       primarySource = 'até a proposta (Qualidade de Qualificação)';
     }
 
+    const insufficientHelper = vel
+      ? `Sem dados suficientes (qualificados=${vel.qualifiedCount}, com vínculo comercial=${vel.withCommercialLink}, com proposta criada=${vel.withProposalCreated}, amostras=${vel.sampleToProposalCreated})`
+      : 'Sem dados suficientes';
+
     const speedMetrics: SpeedMetric[] = [
       {
         id: 'sql_to_proposal',
@@ -494,7 +498,7 @@ export function useRevenueBottlenecks() {
         helper:
           primaryHours != null
             ? `Tempo médio da qualificação ${primarySource}`
-            : 'Sem dados suficientes',
+            : insufficientHelper,
       },
       ...(vel && vel.sampleToCommercialOpp >= MIN_SAMPLE && vel.avgHoursToCommercialOpp != null
         ? [
