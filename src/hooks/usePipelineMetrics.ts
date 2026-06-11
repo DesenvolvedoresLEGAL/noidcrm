@@ -81,7 +81,7 @@ export function useSDRPerformance() {
 
       const [oppsResult, usersResult] = await Promise.all([
         query,
-        supabase.from('profiles').select('id, full_name'),
+        supabase.from('profiles').select('user_id, full_name'),
       ]);
 
       if (oppsResult.error) throw oppsResult.error;
@@ -97,10 +97,10 @@ export function useSDRPerformance() {
         const sdrId = opp.qualified_by_user_id;
         if (!sdrId) return;
 
-        const user = users.find(u => u.id === sdrId);
+        const user = users.find(u => u.user_id === sdrId);
         const existing = sdrMap.get(sdrId) || {
           sdr_user_id: sdrId,
-          sdr_name: user?.full_name || 'Desconhecido',
+          sdr_name: user?.full_name || 'Usuário removido',
           organization_id: '',
           total_sqls_generated: 0,
           deals_won: 0,
@@ -165,7 +165,7 @@ export function useCloserPerformance() {
 
       const [oppsResult, usersResult] = await Promise.all([
         query,
-        supabase.from('profiles').select('id, full_name'),
+        supabase.from('profiles').select('user_id, full_name'),
       ]);
 
       if (oppsResult.error) throw oppsResult.error;
@@ -181,10 +181,10 @@ export function useCloserPerformance() {
         const closerId = opp.owner_user_id;
         if (!closerId) return;
 
-        const user = users.find(u => u.id === closerId);
+        const user = users.find(u => u.user_id === closerId);
         const existing = closerMap.get(closerId) || {
           closer_user_id: closerId,
-          closer_name: user?.full_name || 'Desconhecido',
+          closer_name: user?.full_name || 'Usuário removido',
           organization_id: '',
           deals_won: 0,
           deals_lost: 0,
@@ -340,7 +340,7 @@ export function useHandoffMetrics() {
 
       const [oppsResult, usersResult] = await Promise.all([
         query,
-        supabase.from('profiles').select('id, full_name'),
+        supabase.from('profiles').select('user_id, full_name'),
       ]);
 
       if (oppsResult.error) throw oppsResult.error;
@@ -357,14 +357,14 @@ export function useHandoffMetrics() {
 
       handoffOpps.forEach(opp => {
         const key = `${opp.qualified_by_user_id}_${opp.owner_user_id}`;
-        const sdr = users.find(u => u.id === opp.qualified_by_user_id);
-        const closer = users.find(u => u.id === opp.owner_user_id);
+        const sdr = users.find(u => u.user_id === opp.qualified_by_user_id);
+        const closer = users.find(u => u.user_id === opp.owner_user_id);
 
         const existing = handoffMap.get(key) || {
           sdr_user_id: opp.qualified_by_user_id!,
-          sdr_name: sdr?.full_name || 'Desconhecido',
+          sdr_name: sdr?.full_name || 'Usuário removido',
           closer_user_id: opp.owner_user_id!,
-          closer_name: closer?.full_name || 'Desconhecido',
+          closer_name: closer?.full_name || 'Usuário removido',
           organization_id: '',
           total_handoffs: 0,
           won_after_handoff: 0,
