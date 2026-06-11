@@ -11,6 +11,16 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Require internal secret for cron-only function
+  const internalSecret = req.headers.get('x-internal-secret');
+  const expectedSecret = Deno.env.get('INTERNAL_WORKFLOW_SECRET');
+  if (!expectedSecret || internalSecret !== expectedSecret) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
   try {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
@@ -158,7 +168,6 @@ Deno.serve(async (req) => {
         success: true, 
         expired: expiredOrgs.length,
         processed: processedCount,
-        organizations: processedOrgs,
         timestamp: nowISO,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
