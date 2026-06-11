@@ -15,6 +15,16 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const internalSecret = req.headers.get('x-internal-secret');
+  const expectedSecret = Deno.env.get('INTERNAL_WORKFLOW_SECRET');
+  if (!expectedSecret || internalSecret !== expectedSecret) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
+
   const startTime = Date.now();
   console.log('[process-pending-workflows] Starting batch processing...');
 
