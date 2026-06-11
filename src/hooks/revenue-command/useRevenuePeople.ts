@@ -23,6 +23,7 @@ import { useQualificationQualityV2 } from '@/hooks/reports/useQualificationQuali
 import { useReportCloserV2 } from '@/hooks/useReportCloserV2';
 import { useReportSDRV2 } from '@/hooks/useReportSDRV2';
 import { useOTEMonthlyResults, type OTEMonthlyResult } from '@/hooks/useOTEData';
+import { useActiveUsers } from '@/hooks/users/useActiveUsers';
 import { buildReportV2RequestFromFilters } from '@/lib/reports/buildReportV2Request';
 import { mapCloserV2 } from '@/lib/reports/mappers/mapCloserV2';
 import { mapSdrV2 } from '@/lib/reports/mappers/mapSdrV2';
@@ -242,6 +243,10 @@ export function useRevenuePeople() {
   const periodMonth = useMemo(() => format(periodStart, 'yyyy-MM'), [periodStart]);
   const oteResultsQuery = useOTEMonthlyResults(periodMonth);
 
+  // HOTFIX RCC V3.4C — aba Pessoas reflete operação atual.
+  // Fonte oficial de usuários ativos/elegíveis: crm_active_users_view.
+  const activeUsersQuery = useActiveUsers();
+
   return useMemo<{ data: PeopleData | null; isLoading: boolean; error: Error | null }>(() => {
     const isLoading =
       closedSummary.isLoading ||
@@ -250,6 +255,7 @@ export function useRevenuePeople() {
       sdrReport.isLoading ||
       qualification.isLoading ||
       oteResultsQuery.isLoading ||
+      activeUsersQuery.isLoading ||
       teamVisibility.loading;
 
     const partialSources: string[] = [];
@@ -264,14 +270,22 @@ export function useRevenuePeople() {
       return { data: null, isLoading: true, error: null };
     }
 
+    // ── Filtro canônico: apenas usuários ativos/elegíveis da operação atual.
+    const activeUserIds = new Set<string>(
+      (activeUsersQuery.data ?? []).map((u) => u.user_id).filter(Boolean),
+    );
+    const isActiveEligibleUser = (userId?: string | null) =>
+      !!userId && activeUserIds.has(userId);
+
     const sellerRows = (bySeller.data ?? [])
-      .filter((s) => s.total > 0 && s.key && s.key !== '—')
+      .filter((s) => s.total > 0 && s.key && s.key !== '—' && isActiveEligibleUser(s.key))
       .sort((a, b) => b.total - a.total);
 
     const closerRowsRaw = mapCloserV2(closerReport.data);
     const closerRowsAll = closerRowsRaw.filter(
       (r) =>
         r.closerUserId &&
+        isActiveEligibleUser(r.closerUserId) &&
         r.closerName &&
         r.closerName !== 'Sem nome' &&
         r.closerName !== 'Desconhecido',
@@ -279,12 +293,21 @@ export function useRevenuePeople() {
 
     const sdrView = mapSdrV2(sdrReport.data);
     const sdrSourceRows = sdrView.rows.filter(
-      (r) => r.sdrUserId && r.sdrName && r.sdrName !== 'Sem nome' && r.sdrName !== 'Desconhecido',
+      (r) =>
+        r.sdrUserId &&
+        isActiveEligibleUser(r.sdrUserId) &&
+        r.sdrName &&
+        r.sdrName !== 'Sem nome' &&
+        r.sdrName !== 'Desconhecido',
     );
 
     // Qualidade — preferida; fallback para useReportSDRV2 quando vazia/falha.
     const qualRowsAll = (qualification.data?.rows ?? []).filter(
-      (r) => r.sdr_user_id && r.sdr_name && r.sdr_name !== 'Sem nome',
+      (r) =>
+        r.sdr_user_id &&
+        isActiveEligibleUser(r.sdr_user_id) &&
+        r.sdr_name &&
+        r.sdr_name !== 'Sem nome',
     );
 
     type SdrFull = PeopleSdrSnapshotRow;
@@ -397,7 +420,9 @@ export function useRevenuePeople() {
       levelName?: string;
     }
     const oteRows: OteSignalRow[] = [];
-    const oteResults = (oteResultsQuery.data ?? []) as OTEMonthlyResult[];
+    const oteResults = ((oteResultsQuery.data ?? []) as OTEMonthlyResult[]).filter((r) =>
+      isActiveEligibleUser(r.user_id),
+    );
     oteResults.forEach((r) => {
       const goalType: 'leads' | 'revenue' =
         (r.goal_type as 'leads' | 'revenue') ??
@@ -784,6 +809,8 @@ export function useRevenuePeople() {
     oteResultsQuery.data,
     oteResultsQuery.isLoading,
     oteResultsQuery.error,
+    activeUsersQuery.data,
+    activeUsersQuery.isLoading,
     teamVisibility.loading,
   ]);
 }
