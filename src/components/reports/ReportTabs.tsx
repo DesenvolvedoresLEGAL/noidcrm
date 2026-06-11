@@ -16,7 +16,8 @@ import {
   Compass,
   UserSearch,
   Package,
-  ShieldCheck
+  ShieldCheck,
+  CheckCircle2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
