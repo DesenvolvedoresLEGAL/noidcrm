@@ -237,6 +237,11 @@ export function useRevenuePeople() {
     includeRemovedUsers: false,
   });
 
+  // 5) OTE — mesma fonte do Campeonato Comercial / Objetivos → Resultados.
+  //    Usa o mês de periodStart como bucket (period_month = 'yyyy-MM').
+  const periodMonth = useMemo(() => format(periodStart, 'yyyy-MM'), [periodStart]);
+  const oteResultsQuery = useOTEMonthlyResults(periodMonth);
+
   return useMemo<{ data: PeopleData | null; isLoading: boolean; error: Error | null }>(() => {
     const isLoading =
       closedSummary.isLoading ||
@@ -244,6 +249,7 @@ export function useRevenuePeople() {
       closerReport.isLoading ||
       sdrReport.isLoading ||
       qualification.isLoading ||
+      oteResultsQuery.isLoading ||
       teamVisibility.loading;
 
     const partialSources: string[] = [];
@@ -252,6 +258,7 @@ export function useRevenuePeople() {
     if (closerReport.error) partialSources.push('Performance Closer');
     if (sdrReport.error) partialSources.push('Performance SDR');
     if (qualification.error) partialSources.push('Qualidade de Qualificação');
+    if (oteResultsQuery.error) partialSources.push('OTE / Resultados');
 
     if (!orgId) {
       return { data: null, isLoading: true, error: null };
