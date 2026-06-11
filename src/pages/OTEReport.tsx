@@ -174,7 +174,9 @@ export default function OTEReport() {
             </TabsContent>
 
             <TabsContent value="auditoria">
-              <VendasRealizadasWrapper />
+              <ReportFiltersProvider>
+                <VendasRealizadasWrapper />
+              </ReportFiltersProvider>
             </TabsContent>
           </Tabs>
 
