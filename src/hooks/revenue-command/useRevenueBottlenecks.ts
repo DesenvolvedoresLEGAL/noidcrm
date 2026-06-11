@@ -676,9 +676,9 @@ export function useRevenueBottlenecks() {
         `${fmtBRL(closed.cancelledTotal)} foram cancelados no período (${closed.cancelledCount} venda(s)).`,
       );
     }
-    if (withoutProposal > 0 && qualifiedCount > 0) {
+    if (sqlWithoutProposal > 0 && sqlQualifiedCount > 0) {
       summaryParts.push(
-        `${withoutProposalPct.toFixed(0)}% dos SQLs ainda não viraram proposta.`,
+        `${sqlWithoutProposalPct.toFixed(0)}% dos SQLs ainda não viraram proposta.`,
       );
     }
 
