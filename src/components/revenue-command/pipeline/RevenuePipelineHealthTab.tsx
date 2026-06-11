@@ -28,6 +28,7 @@ import { Button } from '@/components/ui/button';
 import {
   useRevenuePipelineHealth,
   type CriticalIssue,
+  type HygieneRanking as HygieneRankingRow,
   type PipelineIssueId,
   type RecommendedAction,
   type StageHealth,
