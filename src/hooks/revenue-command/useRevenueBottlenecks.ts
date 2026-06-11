@@ -191,31 +191,90 @@ export function useRevenueBottlenecks() {
     },
   });
 
-  // 7) Velocidade SQL → Proposta (cálculo direto a partir das tabelas oficiais)
-  //    Início:  opportunities.qualified_at   (quando o SDR qualificou)
-  //    Fim (em ordem de preferência):
-  //      a) MIN(proposals.created_at)  — primeira proposta criada
-  //      b) MIN(proposals.sent_at)     — primeira proposta enviada
-  //      c) opportunities.created_at   — criação da oportunidade comercial
-  //      d) MIN(proposals.viewed_at)   — primeira visualização do cliente
-  //    Escopo: somente Pipeline de Vendas oficial, qualified_at NOT NULL,
-  //    não soft-deleted. Nenhuma view/edge alterada.
+  // 7) Velocidade SQL → Proposta (HOTFIX V3.2B)
+  //    A qualificação (SQL) costuma nascer no pipeline de Pré-vendas.
+  //    A proposta/oportunidade comercial vive no Pipeline de Vendas.
+  //    Por isso o filtro `pipeline_id = salesPipelineId` é aplicado ao
+  //    DESTINO comercial — nunca à origem da qualificação. Caso contrário
+  //    o handoff Pré-vendas → Vendas é apagado e a amostra fica vazia.
+  //
+  //    Cruzamento:
+  //      - Origem: qualquer oportunidade da org com qualified_at NOT NULL
+  //                (pipelines de qualificação OU de vendas — duplicatas
+  //                podem ter herdado qualified_at).
+  //      - Destino comercial: oportunidade no Pipeline de Vendas oficial
+  //                tal que sales.id = qualified.id (mesmo registro, caso
+  //                qualified_at já tenha sido copiado) OU
+  //                sales.source_opportunity_id = qualified.id (duplicação
+  //                Pré-vendas → Vendas).
+  //      - Fim preferencial: MIN(proposals.created_at) na opp comercial
+  //        Fallback: sales.created_at | MIN(proposals.sent_at)
+  //
+  //    Métrica de handoff/velocidade — não toca em regras financeiras.
   const velocityAggr = useQuery({
-    queryKey: ['revenue-command:bottlenecks:velocity', orgId, salesPipelineId],
+    queryKey: ['revenue-command:bottlenecks:velocity:v3.2b', orgId, salesPipelineId],
     enabled: !!orgId && pipelineResolved,
     staleTime: 60_000,
     queryFn: async () => {
-      const { data, error } = await supabase
+      // (A) Qualificações da organização (qualquer pipeline)
+      const qualQ = await supabase
         .from('opportunities')
-        .select(
-          'id, qualified_at, created_at, proposals(created_at, sent_at, viewed_at)',
-        )
+        .select('id, qualified_at, pipeline_id, created_at')
+        .eq('organization_id', orgId!)
+        .is('deleted_at', null)
+        .not('qualified_at', 'is', null)
+        .limit(5000);
+      if (qualQ.error) throw qualQ.error;
+      const qualified = (qualQ.data ?? []) as any[];
+
+      // (B) Oportunidades comerciais no Pipeline de Vendas
+      const salesQ = await supabase
+        .from('opportunities')
+        .select('id, created_at, source_opportunity_id')
         .eq('organization_id', orgId!)
         .eq('pipeline_id', salesPipelineId!)
         .is('deleted_at', null)
-        .not('qualified_at', 'is', null)
-        .limit(2000);
-      if (error) throw error;
+        .limit(5000);
+      if (salesQ.error) throw salesQ.error;
+      const salesOpps = (salesQ.data ?? []) as any[];
+
+      const salesIds = salesOpps.map((s) => s.id);
+      // (C) Propostas dessas oportunidades de Vendas
+      let proposals: any[] = [];
+      if (salesIds.length) {
+        // chunked IN para evitar URL gigante
+        const chunk = 500;
+        for (let i = 0; i < salesIds.length; i += chunk) {
+          const slice = salesIds.slice(i, i + chunk);
+          const pq = await supabase
+            .from('proposals')
+            .select('opportunity_id, created_at, sent_at, viewed_at')
+            .in('opportunity_id', slice);
+          if (pq.error) throw pq.error;
+          proposals = proposals.concat(pq.data ?? []);
+        }
+      }
+
+      const firstProposalByOpp = new Map<string, { created: number; sent: number; viewed: number }>();
+      for (const p of proposals) {
+        const oid = p.opportunity_id as string;
+        const cur = firstProposalByOpp.get(oid) ?? { created: 0, sent: 0, viewed: 0 };
+        const created = p.created_at ? new Date(p.created_at).getTime() : 0;
+        const sent = p.sent_at ? new Date(p.sent_at).getTime() : 0;
+        const viewed = p.viewed_at ? new Date(p.viewed_at).getTime() : 0;
+        if (created && (!cur.created || created < cur.created)) cur.created = created;
+        if (sent && (!cur.sent || sent < cur.sent)) cur.sent = sent;
+        if (viewed && (!cur.viewed || viewed < cur.viewed)) cur.viewed = viewed;
+        firstProposalByOpp.set(oid, cur);
+      }
+
+      // Indexa oportunidades de Vendas por id e por source_opportunity_id
+      const salesById = new Map<string, any>();
+      const salesBySourceId = new Map<string, any>();
+      for (const s of salesOpps) {
+        salesById.set(s.id, s);
+        if (s.source_opportunity_id) salesBySourceId.set(s.source_opportunity_id, s);
+      }
 
       const diffsHours = {
         toProposalCreated: [] as number[],
@@ -224,42 +283,43 @@ export function useRevenueBottlenecks() {
         toFirstView: [] as number[],
       };
 
-      for (const row of (data ?? []) as any[]) {
-        const qAt = row.qualified_at ? new Date(row.qualified_at).getTime() : 0;
-        if (!qAt) continue;
-        const oppAt = row.created_at ? new Date(row.created_at).getTime() : 0;
-        const proposals: any[] = Array.isArray(row.proposals) ? row.proposals : [];
-        const minOf = (key: string) => {
-          const ts = proposals
-            .map((p) => (p?.[key] ? new Date(p[key]).getTime() : 0))
-            .filter((t) => t > 0);
-          return ts.length ? Math.min(...ts) : 0;
-        };
-        const firstProposalAt = minOf('created_at');
-        const firstSentAt = minOf('sent_at');
-        const firstViewAt = minOf('viewed_at');
+      let withCommercialLink = 0;
+      let withProposalCreated = 0;
 
-        if (firstProposalAt && firstProposalAt > qAt) {
-          diffsHours.toProposalCreated.push(
-            (firstProposalAt - qAt) / 3_600_000,
-          );
+      for (const q of qualified) {
+        const qAt = q.qualified_at ? new Date(q.qualified_at).getTime() : 0;
+        if (!qAt) continue;
+        const commercial = salesById.get(q.id) ?? salesBySourceId.get(q.id) ?? null;
+        if (!commercial) continue;
+        withCommercialLink++;
+
+        const oppAt = commercial.created_at ? new Date(commercial.created_at).getTime() : 0;
+        const fp = firstProposalByOpp.get(commercial.id);
+        if (fp?.created) withProposalCreated++;
+
+        if (fp?.created && fp.created > qAt) {
+          diffsHours.toProposalCreated.push((fp.created - qAt) / 3_600_000);
         }
-        if (firstSentAt && firstSentAt > qAt) {
-          diffsHours.toProposalSent.push((firstSentAt - qAt) / 3_600_000);
+        if (fp?.sent && fp.sent > qAt) {
+          diffsHours.toProposalSent.push((fp.sent - qAt) / 3_600_000);
         }
         if (oppAt && oppAt > qAt) {
           diffsHours.toCommercialOpp.push((oppAt - qAt) / 3_600_000);
         }
-        if (firstViewAt && firstViewAt > qAt) {
-          diffsHours.toFirstView.push((firstViewAt - qAt) / 3_600_000);
+        if (fp?.viewed && fp.viewed > qAt) {
+          diffsHours.toFirstView.push((fp.viewed - qAt) / 3_600_000);
         }
       }
 
       const avg = (arr: number[]) =>
         arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
 
-      return {
-        qualifiedCount: (data ?? []).length,
+      const result = {
+        qualifiedCount: qualified.length,
+        salesOppsCount: salesOpps.length,
+        proposalsCount: proposals.length,
+        withCommercialLink,
+        withProposalCreated,
         avgHoursToProposalCreated: avg(diffsHours.toProposalCreated),
         sampleToProposalCreated: diffsHours.toProposalCreated.length,
         avgHoursToProposalSent: avg(diffsHours.toProposalSent),
@@ -269,6 +329,12 @@ export function useRevenueBottlenecks() {
         avgHoursToFirstView: avg(diffsHours.toFirstView),
         sampleToFirstView: diffsHours.toFirstView.length,
       };
+
+      if (import.meta.env.DEV) {
+        // eslint-disable-next-line no-console
+        console.debug('[RCC V3.2B] SQL→Proposta debug', result);
+      }
+      return result;
     },
   });
 
@@ -418,6 +484,10 @@ export function useRevenueBottlenecks() {
       primarySource = 'até a proposta (Qualidade de Qualificação)';
     }
 
+    const insufficientHelper = vel
+      ? `Sem dados suficientes (qualificados=${vel.qualifiedCount}, com vínculo comercial=${vel.withCommercialLink}, com proposta criada=${vel.withProposalCreated}, amostras=${vel.sampleToProposalCreated})`
+      : 'Sem dados suficientes';
+
     const speedMetrics: SpeedMetric[] = [
       {
         id: 'sql_to_proposal',
@@ -428,7 +498,7 @@ export function useRevenueBottlenecks() {
         helper:
           primaryHours != null
             ? `Tempo médio da qualificação ${primarySource}`
-            : 'Sem dados suficientes',
+            : insufficientHelper,
       },
       ...(vel && vel.sampleToCommercialOpp >= MIN_SAMPLE && vel.avgHoursToCommercialOpp != null
         ? [
