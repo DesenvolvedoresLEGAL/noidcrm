@@ -22,7 +22,7 @@ import {
   Network,
   Brain,
   BookOpen,
-  Trophy,
+  
   Sparkles,
   Compass,
   Boxes,
