@@ -31,6 +31,7 @@ import { RevenueRisksTab } from '@/components/revenue-command/risks/RevenueRisks
 import { RevenueNextActionsTab } from '@/components/revenue-command/next-actions/RevenueNextActionsTab';
 import { RevenueHealthTrustTab } from '@/components/revenue-command/health-trust/RevenueHealthTrustTab';
 import { ListChecks, ShieldCheck } from 'lucide-react';
+import { RevenueCopilotTab } from '@/components/revenue-command/copilot/RevenueCopilotTab';
 
 /**
  * Sprint REVOPS V3.0 — Revenue Command Center
@@ -205,7 +206,7 @@ export default function RevenueCommandPage() {
       value: 'ia',
       label: 'IA',
       icon: Bot,
-      content: <CopilotPlaceholder />,
+      content: <RevenueCopilotTab />,
     },
   ];
 
