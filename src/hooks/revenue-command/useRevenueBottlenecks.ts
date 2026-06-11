@@ -424,6 +424,12 @@ export function useRevenueBottlenecks() {
       speedMetrics,
       revenueRisk,
       executiveSummary,
+      scope: {
+        label: 'Pipeline de Vendas',
+        pipelineId: salesPipelineId ?? null,
+        pipelineName: salesPipelineName ?? null,
+        resolved: pipelineResolved,
+      },
       meta: {
         generatedAt: new Date().toISOString(),
         period: { start, end },
