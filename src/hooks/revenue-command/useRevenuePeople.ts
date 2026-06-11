@@ -272,6 +272,13 @@ export function useRevenuePeople() {
     request: closerRequest,
   });
 
+  // Handoff V2 — SDR→Closer (won/lost/wonRevenue) para derivar SQL→Venda e
+  // receita atribuída ao SDR quando Qualidade de Qualificação não retornou linhas.
+  const handoffReport = useReportHandoffV2({
+    organizationId: orgId,
+    request: closerRequest,
+  });
+
   // 4) Qualidade de qualificação — SDR volume vs qualidade
   const qualification = useQualificationQualityV2({
     proposalStatus: 'any',
