@@ -15,6 +15,7 @@ import { ExperimentsFeed } from '@/components/intelligence/experiments/Experimen
 import { GuardrailsCard } from '@/components/intelligence/experiments/GuardrailsCard';
 import { IcpIntelligencePanel } from '@/components/intelligence/icp/IcpIntelligencePanel';
 import { QualifiedQueuePanel } from '@/components/intelligence/queue/QualifiedQueuePanel';
+import { AutopilotPanel } from '@/components/intelligence/autopilot/AutopilotPanel';
 import { Compass, Sparkles } from 'lucide-react';
 
 const VALID_TABS = ['icp', 'queue', 'sourcing', 'optimization', 'experiments', 'performance'] as const;
