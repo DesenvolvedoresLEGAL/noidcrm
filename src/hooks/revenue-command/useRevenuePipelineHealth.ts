@@ -190,22 +190,35 @@ export function useRevenuePipelineHealth() {
       );
       const profilesMap = new Map<
         string,
-        { name: string; avatar_url: string | null }
+        { name: string | null; avatar_url: string | null; removed: boolean }
       >();
       if (ownerIds.length > 0) {
+        // profiles.user_id = auth user id (= opportunities.owner_user_id)
         const profQ = await supabase
           .from('profiles')
-          .select('id,full_name,avatar_url,email')
-          .in('id', ownerIds);
+          .select('user_id,full_name,avatar_url,email')
+          .in('user_id', ownerIds);
         if (!profQ.error) {
-          (profQ.data ?? []).forEach((p: any) =>
-            profilesMap.set(String(p.id), {
-              name: p.full_name || p.email || 'Sem nome',
+          (profQ.data ?? []).forEach((p: any) => {
+            const name =
+              (p.full_name && String(p.full_name).trim()) ||
+              (p.email && String(p.email).trim()) ||
+              null;
+            profilesMap.set(String(p.user_id), {
+              name,
               avatar_url: p.avatar_url ?? null,
-            }),
-          );
+              removed: false,
+            });
+          });
         }
+        // Owners sem profile = usuário removido
+        ownerIds.forEach((id) => {
+          if (!profilesMap.has(id)) {
+            profilesMap.set(id, { name: null, avatar_url: null, removed: true });
+          }
+        });
       }
+
 
       return { opps, stagesMap, profilesMap };
     },
@@ -392,7 +405,6 @@ export function useRevenuePipelineHealth() {
       byOwner.get(id)!.push(o);
     }
     const ranking: HygieneRanking[] = Array.from(byOwner.entries())
-      .filter(([id]) => id !== '__none__')
       .map(([ownerId, rows]) => {
         let p = 0;
         rows.forEach((r) => {
@@ -403,11 +415,25 @@ export function useRevenuePipelineHealth() {
           0,
           Math.min(100, Math.round(100 - (p / Math.max(1, rows.length)) * 10)),
         );
-        const prof = profilesMap.get(ownerId);
+        let ownerName: string;
+        let avatarUrl: string | null = null;
+        if (ownerId === '__none__') {
+          ownerName = 'Sem responsável';
+        } else {
+          const prof = profilesMap.get(ownerId);
+          avatarUrl = prof?.avatar_url ?? null;
+          if (!prof) {
+            ownerName = 'Usuário removido';
+          } else if (prof.removed) {
+            ownerName = prof.name ? `${prof.name} (removido)` : 'Usuário removido';
+          } else {
+            ownerName = prof.name ?? 'Usuário removido';
+          }
+        }
         return {
           ownerId,
-          ownerName: prof?.name ?? 'Sem nome',
-          avatarUrl: prof?.avatar_url ?? null,
+          ownerName,
+          avatarUrl,
           total: rows.length,
           issues: rows.filter((r) => (oppIssues.get(r.id) ?? []).length > 0)
             .length,
