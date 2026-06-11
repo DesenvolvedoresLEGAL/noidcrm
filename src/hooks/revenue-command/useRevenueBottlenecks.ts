@@ -238,20 +238,31 @@ export function useRevenueBottlenecks() {
   //
   //    Métrica de handoff/velocidade — não toca em regras financeiras.
   const velocityAggr = useQuery({
-    queryKey: ['revenue-command:bottlenecks:velocity:v3.2b', orgId, salesPipelineId],
+    queryKey: [
+      'revenue-command:bottlenecks:velocity:v3.2d',
+      orgId,
+      salesPipelineId,
+      start,
+      end,
+    ],
     enabled: !!orgId && pipelineResolved,
     staleTime: 60_000,
     queryFn: async () => {
-      // (A) Qualificações da organização (qualquer pipeline)
+      // (A) Qualificações da organização (qualquer pipeline) NO PERÍODO ativo.
+      // HOTFIX V3.2D: aplica filtro `qualified_at` ao período do RCC para que
+      // o card "SQLs sem proposta" e a métrica SQL→Proposta não usem histórico.
       const qualQ = await supabase
         .from('opportunities')
         .select('id, qualified_at, pipeline_id, created_at')
         .eq('organization_id', orgId!)
         .is('deleted_at', null)
         .not('qualified_at', 'is', null)
+        .gte('qualified_at', start)
+        .lte('qualified_at', end)
         .limit(5000);
       if (qualQ.error) throw qualQ.error;
       const qualified = (qualQ.data ?? []) as any[];
+
 
       // (B) Oportunidades comerciais no Pipeline de Vendas
       const salesQ = await supabase
