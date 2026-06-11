@@ -36,7 +36,7 @@ export default function KairosHub() {
     const next = value as KairosTab;
     setActiveTab(next);
     const params = new URLSearchParams(searchParams);
-    if (next === 'sourcing') params.delete('tab');
+    if (next === 'icp') params.delete('tab');
     else params.set('tab', next);
     setSearchParams(params, { replace: true });
   };
