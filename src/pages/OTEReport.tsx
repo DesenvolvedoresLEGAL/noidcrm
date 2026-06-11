@@ -142,6 +142,7 @@ export default function OTEReport() {
             <TabsList>
               <TabsTrigger value="overview">Visão Geral</TabsTrigger>
               <TabsTrigger value="history">Histórico</TabsTrigger>
+              <TabsTrigger value="auditoria">Auditoria</TabsTrigger>
             </TabsList>
 
             <TabsContent value="overview">
@@ -168,6 +169,10 @@ export default function OTEReport() {
               ) : (
                 <OTEHistoryTab />
               )}
+            </TabsContent>
+
+            <TabsContent value="auditoria">
+              <VendasRealizadasWrapper />
             </TabsContent>
           </Tabs>
 
