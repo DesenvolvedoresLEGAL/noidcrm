@@ -27,6 +27,7 @@ import { RevenueTodayTab } from '@/components/revenue-command/today/RevenueToday
 import { RevenueBottlenecksTab } from '@/components/revenue-command/bottlenecks/RevenueBottlenecksTab';
 import { RevenuePipelineHealthTab } from '@/components/revenue-command/pipeline/RevenuePipelineHealthTab';
 import { RevenuePeopleTab } from '@/components/revenue-command/people/RevenuePeopleTab';
+import { RevenueRisksTab } from '@/components/revenue-command/risks/RevenueRisksTab';
 
 /**
  * Sprint REVOPS V3.0 — Revenue Command Center
@@ -183,15 +184,7 @@ export default function RevenueCommandPage() {
       value: 'riscos',
       label: 'Riscos',
       icon: AlertTriangle,
-      content: (
-        <RevenueSectionCard
-          title="Riscos"
-          description="Sinais que ameaçam a meta comercial."
-          icon={AlertTriangle}
-        >
-          <PlaceholderGrid items={PLACEHOLDER_SECTIONS.riscos} />
-        </RevenueSectionCard>
-      ),
+      content: <RevenueRisksTab />,
     },
     {
       value: 'ia',
