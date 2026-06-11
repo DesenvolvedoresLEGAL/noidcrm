@@ -77,8 +77,7 @@ interface LeadSearchFormProps {
 }
 
 export function LeadSearchForm({ onExecute, isExecuting }: LeadSearchFormProps) {
-  const { organization } = useCurrentOrganization();
-  const [playbookType, setPlaybookType] = useState('geo');
+  const [playbookType, setPlaybookType] = useState('event');
   const [selectedIcpId, setSelectedIcpId] = useState<string | null>(null);
   const [inputPayload, setInputPayload] = useState<Record<string, any>>({});
   const [scoreThreshold, setScoreThreshold] = useState(60);
@@ -87,16 +86,24 @@ export function LeadSearchForm({ onExecute, isExecuting }: LeadSearchFormProps) 
   const [autoCreateOpportunity, setAutoCreateOpportunity] = useState(false);
   const [autoAssignOwner, setAutoAssignOwner] = useState(false);
 
-  const { data: icps } = useQuery({
-    queryKey: ['icps', organization?.id],
-    queryFn: () => listICPs(organization!.id),
-    enabled: !!organization?.id,
-  });
-
-  const selectedIcp = icps?.find(i => i.id === selectedIcpId);
+  const { data: icps } = useIcpIntelligence();
+  const selectedIcp: IntelligenceICP | undefined = icps?.find(i => i.id === selectedIcpId);
 
   const updatePayload = (key: string, value: any) => {
     setInputPayload(prev => ({ ...prev, [key]: value }));
+  };
+
+  // Quando o ICP muda, sugere segment/city/state nos parâmetros (sem sobrescrever valores já digitados)
+  const handleIcpChange = (id: string) => {
+    setSelectedIcpId(id || null);
+    const icp = icps?.find(i => i.id === id);
+    if (!icp) return;
+    setInputPayload(prev => ({
+      segment: prev.segment || icp.filterHints.segment || '',
+      city: prev.city || icp.filterHints.city || '',
+      state: prev.state || icp.filterHints.state || '',
+      ...prev,
+    }));
   };
 
   const handleExecute = () => {
