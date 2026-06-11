@@ -36,7 +36,7 @@ const reportTabs = [
   { id: 'funnel-balance', label: 'Balanceamento', icon: Target, category: 'funnel' },
   { id: 'conversion-rate', label: 'Conversão', icon: Zap, category: 'funnel' },
   { id: 'stage-conversion', label: 'Estágios', icon: Layers, category: 'funnel' },
-  { id: 'forecast', label: 'Forecast', icon: Calendar, category: 'performance' },
+  
   { id: 'team-performance', label: 'Performance', icon: Users, category: 'performance' },
   { id: 'sdr-performance', label: 'SDR', icon: UserCheck, category: 'performance' },
   { id: 'closer-performance', label: 'Closer', icon: Award, category: 'performance' },
