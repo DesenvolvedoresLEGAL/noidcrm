@@ -32,6 +32,7 @@ import { RevenueNextActionsTab } from '@/components/revenue-command/next-actions
 import { RevenueHealthTrustTab } from '@/components/revenue-command/health-trust/RevenueHealthTrustTab';
 import { ListChecks, ShieldCheck } from 'lucide-react';
 import { RevenueCopilotTab } from '@/components/revenue-command/copilot/RevenueCopilotTab';
+import { RevenueExecutiveWarRoom } from '@/components/revenue-command/war-room/RevenueExecutiveWarRoom';
 
 /**
  * Sprint REVOPS V3.0 — Revenue Command Center
@@ -215,6 +216,7 @@ export default function RevenueCommandPage() {
       <ReportFiltersProvider>
         <PageContainer>
           <RevenueCommandHeader />
+          <RevenueExecutiveWarRoom />
           <RevenueCommandTabs tabs={tabs} value={activeTab} onValueChange={setActiveTab} />
         </PageContainer>
       </ReportFiltersProvider>
