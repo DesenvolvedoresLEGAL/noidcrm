@@ -238,20 +238,31 @@ export function useRevenueBottlenecks() {
   //
   //    Métrica de handoff/velocidade — não toca em regras financeiras.
   const velocityAggr = useQuery({
-    queryKey: ['revenue-command:bottlenecks:velocity:v3.2b', orgId, salesPipelineId],
+    queryKey: [
+      'revenue-command:bottlenecks:velocity:v3.2d',
+      orgId,
+      salesPipelineId,
+      start,
+      end,
+    ],
     enabled: !!orgId && pipelineResolved,
     staleTime: 60_000,
     queryFn: async () => {
-      // (A) Qualificações da organização (qualquer pipeline)
+      // (A) Qualificações da organização (qualquer pipeline) NO PERÍODO ativo.
+      // HOTFIX V3.2D: aplica filtro `qualified_at` ao período do RCC para que
+      // o card "SQLs sem proposta" e a métrica SQL→Proposta não usem histórico.
       const qualQ = await supabase
         .from('opportunities')
         .select('id, qualified_at, pipeline_id, created_at')
         .eq('organization_id', orgId!)
         .is('deleted_at', null)
         .not('qualified_at', 'is', null)
+        .gte('qualified_at', start)
+        .lte('qualified_at', end)
         .limit(5000);
       if (qualQ.error) throw qualQ.error;
       const qualified = (qualQ.data ?? []) as any[];
+
 
       // (B) Oportunidades comerciais no Pipeline de Vendas
       const salesQ = await supabase
@@ -340,12 +351,21 @@ export function useRevenueBottlenecks() {
       const avg = (arr: number[]) =>
         arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
 
+      const sourcePipelines = Array.from(
+        new Set(qualified.map((q) => q.pipeline_id).filter(Boolean)),
+      ) as string[];
+
       const result = {
         qualifiedCount: qualified.length,
         salesOppsCount: salesOpps.length,
         proposalsCount: proposals.length,
         withCommercialLink,
         withProposalCreated,
+        withoutProposal: Math.max(0, qualified.length - withProposalCreated),
+        sourcePipelines,
+        periodStart: start,
+        periodEnd: end,
+        salesPipelineId: salesPipelineId!,
         avgHoursToProposalCreated: avg(diffsHours.toProposalCreated),
         sampleToProposalCreated: diffsHours.toProposalCreated.length,
         avgHoursToProposalSent: avg(diffsHours.toProposalSent),
@@ -358,7 +378,15 @@ export function useRevenueBottlenecks() {
 
       if (import.meta.env.DEV) {
         // eslint-disable-next-line no-console
-        console.debug('[RCC V3.2B] SQL→Proposta debug', result);
+        console.debug('[RCC V3.2D] SQLs sem proposta (período)', {
+          totalQualified: result.qualifiedCount,
+          withProposal: result.withProposalCreated,
+          withoutProposal: result.withoutProposal,
+          withCommercialLink: result.withCommercialLink,
+          dateRange: { start, end },
+          sourcePipelines,
+          salesPipelineId,
+        });
       }
       return result;
     },
@@ -419,11 +447,12 @@ export function useRevenueBottlenecks() {
     const sqlSource = useVelForSql
       ? 'SQL→Proposta (Pré-vendas → Vendas)'
       : 'Qualidade de Qualificação';
+    const periodLabel = `${periodStart.toLocaleDateString('pt-BR')} a ${periodEnd.toLocaleDateString('pt-BR')}`;
     const sqlHelper = !sqlBaseAvailable
       ? 'Dados parciais — fonte indisponível'
       : sqlQualifiedCount > 0
-        ? `${sqlWithoutProposalPct.toFixed(0)}% dos ${sqlQualifiedCount} SQLs ainda sem proposta`
-        : 'SQLs qualificados que ainda não viraram proposta';
+        ? `${sqlWithoutProposal} de ${sqlQualifiedCount} SQLs qualificados · ${periodLabel}${useVelForSql ? ' · Pré-vendas → Pipeline de Vendas' : ''}`
+        : `Sem SQLs qualificados no período (${periodLabel})`;
 
     // Card 3 — perdidas via Win/Loss
     const wlLostCount = wl?.lostCount ?? 0;
