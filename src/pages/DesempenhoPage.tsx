@@ -87,7 +87,8 @@ function DesempenhoContent() {
   return (
     <Layout>
       <div className="flex flex-col h-[calc(100vh-4rem)]">
-        <div className="p-4 md:px-6 md:pt-6 md:pb-4">
+        <div className="p-4 md:px-6 md:pt-6 md:pb-4 space-y-3">
+          <RevenueCommandLegacyBanner rccTab="Pessoas" />
           <PageHeader
             icon={BarChart3}
             title="Desempenho"
