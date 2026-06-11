@@ -136,32 +136,56 @@ function fmtBRL(v: number) {
   return `R$ ${Math.round(v).toLocaleString('pt-BR')}`;
 }
 
+// Helpers — null-safe agregação entre fontes.
+function maxN(a: number | null, b: number | null): number | null {
+  if (a === null) return b;
+  if (b === null) return a;
+  return Math.max(a, b);
+}
+function pickFirst<T>(a: T | null, b: T | null): T | null {
+  return a !== null && a !== undefined ? a : b ?? null;
+}
+function num(v: number | null): number {
+  return v ?? 0;
+}
+
 function classifySdr(row: {
-  qualified: number;
-  withProposal: number;
-  sqlToProposalPct: number;
-  sqlToWonPct: number;
+  qualified: number | null;
+  withProposal: number | null;
+  sqlToProposalPct: number | null;
+  sqlToWonPct: number | null;
 }): { c: PeopleClassification; label: string } {
-  if (row.qualified < 3) return { c: 'insufficient', label: 'Sem dados suficientes' };
-  if (row.qualified >= 20 && row.sqlToProposalPct < 30)
+  const qualified = num(row.qualified);
+  const sqlToProposalKnown = row.sqlToProposalPct !== null;
+  const sqlToProp = num(row.sqlToProposalPct);
+  const sqlToWon = num(row.sqlToWonPct);
+  if (qualified < 3) return { c: 'insufficient', label: 'Sem dados suficientes' };
+  if (sqlToProposalKnown && qualified >= 20 && sqlToProp < 30)
     return { c: 'volume_no_quality', label: 'Volume sem qualidade' };
-  if (row.qualified < 8) return { c: 'low_volume', label: 'Baixo volume' };
-  if (row.sqlToProposalPct >= 60 && row.sqlToWonPct >= 15)
+  if (qualified < 8) return { c: 'low_volume', label: 'Baixo volume' };
+  if (!sqlToProposalKnown) return { c: 'insufficient', label: 'Qualidade sem fonte' };
+  if (sqlToProp >= 60 && sqlToWon >= 15)
     return { c: 'high', label: 'Alta qualidade' };
-  if (row.sqlToProposalPct >= 40) return { c: 'good', label: 'Bom' };
+  if (sqlToProp >= 40) return { c: 'good', label: 'Bom' };
   return { c: 'attention', label: 'Atenção' };
 }
 
 function classifyCloser(row: {
-  won: number;
-  lost: number;
+  won: number | null;
+  lost: number | null;
   winRatePct: number | null;
-  revenue: number;
+  revenue: number | null;
 }): { c: PeopleClassification; label: string } {
-  const processed = row.won + row.lost;
-  if (processed < 3) return { c: 'insufficient', label: 'Sem dados suficientes' };
-  const wr = row.winRatePct ?? 0;
-  if (wr >= 50 && row.revenue > 0) return { c: 'high', label: 'Alta performance' };
+  const won = num(row.won);
+  const lost = num(row.lost);
+  const processed = won + lost;
+  const revenue = num(row.revenue);
+  if (processed < 3 && revenue <= 0) return { c: 'insufficient', label: 'Sem dados suficientes' };
+  if (row.winRatePct === null && processed < 3) {
+    return { c: 'insufficient', label: 'Win Rate sem fonte' };
+  }
+  const wr = row.winRatePct ?? (processed > 0 ? (won / processed) * 100 : 0);
+  if (wr >= 50 && revenue > 0) return { c: 'high', label: 'Alta performance' };
   if (wr >= 30) return { c: 'good', label: 'Bom' };
   if (wr >= 15) return { c: 'attention', label: 'Atenção' };
   return { c: 'risk', label: 'Risco' };
