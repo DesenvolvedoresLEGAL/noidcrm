@@ -9,11 +9,12 @@ import {
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Check, X, AlertTriangle, Download, PackageCheck, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
+import { Check, X, AlertTriangle, Download, PackageCheck, ArrowUp, ArrowDown, ArrowUpDown, Rocket } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Prospect } from '@/hooks/useLeadSourcingV2';
 import { DecisionBadge } from '@/components/decision-engine/DecisionBadge';
 import { RelationshipBadge } from './RelationshipBadge';
+import { AutopilotConfigModal } from '@/components/intelligence/autopilot/AutopilotConfigModal';
 
 type FilterKey = 'all' | 'pending' | 'approved' | 'rejected' | 'imported' | 'duplicate' | 'tier_s' | 'tier_a' | 'tier_b' | 'tier_c' | 'high_score' | 'no_domain' | 'rel_customer' | 'rel_opportunity' | 'rel_account' | 'rel_new';
 
