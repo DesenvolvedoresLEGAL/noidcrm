@@ -581,34 +581,52 @@ export function useRevenuePeople() {
 
     if (typeof window !== 'undefined' && (window as any).__DEV_RCC_PEOPLE__) {
       // eslint-disable-next-line no-console
-      console.debug('[RCC V3.4B] Pessoas', {
+      console.debug('[RCC V3.4D] Pessoas', {
         period: { start, end, periodMonth },
+        activeUsers: activeUserIds.size,
         sellerRows: sellerRows.length,
+        closerSourceRows: closerRowsAll.length,
+        sdrSourceRows: sdrSourceRows.length,
+        qualRowsAll: qualRowsAll.length,
+        oteRows: oteRows.length,
         sdrFull: sdrFull.length,
         closerFull: closerFull.length,
-        qualRows: qualRowsAll.length,
-        sdrV2Rows: sdrSourceRows.length,
-        oteRows: oteRows.length,
+        winsByCloser: closerFull
+          .filter((r) => r.won !== null)
+          .map((r) => ({ name: r.name, won: r.won, revenue: r.revenue })),
+        lossesByCloser: closerFull
+          .filter((r) => r.lost !== null)
+          .map((r) => ({ name: r.name, lost: r.lost })),
+        pipelineByCloser: closerFull
+          .filter((r) => r.activePipeline !== null)
+          .map((r) => ({ name: r.name, pipeline: r.activePipeline })),
+        partialSources,
+        errors: {
+          qualification: qualification.error?.message ?? null,
+          closer: closerReport.error?.message ?? null,
+          sdr: sdrReport.error?.message ?? null,
+          ote: oteResultsQuery.error?.message ?? null,
+          bySeller: bySeller.error?.message ?? null,
+        },
         activePeople,
-        qualificationError: !!qualification.error,
-        closerError: !!closerReport.error,
-        sdrError: !!sdrReport.error,
-        oteError: !!oteResultsQuery.error,
       });
     }
 
     // ── Top performers (até 5)
     const topPerformers: PeopleTopPerformer[] = [];
     closerSnapshot
-      .filter((r) => r.revenue > 0)
+      .filter((r) => num(r.revenue) > 0)
       .slice(0, 3)
       .forEach((r) =>
         topPerformers.push({
           userId: r.userId,
           name: r.name,
           role: 'Closer',
-          primaryMetric: `${fmtBRL(r.revenue)} em receita válida`,
-          contribution: `${r.won} venda(s) ganha(s)${r.winRatePct !== null ? ` · Win Rate ${r.winRatePct.toFixed(0)}%` : ''}`,
+          primaryMetric: `${fmtBRL(num(r.revenue))} em receita válida`,
+          contribution:
+            r.won !== null
+              ? `${r.won} venda(s) ganha(s)${r.winRatePct !== null ? ` · Win Rate ${r.winRatePct.toFixed(0)}%` : ''}`
+              : 'Vendas: N/D',
           cta: CLOSER_CTA,
         }),
       );
@@ -656,9 +674,16 @@ export function useRevenuePeople() {
           role: 'Closer',
           problem:
             r.winRatePct !== null
-              ? `Win Rate baixo (${r.winRatePct.toFixed(0)}%) com ${r.lost} perdido(s)`
-              : `${r.lost} perdido(s) no período`,
-          impact: r.activePipeline > 0 ? `Pipeline ativo ${fmtBRL(r.activePipeline)}` : 'Pipeline vazio',
+              ? `Win Rate baixo (${r.winRatePct.toFixed(0)}%)${r.lost !== null ? ` com ${r.lost} perdido(s)` : ''}`
+              : r.lost !== null
+                ? `${r.lost} perdido(s) no período`
+                : 'Win Rate: N/D',
+          impact:
+            r.activePipeline !== null
+              ? r.activePipeline > 0
+                ? `Pipeline ativo ${fmtBRL(r.activePipeline)}`
+                : 'Pipeline vazio'
+              : 'Pipeline: N/D',
           cta: CLOSER_CTA,
         }),
       );
@@ -673,8 +698,14 @@ export function useRevenuePeople() {
           userId: r.userId,
           name: r.name,
           role: 'SDR',
-          problem: `${r.qualified} SQLs, mas SQL→Proposta de ${r.sqlToProposalPct.toFixed(0)}%`,
-          impact: `${r.withoutProposal} SQLs sem proposta`,
+          problem:
+            r.sqlToProposalPct !== null
+              ? `${num(r.qualified)} SQLs, mas SQL→Proposta de ${r.sqlToProposalPct.toFixed(0)}%`
+              : `${num(r.qualified)} SQLs · SQL→Proposta: N/D`,
+          impact:
+            r.withoutProposal !== null
+              ? `${r.withoutProposal} SQLs sem proposta`
+              : 'Sem vínculo de proposta encontrado',
           cta: QUALITY_CTA,
         }),
       );
@@ -729,11 +760,11 @@ export function useRevenuePeople() {
     // ── Ações recomendadas
     const actions: PeopleRecommendedAction[] = [];
     const sdrVolumeNoQuality = sdrSnapshot.find((r) => r.classification === 'volume_no_quality');
-    if (sdrVolumeNoQuality) {
+    if (sdrVolumeNoQuality && sdrVolumeNoQuality.sqlToProposalPct !== null) {
       actions.push({
         id: 'review-sdr-quality',
         title: 'Revisar qualidade da qualificação',
-        reason: `${sdrVolumeNoQuality.name} tem ${sdrVolumeNoQuality.qualified} SQLs com SQL→Proposta de ${sdrVolumeNoQuality.sqlToProposalPct.toFixed(0)}%.`,
+        reason: `${sdrVolumeNoQuality.name} tem ${num(sdrVolumeNoQuality.qualified)} SQLs com SQL→Proposta de ${sdrVolumeNoQuality.sqlToProposalPct.toFixed(0)}%.`,
         priority: 'alta',
         person: { name: sdrVolumeNoQuality.name, role: 'SDR' },
         cta: QUALITY_CTA,
@@ -744,7 +775,10 @@ export function useRevenuePeople() {
       actions.push({
         id: 'help-closer-pipeline',
         title: 'Apoiar closer em risco',
-        reason: `${closerRisk.name} está com win rate baixo e pipeline ativo de ${fmtBRL(closerRisk.activePipeline)}.`,
+        reason:
+          closerRisk.activePipeline !== null
+            ? `${closerRisk.name} está com win rate baixo e pipeline ativo de ${fmtBRL(closerRisk.activePipeline)}.`
+            : `${closerRisk.name} está com win rate baixo.`,
         priority: 'alta',
         person: { name: closerRisk.name, role: 'Closer' },
         cta: PIPELINE_CTA,
@@ -764,7 +798,7 @@ export function useRevenuePeople() {
       actions.push({
         id: 'increase-sdr-volume',
         title: 'Aumentar volume de qualificação',
-        reason: `${lowVolumeSdr.name} qualificou apenas ${lowVolumeSdr.qualified} no período.`,
+        reason: `${lowVolumeSdr.name} qualificou apenas ${num(lowVolumeSdr.qualified)} no período.`,
         priority: 'média',
         person: { name: lowVolumeSdr.name, role: 'SDR' },
         cta: SDR_CTA,
@@ -787,6 +821,7 @@ export function useRevenuePeople() {
       'Qualidade de Qualificação',
       'OTE / Resultados',
     ];
+
 
     const confidence: PeopleData['meta']['confidence'] =
       partialSources.length === 0
