@@ -28,6 +28,8 @@ import { RevenueBottlenecksTab } from '@/components/revenue-command/bottlenecks/
 import { RevenuePipelineHealthTab } from '@/components/revenue-command/pipeline/RevenuePipelineHealthTab';
 import { RevenuePeopleTab } from '@/components/revenue-command/people/RevenuePeopleTab';
 import { RevenueRisksTab } from '@/components/revenue-command/risks/RevenueRisksTab';
+import { RevenueNextActionsTab } from '@/components/revenue-command/next-actions/RevenueNextActionsTab';
+import { ListChecks } from 'lucide-react';
 
 /**
  * Sprint REVOPS V3.0 — Revenue Command Center
@@ -185,6 +187,12 @@ export default function RevenueCommandPage() {
       label: 'Riscos',
       icon: AlertTriangle,
       content: <RevenueRisksTab />,
+    },
+    {
+      value: 'proximas-acoes',
+      label: 'Próximas Ações',
+      icon: ListChecks,
+      content: <RevenueNextActionsTab />,
     },
     {
       value: 'ia',
