@@ -475,11 +475,7 @@ function HygieneRanking({
   rows,
   loading,
 }: {
-  rows: ReturnType<typeof useRevenuePipelineHealth>['data'] extends infer T
-    ? T extends { ranking: infer R }
-      ? R
-      : never
-    : never;
+  rows: HygieneRankingRow[];
   loading: boolean;
 }) {
   if (loading) {
