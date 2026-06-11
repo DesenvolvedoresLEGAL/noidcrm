@@ -23,8 +23,15 @@ const CLS_TONE: Record<PeopleSdrSnapshotRow['classification'], string> = {
   insufficient: 'bg-muted text-muted-foreground border-border',
 };
 
-function fmtBRL(v: number) {
+function fmtBRL(v: number | null) {
+  if (v === null || v === undefined) return 'N/D';
   return `R$ ${Math.round(v).toLocaleString('pt-BR')}`;
+}
+function fmtInt(v: number | null) {
+  return v === null || v === undefined ? 'N/D' : String(v);
+}
+function fmtPct(v: number | null) {
+  return v === null || v === undefined ? 'N/D' : `${v.toFixed(0)}%`;
 }
 
 export function PeopleSdrQualitySnapshot({ rows }: { rows: PeopleSdrSnapshotRow[] }) {
@@ -63,10 +70,10 @@ export function PeopleSdrQualitySnapshot({ rows }: { rows: PeopleSdrSnapshotRow[
               {rows.map((r) => (
                 <TableRow key={r.userId}>
                   <TableCell className="font-medium">{r.name}</TableCell>
-                  <TableCell className="text-right">{r.qualified}</TableCell>
-                  <TableCell className="text-right">{r.withProposal}</TableCell>
-                  <TableCell className="text-right">{r.sqlToProposalPct.toFixed(0)}%</TableCell>
-                  <TableCell className="text-right">{r.sqlToWonPct.toFixed(0)}%</TableCell>
+                  <TableCell className="text-right">{fmtInt(r.qualified)}</TableCell>
+                  <TableCell className="text-right">{fmtInt(r.withProposal)}</TableCell>
+                  <TableCell className="text-right">{fmtPct(r.sqlToProposalPct)}</TableCell>
+                  <TableCell className="text-right">{fmtPct(r.sqlToWonPct)}</TableCell>
                   <TableCell className="text-right">{fmtBRL(r.revenue)}</TableCell>
                   <TableCell>
                     <Badge variant="outline" className={cn('text-[10px]', CLS_TONE[r.classification])}>

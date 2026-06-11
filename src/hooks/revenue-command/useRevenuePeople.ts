@@ -67,12 +67,12 @@ export interface PeopleNeedsHelpItem {
 export interface PeopleSdrSnapshotRow {
   userId: string;
   name: string;
-  qualified: number;
-  withProposal: number;
-  withoutProposal: number;
-  sqlToProposalPct: number;
-  sqlToWonPct: number;
-  revenue: number;
+  qualified: number | null;
+  withProposal: number | null;
+  withoutProposal: number | null;
+  sqlToProposalPct: number | null;
+  sqlToWonPct: number | null;
+  revenue: number | null;
   classification: PeopleClassification;
   classificationLabel: string;
 }
@@ -80,12 +80,12 @@ export interface PeopleSdrSnapshotRow {
 export interface PeopleCloserSnapshotRow {
   userId: string;
   name: string;
-  revenue: number;
-  won: number;
-  lost: number;
+  revenue: number | null;
+  won: number | null;
+  lost: number | null;
   winRatePct: number | null;
-  avgTicket: number;
-  activePipeline: number;
+  avgTicket: number | null;
+  activePipeline: number | null;
   avgCycleDays: number | null;
   classification: PeopleClassification;
   classificationLabel: string;
@@ -136,32 +136,56 @@ function fmtBRL(v: number) {
   return `R$ ${Math.round(v).toLocaleString('pt-BR')}`;
 }
 
+// Helpers — null-safe agregação entre fontes.
+function maxN(a: number | null, b: number | null): number | null {
+  if (a === null) return b;
+  if (b === null) return a;
+  return Math.max(a, b);
+}
+function pickFirst<T>(a: T | null, b: T | null): T | null {
+  return a !== null && a !== undefined ? a : b ?? null;
+}
+function num(v: number | null): number {
+  return v ?? 0;
+}
+
 function classifySdr(row: {
-  qualified: number;
-  withProposal: number;
-  sqlToProposalPct: number;
-  sqlToWonPct: number;
+  qualified: number | null;
+  withProposal: number | null;
+  sqlToProposalPct: number | null;
+  sqlToWonPct: number | null;
 }): { c: PeopleClassification; label: string } {
-  if (row.qualified < 3) return { c: 'insufficient', label: 'Sem dados suficientes' };
-  if (row.qualified >= 20 && row.sqlToProposalPct < 30)
+  const qualified = num(row.qualified);
+  const sqlToProposalKnown = row.sqlToProposalPct !== null;
+  const sqlToProp = num(row.sqlToProposalPct);
+  const sqlToWon = num(row.sqlToWonPct);
+  if (qualified < 3) return { c: 'insufficient', label: 'Sem dados suficientes' };
+  if (sqlToProposalKnown && qualified >= 20 && sqlToProp < 30)
     return { c: 'volume_no_quality', label: 'Volume sem qualidade' };
-  if (row.qualified < 8) return { c: 'low_volume', label: 'Baixo volume' };
-  if (row.sqlToProposalPct >= 60 && row.sqlToWonPct >= 15)
+  if (qualified < 8) return { c: 'low_volume', label: 'Baixo volume' };
+  if (!sqlToProposalKnown) return { c: 'insufficient', label: 'Qualidade sem fonte' };
+  if (sqlToProp >= 60 && sqlToWon >= 15)
     return { c: 'high', label: 'Alta qualidade' };
-  if (row.sqlToProposalPct >= 40) return { c: 'good', label: 'Bom' };
+  if (sqlToProp >= 40) return { c: 'good', label: 'Bom' };
   return { c: 'attention', label: 'Atenção' };
 }
 
 function classifyCloser(row: {
-  won: number;
-  lost: number;
+  won: number | null;
+  lost: number | null;
   winRatePct: number | null;
-  revenue: number;
+  revenue: number | null;
 }): { c: PeopleClassification; label: string } {
-  const processed = row.won + row.lost;
-  if (processed < 3) return { c: 'insufficient', label: 'Sem dados suficientes' };
-  const wr = row.winRatePct ?? 0;
-  if (wr >= 50 && row.revenue > 0) return { c: 'high', label: 'Alta performance' };
+  const won = num(row.won);
+  const lost = num(row.lost);
+  const processed = won + lost;
+  const revenue = num(row.revenue);
+  if (processed < 3 && revenue <= 0) return { c: 'insufficient', label: 'Sem dados suficientes' };
+  if (row.winRatePct === null && processed < 3) {
+    return { c: 'insufficient', label: 'Win Rate sem fonte' };
+  }
+  const wr = row.winRatePct ?? (processed > 0 ? (won / processed) * 100 : 0);
+  if (wr >= 50 && revenue > 0) return { c: 'high', label: 'Alta performance' };
   if (wr >= 30) return { c: 'good', label: 'Bom' };
   if (wr >= 15) return { c: 'attention', label: 'Atenção' };
   return { c: 'risk', label: 'Risco' };
@@ -318,21 +342,21 @@ export function useRevenuePeople() {
         sdrMap.set(row.userId, row);
         return;
       }
-      // Merge — preserve maiores valores quando fontes divergem.
       const merged: SdrFull = {
         ...existing,
-        qualified: Math.max(existing.qualified, row.qualified),
-        withProposal: Math.max(existing.withProposal, row.withProposal),
-        withoutProposal: Math.max(existing.withoutProposal, row.withoutProposal),
-        sqlToProposalPct: Math.max(existing.sqlToProposalPct, row.sqlToProposalPct),
-        sqlToWonPct: Math.max(existing.sqlToWonPct, row.sqlToWonPct),
-        revenue: Math.max(existing.revenue, row.revenue),
+        qualified: maxN(existing.qualified, row.qualified),
+        withProposal: maxN(existing.withProposal, row.withProposal),
+        withoutProposal: maxN(existing.withoutProposal, row.withoutProposal),
+        sqlToProposalPct: maxN(existing.sqlToProposalPct, row.sqlToProposalPct),
+        sqlToWonPct: maxN(existing.sqlToWonPct, row.sqlToWonPct),
+        revenue: maxN(existing.revenue, row.revenue),
         name: existing.name?.includes('(removido)') ? row.name : existing.name,
       };
       const cls = classifySdr(merged);
       sdrMap.set(row.userId, { ...merged, classification: cls.c, classificationLabel: cls.label });
     };
 
+    // Fonte 1: Qualidade de Qualificação (preferida, traz proposta/venda/receita).
     qualRowsAll.forEach((r) => {
       const base = {
         userId: r.sdr_user_id as string,
@@ -347,16 +371,17 @@ export function useRevenuePeople() {
       const cls = classifySdr(base);
       upsertSdr({ ...base, classification: cls.c, classificationLabel: cls.label });
     });
+    // Fonte 2: SDR V2 — só volume e receita atribuída. Proposta/% ficam N/D.
     sdrSourceRows.forEach((r) => {
       const base = {
         userId: r.sdrUserId,
         name: r.sdrName,
         qualified: r.sqlsGenerated,
-        withProposal: 0,
-        withoutProposal: r.sqlsGenerated,
-        sqlToProposalPct: 0,
-        sqlToWonPct: r.winRatePct ?? 0,
-        revenue: r.revenueAttributed,
+        withProposal: null,
+        withoutProposal: null,
+        sqlToProposalPct: null,
+        sqlToWonPct: null,
+        revenue: r.revenueAttributed > 0 ? r.revenueAttributed : null,
       };
       const cls = classifySdr(base);
       upsertSdr({ ...base, classification: cls.c, classificationLabel: cls.label });
@@ -373,21 +398,20 @@ export function useRevenuePeople() {
       }
       const merged: CloserFull = {
         ...existing,
-        revenue: Math.max(existing.revenue, row.revenue),
-        won: Math.max(existing.won, row.won),
-        lost: Math.max(existing.lost, row.lost),
-        winRatePct:
-          existing.winRatePct !== null ? existing.winRatePct : row.winRatePct,
-        avgTicket: Math.max(existing.avgTicket, row.avgTicket),
-        activePipeline: Math.max(existing.activePipeline, row.activePipeline),
-        avgCycleDays:
-          existing.avgCycleDays !== null ? existing.avgCycleDays : row.avgCycleDays,
+        revenue: maxN(existing.revenue, row.revenue),
+        won: maxN(existing.won, row.won),
+        lost: maxN(existing.lost, row.lost),
+        winRatePct: pickFirst(existing.winRatePct, row.winRatePct),
+        avgTicket: maxN(existing.avgTicket, row.avgTicket),
+        activePipeline: maxN(existing.activePipeline, row.activePipeline),
+        avgCycleDays: pickFirst(existing.avgCycleDays, row.avgCycleDays),
         name: existing.name?.includes('(removido)') ? row.name : existing.name,
       };
       const cls = classifyCloser(merged);
       closerMap.set(row.userId, { ...merged, classification: cls.c, classificationLabel: cls.label });
     };
 
+    // Fonte 1: Closer V2 — métrica completa (won/lost/winRate/ticket/pipeline/ciclo).
     closerRowsAll.forEach((r) => {
       const base = {
         userId: r.closerUserId,
@@ -399,6 +423,24 @@ export function useRevenuePeople() {
         avgTicket: r.avgWonTicket,
         activePipeline: r.activePipelineValue,
         avgCycleDays: r.avgSalesCycleDays,
+      };
+      const cls = classifyCloser(base);
+      upsertCloser({ ...base, classification: cls.c, classificationLabel: cls.label });
+    });
+
+    // Fonte 2: Receita por vendedor (SSoT) — preenche revenue/won/ticket quando
+    // Closer V2 não trouxe o usuário. Lost/pipeline/ciclo ficam N/D.
+    sellerRows.forEach((s) => {
+      const base = {
+        userId: s.key,
+        name: s.label,
+        revenue: s.total,
+        won: s.count,
+        lost: null,
+        winRatePct: null as number | null,
+        avgTicket: s.avgTicket,
+        activePipeline: null,
+        avgCycleDays: null as number | null,
       };
       const cls = classifyCloser(base);
       upsertCloser({ ...base, classification: cls.c, classificationLabel: cls.label });
@@ -452,11 +494,11 @@ export function useRevenuePeople() {
           userId: r.user_id,
           name,
           qualified: realized,
-          withProposal: 0,
-          withoutProposal: realized,
-          sqlToProposalPct: 0,
-          sqlToWonPct: 0,
-          revenue: 0,
+          withProposal: null,
+          withoutProposal: null,
+          sqlToProposalPct: null,
+          sqlToWonPct: null,
+          revenue: null,
         };
         const cls = classifySdr(base);
         upsertSdr({ ...base, classification: cls.c, classificationLabel: cls.label });
@@ -464,12 +506,12 @@ export function useRevenuePeople() {
         const base = {
           userId: r.user_id,
           name,
-          revenue: realized,
-          won: 0,
-          lost: 0,
+          revenue: realized > 0 ? realized : null,
+          won: null,
+          lost: null,
           winRatePct: null as number | null,
-          avgTicket: 0,
-          activePipeline: 0,
+          avgTicket: null,
+          activePipeline: null,
           avgCycleDays: null as number | null,
         };
         const cls = classifyCloser(base);
@@ -481,10 +523,10 @@ export function useRevenuePeople() {
     const closerFull: CloserFull[] = Array.from(closerMap.values());
 
     const sdrSnapshot: PeopleSdrSnapshotRow[] = [...sdrFull]
-      .sort((a, b) => b.qualified - a.qualified)
+      .sort((a, b) => num(b.qualified) - num(a.qualified))
       .slice(0, 5);
     const closerSnapshot: PeopleCloserSnapshotRow[] = [...closerFull]
-      .sort((a, b) => b.revenue - a.revenue || b.won - a.won)
+      .sort((a, b) => num(b.revenue) - num(a.revenue) || num(b.won) - num(a.won))
       .slice(0, 5);
 
     // ── Scoreboard (derivado das listas COMPLETAS, não do top-5)
@@ -495,45 +537,29 @@ export function useRevenuePeople() {
     const top3Pct = totalRevenue > 0 ? (top3Sum / totalRevenue) * 100 : null;
 
     const bestConverterRow = [...closerFull]
-      .filter((r) => r.winRatePct !== null && r.won + r.lost >= 3)
+      .filter((r) => r.winRatePct !== null && num(r.won) + num(r.lost) >= 3)
       .sort((a, b) => (b.winRatePct ?? 0) - (a.winRatePct ?? 0))[0];
     const topSqlVolumeRow = [...sdrFull]
-      .filter((r) => r.qualified > 0)
-      .sort((a, b) => b.qualified - a.qualified)[0];
-    const worstQualityRow =
-      [...sdrFull]
-        .filter((r) => r.qualified >= 5 && r.sqlToProposalPct > 0)
-        .sort((a, b) => a.sqlToProposalPct - b.sqlToProposalPct)[0] ??
-      // Fallback: SDR com menor % de meta OTE (leads).
-      (oteRows
-        .filter((o) => o.role === 'SDR' && o.goal > 0)
-        .sort((a, b) => a.pct - b.pct)[0]
-        ? (() => {
-            const o = oteRows
-              .filter((x) => x.role === 'SDR' && x.goal > 0)
-              .sort((a, b) => a.pct - b.pct)[0];
-            return {
-              userId: o.userId,
-              name: o.name,
-              qualified: o.realized,
-              withProposal: 0,
-              withoutProposal: o.realized,
-              sqlToProposalPct: o.pct,
-              sqlToWonPct: 0,
-              revenue: 0,
-              classification: 'attention' as PeopleClassification,
-              classificationLabel: `Meta de leads em ${o.pct.toFixed(0)}%`,
-            } satisfies PeopleSdrSnapshotRow;
-          })()
-        : undefined);
+      .filter((r) => num(r.qualified) > 0)
+      .sort((a, b) => num(b.qualified) - num(a.qualified))[0];
+    const worstQualityRow = [...sdrFull]
+      .filter((r) => num(r.qualified) >= 5 && r.sqlToProposalPct !== null && r.sqlToProposalPct > 0)
+      .sort((a, b) => num(a.sqlToProposalPct) - num(b.sqlToProposalPct))[0];
 
     // Pessoas Ativas — qualquer sinal comercial no período (não só receita).
     const activePeople = new Set<string>([
       ...sellerRows.map((s) => s.key),
       ...closerFull
-        .filter((r) => r.won + r.lost > 0 || r.activePipeline > 0 || r.revenue > 0)
+        .filter(
+          (r) =>
+            num(r.won) + num(r.lost) > 0 ||
+            num(r.activePipeline) > 0 ||
+            num(r.revenue) > 0,
+        )
         .map((r) => r.userId),
-      ...sdrFull.filter((r) => r.qualified > 0 || r.revenue > 0).map((r) => r.userId),
+      ...sdrFull
+        .filter((r) => num(r.qualified) > 0 || num(r.revenue) > 0)
+        .map((r) => r.userId),
       ...oteRows.filter((r) => r.goal > 0 || r.realized > 0).map((r) => r.userId),
     ]).size;
 
@@ -544,44 +570,63 @@ export function useRevenuePeople() {
         ? { name: bestConverterRow.name, pct: bestConverterRow.winRatePct ?? 0 }
         : null,
       topSqlVolume: topSqlVolumeRow
-        ? { name: topSqlVolumeRow.name, count: topSqlVolumeRow.qualified }
+        ? { name: topSqlVolumeRow.name, count: num(topSqlVolumeRow.qualified) }
         : null,
-      worstQuality: worstQualityRow
-        ? { name: worstQualityRow.name, pct: worstQualityRow.sqlToProposalPct }
-        : null,
+      worstQuality:
+        worstQualityRow && worstQualityRow.sqlToProposalPct !== null
+          ? { name: worstQualityRow.name, pct: worstQualityRow.sqlToProposalPct }
+          : null,
       concentrationTop1Pct: top1Pct,
     };
 
     if (typeof window !== 'undefined' && (window as any).__DEV_RCC_PEOPLE__) {
       // eslint-disable-next-line no-console
-      console.debug('[RCC V3.4B] Pessoas', {
+      console.debug('[RCC V3.4D] Pessoas', {
         period: { start, end, periodMonth },
+        activeUsers: activeUserIds.size,
         sellerRows: sellerRows.length,
+        closerSourceRows: closerRowsAll.length,
+        sdrSourceRows: sdrSourceRows.length,
+        qualRowsAll: qualRowsAll.length,
+        oteRows: oteRows.length,
         sdrFull: sdrFull.length,
         closerFull: closerFull.length,
-        qualRows: qualRowsAll.length,
-        sdrV2Rows: sdrSourceRows.length,
-        oteRows: oteRows.length,
+        winsByCloser: closerFull
+          .filter((r) => r.won !== null)
+          .map((r) => ({ name: r.name, won: r.won, revenue: r.revenue })),
+        lossesByCloser: closerFull
+          .filter((r) => r.lost !== null)
+          .map((r) => ({ name: r.name, lost: r.lost })),
+        pipelineByCloser: closerFull
+          .filter((r) => r.activePipeline !== null)
+          .map((r) => ({ name: r.name, pipeline: r.activePipeline })),
+        partialSources,
+        errors: {
+          qualification: qualification.error?.message ?? null,
+          closer: closerReport.error?.message ?? null,
+          sdr: sdrReport.error?.message ?? null,
+          ote: oteResultsQuery.error?.message ?? null,
+          bySeller: bySeller.error?.message ?? null,
+        },
         activePeople,
-        qualificationError: !!qualification.error,
-        closerError: !!closerReport.error,
-        sdrError: !!sdrReport.error,
-        oteError: !!oteResultsQuery.error,
       });
     }
 
     // ── Top performers (até 5)
     const topPerformers: PeopleTopPerformer[] = [];
     closerSnapshot
-      .filter((r) => r.revenue > 0)
+      .filter((r) => num(r.revenue) > 0)
       .slice(0, 3)
       .forEach((r) =>
         topPerformers.push({
           userId: r.userId,
           name: r.name,
           role: 'Closer',
-          primaryMetric: `${fmtBRL(r.revenue)} em receita válida`,
-          contribution: `${r.won} venda(s) ganha(s)${r.winRatePct !== null ? ` · Win Rate ${r.winRatePct.toFixed(0)}%` : ''}`,
+          primaryMetric: `${fmtBRL(num(r.revenue))} em receita válida`,
+          contribution:
+            r.won !== null
+              ? `${r.won} venda(s) ganha(s)${r.winRatePct !== null ? ` · Win Rate ${r.winRatePct.toFixed(0)}%` : ''}`
+              : 'Vendas: N/D',
           cta: CLOSER_CTA,
         }),
       );
@@ -629,9 +674,16 @@ export function useRevenuePeople() {
           role: 'Closer',
           problem:
             r.winRatePct !== null
-              ? `Win Rate baixo (${r.winRatePct.toFixed(0)}%) com ${r.lost} perdido(s)`
-              : `${r.lost} perdido(s) no período`,
-          impact: r.activePipeline > 0 ? `Pipeline ativo ${fmtBRL(r.activePipeline)}` : 'Pipeline vazio',
+              ? `Win Rate baixo (${r.winRatePct.toFixed(0)}%)${r.lost !== null ? ` com ${r.lost} perdido(s)` : ''}`
+              : r.lost !== null
+                ? `${r.lost} perdido(s) no período`
+                : 'Win Rate: N/D',
+          impact:
+            r.activePipeline !== null
+              ? r.activePipeline > 0
+                ? `Pipeline ativo ${fmtBRL(r.activePipeline)}`
+                : 'Pipeline vazio'
+              : 'Pipeline: N/D',
           cta: CLOSER_CTA,
         }),
       );
@@ -646,8 +698,14 @@ export function useRevenuePeople() {
           userId: r.userId,
           name: r.name,
           role: 'SDR',
-          problem: `${r.qualified} SQLs, mas SQL→Proposta de ${r.sqlToProposalPct.toFixed(0)}%`,
-          impact: `${r.withoutProposal} SQLs sem proposta`,
+          problem:
+            r.sqlToProposalPct !== null
+              ? `${num(r.qualified)} SQLs, mas SQL→Proposta de ${r.sqlToProposalPct.toFixed(0)}%`
+              : `${num(r.qualified)} SQLs · SQL→Proposta: N/D`,
+          impact:
+            r.withoutProposal !== null
+              ? `${r.withoutProposal} SQLs sem proposta`
+              : 'Sem vínculo de proposta encontrado',
           cta: QUALITY_CTA,
         }),
       );
@@ -702,11 +760,11 @@ export function useRevenuePeople() {
     // ── Ações recomendadas
     const actions: PeopleRecommendedAction[] = [];
     const sdrVolumeNoQuality = sdrSnapshot.find((r) => r.classification === 'volume_no_quality');
-    if (sdrVolumeNoQuality) {
+    if (sdrVolumeNoQuality && sdrVolumeNoQuality.sqlToProposalPct !== null) {
       actions.push({
         id: 'review-sdr-quality',
         title: 'Revisar qualidade da qualificação',
-        reason: `${sdrVolumeNoQuality.name} tem ${sdrVolumeNoQuality.qualified} SQLs com SQL→Proposta de ${sdrVolumeNoQuality.sqlToProposalPct.toFixed(0)}%.`,
+        reason: `${sdrVolumeNoQuality.name} tem ${num(sdrVolumeNoQuality.qualified)} SQLs com SQL→Proposta de ${sdrVolumeNoQuality.sqlToProposalPct.toFixed(0)}%.`,
         priority: 'alta',
         person: { name: sdrVolumeNoQuality.name, role: 'SDR' },
         cta: QUALITY_CTA,
@@ -717,7 +775,10 @@ export function useRevenuePeople() {
       actions.push({
         id: 'help-closer-pipeline',
         title: 'Apoiar closer em risco',
-        reason: `${closerRisk.name} está com win rate baixo e pipeline ativo de ${fmtBRL(closerRisk.activePipeline)}.`,
+        reason:
+          closerRisk.activePipeline !== null
+            ? `${closerRisk.name} está com win rate baixo e pipeline ativo de ${fmtBRL(closerRisk.activePipeline)}.`
+            : `${closerRisk.name} está com win rate baixo.`,
         priority: 'alta',
         person: { name: closerRisk.name, role: 'Closer' },
         cta: PIPELINE_CTA,
@@ -737,7 +798,7 @@ export function useRevenuePeople() {
       actions.push({
         id: 'increase-sdr-volume',
         title: 'Aumentar volume de qualificação',
-        reason: `${lowVolumeSdr.name} qualificou apenas ${lowVolumeSdr.qualified} no período.`,
+        reason: `${lowVolumeSdr.name} qualificou apenas ${num(lowVolumeSdr.qualified)} no período.`,
         priority: 'média',
         person: { name: lowVolumeSdr.name, role: 'SDR' },
         cta: SDR_CTA,
@@ -760,6 +821,7 @@ export function useRevenuePeople() {
       'Qualidade de Qualificação',
       'OTE / Resultados',
     ];
+
 
     const confidence: PeopleData['meta']['confidence'] =
       partialSources.length === 0

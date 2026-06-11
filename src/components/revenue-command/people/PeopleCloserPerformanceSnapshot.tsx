@@ -23,8 +23,12 @@ const CLS_TONE: Record<PeopleCloserSnapshotRow['classification'], string> = {
   insufficient: 'bg-muted text-muted-foreground border-border',
 };
 
-function fmtBRL(v: number) {
+function fmtBRL(v: number | null) {
+  if (v === null || v === undefined) return 'N/D';
   return `R$ ${Math.round(v).toLocaleString('pt-BR')}`;
+}
+function fmtInt(v: number | null) {
+  return v === null || v === undefined ? 'N/D' : String(v);
 }
 
 export function PeopleCloserPerformanceSnapshot({ rows }: { rows: PeopleCloserSnapshotRow[] }) {
@@ -66,15 +70,15 @@ export function PeopleCloserPerformanceSnapshot({ rows }: { rows: PeopleCloserSn
                 <TableRow key={r.userId}>
                   <TableCell className="font-medium">{r.name}</TableCell>
                   <TableCell className="text-right">{fmtBRL(r.revenue)}</TableCell>
-                  <TableCell className="text-right">{r.won}</TableCell>
-                  <TableCell className="text-right">{r.lost}</TableCell>
+                  <TableCell className="text-right">{fmtInt(r.won)}</TableCell>
+                  <TableCell className="text-right">{fmtInt(r.lost)}</TableCell>
                   <TableCell className="text-right">
-                    {r.winRatePct !== null ? `${r.winRatePct.toFixed(0)}%` : '—'}
+                    {r.winRatePct !== null ? `${r.winRatePct.toFixed(0)}%` : 'N/D'}
                   </TableCell>
                   <TableCell className="text-right">{fmtBRL(r.avgTicket)}</TableCell>
                   <TableCell className="text-right">{fmtBRL(r.activePipeline)}</TableCell>
                   <TableCell className="text-right">
-                    {r.avgCycleDays !== null ? `${r.avgCycleDays.toFixed(0)}d` : '—'}
+                    {r.avgCycleDays !== null ? `${r.avgCycleDays.toFixed(0)}d` : 'N/D'}
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline" className={cn('text-[10px]', CLS_TONE[r.classification])}>
