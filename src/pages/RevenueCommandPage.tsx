@@ -24,6 +24,7 @@ import {
 import { RevenueSectionCard } from '@/components/revenue-command/RevenueSectionCard';
 import { RevenuePlaceholder } from '@/components/revenue-command/RevenuePlaceholder';
 import { RevenueTodayTab } from '@/components/revenue-command/today/RevenueTodayTab';
+import { RevenueBottlenecksTab } from '@/components/revenue-command/bottlenecks/RevenueBottlenecksTab';
 
 /**
  * Sprint REVOPS V3.0 — Revenue Command Center
@@ -162,15 +163,7 @@ export default function RevenueCommandPage() {
       value: 'gargalos',
       label: 'Gargalos',
       icon: Gauge,
-      content: (
-        <RevenueSectionCard
-          title="Gargalos"
-          description="Pontos de fricção ao longo do funil."
-          icon={Gauge}
-        >
-          <PlaceholderGrid items={PLACEHOLDER_SECTIONS.gargalos} />
-        </RevenueSectionCard>
-      ),
+      content: <RevenueBottlenecksTab />,
     },
     {
       value: 'pipeline',
