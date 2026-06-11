@@ -27,3 +27,17 @@ Resultado persistido em `prospects.relationship_status` e exibido por `Relations
 - ⚪ `new_prospect`
 
 Confirmado em `LeadResultsTable.tsx` (linhas 356, 400-425) e em `useProspectImport.ts` (bloqueio em linhas 76, 124).
+
+---
+
+## KAI.13 — Qualified Queue
+
+Importação direta ao CRM foi removida. O fluxo passa a ser:
+
+```
+Sourcing → kairos-enqueue-prospect → Qualified Queue → kairos-promote-to-crm → CRM
+```
+
+Botão "Importar" agora chama `kairos-enqueue-prospect`. A promoção ao CRM
+acontece exclusivamente em **Kairós > Qualified Queue** quando o item está
+`ready_for_sdr` (enriquecido + decisor + contato + score ≥ 60).
