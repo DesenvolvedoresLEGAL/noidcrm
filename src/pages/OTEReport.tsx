@@ -8,6 +8,7 @@ import { CommissionOverviewTab } from '@/components/results/commission/Commissio
 import { CommissionHistoryTab } from '@/components/results/commission/CommissionHistoryTab';
 import { SimpleGoalsOverviewTab } from '@/components/results/simple/SimpleGoalsOverviewTab';
 import { SimpleGoalsHistoryTab } from '@/components/results/simple/SimpleGoalsHistoryTab';
+import { VendasRealizadasWrapper } from '@/components/reports/wrappers/VendasRealizadasWrapper';
 
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -142,6 +143,7 @@ export default function OTEReport() {
             <TabsList>
               <TabsTrigger value="overview">Visão Geral</TabsTrigger>
               <TabsTrigger value="history">Histórico</TabsTrigger>
+              <TabsTrigger value="auditoria">Auditoria</TabsTrigger>
             </TabsList>
 
             <TabsContent value="overview">
@@ -168,6 +170,10 @@ export default function OTEReport() {
               ) : (
                 <OTEHistoryTab />
               )}
+            </TabsContent>
+
+            <TabsContent value="auditoria">
+              <VendasRealizadasWrapper />
             </TabsContent>
           </Tabs>
 
