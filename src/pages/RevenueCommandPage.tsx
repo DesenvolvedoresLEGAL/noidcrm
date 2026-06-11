@@ -5,6 +5,7 @@ import {
   Bot,
   Gauge,
   HeartPulse,
+  Radar,
   Sparkles,
   Users,
 } from 'lucide-react';
@@ -221,6 +222,3 @@ export default function RevenueCommandPage() {
     </PageContainer>
   );
 }
-
-// Late import to avoid an unused warning in the disabled branch above.
-import { Radar } from 'lucide-react';
