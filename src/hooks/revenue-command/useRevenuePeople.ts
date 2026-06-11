@@ -547,6 +547,89 @@ export function useRevenuePeople() {
     const sdrFull: SdrFull[] = Array.from(sdrMap.values());
     const closerFull: CloserFull[] = Array.from(closerMap.values());
 
+    // ── V3.4E · Normalização Closer: bySeller (SSoT) é PRIMÁRIA para
+    //    revenue/won/ticket. CloserV2 mantém lost/winRate/pipeline/ciclo.
+    const sellerById = new Map(sellerRows.map((s) => [s.key, s]));
+    closerFull.forEach((r) => {
+      const s = sellerById.get(r.userId);
+      if (s) {
+        // SSoT sempre vence em receita e ganhos quando disponível.
+        if (s.total > 0) r.revenue = s.total;
+        if (s.count > 0) r.won = s.count;
+      }
+      // Ticket médio = receita válida / ganhos (regra explícita do briefing).
+      if (r.revenue !== null && r.revenue > 0 && r.won !== null && r.won > 0) {
+        r.avgTicket = r.revenue / r.won;
+      }
+      // Win Rate derivado quando há won + lost suficientes e CloserV2 não trouxe.
+      if (
+        r.winRatePct === null &&
+        r.won !== null &&
+        r.lost !== null &&
+        r.won + r.lost >= 3
+      ) {
+        const p = r.won + r.lost;
+        r.winRatePct = p > 0 ? (r.won / p) * 100 : null;
+      }
+      const cls = classifyCloser(r);
+      r.classification = cls.c;
+      r.classificationLabel = cls.label;
+    });
+
+    // ── V3.4E · Handoff por SDR (won/lost/wonRevenue agregados).
+    //    Usado para preencher SQL→Venda e receita atribuída quando Qualidade
+    //    de Qualificação não retornou linhas para o SDR.
+    const handoffView = mapHandoffV2(handoffReport.data);
+    interface HandoffAggBySdr {
+      name: string;
+      won: number;
+      lost: number;
+      revenue: number;
+    }
+    const handoffBySdr = new Map<string, HandoffAggBySdr>();
+    handoffView.rows.forEach((h) => {
+      if (!isActiveEligibleUser(h.sdrUserId)) return;
+      const cur =
+        handoffBySdr.get(h.sdrUserId) ??
+        ({ name: h.sdrName, won: 0, lost: 0, revenue: 0 } as HandoffAggBySdr);
+      cur.won += h.wonCount;
+      cur.lost += h.lostCount;
+      cur.revenue += h.wonRevenue;
+      handoffBySdr.set(h.sdrUserId, cur);
+    });
+
+    sdrFull.forEach((r) => {
+      const h = handoffBySdr.get(r.userId);
+      if (!h) return;
+      if ((r.revenue === null || r.revenue === 0) && h.revenue > 0) {
+        r.revenue = h.revenue;
+      }
+      const q = num(r.qualified);
+      if (r.sqlToWonPct === null && q > 0 && h.won > 0) {
+        r.sqlToWonPct = (h.won / q) * 100;
+      }
+      const cls = classifySdr(r);
+      r.classification = cls.c;
+      r.classificationLabel = cls.label;
+    });
+
+    // SDRs que existem em Handoff mas nenhuma outra fonte retornou — inclui.
+    handoffBySdr.forEach((h, sdrId) => {
+      if (sdrFull.some((r) => r.userId === sdrId)) return;
+      const base = {
+        userId: sdrId,
+        name: h.name,
+        qualified: null,
+        withProposal: null,
+        withoutProposal: null,
+        sqlToProposalPct: null,
+        sqlToWonPct: null,
+        revenue: h.revenue > 0 ? h.revenue : null,
+      };
+      const cls = classifySdr(base);
+      sdrFull.push({ ...base, classification: cls.c, classificationLabel: cls.label });
+    });
+
     const sdrSnapshot: PeopleSdrSnapshotRow[] = [...sdrFull]
       .sort((a, b) => num(b.qualified) - num(a.qualified))
       .slice(0, 5);
