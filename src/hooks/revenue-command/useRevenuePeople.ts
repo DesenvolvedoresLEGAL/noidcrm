@@ -67,12 +67,12 @@ export interface PeopleNeedsHelpItem {
 export interface PeopleSdrSnapshotRow {
   userId: string;
   name: string;
-  qualified: number;
-  withProposal: number;
-  withoutProposal: number;
-  sqlToProposalPct: number;
-  sqlToWonPct: number;
-  revenue: number;
+  qualified: number | null;
+  withProposal: number | null;
+  withoutProposal: number | null;
+  sqlToProposalPct: number | null;
+  sqlToWonPct: number | null;
+  revenue: number | null;
   classification: PeopleClassification;
   classificationLabel: string;
 }
@@ -80,12 +80,12 @@ export interface PeopleSdrSnapshotRow {
 export interface PeopleCloserSnapshotRow {
   userId: string;
   name: string;
-  revenue: number;
-  won: number;
-  lost: number;
+  revenue: number | null;
+  won: number | null;
+  lost: number | null;
   winRatePct: number | null;
-  avgTicket: number;
-  activePipeline: number;
+  avgTicket: number | null;
+  activePipeline: number | null;
   avgCycleDays: number | null;
   classification: PeopleClassification;
   classificationLabel: string;
