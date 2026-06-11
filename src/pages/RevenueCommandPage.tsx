@@ -25,6 +25,7 @@ import { RevenueSectionCard } from '@/components/revenue-command/RevenueSectionC
 import { RevenuePlaceholder } from '@/components/revenue-command/RevenuePlaceholder';
 import { RevenueTodayTab } from '@/components/revenue-command/today/RevenueTodayTab';
 import { RevenueBottlenecksTab } from '@/components/revenue-command/bottlenecks/RevenueBottlenecksTab';
+import { RevenuePipelineHealthTab } from '@/components/revenue-command/pipeline/RevenuePipelineHealthTab';
 
 /**
  * Sprint REVOPS V3.0 — Revenue Command Center
@@ -169,15 +170,7 @@ export default function RevenueCommandPage() {
       value: 'pipeline',
       label: 'Pipeline Health',
       icon: HeartPulse,
-      content: (
-        <RevenueSectionCard
-          title="Pipeline Health"
-          description="Higiene e qualidade do pipeline em tempo real."
-          icon={HeartPulse}
-        >
-          <PlaceholderGrid items={PLACEHOLDER_SECTIONS.pipeline} />
-        </RevenueSectionCard>
-      ),
+      content: <RevenuePipelineHealthTab />,
     },
     {
       value: 'pessoas',
