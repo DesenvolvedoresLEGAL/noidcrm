@@ -733,6 +733,7 @@ export function useRevenuePeople() {
       'Receita por vendedor',
       'Performance Closer',
       'Qualidade de Qualificação',
+      'OTE / Resultados',
     ];
 
     const confidence: PeopleData['meta']['confidence'] =
@@ -764,6 +765,7 @@ export function useRevenuePeople() {
     orgId,
     start,
     end,
+    periodMonth,
     closedSummary.data,
     closedSummary.isLoading,
     closedSummary.error,
@@ -779,6 +781,9 @@ export function useRevenuePeople() {
     qualification.data,
     qualification.isLoading,
     qualification.error,
+    oteResultsQuery.data,
+    oteResultsQuery.isLoading,
+    oteResultsQuery.error,
     teamVisibility.loading,
   ]);
 }
