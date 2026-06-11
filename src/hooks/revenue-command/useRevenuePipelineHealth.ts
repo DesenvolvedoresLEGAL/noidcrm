@@ -83,8 +83,9 @@ export interface RecommendedAction {
 }
 
 export interface PipelineHealthData {
-  trustScore: number;
-  trustLabel: 'Excelente' | 'Confiável' | 'Atenção' | 'Crítico';
+  trustScore: number | null;
+  trustLabel: 'Excelente' | 'Confiável' | 'Atenção' | 'Crítico' | 'Sem dados ativos';
+  isEmpty: boolean;
   totalOpen: number;
   totalOpenValue: number;
   diagnosis: string;
