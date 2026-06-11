@@ -941,9 +941,11 @@ export function useRevenuePeople() {
 
     const sources = [
       'Resultados/Auditoria',
-      'Receita por vendedor',
-      'Performance Closer',
-      'Qualidade de Qualificação',
+      'Receita por vendedor (SSoT)',
+      'Performance Closer V2',
+      'Performance SDR V2',
+      'Handoff SDR→Closer V2',
+      'Qualidade de Qualificação V2',
       'OTE / Resultados',
     ];
 
