@@ -131,25 +131,30 @@ export function useRevenueBottlenecks() {
   });
 
   // 6) Propostas abertas/rejeitadas — leitura direta
+  // HOTFIX V3.1A: escopo restrito ao pipeline comercial de Vendas (mesma
+  // referência usada pelo Forecast). Propostas/oportunidades de Pré-vendas,
+  // Operacional, Remarketing etc. são excluídas do Revenue Command Center.
   const proposalsAggr = useQuery({
-    queryKey: ['revenue-command:bottlenecks:proposals', orgId, start, end],
-    enabled: !!orgId,
+    queryKey: ['revenue-command:bottlenecks:proposals', orgId, salesPipelineId, start, end],
+    enabled: !!orgId && pipelineResolved,
     staleTime: 60_000,
     queryFn: async () => {
-      // Abertas (sent) — qualquer data
+      // Abertas (sent) — qualquer data, somente pipeline de Vendas
       const openQ = await supabase
         .from('proposals')
-        .select('id, total_amount, sent_at, created_at')
+        .select('id, total_amount, sent_at, created_at, opportunities!inner(pipeline_id)')
         .eq('organization_id', orgId!)
-        .eq('status', 'sent');
+        .eq('status', 'sent')
+        .eq('opportunities.pipeline_id', salesPipelineId!);
       if (openQ.error) throw openQ.error;
 
-      // Rejeitadas no período
+      // Rejeitadas no período — somente pipeline de Vendas
       const lostQ = await supabase
         .from('proposals')
-        .select('id, total_amount')
+        .select('id, total_amount, opportunities!inner(pipeline_id)')
         .eq('organization_id', orgId!)
         .eq('status', 'rejected')
+        .eq('opportunities.pipeline_id', salesPipelineId!)
         .gte('created_at', start)
         .lte('created_at', end);
       if (lostQ.error) throw lostQ.error;
