@@ -405,7 +405,6 @@ export function useRevenuePipelineHealth() {
       byOwner.get(id)!.push(o);
     }
     const ranking: HygieneRanking[] = Array.from(byOwner.entries())
-      .filter(([id]) => id !== '__none__')
       .map(([ownerId, rows]) => {
         let p = 0;
         rows.forEach((r) => {
@@ -416,11 +415,25 @@ export function useRevenuePipelineHealth() {
           0,
           Math.min(100, Math.round(100 - (p / Math.max(1, rows.length)) * 10)),
         );
-        const prof = profilesMap.get(ownerId);
+        let ownerName: string;
+        let avatarUrl: string | null = null;
+        if (ownerId === '__none__') {
+          ownerName = 'Sem responsável';
+        } else {
+          const prof = profilesMap.get(ownerId);
+          avatarUrl = prof?.avatar_url ?? null;
+          if (!prof) {
+            ownerName = 'Usuário removido';
+          } else if (prof.removed) {
+            ownerName = prof.name ? `${prof.name} (removido)` : 'Usuário removido';
+          } else {
+            ownerName = prof.name ?? 'Usuário removido';
+          }
+        }
         return {
           ownerId,
-          ownerName: prof?.name ?? 'Sem nome',
-          avatarUrl: prof?.avatar_url ?? null,
+          ownerName,
+          avatarUrl,
           total: rows.length,
           issues: rows.filter((r) => (oppIssues.get(r.id) ?? []).length > 0)
             .length,
