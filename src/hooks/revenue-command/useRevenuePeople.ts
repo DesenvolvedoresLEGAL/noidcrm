@@ -270,14 +270,22 @@ export function useRevenuePeople() {
       return { data: null, isLoading: true, error: null };
     }
 
+    // ── Filtro canônico: apenas usuários ativos/elegíveis da operação atual.
+    const activeUserIds = new Set<string>(
+      (activeUsersQuery.data ?? []).map((u) => u.user_id).filter(Boolean),
+    );
+    const isActiveEligibleUser = (userId?: string | null) =>
+      !!userId && activeUserIds.has(userId);
+
     const sellerRows = (bySeller.data ?? [])
-      .filter((s) => s.total > 0 && s.key && s.key !== '—')
+      .filter((s) => s.total > 0 && s.key && s.key !== '—' && isActiveEligibleUser(s.key))
       .sort((a, b) => b.total - a.total);
 
     const closerRowsRaw = mapCloserV2(closerReport.data);
     const closerRowsAll = closerRowsRaw.filter(
       (r) =>
         r.closerUserId &&
+        isActiveEligibleUser(r.closerUserId) &&
         r.closerName &&
         r.closerName !== 'Sem nome' &&
         r.closerName !== 'Desconhecido',
@@ -285,12 +293,21 @@ export function useRevenuePeople() {
 
     const sdrView = mapSdrV2(sdrReport.data);
     const sdrSourceRows = sdrView.rows.filter(
-      (r) => r.sdrUserId && r.sdrName && r.sdrName !== 'Sem nome' && r.sdrName !== 'Desconhecido',
+      (r) =>
+        r.sdrUserId &&
+        isActiveEligibleUser(r.sdrUserId) &&
+        r.sdrName &&
+        r.sdrName !== 'Sem nome' &&
+        r.sdrName !== 'Desconhecido',
     );
 
     // Qualidade — preferida; fallback para useReportSDRV2 quando vazia/falha.
     const qualRowsAll = (qualification.data?.rows ?? []).filter(
-      (r) => r.sdr_user_id && r.sdr_name && r.sdr_name !== 'Sem nome',
+      (r) =>
+        r.sdr_user_id &&
+        isActiveEligibleUser(r.sdr_user_id) &&
+        r.sdr_name &&
+        r.sdr_name !== 'Sem nome',
     );
 
     type SdrFull = PeopleSdrSnapshotRow;
