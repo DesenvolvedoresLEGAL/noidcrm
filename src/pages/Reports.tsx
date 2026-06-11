@@ -76,6 +76,8 @@ function ReportsContent() {
         return <TeamPerformanceWrapper />;
       case 'handoff':
         return <HandoffWrapper />;
+      case 'qualification-quality':
+        return <QualificationQualityReportV2 />;
       case 'enriched-decision-makers':
         return <EnrichedDecisionMakersWrapper />;
       case 'products':
