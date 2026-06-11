@@ -420,7 +420,9 @@ export function useRevenuePeople() {
       levelName?: string;
     }
     const oteRows: OteSignalRow[] = [];
-    const oteResults = (oteResultsQuery.data ?? []) as OTEMonthlyResult[];
+    const oteResults = ((oteResultsQuery.data ?? []) as OTEMonthlyResult[]).filter((r) =>
+      isActiveEligibleUser(r.user_id),
+    );
     oteResults.forEach((r) => {
       const goalType: 'leads' | 'revenue' =
         (r.goal_type as 'leads' | 'revenue') ??
