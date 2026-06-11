@@ -447,11 +447,12 @@ export function useRevenueBottlenecks() {
     const sqlSource = useVelForSql
       ? 'SQL→Proposta (Pré-vendas → Vendas)'
       : 'Qualidade de Qualificação';
+    const periodLabel = `${periodStart.toLocaleDateString('pt-BR')} a ${periodEnd.toLocaleDateString('pt-BR')}`;
     const sqlHelper = !sqlBaseAvailable
       ? 'Dados parciais — fonte indisponível'
       : sqlQualifiedCount > 0
-        ? `${sqlWithoutProposalPct.toFixed(0)}% dos ${sqlQualifiedCount} SQLs ainda sem proposta`
-        : 'SQLs qualificados que ainda não viraram proposta';
+        ? `${sqlWithoutProposal} de ${sqlQualifiedCount} SQLs qualificados · ${periodLabel}${useVelForSql ? ' · Pré-vendas → Pipeline de Vendas' : ''}`
+        : `Sem SQLs qualificados no período (${periodLabel})`;
 
     // Card 3 — perdidas via Win/Loss
     const wlLostCount = wl?.lostCount ?? 0;
