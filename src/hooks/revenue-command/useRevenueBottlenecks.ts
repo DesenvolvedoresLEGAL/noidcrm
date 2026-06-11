@@ -191,11 +191,94 @@ export function useRevenueBottlenecks() {
     },
   });
 
+  // 7) Velocidade SQL → Proposta (cálculo direto a partir das tabelas oficiais)
+  //    Início:  opportunities.qualified_at   (quando o SDR qualificou)
+  //    Fim (em ordem de preferência):
+  //      a) MIN(proposals.created_at)  — primeira proposta criada
+  //      b) MIN(proposals.sent_at)     — primeira proposta enviada
+  //      c) opportunities.created_at   — criação da oportunidade comercial
+  //      d) MIN(proposals.viewed_at)   — primeira visualização do cliente
+  //    Escopo: somente Pipeline de Vendas oficial, qualified_at NOT NULL,
+  //    não soft-deleted. Nenhuma view/edge alterada.
+  const velocityAggr = useQuery({
+    queryKey: ['revenue-command:bottlenecks:velocity', orgId, salesPipelineId],
+    enabled: !!orgId && pipelineResolved,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('opportunities')
+        .select(
+          'id, qualified_at, created_at, proposals(created_at, sent_at, viewed_at)',
+        )
+        .eq('organization_id', orgId!)
+        .eq('pipeline_id', salesPipelineId!)
+        .is('deleted_at', null)
+        .not('qualified_at', 'is', null)
+        .limit(2000);
+      if (error) throw error;
+
+      const diffsHours = {
+        toProposalCreated: [] as number[],
+        toProposalSent: [] as number[],
+        toCommercialOpp: [] as number[],
+        toFirstView: [] as number[],
+      };
+
+      for (const row of (data ?? []) as any[]) {
+        const qAt = row.qualified_at ? new Date(row.qualified_at).getTime() : 0;
+        if (!qAt) continue;
+        const oppAt = row.created_at ? new Date(row.created_at).getTime() : 0;
+        const proposals: any[] = Array.isArray(row.proposals) ? row.proposals : [];
+        const minOf = (key: string) => {
+          const ts = proposals
+            .map((p) => (p?.[key] ? new Date(p[key]).getTime() : 0))
+            .filter((t) => t > 0);
+          return ts.length ? Math.min(...ts) : 0;
+        };
+        const firstProposalAt = minOf('created_at');
+        const firstSentAt = minOf('sent_at');
+        const firstViewAt = minOf('viewed_at');
+
+        if (firstProposalAt && firstProposalAt > qAt) {
+          diffsHours.toProposalCreated.push(
+            (firstProposalAt - qAt) / 3_600_000,
+          );
+        }
+        if (firstSentAt && firstSentAt > qAt) {
+          diffsHours.toProposalSent.push((firstSentAt - qAt) / 3_600_000);
+        }
+        if (oppAt && oppAt > qAt) {
+          diffsHours.toCommercialOpp.push((oppAt - qAt) / 3_600_000);
+        }
+        if (firstViewAt && firstViewAt > qAt) {
+          diffsHours.toFirstView.push((firstViewAt - qAt) / 3_600_000);
+        }
+      }
+
+      const avg = (arr: number[]) =>
+        arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
+
+      return {
+        qualifiedCount: (data ?? []).length,
+        avgHoursToProposalCreated: avg(diffsHours.toProposalCreated),
+        sampleToProposalCreated: diffsHours.toProposalCreated.length,
+        avgHoursToProposalSent: avg(diffsHours.toProposalSent),
+        sampleToProposalSent: diffsHours.toProposalSent.length,
+        avgHoursToCommercialOpp: avg(diffsHours.toCommercialOpp),
+        sampleToCommercialOpp: diffsHours.toCommercialOpp.length,
+        avgHoursToFirstView: avg(diffsHours.toFirstView),
+        sampleToFirstView: diffsHours.toFirstView.length,
+      };
+    },
+  });
+
+
   return useMemo<{ data: BottlenecksData | null; isLoading: boolean; error: Error | null }>(() => {
     const isLoading =
       qualification.isLoading ||
       closedSummary.isLoading ||
       proposalsAggr.isLoading ||
+      velocityAggr.isLoading ||
       winLoss.isLoading ||
       (pipelineResolved && forecast.isLoading);
 
@@ -203,6 +286,7 @@ export function useRevenueBottlenecks() {
     if (qualification.error) failedSources.push('Qualidade de Qualificação');
     if (closedSummary.error) failedSources.push('Resultados/Auditoria');
     if (proposalsAggr.error) failedSources.push('Propostas');
+    if (velocityAggr.error) failedSources.push('Velocidade SQL→Proposta');
     if (winLoss.error) failedSources.push('Win/Loss');
     if (forecast.error) failedSources.push('Forecast');
 
@@ -301,24 +385,87 @@ export function useRevenueBottlenecks() {
       }));
 
     // ── Seção 4: Velocidade
-    const qualRows = qual?.rows ?? [];
-    const sqlToProposalHours = qualRows
+    //  Cálculo direto (V3.2A): qualified_at → primeira proposta criada/enviada
+    //  com fallback para criação da oportunidade comercial e visualização.
+    const vel = velocityAggr.data ?? null;
+    const viewSqlToProposalHours = (qual?.rows ?? [])
       .map((r) => r.avg_hours_qualification_to_proposal)
       .filter((v): v is number => typeof v === 'number' && v > 0);
-    const avgSqlToProposalHours =
-      sqlToProposalHours.length > 0
-        ? sqlToProposalHours.reduce((a, b) => a + b, 0) / sqlToProposalHours.length
+    const avgFromView =
+      viewSqlToProposalHours.length > 0
+        ? viewSqlToProposalHours.reduce((a, b) => a + b, 0) /
+          viewSqlToProposalHours.length
         : null;
+
+    // Preferência: proposta criada > oportunidade comercial > proposta enviada
+    const MIN_SAMPLE = 3;
+    let primaryHours: number | null = null;
+    let primarySource = '';
+    if (vel) {
+      if (vel.sampleToProposalCreated >= MIN_SAMPLE && vel.avgHoursToProposalCreated != null) {
+        primaryHours = vel.avgHoursToProposalCreated;
+        primarySource = 'até a primeira proposta criada';
+      } else if (vel.sampleToCommercialOpp >= MIN_SAMPLE && vel.avgHoursToCommercialOpp != null) {
+        primaryHours = vel.avgHoursToCommercialOpp;
+        primarySource = 'até a criação da oportunidade comercial';
+      } else if (vel.sampleToProposalSent >= MIN_SAMPLE && vel.avgHoursToProposalSent != null) {
+        primaryHours = vel.avgHoursToProposalSent;
+        primarySource = 'até o envio da proposta';
+      }
+    }
+    if (primaryHours == null && avgFromView != null) {
+      primaryHours = avgFromView;
+      primarySource = 'até a proposta (Qualidade de Qualificação)';
+    }
 
     const speedMetrics: SpeedMetric[] = [
       {
         id: 'sql_to_proposal',
         label: 'SQL → Proposta',
-        days: avgSqlToProposalHours != null ? avgSqlToProposalHours / 24 : null,
-        hours: avgSqlToProposalHours,
-        available: avgSqlToProposalHours != null,
-        helper: 'Tempo médio de qualificação até proposta',
+        days: primaryHours != null ? primaryHours / 24 : null,
+        hours: primaryHours,
+        available: primaryHours != null,
+        helper:
+          primaryHours != null
+            ? `Tempo médio da qualificação ${primarySource}`
+            : 'Sem dados suficientes',
       },
+      ...(vel && vel.sampleToCommercialOpp >= MIN_SAMPLE && vel.avgHoursToCommercialOpp != null
+        ? [
+            {
+              id: 'sql_to_commercial_opp',
+              label: 'SQL → Oportunidade comercial',
+              days: vel.avgHoursToCommercialOpp / 24,
+              hours: vel.avgHoursToCommercialOpp,
+              available: true,
+              helper: `Qualificação → criação da oportunidade comercial (n=${vel.sampleToCommercialOpp})`,
+            } as SpeedMetric,
+          ]
+        : []),
+      ...(vel && vel.sampleToProposalSent >= MIN_SAMPLE && vel.avgHoursToProposalSent != null
+        ? [
+            {
+              id: 'sql_to_proposal_sent',
+              label: 'SQL → Proposta enviada',
+              days: vel.avgHoursToProposalSent / 24,
+              hours: vel.avgHoursToProposalSent,
+              available: true,
+              helper: `Qualificação → envio da proposta (n=${vel.sampleToProposalSent})`,
+            } as SpeedMetric,
+          ]
+        : []),
+      ...(vel && vel.sampleToFirstView >= MIN_SAMPLE && vel.avgHoursToFirstView != null
+        ? [
+            {
+              id: 'sql_to_first_view',
+              label: 'SQL → 1ª visualização',
+              days: vel.avgHoursToFirstView / 24,
+              hours: vel.avgHoursToFirstView,
+              available: true,
+              helper: `Qualificação → 1ª visualização do cliente (n=${vel.sampleToFirstView})`,
+            } as SpeedMetric,
+          ]
+        : []),
       {
         id: 'proposal_to_won',
         label: 'Proposta → Venda',
@@ -327,23 +474,8 @@ export function useRevenueBottlenecks() {
         available: (wl?.avgCycleWon ?? null) != null,
         helper: 'Ciclo médio de vendas ganhas',
       },
-      {
-        id: 'won_to_delivery',
-        label: 'Venda → Entrega',
-        days: null,
-        hours: null,
-        available: false,
-        helper: 'Disponível na próxima sprint',
-      },
-      {
-        id: 'won_to_settlement',
-        label: 'Venda → Liquidação',
-        days: null,
-        hours: null,
-        available: false,
-        helper: 'Disponível na próxima sprint',
-      },
     ];
+
 
     // ── Seção 5: Receita em risco
     const totalPipeline = fc?.totalPipeline ?? null;
@@ -457,6 +589,9 @@ export function useRevenueBottlenecks() {
     proposalsAggr.data,
     proposalsAggr.error,
     proposalsAggr.isLoading,
+    velocityAggr.data,
+    velocityAggr.error,
+    velocityAggr.isLoading,
     winLoss.data,
     winLoss.error,
     winLoss.isLoading,
