@@ -145,6 +145,7 @@ export interface PeopleData {
     sources: string[];
     partialSources: string[];
     confidence: 'trusted' | 'partial' | 'warning';
+    blockSources?: { sdr: string[]; closer: string[] };
   };
 }
 
