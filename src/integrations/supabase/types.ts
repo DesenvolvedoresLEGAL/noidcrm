@@ -14943,6 +14943,166 @@ export type Database = {
         }
         Relationships: []
       }
+      kairos_batch_logs: {
+        Row: {
+          action: string
+          created_at: string
+          details: Json
+          id: string
+          organization_id: string
+          prospect_id: string | null
+          result: string | null
+          run_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          details?: Json
+          id?: string
+          organization_id: string
+          prospect_id?: string | null
+          result?: string | null
+          run_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          details?: Json
+          id?: string
+          organization_id?: string
+          prospect_id?: string | null
+          result?: string | null
+          run_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kairos_batch_logs_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "kairos_batch_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      kairos_batch_run_items: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          current_stage: Database["public"]["Enums"]["kairos_batch_stage"]
+          id: string
+          message: string | null
+          organization_id: string
+          priority_rank: number
+          prospect_id: string
+          run_id: string
+          started_at: string | null
+          status: Database["public"]["Enums"]["kairos_batch_item_status"]
+          updated_at: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          current_stage?: Database["public"]["Enums"]["kairos_batch_stage"]
+          id?: string
+          message?: string | null
+          organization_id: string
+          priority_rank?: number
+          prospect_id: string
+          run_id: string
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["kairos_batch_item_status"]
+          updated_at?: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          current_stage?: Database["public"]["Enums"]["kairos_batch_stage"]
+          id?: string
+          message?: string | null
+          organization_id?: string
+          priority_rank?: number
+          prospect_id?: string
+          run_id?: string
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["kairos_batch_item_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kairos_batch_run_items_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "kairos_batch_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      kairos_batch_runs: {
+        Row: {
+          completed_at: string | null
+          config: Json
+          created_at: string
+          created_by: string | null
+          credits_estimated: number
+          credits_used: number
+          event_id: string | null
+          failed: number
+          id: string
+          lead_search_id: string | null
+          organization_id: string
+          processed: number
+          run_name: string
+          run_type: string
+          skipped: number
+          started_at: string | null
+          status: Database["public"]["Enums"]["kairos_batch_status"]
+          total_prospects: number
+          updated_at: string
+        }
+        Insert: {
+          completed_at?: string | null
+          config?: Json
+          created_at?: string
+          created_by?: string | null
+          credits_estimated?: number
+          credits_used?: number
+          event_id?: string | null
+          failed?: number
+          id?: string
+          lead_search_id?: string | null
+          organization_id: string
+          processed?: number
+          run_name: string
+          run_type?: string
+          skipped?: number
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["kairos_batch_status"]
+          total_prospects?: number
+          updated_at?: string
+        }
+        Update: {
+          completed_at?: string | null
+          config?: Json
+          created_at?: string
+          created_by?: string | null
+          credits_estimated?: number
+          credits_used?: number
+          event_id?: string | null
+          failed?: number
+          id?: string
+          lead_search_id?: string | null
+          organization_id?: string
+          processed?: number
+          run_name?: string
+          run_type?: string
+          skipped?: number
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["kairos_batch_status"]
+          total_prospects?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       kairos_qualified_queue: {
         Row: {
           approach_brief: Json | null
@@ -36938,6 +37098,28 @@ export type Database = {
         | "loss_report"
         | "retirement"
         | "release"
+      kairos_batch_item_status:
+        | "pending"
+        | "running"
+        | "done"
+        | "skipped"
+        | "failed"
+      kairos_batch_stage:
+        | "matching"
+        | "queue"
+        | "enrichment"
+        | "apollo"
+        | "decision_maker"
+        | "approach"
+        | "ready"
+        | "completed"
+      kairos_batch_status:
+        | "pending"
+        | "running"
+        | "paused"
+        | "completed"
+        | "failed"
+        | "cancelled"
       memory_type:
         | "objection"
         | "win_pattern"
@@ -37280,6 +37462,31 @@ export const Constants = {
         "loss_report",
         "retirement",
         "release",
+      ],
+      kairos_batch_item_status: [
+        "pending",
+        "running",
+        "done",
+        "skipped",
+        "failed",
+      ],
+      kairos_batch_stage: [
+        "matching",
+        "queue",
+        "enrichment",
+        "apollo",
+        "decision_maker",
+        "approach",
+        "ready",
+        "completed",
+      ],
+      kairos_batch_status: [
+        "pending",
+        "running",
+        "paused",
+        "completed",
+        "failed",
+        "cancelled",
       ],
       memory_type: [
         "objection",
