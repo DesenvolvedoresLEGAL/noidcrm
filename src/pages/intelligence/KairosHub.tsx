@@ -21,9 +21,9 @@ type KairosTab = (typeof VALID_TABS)[number];
 
 export default function KairosHub() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const initialTab = (searchParams.get('tab') as KairosTab) ?? 'sourcing';
+  const initialTab = (searchParams.get('tab') as KairosTab) ?? 'icp';
   const [activeTab, setActiveTab] = useState<KairosTab>(
-    VALID_TABS.includes(initialTab) ? initialTab : 'sourcing'
+    VALID_TABS.includes(initialTab) ? initialTab : 'icp'
   );
 
   useEffect(() => {
