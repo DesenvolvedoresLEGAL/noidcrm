@@ -155,40 +155,73 @@ export function LeadSearchForm({ onExecute, isExecuting }: LeadSearchFormProps) 
   return (
     <div className="space-y-6">
       {/* Search Type Selector */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        {SEARCH_TYPES.map(type => {
-          const Icon = type.icon;
-          return (
-            <button
-              key={type.id}
-              onClick={() => setPlaybookType(type.id)}
-              className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all text-sm ${
-                playbookType === type.id
-                  ? 'border-primary bg-primary/5 text-primary'
-                  : 'border-border hover:border-primary/40'
-              }`}
-            >
-              <Icon className="h-5 w-5" />
-              <span className="font-medium text-center leading-tight">{type.label}</span>
-            </button>
-          );
-        })}
-      </div>
+      <TooltipProvider>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          {SEARCH_TYPES.map(type => {
+            const Icon = type.icon;
+            const isWip = type.status === 'wip';
+            const isActive = playbookType === type.id;
+            const btn = (
+              <button
+                key={type.id}
+                disabled={isWip}
+                onClick={() => !isWip && setPlaybookType(type.id)}
+                className={`relative flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all text-sm w-full ${
+                  isWip
+                    ? 'border-dashed border-border bg-muted/30 text-muted-foreground cursor-not-allowed opacity-60'
+                    : isActive
+                      ? 'border-primary bg-primary/5 text-primary'
+                      : 'border-border hover:border-primary/40'
+                }`}
+              >
+                <Icon className="h-5 w-5" />
+                <span className="font-medium text-center leading-tight">{type.label}</span>
+                {isWip && (
+                  <Badge variant="secondary" className="text-[9px] px-1.5 py-0">
+                    Em desenvolvimento
+                  </Badge>
+                )}
+              </button>
+            );
+            if (isWip) {
+              return (
+                <Tooltip key={type.id}>
+                  <TooltipTrigger asChild><span>{btn}</span></TooltipTrigger>
+                  <TooltipContent>
+                    Esta fonte de sourcing ainda não possui engine operacional.
+                  </TooltipContent>
+                </Tooltip>
+              );
+            }
+            return btn;
+          })}
+        </div>
+      </TooltipProvider>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* ICP Block */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm">Perfil Ideal (ICP)</CardTitle>
+            <CardTitle className="text-sm flex items-center gap-1.5">
+              <Target className="h-3.5 w-3.5 text-primary" />
+              ICP Intelligence
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Select value={selectedIcpId || ''} onValueChange={v => setSelectedIcpId(v || null)}>
+            <Select value={selectedIcpId || ''} onValueChange={handleIcpChange}>
               <SelectTrigger>
-                <SelectValue placeholder="Selecione um ICP" />
+                <SelectValue placeholder={icps && icps.length > 0 ? 'Selecione um ICP' : 'Sem clusters disponíveis'} />
               </SelectTrigger>
               <SelectContent>
                 {icps?.map(icp => (
-                  <SelectItem key={icp.id} value={icp.id}>{icp.name}</SelectItem>
+                  <SelectItem key={icp.id} value={icp.id}>
+                    <div className="flex flex-col">
+                      <span className="font-medium">{icp.name}</span>
+                      <span className="text-[10px] text-muted-foreground">
+                        {icp.count} clientes · Ticket {icp.avgTicket.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })} · Recompra {icp.repurchaseRate.toFixed(0)}%
+                      </span>
+                    </div>
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -196,12 +229,12 @@ export function LeadSearchForm({ onExecute, isExecuting }: LeadSearchFormProps) 
               <div className="space-y-2 text-xs">
                 <div className="flex flex-wrap gap-1.5">
                   <Badge variant="outline">{selectedIcp.segment}</Badge>
-                  {selectedIcp.company_size && <Badge variant="outline">{selectedIcp.company_size}</Badge>}
-                  {selectedIcp.revenue_band && <Badge variant="outline">{selectedIcp.revenue_band}</Badge>}
+                  <Badge variant="outline" className="capitalize">{selectedIcp.tier}</Badge>
+                  <Badge variant="outline">{selectedIcp.count} clientes</Badge>
                 </div>
-                {selectedIcp.pain_points?.length > 0 && (
+                {selectedIcp.topCities.length > 0 && (
                   <div className="text-muted-foreground">
-                    Dores: {selectedIcp.pain_points.slice(0, 3).join(', ')}
+                    Top cidades: {selectedIcp.topCities.slice(0, 3).map(c => c.city).join(', ')}
                   </div>
                 )}
               </div>
