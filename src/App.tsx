@@ -170,6 +170,7 @@ const KnowledgeGraph = lazy(() => import("./pages/app/intelligence/KnowledgeGrap
 const Memories = lazy(() => import("./pages/app/intelligence/Memories"));
 const OTEReport = lazy(() => import("./pages/OTEReport"));
 const DesempenhoPage = lazy(() => import("./pages/DesempenhoPage"));
+const RevenueCommandPage = lazy(() => import("./pages/RevenueCommandPage"));
 
 // Admin Panel Routes
 const AdminLayout = lazy(() => import("./pages/admin/AdminLayout"));
@@ -637,6 +638,16 @@ const App = () => (
                   <ProtectedRoute>
                     <LazyRoute>
                       <DesempenhoPage />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/revenue-command"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <RevenueCommandPage />
                     </LazyRoute>
                   </ProtectedRoute>
                 }

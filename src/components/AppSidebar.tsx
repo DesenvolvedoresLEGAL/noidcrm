@@ -26,6 +26,7 @@ import {
   Sparkles,
   Compass,
   Boxes,
+  Radar,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -72,6 +73,7 @@ const ALL_MENU_ITEMS: MenuItem[] = [
   { path: '/app/proposals', label: 'Propostas', icon: FileText, section: 'gestao' },
   { path: '/app/forecast', label: 'Forecast', icon: TrendingUp, section: 'gestao' },
   { path: '/app/reports', label: 'Relatórios', icon: BarChart3, section: 'gestao' },
+  { path: '/app/revenue-command', label: 'Revenue Command', icon: Radar, section: 'gestao' },
 
   // OPERAÇÕES
   { path: '/app/operations/inventory', label: 'Inventário', icon: Boxes, section: 'operacoes' },
