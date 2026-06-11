@@ -278,6 +278,7 @@ export function useRevenueBottlenecks() {
       qualification.isLoading ||
       closedSummary.isLoading ||
       proposalsAggr.isLoading ||
+      velocityAggr.isLoading ||
       winLoss.isLoading ||
       (pipelineResolved && forecast.isLoading);
 
@@ -285,6 +286,7 @@ export function useRevenueBottlenecks() {
     if (qualification.error) failedSources.push('Qualidade de Qualificação');
     if (closedSummary.error) failedSources.push('Resultados/Auditoria');
     if (proposalsAggr.error) failedSources.push('Propostas');
+    if (velocityAggr.error) failedSources.push('Velocidade SQL→Proposta');
     if (winLoss.error) failedSources.push('Win/Loss');
     if (forecast.error) failedSources.push('Forecast');
 
