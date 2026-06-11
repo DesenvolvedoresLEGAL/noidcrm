@@ -98,8 +98,8 @@ export interface QualifiedQueueKpis {
 }
 
 export async function getQualifiedQueueKpis(organizationId: string): Promise<QualifiedQueueKpis> {
-  const { data, error } = await supabase
-    .from('kairos_qualified_queue' as any)
+  const { data, error } = await (supabase as any)
+    .from('kairos_qualified_queue')
     .select('qualification_status,sdr_ready,score')
     .eq('organization_id', organizationId)
     .limit(5000);

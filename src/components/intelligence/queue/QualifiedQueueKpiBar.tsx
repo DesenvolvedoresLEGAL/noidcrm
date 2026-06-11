@@ -1,15 +1,16 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { useQualifiedQueueKpis } from '@/hooks/intelligence/useQualifiedQueueKpis';
 import { Skeleton } from '@/components/ui/skeleton';
+import type { QualifiedQueueKpis } from '@/services/intelligence/qualifiedQueue';
 
-const ITEMS: Array<{ key: keyof Awaited<ReturnType<typeof useQualifiedQueueKpis>>['data'] extends infer T ? T extends object ? keyof T : never : never; label: string }> = [
-  { key: 'captured' as any, label: 'Capturados' },
-  { key: 'qualified' as any, label: 'Qualificados' },
-  { key: 'ready_for_sdr' as any, label: 'Prontos para SDR' },
-  { key: 'review' as any, label: 'Em revisão' },
-  { key: 'imported' as any, label: 'Importados' },
-  { key: 'discarded' as any, label: 'Descartados' },
-  { key: 'conversion_rate' as any, label: 'Aproveitamento (%)' },
+const ITEMS: Array<{ key: keyof QualifiedQueueKpis; label: string; suffix?: string }> = [
+  { key: 'captured', label: 'Capturados' },
+  { key: 'qualified', label: 'Qualificados' },
+  { key: 'ready_for_sdr', label: 'Prontos para SDR' },
+  { key: 'review', label: 'Em revisão' },
+  { key: 'imported', label: 'Importados' },
+  { key: 'discarded', label: 'Descartados' },
+  { key: 'conversion_rate', label: 'Aproveitamento', suffix: '%' },
 ];
 
 export function QualifiedQueueKpiBar() {
@@ -27,13 +28,13 @@ export function QualifiedQueueKpiBar() {
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
-      {ITEMS.map(({ key, label }) => (
+      {ITEMS.map(({ key, label, suffix }) => (
         <Card key={label}>
           <CardContent className="p-3">
             <div className="text-xs text-muted-foreground">{label}</div>
             <div className="text-2xl font-semibold mt-1">
-              {data ? (data as any)[key] ?? 0 : 0}
-              {key === ('conversion_rate' as any) ? '%' : ''}
+              {data?.[key] ?? 0}
+              {suffix ?? ''}
             </div>
           </CardContent>
         </Card>
