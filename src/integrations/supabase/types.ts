@@ -5385,6 +5385,120 @@ export type Database = {
           },
         ]
       }
+      apollo_auto_enrichment_rules: {
+        Row: {
+          allowed_icps: string[] | null
+          allowed_quality_labels: string[]
+          allowed_relationship_status: string[]
+          auto_reveal_contact: boolean
+          auto_select_primary_contact: boolean
+          created_at: string
+          enabled: boolean
+          id: string
+          max_apollo_credits_per_batch: number
+          max_apollo_credits_per_day: number
+          max_contacts_per_company: number
+          minimum_priority_score: number
+          organization_id: string
+          required_domain: boolean
+          updated_at: string
+        }
+        Insert: {
+          allowed_icps?: string[] | null
+          allowed_quality_labels?: string[]
+          allowed_relationship_status?: string[]
+          auto_reveal_contact?: boolean
+          auto_select_primary_contact?: boolean
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          max_apollo_credits_per_batch?: number
+          max_apollo_credits_per_day?: number
+          max_contacts_per_company?: number
+          minimum_priority_score?: number
+          organization_id: string
+          required_domain?: boolean
+          updated_at?: string
+        }
+        Update: {
+          allowed_icps?: string[] | null
+          allowed_quality_labels?: string[]
+          allowed_relationship_status?: string[]
+          auto_reveal_contact?: boolean
+          auto_select_primary_contact?: boolean
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          max_apollo_credits_per_batch?: number
+          max_apollo_credits_per_day?: number
+          max_contacts_per_company?: number
+          minimum_priority_score?: number
+          organization_id?: string
+          required_domain?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      apollo_enrichment_audit: {
+        Row: {
+          apollo_status: string
+          batch_run_id: string | null
+          company_name: string | null
+          contacts_found: number
+          contacts_revealed: number
+          created_at: string
+          credits_used: number
+          decision_maker_found: boolean
+          details: Json
+          icp_category: string | null
+          icp_id: string | null
+          id: string
+          organization_id: string
+          primary_contact_id: string | null
+          priority_score: number | null
+          prospect_id: string
+          skip_reason: string | null
+        }
+        Insert: {
+          apollo_status: string
+          batch_run_id?: string | null
+          company_name?: string | null
+          contacts_found?: number
+          contacts_revealed?: number
+          created_at?: string
+          credits_used?: number
+          decision_maker_found?: boolean
+          details?: Json
+          icp_category?: string | null
+          icp_id?: string | null
+          id?: string
+          organization_id: string
+          primary_contact_id?: string | null
+          priority_score?: number | null
+          prospect_id: string
+          skip_reason?: string | null
+        }
+        Update: {
+          apollo_status?: string
+          batch_run_id?: string | null
+          company_name?: string | null
+          contacts_found?: number
+          contacts_revealed?: number
+          created_at?: string
+          credits_used?: number
+          decision_maker_found?: boolean
+          details?: Json
+          icp_category?: string | null
+          icp_id?: string | null
+          id?: string
+          organization_id?: string
+          primary_contact_id?: string | null
+          priority_score?: number | null
+          prospect_id?: string
+          skip_reason?: string | null
+        }
+        Relationships: []
+      }
       approval_requests: {
         Row: {
           action_key: string
@@ -15105,10 +15219,12 @@ export type Database = {
       }
       kairos_qualified_queue: {
         Row: {
+          apollo_status: string | null
           approach_brief: Json | null
           company_name: string
           confidence: number | null
           contact_status: string | null
+          contacts_found: number
           created_at: string
           decision_maker_status: string | null
           discard_reason: string | null
@@ -15124,6 +15240,9 @@ export type Database = {
           imported_opportunity_id: string | null
           organization_id: string
           owner_id: string | null
+          primary_contact_name: string | null
+          primary_contact_role: string | null
+          primary_contact_score: number | null
           prospect_id: string
           qualification_status: Database["public"]["Enums"]["qualification_status"]
           relationship_status: string | null
@@ -15135,10 +15254,12 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          apollo_status?: string | null
           approach_brief?: Json | null
           company_name: string
           confidence?: number | null
           contact_status?: string | null
+          contacts_found?: number
           created_at?: string
           decision_maker_status?: string | null
           discard_reason?: string | null
@@ -15154,6 +15275,9 @@ export type Database = {
           imported_opportunity_id?: string | null
           organization_id: string
           owner_id?: string | null
+          primary_contact_name?: string | null
+          primary_contact_role?: string | null
+          primary_contact_score?: number | null
           prospect_id: string
           qualification_status?: Database["public"]["Enums"]["qualification_status"]
           relationship_status?: string | null
@@ -15165,10 +15289,12 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          apollo_status?: string | null
           approach_brief?: Json | null
           company_name?: string
           confidence?: number | null
           contact_status?: string | null
+          contacts_found?: number
           created_at?: string
           decision_maker_status?: string | null
           discard_reason?: string | null
@@ -15184,6 +15310,9 @@ export type Database = {
           imported_opportunity_id?: string | null
           organization_id?: string
           owner_id?: string | null
+          primary_contact_name?: string | null
+          primary_contact_role?: string | null
+          primary_contact_score?: number | null
           prospect_id?: string
           qualification_status?: Database["public"]["Enums"]["qualification_status"]
           relationship_status?: string | null
@@ -35707,6 +35836,15 @@ export type Database = {
       finish_headless_humanoid_test_run: {
         Args: { p_run_id: string }
         Returns: Json
+      }
+      fn_apollo_credits_used_today: { Args: { p_org: string }; Returns: number }
+      fn_apollo_should_run: {
+        Args: { p_org: string; p_prospect_id: string }
+        Returns: {
+          eligible: boolean
+          priority_score: number
+          reason: string
+        }[]
       }
       fn_cnae_to_segmento: { Args: { p_cnae: string }; Returns: string }
       fn_infer_segmento_from_name: { Args: { p_nome: string }; Returns: string }
