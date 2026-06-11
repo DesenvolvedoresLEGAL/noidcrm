@@ -27,6 +27,7 @@ import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { RevenueSsotBanner } from '@/components/revenue/RevenueSsotBanner';
+import { RevenueCommandLegacyBanner } from '@/components/revenue-command/migration/RevenueCommandLegacyBanner';
 
 function ForecastLoadingState() {
   return (
