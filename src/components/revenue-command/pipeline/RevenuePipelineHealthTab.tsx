@@ -137,14 +137,24 @@ export function RevenuePipelineHealthTab() {
       {/* Bloco 3 — Problemas críticos */}
       <RevenueSectionCard
         title="Problemas críticos"
-        description="Clique em um card para ver as oportunidades afetadas."
+        description={
+          data?.isEmpty
+            ? 'Sem oportunidades abertas para auditar.'
+            : 'Clique em um card para ver as oportunidades afetadas.'
+        }
         icon={ShieldAlert}
       >
-        <CriticalIssuesGrid
-          issues={data?.issues ?? []}
-          loading={isLoading}
-          onPick={setSelected}
-        />
+        {data?.isEmpty ? (
+          <p className="py-6 text-center text-sm text-muted-foreground">
+            Sem oportunidades abertas para auditar.
+          </p>
+        ) : (
+          <CriticalIssuesGrid
+            issues={data?.issues ?? []}
+            loading={isLoading}
+            onPick={setSelected}
+          />
+        )}
       </RevenueSectionCard>
 
       {/* Bloco 4 — Dinheiro em risco */}
