@@ -11,7 +11,7 @@
  * Camada puramente de leitura — apenas síntese executiva.
  */
 import { useMemo } from 'react';
-import { startOfMonth } from 'date-fns';
+import { format, startOfMonth } from 'date-fns';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { useReportFiltersContext } from '@/contexts/ReportFiltersContext';
 import { useTeamVisibility } from '@/hooks/useTeamVisibility';
@@ -22,6 +22,7 @@ import {
 import { useQualificationQualityV2 } from '@/hooks/reports/useQualificationQualityV2';
 import { useReportCloserV2 } from '@/hooks/useReportCloserV2';
 import { useReportSDRV2 } from '@/hooks/useReportSDRV2';
+import { useOTEMonthlyResults, type OTEMonthlyResult } from '@/hooks/useOTEData';
 import { buildReportV2RequestFromFilters } from '@/lib/reports/buildReportV2Request';
 import { mapCloserV2 } from '@/lib/reports/mappers/mapCloserV2';
 import { mapSdrV2 } from '@/lib/reports/mappers/mapSdrV2';
