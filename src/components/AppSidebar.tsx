@@ -8,6 +8,7 @@ import {
   FileCheck,
   FileText,
   BarChart3,
+  TrendingUp,
   Lightbulb,
   Users,
   Gauge,
@@ -74,9 +75,9 @@ const ALL_MENU_ITEMS: MenuItem[] = [
 
   // REVOPS
   { path: '/app/revenue-command', label: 'Revenue Command', icon: Radar, section: 'revops' },
-  // Sprint RCC V3.9 — Forecast e Desempenho ocultados da navegação principal
-  // por já terem leitura executiva consolidada no Revenue Command.
-  // As rotas continuam acessíveis em /app/forecast e /app/objetivos/desempenho.
+  // Hotfix RCC V3.11A — Forecast restaurado: continua sendo fonte oficial do RCC/War Room.
+  // Desempenho permanece oculto (migrado para RCC → Pessoas); rota /app/objetivos/desempenho segue ativa.
+  { path: '/app/forecast', label: 'Forecast', icon: TrendingUp, section: 'revops' },
   { path: '/app/intelligence/winloss', label: 'Win/Loss Hub', icon: Activity, section: 'revops' },
   { path: '/app/scoring', label: 'Scoring', icon: Gauge, section: 'revops' },
 
