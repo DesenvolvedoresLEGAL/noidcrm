@@ -171,10 +171,11 @@ export function AppSidebar() {
 
   const principalItems = getItemsForSection('principal');
   const gestaoItems = getItemsForSection('gestao');
-  const operacoesItems = getItemsForSection('operacoes');
+  const revopsItems = getItemsForSection('revops');
+  const gtmItems = getItemsForSection('gtm');
   const inteligenciaItems = getItemsForSection('inteligencia');
   const objetivosItems = getItemsForSection('objetivos');
-  const gtmItems = getItemsForSection('gtm');
+  const operacoesItems = getItemsForSection('operacoes');
 
   const renderMenuItem = (item: MenuItem) => {
     const Icon = item.icon;
