@@ -91,6 +91,9 @@ export interface PeopleSdrSnapshotRow {
   revenue: number | null;
   classification: PeopleClassification;
   classificationLabel: string;
+  goalPct?: number | null;
+  goalStatus?: string;
+  sources?: Record<string, string | undefined>;
 }
 
 export interface PeopleCloserSnapshotRow {
@@ -105,6 +108,9 @@ export interface PeopleCloserSnapshotRow {
   avgCycleDays: number | null;
   classification: PeopleClassification;
   classificationLabel: string;
+  goalPct?: number | null;
+  goalStatus?: string;
+  sources?: Record<string, string | undefined>;
 }
 
 export interface PeopleConcentration {
