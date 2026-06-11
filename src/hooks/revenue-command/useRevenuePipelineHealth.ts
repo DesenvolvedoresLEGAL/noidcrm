@@ -226,8 +226,9 @@ export function useRevenuePipelineHealth() {
           : pipelineResolved
             ? null
             : ({
-                trustScore: 0,
-                trustLabel: 'Crítico',
+                trustScore: null,
+                trustLabel: 'Sem dados ativos',
+                isEmpty: true,
                 totalOpen: 0,
                 totalOpenValue: 0,
                 diagnosis:
