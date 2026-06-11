@@ -243,6 +243,10 @@ export function useRevenuePeople() {
   const periodMonth = useMemo(() => format(periodStart, 'yyyy-MM'), [periodStart]);
   const oteResultsQuery = useOTEMonthlyResults(periodMonth);
 
+  // HOTFIX RCC V3.4C — aba Pessoas reflete operação atual.
+  // Fonte oficial de usuários ativos/elegíveis: crm_active_users_view.
+  const activeUsersQuery = useActiveUsers();
+
   return useMemo<{ data: PeopleData | null; isLoading: boolean; error: Error | null }>(() => {
     const isLoading =
       closedSummary.isLoading ||
@@ -251,6 +255,7 @@ export function useRevenuePeople() {
       sdrReport.isLoading ||
       qualification.isLoading ||
       oteResultsQuery.isLoading ||
+      activeUsersQuery.isLoading ||
       teamVisibility.loading;
 
     const partialSources: string[] = [];
