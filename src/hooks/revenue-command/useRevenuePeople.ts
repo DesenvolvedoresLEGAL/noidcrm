@@ -529,15 +529,19 @@ export function useRevenuePeople() {
 
     if (typeof window !== 'undefined' && (window as any).__DEV_RCC_PEOPLE__) {
       // eslint-disable-next-line no-console
-      console.debug('[RCC V3.4A] Pessoas', {
-        period: { start, end },
+      console.debug('[RCC V3.4B] Pessoas', {
+        period: { start, end, periodMonth },
         sellerRows: sellerRows.length,
+        sdrFull: sdrFull.length,
         closerFull: closerFull.length,
-        sdrFromQual: sdrFromQual.length,
-        sdrFromV2: sdrFromV2.length,
+        qualRows: qualRowsAll.length,
+        sdrV2Rows: sdrSourceRows.length,
+        oteRows: oteRows.length,
+        activePeople,
         qualificationError: !!qualification.error,
         closerError: !!closerReport.error,
         sdrError: !!sdrReport.error,
+        oteError: !!oteResultsQuery.error,
       });
     }
 
