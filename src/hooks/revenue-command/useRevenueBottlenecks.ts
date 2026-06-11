@@ -386,13 +386,6 @@ export function useRevenueBottlenecks() {
       return { data: null, isLoading: true, error: null };
     }
 
-    const qual = qualification.data ?? null;
-    const closed = closedSummary.data ?? null;
-    const props = proposalsAggr.data ?? null;
-    const wl = winLoss.data ?? null;
-    const fc = forecast.kpis ?? null;
-
-    // ── Seção 1: Vazamento do Funil
     // ── Seção 1: Vazamento do Funil
     // HOTFIX V3.2C — origens consolidadas:
     //   Card 1 (SQLs sem proposta): prefere velocityAggr (cruza Pré-vendas →
