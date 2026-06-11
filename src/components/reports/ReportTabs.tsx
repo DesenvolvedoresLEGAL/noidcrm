@@ -16,7 +16,8 @@ import {
   Compass,
   UserSearch,
   Package,
-  ShieldCheck
+  ShieldCheck,
+  CheckCircle2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -41,6 +42,7 @@ const reportTabs = [
   { id: 'sdr-performance', label: 'SDR', icon: UserCheck, category: 'performance' },
   { id: 'closer-performance', label: 'Closer', icon: Award, category: 'performance' },
   { id: 'handoff', label: 'Handoff', icon: Handshake, category: 'performance' },
+  { id: 'qualification-quality', label: 'Qualidade Qualif.', icon: CheckCircle2, category: 'performance' },
   { id: 'enriched-decision-makers', label: 'Decisores Enriquecidos', icon: UserSearch, category: 'intelligence' },
   { id: 'products', label: 'Produtos', icon: Package, category: 'catalog' },
 ];

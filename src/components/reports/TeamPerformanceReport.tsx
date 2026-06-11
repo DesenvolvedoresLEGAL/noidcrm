@@ -80,7 +80,7 @@ export function TeamPerformanceReport() {
 
         const existing = sellerMap.get(userId) || {
           user_id: userId,
-          name: profiles?.find(p => p.user_id === userId)?.full_name || 'Desconhecido',
+          name: profiles?.find(p => p.user_id === userId)?.full_name || 'Usuário removido',
           avatar_url: profiles?.find(p => p.user_id === userId)?.avatar_url || null,
           won_count: 0,
           won_value: 0,

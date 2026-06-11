@@ -20,6 +20,7 @@ import { TeamPerformanceWrapper } from '@/components/reports/wrappers/TeamPerfor
 import { OriginReportWrapper } from '@/components/reports/wrappers/OriginReportWrapper';
 import { EnrichedDecisionMakersWrapper } from '@/components/reports/wrappers/EnrichedDecisionMakersWrapper';
 import { ProductsReport } from '@/components/reports/ProductsReport';
+import { QualificationQualityReportV2 } from '@/components/reports/qualification/QualificationQualityReportV2';
 import { useOrganizationPipelines } from '@/hooks/useOrganizationPipelines';
 import { useOrganizationUsers } from '@/hooks/useOrganizationUsers';
 import { ReportFiltersProvider, useReportFiltersContext } from '@/contexts/ReportFiltersContext';
@@ -75,6 +76,8 @@ function ReportsContent() {
         return <TeamPerformanceWrapper />;
       case 'handoff':
         return <HandoffWrapper />;
+      case 'qualification-quality':
+        return <QualificationQualityReportV2 />;
       case 'enriched-decision-makers':
         return <EnrichedDecisionMakersWrapper />;
       case 'products':
