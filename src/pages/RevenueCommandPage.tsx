@@ -170,15 +170,7 @@ export default function RevenueCommandPage() {
       value: 'pipeline',
       label: 'Pipeline Health',
       icon: HeartPulse,
-      content: (
-        <RevenueSectionCard
-          title="Pipeline Health"
-          description="Higiene e qualidade do pipeline em tempo real."
-          icon={HeartPulse}
-        >
-          <PlaceholderGrid items={PLACEHOLDER_SECTIONS.pipeline} />
-        </RevenueSectionCard>
-      ),
+      content: <RevenuePipelineHealthTab />,
     },
     {
       value: 'pessoas',
