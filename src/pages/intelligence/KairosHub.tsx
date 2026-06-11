@@ -13,16 +13,17 @@ import { ActionsHistoryTable } from '@/components/intelligence/optimization/Acti
 import { ExperimentImpactSummary } from '@/components/intelligence/experiments/ExperimentImpactSummary';
 import { ExperimentsFeed } from '@/components/intelligence/experiments/ExperimentsFeed';
 import { GuardrailsCard } from '@/components/intelligence/experiments/GuardrailsCard';
+import { IcpIntelligencePanel } from '@/components/intelligence/icp/IcpIntelligencePanel';
 import { Compass, Sparkles } from 'lucide-react';
 
-const VALID_TABS = ['sourcing', 'optimization', 'experiments', 'performance'] as const;
+const VALID_TABS = ['icp', 'sourcing', 'optimization', 'experiments', 'performance'] as const;
 type KairosTab = (typeof VALID_TABS)[number];
 
 export default function KairosHub() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const initialTab = (searchParams.get('tab') as KairosTab) ?? 'sourcing';
+  const initialTab = (searchParams.get('tab') as KairosTab) ?? 'icp';
   const [activeTab, setActiveTab] = useState<KairosTab>(
-    VALID_TABS.includes(initialTab) ? initialTab : 'sourcing'
+    VALID_TABS.includes(initialTab) ? initialTab : 'icp'
   );
 
   useEffect(() => {
@@ -35,7 +36,7 @@ export default function KairosHub() {
     const next = value as KairosTab;
     setActiveTab(next);
     const params = new URLSearchParams(searchParams);
-    if (next === 'sourcing') params.delete('tab');
+    if (next === 'icp') params.delete('tab');
     else params.set('tab', next);
     setSearchParams(params, { replace: true });
   };
@@ -52,12 +53,17 @@ export default function KairosHub() {
         />
 
         <Tabs value={activeTab} onValueChange={handleTabChange}>
-          <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 max-w-2xl">
+          <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 max-w-3xl">
+            <TabsTrigger value="icp">🎯 ICP Intelligence</TabsTrigger>
             <TabsTrigger value="sourcing">🧭 Sourcing</TabsTrigger>
             <TabsTrigger value="optimization">⚡ Optimization</TabsTrigger>
             <TabsTrigger value="experiments">🧪 Experiments</TabsTrigger>
             <TabsTrigger value="performance">📊 Performance</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="icp" className="space-y-4 md:space-y-6 mt-4">
+            <IcpIntelligencePanel />
+          </TabsContent>
 
           <TabsContent value="sourcing" className="space-y-4 md:space-y-6 mt-4">
             <LeadSourcingEngine />

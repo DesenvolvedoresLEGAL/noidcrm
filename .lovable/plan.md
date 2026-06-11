@@ -1,75 +1,104 @@
-# Sprint REL V2.11 — Qualidade de Qualificação SDR → Proposta → Venda
 
-## Objetivo
-Medir qualidade real do pré-vendas (não só volume): quantos SQLs viraram proposta, foram ganhos, perdidos ou morreram sem proposta. Corrigir transversalmente o problema de "Desconhecido" em SDR, Handoff, Closer e Performance.
+# KAI.12 — ICP Intelligence Engine + Sourcing Audit
 
-## Entregas
+Esta sprint substitui o ICP herdado do Roleplay por clusters reais da base de clientes, audita as fontes de sourcing do Kairós e desabilita as que não têm engine. Sem mudanças em RLS, edge functions financeiras ou regras de receita.
 
-### 1. Backend — Views V2 (migration)
+## 1. Eliminar dependência do Roleplay no Kairós
 
-**`public.v_user_display_resolver_v2`** — Resolução canônica de nomes
-- Une `profiles` (ativos) + snapshots históricos disponíveis (`opportunity_owner_history`, `opportunity_qualification_history`, `auth_audit_log`) para recuperar nome de usuários removidos.
-- Campos: `user_id, display_name, user_status, is_active, is_deleted, resolved_from`.
-- Regras: ativo → nome; removido com histórico → "Nome (removido)"; removido sem histórico → "Usuário removido"; null real → "Sem responsável". Nunca retorna "Desconhecido".
+- `LeadSearchForm.tsx` hoje importa `listICPs` de `@/services/roleplay/icps`. Vamos:
+  - Criar `src/services/intelligence/icpIntelligence.ts` com tipos próprios (`IntelligenceICP`).
+  - Substituir o import em `LeadSearchForm.tsx` (única dependência detectada de roleplay no módulo).
+- O Roleplay continua intocado — apenas o Kairós deixa de ler de lá.
+- Tabela `icp_profiles` continua existindo (é compartilhada/legacy), mas o Kairós passa a consumir um motor derivado de `accounts` + `opportunities` + `proposals`.
 
-**`public.v_report_qualification_quality_v2`** — Unidade = SQL (oportunidade qualificada)
-- Base: `v_reporting_opportunities_v2` + `v_opportunity_first_qualification_v2` + `v_opportunity_amounts_v2` + `v_loss_classification_v2` + `proposals` + `commercial_won_revenue_view`.
-- Regras:
-  - SQL qualificado = `first_qualification_at IS NOT NULL` OR `qualified_by_user_id IS NOT NULL`.
-  - Com proposta = existe proposta vinculada (incluindo cadeia de duplicação/herdada).
-  - Ganho/Perdido = status oficial V2.
-  - Receita = `valid_revenue_amount` da `commercial_won_revenue_view` (líquido, sem cancelamentos).
-- Campos: `organization_id, sdr_user_id, sdr_name, sdr_status, qualified_count, with_proposal_count, without_proposal_count, won_count, lost_count, open_count, valid_revenue_amount, sql_to_proposal_rate, proposal_to_won_rate, sql_to_won_rate, post_qualification_loss_rate, avg_hours_qualification_to_proposal, avg_days_qualification_to_close`.
-- Grants: SELECT para `authenticated`; ALL para `service_role`. Security invoker para herdar RLS das views base.
+## 2. ICP Intelligence Engine (read-only, client-side)
 
-### 2. Edge Function — `report-qualification-quality-v2`
-Input: `organizationId, dateRange, sdrUserIds[], closerUserIds[], status[], proposalStatus[], includeRemovedUsers, teamVisibility`.
-Output: `{ summary, rows[], drilldown?, meta, confidence }`.
-- `confidence`: `trusted | partial | warning` baseado em consistência de `qualified_at`, links de proposta e resolver.
-- Filtros aplicados em SQL parametrizado sobre a view; drilldown lista oportunidades (cliente, oportunidade, datas, SDR, closer, proposta, status, motivo perda, receita válida, dias desde qualificação).
+Novo hook `useIcpIntelligence()` calcula clusters em memória a partir das fontes oficiais (sem novas tabelas, sem edge functions, sem schema novo):
 
-### 3. Frontend
+Fontes de verdade já existentes:
+- `accounts` (tipo, segmento, cidade, estado)
+- `opportunities` (ganhas via `commercial_won_revenue_view` — SSoT de receita)
+- `proposals` (ticket, recorrência)
+- `contracts` (LTV, recompra)
 
-**Nova subaba** em `Relatórios > Desempenho > Handoff` (`ReportTabs.tsx`): adicionar entry `qualification-quality` rotulada "Qualidade de Qualificação".
+Métricas por cliente:
+- receita líquida acumulada (`valid_revenue_amount`)
+- nº de contratações ganhas
+- ticket médio
+- recompra (≥2 deals ganhos)
+- segmento, cidade, estado
+- produtos mais recorrentes
 
-**Componentes novos:**
-- `src/components/reports/qualification/QualificationQualityReportV2.tsx` — Cards (SQLs, com proposta, sem proposta, ganhos, perdidos, receita válida, taxa SQL→Proposta, taxa SQL→Venda) + tabela por SDR + filtros.
-- `src/components/reports/qualification/QualificationDrilldownDialog.tsx` — Drilldown ao clicar SDR.
-- `src/components/reports/qualification/QualificationFilters.tsx` — período, SDR, closer, status, proposta sim/não, ganho/perdido/aberto, usuário ativo/removido, origem, pipeline.
-- `src/hooks/reports/useQualificationQualityV2.ts` — invoca edge function com React Query.
+Clusterização determinística (sem IA):
+- agrupa por `segmento` normalizado
+- dentro de cada segmento aplica faixas de ticket (alta/média) e recompra
+- gera clusters dinâmicos: `Premium`, `Standard`, `Recorrentes`, `One-shot`, etc.
+- nada hardcoded — labels nascem dos dados (ex.: "Expositores Premium" se segmento dominante = Expositores e ticket no top-quartil)
 
-**Helper compartilhado de display:**
-- `src/lib/userDisplay.ts` + `src/hooks/useUserDisplayResolver.ts` consumindo `v_user_display_resolver_v2`. Badge `<RemovedUserBadge />`.
+Saída por cluster: `{ id, name, segment, count, avgTicket, totalRevenue, repurchaseRate, topCities, topProducts }`.
 
-**Correções nas telas existentes (mínimas, sem deletar):**
-- SDR Report: trocar fallback "Desconhecido" pelo resolver; receita atribuída via `commercial_won_revenue_view`; não esconder leads sem proposta.
-- Handoff Report: pares SDR→Closer via resolver; "Sem closer atribuído" quando null.
-- Closer Report: resolver + filtrar usuários removidos do ranking por default; filtro "incluir removidos".
-- Performance Report: resolver para receita histórica.
+## 3. Novo dropdown ICP no LeadSearchForm
 
-### 4. Memória
-Atualizar `mem://index.md` com regras: (a) unidade SQL para qualidade de qualificação; (b) `v_user_display_resolver_v2` é fonte única de nome — proibir fallback "Desconhecido".
+Substitui o Select atual:
+- placeholder: "ICP Intelligence"
+- cada item mostra nome + chips: `N clientes`, `Ticket R$X`, `Recompra Y%`
+- ao selecionar, preenche automaticamente `inputPayload.segment`, `inputPayload.city/state` quando aplicável
+- card lateral exibe drivers do cluster (segmento dominante, top cidades, produtos)
 
-## Critérios de aceite
-1-10 conforme spec do usuário. Cenário de teste: SDR com 10 qualificados (2 proposta, 6 perdidos, 2 sem proposta) → 20% SQL→Proposta, 60% perda pós-qualificação.
+## 4. Tela `Kairós > ICP Intelligence`
 
-## Regressões protegidas
-- Vendas Realizadas continua em receita válida.
-- Cancelamentos não entram como receita.
-- Período usa fim do dia.
+Nova aba dentro de `KairosHub.tsx`:
+- Tab adicional `🎯 ICP Intelligence` antes de `Sourcing`
+- Componente `IcpIntelligencePanel`:
+  - Ranking de clusters (tabela): receita, nº clientes, ticket médio, LTV, recompra %
+  - Cards de distribuição: top segmentos, top cidades/UFs
+  - Lista de produtos mais contratados por cluster
+- Read-only, sem ações de escrita.
 
-## Arquivos impactados (resumo)
-**Novos:** 1 migration, 1 edge function, 5 arquivos frontend (report + drilldown + filters + hook + helper), 1 memória.
-**Editados:** `ReportTabs.tsx`, SDR/Handoff/Closer/Performance reports (apenas troca de label/fallback).
+## 5. Auditoria das abas de sourcing
+
+Investigar `supabase/functions/lead-sourcing/` e providers para classificar cada tipo (event/directory/geo/seed/import) como `functional | partial | stub`. Resultado consolidado em `src/components/playbook/SOURCING_AUDIT.md` (documento técnico).
+
+Hoje, pela memória do projeto e pelo formulário:
+- `event` → funcional (ExpoFP/Firecrawl, provider documentado)
+- `directory`, `geo`, `seed` → sem engine confirmada
+- `import` → funcional (lista colada)
+
+## 6. Desabilitar fontes não funcionais na UI
+
+No `LeadSearchForm.tsx`:
+- Cada item de `SEARCH_TYPES` ganha `status: 'live' | 'wip'`
+- Botões `wip` ficam desabilitados, com badge "Em desenvolvimento" e tooltip "Esta fonte de sourcing ainda não possui engine operacional."
+- Apenas `event` e `import` ficam ativos por padrão (ajustável após a auditoria do passo 5).
+
+## 7. Matching com base de clientes
+
+Reaproveitar a edge function `kairos-match-company` (já existente, documentada na memória — CNPJ→domínio→nome). Garantir que:
+- `LeadResultsTable` exibe o `RelationshipBadge` já existente (🟢 Cliente / 🟡 Conta / 🟠 Oportunidade / ⚪ Novo)
+- Verificar se o badge está sendo renderizado em todas as views de prospect (Sourcing results + Drawer)
+- Bloquear importação de prospect quando `relationship_status = 'customer'` (já documentado, validar)
+
+## Arquivos impactados
+
+Criados:
+- `src/services/intelligence/icpIntelligence.ts`
+- `src/hooks/intelligence/useIcpIntelligence.ts`
+- `src/components/intelligence/icp/IcpIntelligencePanel.tsx`
+- `src/components/intelligence/icp/IcpClusterCard.tsx`
+- `src/components/playbook/SOURCING_AUDIT.md`
+
+Editados:
+- `src/components/playbook/LeadSearchForm.tsx` (drop roleplay, novo dropdown, desabilitar wip)
+- `src/pages/intelligence/KairosHub.tsx` (nova tab + tab order)
+- `src/components/playbook/LeadResultsTable.tsx` (garantir badge — somente se faltar)
 
 ## Riscos
-- Snapshot histórico de nome depende de tabelas com dados parciais — confidence sinaliza isso.
-- View pode ficar pesada; planejo `WHERE organization_id = $1` empurrado e índices existentes em `opportunities(qualified_by_user_id, first_qualification_at)` (validar via linter pós-migration).
-- Resolver alterando telas existentes pode mudar visualização para usuários que hoje aparecem como "Desconhecido" — comportamento esperado.
 
-## Próximos passos
-1. Aprovar plano.
-2. Migration (resolver + view + grants).
-3. Edge function + hook + tela nova.
-4. Patches leves SDR/Handoff/Closer/Performance.
-5. Validar cenário de teste com dados reais via `supabase--read_query`.
+- Cálculo client-side de clusters pode ficar lento para bases >5k accounts; mitigar com `useMemo` + limite de 2000 contas por query (configurable).
+- Roleplay continua usando `icp_profiles` — não tocar nessa tabela.
+- Nenhuma alteração de RLS, schema, edge function financeira ou regra de receita.
+
+## Próximos passos (fora do escopo desta sprint)
+- Persistir clusters em `icp_intelligence_snapshots` para histórico.
+- Implementar engines reais para directory/geo/seed.
+- Job noturno recalculando clusters.
