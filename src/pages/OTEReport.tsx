@@ -9,6 +9,7 @@ import { CommissionHistoryTab } from '@/components/results/commission/Commission
 import { SimpleGoalsOverviewTab } from '@/components/results/simple/SimpleGoalsOverviewTab';
 import { SimpleGoalsHistoryTab } from '@/components/results/simple/SimpleGoalsHistoryTab';
 import { VendasRealizadasWrapper } from '@/components/reports/wrappers/VendasRealizadasWrapper';
+import { ReportFiltersProvider } from '@/contexts/ReportFiltersContext';
 
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
