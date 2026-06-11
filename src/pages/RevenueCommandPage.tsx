@@ -29,7 +29,8 @@ import { RevenuePipelineHealthTab } from '@/components/revenue-command/pipeline/
 import { RevenuePeopleTab } from '@/components/revenue-command/people/RevenuePeopleTab';
 import { RevenueRisksTab } from '@/components/revenue-command/risks/RevenueRisksTab';
 import { RevenueNextActionsTab } from '@/components/revenue-command/next-actions/RevenueNextActionsTab';
-import { ListChecks } from 'lucide-react';
+import { RevenueHealthTrustTab } from '@/components/revenue-command/health-trust/RevenueHealthTrustTab';
+import { ListChecks, ShieldCheck } from 'lucide-react';
 
 /**
  * Sprint REVOPS V3.0 — Revenue Command Center
