@@ -214,6 +214,7 @@ function TrustScoreCard({
   data: ReturnType<typeof useRevenuePipelineHealth>['data'];
   loading: boolean;
 }) {
+  const isEmpty = !!data?.isEmpty;
   return (
     <Card className="border-primary/30">
       <CardHeader className="pb-2">
@@ -223,6 +224,10 @@ function TrustScoreCard({
         <CardTitle className="flex items-baseline gap-2">
           {loading || !data ? (
             <Skeleton className="h-10 w-28" />
+          ) : isEmpty ? (
+            <span className="text-3xl font-semibold text-muted-foreground">
+              N/A
+            </span>
           ) : (
             <>
               <span className="text-4xl font-bold tabular-nums">
@@ -236,6 +241,15 @@ function TrustScoreCard({
       <CardContent className="space-y-3">
         {loading || !data ? (
           <Skeleton className="h-3 w-32" />
+        ) : isEmpty ? (
+          <>
+            <span className="text-sm font-semibold text-muted-foreground">
+              Sem dados ativos
+            </span>
+            <p className="text-[11px] text-muted-foreground">
+              0 oportunidades abertas no Pipeline de Vendas
+            </p>
+          </>
         ) : (
           <>
             <span
@@ -244,11 +258,11 @@ function TrustScoreCard({
               {data.trustLabel}
             </span>
             <Progress
-              value={data.trustScore}
+              value={data.trustScore ?? 0}
               className={`h-2 ${
-                data.trustScore >= 80
+                (data.trustScore ?? 0) >= 80
                   ? '[&>div]:bg-emerald-500'
-                  : data.trustScore >= 70
+                  : (data.trustScore ?? 0) >= 70
                     ? '[&>div]:bg-amber-500'
                     : '[&>div]:bg-red-500'
               }`}
