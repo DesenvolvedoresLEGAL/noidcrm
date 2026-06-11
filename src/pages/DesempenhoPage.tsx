@@ -1,18 +1,21 @@
 import { useState, useEffect } from 'react';
 import { Layout } from '@/components/Layout';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent } from '@/components/ui/card';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PageHeader } from '@/components/ui/page-header';
 import { CompactFilters } from '@/components/reports/CompactFilters';
 import { ReportFiltersProvider, useReportFiltersContext } from '@/contexts/ReportFiltersContext';
-import { TeamPerformanceWrapper } from '@/components/reports/wrappers/TeamPerformanceWrapper';
 import { SDRPerformanceWrapper } from '@/components/reports/wrappers/SDRPerformanceWrapper';
 import { CloserPerformanceWrapper } from '@/components/reports/wrappers/CloserPerformanceWrapper';
 import { HandoffWrapper } from '@/components/reports/wrappers/HandoffWrapper';
 import { QualificationQualityReportV2 } from '@/components/reports/qualification/QualificationQualityReportV2';
+import { PerformanceOverviewTab } from '@/components/objetivos/desempenho/PerformanceOverviewTab';
+import { PerformanceRankingTab } from '@/components/objetivos/desempenho/PerformanceRankingTab';
+import { PerformanceSectionShell } from '@/components/objetivos/desempenho/PerformanceSectionShell';
 import { useOrganizationPipelines } from '@/hooks/useOrganizationPipelines';
 import { useOrganizationUsers } from '@/hooks/useOrganizationUsers';
-import { Trophy, Users, UserCheck, Award, Handshake, CheckCircle2, BarChart3, Sparkles } from 'lucide-react';
+import {
+  Trophy, UserCheck, Award, Handshake, CheckCircle2, BarChart3, Sparkles,
+} from 'lucide-react';
 
 function DesempenhoContent() {
   const { pipelines: availablePipelines, loading: loadingPipelines } = useOrganizationPipelines();
@@ -28,22 +31,56 @@ function DesempenhoContent() {
 
   const renderTab = () => {
     switch (activeTab) {
-      case 'visao-geral': return <TeamPerformanceWrapper />;
-      case 'sdr': return <SDRPerformanceWrapper />;
-      case 'closers': return <CloserPerformanceWrapper />;
-      case 'handoff': return <HandoffWrapper />;
-      case 'qualidade': return <QualificationQualityReportV2 />;
-      case 'ranking':
+      case 'visao-geral':
+        return <PerformanceOverviewTab />;
+      case 'sdr':
         return (
-          <Card>
-            <CardContent className="p-8 text-center text-muted-foreground">
-              <Trophy className="h-10 w-10 mx-auto mb-3 opacity-40" />
-              <p className="font-medium text-foreground">Ranking consolidado</p>
-              <p className="text-sm mt-1">Tabela unificada SDR + Closers em breve.</p>
-            </CardContent>
-          </Card>
+          <PerformanceSectionShell
+            icon={UserCheck}
+            title="Produtividade de pré-vendas"
+            description="Leads trabalhados, qualificados, taxa de qualificação e tempo médio por SDR."
+            accent="indigo"
+          >
+            <SDRPerformanceWrapper />
+          </PerformanceSectionShell>
         );
-      default: return <TeamPerformanceWrapper />;
+      case 'closers':
+        return (
+          <PerformanceSectionShell
+            icon={Award}
+            title="Eficiência de fechamento"
+            description="Conversão, ciclo médio e produtividade comercial por Closer. Receita, comissão e OTE em Resultados."
+            accent="primary"
+          >
+            <CloserPerformanceWrapper />
+          </PerformanceSectionShell>
+        );
+      case 'handoff':
+        return (
+          <PerformanceSectionShell
+            icon={Handshake}
+            title="Passagem de bastão SDR → Closer"
+            description="Tempo de primeiro contato, SLA e taxa de aceite das oportunidades qualificadas."
+            accent="teal"
+          >
+            <HandoffWrapper />
+          </PerformanceSectionShell>
+        );
+      case 'qualidade':
+        return (
+          <PerformanceSectionShell
+            icon={CheckCircle2}
+            title="Qualidade da qualificação"
+            description="SQLs com proposta, ganhos, perdidos e mortos sem proposta. Sinal de qualidade real do pipeline."
+            accent="emerald"
+          >
+            <QualificationQualityReportV2 />
+          </PerformanceSectionShell>
+        );
+      case 'ranking':
+        return <PerformanceRankingTab />;
+      default:
+        return <PerformanceOverviewTab />;
     }
   };
 
@@ -54,7 +91,7 @@ function DesempenhoContent() {
           <PageHeader
             icon={BarChart3}
             title="Desempenho"
-            subtitle="Performance comercial, produtividade individual e qualidade operacional"
+            subtitle="Performance de pessoas, produtividade comercial e qualidade da operação"
             variant="indigo"
             badge={{ label: 'Performance', icon: Sparkles }}
           />
@@ -70,13 +107,13 @@ function DesempenhoContent() {
                 <UserCheck className="h-4 w-4 mr-2" />SDR
               </TabsTrigger>
               <TabsTrigger value="closers" className="data-[state=active]:bg-primary/15 data-[state=active]:text-primary">
-                <Award className="h-4 w-4 mr-2" />Closers
+                <Award className="h-4 w-4 mr-2" />Closer
               </TabsTrigger>
               <TabsTrigger value="handoff" className="data-[state=active]:bg-primary/15 data-[state=active]:text-primary">
                 <Handshake className="h-4 w-4 mr-2" />Handoff
               </TabsTrigger>
               <TabsTrigger value="qualidade" className="data-[state=active]:bg-primary/15 data-[state=active]:text-primary">
-                <CheckCircle2 className="h-4 w-4 mr-2" />Qualidade Qualif.
+                <CheckCircle2 className="h-4 w-4 mr-2" />Qualidade
               </TabsTrigger>
               <TabsTrigger value="ranking" className="data-[state=active]:bg-primary/15 data-[state=active]:text-primary">
                 <Trophy className="h-4 w-4 mr-2" />Ranking
