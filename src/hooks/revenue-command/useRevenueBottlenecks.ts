@@ -141,11 +141,10 @@ export function useRevenueBottlenecks() {
   // referência usada pelo Forecast). Propostas/oportunidades de Pré-vendas,
   // Operacional, Remarketing etc. são excluídas do Revenue Command Center.
   const proposalsAggr = useQuery({
-    queryKey: ['revenue-command:bottlenecks:proposals', orgId, salesPipelineId, start, end],
+    queryKey: ['revenue-command:bottlenecks:proposals:v3.2c', orgId, salesPipelineId, start, end],
     enabled: !!orgId && pipelineResolved,
     staleTime: 60_000,
     queryFn: async () => {
-      // Abertas (sent) — qualquer data, somente pipeline de Vendas
       const openQ = await supabase
         .from('proposals')
         .select('id, total_amount, sent_at, created_at, opportunities!inner(pipeline_id)')
@@ -154,7 +153,6 @@ export function useRevenueBottlenecks() {
         .eq('opportunities.pipeline_id', salesPipelineId!);
       if (openQ.error) throw openQ.error;
 
-      // Rejeitadas no período — somente pipeline de Vendas
       const lostQ = await supabase
         .from('proposals')
         .select('id, total_amount, opportunities!inner(pipeline_id)')
@@ -165,11 +163,26 @@ export function useRevenueBottlenecks() {
         .lte('created_at', end);
       if (lostQ.error) throw lostQ.error;
 
+      // HOTFIX V3.2C: Oportunidades comerciais ABERTAS no Pipeline de Vendas
+      const openOppsQ = await supabase
+        .from('opportunities')
+        .select('id, valor_previsto, created_at')
+        .eq('organization_id', orgId!)
+        .eq('pipeline_id', salesPipelineId!)
+        .eq('status', 'open')
+        .is('deleted_at', null);
+      if (openOppsQ.error) throw openOppsQ.error;
+
       const open = openQ.data ?? [];
       const lost = lostQ.data ?? [];
+      const openOpps = openOppsQ.data ?? [];
 
       const openValue = open.reduce((s, p: any) => s + (Number(p.total_amount) || 0), 0);
       const lostValue = lost.reduce((s, p: any) => s + (Number(p.total_amount) || 0), 0);
+      const openOppsValue = openOpps.reduce(
+        (s, o: any) => s + (Number(o.valor_previsto) || 0),
+        0,
+      );
 
       const nowMs = now.getTime();
       const ages = open
@@ -181,12 +194,25 @@ export function useRevenueBottlenecks() {
         .filter((d): d is number => d != null);
       const avgAgeDays = ages.length ? ages.reduce((a, b) => a + b, 0) / ages.length : null;
 
+      const oppAges = openOpps
+        .map((o: any) => {
+          if (!o.created_at) return null;
+          return Math.max(0, (nowMs - new Date(o.created_at).getTime()) / 86_400_000);
+        })
+        .filter((d): d is number => d != null);
+      const avgOppAgeDays = oppAges.length
+        ? oppAges.reduce((a, b) => a + b, 0) / oppAges.length
+        : null;
+
       return {
         openCount: open.length,
         openValue,
         avgAgeDays,
         lostCount: lost.length,
         lostValue,
+        openOppsCount: openOpps.length,
+        openOppsValue,
+        avgOppAgeDays,
       };
     },
   });
