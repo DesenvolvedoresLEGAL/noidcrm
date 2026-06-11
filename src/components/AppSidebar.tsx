@@ -65,51 +65,49 @@ const ALL_MENU_ITEMS: MenuItem[] = [
   // PRINCIPAL (sem label)
   { path: '/app/dashboard', label: 'Dashboard', icon: LayoutDashboard, section: 'principal' },
   { path: '/app/opportunities', label: 'Pipeline', icon: Target, section: 'principal' },
-  
+
   // GESTÃO
   { path: '/app/activities', label: 'Atividades', icon: CheckSquare, section: 'gestao' },
   { path: '/app/accounts', label: 'Contas', icon: Building2, section: 'gestao' },
   { path: '/app/contracts', label: 'Contratos', icon: FileCheck, section: 'gestao' },
   { path: '/app/proposals', label: 'Propostas', icon: FileText, section: 'gestao' },
-  { path: '/app/forecast', label: 'Forecast', icon: TrendingUp, section: 'gestao' },
-  { path: '/app/reports', label: 'Relatórios', icon: BarChart3, section: 'gestao' },
-  { path: '/app/revenue-command', label: 'Revenue Command', icon: Radar, section: 'gestao' },
 
-  // OPERAÇÕES
-  { path: '/app/operations/inventory', label: 'Inventário', icon: Boxes, section: 'operacoes' },
-  
+  // REVOPS
+  { path: '/app/revenue-command', label: 'Revenue Command', icon: Radar, section: 'revops' },
+  { path: '/app/forecast', label: 'Forecast', icon: TrendingUp, section: 'revops' },
+  { path: '/app/intelligence/winloss', label: 'Win/Loss Hub', icon: Activity, section: 'revops' },
+  { path: '/app/scoring', label: 'Scoring', icon: Gauge, section: 'revops' },
+
+  // GTM
+  { path: '/app/intelligence/kairos', label: 'Kairós', icon: Compass, section: 'gtm' },
+  { path: '/app/gtm/sdr', label: 'SDR Center', icon: Zap, section: 'gtm' },
+  { path: '/app/gtm/ae', label: 'AE Dashboard', icon: Handshake, section: 'gtm' },
+  { path: '/app/intelligence/vibe', label: 'Vibe Selling', icon: Sparkles, section: 'gtm' },
+  { path: '/app/intelligence/playbooks', label: 'Playbooks', icon: BookOpen, section: 'gtm' },
+  { path: '/app/roleplay', label: 'Roleplay', icon: Users, section: 'gtm' },
+
   // INTELIGÊNCIA
   { path: '/app/insights', label: 'Insights', icon: Lightbulb, section: 'inteligencia' },
-  { path: '/app/intelligence/kairos', label: 'Kairós', icon: Compass, section: 'inteligencia' },
   { path: '/app/intelligence/graph', label: 'Knowledge Graph', icon: Network, section: 'inteligencia' },
   { path: '/app/intelligence/memories', label: 'Memórias', icon: Brain, section: 'inteligencia' },
-  { path: '/app/intelligence/playbooks', label: 'Playbooks', icon: BookOpen, section: 'inteligencia' },
-  { path: '/app/scoring', label: 'Scoring', icon: Gauge, section: 'inteligencia' },
-  { path: '/app/intelligence/vibe', label: 'Vibe Selling', icon: Sparkles, section: 'inteligencia' },
-  { path: '/app/intelligence/winloss', label: 'Win/Loss Hub', icon: Activity, section: 'inteligencia' },
-  
+
   // OBJETIVOS
   { path: '/app/reports/ote', label: 'Resultados', icon: DollarSign, section: 'objetivos' },
   { path: '/app/objetivos/desempenho', label: 'Desempenho', icon: Trophy, section: 'objetivos' },
   { path: '/app/settings/sales', label: 'Configurações', icon: Settings2, section: 'objetivos' },
-  { path: '/app/roleplay', label: 'Roleplay', icon: Users, section: 'objetivos' },
-  
-  // GTM
-  { path: '/app/gtm/sdr', label: 'SDR Center', icon: Zap, section: 'gtm' },
-  { path: '/app/gtm/ae', label: 'AE Dashboard', icon: Handshake, section: 'gtm' },
-  { path: '/app/gtm/cs', label: 'CS Engine', icon: HeadphonesIcon, section: 'gtm' },
-  { path: '/app/gtm/revops', label: 'RevOps', icon: Settings2, section: 'gtm' },
-  { path: '/app/gtm/manager', label: 'Manager', icon: Users, section: 'gtm' },
-  { path: '/app/gtm/ceo', label: 'CEO Cockpit', icon: Crown, section: 'gtm' },
+
+  // OPERAÇÕES
+  { path: '/app/operations/inventory', label: 'Inventário', icon: Boxes, section: 'operacoes' },
 ];
 
 const SECTION_LABELS: Record<string, string> = {
   principal: '',
   gestao: 'Gestão',
-  operacoes: 'Operações',
-  inteligencia: 'Inteligência',
+  revops: 'RevOps',
   gtm: 'GTM',
+  inteligencia: 'Inteligência',
   objetivos: 'Objetivos',
+  operacoes: 'Operações',
 };
 
 export function AppSidebar() {
@@ -173,10 +171,11 @@ export function AppSidebar() {
 
   const principalItems = getItemsForSection('principal');
   const gestaoItems = getItemsForSection('gestao');
-  const operacoesItems = getItemsForSection('operacoes');
+  const revopsItems = getItemsForSection('revops');
+  const gtmItems = getItemsForSection('gtm');
   const inteligenciaItems = getItemsForSection('inteligencia');
   const objetivosItems = getItemsForSection('objetivos');
-  const gtmItems = getItemsForSection('gtm');
+  const operacoesItems = getItemsForSection('operacoes');
 
   const renderMenuItem = (item: MenuItem) => {
     const Icon = item.icon;
@@ -251,9 +250,10 @@ export function AppSidebar() {
         <SidebarContent className="px-2 py-2">
           {renderSection(principalItems, SECTION_LABELS.principal, 'principal')}
           {renderSection(gestaoItems, SECTION_LABELS.gestao, 'gestao')}
+          {renderSection(revopsItems, SECTION_LABELS.revops, 'revops')}
+          {renderSection(gtmItems, SECTION_LABELS.gtm, 'gtm')}
           {renderSection(inteligenciaItems, SECTION_LABELS.inteligencia, 'inteligencia')}
           {renderSection(objetivosItems, SECTION_LABELS.objetivos, 'objetivos')}
-          {renderSection(gtmItems, SECTION_LABELS.gtm, 'gtm')}
           {renderSection(operacoesItems, SECTION_LABELS.operacoes, 'operacoes')}
         </SidebarContent>
 
