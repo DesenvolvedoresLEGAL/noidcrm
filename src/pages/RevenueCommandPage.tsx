@@ -26,6 +26,7 @@ import { RevenuePlaceholder } from '@/components/revenue-command/RevenuePlacehol
 import { RevenueTodayTab } from '@/components/revenue-command/today/RevenueTodayTab';
 import { RevenueBottlenecksTab } from '@/components/revenue-command/bottlenecks/RevenueBottlenecksTab';
 import { RevenuePipelineHealthTab } from '@/components/revenue-command/pipeline/RevenuePipelineHealthTab';
+import { RevenuePeopleTab } from '@/components/revenue-command/people/RevenuePeopleTab';
 
 /**
  * Sprint REVOPS V3.0 — Revenue Command Center
@@ -176,15 +177,7 @@ export default function RevenueCommandPage() {
       value: 'pessoas',
       label: 'Pessoas',
       icon: Users,
-      content: (
-        <RevenueSectionCard
-          title="Pessoas"
-          description="Desempenho individual e de times."
-          icon={Users}
-        >
-          <PlaceholderGrid items={PLACEHOLDER_SECTIONS.pessoas} />
-        </RevenueSectionCard>
-      ),
+      content: <RevenuePeopleTab />,
     },
     {
       value: 'riscos',

@@ -1,0 +1,558 @@
+/**
+ * Sprint REVOPS V3.4 — Hook agregador da aba "Pessoas" do Revenue Command Center.
+ *
+ * Consome SOMENTE fontes oficiais já existentes:
+ *  - useRevenueBySeller / useClosedRevenueSummary (commercial_won_revenue_view SSoT)
+ *  - useQualificationQualityV2 (Qualidade de Qualificação SDR)
+ *  - useReportCloserV2 (Performance Closer V2)
+ *  - useReportSDRV2 (Performance SDR V2)
+ *
+ * Não cria nem altera qualquer view, edge function ou regra financeira.
+ * Camada puramente de leitura — apenas síntese executiva.
+ */
+import { useMemo } from 'react';
+import { startOfMonth } from 'date-fns';
+import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
+import { useReportFiltersContext } from '@/contexts/ReportFiltersContext';
+import { useTeamVisibility } from '@/hooks/useTeamVisibility';
+import {
+  useClosedRevenueSummary,
+  useRevenueBySeller,
+} from '@/hooks/revenue/useRevenueSsot';
+import { useQualificationQualityV2 } from '@/hooks/reports/useQualificationQualityV2';
+import { useReportCloserV2 } from '@/hooks/useReportCloserV2';
+import { useReportSDRV2 } from '@/hooks/useReportSDRV2';
+import { buildReportV2RequestFromFilters } from '@/lib/reports/buildReportV2Request';
+import { mapCloserV2 } from '@/lib/reports/mappers/mapCloserV2';
+import { mapSdrV2 } from '@/lib/reports/mappers/mapSdrV2';
+
+export type PeopleClassification =
+  | 'high'
+  | 'good'
+  | 'attention'
+  | 'risk'
+  | 'volume_no_quality'
+  | 'low_volume'
+  | 'insufficient';
+
+export interface PeopleScoreboard {
+  activePeople: number;
+  topPerformer: { name: string; value: number } | null;
+  bestConverter: { name: string; pct: number } | null;
+  topSqlVolume: { name: string; count: number } | null;
+  worstQuality: { name: string; pct: number } | null;
+  concentrationTop1Pct: number | null;
+}
+
+export interface PeopleTopPerformer {
+  userId: string;
+  name: string;
+  role: 'Closer' | 'SDR';
+  primaryMetric: string;
+  contribution: string;
+  cta: { label: string; to: string };
+}
+
+export interface PeopleNeedsHelpItem {
+  userId: string;
+  name: string;
+  role: 'Closer' | 'SDR';
+  problem: string;
+  impact: string;
+  cta: { label: string; to: string };
+}
+
+export interface PeopleSdrSnapshotRow {
+  userId: string;
+  name: string;
+  qualified: number;
+  withProposal: number;
+  withoutProposal: number;
+  sqlToProposalPct: number;
+  sqlToWonPct: number;
+  revenue: number;
+  classification: PeopleClassification;
+  classificationLabel: string;
+}
+
+export interface PeopleCloserSnapshotRow {
+  userId: string;
+  name: string;
+  revenue: number;
+  won: number;
+  lost: number;
+  winRatePct: number | null;
+  avgTicket: number;
+  activePipeline: number;
+  avgCycleDays: number | null;
+  classification: PeopleClassification;
+  classificationLabel: string;
+}
+
+export interface PeopleConcentration {
+  top1Pct: number | null;
+  top1Name: string | null;
+  top3Pct: number | null;
+  totalRevenue: number;
+  level: 'healthy' | 'info' | 'warning' | 'critical';
+  message: string;
+}
+
+export interface PeopleRecommendedAction {
+  id: string;
+  title: string;
+  reason: string;
+  priority: 'alta' | 'média' | 'baixa';
+  person?: { name: string; role: string };
+  cta: { label: string; to: string };
+}
+
+export interface PeopleData {
+  scoreboard: PeopleScoreboard;
+  topPerformers: PeopleTopPerformer[];
+  needsHelp: PeopleNeedsHelpItem[];
+  sdrSnapshot: PeopleSdrSnapshotRow[];
+  closerSnapshot: PeopleCloserSnapshotRow[];
+  concentration: PeopleConcentration;
+  actions: PeopleRecommendedAction[];
+  meta: {
+    generatedAt: string;
+    period: { start: string; end: string };
+    sources: string[];
+    partialSources: string[];
+    confidence: 'trusted' | 'partial' | 'warning';
+  };
+}
+
+const SDR_CTA = { label: 'Ver Desempenho SDR', to: '/app/objetivos/desempenho?tab=sdr' };
+const CLOSER_CTA = { label: 'Ver Desempenho Closer', to: '/app/objetivos/desempenho?tab=closer' };
+const QUALITY_CTA = { label: 'Ver Qualidade de Qualificação', to: '/app/objetivos/desempenho?tab=qualidade' };
+const PIPELINE_CTA = { label: 'Abrir Pipeline', to: '/app/opportunities' };
+
+function fmtBRL(v: number) {
+  return `R$ ${Math.round(v).toLocaleString('pt-BR')}`;
+}
+
+function classifySdr(row: {
+  qualified: number;
+  withProposal: number;
+  sqlToProposalPct: number;
+  sqlToWonPct: number;
+}): { c: PeopleClassification; label: string } {
+  if (row.qualified < 3) return { c: 'insufficient', label: 'Sem dados suficientes' };
+  if (row.qualified >= 20 && row.sqlToProposalPct < 30)
+    return { c: 'volume_no_quality', label: 'Volume sem qualidade' };
+  if (row.qualified < 8) return { c: 'low_volume', label: 'Baixo volume' };
+  if (row.sqlToProposalPct >= 60 && row.sqlToWonPct >= 15)
+    return { c: 'high', label: 'Alta qualidade' };
+  if (row.sqlToProposalPct >= 40) return { c: 'good', label: 'Bom' };
+  return { c: 'attention', label: 'Atenção' };
+}
+
+function classifyCloser(row: {
+  won: number;
+  lost: number;
+  winRatePct: number | null;
+  revenue: number;
+}): { c: PeopleClassification; label: string } {
+  const processed = row.won + row.lost;
+  if (processed < 3) return { c: 'insufficient', label: 'Sem dados suficientes' };
+  const wr = row.winRatePct ?? 0;
+  if (wr >= 50 && row.revenue > 0) return { c: 'high', label: 'Alta performance' };
+  if (wr >= 30) return { c: 'good', label: 'Bom' };
+  if (wr >= 15) return { c: 'attention', label: 'Atenção' };
+  return { c: 'risk', label: 'Risco' };
+}
+
+export function useRevenuePeople() {
+  const { organization } = useCurrentOrganization();
+  const orgId = organization?.id ?? null;
+  const filtersCtx = useReportFiltersContext();
+  const teamVisibility = useTeamVisibility();
+
+  const { filters, effectiveDates } = filtersCtx;
+
+  const now = useMemo(() => new Date(), []);
+  const periodStart = useMemo(
+    () =>
+      effectiveDates?.startDate
+        ? new Date(effectiveDates.startDate)
+        : startOfMonth(now),
+    [effectiveDates?.startDate, now],
+  );
+  const periodEnd = useMemo(
+    () => (effectiveDates?.endDate ? new Date(effectiveDates.endDate) : now),
+    [effectiveDates?.endDate, now],
+  );
+  const start = periodStart.toISOString();
+  const end = periodEnd.toISOString();
+
+  // 1) Receita válida agregada (SSoT) — para concentração total
+  const closedSummary = useClosedRevenueSummary({
+    surface: 'revenue-command:people',
+    organizationId: orgId ?? undefined,
+    start,
+    end,
+    pipelineIds: filters?.pipelines?.length ? filters.pipelines : undefined,
+  });
+
+  // 2) Receita por vendedor (SSoT) — fonte canônica para top performer
+  const bySeller = useRevenueBySeller({
+    surface: 'revenue-command:people',
+    organizationId: orgId ?? undefined,
+    start,
+    end,
+    pipelineIds: filters?.pipelines?.length ? filters.pipelines : undefined,
+  });
+
+  // 3) Closer V2 — win rate, ticket médio, ciclo
+  const closerRequest = useMemo(() => {
+    if (!orgId || teamVisibility.loading) return undefined;
+    return buildReportV2RequestFromFilters({
+      organizationId: orgId,
+      filters,
+      effectiveDates,
+      teamVisibility: {
+        enabled: !teamVisibility.canViewAll,
+        visibleUserIds: teamVisibility.visibleUserIds,
+      },
+    });
+  }, [orgId, filters, effectiveDates, teamVisibility]);
+
+  const closerReport = useReportCloserV2({
+    organizationId: orgId,
+    request: closerRequest,
+  });
+
+  const sdrReport = useReportSDRV2({
+    organizationId: orgId,
+    request: closerRequest,
+  });
+
+  // 4) Qualidade de qualificação — SDR volume vs qualidade
+  const qualification = useQualificationQualityV2({
+    proposalStatus: 'any',
+    includeRemovedUsers: false,
+  });
+
+  return useMemo<{ data: PeopleData | null; isLoading: boolean; error: Error | null }>(() => {
+    const isLoading =
+      closedSummary.isLoading ||
+      bySeller.isLoading ||
+      closerReport.isLoading ||
+      sdrReport.isLoading ||
+      qualification.isLoading ||
+      teamVisibility.loading;
+
+    const partialSources: string[] = [];
+    if (closedSummary.error) partialSources.push('Resultados/Auditoria');
+    if (bySeller.error) partialSources.push('Receita por vendedor');
+    if (closerReport.error) partialSources.push('Performance Closer');
+    if (sdrReport.error) partialSources.push('Performance SDR');
+    if (qualification.error) partialSources.push('Qualidade de Qualificação');
+
+    if (!orgId) {
+      return { data: null, isLoading: true, error: null };
+    }
+
+    const sellerRows = (bySeller.data ?? [])
+      .filter((s) => s.total > 0 && s.key && s.key !== '—')
+      .sort((a, b) => b.total - a.total);
+
+    const closerRows = mapCloserV2(closerReport.data).filter(
+      (r) => r.closerName && r.closerName !== 'Sem nome',
+    );
+
+    const sdrView = mapSdrV2(sdrReport.data);
+    const sdrSourceRows = sdrView.rows.filter((r) => r.sdrName && r.sdrName !== 'Sem nome');
+    const qualRows = (qualification.data?.rows ?? []).filter((r) => r.sdr_user_id);
+
+    // ── SDR snapshot — preferir Qualidade de Qualificação (mais rica),
+    //    fallback para useReportSDRV2.
+    const sdrSnapshot: PeopleSdrSnapshotRow[] = (qualRows.length
+      ? qualRows.map((r) => ({
+          userId: r.sdr_user_id as string,
+          name: r.sdr_is_deleted ? `${r.sdr_name} (removido)` : r.sdr_name,
+          qualified: r.qualified_count,
+          withProposal: r.with_proposal_count,
+          withoutProposal: r.without_proposal_count,
+          sqlToProposalPct: r.sql_to_proposal_rate,
+          sqlToWonPct: r.sql_to_won_rate,
+          revenue: r.valid_revenue_amount,
+        }))
+      : sdrSourceRows.map((r) => ({
+          userId: r.sdrUserId,
+          name: r.sdrName,
+          qualified: r.sqlsGenerated,
+          withProposal: 0,
+          withoutProposal: r.sqlsGenerated,
+          sqlToProposalPct: 0,
+          sqlToWonPct: r.winRatePct ?? 0,
+          revenue: r.revenueAttributed,
+        }))
+    )
+      .map((r) => {
+        const cls = classifySdr(r);
+        return { ...r, classification: cls.c, classificationLabel: cls.label };
+      })
+      .sort((a, b) => b.qualified - a.qualified)
+      .slice(0, 5);
+
+    // ── Closer snapshot
+    const closerSnapshot: PeopleCloserSnapshotRow[] = closerRows
+      .map((r) => {
+        const base = {
+          userId: r.closerUserId,
+          name: r.closerName ?? 'Sem responsável',
+          revenue: r.wonRevenue,
+          won: r.wonCount,
+          lost: r.lostCount,
+          winRatePct: r.winRatePct,
+          avgTicket: r.avgWonTicket,
+          activePipeline: r.activePipelineValue,
+          avgCycleDays: r.avgSalesCycleDays,
+        };
+        const cls = classifyCloser(base);
+        return { ...base, classification: cls.c, classificationLabel: cls.label };
+      })
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 5);
+
+    // ── Scoreboard
+    const totalRevenue = closedSummary.data?.validTotal ?? 0;
+    const top1 = sellerRows[0] ?? null;
+    const top3Sum = sellerRows.slice(0, 3).reduce((s, r) => s + r.total, 0);
+    const top1Pct = totalRevenue > 0 && top1 ? (top1.total / totalRevenue) * 100 : null;
+    const top3Pct = totalRevenue > 0 ? (top3Sum / totalRevenue) * 100 : null;
+
+    const bestConverterRow = [...closerSnapshot]
+      .filter((r) => r.winRatePct !== null && r.won + r.lost >= 3)
+      .sort((a, b) => (b.winRatePct ?? 0) - (a.winRatePct ?? 0))[0];
+    const topSqlVolumeRow = [...sdrSnapshot].sort((a, b) => b.qualified - a.qualified)[0];
+    const worstQualityRow = [...sdrSnapshot]
+      .filter((r) => r.qualified >= 10)
+      .sort((a, b) => a.sqlToProposalPct - b.sqlToProposalPct)[0];
+
+    const activePeople =
+      new Set<string>([
+        ...sellerRows.map((s) => s.key),
+        ...closerSnapshot.map((r) => r.userId),
+        ...sdrSnapshot.map((r) => r.userId),
+      ]).size;
+
+    const scoreboard: PeopleScoreboard = {
+      activePeople,
+      topPerformer: top1 ? { name: top1.label, value: top1.total } : null,
+      bestConverter: bestConverterRow
+        ? { name: bestConverterRow.name, pct: bestConverterRow.winRatePct ?? 0 }
+        : null,
+      topSqlVolume: topSqlVolumeRow
+        ? { name: topSqlVolumeRow.name, count: topSqlVolumeRow.qualified }
+        : null,
+      worstQuality: worstQualityRow
+        ? { name: worstQualityRow.name, pct: worstQualityRow.sqlToProposalPct }
+        : null,
+      concentrationTop1Pct: top1Pct,
+    };
+
+    // ── Top performers (até 5)
+    const topPerformers: PeopleTopPerformer[] = [];
+    closerSnapshot
+      .filter((r) => r.revenue > 0)
+      .slice(0, 3)
+      .forEach((r) =>
+        topPerformers.push({
+          userId: r.userId,
+          name: r.name,
+          role: 'Closer',
+          primaryMetric: `${fmtBRL(r.revenue)} em receita válida`,
+          contribution: `${r.won} venda(s) ganha(s)${r.winRatePct !== null ? ` · Win Rate ${r.winRatePct.toFixed(0)}%` : ''}`,
+          cta: CLOSER_CTA,
+        }),
+      );
+    sdrSnapshot
+      .filter(
+        (r) =>
+          (r.classification === 'high' || r.classification === 'good') && r.qualified >= 5,
+      )
+      .slice(0, 2)
+      .forEach((r) =>
+        topPerformers.push({
+          userId: r.userId,
+          name: r.name,
+          role: 'SDR',
+          primaryMetric: `${r.qualified} SQLs qualificados`,
+          contribution: `SQL→Proposta ${r.sqlToProposalPct.toFixed(0)}% · ${fmtBRL(r.revenue)} influenciados`,
+          cta: SDR_CTA,
+        }),
+      );
+
+    // ── Quem precisa de ajuda (até 5)
+    const needsHelp: PeopleNeedsHelpItem[] = [];
+    closerSnapshot
+      .filter((r) => r.classification === 'risk' || r.classification === 'attention')
+      .slice(0, 3)
+      .forEach((r) =>
+        needsHelp.push({
+          userId: r.userId,
+          name: r.name,
+          role: 'Closer',
+          problem:
+            r.winRatePct !== null
+              ? `Win Rate baixo (${r.winRatePct.toFixed(0)}%) com ${r.lost} perdido(s)`
+              : `${r.lost} perdido(s) no período`,
+          impact: r.activePipeline > 0 ? `Pipeline ativo ${fmtBRL(r.activePipeline)}` : 'Pipeline vazio',
+          cta: CLOSER_CTA,
+        }),
+      );
+    sdrSnapshot
+      .filter(
+        (r) =>
+          r.classification === 'volume_no_quality' || r.classification === 'attention',
+      )
+      .slice(0, 3)
+      .forEach((r) =>
+        needsHelp.push({
+          userId: r.userId,
+          name: r.name,
+          role: 'SDR',
+          problem: `${r.qualified} SQLs, mas SQL→Proposta de ${r.sqlToProposalPct.toFixed(0)}%`,
+          impact: `${r.withoutProposal} SQLs sem proposta`,
+          cta: QUALITY_CTA,
+        }),
+      );
+
+    // ── Concentração
+    let level: PeopleConcentration['level'] = 'healthy';
+    let message = 'Distribuição saudável da receita entre o time.';
+    if (top1Pct !== null) {
+      if (top1Pct > 85) {
+        level = 'critical';
+        message = `${top1Pct.toFixed(0)}% da receita válida está concentrada em ${top1?.label}. Risco operacional alto: a operação depende de uma única pessoa.`;
+      } else if (top1Pct > 70) {
+        level = 'warning';
+        message = `${top1Pct.toFixed(0)}% da receita válida vem de ${top1?.label}. Atenção à dependência comercial.`;
+      } else if (top3Pct !== null && top3Pct > 90) {
+        level = 'info';
+        message = `${top3Pct.toFixed(0)}% da receita está concentrada no top 3. Avalie ampliar a base produtiva.`;
+      }
+    } else {
+      message = 'Sem receita válida no período para calcular concentração.';
+    }
+    const concentration: PeopleConcentration = {
+      top1Pct,
+      top1Name: top1?.label ?? null,
+      top3Pct,
+      totalRevenue,
+      level,
+      message,
+    };
+
+    // ── Ações recomendadas
+    const actions: PeopleRecommendedAction[] = [];
+    const sdrVolumeNoQuality = sdrSnapshot.find((r) => r.classification === 'volume_no_quality');
+    if (sdrVolumeNoQuality) {
+      actions.push({
+        id: 'review-sdr-quality',
+        title: 'Revisar qualidade da qualificação',
+        reason: `${sdrVolumeNoQuality.name} tem ${sdrVolumeNoQuality.qualified} SQLs com SQL→Proposta de ${sdrVolumeNoQuality.sqlToProposalPct.toFixed(0)}%.`,
+        priority: 'alta',
+        person: { name: sdrVolumeNoQuality.name, role: 'SDR' },
+        cta: QUALITY_CTA,
+      });
+    }
+    const closerRisk = closerSnapshot.find((r) => r.classification === 'risk');
+    if (closerRisk) {
+      actions.push({
+        id: 'help-closer-pipeline',
+        title: 'Apoiar closer em risco',
+        reason: `${closerRisk.name} está com win rate baixo e pipeline ativo de ${fmtBRL(closerRisk.activePipeline)}.`,
+        priority: 'alta',
+        person: { name: closerRisk.name, role: 'Closer' },
+        cta: PIPELINE_CTA,
+      });
+    }
+    if (level === 'critical' || level === 'warning') {
+      actions.push({
+        id: 'review-concentration',
+        title: 'Revisar concentração de receita',
+        reason: message,
+        priority: level === 'critical' ? 'alta' : 'média',
+        cta: CLOSER_CTA,
+      });
+    }
+    const lowVolumeSdr = sdrSnapshot.find((r) => r.classification === 'low_volume');
+    if (lowVolumeSdr) {
+      actions.push({
+        id: 'increase-sdr-volume',
+        title: 'Aumentar volume de qualificação',
+        reason: `${lowVolumeSdr.name} qualificou apenas ${lowVolumeSdr.qualified} no período.`,
+        priority: 'média',
+        person: { name: lowVolumeSdr.name, role: 'SDR' },
+        cta: SDR_CTA,
+      });
+    }
+    if (actions.length === 0) {
+      actions.push({
+        id: 'all-good',
+        title: 'Operação estável',
+        reason: 'Nenhuma intervenção crítica detectada com os dados disponíveis no período.',
+        priority: 'baixa',
+        cta: CLOSER_CTA,
+      });
+    }
+
+    const sources = [
+      'Resultados/Auditoria',
+      'Receita por vendedor',
+      'Performance Closer',
+      'Qualidade de Qualificação',
+    ];
+
+    const confidence: PeopleData['meta']['confidence'] =
+      partialSources.length === 0
+        ? 'trusted'
+        : partialSources.length >= 3
+          ? 'warning'
+          : 'partial';
+
+    const data: PeopleData = {
+      scoreboard,
+      topPerformers,
+      needsHelp,
+      sdrSnapshot,
+      closerSnapshot,
+      concentration,
+      actions,
+      meta: {
+        generatedAt: new Date().toISOString(),
+        period: { start, end },
+        sources,
+        partialSources,
+        confidence,
+      },
+    };
+
+    return { data, isLoading: false, error: null };
+  }, [
+    orgId,
+    start,
+    end,
+    closedSummary.data,
+    closedSummary.isLoading,
+    closedSummary.error,
+    bySeller.data,
+    bySeller.isLoading,
+    bySeller.error,
+    closerReport.data,
+    closerReport.isLoading,
+    closerReport.error,
+    sdrReport.data,
+    sdrReport.isLoading,
+    sdrReport.error,
+    qualification.data,
+    qualification.isLoading,
+    qualification.error,
+    teamVisibility.loading,
+  ]);
+}
