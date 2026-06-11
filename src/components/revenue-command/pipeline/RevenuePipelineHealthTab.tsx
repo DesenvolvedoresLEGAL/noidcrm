@@ -55,6 +55,7 @@ const TRUST_COLOR: Record<string, string> = {
   Confiável: 'text-emerald-500',
   Atenção: 'text-amber-500',
   Crítico: 'text-red-500',
+  'Sem dados ativos': 'text-muted-foreground',
 };
 
 const STAGE_COLOR = {
