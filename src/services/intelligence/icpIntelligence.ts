@@ -81,7 +81,7 @@ export async function computeIcpIntelligence(organizationId: string): Promise<In
     .eq('organization_id', organizationId)
     .limit(10000);
   if (wonErr) throw wonErr;
-  const won = ((wonData ?? []) as WonRow[]).filter(r => r.account_id && !r.is_cancelled_sale);
+  const won = ((wonData ?? []) as unknown as WonRow[]).filter(r => r.account_id && !r.is_cancelled_sale);
 
   // 3. Agregar por conta
   interface AccAgg {
