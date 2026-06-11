@@ -16,6 +16,7 @@ import { useOrganizationUsers } from '@/hooks/useOrganizationUsers';
 import {
   Trophy, UserCheck, Award, Handshake, CheckCircle2, BarChart3, Sparkles,
 } from 'lucide-react';
+import { RevenueCommandLegacyBanner } from '@/components/revenue-command/migration/RevenueCommandLegacyBanner';
 
 function DesempenhoContent() {
   const { pipelines: availablePipelines, loading: loadingPipelines } = useOrganizationPipelines();
