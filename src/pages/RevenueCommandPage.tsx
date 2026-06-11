@@ -9,10 +9,12 @@ import {
   Sparkles,
   Users,
 } from 'lucide-react';
+import { Layout } from '@/components/Layout';
 import { PageContainer } from '@/components/ui/page-container';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useFeatureFlag } from '@/hooks/useFeatureFlag';
+import { usePermissions } from '@/hooks/usePermissions';
 import { RevenueCommandHeader } from '@/components/revenue-command/RevenueCommandHeader';
 import {
   RevenueCommandTabs,
@@ -102,38 +104,49 @@ function CopilotPlaceholder() {
 
 export default function RevenueCommandPage() {
   const { enabled, loading } = useFeatureFlag('revenue_command_center_enabled');
+  const { isAdmin, isOwner, loading: permLoading } = usePermissions();
   const [activeTab, setActiveTab] = useState('hoje');
 
-  if (loading) {
+  // Fallback de rollout: admin/owner sempre pode visualizar (preview/validação),
+  // mesmo se a flag ainda não foi configurada. Em produção com flag off para
+  // demais perfis, mantém o estado bloqueado.
+  const canPreview = isAdmin || isOwner;
+  const allowed = enabled || canPreview;
+
+  if (loading || permLoading) {
     return (
-      <PageContainer>
-        <div className="h-24 animate-pulse rounded-lg bg-muted" />
-        <div className="h-64 animate-pulse rounded-lg bg-muted" />
-      </PageContainer>
+      <Layout>
+        <PageContainer>
+          <div className="h-24 animate-pulse rounded-lg bg-muted" />
+          <div className="h-64 animate-pulse rounded-lg bg-muted" />
+        </PageContainer>
+      </Layout>
     );
   }
 
-  if (!enabled) {
+  if (!allowed) {
     return (
-      <PageContainer>
-        <RevenueCommandHeader />
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center gap-3 py-16 text-center">
-            <div className="rounded-full bg-muted p-3">
-              <Radar className="h-6 w-6 text-muted-foreground" />
-            </div>
-            <h2 className="text-lg font-semibold">Revenue Command Center indisponível</h2>
-            <p className="max-w-md text-sm text-muted-foreground">
-              Este módulo está em rollout controlado. Solicite a um administrador da
-              organização para habilitar o feature flag{' '}
-              <code className="rounded bg-muted px-1 text-xs">
-                revenue_command_center_enabled
-              </code>
-              .
-            </p>
-          </CardContent>
-        </Card>
-      </PageContainer>
+      <Layout>
+        <PageContainer>
+          <RevenueCommandHeader />
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center gap-3 py-16 text-center">
+              <div className="rounded-full bg-muted p-3">
+                <Radar className="h-6 w-6 text-muted-foreground" />
+              </div>
+              <h2 className="text-lg font-semibold">Revenue Command Center indisponível</h2>
+              <p className="max-w-md text-sm text-muted-foreground">
+                Este módulo está em rollout controlado. Solicite a um administrador da
+                organização para habilitar o feature flag{' '}
+                <code className="rounded bg-muted px-1 text-xs">
+                  revenue_command_center_enabled
+                </code>
+                .
+              </p>
+            </CardContent>
+          </Card>
+        </PageContainer>
+      </Layout>
     );
   }
 
@@ -209,9 +222,11 @@ export default function RevenueCommandPage() {
   ];
 
   return (
-    <PageContainer>
-      <RevenueCommandHeader />
-      <RevenueCommandTabs tabs={tabs} value={activeTab} onValueChange={setActiveTab} />
-    </PageContainer>
+    <Layout>
+      <PageContainer>
+        <RevenueCommandHeader />
+        <RevenueCommandTabs tabs={tabs} value={activeTab} onValueChange={setActiveTab} />
+      </PageContainer>
+    </Layout>
   );
 }
