@@ -10,6 +10,7 @@ import {
   Users,
 } from 'lucide-react';
 import { Layout } from '@/components/Layout';
+import { ReportFiltersProvider } from '@/contexts/ReportFiltersContext';
 import { PageContainer } from '@/components/ui/page-container';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -223,10 +224,12 @@ export default function RevenueCommandPage() {
 
   return (
     <Layout>
-      <PageContainer>
-        <RevenueCommandHeader />
-        <RevenueCommandTabs tabs={tabs} value={activeTab} onValueChange={setActiveTab} />
-      </PageContainer>
+      <ReportFiltersProvider>
+        <PageContainer>
+          <RevenueCommandHeader />
+          <RevenueCommandTabs tabs={tabs} value={activeTab} onValueChange={setActiveTab} />
+        </PageContainer>
+      </ReportFiltersProvider>
     </Layout>
   );
 }
