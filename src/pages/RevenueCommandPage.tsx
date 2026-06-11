@@ -184,15 +184,7 @@ export default function RevenueCommandPage() {
       value: 'riscos',
       label: 'Riscos',
       icon: AlertTriangle,
-      content: (
-        <RevenueSectionCard
-          title="Riscos"
-          description="Sinais que ameaçam a meta comercial."
-          icon={AlertTriangle}
-        >
-          <PlaceholderGrid items={PLACEHOLDER_SECTIONS.riscos} />
-        </RevenueSectionCard>
-      ),
+      content: <RevenueRisksTab />,
     },
     {
       value: 'ia',
