@@ -13,9 +13,10 @@ import { ActionsHistoryTable } from '@/components/intelligence/optimization/Acti
 import { ExperimentImpactSummary } from '@/components/intelligence/experiments/ExperimentImpactSummary';
 import { ExperimentsFeed } from '@/components/intelligence/experiments/ExperimentsFeed';
 import { GuardrailsCard } from '@/components/intelligence/experiments/GuardrailsCard';
+import { IcpIntelligencePanel } from '@/components/intelligence/icp/IcpIntelligencePanel';
 import { Compass, Sparkles } from 'lucide-react';
 
-const VALID_TABS = ['sourcing', 'optimization', 'experiments', 'performance'] as const;
+const VALID_TABS = ['icp', 'sourcing', 'optimization', 'experiments', 'performance'] as const;
 type KairosTab = (typeof VALID_TABS)[number];
 
 export default function KairosHub() {
