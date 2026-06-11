@@ -22,7 +22,7 @@ export default function MigrationAuditPage() {
       <PageContainer>
         <PageHeader
           title="Auditoria de migração — Revenue Command"
-          description="Mapa do que já vive dentro do RCC, o que ainda depende dos módulos legados e quais métricas continuam duplicadas."
+          subtitle="Mapa do que já vive dentro do RCC, o que ainda depende dos módulos legados e quais métricas continuam duplicadas."
           icon={ShieldCheck}
         />
 
