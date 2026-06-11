@@ -14943,6 +14943,121 @@ export type Database = {
         }
         Relationships: []
       }
+      kairos_qualified_queue: {
+        Row: {
+          approach_brief: Json | null
+          company_name: string
+          confidence: number | null
+          contact_status: string | null
+          created_at: string
+          decision_maker_status: string | null
+          discard_reason: string | null
+          domain: string | null
+          enrichment_status: string | null
+          event_id: string | null
+          grade: string | null
+          icp_match: boolean
+          id: string
+          imported_account_id: string | null
+          imported_at: string | null
+          imported_contact_id: string | null
+          imported_opportunity_id: string | null
+          organization_id: string
+          owner_id: string | null
+          prospect_id: string
+          qualification_status: Database["public"]["Enums"]["qualification_status"]
+          relationship_status: string | null
+          review_reason: string | null
+          score: number
+          sdr_ready: boolean
+          source: string | null
+          source_type: string | null
+          updated_at: string
+        }
+        Insert: {
+          approach_brief?: Json | null
+          company_name: string
+          confidence?: number | null
+          contact_status?: string | null
+          created_at?: string
+          decision_maker_status?: string | null
+          discard_reason?: string | null
+          domain?: string | null
+          enrichment_status?: string | null
+          event_id?: string | null
+          grade?: string | null
+          icp_match?: boolean
+          id?: string
+          imported_account_id?: string | null
+          imported_at?: string | null
+          imported_contact_id?: string | null
+          imported_opportunity_id?: string | null
+          organization_id: string
+          owner_id?: string | null
+          prospect_id: string
+          qualification_status?: Database["public"]["Enums"]["qualification_status"]
+          relationship_status?: string | null
+          review_reason?: string | null
+          score?: number
+          sdr_ready?: boolean
+          source?: string | null
+          source_type?: string | null
+          updated_at?: string
+        }
+        Update: {
+          approach_brief?: Json | null
+          company_name?: string
+          confidence?: number | null
+          contact_status?: string | null
+          created_at?: string
+          decision_maker_status?: string | null
+          discard_reason?: string | null
+          domain?: string | null
+          enrichment_status?: string | null
+          event_id?: string | null
+          grade?: string | null
+          icp_match?: boolean
+          id?: string
+          imported_account_id?: string | null
+          imported_at?: string | null
+          imported_contact_id?: string | null
+          imported_opportunity_id?: string | null
+          organization_id?: string
+          owner_id?: string | null
+          prospect_id?: string
+          qualification_status?: Database["public"]["Enums"]["qualification_status"]
+          relationship_status?: string | null
+          review_reason?: string | null
+          score?: number
+          sdr_ready?: boolean
+          source?: string | null
+          source_type?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kairos_qualified_queue_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kairos_qualified_queue_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_report_legacy_retirement_readiness_v2"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "kairos_qualified_queue_prospect_id_fkey"
+            columns: ["prospect_id"]
+            isOneToOne: false
+            referencedRelation: "prospects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lead_emotional_memory: {
         Row: {
           account_id: string | null
@@ -36848,6 +36963,19 @@ export type Database = {
         | "finance"
         | "operations"
       platform_admin_role: "super_admin" | "admin" | "support"
+      qualification_status:
+        | "captured"
+        | "existing_customer"
+        | "existing_account"
+        | "duplicate"
+        | "enriched"
+        | "decision_maker_found"
+        | "contact_revealed"
+        | "approach_ready"
+        | "ready_for_sdr"
+        | "human_review"
+        | "imported"
+        | "discarded"
       roleplay_sender_type: "seller" | "ai_client"
       seller_role_type:
         | "Closer"
@@ -37181,6 +37309,20 @@ export const Constants = {
         "operations",
       ],
       platform_admin_role: ["super_admin", "admin", "support"],
+      qualification_status: [
+        "captured",
+        "existing_customer",
+        "existing_account",
+        "duplicate",
+        "enriched",
+        "decision_maker_found",
+        "contact_revealed",
+        "approach_ready",
+        "ready_for_sdr",
+        "human_review",
+        "imported",
+        "discarded",
+      ],
       roleplay_sender_type: ["seller", "ai_client"],
       seller_role_type: [
         "Closer",
