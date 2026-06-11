@@ -115,6 +115,17 @@ export function RevenuePipelineHealthTab() {
         )}
       </header>
 
+      {import.meta.env.DEV && data && (
+        <div className="rounded-md border border-dashed border-amber-500/40 bg-amber-500/5 p-3 text-[11px] font-mono text-muted-foreground">
+          <div className="mb-1 font-semibold text-amber-700">DEBUG — Pipeline Health</div>
+          <div>Pipeline encontrado: {data.scope.pipelineName ?? '—'}</div>
+          <div>Pipeline ID: {data.scope.pipelineId ?? '—'}</div>
+          <div>Oportunidades abertas: {data.totalOpen}</div>
+          <div>Valor pipeline: {fmtBRL(data.totalOpenValue)}</div>
+          <div>Filtro: status NOT IN (won, lost, cancelled) · deleted_at IS NULL</div>
+        </div>
+      )}
+
       {data && !data.scope.resolved && (
         <Alert variant="default" className="border-amber-500/40 bg-amber-500/5">
           <AlertCircle className="h-4 w-4 text-amber-600" />

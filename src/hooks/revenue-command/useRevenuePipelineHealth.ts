@@ -153,6 +153,9 @@ export function useRevenuePipelineHealth() {
     staleTime: 60_000,
     queryFn: async () => {
       // 1) Open opportunities of the sales pipeline
+      //    "Aberta" = não terminal (não won/lost) e não soft-deleted.
+      //    O CRM usa status='new' como aberto; alguns registros legados podem
+      //    usar 'open'. Filtramos por negação para abranger ambos sem regredir.
       const oppQ = await supabase
         .from('opportunities')
         .select(
@@ -161,9 +164,10 @@ export function useRevenuePipelineHealth() {
         .eq('organization_id', orgId!)
         .eq('pipeline_id', salesPipelineId!)
         .is('deleted_at', null)
-        .eq('status', 'open');
+        .not('status', 'in', '(won,lost,cancelled,canceled)');
       if (oppQ.error) throw oppQ.error;
       const opps = (oppQ.data ?? []) as OpportunityRow[];
+
 
       // 2) Stages of the sales pipeline (names + order)
       const stagesQ = await supabase
