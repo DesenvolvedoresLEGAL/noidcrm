@@ -10,6 +10,7 @@ import {
   useRevenueRisks,
   type RiskBlock,
   type RiskLevel,
+  type RecommendedRiskAction,
 } from '@/hooks/revenue-command/useRevenueRisks';
 
 const LEVEL_DOT: Record<RiskLevel, string> = {
