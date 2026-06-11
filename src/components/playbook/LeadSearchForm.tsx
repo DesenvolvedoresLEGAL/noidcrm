@@ -7,10 +7,9 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Rocket, MapPin, Globe, Users, FileUp, CalendarDays, AlertCircle } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
-import { listICPs } from '@/services/roleplay/icps';
-import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
+import { Loader2, Rocket, MapPin, Globe, Users, FileUp, CalendarDays, AlertCircle, Target } from 'lucide-react';
+import { useIcpIntelligence, type IntelligenceICP } from '@/hooks/intelligence/useIcpIntelligence';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Slider } from '@/components/ui/slider';
 import { toast } from 'sonner';
 
