@@ -76,6 +76,7 @@ export default function Forecast() {
   return (
     <Layout>
       <div className="p-4 md:p-6 space-y-4 md:space-y-6">
+        <RevenueCommandLegacyBanner rccTab="Hoje na Operação · Riscos · Pipeline Health" />
         {/* Header */}
         <PageHeader
           icon={TrendingUp}
