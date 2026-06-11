@@ -23,8 +23,12 @@ const CLS_TONE: Record<PeopleCloserSnapshotRow['classification'], string> = {
   insufficient: 'bg-muted text-muted-foreground border-border',
 };
 
-function fmtBRL(v: number) {
+function fmtBRL(v: number | null) {
+  if (v === null || v === undefined) return 'N/D';
   return `R$ ${Math.round(v).toLocaleString('pt-BR')}`;
+}
+function fmtInt(v: number | null) {
+  return v === null || v === undefined ? 'N/D' : String(v);
 }
 
 export function PeopleCloserPerformanceSnapshot({ rows }: { rows: PeopleCloserSnapshotRow[] }) {
