@@ -168,7 +168,6 @@ Deno.serve(async (req) => {
         success: true, 
         expired: expiredOrgs.length,
         processed: processedCount,
-        organizations: processedOrgs,
         timestamp: nowISO,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
