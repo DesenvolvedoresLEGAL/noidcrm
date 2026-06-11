@@ -23,6 +23,7 @@ import { useQualificationQualityV2 } from '@/hooks/reports/useQualificationQuali
 import { useReportCloserV2 } from '@/hooks/useReportCloserV2';
 import { useReportSDRV2 } from '@/hooks/useReportSDRV2';
 import { useOTEMonthlyResults, type OTEMonthlyResult } from '@/hooks/useOTEData';
+import { useActiveUsers } from '@/hooks/users/useActiveUsers';
 import { buildReportV2RequestFromFilters } from '@/lib/reports/buildReportV2Request';
 import { mapCloserV2 } from '@/lib/reports/mappers/mapCloserV2';
 import { mapSdrV2 } from '@/lib/reports/mappers/mapSdrV2';
