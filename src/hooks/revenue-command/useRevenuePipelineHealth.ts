@@ -412,58 +412,90 @@ export function useRevenuePipelineHealth() {
       })
       .sort((a, b) => b.score - a.score);
 
+    // ── Empty state: pipeline sem oportunidades abertas
+    const isEmpty = totalOpen === 0;
+
     // ── Diagnóstico executivo (sem IA)
     const sorted = [...issues].filter((i) => i.count > 0).sort(
       (a, b) => b.count * ISSUE_WEIGHT[b.id] - a.count * ISSUE_WEIGHT[a.id],
     );
     const top = sorted.slice(0, 3);
-    const intro =
-      trustScore >= 90
-        ? 'O pipeline apresenta excelente confiabilidade.'
-        : trustScore >= 80
-          ? 'O pipeline apresenta boa confiabilidade.'
-          : trustScore >= 70
-            ? 'O pipeline apresenta sinais de atenção.'
-            : 'O pipeline apresenta nível crítico de confiabilidade.';
-    const bullets = top
-      .map((t) => `• ${t.count} ${t.label.toLowerCase()}`)
-      .join('\n');
-    const outro =
-      top.length > 0
-        ? 'Esses itens representam risco de forecast e perda de produtividade.'
-        : 'Nenhum problema crítico relevante detectado.';
-    const diagnosis = `${intro}${top.length ? `\n\nOs maiores riscos atuais são:\n${bullets}\n\n${outro}` : ` ${outro}`}`;
+    let diagnosis: string;
+    if (isEmpty) {
+      diagnosis =
+        'Não há oportunidades abertas no Pipeline de Vendas no período/escopo atual. A saúde do pipeline não pode ser avaliada com base em volume ativo.';
+    } else {
+      const intro =
+        trustScore >= 90
+          ? 'O pipeline apresenta excelente confiabilidade.'
+          : trustScore >= 80
+            ? 'O pipeline apresenta boa confiabilidade.'
+            : trustScore >= 70
+              ? 'O pipeline apresenta sinais de atenção.'
+              : 'O pipeline apresenta nível crítico de confiabilidade.';
+      const bullets = top
+        .map((t) => `• ${t.count} ${t.label.toLowerCase()}`)
+        .join('\n');
+      const outro =
+        top.length > 0
+          ? 'Esses itens representam risco de forecast e perda de produtividade.'
+          : 'Nenhum problema crítico relevante detectado.';
+      diagnosis = `${intro}${top.length ? `\n\nOs maiores riscos atuais são:\n${bullets}\n\n${outro}` : ` ${outro}`}`;
+    }
 
     // ── Ações recomendadas
     const actions: RecommendedAction[] = [];
-    const pushAction = (
-      issue: PipelineIssueId,
-      priority: RecommendedAction['priority'],
-      verb: string,
-    ) => {
-      const bucket = issues.find((i) => i.id === issue);
-      if (!bucket || bucket.count === 0) return;
-      actions.push({
-        id: `action_${issue}`,
-        priority,
-        title: `${verb} ${bucket.count} ${bucket.label.toLowerCase()}.`,
-        impactValue: bucket.value,
-        count: bucket.count,
-        filterIssue: issue,
-      });
-    };
-    pushAction('overdue', 'high', 'Corrigir');
-    pushAction('duplicate', 'high', 'Resolver');
-    pushAction('no_next_activity', 'medium', 'Atualizar');
-    pushAction('stale', 'medium', 'Reativar');
-    pushAction('no_value', 'medium', 'Preencher valor de');
-    pushAction('no_owner', 'low', 'Atribuir owner em');
-    pushAction('no_account', 'low', 'Vincular empresa em');
-    pushAction('no_contact', 'low', 'Vincular contato em');
+    if (isEmpty) {
+      actions.push(
+        {
+          id: 'action_review_filters',
+          priority: 'high',
+          title: 'Revisar período e filtros aplicados.',
+          impactValue: 0,
+          count: 0,
+          filterIssue: 'no_owner',
+        },
+        {
+          id: 'action_verify_pipeline',
+          priority: 'high',
+          title:
+            'Verificar se há oportunidades abertas no Pipeline de Vendas.',
+          impactValue: 0,
+          count: 0,
+          filterIssue: 'no_owner',
+        },
+      );
+    } else {
+      const pushAction = (
+        issue: PipelineIssueId,
+        priority: RecommendedAction['priority'],
+        verb: string,
+      ) => {
+        const bucket = issues.find((i) => i.id === issue);
+        if (!bucket || bucket.count === 0) return;
+        actions.push({
+          id: `action_${issue}`,
+          priority,
+          title: `${verb} ${bucket.count} ${bucket.label.toLowerCase()}.`,
+          impactValue: bucket.value,
+          count: bucket.count,
+          filterIssue: issue,
+        });
+      };
+      pushAction('overdue', 'high', 'Corrigir');
+      pushAction('duplicate', 'high', 'Resolver');
+      pushAction('no_next_activity', 'medium', 'Atualizar');
+      pushAction('stale', 'medium', 'Reativar');
+      pushAction('no_value', 'medium', 'Preencher valor de');
+      pushAction('no_owner', 'low', 'Atribuir owner em');
+      pushAction('no_account', 'low', 'Vincular empresa em');
+      pushAction('no_contact', 'low', 'Vincular contato em');
+    }
 
     const data: PipelineHealthData = {
-      trustScore,
-      trustLabel: trustLabel(trustScore),
+      trustScore: isEmpty ? null : trustScore,
+      trustLabel: isEmpty ? 'Sem dados ativos' : trustLabel(trustScore),
+      isEmpty,
       totalOpen,
       totalOpenValue: opps.reduce(
         (s, o) => s + (Number(o.valor_previsto) || 0),
