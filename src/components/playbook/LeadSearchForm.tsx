@@ -53,11 +53,11 @@ function sanitizeEventUrl(raw: string): { url: string | null; error: string | nu
 }
 
 const SEARCH_TYPES = [
-  { id: 'event', label: 'Evento (Expositores)', icon: CalendarDays, description: 'Encontre leads a partir de eventos e feiras' },
-  { id: 'directory', label: 'Diretórios', icon: Globe, description: 'Busque em diretórios de empresas' },
-  { id: 'geo', label: 'Busca Geográfica', icon: MapPin, description: 'Prospecção por localização' },
-  { id: 'seed', label: 'Seed Expansion', icon: Users, description: 'Encontre empresas similares' },
-  { id: 'import', label: 'Lista Importada', icon: FileUp, description: 'Analise uma lista existente' },
+  { id: 'event', label: 'Evento (Expositores)', icon: CalendarDays, description: 'Encontre leads a partir de eventos e feiras', status: 'live' as const },
+  { id: 'import', label: 'Lista Importada', icon: FileUp, description: 'Analise uma lista existente', status: 'live' as const },
+  { id: 'directory', label: 'Diretórios', icon: Globe, description: 'Busque em diretórios de empresas', status: 'wip' as const },
+  { id: 'geo', label: 'Busca Geográfica', icon: MapPin, description: 'Prospecção por localização', status: 'wip' as const },
+  { id: 'seed', label: 'Seed Expansion', icon: Users, description: 'Encontre empresas similares', status: 'wip' as const },
 ];
 
 interface LeadSearchFormProps {
