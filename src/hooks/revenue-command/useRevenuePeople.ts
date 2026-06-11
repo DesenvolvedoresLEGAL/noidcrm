@@ -689,30 +689,47 @@ export function useRevenuePeople() {
 
     if (typeof window !== 'undefined' && (window as any).__DEV_RCC_PEOPLE__) {
       // eslint-disable-next-line no-console
-      console.debug('[RCC V3.4D] Pessoas', {
+      console.debug('[RCC V3.4E] Pessoas — reconciliação de fontes', {
         period: { start, end, periodMonth },
         activeUsers: activeUserIds.size,
-        sellerRows: sellerRows.length,
-        closerSourceRows: closerRowsAll.length,
-        sdrSourceRows: sdrSourceRows.length,
-        qualRowsAll: qualRowsAll.length,
-        oteRows: oteRows.length,
-        sdrFull: sdrFull.length,
-        closerFull: closerFull.length,
-        winsByCloser: closerFull
-          .filter((r) => r.won !== null)
-          .map((r) => ({ name: r.name, won: r.won, revenue: r.revenue })),
-        lossesByCloser: closerFull
-          .filter((r) => r.lost !== null)
-          .map((r) => ({ name: r.name, lost: r.lost })),
-        pipelineByCloser: closerFull
-          .filter((r) => r.activePipeline !== null)
-          .map((r) => ({ name: r.name, pipeline: r.activePipeline })),
+        sourceCounts: {
+          bySeller: sellerRows.length,
+          closerV2: closerRowsAll.length,
+          sdrV2: sdrSourceRows.length,
+          qualificationQuality: qualRowsAll.length,
+          handoffV2: handoffView.rows.length,
+          ote: oteRows.length,
+        },
+        closerByUser: closerFull.map((r) => ({
+          name: r.name,
+          revenue: r.revenue,
+          won: r.won,
+          lost: r.lost,
+          winRatePct: r.winRatePct,
+          avgTicket: r.avgTicket,
+          activePipeline: r.activePipeline,
+          avgCycleDays: r.avgCycleDays,
+          fromBySeller: sellerById.has(r.userId),
+          fromCloserV2: closerRowsAll.some((c) => c.closerUserId === r.userId),
+        })),
+        sdrByUser: sdrFull.map((r) => ({
+          name: r.name,
+          qualified: r.qualified,
+          withProposal: r.withProposal,
+          sqlToProposalPct: r.sqlToProposalPct,
+          sqlToWonPct: r.sqlToWonPct,
+          revenue: r.revenue,
+          fromQuality: qualRowsAll.some((q) => q.sdr_user_id === r.userId),
+          fromSdrV2: sdrSourceRows.some((s) => s.sdrUserId === r.userId),
+          fromHandoff: handoffBySdr.has(r.userId),
+          fromOte: oteRows.some((o) => o.userId === r.userId && o.role === 'SDR'),
+        })),
         partialSources,
         errors: {
           qualification: qualification.error?.message ?? null,
           closer: closerReport.error?.message ?? null,
           sdr: sdrReport.error?.message ?? null,
+          handoff: handoffReport.error?.message ?? null,
           ote: oteResultsQuery.error?.message ?? null,
           bySeller: bySeller.error?.message ?? null,
         },
