@@ -11,7 +11,7 @@ import {
   Lightbulb,
   Users,
   Gauge,
-  TrendingUp,
+  
   Zap,
   Handshake,
   HeadphonesIcon,
