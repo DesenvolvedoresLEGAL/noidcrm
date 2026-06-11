@@ -1,79 +1,75 @@
-## Diagnóstico forense — por que a Luisa apareceu como Mak Frigo, Arauterm, Tecnosul, etc.
+# Sprint REL V2.11 — Qualidade de Qualificação SDR → Proposta → Venda
 
-### Causa raiz (1) — Domínio errado salvo no prospect
-A view `prospects` tem **18 prospects** com `normalized_domain` apontando para sites agregadores/diretórios em vez do site oficial da empresa:
+## Objetivo
+Medir qualidade real do pré-vendas (não só volume): quantos SQLs viraram proposta, foram ganhos, perdidos ou morreram sem proposta. Corrigir transversalmente o problema de "Desconhecido" em SDR, Handoff, Closer e Performance.
 
-| Domínio poluente | Qtde prospects |
-|---|---|
-| `jusbrasil.com.br` | 9 (ARAUTERM, Mak Frigo, Tecnosul, Itambé, Softys, Clextral, Canalinox, Ziemann, PGB) |
-| `instagram.com` | 4 |
-| `facebook.com` | 2 |
-| `linkedin.com` | 2 |
-| `econodata.com.br` | 1 |
+## Entregas
 
-O Apollo é chamado em `run-apollo-enrichment` com `q_organization_domains: jusbrasil.com.br` → ele devolve funcionários da **JusBrasil** (Luisa Voiciechovski, Events Analyst Jr.) como se fossem da Arauterm/Mak Frigo. O mesmo aconteceria com qualquer prospect cujo domínio aponte para um agregador.
+### 1. Backend — Views V2 (migration)
 
-### Causa raiz (2) — Blocklist incompleta e não aplicada em todos os writers
-`supabase/functions/enrich-prospect-identity/index.ts` tem `BLOCKED_DOMAINS` (linhas 20-25) mas:
-- Falta `jusbrasil.com.br`, `econodata.com.br`, `cnpj.biz`, `consultasocio.com`, `empresaqualifica.com.br`, `cnpjs.rocks`, `apontador.com.br`, `econoinfo.com.br`, `solucoes.receita.fazenda.gov.br`, `cnpj.info`, `casadosdados.com.br`, `cnpjbiz.com`.
-- A blocklist só é usada em `enrich-prospect-identity`. Há **3 outros writers** em `lead-sourcing/index.ts` (linhas 890, 2839, 3171) que setam `normalized_domain` sem passar pelo filtro — daí `linkedin.com`/`instagram.com` foram persistidos mesmo já estando na lista.
+**`public.v_user_display_resolver_v2`** — Resolução canônica de nomes
+- Une `profiles` (ativos) + snapshots históricos disponíveis (`opportunity_owner_history`, `opportunity_qualification_history`, `auth_audit_log`) para recuperar nome de usuários removidos.
+- Campos: `user_id, display_name, user_status, is_active, is_deleted, resolved_from`.
+- Regras: ativo → nome; removido com histórico → "Nome (removido)"; removido sem histórico → "Usuário removido"; null real → "Sem responsável". Nunca retorna "Desconhecido".
 
-### Causa raiz (3) — Apollo não valida que a pessoa pertence ao prospect
-`run-apollo-enrichment` (linhas 412-442) confia cegamente em qualquer pessoa retornada pelo Apollo. Não há sanity check de que `person.organization.primary_domain` (ou `organization.website_url`) bate com `prospect.normalized_domain` — então mesmo com domínio errado, a contaminação passa direto.
+**`public.v_report_qualification_quality_v2`** — Unidade = SQL (oportunidade qualificada)
+- Base: `v_reporting_opportunities_v2` + `v_opportunity_first_qualification_v2` + `v_opportunity_amounts_v2` + `v_loss_classification_v2` + `proposals` + `commercial_won_revenue_view`.
+- Regras:
+  - SQL qualificado = `first_qualification_at IS NOT NULL` OR `qualified_by_user_id IS NOT NULL`.
+  - Com proposta = existe proposta vinculada (incluindo cadeia de duplicação/herdada).
+  - Ganho/Perdido = status oficial V2.
+  - Receita = `valid_revenue_amount` da `commercial_won_revenue_view` (líquido, sem cancelamentos).
+- Campos: `organization_id, sdr_user_id, sdr_name, sdr_status, qualified_count, with_proposal_count, without_proposal_count, won_count, lost_count, open_count, valid_revenue_amount, sql_to_proposal_rate, proposal_to_won_rate, sql_to_won_rate, post_qualification_loss_rate, avg_hours_qualification_to_proposal, avg_days_qualification_to_close`.
+- Grants: SELECT para `authenticated`; ALL para `service_role`. Security invoker para herdar RLS das views base.
 
-### Causa raiz (4) — Sem dedupe global de pessoas
-A unique constraint atual é `(prospect_id, email_normalized)`. Como a Luisa veio **sem e-mail** em quase todas as execuções, o constraint não bateu e ela foi inserida 10x em 10 prospects diferentes. Não há nenhum sinal cross-prospect tipo "este `apollo_person_id` ou `linkedin_url` já existe na sua org com outra empresa — provavelmente domínio errado".
+### 2. Edge Function — `report-qualification-quality-v2`
+Input: `organizationId, dateRange, sdrUserIds[], closerUserIds[], status[], proposalStatus[], includeRemovedUsers, teamVisibility`.
+Output: `{ summary, rows[], drilldown?, meta, confidence }`.
+- `confidence`: `trusted | partial | warning` baseado em consistência de `qualified_at`, links de proposta e resolver.
+- Filtros aplicados em SQL parametrizado sobre a view; drilldown lista oportunidades (cliente, oportunidade, datas, SDR, closer, proposta, status, motivo perda, receita válida, dias desde qualificação).
 
-### Causa raiz (5) — Telefone do `phone_public` da empresa virando phone da pessoa
-`run-apollo-enrichment` linha 418 faz fallback `phone = person.phone_numbers?.[0] ?? person.organization?.phone ?? person.account?.phone`. Isso pega o telefone **da empresa** quando a pessoa não tem telefone próprio, gerando falso positivo (`+5511994543677` é provavelmente telefone da JusBrasil, não da Luisa).
+### 3. Frontend
 
----
+**Nova subaba** em `Relatórios > Desempenho > Handoff` (`ReportTabs.tsx`): adicionar entry `qualification-quality` rotulada "Qualidade de Qualificação".
 
-## Plano de correção
+**Componentes novos:**
+- `src/components/reports/qualification/QualificationQualityReportV2.tsx` — Cards (SQLs, com proposta, sem proposta, ganhos, perdidos, receita válida, taxa SQL→Proposta, taxa SQL→Venda) + tabela por SDR + filtros.
+- `src/components/reports/qualification/QualificationDrilldownDialog.tsx` — Drilldown ao clicar SDR.
+- `src/components/reports/qualification/QualificationFilters.tsx` — período, SDR, closer, status, proposta sim/não, ganho/perdido/aberto, usuário ativo/removido, origem, pipeline.
+- `src/hooks/reports/useQualificationQualityV2.ts` — invoca edge function com React Query.
 
-### 1) Edge function `enrich-prospect-identity`
-- Expandir `BLOCKED_DOMAINS` para incluir agregadores BR: `jusbrasil.com.br`, `econodata.com.br`, `cnpj.biz`, `cnpj.info`, `cnpjs.rocks`, `cnpjbiz.com`, `consultasocio.com`, `empresaqualifica.com.br`, `casadosdados.com.br`, `apontador.com.br`, `econoinfo.com.br`, `solucoes.receita.fazenda.gov.br`, `receita.fazenda.gov.br`, `gov.br`, `mercadolivre.com.br`, `olx.com.br`, `tiktok.com`, `pinterest.com`, `medium.com`, `crunchbase.com`, `bloomberg.com`, `dnb.com`, `zoominfo.com`, `apollo.io`, `rocketreach.co`.
-- Exportar `isBlockedDomain` / `BLOCKED_DOMAINS` em módulo compartilhado novo: `supabase/functions/_shared/domain-blocklist.ts`.
+**Helper compartilhado de display:**
+- `src/lib/userDisplay.ts` + `src/hooks/useUserDisplayResolver.ts` consumindo `v_user_display_resolver_v2`. Badge `<RemovedUserBadge />`.
 
-### 2) Edge function `lead-sourcing`
-- Importar o blocklist compartilhado e validar nos 3 pontos (linhas 890, 2839, 3171) antes de gravar `normalized_domain`. Se bloqueado → grava `null` e marca `review_needed = true` com `recommended_next_action = 'verify_domain'`.
+**Correções nas telas existentes (mínimas, sem deletar):**
+- SDR Report: trocar fallback "Desconhecido" pelo resolver; receita atribuída via `commercial_won_revenue_view`; não esconder leads sem proposta.
+- Handoff Report: pares SDR→Closer via resolver; "Sem closer atribuído" quando null.
+- Closer Report: resolver + filtrar usuários removidos do ranking por default; filtro "incluir removidos".
+- Performance Report: resolver para receita histórica.
 
-### 3) Edge function `run-apollo-enrichment` — proteções defensivas
-- **Sanity check de domínio** antes do upsert: para cada pessoa retornada, comparar `person.organization?.primary_domain` (ou website) com `prospect.normalized_domain` (normalizado, removendo `www.`). Se divergir, descartar a linha e logar em `attempts` como `domain_mismatch_filtered`.
-- **Bloqueio de domínio poluente na chamada**: se `pickDomain(prospect)` cair em `isBlockedDomain`, retornar `skip("blocked_domain", ...)` em vez de consultar Apollo com lixo.
-- **Não usar telefone da empresa como telefone da pessoa**: remover o fallback `organization?.phone / account?.phone` da linha 418 (manter apenas `person.phone_numbers` e `sanitized_phone`).
+### 4. Memória
+Atualizar `mem://index.md` com regras: (a) unidade SQL para qualidade de qualificação; (b) `v_user_display_resolver_v2` é fonte única de nome — proibir fallback "Desconhecido".
 
-### 4) Dedupe cross-prospect (defesa em profundidade)
-- Index único parcial `enriched_contact_profiles_apollo_person_id_unique`: `(workspace_id, apollo_person_id) WHERE apollo_person_id IS NOT NULL AND is_merged = false`. Evita a mesma pessoa Apollo em 2 prospects da mesma org.
-- Index único parcial `enriched_contact_profiles_linkedin_url_unique`: `(workspace_id, lower(linkedin_url)) WHERE linkedin_url IS NOT NULL AND is_merged = false`.
-- Em `run-apollo-enrichment`: ao detectar conflito (23505) por `apollo_person_id`/`linkedin_url`, registrar `system_events('apollo_cross_prospect_conflict', { prospect_id, apollo_person_id, existing_prospect_id })` para virar sinal de domínio errado.
+## Critérios de aceite
+1-10 conforme spec do usuário. Cenário de teste: SDR com 10 qualificados (2 proposta, 6 perdidos, 2 sem proposta) → 20% SQL→Proposta, 60% perda pós-qualificação.
 
-### 5) Limpeza de dados (migration)
-- Para os 18 prospects com `normalized_domain` em blocklist: `UPDATE prospects SET normalized_domain = NULL, website = NULL, enrichment_status = 'pending', review_needed = true, recommended_next_action = 'verify_domain' WHERE …`.
-- Para todos os `enriched_contact_profiles` desses 18 prospects (e especificamente a Luisa nas 10 ocorrências): marcar `is_merged = true` com motivo `wrong_company_domain` para sumir da UI sem perder histórico.
-- Marcar `decision_maker_found = false` e zerar `apollo_enriched_at` nesses prospects para permitir reenriquecimento após a equipe corrigir o domínio.
+## Regressões protegidas
+- Vendas Realizadas continua em receita válida.
+- Cancelamentos não entram como receita.
+- Período usa fim do dia.
 
-### 6) UI Kairós (opcional, escopo mínimo)
-- No card de prospect quando `review_needed = true` e `recommended_next_action = 'verify_domain'`, exibir badge "Domínio suspeito — verificar antes de enriquecer". Bloquear o botão "Enriquecer com Apollo" enquanto o usuário não informar domínio manual. *Pode ficar para um segundo passo se você quiser apenas a correção backend agora.*
-
-### 7) Validação pós-deploy
-- Reenriquecer manualmente 1 prospect saneado (ex: ARAUTERM após informar domínio correto) e confirmar que Luisa NÃO aparece mais.
-- Rodar `SELECT count(*) FROM enriched_contact_profiles WHERE full_name='Luisa' AND role_title ILIKE '%events analyst%' AND is_merged=false;` → deve retornar 0.
-- Conferir log `system_events` por `apollo_cross_prospect_conflict` nos próximos enriquecimentos.
-
----
-
-## Arquivos impactados
-- **Novo**: `supabase/functions/_shared/domain-blocklist.ts`
-- **Editado**: `supabase/functions/enrich-prospect-identity/index.ts`
-- **Editado**: `supabase/functions/lead-sourcing/index.ts` (3 writers)
-- **Editado**: `supabase/functions/run-apollo-enrichment/index.ts` (skip blocked, sanity check, phone fallback)
-- **Migration**: 2 índices únicos parciais + UPDATE de saneamento (prospects + enriched_contact_profiles)
-- *(Opcional)* `src/components/kairos/...` para badge de domínio suspeito.
+## Arquivos impactados (resumo)
+**Novos:** 1 migration, 1 edge function, 5 arquivos frontend (report + drilldown + filters + hook + helper), 1 memória.
+**Editados:** `ReportTabs.tsx`, SDR/Handoff/Closer/Performance reports (apenas troca de label/fallback).
 
 ## Riscos
-- **Baixo**: ampliar blocklist pode bloquear prospect legítimo cuja única referência é redes sociais — mitigado pelo `review_needed=true` que mantém o lead na fila para correção manual.
-- **Médio**: índice único parcial em `apollo_person_id` pode falhar se já houver duplicatas. Mitigado pelo passo 5 (marca `is_merged=true` antes de criar o índice).
-- **Nulo**: nenhuma quebra de RLS/multi-tenant; tudo dentro de `workspace_id/organization_id`.
+- Snapshot histórico de nome depende de tabelas com dados parciais — confidence sinaliza isso.
+- View pode ficar pesada; planejo `WHERE organization_id = $1` empurrado e índices existentes em `opportunities(qualified_by_user_id, first_qualification_at)` (validar via linter pós-migration).
+- Resolver alterando telas existentes pode mudar visualização para usuários que hoje aparecem como "Desconhecido" — comportamento esperado.
 
-## Quer que eu siga com o plano completo (1→7) ou prefere uma versão enxuta só com 1+2+3+5 (correção crítica sem UI nem índices novos)?
+## Próximos passos
+1. Aprovar plano.
+2. Migration (resolver + view + grants).
+3. Edge function + hook + tela nova.
+4. Patches leves SDR/Handoff/Closer/Performance.
+5. Validar cenário de teste com dados reais via `supabase--read_query`.
