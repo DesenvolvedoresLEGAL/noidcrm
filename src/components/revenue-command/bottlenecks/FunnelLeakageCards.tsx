@@ -1,4 +1,4 @@
-import { ArrowRight, FileX, FilesIcon, XCircle, FileWarning } from 'lucide-react';
+import { ArrowRight, FileX, Files, XCircle, FileWarning } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -6,7 +6,7 @@ import type { FunnelLeak } from '@/hooks/revenue-command/useRevenueBottlenecks';
 
 const ICONS: Record<FunnelLeak['id'], React.ComponentType<{ className?: string }>> = {
   sqls_without_proposal: FileX,
-  open_proposals: FilesIcon,
+  open_proposals: Files,
   lost_proposals: FileWarning,
   cancelled_sales: XCircle,
 };
