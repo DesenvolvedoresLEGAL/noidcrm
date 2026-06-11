@@ -520,7 +520,8 @@ export function useRevenueBottlenecks() {
     // ── Seção 4: Velocidade
     //  Cálculo direto (V3.2A): qualified_at → primeira proposta criada/enviada
     //  com fallback para criação da oportunidade comercial e visualização.
-    const vel = velocityAggr.data ?? null;
+    // `vel` already declared above
+
     const viewSqlToProposalHours = (qual?.rows ?? [])
       .map((r) => r.avg_hours_qualification_to_proposal)
       .filter((v): v is number => typeof v === 'number' && v > 0);
