@@ -654,6 +654,16 @@ const App = () => (
                 }
               />
               <Route
+                path="/app/revenue-command/migration-audit"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <MigrationAuditPage />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="/app/settings/sales"
                 element={
                   <ProtectedRoute>
