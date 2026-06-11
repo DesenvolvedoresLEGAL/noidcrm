@@ -55,9 +55,10 @@ export default function KairosHub() {
         />
 
         <Tabs value={activeTab} onValueChange={handleTabChange}>
-          <TabsList className="grid w-full grid-cols-2 md:grid-cols-6 max-w-4xl">
+          <TabsList className="grid w-full grid-cols-2 md:grid-cols-7 max-w-5xl">
             <TabsTrigger value="icp">🎯 ICP Intelligence</TabsTrigger>
             <TabsTrigger value="queue">📥 Qualified Queue</TabsTrigger>
+            <TabsTrigger value="autopilot">🚀 Autopilot</TabsTrigger>
             <TabsTrigger value="sourcing">🧭 Sourcing</TabsTrigger>
             <TabsTrigger value="optimization">⚡ Optimization</TabsTrigger>
             <TabsTrigger value="experiments">🧪 Experiments</TabsTrigger>
@@ -71,6 +72,11 @@ export default function KairosHub() {
           <TabsContent value="queue" className="space-y-4 md:space-y-6 mt-4">
             <QualifiedQueuePanel />
           </TabsContent>
+
+          <TabsContent value="autopilot" className="space-y-4 md:space-y-6 mt-4">
+            <AutopilotPanel />
+          </TabsContent>
+
 
           <TabsContent value="sourcing" className="space-y-4 md:space-y-6 mt-4">
             <LeadSourcingEngine />
