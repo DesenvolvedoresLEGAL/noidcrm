@@ -9,10 +9,12 @@ import {
   Sparkles,
   Users,
 } from 'lucide-react';
+import { Layout } from '@/components/Layout';
 import { PageContainer } from '@/components/ui/page-container';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useFeatureFlag } from '@/hooks/useFeatureFlag';
+import { usePermissions } from '@/hooks/usePermissions';
 import { RevenueCommandHeader } from '@/components/revenue-command/RevenueCommandHeader';
 import {
   RevenueCommandTabs,
