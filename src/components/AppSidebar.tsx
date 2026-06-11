@@ -95,7 +95,7 @@ const ALL_MENU_ITEMS: MenuItem[] = [
 
   // OBJETIVOS
   { path: '/app/reports/ote', label: 'Resultados', icon: DollarSign, section: 'objetivos' },
-  { path: '/app/objetivos/desempenho', label: 'Desempenho', icon: Trophy, section: 'objetivos' },
+  // Sprint RCC V3.9 — Desempenho ocultado da navegação principal (migrado para RCC → Pessoas).
   { path: '/app/settings/sales', label: 'Configurações', icon: Settings2, section: 'objetivos' },
 
   // OPERAÇÕES
