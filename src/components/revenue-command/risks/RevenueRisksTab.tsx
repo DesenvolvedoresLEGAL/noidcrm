@@ -140,15 +140,7 @@ function RankingPanel({ ranking }: { ranking: RiskBlock[] }) {
   );
 }
 
-function ActionsPanel({
-  actions,
-}: {
-  actions: ReturnType<typeof useRevenueRisks>['data'] extends infer T
-    ? T extends { actions: infer A }
-      ? A
-      : never
-    : never;
-}) {
+function ActionsPanel({ actions }: { actions: RecommendedRiskAction[] }) {
   if (!actions || actions.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
