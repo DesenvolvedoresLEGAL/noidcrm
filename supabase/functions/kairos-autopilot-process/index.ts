@@ -82,26 +82,25 @@ async function processItem(admin: SupabaseClient, runId: string, item: any, conf
     }
   }
 
-  // Step 5: Apollo
+  // Step 5: Apollo Invisible Mode (decisão é interna; respeita rules + score + limites)
   const apolloLimit = config.max_apollo_credits ?? 0;
   if (config.allow_apollo && creditsUsedRef.v < apolloLimit) {
-    const { data: prospect } = await admin.from("prospects").select("normalized_domain,decision_maker_found,email_public,confidence").eq("id", prospectId).maybeSingle();
-    const minScore = config.min_score ?? 0;
-    const score = Math.round(Number(prospect?.confidence ?? 0) * 100);
-    if (prospect?.normalized_domain && !prospect.decision_maker_found && score >= minScore) {
-      await admin.from("kairos_batch_run_items").update({ current_stage: "apollo" }).eq("id", item.id);
-      try {
-        await admin.functions.invoke("run-apollo-enrichment", {
-          body: { prospect_id: prospectId, max_contacts: config.max_contacts_per_company ?? 3 },
-          headers: { Authorization: `Bearer ${serviceKey}` },
-        });
-        creditsUsedRef.v += 1;
-        await log(admin, runId, orgId, prospectId, "apollo", "ok", { credits_used: creditsUsedRef.v });
-      } catch (e) {
-        await log(admin, runId, orgId, prospectId, "apollo", "failed", { error: String(e) });
-      }
-    } else {
-      await log(admin, runId, orgId, prospectId, "apollo", "skipped", { reason: !prospect?.normalized_domain ? "no_domain" : prospect.decision_maker_found ? "already_has_dm" : "low_score" });
+    await admin.from("kairos_batch_run_items").update({ current_stage: "apollo" }).eq("id", item.id);
+    try {
+      const { data: ap } = await admin.functions.invoke("kairos-apollo-invisible", {
+        body: {
+          prospect_id: prospectId,
+          batch_run_id: runId,
+          organization_id: orgId,
+          batch_credits_used: creditsUsedRef.v,
+        },
+        headers: { Authorization: `Bearer ${serviceKey}` },
+      });
+      const used = Number((ap as any)?.credits_used ?? 0);
+      creditsUsedRef.v += used;
+      await log(admin, runId, orgId, prospectId, "apollo", (ap as any)?.status ?? "unknown", ap as any);
+    } catch (e) {
+      await log(admin, runId, orgId, prospectId, "apollo", "failed", { error: String(e) });
     }
   } else if (config.allow_apollo) {
     await log(admin, runId, orgId, prospectId, "apollo", "skipped", { reason: "credit_limit_reached" });

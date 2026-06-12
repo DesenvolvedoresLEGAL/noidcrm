@@ -41,3 +41,13 @@ Sourcing → kairos-enqueue-prospect → Qualified Queue → kairos-promote-to-c
 Botão "Importar" agora chama `kairos-enqueue-prospect`. A promoção ao CRM
 acontece exclusivamente em **Kairós > Qualified Queue** quando o item está
 `ready_for_sdr` (enriquecido + decisor + contato + score ≥ 60).
+
+---
+
+## KAI.15 — Apollo Invisible Mode
+
+Apollo deixou de ser ação manual. Acionado automaticamente por
+`kairos-apollo-invisible` (via Autopilot ou direto). Regras em
+`apollo_auto_enrichment_rules`, auditoria em `apollo_enrichment_audit`,
+KPIs/ROI em `/app/intelligence/apollo-roi`. Detalhes:
+`src/components/playbook/APOLLO_INVISIBLE.md`.
