@@ -467,5 +467,12 @@ export function EditOpportunityModal({
         </Form>
       </DialogContent>
     </Dialog>
+    <QualificationGateModal
+      open={gateOpen}
+      onOpenChange={setGateOpen}
+      score={qualScore.total}
+      blockers={qualScore.blockers}
+    />
+    </>
   );
 }
