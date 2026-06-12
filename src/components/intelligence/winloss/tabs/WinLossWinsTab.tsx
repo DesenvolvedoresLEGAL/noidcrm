@@ -11,6 +11,7 @@ import {
   Users, Layers, MessageSquareQuote, BookOpen, GitBranch,
 } from 'lucide-react';
 import type { WinLossDataResult, WonStageRow } from '@/hooks/useWinLossData';
+import { WinOriginBreakdownBlock } from '../WinOriginBreakdownBlock';
 
 interface Props {
   data: WinLossDataResult | undefined;
