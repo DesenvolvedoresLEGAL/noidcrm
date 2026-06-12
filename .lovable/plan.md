@@ -1,82 +1,70 @@
-# Sprint 4 — Histórico e Auditoria da Qualificação
+## Sprint 5 — UI/UX: Bloco "Qualificação Comercial"
 
-Registrar 3 novos tipos de eventos em `timeline_events` (aparecem na aba **Histórico** da oportunidade) usando o logger central `src/services/crm/timeline-logger.ts`. Sem mudança de schema: a tabela já tem `metadata jsonb`, `actor_user_id`, `timestamp`. Apenas adicionamos novos valores de `activity_type` (`qualification_score_updated`, `lead_disqualified`, `sales_handoff_blocked`).
+### Objetivo
+Transformar o atual `QualificationScoreCard` (que só mostra score + barra + detalhamento collapsável) num bloco comercial completo chamado **Qualificação Comercial**, exibindo numa única visão: score, classificação, status de handoff, campos completos, campos pendentes e próxima ação recomendada.
 
-## 1. `timeline-logger.ts` — 3 novos helpers
+### O que muda
 
-```ts
-logQualificationScoreEvent(opportunityId, {
-  previousScore, nextScore,
-  previousTier, nextTier,
-  pendingBlockers // string[]
-})
-// type: 'score', activity_type: 'qualification_score_updated'
-// title: "Score de Qualificação atualizado: {prev}→{next} ({tierPrev} → {tierNext})"
+1. **Renomear o bloco** de "Score de Qualificação" para **"Qualificação Comercial"** (subtítulo continua "Baseado no Checklist Obrigatório").
 
-logDisqualificationEvent(opportunityId, {
-  reasonSlug, reasonLabel, observation,
-  remarketingCreated, remarketingOpportunityId, remarketingExisted
-})
-// type: 'audit', activity_type: 'lead_disqualified'
-// title: "Lead desqualificado no Pré-vendas: {reasonLabel}"
+2. **Nova função pura** `src/lib/qualification/qualificationRecommendation.ts`:
+   - `getQualificationRecommendation(result, ctx)` → retorna `{ title, description }` baseado em prioridade dos blockers e tier:
+     - Sem permissão válida → "Validar decisor e combinar próximo passo antes de enviar para Vendas."
+     - Sem `poder_decisao` → "Identificar o decisor real antes de avançar."
+     - Sem `proximo_passo` → "Combinar próximo passo claro com o lead."
+     - Sem urgência/data/local → "Mapear evento (data, local e urgência) para qualificar."
+     - Sem demanda (conexões/finalidade) → "Detalhar a demanda técnica do evento."
+     - Sem account/contact → "Cadastrar empresa e contato principal."
+     - Score ≥ 75 e sem blockers → "Lead pronto para Vendas. Mover para o próximo funil."
+     - Score 60-74 → "Reforçar pontos fracos do checklist para liberar handoff."
+     - Score < 60 → "Lead ainda imaturo. Continuar descoberta antes de propor."
+   - Testes unitários em `qualificationRecommendation.test.ts`.
 
-logSalesHandoffBlockedEvent(opportunityId, {
-  currentScore, requiredScore, pendingBlockers
-})
-// type: 'audit', activity_type: 'sales_handoff_blocked'
-// title: "Tentativa bloqueada de passagem para Vendas"
-```
+3. **Refatorar `QualificationScoreCard.tsx`** (mantém o nome do arquivo e a API `score: UseQualificationScoreReturn`), com novo layout sempre visível (sem collapse no essencial):
 
-Cada helper preenche `metadata` com todos os campos relevantes (usuário e timestamp já vêm do logger). Erros não bloqueiam o fluxo principal (try/catch já existe no logger).
+   ```
+   ┌─ Qualificação Comercial ─────────────────────┐
+   │ 🎯 Score 67/100         [Badge: SQL fraco]   │
+   │ ███████░░░░░ progress                        │
+   │                                              │
+   │ Status: ⛔ Não pode ir para Vendas           │
+   │  (ou)   ✅ Pronto para Vendas                │
+   │                                              │
+   │ ✅ Completos (4)         ⚠️ Pendentes (3)    │
+   │  • Evento identificado   • Permissão real    │
+   │  • Data e local          • Poder de decisão  │
+   │  • Demanda clara         • Próximo passo     │
+   │  • Urgência                                  │
+   │                                              │
+   │ 💡 Ação recomendada                          │
+   │ Validar decisor e combinar próximo passo… │
+   │                                              │
+   │ [▾ Ver pontuação detalhada]  (collapse)      │
+   └──────────────────────────────────────────────┘
+   ```
 
-## 2. Disparadores
+   - "Completos" = `breakdown` items com `got === max` (label do critério).
+   - "Pendentes" = `score.blockers` (lista já calculada no Sprint 2).
+   - "Status" deriva de `score.canMoveToSales`.
+   - "Ação recomendada" vem do helper novo.
+   - O detalhamento por critério (lista got/max) continua existindo, mas vira o único conteúdo do collapse.
+   - Sem cores hardcoded — usar tokens semânticos (`text-emerald-600`/`text-amber-600` já em uso, manter padrão atual do arquivo).
 
-### a) Score atualizado — `src/hooks/useOpportunityQualificationScore.ts`
+4. **Sidebar (`OpportunitySidebar.tsx`)**: o badge compacto `Target {score}/100` permanece. Não duplicar o bloco grande aqui (já fica na aba Formulários). Sem mudanças além de garantir tooltip atualizado com a classificação.
 
-- `useEffect` observa `(score, classification.tier)`.
-- Mantém um **ref local** `lastLogged` por instância **+ um Map module-level** `qualScoreLastSignatureByOpp: Map<opportunityId, {score, tier}>` para deduplicar entre múltiplos componentes que montam o hook.
-- Regra "mudança relevante": **muda o tier** OU `|delta| ≥ 10` pontos.
-- Não loga primeiro valor (sem `previous`).
-- Não loga durante `isLoading`.
-- Chama `logQualificationScoreEvent` com `previous/next/tier/blockers`.
+5. **Aba Formulários (`OpportunityFormsTab.tsx`)**: nenhuma mudança estrutural — o card já é renderizado no topo via `<QualificationScoreCard score={qualScore} />`. Ele simplesmente passa a mostrar o conteúdo novo.
 
-### b) Desqualificação — `src/services/crm/disqualify.ts`
+### Arquivos impactados
+- `src/lib/qualification/qualificationRecommendation.ts` (novo)
+- `src/lib/qualification/qualificationRecommendation.test.ts` (novo)
+- `src/components/opportunity/qualification/QualificationScoreCard.tsx` (refatorado — mesma API)
 
-- Ao final de `disqualifyPreSalesOpportunity`, antes do `return`, chamar `logDisqualificationEvent` com:
-  - `reasonSlug`, `reasonLabel` (do mapa), `observation`
-  - `remarketingCreated = result.duplicated`
-  - `remarketingExisted = result.remarketingExisted`
-  - `remarketingOpportunityId = result.remarketingOpportunityId`
-- Wrap em try/catch silencioso.
+### Riscos
+- Baixo. Mudança puramente visual + helper puro. `useOpportunityQualificationScore` e a fórmula do Sprint 2 não mudam, então score, gate de handoff (Sprint 2/3) e auditoria (Sprint 4) seguem intactos.
+- Sem migração, sem alteração de RLS, sem alteração de hooks/serviços.
 
-### c) Bloqueio handoff — `src/components/opportunity/EditOpportunityModal.tsx`
-
-- No ponto em que detecta `isQualToSalesMove && !canMoveToSales` antes de abrir o `QualificationGateModal`, chamar `logSalesHandoffBlockedEvent` com `currentScore=qualScore.score`, `requiredScore=75`, `pendingBlockers=qualScore.blockers`.
-- Anti-spam: usa o mesmo padrão de Map module-level (`handoffBlockedLastLoggedByOpp`) com janela de 60s para evitar enxurrada se o usuário tentar várias vezes seguidas.
-
-## 3. Renderização no histórico
-
-A `OpportunityHistoryTab` já renderiza `timeline_events` agrupando por `type/activity_type` com fallback genérico. Vamos verificar se renderiza `activity_type` desconhecido com ícone neutro — se sim, nada a fazer; se não, adicionamos labels/icones rápidos para os 3 novos `activity_type`. (Confirmo na implementação.)
-
-## 4. Arquivos
-
-**Editados**
-- `src/services/crm/timeline-logger.ts` — 3 funções.
-- `src/services/crm/disqualify.ts` — chamada do logger.
-- `src/hooks/useOpportunityQualificationScore.ts` — change detection + log.
-- `src/components/opportunity/EditOpportunityModal.tsx` — log no gate.
-- (Opcional) `src/components/opportunity/OpportunityHistoryTab.tsx` — labels/ícones para os 3 novos `activity_type`.
-
-## 5. Riscos & decisões
-
-- **Sem migração**: usamos `timeline_events.metadata` (jsonb). Convenções existentes preservadas.
-- **Dedupe de score**: regra "tier change OU Δ≥10 pts" + Map de sessão evita ruído sem deixar de capturar eventos relevantes.
-- **Falha de log nunca bloqueia** desqualificação/score/handoff (try/catch interno do logger).
-- **PII**: observação é gravada no `metadata` — ok, mesma política que `loss_comment`/notes existentes.
-
-## 6. Validação manual
-
-1. Editar checklist da oportunidade em PRÉ VENDAS, mudando urgência/decisor → histórico mostra "Score de Qualificação atualizado: X→Y".
-2. Tentar mover lead com score < 75 para Vendas → gate abre + histórico ganha "Tentativa bloqueada de passagem para Vendas".
-3. Desqualificar lead com toggle ON → histórico mostra "Lead desqualificado no Pré-vendas: {motivo}" com `remarketing_created=true` no metadata.
-4. Desqualificar lead com toggle OFF → mesmo evento, `remarketing_created=false`.
+### Validação manual
+- Lead com score < 60 → bloco mostra "Frio/Em desenvolvimento", status bloqueado, ação de descoberta.
+- Lead com score 67 e blockers de permissão/poder/próximo passo → reproduz exemplo do briefing.
+- Lead com score ≥ 75 e sem blockers → status "Pronto para Vendas", ação recomendando handoff.
+- Collapse "Ver pontuação detalhada" mostra breakdown got/max como antes.
