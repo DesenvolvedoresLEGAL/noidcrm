@@ -96,6 +96,58 @@ Deno.serve(async (req) => {
       .single();
     if (uErr) throw uErr;
 
+    // KAI.16 — Revenue Attribution seed
+    try {
+      const { data: prospect } = await admin
+        .from("prospects")
+        .select("id, event_name, icp_profile_id, source_label")
+        .eq("id", item.prospect_id)
+        .maybeSingle();
+
+      const { data: batchItem } = await admin
+        .from("kairos_batch_run_items")
+        .select("run_id")
+        .eq("prospect_id", item.prospect_id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      let icpName: string | null = null;
+      if (prospect?.icp_profile_id) {
+        const { data: icp } = await admin
+          .from("icp_profiles").select("name").eq("id", prospect.icp_profile_id).maybeSingle();
+        icpName = (icp as { name?: string } | null)?.name ?? null;
+      }
+
+      await admin.from("kairos_revenue_attribution").upsert({
+        organization_id: item.organization_id,
+        event_id: item.event_id ?? null,
+        event_name: prospect?.event_name ?? null,
+        batch_run_id: batchItem?.run_id ?? null,
+        prospect_id: item.prospect_id,
+        queue_id: item.id,
+        account_id: result.account_id,
+        contact_id: result.contact_id,
+        opportunity_id: result.opportunity_id,
+        source_type: item.source_type ?? null,
+        source_name: item.source ?? prospect?.source_label ?? null,
+        icp_cluster_id: prospect?.icp_profile_id ?? null,
+        icp_cluster_name: icpName,
+        apollo_provider_used: item.apollo_status ? "apollo" : null,
+        primary_contact_role: item.primary_contact_role ?? null,
+        primary_contact_score: item.primary_contact_score ?? null,
+        owner_id: item.owner_id ?? userId,
+        sdr_id: userId,
+        opportunity_created_at: new Date().toISOString(),
+        status: "promoted_to_crm",
+      } as any, { onConflict: "opportunity_id" });
+
+      // Initial sync with proposals/revenue (no-op if nothing exists yet)
+      await admin.rpc("fn_kairos_sync_attribution", { p_opportunity_id: result.opportunity_id });
+    } catch (e) {
+      console.warn("[promote] failed to seed kairos_revenue_attribution", e);
+    }
+
     return json(200, { item: updated, crm: result });
   } catch (err) {
     console.error("[kairos-promote-to-crm]", err);
