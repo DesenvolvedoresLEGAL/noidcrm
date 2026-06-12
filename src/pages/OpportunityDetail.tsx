@@ -19,6 +19,8 @@ import { DealMemoryPanel } from '@/components/memory/DealMemoryPanel';
 import { OpportunityDiagnosticTab } from '@/components/opportunity/OpportunityDiagnosticTab';
 import { EditOpportunityModal } from '@/components/opportunity/EditOpportunityModal';
 import { LossReasonModal, type LossDetails } from '@/components/opportunity/LossReasonModal';
+import { DisqualifyLeadModal, type DisqualifyLeadDetails } from '@/components/opportunity/DisqualifyLeadModal';
+import { disqualifyPreSalesOpportunity } from '@/services/crm/disqualify';
 import { WinReasonModal, type WinDetails } from '@/components/opportunity/WinReasonModal';
 import { SellerClassificationBanner } from '@/components/opportunity/SellerClassificationBanner';
 import { ReopenOpportunityModal } from '@/components/opportunity/ReopenOpportunityModal';
@@ -60,6 +62,7 @@ export default function OpportunityDetail() {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [lossReasonModalOpen, setLossReasonModalOpen] = useState(false);
+  const [disqualifyModalOpen, setDisqualifyModalOpen] = useState(false);
   const [winReasonModalOpen, setWinReasonModalOpen] = useState(false);
   const [reopenModalOpen, setReopenModalOpen] = useState(false);
   const [sellerClassificationMode, setSellerClassificationMode] = useState(false);
@@ -239,11 +242,50 @@ export default function OpportunityDetail() {
   };
 
   const handleLost = () => {
-    setLossReasonModalOpen(true);
+    if (opportunity?.pipeline?.pipeline_type === 'qualification') {
+      setDisqualifyModalOpen(true);
+    } else {
+      setLossReasonModalOpen(true);
+    }
   };
 
   const handleConfirmLoss = (details: LossDetails) => {
     lossMutation.mutate(details);
+  };
+
+  const disqualifyMutation = useMutation({
+    mutationFn: async (details: DisqualifyLeadDetails) => {
+      const result = await disqualifyPreSalesOpportunity(id!, {
+        reasonSlug: details.reasonSlug,
+        observation: details.observation,
+        createRemarketing: details.createRemarketing,
+      });
+      await processPendingWorkflows(id!);
+      return result;
+    },
+    onSuccess: (result) => {
+      invalidateOpportunity(queryClient, id);
+      setDisqualifyModalOpen(false);
+      if (result.remarketingExisted) {
+        toast({ title: 'Lead desqualificado e já existente no Remarketing.' });
+      } else if (result.duplicated) {
+        toast({ title: 'Lead desqualificado. Nova oportunidade criada no Remarketing.' });
+      } else if (result.remarketingPipelineMissing) {
+        toast({
+          title: 'Lead desqualificado.',
+          description: 'Funil Remarketing não configurado nesta organização.',
+        });
+      } else {
+        toast({ title: 'Lead desqualificado.' });
+      }
+    },
+    onError: (error: Error) => {
+      toast({ variant: 'destructive', title: 'Erro ao desqualificar', description: error.message });
+    },
+  });
+
+  const handleConfirmDisqualify = (details: DisqualifyLeadDetails) => {
+    disqualifyMutation.mutate(details);
   };
 
   const handleReopen = () => {
@@ -521,6 +563,16 @@ export default function OpportunityDetail() {
         onConfirm={handleConfirmLoss}
         opportunityTitle={opportunity.title}
         pipelineId={opportunity.pipeline_id}
+      />
+
+      {/* Disqualify Lead Modal (PRÉ VENDAS) */}
+      <DisqualifyLeadModal
+        open={disqualifyModalOpen}
+        onClose={() => setDisqualifyModalOpen(false)}
+        onConfirm={handleConfirmDisqualify}
+        opportunityId={opportunity.id}
+        opportunityTitle={opportunity.title}
+        isLoading={disqualifyMutation.isPending}
       />
 
       {/* Delete Confirmation - with typing requirement */}
