@@ -4,6 +4,8 @@ import { Rocket } from 'lucide-react';
 import { AutopilotKpiBar } from './AutopilotKpiBar';
 import { AutopilotRunsTable } from './AutopilotRunsTable';
 import { AutopilotConfigModal } from './AutopilotConfigModal';
+import { ApolloKpiBar } from './ApolloKpiBar';
+import { ApolloInvisibleSettingsCard } from './ApolloInvisibleSettingsCard';
 
 export function AutopilotPanel() {
   const [modalOpen, setModalOpen] = useState(false);
@@ -24,6 +26,8 @@ export function AutopilotPanel() {
         Dica: para iniciar um lote, abra <strong>Sourcing</strong>, execute uma busca e clique em <strong>🚀 Executar Autopilot</strong> nos resultados.
       </p>
       <AutopilotKpiBar />
+      <ApolloKpiBar />
+      <ApolloInvisibleSettingsCard />
       <AutopilotRunsTable />
       <AutopilotConfigModal open={modalOpen} onClose={() => setModalOpen(false)} />
     </div>
