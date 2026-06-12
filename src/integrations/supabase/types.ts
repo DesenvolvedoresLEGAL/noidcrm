@@ -15347,6 +15347,234 @@ export type Database = {
           },
         ]
       }
+      kairos_revenue_attribution: {
+        Row: {
+          account_id: string | null
+          apollo_provider_used: string | null
+          batch_run_id: string | null
+          contact_id: string | null
+          contract_id: string | null
+          created_at: string
+          event_id: string | null
+          event_name: string | null
+          icp_cluster_id: string | null
+          icp_cluster_name: string | null
+          id: string
+          lost_at: string | null
+          opportunity_created_at: string | null
+          opportunity_id: string | null
+          organization_id: string
+          owner_id: string | null
+          primary_contact_department: string | null
+          primary_contact_role: string | null
+          primary_contact_score: number | null
+          proposal_created_at: string | null
+          proposal_id: string | null
+          proposal_sent_at: string | null
+          proposal_viewed_at: string | null
+          prospect_id: string | null
+          queue_id: string | null
+          revenue_amount: number | null
+          sdr_id: string | null
+          source_name: string | null
+          source_type: string | null
+          status: Database["public"]["Enums"]["kairos_attribution_status"]
+          updated_at: string
+          valid_revenue_amount: number | null
+          won_at: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          apollo_provider_used?: string | null
+          batch_run_id?: string | null
+          contact_id?: string | null
+          contract_id?: string | null
+          created_at?: string
+          event_id?: string | null
+          event_name?: string | null
+          icp_cluster_id?: string | null
+          icp_cluster_name?: string | null
+          id?: string
+          lost_at?: string | null
+          opportunity_created_at?: string | null
+          opportunity_id?: string | null
+          organization_id: string
+          owner_id?: string | null
+          primary_contact_department?: string | null
+          primary_contact_role?: string | null
+          primary_contact_score?: number | null
+          proposal_created_at?: string | null
+          proposal_id?: string | null
+          proposal_sent_at?: string | null
+          proposal_viewed_at?: string | null
+          prospect_id?: string | null
+          queue_id?: string | null
+          revenue_amount?: number | null
+          sdr_id?: string | null
+          source_name?: string | null
+          source_type?: string | null
+          status?: Database["public"]["Enums"]["kairos_attribution_status"]
+          updated_at?: string
+          valid_revenue_amount?: number | null
+          won_at?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          apollo_provider_used?: string | null
+          batch_run_id?: string | null
+          contact_id?: string | null
+          contract_id?: string | null
+          created_at?: string
+          event_id?: string | null
+          event_name?: string | null
+          icp_cluster_id?: string | null
+          icp_cluster_name?: string | null
+          id?: string
+          lost_at?: string | null
+          opportunity_created_at?: string | null
+          opportunity_id?: string | null
+          organization_id?: string
+          owner_id?: string | null
+          primary_contact_department?: string | null
+          primary_contact_role?: string | null
+          primary_contact_score?: number | null
+          proposal_created_at?: string | null
+          proposal_id?: string | null
+          proposal_sent_at?: string | null
+          proposal_viewed_at?: string | null
+          prospect_id?: string | null
+          queue_id?: string | null
+          revenue_amount?: number | null
+          sdr_id?: string | null
+          source_name?: string | null
+          source_type?: string | null
+          status?: Database["public"]["Enums"]["kairos_attribution_status"]
+          updated_at?: string
+          valid_revenue_amount?: number | null
+          won_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kairos_revenue_attribution_batch_run_id_fkey"
+            columns: ["batch_run_id"]
+            isOneToOne: false
+            referencedRelation: "kairos_batch_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kairos_revenue_attribution_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: true
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kairos_revenue_attribution_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: true
+            referencedRelation: "v_ai_reports_context_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "kairos_revenue_attribution_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: true
+            referencedRelation: "v_loss_classification_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "kairos_revenue_attribution_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: true
+            referencedRelation: "v_loss_semantic_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "kairos_revenue_attribution_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: true
+            referencedRelation: "v_lost_deals_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "kairos_revenue_attribution_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: true
+            referencedRelation: "v_lost_deals_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "kairos_revenue_attribution_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: true
+            referencedRelation: "v_opportunities_hygiene_base"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kairos_revenue_attribution_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: true
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "kairos_revenue_attribution_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: true
+            referencedRelation: "v_opportunity_stage_age_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "kairos_revenue_attribution_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: true
+            referencedRelation: "v_report_losses_detail_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "kairos_revenue_attribution_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: true
+            referencedRelation: "v_report_qualification_quality_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "kairos_revenue_attribution_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: true
+            referencedRelation: "v_reporting_opportunities_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "kairos_revenue_attribution_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kairos_revenue_attribution_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_report_legacy_retirement_readiness_v2"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "kairos_revenue_attribution_prospect_id_fkey"
+            columns: ["prospect_id"]
+            isOneToOne: false
+            referencedRelation: "prospects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kairos_revenue_attribution_queue_id_fkey"
+            columns: ["queue_id"]
+            isOneToOne: false
+            referencedRelation: "kairos_qualified_queue"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lead_emotional_memory: {
         Row: {
           account_id: string | null
@@ -32214,6 +32442,54 @@ export type Database = {
           },
         ]
       }
+      kairos_revenue_attribution_summary: {
+        Row: {
+          active_attributions: number | null
+          attributions: number | null
+          avg_ticket: number | null
+          batch_run_id: string | null
+          conversion_rate: number | null
+          deals_cancelled: number | null
+          deals_lost: number | null
+          deals_won: number | null
+          event_id: string | null
+          event_name: string | null
+          icp_cluster_id: string | null
+          icp_cluster_name: string | null
+          organization_id: string | null
+          owner_id: string | null
+          primary_contact_department: string | null
+          proposals_created: number | null
+          proposals_sent: number | null
+          proposals_viewed: number | null
+          revenue_total: number | null
+          sdr_id: string | null
+          valid_revenue_total: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kairos_revenue_attribution_batch_run_id_fkey"
+            columns: ["batch_run_id"]
+            isOneToOne: false
+            referencedRelation: "kairos_batch_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kairos_revenue_attribution_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kairos_revenue_attribution_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_report_legacy_retirement_readiness_v2"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
       mcp_action_catalog_view: {
         Row: {
           agent_executable: boolean | null
@@ -35848,6 +36124,10 @@ export type Database = {
       }
       fn_cnae_to_segmento: { Args: { p_cnae: string }; Returns: string }
       fn_infer_segmento_from_name: { Args: { p_nome: string }; Returns: string }
+      fn_kairos_sync_attribution: {
+        Args: { p_opportunity_id: string }
+        Returns: string
+      }
       fn_list_accounts_for_segmento_backfill: {
         Args: { p_limit?: number }
         Returns: {
@@ -37236,6 +37516,17 @@ export type Database = {
         | "loss_report"
         | "retirement"
         | "release"
+      kairos_attribution_status:
+        | "sourced"
+        | "queued"
+        | "promoted_to_crm"
+        | "opportunity_open"
+        | "proposal_created"
+        | "proposal_sent"
+        | "proposal_viewed"
+        | "won"
+        | "lost"
+        | "cancelled"
       kairos_batch_item_status:
         | "pending"
         | "running"
@@ -37600,6 +37891,18 @@ export const Constants = {
         "loss_report",
         "retirement",
         "release",
+      ],
+      kairos_attribution_status: [
+        "sourced",
+        "queued",
+        "promoted_to_crm",
+        "opportunity_open",
+        "proposal_created",
+        "proposal_sent",
+        "proposal_viewed",
+        "won",
+        "lost",
+        "cancelled",
       ],
       kairos_batch_item_status: [
         "pending",
