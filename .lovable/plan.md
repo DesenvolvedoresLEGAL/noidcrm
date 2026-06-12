@@ -1,70 +1,42 @@
-## Sprint 5 — UI/UX: Bloco "Qualificação Comercial"
+## Verificação final — Sprints 1 a 5 vs. critério de aceite
 
-### Objetivo
-Transformar o atual `QualificationScoreCard` (que só mostra score + barra + detalhamento collapsável) num bloco comercial completo chamado **Qualificação Comercial**, exibindo numa única visão: score, classificação, status de handoff, campos completos, campos pendentes e próxima ação recomendada.
+Não há código novo a escrever: a mensagem é a régua final do épico. Abaixo, status de cada critério mapeado para o que já existe no projeto após Sprints 1-5.
 
-### O que muda
+### Critérios de aceite
 
-1. **Renomear o bloco** de "Score de Qualificação" para **"Qualificação Comercial"** (subtítulo continua "Baseado no Checklist Obrigatório").
+| # | Critério | Status | Onde mora |
+|---|----------|--------|-----------|
+| 1 | Formulário aparece como **Checklist Obrigatório de Qualificação** | ✅ | Custom form criado no Sprint 1; resolvido em `useOpportunityQualificationScore` por nome (`checklist obrigatório de qualificação`). |
+| 2 | Campos obrigatórios disponíveis e salvando | ✅ | `custom_fields` (entity_type=opportunity) + `custom_form_values` via fluxo padrão do CRM. |
+| 3 | Score calculado automaticamente | ✅ | `src/lib/qualification/qualificationScore.ts` + hook `useOpportunityQualificationScore`. |
+| 4 | Classificação aparece na oportunidade | ✅ | `QualificationScoreCard` (aba Formulários) + badge na `OpportunitySidebar`. |
+| 5 | Lead com score < 75 não pode ir para Vendas | ✅ | Gate em `EditOpportunityModal.tsx` + `QualificationGateModal`. |
+| 6 | Botão **Perdeu** abre modal de desqualificação no Pré-vendas | ✅ | Roteamento por `pipeline_type === 'qualification'` em `OpportunityDetail.tsx` → `DisqualifyLeadModal`. |
+| 7 | Oportunidade perdida movida para **Desqualificado** | ✅ | `disqualifyPreSalesOpportunity` em `src/services/crm/disqualify.ts`. |
+| 8 | Oportunidade duplicada no funil **Remarketing** | ✅ | Mesmo serviço, com flag `createRemarketing`, preservando account/contact/`custom_form_values`. |
+| 9 | Sem duplicação repetida no Remarketing | ✅ | `findActiveRemarketingDuplicate` antes de criar; UI desabilita o toggle e mostra link quando já existe. |
+| 10 | Tudo registrado no histórico | ✅ | `timeline-logger.ts`: `qualification_score_updated`, `lead_disqualified`, `sales_handoff_blocked`. |
 
-2. **Nova função pura** `src/lib/qualification/qualificationRecommendation.ts`:
-   - `getQualificationRecommendation(result, ctx)` → retorna `{ title, description }` baseado em prioridade dos blockers e tier:
-     - Sem permissão válida → "Validar decisor e combinar próximo passo antes de enviar para Vendas."
-     - Sem `poder_decisao` → "Identificar o decisor real antes de avançar."
-     - Sem `proximo_passo` → "Combinar próximo passo claro com o lead."
-     - Sem urgência/data/local → "Mapear evento (data, local e urgência) para qualificar."
-     - Sem demanda (conexões/finalidade) → "Detalhar a demanda técnica do evento."
-     - Sem account/contact → "Cadastrar empresa e contato principal."
-     - Score ≥ 75 e sem blockers → "Lead pronto para Vendas. Mover para o próximo funil."
-     - Score 60-74 → "Reforçar pontos fracos do checklist para liberar handoff."
-     - Score < 60 → "Lead ainda imaturo. Continuar descoberta antes de propor."
-   - Testes unitários em `qualificationRecommendation.test.ts`.
+### Regras de não-regressão (preservadas)
 
-3. **Refatorar `QualificationScoreCard.tsx`** (mantém o nome do arquivo e a API `score: UseQualificationScoreReturn`), com novo layout sempre visível (sem collapse no essencial):
+- **Propostas / Vendas / Forecast / OTE / Revenue / Win-Loss**: nenhuma das mudanças tocou `proposals`, `commercial_won_revenue_view`, `forecast_*`, `ote_*`, `win_loss_records`, `commission_*`. As receitas continuam saindo da SSoT (`commercial_won_revenue_view` / `valid_revenue_amount`).
+- **Win/Loss em Vendas**: o roteamento por `pipeline_type` mantém o fluxo legado (`LossReasonModal`) intacto para `sales`; só `qualification` cai no novo modal.
+- **`closed_at` imutável**: o serviço de desqualificação respeita o trigger existente — não sobrescreve `closed_at`.
+- **Título uppercase** (`trg_opportunity_title_upper`): a duplicação para Remarketing herda o título e o trigger normaliza sem ação extra.
+- **Campos personalizados**: nenhum `custom_field` foi removido ou renomeado; a leitura mapeia UUID → `field_key` via `custom_fields` (entity_type=opportunity).
+- **RLS / multi-tenant**: serviço e hook usam `supabase` autenticado; nenhuma policy foi alterada; novas colunas em `opportunities` (Sprint 3) são lidas/escritas apenas por usuários da org via as policies existentes.
 
-   ```
-   ┌─ Qualificação Comercial ─────────────────────┐
-   │ 🎯 Score 67/100         [Badge: SQL fraco]   │
-   │ ███████░░░░░ progress                        │
-   │                                              │
-   │ Status: ⛔ Não pode ir para Vendas           │
-   │  (ou)   ✅ Pronto para Vendas                │
-   │                                              │
-   │ ✅ Completos (4)         ⚠️ Pendentes (3)    │
-   │  • Evento identificado   • Permissão real    │
-   │  • Data e local          • Poder de decisão  │
-   │  • Demanda clara         • Próximo passo     │
-   │  • Urgência                                  │
-   │                                              │
-   │ 💡 Ação recomendada                          │
-   │ Validar decisor e combinar próximo passo… │
-   │                                              │
-   │ [▾ Ver pontuação detalhada]  (collapse)      │
-   └──────────────────────────────────────────────┘
-   ```
+### Itens recomendados como follow-up (fora do escopo desta sprint, opcional)
 
-   - "Completos" = `breakdown` items com `got === max` (label do critério).
-   - "Pendentes" = `score.blockers` (lista já calculada no Sprint 2).
-   - "Status" deriva de `score.canMoveToSales`.
-   - "Ação recomendada" vem do helper novo.
-   - O detalhamento por critério (lista got/max) continua existindo, mas vira o único conteúdo do collapse.
-   - Sem cores hardcoded — usar tokens semânticos (`text-emerald-600`/`text-amber-600` já em uso, manter padrão atual do arquivo).
+1. **Smoke test manual de regressão** com checklist abaixo no ambiente de preview:
+   - Editar checklist → ver bloco "Qualificação Comercial" atualizar score em tempo real.
+   - Tentar mover < 75 para Vendas → bloqueado + evento `sales_handoff_blocked` no histórico.
+   - Atingir ≥ 75 com checklist completo → mover liberado.
+   - Clicar **Perdeu** em Pré-vendas → `DisqualifyLeadModal`; em Vendas → `LossReasonModal` (não regrediu).
+   - Desqualificar com Remarketing ON → cria deal espelho; repetir → segundo deal não criado, link aparece.
+   - Conferir 3 tipos de eventos na aba Histórico.
+2. **Backfill opcional** (não obrigatório): rodar uma query de leitura em `opportunities` do pipeline de qualificação para recalcular score on-demand quando a oportunidade for aberta — já é o comportamento atual via hook, então nenhum job é necessário.
 
-4. **Sidebar (`OpportunitySidebar.tsx`)**: o badge compacto `Target {score}/100` permanece. Não duplicar o bloco grande aqui (já fica na aba Formulários). Sem mudanças além de garantir tooltip atualizado com a classificação.
+### Conclusão
 
-5. **Aba Formulários (`OpportunityFormsTab.tsx`)**: nenhuma mudança estrutural — o card já é renderizado no topo via `<QualificationScoreCard score={qualScore} />`. Ele simplesmente passa a mostrar o conteúdo novo.
-
-### Arquivos impactados
-- `src/lib/qualification/qualificationRecommendation.ts` (novo)
-- `src/lib/qualification/qualificationRecommendation.test.ts` (novo)
-- `src/components/opportunity/qualification/QualificationScoreCard.tsx` (refatorado — mesma API)
-
-### Riscos
-- Baixo. Mudança puramente visual + helper puro. `useOpportunityQualificationScore` e a fórmula do Sprint 2 não mudam, então score, gate de handoff (Sprint 2/3) e auditoria (Sprint 4) seguem intactos.
-- Sem migração, sem alteração de RLS, sem alteração de hooks/serviços.
-
-### Validação manual
-- Lead com score < 60 → bloco mostra "Frio/Em desenvolvimento", status bloqueado, ação de descoberta.
-- Lead com score 67 e blockers de permissão/poder/próximo passo → reproduz exemplo do briefing.
-- Lead com score ≥ 75 e sem blockers → status "Pronto para Vendas", ação recomendando handoff.
-- Collapse "Ver pontuação detalhada" mostra breakdown got/max como antes.
+Sprints 1-5 atendem 10/10 critérios de aceite sem violar nenhuma regra de Propostas, Vendas Realizadas, Forecast, OTE, Win/Loss ou Revenue Command. Nenhuma alteração adicional de código é necessária — recomendo apenas validar via o smoke test acima antes de fechar o épico.
