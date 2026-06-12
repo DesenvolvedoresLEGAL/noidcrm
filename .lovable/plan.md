@@ -1,119 +1,82 @@
-# Sprint 3 — Ação "Perdeu" no Pré-vendas (Desqualificação)
+# Sprint 4 — Histórico e Auditoria da Qualificação
 
-Trocar o modal de perda padrão por um modal de **Desqualificação** dedicado quando a oportunidade está em pipeline `qualification`, mover para a etapa **Desqualificado**, opcionalmente duplicar para o funil **REMARKETING** e evitar duplicidade ativa.
+Registrar 3 novos tipos de eventos em `timeline_events` (aparecem na aba **Histórico** da oportunidade) usando o logger central `src/services/crm/timeline-logger.ts`. Sem mudança de schema: a tabela já tem `metadata jsonb`, `actor_user_id`, `timestamp`. Apenas adicionamos novos valores de `activity_type` (`qualification_score_updated`, `lead_disqualified`, `sales_handoff_blocked`).
 
-## 1. Banco de dados (1 migração)
-
-Adicionar colunas à `opportunities` (todas nullable, sem default agressivo):
-
-- `qualification_loss_reason TEXT` — slug do motivo (19 opções fixas).
-- `remarketing_source TEXT` — ex.: `pre_sales_disqualification`.
-- `remarketing_reason TEXT` — cópia do motivo + observação para uso da fila de remarketing.
-- `remarketing_status TEXT` — default `null`; setado `'pending'` na duplicata.
-- `remarketing_created_at TIMESTAMPTZ`.
-- Índice parcial:  
-  `CREATE INDEX IF NOT EXISTS idx_opportunities_remarketing_dedup ON opportunities (source_opportunity_id) WHERE remarketing_source IS NOT NULL AND deleted_at IS NULL;`
-
-Reusamos a coluna existente **`source_opportunity_id`** como `original_opportunity_id` (mesma semântica de handoff). Nada em RLS muda; políticas atuais já cobrem.
-
-## 2. Constantes de domínio (frontend)
-
-**Novo:** `src/lib/qualification/disqualifyReasons.ts`
-
-Enum estático com as **19 opções** (slug + label) conforme briefing:
-
-```
-sem_evento, sem_data, sem_local, sem_escopo_minimo,
-sem_conexoes, sem_finalidade, sem_urgencia, sem_decisor,
-sem_proximo_passo, cliente_pesquisando, pedido_generico_preco,
-baixa_maturidade, nao_respondeu, nao_visualizou_proposta,
-nao_precisa_solucao, fora_icp, concorrente_escolhido,
-preco_inviavel, outro
-```
-
-## 3. Service de desqualificação
-
-**Novo:** `src/services/crm/disqualify.ts`
+## 1. `timeline-logger.ts` — 3 novos helpers
 
 ```ts
-disqualifyPreSalesOpportunity(opportunityId, {
-  reasonSlug, observation, createRemarketing
-}): Promise<{ disqualified: true; duplicated: boolean; remarketingExisted: boolean; remarketingOpportunityId?: string }>
+logQualificationScoreEvent(opportunityId, {
+  previousScore, nextScore,
+  previousTier, nextTier,
+  pendingBlockers // string[]
+})
+// type: 'score', activity_type: 'qualification_score_updated'
+// title: "Score de Qualificação atualizado: {prev}→{next} ({tierPrev} → {tierNext})"
+
+logDisqualificationEvent(opportunityId, {
+  reasonSlug, reasonLabel, observation,
+  remarketingCreated, remarketingOpportunityId, remarketingExisted
+})
+// type: 'audit', activity_type: 'lead_disqualified'
+// title: "Lead desqualificado no Pré-vendas: {reasonLabel}"
+
+logSalesHandoffBlockedEvent(opportunityId, {
+  currentScore, requiredScore, pendingBlockers
+})
+// type: 'audit', activity_type: 'sales_handoff_blocked'
+// title: "Tentativa bloqueada de passagem para Vendas"
 ```
 
-Passos:
+Cada helper preenche `metadata` com todos os campos relevantes (usuário e timestamp já vêm do logger). Erros não bloqueiam o fluxo principal (try/catch já existe no logger).
 
-1. Carrega `opportunities` + `accounts(id,nome_fantasia,razao_social)` + `contacts(id,nome,emails)` + `pipeline:pipelines(pipeline_type,organization_id)`. Valida que `pipeline_type='qualification'`.
-2. Resolve `desqualificadoStageId` em `stages` do mesmo pipeline com `name ILIKE 'desqualificad%'` (`order_index DESC` para pegar a final). Fallback: mantém `stage_id` atual e loga warn (não bloqueia).
-3. **Update** na oportunidade original:
-   - `status='lost'`, `stage_id=desqualificadoStageId`
-   - `qualification_loss_reason=reasonSlug`
-   - `loss_comment=observation || null`
-   - `closed_at=now`, `updated_at=now`
-   - `closed_by` é setado por trigger existente (`closed_at` é fonte da verdade — Core rule respeitada).
-   - Limpa score/AI fields como `markOpportunityAsLost` faz.
-4. **win_loss_records**: upsert com `outcome='lost'`, `reason_id=null`, `reason_seller=observation`, `loss_accountability='unknown'`. Apenas para manter tracking consistente.
-5. **Anti-duplicidade**: query `from('opportunities').select('id').eq('source_opportunity_id', opportunityId).eq('remarketing_source','pre_sales_disqualification').is('deleted_at', null).in('status', ['new','open']).limit(1)`. Se existir → retorna `remarketingExisted=true, duplicated=false`.
-6. Se `createRemarketing && !remarketingExisted`:
-   - Resolve **REMARKETING pipeline**: `pipelines` da org com `pipeline_type='renewal'` e `name ILIKE '%remarketing%'` (limit 1). Se ausente → `duplicated=false` + toast "Funil Remarketing não configurado".
-   - Stage inicial: menor `order_index`.
-   - Insert nova opportunity copiando: `title` (mantém UPPERCASE — trigger já força), `account_id`, `contact_id`, `owner_user_id`, `origem`, `valor_previsto` (se houver), `produto` se houver. Define `pipeline_id`, `stage_id`, `status='new'`, `source_opportunity_id=opportunityId`, `remarketing_source='pre_sales_disqualification'`, `remarketing_reason=reasonSlug + (observation ? ' — ' + observation : '')`, `remarketing_status='pending'`, `remarketing_created_at=now`.
-   - **Custom form values**: lê linha de `custom_form_values` do checklist obrigatório (entity_id=original) e insere clone para a nova entity_id (mesma `custom_form_id`, mesmos `values` — herda nome/data/local do evento, conexões, equipamentos, finalidade). `filled_by` = usuário atual; `filled_at=now`.
-7. Chama `processPendingWorkflows(opportunityId)` (mesmo padrão de `lossMutation`).
-8. Retorna `{ disqualified: true, duplicated: !!createRemarketing && !remarketingExisted, remarketingExisted, remarketingOpportunityId }`.
+## 2. Disparadores
 
-## 4. UI — `DisqualifyLeadModal`
+### a) Score atualizado — `src/hooks/useOpportunityQualificationScore.ts`
 
-**Novo:** `src/components/opportunity/DisqualifyLeadModal.tsx`
+- `useEffect` observa `(score, classification.tier)`.
+- Mantém um **ref local** `lastLogged` por instância **+ um Map module-level** `qualScoreLastSignatureByOpp: Map<opportunityId, {score, tier}>` para deduplicar entre múltiplos componentes que montam o hook.
+- Regra "mudança relevante": **muda o tier** OU `|delta| ≥ 10` pontos.
+- Não loga primeiro valor (sem `previous`).
+- Não loga durante `isLoading`.
+- Chama `logQualificationScoreEvent` com `previous/next/tier/blockers`.
 
-Campos:
-- **Motivo da desqualificação** (`Select`, obrigatório) — 19 opções.
-- **Observação** (`Textarea`, opcional, max 2000 char).
-- **Toggle** "Sim, criar oportunidade no funil Remarketing" (default ON).
-- Botões: Cancelar / **Confirmar desqualificação** (destructive).
+### b) Desqualificação — `src/services/crm/disqualify.ts`
 
-Pré-detecção de duplicata:
-- Ao abrir, dispara `useQuery` que consulta a mesma condição do passo 5 acima. Se já existir → toggle fica **desabilitado e marcado como off**, com banner informativo: *"Lead desqualificado e já existente no Remarketing."* (com link "Abrir oportunidade no Remarketing").
+- Ao final de `disqualifyPreSalesOpportunity`, antes do `return`, chamar `logDisqualificationEvent` com:
+  - `reasonSlug`, `reasonLabel` (do mapa), `observation`
+  - `remarketingCreated = result.duplicated`
+  - `remarketingExisted = result.remarketingExisted`
+  - `remarketingOpportunityId = result.remarketingOpportunityId`
+- Wrap em try/catch silencioso.
 
-Submit:
-- Chama mutation que invoca `disqualifyPreSalesOpportunity`.
-- Em sucesso: invalida cache, fecha modal. Toast:
-  - `duplicated=true` → "Lead desqualificado. Nova oportunidade criada no Remarketing."
-  - `remarketingExisted=true` → "Lead desqualificado e já existente no Remarketing."
-  - sem remarketing pipeline → "Lead desqualificado. Funil Remarketing não configurado."
-  - toggle off → "Lead desqualificado."
+### c) Bloqueio handoff — `src/components/opportunity/EditOpportunityModal.tsx`
 
-## 5. Roteamento no `OpportunityDetail.tsx`
+- No ponto em que detecta `isQualToSalesMove && !canMoveToSales` antes de abrir o `QualificationGateModal`, chamar `logSalesHandoffBlockedEvent` com `currentScore=qualScore.score`, `requiredScore=75`, `pendingBlockers=qualScore.blockers`.
+- Anti-spam: usa o mesmo padrão de Map module-level (`handoffBlockedLastLoggedByOpp`) com janela de 60s para evitar enxurrada se o usuário tentar várias vezes seguidas.
 
-- `handleLost()` decide: se `opportunity.pipeline?.pipeline_type === 'qualification'`, abre `DisqualifyLeadModal`; senão, abre `LossReasonModal` (comportamento atual).
-- Nova `disqualifyMutation` separada da `lossMutation` para isolar erros e mensagens.
-- `LossReasonModal` continua intacto (regras de Vendas).
+## 3. Renderização no histórico
 
-## 6. Arquivos
+A `OpportunityHistoryTab` já renderiza `timeline_events` agrupando por `type/activity_type` com fallback genérico. Vamos verificar se renderiza `activity_type` desconhecido com ícone neutro — se sim, nada a fazer; se não, adicionamos labels/icones rápidos para os 3 novos `activity_type`. (Confirmo na implementação.)
 
-**Novos**
-- `supabase/migrations/<ts>_qualification_disqualify_and_remarketing.sql`
-- `src/lib/qualification/disqualifyReasons.ts`
-- `src/services/crm/disqualify.ts`
-- `src/components/opportunity/DisqualifyLeadModal.tsx`
+## 4. Arquivos
 
 **Editados**
-- `src/pages/OpportunityDetail.tsx` — roteamento + mutation.
+- `src/services/crm/timeline-logger.ts` — 3 funções.
+- `src/services/crm/disqualify.ts` — chamada do logger.
+- `src/hooks/useOpportunityQualificationScore.ts` — change detection + log.
+- `src/components/opportunity/EditOpportunityModal.tsx` — log no gate.
+- (Opcional) `src/components/opportunity/OpportunityHistoryTab.tsx` — labels/ícones para os 3 novos `activity_type`.
 
-Nada em forecast, revenue, dashboards ou OTE muda.
+## 5. Riscos & decisões
 
-## 7. Riscos & decisões
+- **Sem migração**: usamos `timeline_events.metadata` (jsonb). Convenções existentes preservadas.
+- **Dedupe de score**: regra "tier change OU Δ≥10 pts" + Map de sessão evita ruído sem deixar de capturar eventos relevantes.
+- **Falha de log nunca bloqueia** desqualificação/score/handoff (try/catch interno do logger).
+- **PII**: observação é gravada no `metadata` — ok, mesma política que `loss_comment`/notes existentes.
 
-- **Reuso de `source_opportunity_id`**: alinha com `mem://crm/deal-handoff-data-continuity` e com a unique index existente. Tratamos `original_opportunity_id` do briefing como alias semântico.
-- **`closed_at` imutável (Core rule)**: respeitado — só preenchido na transição `open → lost`. Reabertura existente já trata `closed_at` corretamente.
-- **Stage "Desqualificado"** pode não existir em todas as orgs com `qualification` — fallback documentado (mantém stage atual + warn).
-- **Funil REMARKETING** detectado por `pipeline_type='renewal' AND name ILIKE '%remarketing%'`; se ausente, apenas pula a duplicação sem falhar a desqualificação.
-- **Win-loss reporting**: gravamos `win_loss_records` mas com `reason_id=null`. Charts agregam por motivo via `qualification_loss_reason` numa sprint futura (fora deste escopo). Hoje aparecerá como "Sem motivo classificado" em Win/Loss Hub para esses casos — risco menor, pipeline qualification já tem visão própria.
-- **Trigger UPPERCASE** mantém título consistente na duplicata automaticamente.
+## 6. Validação manual
 
-## 8. Validação manual
-
-1. Em PRÉ VENDAS, clicar **Perdeu** → modal "Desqualificar lead" abre (e não o de Vendas).
-2. Selecionar motivo + observação, toggle ON, confirmar → original vira `lost` no stage Desqualificado e nova oportunidade aparece em REMARKETING com mesma empresa/contato/owner e checklist herdado.
-3. Tentar desqualificar de novo o mesmo lead → toggle desabilitado + banner "já existente no Remarketing".
-4. Em VENDAS, clicar **Perdeu** → modal atual `LossReasonModal` continua aparecendo.
+1. Editar checklist da oportunidade em PRÉ VENDAS, mudando urgência/decisor → histórico mostra "Score de Qualificação atualizado: X→Y".
+2. Tentar mover lead com score < 75 para Vendas → gate abre + histórico ganha "Tentativa bloqueada de passagem para Vendas".
+3. Desqualificar lead com toggle ON → histórico mostra "Lead desqualificado no Pré-vendas: {motivo}" com `remarketing_created=true` no metadata.
+4. Desqualificar lead com toggle OFF → mesmo evento, `remarketing_created=false`.
