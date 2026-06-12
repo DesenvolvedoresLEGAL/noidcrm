@@ -17,9 +17,10 @@ import { IcpIntelligencePanel } from '@/components/intelligence/icp/IcpIntellige
 import { QualifiedQueuePanel } from '@/components/intelligence/queue/QualifiedQueuePanel';
 import { AutopilotPanel } from '@/components/intelligence/autopilot/AutopilotPanel';
 import { RevenueAttributionPanel } from '@/components/intelligence/revenue/RevenueAttributionPanel';
+import { GtmPerformancePanel } from '@/components/intelligence/gtm/GtmPerformancePanel';
 import { Compass, Sparkles } from 'lucide-react';
 
-const VALID_TABS = ['icp', 'queue', 'autopilot', 'revenue', 'sourcing', 'optimization', 'experiments', 'performance'] as const;
+const VALID_TABS = ['icp', 'queue', 'autopilot', 'revenue', 'gtm', 'sourcing', 'optimization', 'experiments', 'performance'] as const;
 type KairosTab = (typeof VALID_TABS)[number];
 
 export default function KairosHub() {
