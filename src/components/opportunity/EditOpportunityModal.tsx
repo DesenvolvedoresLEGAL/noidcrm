@@ -119,7 +119,28 @@ export function EditOpportunityModal({
   const selectedPipeline = pipelines.find((p) => p.id === selectedPipelineId);
   const watchedAccountId = form.watch('account_id');
 
+  const originPipeline = pipelines.find((p) => p.id === opportunity?.pipeline_id);
+  const isQualToSalesMove =
+    originPipeline?.pipeline_type === 'qualification' &&
+    selectedPipeline?.pipeline_type === 'sales' &&
+    originPipeline.id !== selectedPipeline.id;
+
+  const qualScore = useOpportunityQualificationScore({
+    opportunityId: opportunity?.id,
+    pipelineId: opportunity?.pipeline_id,
+    account: opportunity?.accounts ?? opportunity?.account ?? null,
+    contact: opportunity?.contacts ?? opportunity?.contact ?? null,
+  });
+
+  const [gateOpen, setGateOpen] = useState(false);
+
   const onSubmit = async (data: EditOpportunityFormData) => {
+    // Sprint 2: Block qualification → sales handoff if checklist incomplete.
+    if (isQualToSalesMove && !qualScore.isLoading && !qualScore.canMoveToSales) {
+      setGateOpen(true);
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       // Convert Date to ISO UTC timestamp
