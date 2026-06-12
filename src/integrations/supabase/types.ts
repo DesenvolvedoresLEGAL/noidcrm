@@ -18142,8 +18142,13 @@ export type Database = {
           prob: number | null
           produto: string | null
           prospect_id: string | null
+          qualification_loss_reason: string | null
           qualified_at: string | null
           qualified_by_user_id: string | null
+          remarketing_created_at: string | null
+          remarketing_reason: string | null
+          remarketing_source: string | null
+          remarketing_status: string | null
           requires_seller_classification: boolean
           response_velocity: number | null
           risk_level: string | null
@@ -18251,8 +18256,13 @@ export type Database = {
           prob?: number | null
           produto?: string | null
           prospect_id?: string | null
+          qualification_loss_reason?: string | null
           qualified_at?: string | null
           qualified_by_user_id?: string | null
+          remarketing_created_at?: string | null
+          remarketing_reason?: string | null
+          remarketing_source?: string | null
+          remarketing_status?: string | null
           requires_seller_classification?: boolean
           response_velocity?: number | null
           risk_level?: string | null
@@ -18360,8 +18370,13 @@ export type Database = {
           prob?: number | null
           produto?: string | null
           prospect_id?: string | null
+          qualification_loss_reason?: string | null
           qualified_at?: string | null
           qualified_by_user_id?: string | null
+          remarketing_created_at?: string | null
+          remarketing_reason?: string | null
+          remarketing_source?: string | null
+          remarketing_status?: string | null
           requires_seller_classification?: boolean
           response_velocity?: number | null
           risk_level?: string | null
