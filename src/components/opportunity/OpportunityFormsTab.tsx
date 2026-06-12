@@ -31,6 +31,15 @@ export function OpportunityFormsTab({
   const { data: publicForms = [], isLoading: loadingPublicForms } = useOpportunityPublicForms(opportunityId);
   const { togglePublicForm, isToggling } = useOpportunityPublicFormMutations();
 
+  const isQualificationPipeline =
+    opportunity?.pipeline?.pipeline_type === 'qualification';
+  const qualScore = useOpportunityQualificationScore({
+    opportunityId,
+    pipelineId,
+    account,
+    contact,
+  });
+
   const getPublicFormData = (formId: string) => {
     return publicForms.find(pf => pf.form_id === formId);
   };
