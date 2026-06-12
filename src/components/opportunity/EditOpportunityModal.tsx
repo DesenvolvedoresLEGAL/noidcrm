@@ -46,6 +46,10 @@ import { OriginSelect } from '@/components/opportunity/OriginSelect';
 import { getOpportunityTags, setOpportunityTags } from '@/hooks/useOrganizationTags';
 import { useOpportunityQualificationScore } from '@/hooks/useOpportunityQualificationScore';
 import { QualificationGateModal } from '@/components/opportunity/qualification/QualificationGateModal';
+import { logSalesHandoffBlockedEvent } from '@/services/crm/timeline-logger';
+
+/** Module-level anti-spam (60s window) for sales handoff blocked events. */
+const handoffBlockedLastLoggedByOpp = new Map<string, number>();
 
 const editOpportunitySchema = z.object({
   title: z.string().min(1, 'Título é obrigatório'),
@@ -137,6 +141,20 @@ export function EditOpportunityModal({
   const onSubmit = async (data: EditOpportunityFormData) => {
     // Sprint 2: Block qualification → sales handoff if checklist incomplete.
     if (isQualToSalesMove && !qualScore.isLoading && !qualScore.canMoveToSales) {
+      const oppId = opportunity?.id as string | undefined;
+      if (oppId) {
+        const last = handoffBlockedLastLoggedByOpp.get(oppId) || 0;
+        if (Date.now() - last > 60_000) {
+          handoffBlockedLastLoggedByOpp.set(oppId, Date.now());
+          logSalesHandoffBlockedEvent(oppId, {
+            currentScore: qualScore.total,
+            requiredScore: 75,
+            pendingBlockers: qualScore.blockers,
+            fromPipelineId: originPipeline?.id,
+            toPipelineId: selectedPipeline?.id,
+          }).catch((err) => console.error('[handoffBlocked] log failed', err));
+        }
+      }
       setGateOpen(true);
       return;
     }

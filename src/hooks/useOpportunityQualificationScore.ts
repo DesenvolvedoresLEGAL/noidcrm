@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useCustomFormsByPipeline } from '@/hooks/useCustomForms';
 import { useCustomFormValues } from '@/hooks/useCustomFormValues';
@@ -7,6 +7,13 @@ import {
   computeQualificationScore,
   QualificationScoreResult,
 } from '@/lib/qualification/qualificationScore';
+import { logQualificationScoreEvent } from '@/services/crm/timeline-logger';
+
+/** Module-level dedupe across multiple hook instances rendering the same opp. */
+const qualScoreLastSignatureByOpp = new Map<
+  string,
+  { score: number; tier: string }
+>();
 
 const QUALIFICATION_KEYS = [
   'nome_evento',
@@ -92,9 +99,36 @@ export function useOpportunityQualificationScore({
     return computeQualificationScore(valuesByKey, { hasAccount, hasContact });
   }, [savedValues, fieldMap, account, contact]);
 
+  const isLoading = loadingForms || loadingValues || loadingFields;
+
+  // Sprint 4 — log relevant score changes (tier change or |delta| ≥ 10)
+  const initializedRef = useRef(false);
+  useEffect(() => {
+    if (!opportunityId || isLoading) return;
+    const signature = { score: result.total, tier: result.classification.tier };
+    const last = qualScoreLastSignatureByOpp.get(opportunityId);
+    if (!last) {
+      qualScoreLastSignatureByOpp.set(opportunityId, signature);
+      initializedRef.current = true;
+      return;
+    }
+    const tierChanged = last.tier !== signature.tier;
+    const deltaSig = Math.abs(signature.score - last.score) >= 10;
+    if (!tierChanged && !deltaSig) return;
+    qualScoreLastSignatureByOpp.set(opportunityId, signature);
+    logQualificationScoreEvent(opportunityId, {
+      previousScore: last.score,
+      nextScore: signature.score,
+      previousTier: last.tier,
+      nextTier: signature.tier,
+      nextTierLabel: result.classification.label,
+      pendingBlockers: result.blockers,
+    }).catch((err) => console.error('[qualScore] log failed', err));
+  }, [opportunityId, isLoading, result.total, result.classification.tier, result.classification.label, result.blockers]);
+
   return {
     ...result,
-    isLoading: loadingForms || loadingValues || loadingFields,
+    isLoading,
     formId: form?.id,
     hasForm: !!form,
   };

@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { DisqualifyReasonSlug } from '@/lib/qualification/disqualifyReasons';
 import { DISQUALIFY_REASON_LABEL } from '@/lib/qualification/disqualifyReasons';
+import { logDisqualificationEvent } from './timeline-logger';
 
 export interface DisqualifyParams {
   reasonSlug: DisqualifyReasonSlug;
@@ -149,138 +150,149 @@ export async function disqualifyPreSalesOpportunity(
     console.error('[disqualify] win_loss_records (non-blocking)', err);
   }
 
+  // Holds the final result so we can log once at the end.
+  let result: DisqualifyResult;
+
   // 5. Anti-duplication check
   const existing = await findActiveRemarketingDuplicate(opportunityId);
   if (existing) {
-    return {
+    result = {
       disqualified: true,
       duplicated: false,
       remarketingExisted: true,
       remarketingPipelineMissing: false,
       remarketingOpportunityId: existing.id,
     };
-  }
-
-  if (!createRemarketing) {
-    return {
+  } else if (!createRemarketing) {
+    result = {
       disqualified: true,
       duplicated: false,
       remarketingExisted: false,
       remarketingPipelineMissing: false,
     };
-  }
+  } else {
+    // 6. Resolve REMARKETING pipeline
+    const { data: remarketingPipeline } = await supabase
+      .from('pipelines')
+      .select('id, organization_id')
+      .eq('organization_id', orgId)
+      .eq('pipeline_type', 'renewal')
+      .ilike('name', '%remarketing%')
+      .limit(1)
+      .maybeSingle();
 
-  // 6. Resolve REMARKETING pipeline
-  const { data: remarketingPipeline } = await supabase
-    .from('pipelines')
-    .select('id, organization_id')
-    .eq('organization_id', orgId)
-    .eq('pipeline_type', 'renewal')
-    .ilike('name', '%remarketing%')
-    .limit(1)
-    .maybeSingle();
+    const { data: firstStage } = remarketingPipeline
+      ? await supabase
+          .from('stages')
+          .select('id')
+          .eq('pipeline_id', remarketingPipeline.id as string)
+          .order('order_index', { ascending: true })
+          .limit(1)
+          .maybeSingle()
+      : { data: null };
 
-  if (!remarketingPipeline) {
-    return {
-      disqualified: true,
-      duplicated: false,
-      remarketingExisted: false,
-      remarketingPipelineMissing: true,
-    };
-  }
-
-  const { data: firstStage } = await supabase
-    .from('stages')
-    .select('id')
-    .eq('pipeline_id', remarketingPipeline.id as string)
-    .order('order_index', { ascending: true })
-    .limit(1)
-    .maybeSingle();
-
-  if (!firstStage) {
-    return {
-      disqualified: true,
-      duplicated: false,
-      remarketingExisted: false,
-      remarketingPipelineMissing: true,
-    };
-  }
-
-  // 7. Insert remarketing duplicate
-  const remarketingReason = observation?.trim()
-    ? `${reasonLabel} — ${observation.trim()}`
-    : reasonLabel;
-
-  const insertPayload: Record<string, any> = {
-    organization_id: orgId,
-    pipeline_id: remarketingPipeline.id,
-    stage_id: firstStage.id,
-    title: opp.title, // trigger forces uppercase
-    account_id: opp.account_id,
-    contact_id: opp.contact_id,
-    owner_user_id: opp.owner_user_id,
-    origem: (opp as any).origem ?? null,
-    valor_previsto: (opp as any).valor_previsto ?? null,
-    produto: (opp as any).produto ?? null,
-    status: 'new',
-    source_opportunity_id: opportunityId,
-    remarketing_source: 'pre_sales_disqualification',
-    remarketing_reason: remarketingReason,
-    remarketing_status: 'pending',
-    remarketing_created_at: nowIso,
-  };
-
-  const { data: inserted, error: insErr } = await supabase
-    .from('opportunities')
-    .insert(insertPayload as any)
-    .select('id')
-    .single();
-
-  if (insErr) {
-    // If unique handoff index trips (race), treat as already existed
-    if ((insErr as any).code === '23505') {
-      const dup = await findActiveRemarketingDuplicate(opportunityId);
-      return {
+    if (!remarketingPipeline || !firstStage) {
+      result = {
         disqualified: true,
         duplicated: false,
-        remarketingExisted: true,
-        remarketingPipelineMissing: false,
-        remarketingOpportunityId: dup?.id,
+        remarketingExisted: false,
+        remarketingPipelineMissing: true,
       };
-    }
-    console.error('[disqualify] insert remarketing error', insErr);
-    throw new Error(insErr.message);
-  }
+    } else {
+      // 7. Insert remarketing duplicate
+      const remarketingReason = observation?.trim()
+        ? `${reasonLabel} — ${observation.trim()}`
+        : reasonLabel;
 
-  // 8. Clone custom_form_values rows from original → duplicate (checklist inheritance)
-  try {
-    const { data: formRows } = await supabase
-      .from('custom_form_values')
-      .select('custom_form_id, values, entity_type')
-      .eq('entity_id', opportunityId);
-
-    if (formRows && formRows.length > 0) {
-      const { data: userData } = await supabase.auth.getUser();
-      const clones = formRows.map((r: any) => ({
+      const insertPayload: Record<string, any> = {
         organization_id: orgId,
-        custom_form_id: r.custom_form_id,
-        entity_id: inserted!.id,
-        entity_type: r.entity_type,
-        values: r.values,
-        filled_by: userData?.user?.id ?? null,
-        filled_at: nowIso,
-      }));
-      await supabase.from('custom_form_values').insert(clones);
+        pipeline_id: remarketingPipeline.id,
+        stage_id: firstStage.id,
+        title: opp.title,
+        account_id: opp.account_id,
+        contact_id: opp.contact_id,
+        owner_user_id: opp.owner_user_id,
+        origem: (opp as any).origem ?? null,
+        valor_previsto: (opp as any).valor_previsto ?? null,
+        produto: (opp as any).produto ?? null,
+        status: 'new',
+        source_opportunity_id: opportunityId,
+        remarketing_source: 'pre_sales_disqualification',
+        remarketing_reason: remarketingReason,
+        remarketing_status: 'pending',
+        remarketing_created_at: nowIso,
+      };
+
+      const { data: inserted, error: insErr } = await supabase
+        .from('opportunities')
+        .insert(insertPayload as any)
+        .select('id')
+        .single();
+
+      if (insErr) {
+        if ((insErr as any).code === '23505') {
+          const dup = await findActiveRemarketingDuplicate(opportunityId);
+          result = {
+            disqualified: true,
+            duplicated: false,
+            remarketingExisted: true,
+            remarketingPipelineMissing: false,
+            remarketingOpportunityId: dup?.id,
+          };
+        } else {
+          console.error('[disqualify] insert remarketing error', insErr);
+          throw new Error(insErr.message);
+        }
+      } else {
+        // 8. Clone custom_form_values rows from original → duplicate
+        try {
+          const { data: formRows } = await supabase
+            .from('custom_form_values')
+            .select('custom_form_id, values, entity_type')
+            .eq('entity_id', opportunityId);
+
+          if (formRows && formRows.length > 0) {
+            const { data: userData } = await supabase.auth.getUser();
+            const clones = formRows.map((r: any) => ({
+              organization_id: orgId,
+              custom_form_id: r.custom_form_id,
+              entity_id: inserted!.id,
+              entity_type: r.entity_type,
+              values: r.values,
+              filled_by: userData?.user?.id ?? null,
+              filled_at: nowIso,
+            }));
+            await supabase.from('custom_form_values').insert(clones);
+          }
+        } catch (err) {
+          console.error('[disqualify] cloning custom_form_values (non-blocking)', err);
+        }
+
+        result = {
+          disqualified: true,
+          duplicated: true,
+          remarketingExisted: false,
+          remarketingPipelineMissing: false,
+          remarketingOpportunityId: inserted!.id,
+        };
+      }
     }
-  } catch (err) {
-    console.error('[disqualify] cloning custom_form_values (non-blocking)', err);
   }
 
-  return {
-    disqualified: true,
-    duplicated: true,
-    remarketingExisted: false,
-    remarketingPipelineMissing: false,
-    remarketingOpportunityId: inserted!.id,
-  };
+  // 9. Timeline log (non-blocking)
+  try {
+    await logDisqualificationEvent(opportunityId, {
+      reasonSlug,
+      reasonLabel,
+      observation,
+      remarketingCreated: result.duplicated,
+      remarketingExisted: result.remarketingExisted,
+      remarketingOpportunityId: result.remarketingOpportunityId,
+      remarketingPipelineMissing: result.remarketingPipelineMissing,
+    });
+  } catch (err) {
+    console.error('[disqualify] timeline log (non-blocking)', err);
+  }
+
+  return result;
 }
