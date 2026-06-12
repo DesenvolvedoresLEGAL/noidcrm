@@ -26,6 +26,8 @@ import { OwnerSelector } from './OwnerSelector';
 import { SidebarDataSection } from './sidebar/SidebarDataSection';
 import { QuickIndicators } from './sidebar/QuickIndicators';
 import { WinLossRiskAlerts } from '@/components/opportunities/WinLossRiskAlerts';
+import { useOpportunityQualificationScore } from '@/hooks/useOpportunityQualificationScore';
+import { Target } from 'lucide-react';
 
 interface OpportunitySidebarProps {
   opportunity: any;
