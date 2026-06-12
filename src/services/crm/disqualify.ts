@@ -232,7 +232,7 @@ export async function disqualifyPreSalesOpportunity(
 
   const { data: inserted, error: insErr } = await supabase
     .from('opportunities')
-    .insert(insertPayload)
+    .insert(insertPayload as any)
     .select('id')
     .single();
 
