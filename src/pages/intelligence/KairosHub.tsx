@@ -17,9 +17,10 @@ import { IcpIntelligencePanel } from '@/components/intelligence/icp/IcpIntellige
 import { QualifiedQueuePanel } from '@/components/intelligence/queue/QualifiedQueuePanel';
 import { AutopilotPanel } from '@/components/intelligence/autopilot/AutopilotPanel';
 import { RevenueAttributionPanel } from '@/components/intelligence/revenue/RevenueAttributionPanel';
+import { GtmPerformancePanel } from '@/components/intelligence/gtm/GtmPerformancePanel';
 import { Compass, Sparkles } from 'lucide-react';
 
-const VALID_TABS = ['icp', 'queue', 'autopilot', 'revenue', 'sourcing', 'optimization', 'experiments', 'performance'] as const;
+const VALID_TABS = ['icp', 'queue', 'autopilot', 'revenue', 'gtm', 'sourcing', 'optimization', 'experiments', 'performance'] as const;
 type KairosTab = (typeof VALID_TABS)[number];
 
 export default function KairosHub() {
@@ -56,11 +57,12 @@ export default function KairosHub() {
         />
 
         <Tabs value={activeTab} onValueChange={handleTabChange}>
-          <TabsList className="grid w-full grid-cols-2 md:grid-cols-8 max-w-6xl">
+          <TabsList className="grid w-full grid-cols-2 md:grid-cols-9 max-w-6xl">
             <TabsTrigger value="icp">🎯 ICP Intelligence</TabsTrigger>
             <TabsTrigger value="queue">📥 Qualified Queue</TabsTrigger>
             <TabsTrigger value="autopilot">🚀 Autopilot</TabsTrigger>
             <TabsTrigger value="revenue">💰 Revenue Attribution</TabsTrigger>
+            <TabsTrigger value="gtm">📊 GTM Performance</TabsTrigger>
             <TabsTrigger value="sourcing">🧭 Sourcing</TabsTrigger>
             <TabsTrigger value="optimization">⚡ Optimization</TabsTrigger>
             <TabsTrigger value="experiments">🧪 Experiments</TabsTrigger>
@@ -82,6 +84,11 @@ export default function KairosHub() {
           <TabsContent value="revenue" className="space-y-4 md:space-y-6 mt-4">
             <RevenueAttributionPanel />
           </TabsContent>
+
+          <TabsContent value="gtm" className="space-y-4 md:space-y-6 mt-4">
+            <GtmPerformancePanel />
+          </TabsContent>
+
 
 
 

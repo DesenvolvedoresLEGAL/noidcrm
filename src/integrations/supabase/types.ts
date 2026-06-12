@@ -15217,6 +15217,78 @@ export type Database = {
         }
         Relationships: []
       }
+      kairos_gtm_recommendations: {
+        Row: {
+          confidence_score: number | null
+          created_at: string
+          dedup_key: string
+          description: string
+          id: string
+          impact_estimate: number | null
+          metric_snapshot: Json
+          organization_id: string
+          recommendation_type: string
+          severity: string
+          status: string
+          target_id: string | null
+          target_label: string | null
+          target_type: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          confidence_score?: number | null
+          created_at?: string
+          dedup_key: string
+          description: string
+          id?: string
+          impact_estimate?: number | null
+          metric_snapshot?: Json
+          organization_id: string
+          recommendation_type: string
+          severity?: string
+          status?: string
+          target_id?: string | null
+          target_label?: string | null
+          target_type: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          confidence_score?: number | null
+          created_at?: string
+          dedup_key?: string
+          description?: string
+          id?: string
+          impact_estimate?: number | null
+          metric_snapshot?: Json
+          organization_id?: string
+          recommendation_type?: string
+          severity?: string
+          status?: string
+          target_id?: string | null
+          target_label?: string | null
+          target_type?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kairos_gtm_recommendations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kairos_gtm_recommendations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_report_legacy_retirement_readiness_v2"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
       kairos_qualified_queue: {
         Row: {
           apollo_status: string | null
@@ -32442,6 +32514,88 @@ export type Database = {
           },
         ]
       }
+      kairos_apollo_performance_summary: {
+        Row: {
+          batch_run_id: string | null
+          contacts_found: number | null
+          contacts_revealed: number | null
+          credits_used: number | null
+          decision_makers: number | null
+          enriched: number | null
+          executions: number | null
+          failed: number | null
+          icp_category: string | null
+          icp_id: string | null
+          organization_id: string | null
+          partial: number | null
+          skipped: number | null
+        }
+        Relationships: []
+      }
+      kairos_gtm_performance_summary: {
+        Row: {
+          apollo_credits_used: number | null
+          apollo_dm_found_count: number | null
+          apollo_executed_count: number | null
+          approach_ready_count: number | null
+          batch_run_id: string | null
+          captured_count: number | null
+          contact_revealed_count: number | null
+          decision_maker_found_count: number | null
+          enriched_count: number | null
+          event_id: string | null
+          event_name: string | null
+          icp_cluster_id: string | null
+          icp_cluster_name: string | null
+          last_capture_at: string | null
+          lost_count: number | null
+          opportunities_created_count: number | null
+          organization_id: string | null
+          owner_id: string | null
+          primary_contact_department: string | null
+          promoted_to_crm_count: number | null
+          proposals_created_count: number | null
+          proposals_sent_count: number | null
+          proposals_viewed_count: number | null
+          queued_count: number | null
+          revenue_amount: number | null
+          sdr_id: string | null
+          sdr_ready_count: number | null
+          source_type: string | null
+          valid_revenue_amount: number | null
+          won_count: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kairos_batch_run_items_run_id_fkey"
+            columns: ["batch_run_id"]
+            isOneToOne: false
+            referencedRelation: "kairos_batch_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kairos_qualified_queue_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kairos_qualified_queue_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_report_legacy_retirement_readiness_v2"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "prospects_icp_profile_id_fkey"
+            columns: ["icp_cluster_id"]
+            isOneToOne: false
+            referencedRelation: "icp_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       kairos_revenue_attribution_summary: {
         Row: {
           active_attributions: number | null
@@ -36124,6 +36278,10 @@ export type Database = {
       }
       fn_cnae_to_segmento: { Args: { p_cnae: string }; Returns: string }
       fn_infer_segmento_from_name: { Args: { p_nome: string }; Returns: string }
+      fn_kairos_compute_gtm_performance: {
+        Args: { p_organization_id: string }
+        Returns: Json
+      }
       fn_kairos_sync_attribution: {
         Args: { p_opportunity_id: string }
         Returns: string
