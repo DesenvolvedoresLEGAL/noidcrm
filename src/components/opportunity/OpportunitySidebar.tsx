@@ -80,8 +80,18 @@ export function OpportunitySidebar({
 
   const temperature = opportunity.temperatura || opportunity.temperature;
 
+  const isQualificationPipeline =
+    opportunity.pipeline?.pipeline_type === 'qualification';
+  const qualScore = useOpportunityQualificationScore({
+    opportunityId: opportunity.id,
+    pipelineId: opportunity.pipeline_id,
+    account: opportunity.accounts ?? opportunity.account ?? null,
+    contact: opportunity.contacts ?? opportunity.contact ?? null,
+  });
+
   return (
     <div className="space-y-3">
+
       {/* Hero Card - Title, Status, Badges, Actions */}
       <div className="bg-card border rounded-lg p-4 space-y-4">
         {/* Title - Editable */}
