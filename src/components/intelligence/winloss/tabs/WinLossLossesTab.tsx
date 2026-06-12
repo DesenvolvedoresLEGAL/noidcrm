@@ -391,6 +391,9 @@ export function WinLossLossesTab({
            opportunity_stage_history; fallback = stage atual. */}
       <LostByStageCard rows={lostStageBreakdown} />
 
+      {/* 7b. Perdas por Canal de Origem (Sprint WL-LOSSES-06) */}
+      <LossOriginBreakdownBlock data={data} />
+
       {/* 8. Motivo Declarado x Motivo Inferido (Sprint WL-LOSS-04 — determinístico)
            Antes dependia exclusivamente de loss_semantic_analyses (IA). Agora usa
            inferência por palavras-chave sobre opportunities.loss_comment vs
