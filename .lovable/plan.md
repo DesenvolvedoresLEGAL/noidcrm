@@ -1,88 +1,58 @@
-# KAI.15 — Apollo Invisible Mode
+# Sprint 1 — Checklist Obrigatório de Qualificação
 
-Transforma Apollo de ação manual em camada de infraestrutura invisível dentro do Kairós. Saída continua sendo a Qualified Queue.
+Adaptar o formulário existente **"Checklist de Locação"** (form id `55fa0451-...`, org `d1b68a0f-...`) para se tornar o **Checklist Obrigatório de Qualificação**, com os 12 campos obrigatórios da pré-venda, vinculado exclusivamente ao funil **PRÉ VENDAS** (`d1b68a0f-...-sales-1`).
 
-## 1. Schema (migration única)
+Apenas configuração de dados (migração) + um pequeno ajuste de UI para a regra condicional do campo 12. Sem mudanças em lógica de negócio.
 
-**`apollo_auto_enrichment_rules`** (1 linha por organização)
-- `enabled` bool default true
-- `minimum_priority_score` int default 180
-- `allowed_quality_labels` text[] default `{high_confidence,usable}`
-- `required_domain` bool default true
-- `allowed_relationship_status` text[] default `{new_prospect}`
-- `allowed_icps` uuid[] (null = todos)
-- `max_contacts_per_company` int default 3
-- `max_apollo_credits_per_day` int default 500
-- `max_apollo_credits_per_batch` int default 200
-- `auto_select_primary_contact` bool default true
-- `auto_reveal_contact` bool default true
-- RLS: leitura organização; escrita admin/manager
+## 1. Migração SQL (única transação)
 
-**`apollo_enrichment_audit`**
-- `batch_run_id`, `prospect_id`, `company_name`, `apollo_status` (`skipped|partial|enriched|failed`), `skip_reason`, `credits_used`, `contacts_found`, `contacts_revealed`, `primary_contact_id`, `decision_maker_found` bool, `icp_id`, `priority_score`
-- RLS: org members select; service_role all
+### 1.1 Renomear o formulário e vincular ao funil
+- `UPDATE custom_forms SET name = 'Checklist Obrigatório de Qualificação', pipeline_ids = ARRAY['d1b68a0f-4e2a-48ce-a03d-19c2751f5f2d-sales-1'] WHERE id = '55fa0451-eadf-43f5-abe5-ae02a85af95c';`
 
-**Extensão `kairos_qualified_queue`**: adiciona `apollo_status`, `contacts_found` int, `primary_contact_name`, `primary_contact_role`, `primary_contact_score`
+### 1.2 Criar/atualizar custom fields (entity_type='opportunity')
+Reaproveitar quando o `field_key` já existe; criar quando faltar. Todos com `is_required = true`.
 
-**Função `fn_apollo_should_run(p_prospect_id, p_rules)`** retorna `(eligible bool, reason text)` aplicando todas as regras de elegibilidade.
+| # | field_key | label | field_type | options |
+|---|-----------|-------|------------|---------|
+| 3 | `nome_evento` | Nome do evento | text | — |
+| 4 | `data_evento` | Data do evento | date | — |
+| 5 | `local_evento` | Local do evento | text | — |
+| 6 | `conexoes_simultaneas` | Quantidade de conexões simultâneas | number | — |
+| 7 | `equipamentos` | Equipamentos que deseja conectar | multi_select | notebook, celular, tablet, totem, máquina de cartão, sistema de credenciamento, TV, câmera, PDV, outro |
+| 8 | `finalidade_uso` | Finalidade de uso | multi_select | vendas no stand, geração de leads, credenciamento, transmissão ao vivo, demonstração de produto, operação interna, pagamento/POS, sistema próprio, backup de internet, outro |
+| 9 | `urgencia_real` | Urgência real | select | Evento em até 3 dias / 4 a 9 dias / 10 a 20 dias / 21 a 30 dias / acima de 30 dias / Sem data definida |
+| 10 | `poder_decisao` | Poder ou influência na decisão | select | Decisor final / Influenciador direto / Comprador/financeiro / Usuário técnico / Apenas pesquisando / Não identificado |
+| 11 | `proximo_passo` | Próximo passo combinado | select | Enviar proposta / Agendar reunião / Validar escopo / Validar orçamento / Aguardar retorno do cliente / Sem próximo passo |
+| 11b | `proximo_passo_obs` | Observação do próximo passo | textarea | — (não obrigatório) |
+| 12 | `permissao_proposta` | Permissão real para proposta | select | Cliente pediu proposta / Cliente validou escopo e pediu preço / Cliente confirmou interesse real / SDR está sugerindo proposta sem pedido claro / Não houve permissão para proposta |
 
-**Função `fn_apollo_credits_used_today(org_id)`** soma `credits_used` de `apollo_enrichment_audit` nas últimas 24h.
+Estratégia: `INSERT ... ON CONFLICT (organization_id, entity_type, field_key) DO UPDATE` para idempotência. Onde já existir (`nome_evento`, `data_evento`→atualmente `dataevent`, `conexoes_simultaneas`, `equipamentos`, `finalidade_uso`), apenas garantir `is_required=true` e atualizar `options` para os enums acima. Os campos antigos não relacionados ao checklist (`briefing`, `frete_pedido`, `tamanho_espaco`, `dataentrega`, `dataretira`, `data_pagamento`, `ambiente`) permanecem em `custom_fields` (não removidos), mas saem do JSON `fields` do formulário.
 
-## 2. Edge Functions
+Nota: o campo atual `dataevent` será mantido como legado; o checklist usará o novo `data_evento`. (Alternativa: renomear `field_key`. Como há valores históricos em `custom_field_values`, prefiro criar o novo `data_evento` para não quebrar dados antigos.)
 
-- **`kairos-apollo-invisible`** — núcleo. Input: `prospect_id`, `batch_run_id?`. Carrega rules, chama `fn_apollo_should_run`, se elegível invoca `run-apollo-enrichment` (existente), aplica filtro de departamentos por ICP, filtro de cargos (Head/Director/Gerente/Coordenador/Especialista; ignora Estagiário/Assistente/Analista Júnior), calcula Contact Score (email 30 + phone 20 + senioridade 20 + linkedin 15 + ICP-role 15), marca `is_primary` no melhor, se `auto_reveal_contact` chama `reveal-apollo-contact` até `max_contacts_per_company`, escreve em `apollo_enrichment_audit`, atualiza `kairos_qualified_queue` (`apollo_status`, contatos, primary). Respeita limites de crédito diário e por batch.
+### 1.3 Reconstruir `custom_forms.fields` (JSONB) na ordem do checklist
+Array em ordem 0…12 com:
+- itens 1 e 2 reaproveitando os nativos já usados: `native-account-nome_fantasia` (Nome da empresa) e `native-contact-nome` (Nome do contato), ambos `is_required: true`.
+- itens 3…12 referenciando os `custom_fields` (source `custom`, `entity_source: opportunity`), todos `is_required: true`.
 
-- **`kairos-apollo-estimate`** — input lista de `prospect_ids` ou `batch_run_id`. Para cada, roda `fn_apollo_should_run` (dry run). Retorna `{eligible_count, ineligible_count, estimated_contacts, estimated_credits, daily_limit, daily_used, batch_limit}`.
+## 2. Front-end (mínimo)
 
-- **`kairos-autopilot-process`** (editar): no estágio `apollo` chama `kairos-apollo-invisible` ao invés de `run-apollo-enrichment` direto. Aborta batch quando `credits_used_batch >= max_apollo_credits_per_batch`.
+### 2.1 Regra condicional do campo 12
+Em `src/components/opportunities/CustomFormRenderer.tsx` (ou equivalente que renderiza `custom_forms`), adicionar lógica: quando `proximo_passo === 'Enviar proposta'`, marcar `permissao_proposta` como obrigatório no validador (independente do `is_required` salvo). Já é obrigatório por padrão, mas a regra cobre futuras alterações.
 
-**Mapa departamentos por ICP** em `_shared/apollo-icp-departments.ts`:
-- AGÊNCIAS: Marketing, Eventos, Operações, Compras
-- ORGANIZADORES: Eventos, Operações, Compras
-- MONTADORAS: Operações, Compras, Projetos
-- PATROCINADORES: Marketing, Trade Marketing, Eventos
-- EXPOSITORES: Marketing, Eventos, Trade, Compras
+Adicionar também validação no submit: se `permissao_proposta` ∈ {"SDR está sugerindo proposta sem pedido claro", "Não houve permissão para proposta"} e o usuário tentar mover a oportunidade para o funil VENDAS, bloquear com toast informativo. (Apenas regra de UI no handoff — sem alterar fluxo oficial de movimentação.)
 
-Resolve ICP do prospect via `icp_profiles.category` (fallback EXPOSITORES).
+> Se preferir manter o sprint estritamente configuracional, removo o bloqueio de handoff e deixo apenas para um sprint futuro.
 
-## 3. Eventos (system_events)
+### 2.2 Nenhuma outra mudança
+- Sem mudar serviços de revenue, sem tocar RLS, sem novas tabelas.
+- Form continua sendo lido pelos hooks existentes `useCustomForms` / `useCustomFormValues`.
 
-`apollo_enrichment_started`, `apollo_enrichment_completed`, `apollo_skipped`, `decision_maker_found`, `contact_revealed` — gravados pela edge function. Consumidos por Learning Loop posteriormente (apenas escrita nesta sprint).
+## 3. Riscos & validação
+- **Risco:** dados históricos preenchidos como `dataevent`/`evento` (label "Endereço Entrega/Retirada" no field_key `evento` 😬) — não serão tocados; novo `data_evento`/`local_evento` começam vazios.
+- **Validação:** após a migração, abrir uma oportunidade do funil PRÉ VENDAS e confirmar que o formulário aparece com os 12 itens na ordem, todos marcados como obrigatórios; e que o formulário **não** aparece em oportunidades de outros funis.
 
-## 4. Services / Hooks (frontend)
-
-- `src/services/intelligence/apolloInvisible.ts`: `getRules`, `updateRules`, `estimateApollo(prospectIds | batchRunId)`, `listApolloAudit(filters)`, `getApolloKpis(filters)`, `getApolloROI(filters)`
-- `src/hooks/intelligence/useApolloRules.ts`, `useApolloEstimate.ts`, `useApolloAudit.ts`, `useApolloKpis.ts`, `useApolloROI.ts`
-
-## 5. UI
-
-- **`ApolloInvisibleSettingsCard.tsx`** (Autopilot tab + nova sub-aba): formulário das rules.
-- **`ApolloKpiBar.tsx`**: bloco "Apollo Performance" no Autopilot panel (empresas avaliadas, executado, ignorado, decisores, revelados, créditos, custo/decisor, taxa aproveitamento).
-- **`AutopilotConfigModal.tsx`** (editar): adiciona preview de `estimateApollo` (elegíveis/ineligíveis/contatos/créditos vs limite diário e batch). Botão de execução bloqueado se exceder limite.
-- **`AutopilotRunDrawer.tsx`** (editar): aba "Apollo Audit" listando `apollo_enrichment_audit` do run.
-- **`QualifiedQueueTable.tsx`** (editar): colunas `primary_contact_name/role/score`, badge `apollo_status`.
-- **`ApolloRoiPage.tsx`** em `src/pages/intelligence/ApolloRoi.tsx`: filtros (período/evento/ICP/batch), KPIs (créditos, decisores, contatos válidos, SDR Ready gerados, oportunidades, receita atribuída via `commercial_won_revenue_view`, ROI estimado). Linkada no `KairosHub` como aba "💎 Apollo ROI".
-- **Alertas** (banner no Autopilot): crédito ≥80% do limite diário, taxa de decisores <20%, ICP com cobertura <10%, falha do provider em últimas 24h.
-
-## 6. Garantias
-
-- Apollo NUNCA cria opportunity/account/contact no CRM, não dispara email/WhatsApp. Saída exclusiva = atualização da Qualified Queue + audit.
-- Promoção ao CRM permanece manual (KAI.13).
-- `relationship_status != new_prospect` → skip automático.
-
-## 7. Docs
-
-- `src/components/playbook/APOLLO_INVISIBLE.md` — arquitetura, regras de elegibilidade, departamentos por ICP, fórmula Contact Score, limites.
-- Atualizar `SOURCING_AUDIT.md` e `AUTOPILOT.md`.
-
-## Riscos
-
-- Custo Apollo descontrolado → mitigado por limites diário + batch + skip por score.
-- Decisor errado → fórmula Contact Score + filtro de cargos.
-- Apollo down → audit `apollo_status=failed`, batch continua próximos itens.
-- Sem ICP mapeado → fallback EXPOSITORES.
-
-## Arquivos
-
-**Novos:** 1 migration, 2 edge functions, `_shared/apollo-icp-departments.ts`, 1 service, 5 hooks, 5 componentes UI, 1 página, 1 doc.
-**Editados:** `kairos-autopilot-process`, `AutopilotConfigModal`, `AutopilotRunDrawer`, `AutopilotPanel`, `QualifiedQueueTable`, `KairosHub`, `SOURCING_AUDIT.md`, `AUTOPILOT.md`, `src/integrations/supabase/types.ts` (auto).
+## 4. Entregáveis
+- 1 migração SQL idempotente.
+- 1 pequeno patch em `CustomFormRenderer` para a regra condicional do item 11→12 (opcional o bloqueio de handoff).
+- Nenhum outro arquivo alterado.
