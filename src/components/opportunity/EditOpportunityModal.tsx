@@ -44,6 +44,8 @@ import { ContactCombobox } from '@/components/opportunity/ContactCombobox';
 import { TagsMultiSelect } from '@/components/opportunity/TagsMultiSelect';
 import { OriginSelect } from '@/components/opportunity/OriginSelect';
 import { getOpportunityTags, setOpportunityTags } from '@/hooks/useOrganizationTags';
+import { useOpportunityQualificationScore } from '@/hooks/useOpportunityQualificationScore';
+import { QualificationGateModal } from '@/components/opportunity/qualification/QualificationGateModal';
 
 const editOpportunitySchema = z.object({
   title: z.string().min(1, 'Título é obrigatório'),
@@ -117,7 +119,28 @@ export function EditOpportunityModal({
   const selectedPipeline = pipelines.find((p) => p.id === selectedPipelineId);
   const watchedAccountId = form.watch('account_id');
 
+  const originPipeline = pipelines.find((p) => p.id === opportunity?.pipeline_id);
+  const isQualToSalesMove =
+    originPipeline?.pipeline_type === 'qualification' &&
+    selectedPipeline?.pipeline_type === 'sales' &&
+    originPipeline.id !== selectedPipeline.id;
+
+  const qualScore = useOpportunityQualificationScore({
+    opportunityId: opportunity?.id,
+    pipelineId: opportunity?.pipeline_id,
+    account: opportunity?.accounts ?? opportunity?.account ?? null,
+    contact: opportunity?.contacts ?? opportunity?.contact ?? null,
+  });
+
+  const [gateOpen, setGateOpen] = useState(false);
+
   const onSubmit = async (data: EditOpportunityFormData) => {
+    // Sprint 2: Block qualification → sales handoff if checklist incomplete.
+    if (isQualToSalesMove && !qualScore.isLoading && !qualScore.canMoveToSales) {
+      setGateOpen(true);
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       // Convert Date to ISO UTC timestamp
@@ -163,6 +186,7 @@ export function EditOpportunityModal({
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-full h-[100dvh] max-w-full md:max-w-2xl md:h-auto md:max-h-[90vh] rounded-none md:rounded-lg overflow-y-auto p-4 md:p-6">
         <DialogHeader>
@@ -443,5 +467,12 @@ export function EditOpportunityModal({
         </Form>
       </DialogContent>
     </Dialog>
+    <QualificationGateModal
+      open={gateOpen}
+      onOpenChange={setGateOpen}
+      score={qualScore.total}
+      blockers={qualScore.blockers}
+    />
+    </>
   );
 }

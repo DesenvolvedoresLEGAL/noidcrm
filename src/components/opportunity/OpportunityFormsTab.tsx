@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
+import { useOpportunityQualificationScore } from '@/hooks/useOpportunityQualificationScore';
+import { QualificationScoreCard } from '@/components/opportunity/qualification/QualificationScoreCard';
 
 interface OpportunityFormsTabProps {
   opportunityId: string;
@@ -28,6 +30,15 @@ export function OpportunityFormsTab({
   const { data: forms = [], isLoading } = useCustomFormsByPipeline(pipelineId);
   const { data: publicForms = [], isLoading: loadingPublicForms } = useOpportunityPublicForms(opportunityId);
   const { togglePublicForm, isToggling } = useOpportunityPublicFormMutations();
+
+  const isQualificationPipeline =
+    opportunity?.pipeline?.pipeline_type === 'qualification';
+  const qualScore = useOpportunityQualificationScore({
+    opportunityId,
+    pipelineId,
+    account,
+    contact,
+  });
 
   const getPublicFormData = (formId: string) => {
     return publicForms.find(pf => pf.form_id === formId);
@@ -77,6 +88,9 @@ export function OpportunityFormsTab({
 
   return (
     <div className="space-y-6">
+      {isQualificationPipeline && qualScore.hasForm && (
+        <QualificationScoreCard score={qualScore} />
+      )}
       {forms.map((form) => {
         const isAccountForm = form.entity_type === 'account';
         const entityId = isAccountForm ? account?.id : opportunityId;

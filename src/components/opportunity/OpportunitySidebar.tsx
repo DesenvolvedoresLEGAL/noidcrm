@@ -26,6 +26,8 @@ import { OwnerSelector } from './OwnerSelector';
 import { SidebarDataSection } from './sidebar/SidebarDataSection';
 import { QuickIndicators } from './sidebar/QuickIndicators';
 import { WinLossRiskAlerts } from '@/components/opportunities/WinLossRiskAlerts';
+import { useOpportunityQualificationScore } from '@/hooks/useOpportunityQualificationScore';
+import { Target } from 'lucide-react';
 
 interface OpportunitySidebarProps {
   opportunity: any;
@@ -78,8 +80,18 @@ export function OpportunitySidebar({
 
   const temperature = opportunity.temperatura || opportunity.temperature;
 
+  const isQualificationPipeline =
+    opportunity.pipeline?.pipeline_type === 'qualification';
+  const qualScore = useOpportunityQualificationScore({
+    opportunityId: opportunity.id,
+    pipelineId: opportunity.pipeline_id,
+    account: opportunity.accounts ?? opportunity.account ?? null,
+    contact: opportunity.contacts ?? opportunity.contact ?? null,
+  });
+
   return (
     <div className="space-y-3">
+
       {/* Hero Card - Title, Status, Badges, Actions */}
       <div className="bg-card border rounded-lg p-4 space-y-4">
         {/* Title - Editable */}
@@ -118,6 +130,19 @@ export function OpportunitySidebar({
           {temperature && (
             <Badge className={cn("text-[10px] px-2 py-0.5", temperatureStyles[temperature] || '')}>
               {temperatureLabels[temperature] || temperature}
+            </Badge>
+          )}
+          {isQualificationPipeline && qualScore.hasForm && !qualScore.isLoading && (
+            <Badge
+              variant="outline"
+              className={cn(
+                'text-[10px] px-2 py-0.5 gap-1 border',
+                qualScore.classification.colorClass
+              )}
+              title={`${qualScore.classification.label} — ${qualScore.total}/100`}
+            >
+              <Target className="h-2.5 w-2.5" />
+              {qualScore.total}/100
             </Badge>
           )}
           
