@@ -57,11 +57,12 @@ export default function KairosHub() {
         />
 
         <Tabs value={activeTab} onValueChange={handleTabChange}>
-          <TabsList className="grid w-full grid-cols-2 md:grid-cols-8 max-w-6xl">
+          <TabsList className="grid w-full grid-cols-2 md:grid-cols-9 max-w-6xl">
             <TabsTrigger value="icp">🎯 ICP Intelligence</TabsTrigger>
             <TabsTrigger value="queue">📥 Qualified Queue</TabsTrigger>
             <TabsTrigger value="autopilot">🚀 Autopilot</TabsTrigger>
             <TabsTrigger value="revenue">💰 Revenue Attribution</TabsTrigger>
+            <TabsTrigger value="gtm">📊 GTM Performance</TabsTrigger>
             <TabsTrigger value="sourcing">🧭 Sourcing</TabsTrigger>
             <TabsTrigger value="optimization">⚡ Optimization</TabsTrigger>
             <TabsTrigger value="experiments">🧪 Experiments</TabsTrigger>
@@ -83,6 +84,11 @@ export default function KairosHub() {
           <TabsContent value="revenue" className="space-y-4 md:space-y-6 mt-4">
             <RevenueAttributionPanel />
           </TabsContent>
+
+          <TabsContent value="gtm" className="space-y-4 md:space-y-6 mt-4">
+            <GtmPerformancePanel />
+          </TabsContent>
+
 
 
 
