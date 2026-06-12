@@ -88,6 +88,9 @@ export function OpportunityFormsTab({
 
   return (
     <div className="space-y-6">
+      {isQualificationPipeline && qualScore.hasForm && (
+        <QualificationScoreCard score={qualScore} />
+      )}
       {forms.map((form) => {
         const isAccountForm = form.entity_type === 'account';
         const entityId = isAccountForm ? account?.id : opportunityId;
