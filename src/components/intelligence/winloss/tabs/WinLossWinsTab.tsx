@@ -11,6 +11,7 @@ import {
   Users, Layers, MessageSquareQuote, BookOpen, GitBranch,
 } from 'lucide-react';
 import type { WinLossDataResult, WonStageRow } from '@/hooks/useWinLossData';
+import { WinOriginBreakdownBlock } from '../WinOriginBreakdownBlock';
 
 interface Props {
   data: WinLossDataResult | undefined;
@@ -266,7 +267,11 @@ export function WinLossWinsTab({ data, isLoading, ssotWon }: Props) {
         </Card>
       )}
 
+      {/* 6b. Vitórias por Canal de Origem (Sprint WL-WINS-06) */}
+      <WinOriginBreakdownBlock data={data} />
+
       {/* 7. Vitórias por Segmento */}
+
       {agg.segmentBreakdown.length > 0 && (
         <div className="grid md:grid-cols-1 gap-4">
           <BreakdownCard
