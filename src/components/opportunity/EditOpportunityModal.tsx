@@ -44,6 +44,8 @@ import { ContactCombobox } from '@/components/opportunity/ContactCombobox';
 import { TagsMultiSelect } from '@/components/opportunity/TagsMultiSelect';
 import { OriginSelect } from '@/components/opportunity/OriginSelect';
 import { getOpportunityTags, setOpportunityTags } from '@/hooks/useOrganizationTags';
+import { useOpportunityQualificationScore } from '@/hooks/useOpportunityQualificationScore';
+import { QualificationGateModal } from '@/components/opportunity/qualification/QualificationGateModal';
 
 const editOpportunitySchema = z.object({
   title: z.string().min(1, 'Título é obrigatório'),
