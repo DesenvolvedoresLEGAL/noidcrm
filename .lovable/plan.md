@@ -1,58 +1,102 @@
-# Sprint 1 — Checklist Obrigatório de Qualificação
+# Sprint 2 — Score de Qualificação
 
-Adaptar o formulário existente **"Checklist de Locação"** (form id `55fa0451-...`, org `d1b68a0f-...`) para se tornar o **Checklist Obrigatório de Qualificação**, com os 12 campos obrigatórios da pré-venda, vinculado exclusivamente ao funil **PRÉ VENDAS** (`d1b68a0f-...-sales-1`).
+Score de qualificação 0–100, calculado em tempo real a partir dos valores do **Checklist Obrigatório de Qualificação** (formulário criado no Sprint 1). Apenas frontend — nenhuma alteração no banco, RLS ou serviços de revenue.
 
-Apenas configuração de dados (migração) + um pequeno ajuste de UI para a regra condicional do campo 12. Sem mudanças em lógica de negócio.
+## 1. Lib pura de cálculo
 
-## 1. Migração SQL (única transação)
+**Novo:** `src/lib/qualification/qualificationScore.ts`
 
-### 1.1 Renomear o formulário e vincular ao funil
-- `UPDATE custom_forms SET name = 'Checklist Obrigatório de Qualificação', pipeline_ids = ARRAY['d1b68a0f-4e2a-48ce-a03d-19c2751f5f2d-sales-1'] WHERE id = '55fa0451-eadf-43f5-abe5-ae02a85af95c';`
+Função `computeQualificationScore(values: Record<string, any>, ctx: { hasAccount: boolean; hasContact: boolean })` que recebe valores **indexados por `field_key` semântico** (nome_evento, data_evento, local_evento, conexoes_simultaneas, equipamentos, finalidade_uso, urgencia_real, poder_decisao, proximo_passo, permissao_proposta) e retorna:
 
-### 1.2 Criar/atualizar custom fields (entity_type='opportunity')
-Reaproveitar quando o `field_key` já existe; criar quando faltar. Todos com `is_required = true`.
+```ts
+{
+  total: number,           // 0-100
+  breakdown: { key: string; label: string; got: number; max: number }[],
+  classification: { tier: 'cold'|'developing'|'sql_weak'|'sql_valid'|'sql_priority'; label: string; colorClass: string },
+  blockers: string[],      // campos faltantes p/ ir a Vendas
+  canMoveToSales: boolean, // score≥75 && checklist completo && permissao_proposta válida
+}
+```
 
-| # | field_key | label | field_type | options |
-|---|-----------|-------|------------|---------|
-| 3 | `nome_evento` | Nome do evento | text | — |
-| 4 | `data_evento` | Data do evento | date | — |
-| 5 | `local_evento` | Local do evento | text | — |
-| 6 | `conexoes_simultaneas` | Quantidade de conexões simultâneas | number | — |
-| 7 | `equipamentos` | Equipamentos que deseja conectar | multi_select | notebook, celular, tablet, totem, máquina de cartão, sistema de credenciamento, TV, câmera, PDV, outro |
-| 8 | `finalidade_uso` | Finalidade de uso | multi_select | vendas no stand, geração de leads, credenciamento, transmissão ao vivo, demonstração de produto, operação interna, pagamento/POS, sistema próprio, backup de internet, outro |
-| 9 | `urgencia_real` | Urgência real | select | Evento em até 3 dias / 4 a 9 dias / 10 a 20 dias / 21 a 30 dias / acima de 30 dias / Sem data definida |
-| 10 | `poder_decisao` | Poder ou influência na decisão | select | Decisor final / Influenciador direto / Comprador/financeiro / Usuário técnico / Apenas pesquisando / Não identificado |
-| 11 | `proximo_passo` | Próximo passo combinado | select | Enviar proposta / Agendar reunião / Validar escopo / Validar orçamento / Aguardar retorno do cliente / Sem próximo passo |
-| 11b | `proximo_passo_obs` | Observação do próximo passo | textarea | — (não obrigatório) |
-| 12 | `permissao_proposta` | Permissão real para proposta | select | Cliente pediu proposta / Cliente validou escopo e pediu preço / Cliente confirmou interesse real / SDR está sugerindo proposta sem pedido claro / Não houve permissão para proposta |
+Regras exatas conforme briefing (Evento 7+7+6, Demanda 8+6+6, Data&Local 8+7, Urgência/Poder/Próximo passo/Permissão por enum). `permissao_proposta` válida = `cliente_pediu_proposta | cliente_validou_escopo | cliente_confirmou_interesse`.
 
-Estratégia: `INSERT ... ON CONFLICT (organization_id, entity_type, field_key) DO UPDATE` para idempotência. Onde já existir (`nome_evento`, `data_evento`→atualmente `dataevent`, `conexoes_simultaneas`, `equipamentos`, `finalidade_uso`), apenas garantir `is_required=true` e atualizar `options` para os enums acima. Os campos antigos não relacionados ao checklist (`briefing`, `frete_pedido`, `tamanho_espaco`, `dataentrega`, `dataretira`, `data_pagamento`, `ambiente`) permanecem em `custom_fields` (não removidos), mas saem do JSON `fields` do formulário.
+Classificação:
+- 0–39 Frio (cinza)
+- 40–59 Em desenvolvimento (amarelo)
+- 60–74 SQL fraco (laranja)
+- 75–89 SQL válido (azul)
+- 90–100 SQL prioritário (roxo)
 
-Nota: o campo atual `dataevent` será mantido como legado; o checklist usará o novo `data_evento`. (Alternativa: renomear `field_key`. Como há valores históricos em `custom_field_values`, prefiro criar o novo `data_evento` para não quebrar dados antigos.)
+Testes unitários `qualificationScore.test.ts` para cada faixa e parciais.
 
-### 1.3 Reconstruir `custom_forms.fields` (JSONB) na ordem do checklist
-Array em ordem 0…12 com:
-- itens 1 e 2 reaproveitando os nativos já usados: `native-account-nome_fantasia` (Nome da empresa) e `native-contact-nome` (Nome do contato), ambos `is_required: true`.
-- itens 3…12 referenciando os `custom_fields` (source `custom`, `entity_source: opportunity`), todos `is_required: true`.
+## 2. Hook de score
 
-## 2. Front-end (mínimo)
+**Novo:** `src/hooks/useOpportunityQualificationScore.ts`
 
-### 2.1 Regra condicional do campo 12
-Em `src/components/opportunities/CustomFormRenderer.tsx` (ou equivalente que renderiza `custom_forms`), adicionar lógica: quando `proximo_passo === 'Enviar proposta'`, marcar `permissao_proposta` como obrigatório no validador (independente do `is_required` salvo). Já é obrigatório por padrão, mas a regra cobre futuras alterações.
+- Recebe `opportunityId`, `account`, `contact`.
+- Carrega o formulário do funil **PRÉ VENDAS** via `useCustomFormsByPipeline` (já existente) e seleciona aquele cujo nome começa com "Checklist Obrigatório de Qualificação" (fallback: primeiro form `entity_type=opportunity` desse pipeline).
+- Carrega `custom_form_values` via `useCustomFormValues`.
+- Carrega metadata dos `custom_fields` (id → field_key) para traduzir field IDs salvos → chaves semânticas.
+- Compõe `valuesByKey` e chama `computeQualificationScore`. Inclui `nome_empresa` (= `account.nome_fantasia/razao_social`) e `nome_contato` (= `contact.nome`) para o checklist obrigatório de bloqueio.
+- Retorna `{ score, classification, breakdown, blockers, canMoveToSales, isLoading }`.
 
-Adicionar também validação no submit: se `permissao_proposta` ∈ {"SDR está sugerindo proposta sem pedido claro", "Não houve permissão para proposta"} e o usuário tentar mover a oportunidade para o funil VENDAS, bloquear com toast informativo. (Apenas regra de UI no handoff — sem alterar fluxo oficial de movimentação.)
+> Reativo: como o save do checklist invalida `custom-form-values`, o score recalcula sozinho.
 
-> Se preferir manter o sprint estritamente configuracional, removo o bloqueio de handoff e deixo apenas para um sprint futuro.
+## 3. UI — Bloco "Score de Qualificação"
 
-### 2.2 Nenhuma outra mudança
-- Sem mudar serviços de revenue, sem tocar RLS, sem novas tabelas.
-- Form continua sendo lido pelos hooks existentes `useCustomForms` / `useCustomFormValues`.
+**Novo:** `src/components/opportunity/qualification/QualificationScoreCard.tsx`
 
-## 3. Riscos & validação
-- **Risco:** dados históricos preenchidos como `dataevent`/`evento` (label "Endereço Entrega/Retirada" no field_key `evento` 😬) — não serão tocados; novo `data_evento`/`local_evento` começam vazios.
-- **Validação:** após a migração, abrir uma oportunidade do funil PRÉ VENDAS e confirmar que o formulário aparece com os 12 itens na ordem, todos marcados como obrigatórios; e que o formulário **não** aparece em oportunidades de outros funis.
+- Header com título "Score de Qualificação", número grande `XX/100`, barra de progresso (`Progress` shadcn), badge de classificação colorida.
+- Lista colapsável (default fechada) com breakdown por critério (`got/max`).
+- Quando `canMoveToSales=false` em pipeline sales, mostra mini-aviso "Faltam X itens para liberar Vendas".
 
-## 4. Entregáveis
-- 1 migração SQL idempotente.
-- 1 pequeno patch em `CustomFormRenderer` para a regra condicional do item 11→12 (opcional o bloqueio de handoff).
-- Nenhum outro arquivo alterado.
+**Pontos de exibição:**
+1. **Topo da aba Formulários** — `OpportunityFormsTab.tsx` renderiza o card antes da lista de forms (apenas quando o pipeline atual é `qualification`).
+2. **Sidebar da oportunidade** — `OpportunitySidebar.tsx`: versão compacta (apenas número + badge) com link para a aba Formulários.
+
+Sem nova rota; sem nova seção/tab dedicada (mantém escopo mínimo).
+
+## 4. Bloqueio de passagem para Vendas
+
+**Novo:** `src/components/opportunity/qualification/QualificationGateModal.tsx`
+
+Modal de aviso "Lead ainda não pode ir para Vendas" com:
+- Texto fixo do briefing.
+- Lista de pendências (`blockers` do hook), incluindo "Score < 75 (atual: NN)" se aplicável.
+- Botão único "Voltar para qualificação" que fecha o modal.
+
+**Editar `src/components/opportunity/EditOpportunityModal.tsx`:**
+- No `onSubmit`, antes de chamar `onSave`, comparar `opportunity.pipeline?.pipeline_type` original vs `selectedPipeline.pipeline_type`. Se origem `qualification` e destino `sales`, invocar o gate (cálculo síncrono via lib + valores já fetchados pelo hook injetado por context/prop).
+- Se `!canMoveToSales`, abrir `QualificationGateModal` e abortar o submit.
+
+**Edge cases fora de escopo (sprint futuro):**
+- Drag-and-drop direto no Kanban entre funis.
+- Handoff via `duplicateOpportunity`.
+> Sinalizo no PR; o caminho oficial pelo modal de edição já cobre o fluxo prescrito pelo briefing.
+
+## 5. Arquivos
+
+**Novos**
+- `src/lib/qualification/qualificationScore.ts`
+- `src/lib/qualification/qualificationScore.test.ts`
+- `src/hooks/useOpportunityQualificationScore.ts`
+- `src/components/opportunity/qualification/QualificationScoreCard.tsx`
+- `src/components/opportunity/qualification/QualificationGateModal.tsx`
+
+**Editados**
+- `src/components/opportunity/OpportunityFormsTab.tsx` — render do card no topo.
+- `src/components/opportunity/OpportunitySidebar.tsx` — badge compacto.
+- `src/components/opportunity/EditOpportunityModal.tsx` — gate antes do save.
+
+## 6. Riscos
+
+- **Mapeamento de field_key.** Depende dos `field_key` semânticos cravados no Sprint 1. Se o organizador renomeá-los, o score zera silenciosamente — adicionar log dev e seção "Sem dados de checklist" quando nada bater.
+- **Outros funis de qualificação.** A regra aplica genericamente a `pipeline_type='qualification'`; só dispara o card se existir form com os keys esperados.
+- **Sem mudanças em revenue/forecast/closed_at.** Apenas presentation + validation client-side.
+
+## 7. Validação
+
+- Abrir oportunidade do funil PRÉ VENDAS → card aparece, score reage a cada save do checklist.
+- Tentar mover para VENDAS com score <75 → modal bloqueia.
+- Cumprir checklist + score ≥75 → modal não aparece, save procede.
+- Pipeline não-qualification → card não aparece, gate não dispara.
