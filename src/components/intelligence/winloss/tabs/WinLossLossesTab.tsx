@@ -14,6 +14,7 @@ import {
   Lightbulb, ArrowUp, ArrowDown,
 } from 'lucide-react';
 import type { WinLossDataResult, TimeframePreset, DateRange } from '@/hooks/useWinLossData';
+import { LossOriginBreakdownBlock } from '../LossOriginBreakdownBlock';
 import type { LossSemanticAggregates } from '@/hooks/useLossSemantic';
 import {
   buildCommercialFailureSummary,
