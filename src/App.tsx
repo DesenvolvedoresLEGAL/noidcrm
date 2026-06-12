@@ -162,6 +162,7 @@ const ManagerDashboard = lazy(() => import("./pages/gtm/ManagerDashboard"));
 const CEODashboard = lazy(() => import("./pages/gtm/CEODashboard"));
 const PlaybooksHub = lazy(() => import("./pages/intelligence/PlaybooksHub"));
 const KairosHub = lazy(() => import("./pages/intelligence/KairosHub"));
+const ApolloRoi = lazy(() => import("./pages/intelligence/ApolloRoi"));
 const OptimizationHub = lazy(() => import("./pages/intelligence/OptimizationHub"));
 const ExperimentsHub = lazy(() => import("./pages/intelligence/ExperimentsHub"));
 const WinLossHub = lazy(() => import("./pages/intelligence/WinLossHub"));
@@ -1166,6 +1167,17 @@ const App = () => (
                 path="/app/intelligence/experiments"
                 element={<Navigate to="/app/intelligence/kairos?tab=experiments" replace />}
               />
+              <Route
+                path="/app/intelligence/apollo-roi"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <ApolloRoi />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+
 
               {/* Intelligence Routes */}
               <Route
