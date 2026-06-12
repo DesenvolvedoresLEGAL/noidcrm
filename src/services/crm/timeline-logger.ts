@@ -267,3 +267,116 @@ export async function logVibeAlertEvent(
     },
   });
 }
+
+/**
+ * Sprint 4 — Score de Qualificação atualizado.
+ */
+export async function logQualificationScoreEvent(
+  opportunityId: string,
+  params: {
+    previousScore: number;
+    nextScore: number;
+    previousTier: string;
+    nextTier: string;
+    previousTierLabel?: string;
+    nextTierLabel?: string;
+    pendingBlockers?: string[];
+  }
+): Promise<void> {
+  const {
+    previousScore, nextScore,
+    previousTier, nextTier,
+    previousTierLabel, nextTierLabel,
+    pendingBlockers = [],
+  } = params;
+
+  const arrow = previousScore !== nextScore ? `${previousScore}→${nextScore}` : `${nextScore}`;
+  const tierChange =
+    previousTier !== nextTier
+      ? ` (${previousTierLabel || previousTier} → ${nextTierLabel || nextTier})`
+      : '';
+
+  await logTimelineEvent({
+    opportunityId,
+    type: 'score',
+    activityType: 'qualification_score_updated',
+    title: `Score de Qualificação atualizado: ${arrow}${tierChange}`,
+    metadata: {
+      previous_score: previousScore,
+      next_score: nextScore,
+      delta: nextScore - previousScore,
+      previous_tier: previousTier,
+      next_tier: nextTier,
+      previous_tier_label: previousTierLabel,
+      next_tier_label: nextTierLabel,
+      pending_blockers: pendingBlockers,
+    },
+  });
+}
+
+/**
+ * Sprint 4 — Lead desqualificado no Pré-vendas.
+ */
+export async function logDisqualificationEvent(
+  opportunityId: string,
+  params: {
+    reasonSlug: string;
+    reasonLabel: string;
+    observation?: string;
+    remarketingCreated: boolean;
+    remarketingExisted: boolean;
+    remarketingOpportunityId?: string | null;
+    remarketingPipelineMissing?: boolean;
+  }
+): Promise<void> {
+  const {
+    reasonSlug, reasonLabel, observation,
+    remarketingCreated, remarketingExisted,
+    remarketingOpportunityId, remarketingPipelineMissing,
+  } = params;
+
+  await logTimelineEvent({
+    opportunityId,
+    type: 'audit',
+    activityType: 'lead_disqualified',
+    title: `Lead desqualificado no Pré-vendas: ${reasonLabel}`,
+    metadata: {
+      reason_slug: reasonSlug,
+      reason_label: reasonLabel,
+      observation: observation || null,
+      remarketing_created: remarketingCreated,
+      remarketing_existed: remarketingExisted,
+      remarketing_opportunity_id: remarketingOpportunityId || null,
+      remarketing_pipeline_missing: !!remarketingPipelineMissing,
+    },
+  });
+}
+
+/**
+ * Sprint 4 — Tentativa bloqueada de passagem para Vendas.
+ */
+export async function logSalesHandoffBlockedEvent(
+  opportunityId: string,
+  params: {
+    currentScore: number;
+    requiredScore: number;
+    pendingBlockers: string[];
+    fromPipelineId?: string;
+    toPipelineId?: string;
+  }
+): Promise<void> {
+  const { currentScore, requiredScore, pendingBlockers, fromPipelineId, toPipelineId } = params;
+  await logTimelineEvent({
+    opportunityId,
+    type: 'audit',
+    activityType: 'sales_handoff_blocked',
+    title: `Tentativa bloqueada de passagem para Vendas (score ${currentScore}/${requiredScore})`,
+    metadata: {
+      current_score: currentScore,
+      required_score: requiredScore,
+      pending_blockers: pendingBlockers,
+      from_pipeline_id: fromPipelineId,
+      to_pipeline_id: toPipelineId,
+    },
+  });
+}
