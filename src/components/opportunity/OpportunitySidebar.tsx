@@ -132,6 +132,19 @@ export function OpportunitySidebar({
               {temperatureLabels[temperature] || temperature}
             </Badge>
           )}
+          {isQualificationPipeline && qualScore.hasForm && !qualScore.isLoading && (
+            <Badge
+              variant="outline"
+              className={cn(
+                'text-[10px] px-2 py-0.5 gap-1 border',
+                qualScore.classification.colorClass
+              )}
+              title={`${qualScore.classification.label} — ${qualScore.total}/100`}
+            >
+              <Target className="h-2.5 w-2.5" />
+              {qualScore.total}/100
+            </Badge>
+          )}
           
           {/* Owner Avatar with Dropdown */}
           <OwnerSelector
