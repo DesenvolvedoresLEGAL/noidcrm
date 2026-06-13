@@ -296,13 +296,6 @@ export default function WinLossReasons() {
       });
       return;
     }
-    if (
-      !confirm(
-        'Aplicar matriz oficial de escopo (PRÉ VENDAS / VENDAS) aos motivos existentes?\n' +
-          'Operação idempotente: não apaga motivos, apenas atualiza pipeline_ids, tipo e categoria.'
-      )
-    )
-      return;
     try {
       setApplyingMatrix(true);
       const report = await applyLossWinReasonsScopeMatrix(orgId);
