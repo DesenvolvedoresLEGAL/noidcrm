@@ -55,6 +55,8 @@ export default function WinLossReasons() {
   const [selectedPipeline, setSelectedPipeline] = useState<string>('all');
   const [selectedType, setSelectedType] = useState<string>('all');
   const [seeding, setSeeding] = useState(false);
+  const [applyingMatrix, setApplyingMatrix] = useState(false);
+  const [matrixReport, setMatrixReport] = useState<ScopeMatrixReport | null>(null);
   const [isLossModalOpen, setIsLossModalOpen] = useState(false);
   const [isWinModalOpen, setIsWinModalOpen] = useState(false);
   const [editingLossReason, setEditingLossReason] = useState<LossReason | null>(null);
