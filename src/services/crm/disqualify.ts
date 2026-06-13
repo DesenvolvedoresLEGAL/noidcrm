@@ -4,10 +4,14 @@ import { DISQUALIFY_REASON_LABEL } from '@/lib/qualification/disqualifyReasons';
 import { logDisqualificationEvent } from './timeline-logger';
 
 export interface DisqualifyParams {
-  /** Stable reason key — framework reason_key or legacy hardcoded slug. */
+  /** Stable reason key — official loss_reasons.id, framework key, or legacy slug. */
   reasonSlug: DisqualifyReasonSlug | string;
-  /** Optional human label (used when reason comes from active framework). */
+  /** Official loss_reasons.id — when present persists the FK. */
+  reasonId?: string;
+  /** Optional human label (used when reason comes from official/framework source). */
   reasonLabel?: string;
+  /** Optional accountability bucket from the official reason. */
+  reasonAccountability?: string | null;
   observation?: string;
   createRemarketing: boolean;
 }
