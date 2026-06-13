@@ -44,6 +44,7 @@ import {
   type WinReason,
 } from '@/services/crm/win-reasons';
 import { listPipelines, type Pipeline } from '@/services/crm/pipelines';
+import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { LossReasonModal } from '@/components/settings/LossReasonModal';
 import { WinReasonModal } from '@/components/settings/WinReasonModal';
 
