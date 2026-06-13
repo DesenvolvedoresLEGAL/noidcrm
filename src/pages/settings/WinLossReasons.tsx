@@ -321,6 +321,15 @@ export default function WinLossReasons() {
           <div className="flex gap-2">
             <Button
               variant="outline"
+              onClick={handleApplyMatrix}
+              disabled={applyingMatrix}
+              title="Reescopa motivos para PRÉ VENDAS / VENDAS conforme matriz oficial (idempotente)"
+            >
+              <Sparkles className="mr-2 h-4 w-4" />
+              {applyingMatrix ? 'Aplicando...' : 'Aplicar matriz de escopo'}
+            </Button>
+            <Button
+              variant="outline"
               onClick={handleSeedPreSales}
               disabled={seeding}
               title="Cria os motivos padrão de desqualificação para PRÉ VENDAS (idempotente)"
