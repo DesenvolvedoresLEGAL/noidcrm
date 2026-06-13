@@ -316,6 +316,16 @@ export default function WinLossReasons() {
               ))}
             </SelectContent>
           </Select>
+          <Select value={selectedType} onValueChange={setSelectedType}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Filtrar por tipo" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os tipos</SelectItem>
+              <SelectItem value="lost">Motivo de Perda</SelectItem>
+              <SelectItem value="disqualification">Motivo de Desqualificação</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
