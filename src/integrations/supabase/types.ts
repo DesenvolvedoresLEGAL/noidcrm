@@ -36192,6 +36192,10 @@ export type Database = {
         Args: { p_proposal_id: string; p_reference_at?: string }
         Returns: Json
       }
+      apply_loss_win_reasons_scope_matrix: {
+        Args: { p_org_id: string }
+        Returns: Json
+      }
       apply_proposal_financial_audit_item: {
         Args: { p_apply_mode?: string; p_audit_item_id: string }
         Returns: Json
