@@ -36334,7 +36334,9 @@ export type Database = {
         Returns: boolean
       }
       can_read_delivery_log: { Args: { _log_id: string }; Returns: boolean }
-      can_view_all: { Args: { _user_id: string }; Returns: boolean }
+      can_view_all:
+        | { Args: { _user_id: string }; Returns: boolean }
+        | { Args: { _org_id: string; _user_id: string }; Returns: boolean }
       can_view_by_team: {
         Args: { _owner_user_id: string; _user_id: string }
         Returns: boolean
@@ -37451,7 +37453,9 @@ export type Database = {
         Args: { _org_id: string; _user_id: string }
         Returns: boolean
       }
-      is_admin_or_owner: { Args: { _user_id: string }; Returns: boolean }
+      is_admin_or_owner:
+        | { Args: { _user_id: string }; Returns: boolean }
+        | { Args: { _org_id: string; _user_id: string }; Returns: boolean }
       is_feature_enabled: { Args: { _flag_key: string }; Returns: boolean }
       is_org_admin: {
         Args: { _org_id: string; _user_id: string }
