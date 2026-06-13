@@ -109,17 +109,25 @@ export async function disqualifyPreSalesOpportunity(
   if (observation?.trim()) lossCommentParts.push(observation.trim());
   const lossComment = lossCommentParts.join(' — ');
 
+  const accountabilityValue = (
+    reasonAccountability &&
+    ['commercial', 'client', 'operations', 'market', 'unknown'].includes(reasonAccountability)
+      ? reasonAccountability
+      : 'unknown'
+  ) as 'commercial' | 'client' | 'operations' | 'market' | 'unknown';
+
   const updatePayload: Record<string, any> = {
     status: 'lost',
     qualification_loss_reason: reasonSlug,
     loss_comment: lossComment,
-    loss_accountability: 'unknown',
+    loss_accountability: accountabilityValue,
     closed_at: nowIso,
     updated_at: nowIso,
     opportunity_score: null,
     win_probability_ai: null,
     score_updated_at: null,
   };
+  if (reasonId) updatePayload.loss_reason_id = reasonId;
   if (desqualificadoStageId) updatePayload.stage_id = desqualificadoStageId;
 
   const { error: updErr } = await supabase
