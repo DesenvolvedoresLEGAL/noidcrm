@@ -173,3 +173,33 @@ export async function seedPreSalesDisqualificationReasons(
   }
   return (data as number) ?? 0;
 }
+
+export interface ScopeMatrixReport {
+  org_id: string;
+  qual_pipeline_id: string | null;
+  sales_pipeline_id: string | null;
+  created: string[];
+  updated: string[];
+  unmapped: string[];
+  still_all_funnels: string[];
+  summary_loss_reasons: Record<string, number>;
+  summary_win_reasons: Record<string, number>;
+}
+
+/**
+ * Applies the official PRÉ VENDAS / VENDAS scope matrix to existing
+ * loss + win reasons for the given org. Idempotent.
+ */
+export async function applyLossWinReasonsScopeMatrix(
+  organizationId: string
+): Promise<ScopeMatrixReport> {
+  const { data, error } = await supabase.rpc(
+    'apply_loss_win_reasons_scope_matrix' as any,
+    { p_org_id: organizationId }
+  );
+  if (error) {
+    console.error('Error applying scope matrix:', error);
+    throw error;
+  }
+  return data as ScopeMatrixReport;
+}
