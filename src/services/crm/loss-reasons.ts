@@ -7,7 +7,9 @@ export {
   deleteLossReason,
   toggleLossReasonStatus,
   seedPreSalesDisqualificationReasons,
+  applyLossWinReasonsScopeMatrix,
   type LossReason,
   type LossReasonType,
   type LossReasonInput,
+  type ScopeMatrixReport,
 } from '../supabase/loss-reasons';

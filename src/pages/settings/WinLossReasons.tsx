@@ -33,7 +33,9 @@ import {
   deleteLossReason,
   toggleLossReasonStatus,
   seedPreSalesDisqualificationReasons,
+  applyLossWinReasonsScopeMatrix,
   type LossReason,
+  type ScopeMatrixReport,
 } from '@/services/crm/loss-reasons';
 import {
   listWinReasons as listAllWinReasons,
@@ -53,6 +55,8 @@ export default function WinLossReasons() {
   const [selectedPipeline, setSelectedPipeline] = useState<string>('all');
   const [selectedType, setSelectedType] = useState<string>('all');
   const [seeding, setSeeding] = useState(false);
+  const [applyingMatrix, setApplyingMatrix] = useState(false);
+  const [matrixReport, setMatrixReport] = useState<ScopeMatrixReport | null>(null);
   const [isLossModalOpen, setIsLossModalOpen] = useState(false);
   const [isWinModalOpen, setIsWinModalOpen] = useState(false);
   const [editingLossReason, setEditingLossReason] = useState<LossReason | null>(null);
@@ -256,6 +260,44 @@ export default function WinLossReasons() {
     }
   };
 
+  const handleApplyMatrix = async () => {
+    const anyPipeline = pipelines.find((p) => !!(p as any).organization_id);
+    if (!anyPipeline) {
+      toast({
+        title: 'Sem pipelines',
+        description: 'Crie pelo menos um funil antes de aplicar a matriz.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (
+      !confirm(
+        'Aplicar matriz oficial de escopo (PRÉ VENDAS / VENDAS) aos motivos existentes?\n' +
+          'Operação idempotente: não apaga motivos, apenas atualiza pipeline_ids, tipo e categoria.'
+      )
+    )
+      return;
+    try {
+      setApplyingMatrix(true);
+      const orgId = (anyPipeline as any).organization_id as string;
+      const report = await applyLossWinReasonsScopeMatrix(orgId);
+      setMatrixReport(report);
+      toast({
+        title: 'Matriz aplicada',
+        description: `${report.updated.length} atualizados • ${report.created.length} criados`,
+      });
+      loadData();
+    } catch (err: any) {
+      toast({
+        title: 'Erro',
+        description: err?.message || 'Falha ao aplicar matriz',
+        variant: 'destructive',
+      });
+    } finally {
+      setApplyingMatrix(false);
+    }
+  };
+
   const filteredWinReasons = winReasons
     .filter(reason => {
       const matchesSearch = reason.name.toLowerCase().includes(searchTerm.toLowerCase());
@@ -279,6 +321,15 @@ export default function WinLossReasons() {
           <div className="flex gap-2">
             <Button
               variant="outline"
+              onClick={handleApplyMatrix}
+              disabled={applyingMatrix}
+              title="Reescopa motivos para PRÉ VENDAS / VENDAS conforme matriz oficial (idempotente)"
+            >
+              <Sparkles className="mr-2 h-4 w-4" />
+              {applyingMatrix ? 'Aplicando...' : 'Aplicar matriz de escopo'}
+            </Button>
+            <Button
+              variant="outline"
               onClick={handleSeedPreSales}
               disabled={seeding}
               title="Cria os motivos padrão de desqualificação para PRÉ VENDAS (idempotente)"
@@ -292,6 +343,64 @@ export default function WinLossReasons() {
             </Button>
           </div>
         </div>
+
+        {matrixReport && (
+          <div className="rounded-md border bg-muted/30 p-4 text-sm space-y-2">
+            <div className="flex items-center justify-between">
+              <strong>Relatório da matriz aplicada</strong>
+              <Button variant="ghost" size="sm" onClick={() => setMatrixReport(null)}>
+                Fechar
+              </Button>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+              <div>
+                <div className="text-muted-foreground">Atualizados</div>
+                <div className="text-lg font-semibold">{matrixReport.updated.length}</div>
+              </div>
+              <div>
+                <div className="text-muted-foreground">Criados</div>
+                <div className="text-lg font-semibold">{matrixReport.created.length}</div>
+              </div>
+              <div>
+                <div className="text-muted-foreground">Ainda "Todos os funis"</div>
+                <div className="text-lg font-semibold">
+                  {matrixReport.still_all_funnels.length}
+                </div>
+              </div>
+              <div>
+                <div className="text-muted-foreground">Não mapeados</div>
+                <div className="text-lg font-semibold">{matrixReport.unmapped.length}</div>
+              </div>
+            </div>
+            {matrixReport.still_all_funnels.length > 0 && (
+              <details className="text-xs">
+                <summary className="cursor-pointer text-muted-foreground">
+                  Motivos ainda em Todos os funis ({matrixReport.still_all_funnels.length})
+                </summary>
+                <ul className="mt-1 ml-4 list-disc">
+                  {matrixReport.still_all_funnels.map((n) => (
+                    <li key={n}>{n}</li>
+                  ))}
+                </ul>
+              </details>
+            )}
+            <div className="text-xs text-muted-foreground pt-2 border-t">
+              Loss: total {matrixReport.summary_loss_reasons.total} • ativos{' '}
+              {matrixReport.summary_loss_reasons.active} • PRÉ VENDAS{' '}
+              {matrixReport.summary_loss_reasons.qual} • VENDAS{' '}
+              {matrixReport.summary_loss_reasons.sales} • Todos{' '}
+              {matrixReport.summary_loss_reasons.all_funnels}
+              {' • '}desqualificação {matrixReport.summary_loss_reasons.disqualification}
+            </div>
+            <div className="text-xs text-muted-foreground">
+              Win: total {matrixReport.summary_win_reasons.total} • PRÉ VENDAS{' '}
+              {matrixReport.summary_win_reasons.qual} • VENDAS{' '}
+              {matrixReport.summary_win_reasons.sales} • Todos{' '}
+              {matrixReport.summary_win_reasons.all_funnels}
+            </div>
+          </div>
+        )}
+
 
         <div className="flex gap-4">
           <div className="relative flex-1">
