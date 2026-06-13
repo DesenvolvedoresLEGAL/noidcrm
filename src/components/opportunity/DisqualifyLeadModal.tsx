@@ -18,23 +18,25 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Settings2 } from 'lucide-react';
 import {
   DISQUALIFY_REASONS,
   DISQUALIFY_REASON_LABEL,
   type DisqualifyReasonSlug,
 } from '@/lib/qualification/disqualifyReasons';
 import { findActiveRemarketingDuplicate } from '@/services/crm/disqualify';
-import {
-  useActiveQualificationFramework,
-  useQualificationFrameworkBundle,
-} from '@/hooks/useQualificationFramework';
+import { getDisqualifyReasonsForPipeline } from '@/services/crm/loss-reasons';
 
 export interface DisqualifyLeadDetails {
-  /** Stable key (framework's reason_key when available, else legacy slug). */
+  /** Stable key — official loss_reasons.id when available, else legacy slug. */
   reasonKey: string;
+  /** Official loss_reasons.id when sourced from the official table. */
+  reasonId?: string;
   /** Human label for UI / persistence. */
   reasonLabel: string;
+  /** Optional category/accountability from the official reason. */
+  reasonCategory?: string | null;
+  reasonAccountability?: string | null;
   /** @deprecated kept for backwards compat with disqualify.ts and callers. */
   reasonSlug: DisqualifyReasonSlug | string;
   observation: string;
@@ -47,6 +49,7 @@ interface DisqualifyLeadModalProps {
   onConfirm: (details: DisqualifyLeadDetails) => void;
   opportunityId: string;
   opportunityTitle: string;
+  pipelineId?: string | null;
   isLoading?: boolean;
 }
 
@@ -56,40 +59,51 @@ export function DisqualifyLeadModal({
   onConfirm,
   opportunityId,
   opportunityTitle,
+  pipelineId,
   isLoading,
 }: DisqualifyLeadModalProps) {
   const [reasonKey, setReasonKey] = useState<string>('');
   const [observation, setObservation] = useState('');
   const [createRemarketing, setCreateRemarketing] = useState(true);
 
-  // Active framework reasons (preferred). Falls back to hardcoded constant
-  // when no framework is active OR the active framework has no reasons.
-  const { data: activeFw } = useActiveQualificationFramework();
-  const { data: bundle } = useQualificationFrameworkBundle(activeFw?.id);
+  // Official source of truth: Configurações > Motivos de Ganho/Perda
+  const { data: officialReasons = [], isLoading: loadingReasons } = useQuery({
+    queryKey: ['disqualify-reasons', pipelineId, open],
+    queryFn: () => getDisqualifyReasonsForPipeline(pipelineId!),
+    enabled: open && !!pipelineId,
+    staleTime: 30_000,
+  });
 
-  const frameworkReasons = useMemo(
-    () => (bundle?.reasons ?? []).filter((r) => r.is_active),
-    [bundle?.reasons]
-  );
+  type Opt = {
+    key: string;
+    label: string;
+    reasonId?: string;
+    category?: string | null;
+    accountability?: string | null;
+    sendToRemarketingDefault: boolean;
+  };
 
-  const usingFramework = frameworkReasons.length > 0;
+  const usingOfficial = officialReasons.length > 0;
 
-  const options = useMemo(() => {
-    if (usingFramework) {
-      return frameworkReasons.map((r) => ({
-        key: r.reason_key,
-        label: r.reason_label,
-        sendToRemarketingDefault: r.send_to_remarketing_default,
+  const options = useMemo<Opt[]>(() => {
+    if (usingOfficial) {
+      return officialReasons.map((r) => ({
+        key: r.id,
+        reasonId: r.id,
+        label: r.name,
+        category: r.category ?? null,
+        accountability: r.loss_accountability ?? null,
+        sendToRemarketingDefault: r.send_to_remarketing_default ?? false,
       }));
     }
+    // Fallback: hardcoded list (only when org has no reasons configured yet)
     return DISQUALIFY_REASONS.map((r) => ({
       key: r.slug as string,
       label: r.label,
       sendToRemarketingDefault: true,
     }));
-  }, [usingFramework, frameworkReasons]);
+  }, [usingOfficial, officialReasons]);
 
-  // Pre-check if a remarketing duplicate already exists
   const { data: existingDup } = useQuery({
     queryKey: ['remarketing-dup', opportunityId, open],
     queryFn: () => findActiveRemarketingDuplicate(opportunityId),
@@ -109,8 +123,6 @@ export function DisqualifyLeadModal({
     if (existingDup) setCreateRemarketing(false);
   }, [existingDup]);
 
-  // When a reason is chosen, pre-apply its default remarketing toggle
-  // (unless a duplicate already exists — that always forces OFF).
   useEffect(() => {
     if (!reasonKey || existingDup) return;
     const opt = options.find((o) => o.key === reasonKey);
@@ -128,8 +140,10 @@ export function DisqualifyLeadModal({
       reasonKey;
     onConfirm({
       reasonKey,
+      reasonId: opt?.reasonId,
       reasonLabel,
-      // Backwards-compat alias for current disqualify.ts contract.
+      reasonCategory: opt?.category ?? null,
+      reasonAccountability: opt?.accountability ?? null,
       reasonSlug: reasonKey,
       observation: observation.trim(),
       createRemarketing: existingDup ? false : createRemarketing,
@@ -162,9 +176,11 @@ export function DisqualifyLeadModal({
 
           <div className="space-y-2">
             <Label>Motivo da desqualificação *</Label>
-            <Select value={reasonKey} onValueChange={setReasonKey}>
+            <Select value={reasonKey} onValueChange={setReasonKey} disabled={loadingReasons}>
               <SelectTrigger>
-                <SelectValue placeholder="Selecione o motivo" />
+                <SelectValue
+                  placeholder={loadingReasons ? 'Carregando motivos...' : 'Selecione o motivo'}
+                />
               </SelectTrigger>
               <SelectContent>
                 {options.map((opt) => (
@@ -174,9 +190,18 @@ export function DisqualifyLeadModal({
                 ))}
               </SelectContent>
             </Select>
-            {!usingFramework && (
+            {usingOfficial ? (
+              <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+                <Settings2 className="h-3 w-3" />
+                Motivos definidos em Configurações &gt; Motivos de Ganho/Perda.
+              </p>
+            ) : (
               <p className="text-[11px] text-muted-foreground">
-                Usando lista padrão. Configure motivos em Configurações &gt; Régua de Qualificação.
+                Usando lista padrão. Cadastre motivos em{' '}
+                <a href="/app/settings/win-loss-reasons" className="underline">
+                  Configurações &gt; Motivos de Ganho/Perda
+                </a>
+                .
               </p>
             )}
           </div>
@@ -216,11 +241,7 @@ export function DisqualifyLeadModal({
             <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>
               Cancelar
             </Button>
-            <Button
-              onClick={handleConfirm}
-              disabled={!canSubmit}
-              variant="destructive"
-            >
+            <Button onClick={handleConfirm} disabled={!canSubmit} variant="destructive">
               {isLoading ? 'Confirmando...' : 'Confirmar desqualificação'}
             </Button>
           </div>

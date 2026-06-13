@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
 import {
   Select,
   SelectContent,
@@ -41,6 +42,9 @@ export function LossReasonModal({
   const [isActive, setIsActive] = useState(true);
   const [audience, setAudience] = useState<string>('both');
   const [category, setCategory] = useState<string>('');
+  const [reasonType, setReasonType] = useState<'lost' | 'disqualification'>('lost');
+  const [accountability, setAccountability] = useState<string>('unknown');
+  const [sendToRemarketing, setSendToRemarketing] = useState(false);
   const [allPipelines, setAllPipelines] = useState(true);
   const [selectedPipelines, setSelectedPipelines] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -53,6 +57,9 @@ export function LossReasonModal({
         setIsActive(reason.is_active);
         setAudience((reason as any).audience || 'both');
         setCategory((reason as any).category || '');
+        setReasonType(((reason as any).reason_type as any) || 'lost');
+        setAccountability((reason as any).loss_accountability || 'unknown');
+        setSendToRemarketing(!!(reason as any).send_to_remarketing_default);
         setAllPipelines(!reason.pipeline_ids || reason.pipeline_ids.length === 0);
         setSelectedPipelines(reason.pipeline_ids || []);
       } else {
@@ -60,6 +67,9 @@ export function LossReasonModal({
         setIsActive(true);
         setAudience('both');
         setCategory('');
+        setReasonType('lost');
+        setAccountability('unknown');
+        setSendToRemarketing(false);
         setAllPipelines(true);
         setSelectedPipelines([]);
       }
@@ -68,68 +78,50 @@ export function LossReasonModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!name.trim()) {
-      toast({
-        title: 'Erro',
-        description: 'Nome do motivo é obrigatório',
-        variant: 'destructive',
-      });
+      toast({ title: 'Erro', description: 'Nome do motivo é obrigatório', variant: 'destructive' });
       return;
     }
-
     setLoading(true);
-
     try {
       const data = {
         name: name.trim(),
         is_active: isActive,
         pipeline_ids: allPipelines ? null : selectedPipelines,
         audience,
-        category: category || undefined,
+        category: category || null,
+        reason_type: reasonType,
+        loss_accountability: accountability,
+        send_to_remarketing_default: sendToRemarketing,
       };
 
       if (reason) {
         await updateLossReason(reason.id, data);
-        toast({
-          title: 'Sucesso',
-          description: 'Motivo de perda atualizado',
-        });
+        toast({ title: 'Sucesso', description: 'Motivo atualizado' });
       } else {
         await createLossReason(data);
-        toast({
-          title: 'Sucesso',
-          description: 'Motivo de perda criado',
-        });
+        toast({ title: 'Sucesso', description: 'Motivo criado' });
       }
       onClose();
     } catch (error) {
       console.error('Error saving loss reason:', error);
-      toast({
-        title: 'Erro',
-        description: 'Erro ao salvar motivo de perda',
-        variant: 'destructive',
-      });
+      toast({ title: 'Erro', description: 'Erro ao salvar motivo', variant: 'destructive' });
     } finally {
       setLoading(false);
     }
   };
 
   const togglePipeline = (pipelineId: string) => {
-    setSelectedPipelines(prev =>
-      prev.includes(pipelineId)
-        ? prev.filter(id => id !== pipelineId)
-        : [...prev, pipelineId]
+    setSelectedPipelines((prev) =>
+      prev.includes(pipelineId) ? prev.filter((id) => id !== pipelineId) : [...prev, pipelineId]
     );
   };
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[520px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>
-            {reason ? 'Editar Motivo de Perda' : 'Novo Motivo de Perda'}
-          </DialogTitle>
+          <DialogTitle>{reason ? 'Editar Motivo' : 'Novo Motivo'}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
@@ -138,13 +130,49 @@ export function LossReasonModal({
               id="name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Ex: Preço percebido como alto"
+              placeholder="Ex: Sem evento definido"
               required
             />
           </div>
 
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label>Tipo</Label>
+              <Select value={reasonType} onValueChange={(v) => setReasonType(v as any)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="lost">Motivo de Perda</SelectItem>
+                  <SelectItem value="disqualification">Motivo de Desqualificação</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground">
+                {reasonType === 'disqualification'
+                  ? 'Usado no botão "Perdeu" do funil PRÉ VENDAS.'
+                  : 'Usado em fechamentos perdidos em VENDAS.'}
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Accountability</Label>
+              <Select value={accountability} onValueChange={setAccountability}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="commercial">Comercial</SelectItem>
+                  <SelectItem value="client">Cliente</SelectItem>
+                  <SelectItem value="market">Mercado</SelectItem>
+                  <SelectItem value="operations">Operações</SelectItem>
+                  <SelectItem value="unknown">Indefinido</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
           <div className="space-y-2">
-            <Label htmlFor="category">Categoria (Macro Motivo)</Label>
+            <Label>Categoria (Macro Motivo)</Label>
             <Select value={category} onValueChange={setCategory}>
               <SelectTrigger>
                 <SelectValue placeholder="Selecione a categoria" />
@@ -160,13 +188,10 @@ export function LossReasonModal({
                 <SelectItem value="other">Outro</SelectItem>
               </SelectContent>
             </Select>
-            <p className="text-xs text-muted-foreground">
-              Agrupa este motivo em uma categoria macro para análise.
-            </p>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="audience">Visibilidade</Label>
+            <Label>Visibilidade</Label>
             <Select value={audience} onValueChange={setAudience}>
               <SelectTrigger>
                 <SelectValue />
@@ -177,16 +202,27 @@ export function LossReasonModal({
                 <SelectItem value="both">Ambos</SelectItem>
               </SelectContent>
             </Select>
-            <p className="text-xs text-muted-foreground">
-              Define se este motivo aparece para o cliente no link público, para o vendedor no CRM, ou ambos.
+            <p className="text-[11px] text-muted-foreground">
+              O modal "Desqualificar lead" só lista motivos com visibilidade Vendedor ou Ambos.
             </p>
           </div>
 
+          <div className="flex items-center justify-between rounded-md border p-3">
+            <div>
+              <Label htmlFor="rmkt">Enviar para Remarketing por padrão</Label>
+              <p className="text-[11px] text-muted-foreground">
+                Quando este motivo for selecionado, marcar a opção de criar oportunidade no
+                funil Remarketing.
+              </p>
+            </div>
+            <Switch id="rmkt" checked={sendToRemarketing} onCheckedChange={setSendToRemarketing} />
+          </div>
+
           <div className="space-y-2">
-            <Label htmlFor="status">Status</Label>
+            <Label>Status</Label>
             <Select
               value={isActive ? 'active' : 'inactive'}
-              onValueChange={(value) => setIsActive(value === 'active')}
+              onValueChange={(v) => setIsActive(v === 'active')}
             >
               <SelectTrigger>
                 <SelectValue />
@@ -206,15 +242,10 @@ export function LossReasonModal({
                 checked={allPipelines}
                 onCheckedChange={(checked) => {
                   setAllPipelines(checked as boolean);
-                  if (checked) {
-                    setSelectedPipelines([]);
-                  }
+                  if (checked) setSelectedPipelines([]);
                 }}
               />
-              <label
-                htmlFor="all-pipelines"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-              >
+              <label htmlFor="all-pipelines" className="text-sm font-medium">
                 Todos os funis
               </label>
             </div>
@@ -228,10 +259,7 @@ export function LossReasonModal({
                       checked={selectedPipelines.includes(pipeline.id)}
                       onCheckedChange={() => togglePipeline(pipeline.id)}
                     />
-                    <label
-                      htmlFor={`pipeline-${pipeline.id}`}
-                      className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                    >
+                    <label htmlFor={`pipeline-${pipeline.id}`} className="text-sm">
                       {pipeline.name}
                     </label>
                   </div>

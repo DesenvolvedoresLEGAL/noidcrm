@@ -4,10 +4,14 @@ import { DISQUALIFY_REASON_LABEL } from '@/lib/qualification/disqualifyReasons';
 import { logDisqualificationEvent } from './timeline-logger';
 
 export interface DisqualifyParams {
-  /** Stable reason key — framework reason_key or legacy hardcoded slug. */
+  /** Stable reason key — official loss_reasons.id, framework key, or legacy slug. */
   reasonSlug: DisqualifyReasonSlug | string;
-  /** Optional human label (used when reason comes from active framework). */
+  /** Official loss_reasons.id — when present persists the FK. */
+  reasonId?: string;
+  /** Optional human label (used when reason comes from official/framework source). */
   reasonLabel?: string;
+  /** Optional accountability bucket from the official reason. */
+  reasonAccountability?: string | null;
   observation?: string;
   createRemarketing: boolean;
 }
@@ -50,7 +54,14 @@ export async function disqualifyPreSalesOpportunity(
   params: DisqualifyParams
 ): Promise<DisqualifyResult> {
   const nowIso = new Date().toISOString();
-  const { reasonSlug, reasonLabel: providedLabel, observation, createRemarketing } = params;
+  const {
+    reasonSlug,
+    reasonId,
+    reasonLabel: providedLabel,
+    reasonAccountability,
+    observation,
+    createRemarketing,
+  } = params;
 
   // 1. Load opportunity + pipeline context
   const { data: opp, error: oppErr } = await supabase
@@ -98,17 +109,25 @@ export async function disqualifyPreSalesOpportunity(
   if (observation?.trim()) lossCommentParts.push(observation.trim());
   const lossComment = lossCommentParts.join(' — ');
 
+  const accountabilityValue = (
+    reasonAccountability &&
+    ['commercial', 'client', 'operations', 'market', 'unknown'].includes(reasonAccountability)
+      ? reasonAccountability
+      : 'unknown'
+  ) as 'commercial' | 'client' | 'operations' | 'market' | 'unknown';
+
   const updatePayload: Record<string, any> = {
     status: 'lost',
     qualification_loss_reason: reasonSlug,
     loss_comment: lossComment,
-    loss_accountability: 'unknown',
+    loss_accountability: accountabilityValue,
     closed_at: nowIso,
     updated_at: nowIso,
     opportunity_score: null,
     win_probability_ai: null,
     score_updated_at: null,
   };
+  if (reasonId) updatePayload.loss_reason_id = reasonId;
   if (desqualificadoStageId) updatePayload.stage_id = desqualificadoStageId;
 
   const { error: updErr } = await supabase
@@ -132,9 +151,9 @@ export async function disqualifyPreSalesOpportunity(
 
     const payload = {
       outcome: 'lost' as const,
-      reason_id: null,
+      reason_id: reasonId ?? null,
       reason_seller: lossComment,
-      loss_accountability: 'unknown' as const,
+      loss_accountability: accountabilityValue,
       is_recoverable: 'maybe' as const,
       final_value: (opp as any).valor_previsto ?? null,
       recorded_by: userData?.user?.id,

@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Search, Pencil, Trash2, Trophy, XCircle } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Trophy, XCircle, Sparkles } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -32,6 +32,7 @@ import {
   listLossReasons,
   deleteLossReason,
   toggleLossReasonStatus,
+  seedPreSalesDisqualificationReasons,
   type LossReason,
 } from '@/services/crm/loss-reasons';
 import {
@@ -50,6 +51,8 @@ export default function WinLossReasons() {
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPipeline, setSelectedPipeline] = useState<string>('all');
+  const [selectedType, setSelectedType] = useState<string>('all');
+  const [seeding, setSeeding] = useState(false);
   const [isLossModalOpen, setIsLossModalOpen] = useState(false);
   const [isWinModalOpen, setIsWinModalOpen] = useState(false);
   const [editingLossReason, setEditingLossReason] = useState<LossReason | null>(null);
@@ -217,8 +220,41 @@ export default function WinLossReasons() {
     const matchesPipeline = selectedPipeline === 'all' ||
       !reason.pipeline_ids ||
       reason.pipeline_ids.includes(selectedPipeline);
-    return matchesSearch && matchesPipeline;
+    const rType = (reason as any).reason_type || 'lost';
+    const matchesType = selectedType === 'all' || rType === selectedType;
+    return matchesSearch && matchesPipeline && matchesType;
   });
+
+  const handleSeedPreSales = async () => {
+    const qualPipelines = pipelines.filter((p) => (p as any).pipeline_type === 'qualification');
+    if (qualPipelines.length === 0) {
+      toast({
+        title: 'Nenhum funil de PRÉ VENDAS',
+        description: 'Crie um funil de qualificação antes de aplicar o template.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    const target =
+      selectedPipeline !== 'all' &&
+      qualPipelines.find((p) => p.id === selectedPipeline);
+    const pipeline = target || qualPipelines[0];
+    if (!confirm(`Aplicar template de motivos de Desqualificação ao funil "${pipeline.name}"?`)) return;
+    try {
+      setSeeding(true);
+      const orgId = (pipeline as any).organization_id as string;
+      const inserted = await seedPreSalesDisqualificationReasons(orgId, pipeline.id);
+      toast({
+        title: 'Template aplicado',
+        description: `${inserted} motivos criados (existentes preservados).`,
+      });
+      loadData();
+    } catch (err: any) {
+      toast({ title: 'Erro', description: err?.message || 'Falha ao aplicar template', variant: 'destructive' });
+    } finally {
+      setSeeding(false);
+    }
+  };
 
   const filteredWinReasons = winReasons
     .filter(reason => {
@@ -240,10 +276,21 @@ export default function WinLossReasons() {
               Gerencie os motivos de ganho e perda de oportunidades
             </p>
           </div>
-          <Button onClick={() => activeTab === 'loss' ? setIsLossModalOpen(true) : setIsWinModalOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Adicionar motivo
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={handleSeedPreSales}
+              disabled={seeding}
+              title="Cria os motivos padrão de desqualificação para PRÉ VENDAS (idempotente)"
+            >
+              <Sparkles className="mr-2 h-4 w-4" />
+              {seeding ? 'Aplicando...' : 'Aplicar template PRÉ VENDAS'}
+            </Button>
+            <Button onClick={() => activeTab === 'loss' ? setIsLossModalOpen(true) : setIsWinModalOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Adicionar motivo
+            </Button>
+          </div>
         </div>
 
         <div className="flex gap-4">
@@ -269,6 +316,16 @@ export default function WinLossReasons() {
               ))}
             </SelectContent>
           </Select>
+          <Select value={selectedType} onValueChange={setSelectedType}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Filtrar por tipo" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os tipos</SelectItem>
+              <SelectItem value="lost">Motivo de Perda</SelectItem>
+              <SelectItem value="disqualification">Motivo de Desqualificação</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -289,6 +346,7 @@ export default function WinLossReasons() {
                 <TableHeader>
                   <TableRow>
                      <TableHead>MOTIVO</TableHead>
+                     <TableHead>TIPO</TableHead>
                      <TableHead>CATEGORIA</TableHead>
                      <TableHead>VISIBILIDADE</TableHead>
                      <TableHead>FUNIL</TableHead>
@@ -299,13 +357,13 @@ export default function WinLossReasons() {
                 <TableBody>
                   {loading ? (
                     <TableRow>
-                     <TableCell colSpan={6} className="text-center">
+                     <TableCell colSpan={7} className="text-center">
                         Carregando...
                       </TableCell>
                     </TableRow>
                   ) : filteredLossReasons.length === 0 ? (
                     <TableRow>
-                     <TableCell colSpan={6} className="text-center text-muted-foreground">
+                     <TableCell colSpan={7} className="text-center text-muted-foreground">
                         Nenhum motivo encontrado
                       </TableCell>
                     </TableRow>
@@ -313,6 +371,11 @@ export default function WinLossReasons() {
                     filteredLossReasons.map((reason) => (
                       <TableRow key={reason.id}>
                         <TableCell className="font-medium">{reason.name}</TableCell>
+                        <TableCell>
+                          <Badge variant={((reason as any).reason_type === 'disqualification') ? 'destructive' : 'secondary'}>
+                            {((reason as any).reason_type === 'disqualification') ? 'Desqualificação' : 'Perda'}
+                          </Badge>
+                        </TableCell>
                         <TableCell>
                           <span className="text-sm text-muted-foreground">{getCategoryLabel((reason as any).category)}</span>
                         </TableCell>

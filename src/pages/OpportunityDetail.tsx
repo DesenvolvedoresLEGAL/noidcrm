@@ -257,7 +257,9 @@ export default function OpportunityDetail() {
     mutationFn: async (details: DisqualifyLeadDetails) => {
       const result = await disqualifyPreSalesOpportunity(id!, {
         reasonSlug: details.reasonKey ?? details.reasonSlug,
+        reasonId: details.reasonId,
         reasonLabel: details.reasonLabel,
+        reasonAccountability: details.reasonAccountability,
         observation: details.observation,
         createRemarketing: details.createRemarketing,
       });
@@ -573,6 +575,7 @@ export default function OpportunityDetail() {
         onConfirm={handleConfirmDisqualify}
         opportunityId={opportunity.id}
         opportunityTitle={opportunity.title}
+        pipelineId={opportunity.pipeline_id}
         isLoading={disqualifyMutation.isPending}
       />
 
