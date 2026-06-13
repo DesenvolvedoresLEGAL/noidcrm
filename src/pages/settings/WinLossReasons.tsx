@@ -67,7 +67,8 @@ import { LossReasonModal } from '@/components/settings/LossReasonModal';
 import { WinReasonModal } from '@/components/settings/WinReasonModal';
 
 export default function WinLossReasons() {
-  const { organization } = useCurrentOrganization();
+  const { organization, isAdmin } = useCurrentOrganization();
+  const [pendingAdvancedAction, setPendingAdvancedAction] = useState<null | 'matrix' | 'seed' | 'diagnostic'>(null);
   const [lossReasons, setLossReasons] = useState<LossReason[]>([]);
   const [winReasons, setWinReasons] = useState<WinReason[]>([]);
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
