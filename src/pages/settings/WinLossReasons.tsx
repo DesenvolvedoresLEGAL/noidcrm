@@ -260,6 +260,44 @@ export default function WinLossReasons() {
     }
   };
 
+  const handleApplyMatrix = async () => {
+    const anyPipeline = pipelines.find((p) => !!(p as any).organization_id);
+    if (!anyPipeline) {
+      toast({
+        title: 'Sem pipelines',
+        description: 'Crie pelo menos um funil antes de aplicar a matriz.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (
+      !confirm(
+        'Aplicar matriz oficial de escopo (PRÉ VENDAS / VENDAS) aos motivos existentes?\n' +
+          'Operação idempotente: não apaga motivos, apenas atualiza pipeline_ids, tipo e categoria.'
+      )
+    )
+      return;
+    try {
+      setApplyingMatrix(true);
+      const orgId = (anyPipeline as any).organization_id as string;
+      const report = await applyLossWinReasonsScopeMatrix(orgId);
+      setMatrixReport(report);
+      toast({
+        title: 'Matriz aplicada',
+        description: `${report.updated.length} atualizados • ${report.created.length} criados`,
+      });
+      loadData();
+    } catch (err: any) {
+      toast({
+        title: 'Erro',
+        description: err?.message || 'Falha ao aplicar matriz',
+        variant: 'destructive',
+      });
+    } finally {
+      setApplyingMatrix(false);
+    }
+  };
+
   const filteredWinReasons = winReasons
     .filter(reason => {
       const matchesSearch = reason.name.toLowerCase().includes(searchTerm.toLowerCase());
