@@ -346,6 +346,7 @@ export default function WinLossReasons() {
                 <TableHeader>
                   <TableRow>
                      <TableHead>MOTIVO</TableHead>
+                     <TableHead>TIPO</TableHead>
                      <TableHead>CATEGORIA</TableHead>
                      <TableHead>VISIBILIDADE</TableHead>
                      <TableHead>FUNIL</TableHead>
@@ -356,13 +357,13 @@ export default function WinLossReasons() {
                 <TableBody>
                   {loading ? (
                     <TableRow>
-                     <TableCell colSpan={6} className="text-center">
+                     <TableCell colSpan={7} className="text-center">
                         Carregando...
                       </TableCell>
                     </TableRow>
                   ) : filteredLossReasons.length === 0 ? (
                     <TableRow>
-                     <TableCell colSpan={6} className="text-center text-muted-foreground">
+                     <TableCell colSpan={7} className="text-center text-muted-foreground">
                         Nenhum motivo encontrado
                       </TableCell>
                     </TableRow>
