@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Search, Pencil, Trash2, Trophy, XCircle } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Trophy, XCircle, Sparkles } from 'lucide-react';
 import {
   Table,
   TableBody,
