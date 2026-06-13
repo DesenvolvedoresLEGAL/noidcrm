@@ -151,9 +151,9 @@ export async function disqualifyPreSalesOpportunity(
 
     const payload = {
       outcome: 'lost' as const,
-      reason_id: null,
+      reason_id: reasonId ?? null,
       reason_seller: lossComment,
-      loss_accountability: 'unknown' as const,
+      loss_accountability: accountabilityValue,
       is_recoverable: 'maybe' as const,
       final_value: (opp as any).valor_previsto ?? null,
       recorded_by: userData?.user?.id,
