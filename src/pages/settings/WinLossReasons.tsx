@@ -342,30 +342,73 @@ export default function WinLossReasons() {
             </p>
           </div>
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={handleApplyMatrix}
-              disabled={applyingMatrix}
-              title="Reescopa motivos para PRÉ VENDAS / VENDAS conforme matriz oficial (idempotente)"
-            >
-              <Sparkles className="mr-2 h-4 w-4" />
-              {applyingMatrix ? 'Aplicando...' : 'Aplicar matriz de escopo'}
-            </Button>
-            <Button
-              variant="outline"
-              onClick={handleSeedPreSales}
-              disabled={seeding}
-              title="Cria os motivos padrão de desqualificação para PRÉ VENDAS (idempotente)"
-            >
-              <Sparkles className="mr-2 h-4 w-4" />
-              {seeding ? 'Aplicando...' : 'Aplicar template PRÉ VENDAS'}
-            </Button>
             <Button onClick={() => activeTab === 'loss' ? setIsLossModalOpen(true) : setIsWinModalOpen(true)}>
               <Plus className="mr-2 h-4 w-4" />
               Adicionar motivo
             </Button>
+            {isAdmin && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    title="Ações avançadas"
+                    aria-label="Ações avançadas"
+                    disabled={seeding || applyingMatrix}
+                  >
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel>Ações avançadas</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={() => setPendingAdvancedAction('seed')}>
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    Aplicar template PRÉ VENDAS
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setPendingAdvancedAction('matrix')}>
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    Reaplicar matriz de escopo
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setPendingAdvancedAction('diagnostic')}>
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    Ver diagnóstico dos motivos
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
         </div>
+
+        <AlertDialog
+          open={pendingAdvancedAction !== null}
+          onOpenChange={(open) => { if (!open) setPendingAdvancedAction(null); }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Ação avançada de configuração</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esta ação ajusta motivos e escopos de funil. Use apenas em setup, migração ou
+                manutenção. Ela é idempotente e não apaga dados, mas pode alterar a organização
+                dos motivos.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  const action = pendingAdvancedAction;
+                  setPendingAdvancedAction(null);
+                  if (action === 'seed') handleSeedPreSales();
+                  else if (action === 'matrix' || action === 'diagnostic') handleApplyMatrix();
+                }}
+              >
+                Confirmar ação
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
 
         {matrixReport && (
           <div className="rounded-md border bg-muted/30 p-4 text-sm space-y-2">
