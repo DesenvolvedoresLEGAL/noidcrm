@@ -256,7 +256,8 @@ export default function OpportunityDetail() {
   const disqualifyMutation = useMutation({
     mutationFn: async (details: DisqualifyLeadDetails) => {
       const result = await disqualifyPreSalesOpportunity(id!, {
-        reasonSlug: details.reasonSlug,
+        reasonSlug: details.reasonKey ?? details.reasonSlug,
+        reasonLabel: details.reasonLabel,
         observation: details.observation,
         createRemarketing: details.createRemarketing,
       });

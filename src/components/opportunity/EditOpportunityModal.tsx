@@ -488,8 +488,7 @@ export function EditOpportunityModal({
     <QualificationGateModal
       open={gateOpen}
       onOpenChange={setGateOpen}
-      score={qualScore.total}
-      blockers={qualScore.blockers}
+      result={qualScore}
     />
     </>
   );
