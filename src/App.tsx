@@ -126,6 +126,7 @@ const Support = lazy(() => import("./pages/Support"));
 const ProposalEditor = lazy(() => import("./pages/ProposalEditor"));
 const CustomFields = lazy(() => import("./pages/settings/CustomFields"));
 const CustomForms = lazy(() => import("./pages/settings/CustomForms"));
+const QualificationFrameworkPage = lazy(() => import("./pages/settings/QualificationFrameworkPage"));
 const TagsManagement = lazy(() => import("./pages/settings/TagsManagement"));
 const PermissionSettings = lazy(() => import("./pages/settings/PermissionSettings"));
 const Industries = lazy(() => import("./pages/settings/Industries"));
@@ -917,6 +918,7 @@ const App = () => (
                 <Route path="/app/settings/proposal-templates/:id/edit" element={<ProposalTemplateEditor />} />
                 <Route path="/app/settings/custom-fields" element={<CustomFields />} />
                 <Route path="/app/settings/custom-forms" element={<CustomForms />} />
+                <Route path="/app/settings/qualification" element={<QualificationFrameworkPage />} />
                 <Route path="/app/settings/tags" element={<TagsManagement />} />
                 <Route path="/app/settings/permissions" element={<PermissionSettings />} />
                 <Route path="/app/settings/sales-config" element={<SalesConfigPage />} />

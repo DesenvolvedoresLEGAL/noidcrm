@@ -26366,6 +26366,465 @@ export type Database = {
           },
         ]
       }
+      qualification_automations: {
+        Row: {
+          config: Json
+          created_at: string
+          description: string | null
+          framework_id: string
+          id: string
+          is_active: boolean
+          name: string
+          order_index: number
+          organization_id: string
+          trigger_key: string
+          updated_at: string
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          description?: string | null
+          framework_id: string
+          id?: string
+          is_active?: boolean
+          name: string
+          order_index?: number
+          organization_id: string
+          trigger_key: string
+          updated_at?: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          description?: string | null
+          framework_id?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          order_index?: number
+          organization_id?: string
+          trigger_key?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "qualification_automations_framework_id_fkey"
+            columns: ["framework_id"]
+            isOneToOne: false
+            referencedRelation: "qualification_frameworks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      qualification_blocking_rules: {
+        Row: {
+          action_key: string
+          action_label: string
+          block_message_body: string | null
+          block_message_title: string | null
+          created_at: string
+          framework_id: string
+          id: string
+          is_active: boolean
+          minimum_score: number | null
+          order_index: number
+          organization_id: string
+          require_all_required_fields: boolean
+          require_valid_proposal_permission: boolean
+          target_pipeline_id: string | null
+          target_stage_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          action_key: string
+          action_label: string
+          block_message_body?: string | null
+          block_message_title?: string | null
+          created_at?: string
+          framework_id: string
+          id?: string
+          is_active?: boolean
+          minimum_score?: number | null
+          order_index?: number
+          organization_id: string
+          require_all_required_fields?: boolean
+          require_valid_proposal_permission?: boolean
+          target_pipeline_id?: string | null
+          target_stage_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          action_key?: string
+          action_label?: string
+          block_message_body?: string | null
+          block_message_title?: string | null
+          created_at?: string
+          framework_id?: string
+          id?: string
+          is_active?: boolean
+          minimum_score?: number | null
+          order_index?: number
+          organization_id?: string
+          require_all_required_fields?: boolean
+          require_valid_proposal_permission?: boolean
+          target_pipeline_id?: string | null
+          target_stage_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "qualification_blocking_rules_framework_id_fkey"
+            columns: ["framework_id"]
+            isOneToOne: false
+            referencedRelation: "qualification_frameworks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      qualification_criteria: {
+        Row: {
+          created_at: string
+          criterion_key: string | null
+          description: string | null
+          framework_id: string
+          id: string
+          is_active: boolean
+          is_required: boolean
+          name: string
+          order_index: number
+          organization_id: string
+          updated_at: string
+          weight: number
+        }
+        Insert: {
+          created_at?: string
+          criterion_key?: string | null
+          description?: string | null
+          framework_id: string
+          id?: string
+          is_active?: boolean
+          is_required?: boolean
+          name: string
+          order_index?: number
+          organization_id: string
+          updated_at?: string
+          weight?: number
+        }
+        Update: {
+          created_at?: string
+          criterion_key?: string | null
+          description?: string | null
+          framework_id?: string
+          id?: string
+          is_active?: boolean
+          is_required?: boolean
+          name?: string
+          order_index?: number
+          organization_id?: string
+          updated_at?: string
+          weight?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "qualification_criteria_framework_id_fkey"
+            columns: ["framework_id"]
+            isOneToOne: false
+            referencedRelation: "qualification_frameworks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      qualification_criterion_fields: {
+        Row: {
+          created_at: string
+          criterion_id: string
+          field_key: string
+          field_label: string
+          field_source: string
+          field_type: string
+          framework_id: string
+          id: string
+          invalid_values: string[]
+          is_required_for_advance: boolean
+          is_required_for_score: boolean
+          max_value: number | null
+          min_value: number | null
+          options: Json
+          order_index: number
+          organization_id: string
+          points: number
+          updated_at: string
+          validation_type: string | null
+        }
+        Insert: {
+          created_at?: string
+          criterion_id: string
+          field_key: string
+          field_label: string
+          field_source: string
+          field_type?: string
+          framework_id: string
+          id?: string
+          invalid_values?: string[]
+          is_required_for_advance?: boolean
+          is_required_for_score?: boolean
+          max_value?: number | null
+          min_value?: number | null
+          options?: Json
+          order_index?: number
+          organization_id: string
+          points?: number
+          updated_at?: string
+          validation_type?: string | null
+        }
+        Update: {
+          created_at?: string
+          criterion_id?: string
+          field_key?: string
+          field_label?: string
+          field_source?: string
+          field_type?: string
+          framework_id?: string
+          id?: string
+          invalid_values?: string[]
+          is_required_for_advance?: boolean
+          is_required_for_score?: boolean
+          max_value?: number | null
+          min_value?: number | null
+          options?: Json
+          order_index?: number
+          organization_id?: string
+          points?: number
+          updated_at?: string
+          validation_type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "qualification_criterion_fields_criterion_id_fkey"
+            columns: ["criterion_id"]
+            isOneToOne: false
+            referencedRelation: "qualification_criteria"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "qualification_criterion_fields_framework_id_fkey"
+            columns: ["framework_id"]
+            isOneToOne: false
+            referencedRelation: "qualification_frameworks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      qualification_disqualification_reasons: {
+        Row: {
+          accountability: string | null
+          category: string | null
+          created_at: string
+          framework_id: string
+          id: string
+          is_active: boolean
+          order_index: number
+          organization_id: string
+          reason_key: string
+          reason_label: string
+          send_to_remarketing_default: boolean
+          updated_at: string
+        }
+        Insert: {
+          accountability?: string | null
+          category?: string | null
+          created_at?: string
+          framework_id: string
+          id?: string
+          is_active?: boolean
+          order_index?: number
+          organization_id: string
+          reason_key: string
+          reason_label: string
+          send_to_remarketing_default?: boolean
+          updated_at?: string
+        }
+        Update: {
+          accountability?: string | null
+          category?: string | null
+          created_at?: string
+          framework_id?: string
+          id?: string
+          is_active?: boolean
+          order_index?: number
+          organization_id?: string
+          reason_key?: string
+          reason_label?: string
+          send_to_remarketing_default?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "qualification_disqualification_reasons_framework_id_fkey"
+            columns: ["framework_id"]
+            isOneToOne: false
+            referencedRelation: "qualification_frameworks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      qualification_framework_audit_log: {
+        Row: {
+          action: string
+          diff: Json
+          entity_id: string | null
+          entity_type: string | null
+          framework_id: string
+          id: string
+          organization_id: string
+          performed_at: string
+          performed_by: string | null
+        }
+        Insert: {
+          action: string
+          diff?: Json
+          entity_id?: string | null
+          entity_type?: string | null
+          framework_id: string
+          id?: string
+          organization_id: string
+          performed_at?: string
+          performed_by?: string | null
+        }
+        Update: {
+          action?: string
+          diff?: Json
+          entity_id?: string | null
+          entity_type?: string | null
+          framework_id?: string
+          id?: string
+          organization_id?: string
+          performed_at?: string
+          performed_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "qualification_framework_audit_log_framework_id_fkey"
+            columns: ["framework_id"]
+            isOneToOne: false
+            referencedRelation: "qualification_frameworks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      qualification_frameworks: {
+        Row: {
+          applies_to_pipeline_ids: string[]
+          applies_to_stage_ids: string[]
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          metadata: Json
+          minimum_score_to_advance: number
+          name: string
+          organization_id: string
+          target_pipeline_id: string | null
+          template_key: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          applies_to_pipeline_ids?: string[]
+          applies_to_stage_ids?: string[]
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          metadata?: Json
+          minimum_score_to_advance?: number
+          name: string
+          organization_id: string
+          target_pipeline_id?: string | null
+          template_key?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          applies_to_pipeline_ids?: string[]
+          applies_to_stage_ids?: string[]
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          metadata?: Json
+          minimum_score_to_advance?: number
+          name?: string
+          organization_id?: string
+          target_pipeline_id?: string | null
+          template_key?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      qualification_score_ranges: {
+        Row: {
+          color: string | null
+          created_at: string
+          description: string | null
+          framework_id: string
+          id: string
+          is_priority: boolean
+          is_sql: boolean
+          label: string
+          max_score: number
+          min_score: number
+          order_index: number
+          organization_id: string
+          range_key: string | null
+          updated_at: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          framework_id: string
+          id?: string
+          is_priority?: boolean
+          is_sql?: boolean
+          label: string
+          max_score: number
+          min_score: number
+          order_index?: number
+          organization_id: string
+          range_key?: string | null
+          updated_at?: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          framework_id?: string
+          id?: string
+          is_priority?: boolean
+          is_sql?: boolean
+          label?: string
+          max_score?: number
+          min_score?: number
+          order_index?: number
+          organization_id?: string
+          range_key?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "qualification_score_ranges_framework_id_fkey"
+            columns: ["framework_id"]
+            isOneToOne: false
+            referencedRelation: "qualification_frameworks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rate_limit_log: {
         Row: {
           blocked: boolean | null
@@ -35728,6 +36187,7 @@ export type Database = {
         Args: { p_apply_mode?: string; p_audit_item_id: string }
         Returns: Json
       }
+      apply_qualification_template_legal: { Args: never; Returns: string }
       approve_hypothesis: {
         Args: { _hypothesis_id: string }
         Returns: {

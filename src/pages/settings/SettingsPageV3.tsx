@@ -103,6 +103,7 @@ const settingsCategories: SettingsCategory[] = [
       { id: 'custom-fields', label: 'Campos Personalizados', description: 'Campos customizados para entidades', icon: Layers, path: '/app/settings/custom-fields', requiredLevel: 'partial', keywords: ['campo', 'customizado', 'personalizado', 'variável'] },
       { id: 'custom-forms', label: 'Formulários', description: 'Checklists e formulários personalizados', icon: FileCheck, path: '/app/settings/custom-forms', requiredLevel: 'partial', keywords: ['formulário', 'checklist', 'form'] },
       { id: 'tags', label: 'Tags', description: 'Gerencie tags de contas e oportunidades', icon: TagIcon, path: '/app/settings/tags', requiredLevel: 'partial', keywords: ['tag', 'etiqueta', 'rótulo', 'classificação'] },
+      { id: 'qualification', label: 'Régua de Qualificação', description: 'Configure critérios, pesos, campos obrigatórios, score comercial e regras de passagem entre funis', icon: FileCheck, path: '/app/settings/qualification', requiredLevel: 'full', keywords: ['qualificação', 'score', 'critério', 'régua', 'sql', 'desqualificação'] },
     ],
   },
   // 6. Propostas

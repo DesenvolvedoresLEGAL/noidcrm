@@ -1,42 +1,72 @@
-## Verificação final — Sprints 1 a 5 vs. critério de aceite
+# Régua de Qualificação — Plano de Implementação (status)
 
-Não há código novo a escrever: a mensagem é a régua final do épico. Abaixo, status de cada critério mapeado para o que já existe no projeto após Sprints 1-5.
+## Sprint 1 — Schema base + RLS — ✅ ENTREGUE
+Tabelas criadas com RLS por `organization_id`, GRANTs, triggers `updated_at`:
+- `qualification_frameworks`
+- `qualification_criteria`
+- `qualification_criterion_fields`
+- `qualification_score_ranges`
+- `qualification_blocking_rules`
+- `qualification_disqualification_reasons`
+- `qualification_automations`
+- `qualification_framework_audit_log`
 
-### Critérios de aceite
+## Sprint 2 — Tipos + Service + Hooks — ✅ ENTREGUE
+- `src/types/qualification.ts`
+- `src/services/qualification/frameworksService.ts` (listFrameworks, getActiveFramework, getFrameworkBundle, applyLegalTemplate, update helpers)
+- `src/hooks/useQualificationFramework.ts`
 
-| # | Critério | Status | Onde mora |
-|---|----------|--------|-----------|
-| 1 | Formulário aparece como **Checklist Obrigatório de Qualificação** | ✅ | Custom form criado no Sprint 1; resolvido em `useOpportunityQualificationScore` por nome (`checklist obrigatório de qualificação`). |
-| 2 | Campos obrigatórios disponíveis e salvando | ✅ | `custom_fields` (entity_type=opportunity) + `custom_form_values` via fluxo padrão do CRM. |
-| 3 | Score calculado automaticamente | ✅ | `src/lib/qualification/qualificationScore.ts` + hook `useOpportunityQualificationScore`. |
-| 4 | Classificação aparece na oportunidade | ✅ | `QualificationScoreCard` (aba Formulários) + badge na `OpportunitySidebar`. |
-| 5 | Lead com score < 75 não pode ir para Vendas | ✅ | Gate em `EditOpportunityModal.tsx` + `QualificationGateModal`. |
-| 6 | Botão **Perdeu** abre modal de desqualificação no Pré-vendas | ✅ | Roteamento por `pipeline_type === 'qualification'` em `OpportunityDetail.tsx` → `DisqualifyLeadModal`. |
-| 7 | Oportunidade perdida movida para **Desqualificado** | ✅ | `disqualifyPreSalesOpportunity` em `src/services/crm/disqualify.ts`. |
-| 8 | Oportunidade duplicada no funil **Remarketing** | ✅ | Mesmo serviço, com flag `createRemarketing`, preservando account/contact/`custom_form_values`. |
-| 9 | Sem duplicação repetida no Remarketing | ✅ | `findActiveRemarketingDuplicate` antes de criar; UI desabilita o toggle e mostra link quando já existe. |
-| 10 | Tudo registrado no histórico | ✅ | `timeline-logger.ts`: `qualification_score_updated`, `lead_disqualified`, `sales_handoff_blocked`. |
+## Sprint 3 — Página em Configurações > Personalizado — ✅ ENTREGUE
+- Card "Régua de Qualificação" adicionado em `SettingsPageV3.tsx` (categoria Personalizado, `requiredLevel: 'full'`)
+- Rota `/app/settings/qualification` em `App.tsx`
+- Breadcrumb em `SettingsLayout.tsx`
+- Permission gate via `<SettingsGate requiredLevel="full">`
+- 8 abas implementadas: Visão Geral, Critérios, Campos Obrigatórios, Classificações, Regras de Bloqueio, Motivos de Desqualificação, Automações, Templates
 
-### Regras de não-regressão (preservadas)
+## Sprint 4 — Aba Visão Geral — ✅ ENTREGUE
+KPIs, edição inline de nome/descrição/score mínimo, botões Editar/Ativar-Inativar/Aplicar Template.
 
-- **Propostas / Vendas / Forecast / OTE / Revenue / Win-Loss**: nenhuma das mudanças tocou `proposals`, `commercial_won_revenue_view`, `forecast_*`, `ote_*`, `win_loss_records`, `commission_*`. As receitas continuam saindo da SSoT (`commercial_won_revenue_view` / `valid_revenue_amount`).
-- **Win/Loss em Vendas**: o roteamento por `pipeline_type` mantém o fluxo legado (`LossReasonModal`) intacto para `sales`; só `qualification` cai no novo modal.
-- **`closed_at` imutável**: o serviço de desqualificação respeita o trigger existente — não sobrescreve `closed_at`.
-- **Título uppercase** (`trg_opportunity_title_upper`): a duplicação para Remarketing herda o título e o trigger normaliza sem ação extra.
-- **Campos personalizados**: nenhum `custom_field` foi removido ou renomeado; a leitura mapeia UUID → `field_key` via `custom_fields` (entity_type=opportunity).
-- **RLS / multi-tenant**: serviço e hook usam `supabase` autenticado; nenhuma policy foi alterada; novas colunas em `opportunities` (Sprint 3) são lidas/escritas apenas por usuários da org via as policies existentes.
+## Sprint 5 — Aba Critérios — ✅ MVP
+Edição de peso (onBlur) e toggle de ativo. Alerta soft quando soma ≠ 100. Reordenar drag-and-drop fica para iteração futura.
 
-### Itens recomendados como follow-up (fora do escopo desta sprint, opcional)
+## Sprint 6 — Aba Campos Obrigatórios — ✅ MVP (leitura)
+Lista agrupada por critério com pontos, flags de score/avanço e valores inválidos. Edição CRUD completa fica para iteração futura.
 
-1. **Smoke test manual de regressão** com checklist abaixo no ambiente de preview:
-   - Editar checklist → ver bloco "Qualificação Comercial" atualizar score em tempo real.
-   - Tentar mover < 75 para Vendas → bloqueado + evento `sales_handoff_blocked` no histórico.
-   - Atingir ≥ 75 com checklist completo → mover liberado.
-   - Clicar **Perdeu** em Pré-vendas → `DisqualifyLeadModal`; em Vendas → `LossReasonModal` (não regrediu).
-   - Desqualificar com Remarketing ON → cria deal espelho; repetir → segundo deal não criado, link aparece.
-   - Conferir 3 tipos de eventos na aba Histórico.
-2. **Backfill opcional** (não obrigatório): rodar uma query de leitura em `opportunities` do pipeline de qualificação para recalcular score on-demand quando a oportunidade for aberta — já é o comportamento atual via hook, então nenhum job é necessário.
+## Sprint 7 — Aba Classificações — ✅ MVP (leitura)
+Lista das faixas com flags SQL/Prioridade. Edição CRUD fica para iteração futura.
 
-### Conclusão
+## Sprint 8 — Aba Regras de Bloqueio — ✅ MVP
+Lista com toggle ativo/inativo por regra; CRUD completo (criar/editar) fica para iteração futura.
 
-Sprints 1-5 atendem 10/10 critérios de aceite sem violar nenhuma regra de Propostas, Vendas Realizadas, Forecast, OTE, Win/Loss ou Revenue Command. Nenhuma alteração adicional de código é necessária — recomendo apenas validar via o smoke test acima antes de fechar o épico.
+## Sprint 9 — Aba Motivos de Desqualificação — ✅ MVP
+Lista com toggles de remarketing-default e ativo. Edição/criação CRUD fica para iteração futura.
+
+## Sprint 10 — Aba Automações — ✅ MVP
+Lista com toggle ativo/inativo. Editor visual de config fica para iteração futura.
+
+## Sprint 11 — Template LEGAL — ✅ ENTREGUE
+- RPC `apply_qualification_template_legal()` (SECURITY DEFINER) cria/substitui régua LEGAL completa para a organização do usuário
+- Card "LEGAL Eventos e Conectividade" na aba Templates com modal de confirmação
+- Template seeded:
+  - 7 critérios somando 100 pontos
+  - 14 campos (com opções, pontos por valor, valores inválidos)
+  - 5 faixas de classificação
+  - 1 regra de bloqueio Pré-vendas → Vendas (score 75, checklist completo, permissão válida)
+  - 19 motivos de desqualificação categorizados
+  - 1 automação `on_disqualify` com config para Remarketing
+- Régua nasce **inativa** — sem risco para Sprints 1–5 existentes (fallback ativo)
+
+## Sprint 12 — Integração com a oportunidade — ⏸ DIFERIDO
+Mantido o engine atual (`useOpportunityQualificationScore` + `qualificationScore.ts`). Integração configurável fica para iteração futura conforme combinado (não quebrar Sprints 1–5).
+
+## Sprint 13 — Auditoria — ⏸ DIFERIDO (tabela existe)
+`qualification_framework_audit_log` criada. Hooks de log nas mutations CRUD ficam para iteração futura.
+
+## Sprint 14 — Permissões — ✅ ENTREGUE (via SettingsGate)
+Acesso à página exige `requiredLevel: 'full'` (owner/admin). Demais perfis seguem vendo o score na oportunidade normalmente.
+
+## Compatibilidade verificada
+- Nada alterado em Propostas, Forecast, OTE, Win/Loss, Revenue Command
+- `DisqualifyLeadModal`, engine de score atual e Remarketing inalterados
+- Régua nasce inativa por org — engine antigo continua decisor único
+- Multitenant: tudo escopado por `organization_id` + RLS
