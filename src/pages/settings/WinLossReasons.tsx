@@ -372,6 +372,11 @@ export default function WinLossReasons() {
                       <TableRow key={reason.id}>
                         <TableCell className="font-medium">{reason.name}</TableCell>
                         <TableCell>
+                          <Badge variant={((reason as any).reason_type === 'disqualification') ? 'destructive' : 'secondary'}>
+                            {((reason as any).reason_type === 'disqualification') ? 'Desqualificação' : 'Perda'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
                           <span className="text-sm text-muted-foreground">{getCategoryLabel((reason as any).category)}</span>
                         </TableCell>
                         <TableCell>
