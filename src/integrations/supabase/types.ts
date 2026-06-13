@@ -16466,8 +16466,11 @@ export type Database = {
           is_active: boolean
           loss_accountability: string
           name: string
+          order_index: number
           organization_id: string
           pipeline_ids: string[] | null
+          reason_type: string
+          send_to_remarketing_default: boolean
           updated_at: string
         }
         Insert: {
@@ -16478,8 +16481,11 @@ export type Database = {
           is_active?: boolean
           loss_accountability?: string
           name: string
+          order_index?: number
           organization_id: string
           pipeline_ids?: string[] | null
+          reason_type?: string
+          send_to_remarketing_default?: boolean
           updated_at?: string
         }
         Update: {
@@ -16490,8 +16496,11 @@ export type Database = {
           is_active?: boolean
           loss_accountability?: string
           name?: string
+          order_index?: number
           organization_id?: string
           pipeline_ids?: string[] | null
+          reason_type?: string
+          send_to_remarketing_default?: boolean
           updated_at?: string
         }
         Relationships: [
@@ -37905,6 +37914,10 @@ export type Database = {
       seed_inventory_pricing_rules: {
         Args: { p_org: string }
         Returns: undefined
+      }
+      seed_pre_sales_disqualification_reasons: {
+        Args: { p_org_id: string; p_pipeline_id: string }
+        Returns: number
       }
       seed_recommended_proposal_templates: {
         Args: { p_org_id: string }
