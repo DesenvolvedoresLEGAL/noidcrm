@@ -276,10 +276,21 @@ export default function WinLossReasons() {
               Gerencie os motivos de ganho e perda de oportunidades
             </p>
           </div>
-          <Button onClick={() => activeTab === 'loss' ? setIsLossModalOpen(true) : setIsWinModalOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Adicionar motivo
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={handleSeedPreSales}
+              disabled={seeding}
+              title="Cria os motivos padrão de desqualificação para PRÉ VENDAS (idempotente)"
+            >
+              <Sparkles className="mr-2 h-4 w-4" />
+              {seeding ? 'Aplicando...' : 'Aplicar template PRÉ VENDAS'}
+            </Button>
+            <Button onClick={() => activeTab === 'loss' ? setIsLossModalOpen(true) : setIsWinModalOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Adicionar motivo
+            </Button>
+          </div>
         </div>
 
         <div className="flex gap-4">
