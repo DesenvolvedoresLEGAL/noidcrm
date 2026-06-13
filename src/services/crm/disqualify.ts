@@ -4,10 +4,14 @@ import { DISQUALIFY_REASON_LABEL } from '@/lib/qualification/disqualifyReasons';
 import { logDisqualificationEvent } from './timeline-logger';
 
 export interface DisqualifyParams {
-  reasonSlug: DisqualifyReasonSlug;
+  /** Stable reason key — framework reason_key or legacy hardcoded slug. */
+  reasonSlug: DisqualifyReasonSlug | string;
+  /** Optional human label (used when reason comes from active framework). */
+  reasonLabel?: string;
   observation?: string;
   createRemarketing: boolean;
 }
+
 
 export interface DisqualifyResult {
   disqualified: true;
@@ -46,7 +50,7 @@ export async function disqualifyPreSalesOpportunity(
   params: DisqualifyParams
 ): Promise<DisqualifyResult> {
   const nowIso = new Date().toISOString();
-  const { reasonSlug, observation, createRemarketing } = params;
+  const { reasonSlug, reasonLabel: providedLabel, observation, createRemarketing } = params;
 
   // 1. Load opportunity + pipeline context
   const { data: opp, error: oppErr } = await supabase
@@ -86,7 +90,10 @@ export async function disqualifyPreSalesOpportunity(
   }
 
   // 3. Update original opportunity → lost + Desqualificado stage
-  const reasonLabel = DISQUALIFY_REASON_LABEL[reasonSlug] ?? reasonSlug;
+  const reasonLabel =
+    providedLabel ??
+    DISQUALIFY_REASON_LABEL[reasonSlug as DisqualifyReasonSlug] ??
+    reasonSlug;
   const lossCommentParts = [`[Desqualificação] ${reasonLabel}`];
   if (observation?.trim()) lossCommentParts.push(observation.trim());
   const lossComment = lossCommentParts.join(' — ');
