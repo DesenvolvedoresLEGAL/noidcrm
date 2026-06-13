@@ -86,9 +86,30 @@ export function useOpportunityQualificationScore({
   const result = useMemo<QualificationScoreResult>(() => {
     const raw = (savedValues?.values || {}) as Record<string, unknown>;
     const valuesByKey: Record<string, unknown> = {};
-    for (const [fieldId, value] of Object.entries(raw)) {
-      const key = fieldMap[fieldId];
-      if (key) valuesByKey[key] = value;
+    // CustomFormRenderer saves custom-field keys as `custom-<entity>-<fieldUuid>`
+    // (e.g. "custom-opportunity-<uuid>"). Strip the prefix before mapping to field_key.
+    // Also accept bare UUIDs as a fallback for any legacy payloads.
+    for (const [rawKey, value] of Object.entries(raw)) {
+      let uuid: string | undefined;
+      if (rawKey.startsWith('custom-opportunity-')) {
+        uuid = rawKey.slice('custom-opportunity-'.length);
+      } else if (rawKey.startsWith('custom-')) {
+        // custom-<entity>-<uuid>
+        const parts = rawKey.split('-');
+        uuid = parts.slice(2).join('-');
+      } else if (fieldMap[rawKey]) {
+        uuid = rawKey;
+      }
+      if (!uuid) continue;
+      const key = fieldMap[uuid];
+      if (!key) continue;
+      // Normalize: numeric strings → number for `conexoes_simultaneas`.
+      if (key === 'conexoes_simultaneas' && typeof value === 'string') {
+        const n = Number(value);
+        valuesByKey[key] = Number.isFinite(n) ? n : value;
+      } else {
+        valuesByKey[key] = value;
+      }
     }
     const hasAccount = !!(
       account?.id ||
