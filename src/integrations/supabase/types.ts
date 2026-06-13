@@ -36187,6 +36187,7 @@ export type Database = {
         Args: { p_apply_mode?: string; p_audit_item_id: string }
         Returns: Json
       }
+      apply_qualification_template_legal: { Args: never; Returns: string }
       approve_hypothesis: {
         Args: { _hypothesis_id: string }
         Returns: {
