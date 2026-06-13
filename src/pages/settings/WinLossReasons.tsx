@@ -51,6 +51,8 @@ export default function WinLossReasons() {
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPipeline, setSelectedPipeline] = useState<string>('all');
+  const [selectedType, setSelectedType] = useState<string>('all');
+  const [seeding, setSeeding] = useState(false);
   const [isLossModalOpen, setIsLossModalOpen] = useState(false);
   const [isWinModalOpen, setIsWinModalOpen] = useState(false);
   const [editingLossReason, setEditingLossReason] = useState<LossReason | null>(null);
