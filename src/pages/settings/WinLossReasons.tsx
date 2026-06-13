@@ -44,10 +44,12 @@ import {
   type WinReason,
 } from '@/services/crm/win-reasons';
 import { listPipelines, type Pipeline } from '@/services/crm/pipelines';
+import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { LossReasonModal } from '@/components/settings/LossReasonModal';
 import { WinReasonModal } from '@/components/settings/WinReasonModal';
 
 export default function WinLossReasons() {
+  const { organization } = useCurrentOrganization();
   const [lossReasons, setLossReasons] = useState<LossReason[]>([]);
   const [winReasons, setWinReasons] = useState<WinReason[]>([]);
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
@@ -230,6 +232,11 @@ export default function WinLossReasons() {
   });
 
   const handleSeedPreSales = async () => {
+    const orgId = organization?.id;
+    if (!orgId) {
+      toast({ title: 'Organização não carregada', description: 'Aguarde o carregamento e tente novamente.', variant: 'destructive' });
+      return;
+    }
     const qualPipelines = pipelines.filter((p) => (p as any).pipeline_type === 'qualification');
     if (qualPipelines.length === 0) {
       toast({
@@ -246,11 +253,12 @@ export default function WinLossReasons() {
     if (!confirm(`Aplicar template de motivos de Desqualificação ao funil "${pipeline.name}"?`)) return;
     try {
       setSeeding(true);
-      const orgId = (pipeline as any).organization_id as string;
       const inserted = await seedPreSalesDisqualificationReasons(orgId, pipeline.id);
       toast({
-        title: 'Template aplicado',
-        description: `${inserted} motivos criados (existentes preservados).`,
+        title: inserted > 0 ? 'Template aplicado' : 'Template já aplicado',
+        description: inserted > 0
+          ? `${inserted} motivos criados (existentes preservados).`
+          : 'Nenhum novo motivo foi criado (idempotente).',
       });
       loadData();
     } catch (err: any) {
@@ -261,11 +269,11 @@ export default function WinLossReasons() {
   };
 
   const handleApplyMatrix = async () => {
-    const anyPipeline = pipelines.find((p) => !!(p as any).organization_id);
-    if (!anyPipeline) {
+    const orgId = organization?.id;
+    if (!orgId) {
       toast({
-        title: 'Sem pipelines',
-        description: 'Crie pelo menos um funil antes de aplicar a matriz.',
+        title: 'Organização não carregada',
+        description: 'Aguarde o carregamento e tente novamente.',
         variant: 'destructive',
       });
       return;
@@ -279,12 +287,14 @@ export default function WinLossReasons() {
       return;
     try {
       setApplyingMatrix(true);
-      const orgId = (anyPipeline as any).organization_id as string;
       const report = await applyLossWinReasonsScopeMatrix(orgId);
       setMatrixReport(report);
+      const changed = (report.updated?.length || 0) + (report.created?.length || 0);
       toast({
-        title: 'Matriz aplicada',
-        description: `${report.updated.length} atualizados • ${report.created.length} criados`,
+        title: changed > 0 ? 'Matriz aplicada' : 'Matriz já aplicada',
+        description: changed > 0
+          ? `${report.updated.length} atualizados • ${report.created.length} criados`
+          : 'Nenhuma alteração necessária (idempotente).',
       });
       loadData();
     } catch (err: any) {
@@ -297,6 +307,8 @@ export default function WinLossReasons() {
       setApplyingMatrix(false);
     }
   };
+
+
 
   const filteredWinReasons = winReasons
     .filter(reason => {
