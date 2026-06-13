@@ -33,7 +33,9 @@ import {
   deleteLossReason,
   toggleLossReasonStatus,
   seedPreSalesDisqualificationReasons,
+  applyLossWinReasonsScopeMatrix,
   type LossReason,
+  type ScopeMatrixReport,
 } from '@/services/crm/loss-reasons';
 import {
   listWinReasons as listAllWinReasons,
