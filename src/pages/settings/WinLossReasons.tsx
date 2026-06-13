@@ -220,8 +220,41 @@ export default function WinLossReasons() {
     const matchesPipeline = selectedPipeline === 'all' ||
       !reason.pipeline_ids ||
       reason.pipeline_ids.includes(selectedPipeline);
-    return matchesSearch && matchesPipeline;
+    const rType = (reason as any).reason_type || 'lost';
+    const matchesType = selectedType === 'all' || rType === selectedType;
+    return matchesSearch && matchesPipeline && matchesType;
   });
+
+  const handleSeedPreSales = async () => {
+    const qualPipelines = pipelines.filter((p) => (p as any).pipeline_type === 'qualification');
+    if (qualPipelines.length === 0) {
+      toast({
+        title: 'Nenhum funil de PRÉ VENDAS',
+        description: 'Crie um funil de qualificação antes de aplicar o template.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    const target =
+      selectedPipeline !== 'all' &&
+      qualPipelines.find((p) => p.id === selectedPipeline);
+    const pipeline = target || qualPipelines[0];
+    if (!confirm(`Aplicar template de motivos de Desqualificação ao funil "${pipeline.name}"?`)) return;
+    try {
+      setSeeding(true);
+      const orgId = (pipeline as any).organization_id as string;
+      const inserted = await seedPreSalesDisqualificationReasons(orgId, pipeline.id);
+      toast({
+        title: 'Template aplicado',
+        description: `${inserted} motivos criados (existentes preservados).`,
+      });
+      loadData();
+    } catch (err: any) {
+      toast({ title: 'Erro', description: err?.message || 'Falha ao aplicar template', variant: 'destructive' });
+    } finally {
+      setSeeding(false);
+    }
+  };
 
   const filteredWinReasons = winReasons
     .filter(reason => {
