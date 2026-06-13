@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   Dialog,
@@ -21,12 +21,22 @@ import {
 import { AlertCircle } from 'lucide-react';
 import {
   DISQUALIFY_REASONS,
+  DISQUALIFY_REASON_LABEL,
   type DisqualifyReasonSlug,
 } from '@/lib/qualification/disqualifyReasons';
 import { findActiveRemarketingDuplicate } from '@/services/crm/disqualify';
+import {
+  useActiveQualificationFramework,
+  useQualificationFrameworkBundle,
+} from '@/hooks/useQualificationFramework';
 
 export interface DisqualifyLeadDetails {
-  reasonSlug: DisqualifyReasonSlug;
+  /** Stable key (framework's reason_key when available, else legacy slug). */
+  reasonKey: string;
+  /** Human label for UI / persistence. */
+  reasonLabel: string;
+  /** @deprecated kept for backwards compat with disqualify.ts and callers. */
+  reasonSlug: DisqualifyReasonSlug | string;
   observation: string;
   createRemarketing: boolean;
 }
@@ -48,9 +58,36 @@ export function DisqualifyLeadModal({
   opportunityTitle,
   isLoading,
 }: DisqualifyLeadModalProps) {
-  const [reasonSlug, setReasonSlug] = useState<DisqualifyReasonSlug | ''>('');
+  const [reasonKey, setReasonKey] = useState<string>('');
   const [observation, setObservation] = useState('');
   const [createRemarketing, setCreateRemarketing] = useState(true);
+
+  // Active framework reasons (preferred). Falls back to hardcoded constant
+  // when no framework is active OR the active framework has no reasons.
+  const { data: activeFw } = useActiveQualificationFramework();
+  const { data: bundle } = useQualificationFrameworkBundle(activeFw?.id);
+
+  const frameworkReasons = useMemo(
+    () => (bundle?.reasons ?? []).filter((r) => r.is_active),
+    [bundle?.reasons]
+  );
+
+  const usingFramework = frameworkReasons.length > 0;
+
+  const options = useMemo(() => {
+    if (usingFramework) {
+      return frameworkReasons.map((r) => ({
+        key: r.reason_key,
+        label: r.reason_label,
+        sendToRemarketingDefault: r.send_to_remarketing_default,
+      }));
+    }
+    return DISQUALIFY_REASONS.map((r) => ({
+      key: r.slug as string,
+      label: r.label,
+      sendToRemarketingDefault: true,
+    }));
+  }, [usingFramework, frameworkReasons]);
 
   // Pre-check if a remarketing duplicate already exists
   const { data: existingDup } = useQuery({
@@ -62,7 +99,7 @@ export function DisqualifyLeadModal({
 
   useEffect(() => {
     if (open) {
-      setReasonSlug('');
+      setReasonKey('');
       setObservation('');
       setCreateRemarketing(true);
     }
@@ -72,12 +109,28 @@ export function DisqualifyLeadModal({
     if (existingDup) setCreateRemarketing(false);
   }, [existingDup]);
 
-  const canSubmit = !!reasonSlug && !isLoading;
+  // When a reason is chosen, pre-apply its default remarketing toggle
+  // (unless a duplicate already exists — that always forces OFF).
+  useEffect(() => {
+    if (!reasonKey || existingDup) return;
+    const opt = options.find((o) => o.key === reasonKey);
+    if (opt) setCreateRemarketing(opt.sendToRemarketingDefault);
+  }, [reasonKey, options, existingDup]);
+
+  const canSubmit = !!reasonKey && !isLoading;
 
   const handleConfirm = () => {
-    if (!reasonSlug) return;
+    if (!reasonKey) return;
+    const opt = options.find((o) => o.key === reasonKey);
+    const reasonLabel =
+      opt?.label ??
+      DISQUALIFY_REASON_LABEL[reasonKey as DisqualifyReasonSlug] ??
+      reasonKey;
     onConfirm({
-      reasonSlug: reasonSlug as DisqualifyReasonSlug,
+      reasonKey,
+      reasonLabel,
+      // Backwards-compat alias for current disqualify.ts contract.
+      reasonSlug: reasonKey,
       observation: observation.trim(),
       createRemarketing: existingDup ? false : createRemarketing,
     });
@@ -109,21 +162,23 @@ export function DisqualifyLeadModal({
 
           <div className="space-y-2">
             <Label>Motivo da desqualificação *</Label>
-            <Select
-              value={reasonSlug}
-              onValueChange={(v) => setReasonSlug(v as DisqualifyReasonSlug)}
-            >
+            <Select value={reasonKey} onValueChange={setReasonKey}>
               <SelectTrigger>
                 <SelectValue placeholder="Selecione o motivo" />
               </SelectTrigger>
               <SelectContent>
-                {DISQUALIFY_REASONS.map((opt) => (
-                  <SelectItem key={opt.slug} value={opt.slug}>
+                {options.map((opt) => (
+                  <SelectItem key={opt.key} value={opt.key}>
                     {opt.label}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            {!usingFramework && (
+              <p className="text-[11px] text-muted-foreground">
+                Usando lista padrão. Configure motivos em Configurações &gt; Régua de Qualificação.
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">
