@@ -54,7 +54,14 @@ export async function disqualifyPreSalesOpportunity(
   params: DisqualifyParams
 ): Promise<DisqualifyResult> {
   const nowIso = new Date().toISOString();
-  const { reasonSlug, reasonLabel: providedLabel, observation, createRemarketing } = params;
+  const {
+    reasonSlug,
+    reasonId,
+    reasonLabel: providedLabel,
+    reasonAccountability,
+    observation,
+    createRemarketing,
+  } = params;
 
   // 1. Load opportunity + pipeline context
   const { data: opp, error: oppErr } = await supabase
