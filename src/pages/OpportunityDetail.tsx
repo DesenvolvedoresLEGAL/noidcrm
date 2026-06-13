@@ -573,6 +573,7 @@ export default function OpportunityDetail() {
         onConfirm={handleConfirmDisqualify}
         opportunityId={opportunity.id}
         opportunityTitle={opportunity.title}
+        pipelineId={opportunity.pipeline_id}
         isLoading={disqualifyMutation.isPending}
       />
 
