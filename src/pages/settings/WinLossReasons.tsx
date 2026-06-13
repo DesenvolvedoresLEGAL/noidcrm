@@ -32,6 +32,7 @@ import {
   listLossReasons,
   deleteLossReason,
   toggleLossReasonStatus,
+  seedPreSalesDisqualificationReasons,
   type LossReason,
 } from '@/services/crm/loss-reasons';
 import {
