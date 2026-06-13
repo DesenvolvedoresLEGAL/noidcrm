@@ -269,7 +269,6 @@ export default function WinLossReasons() {
       selectedPipeline !== 'all' &&
       qualPipelines.find((p) => p.id === selectedPipeline);
     const pipeline = target || qualPipelines[0];
-    if (!confirm(`Aplicar template de motivos de Desqualificação ao funil "${pipeline.name}"?`)) return;
     try {
       setSeeding(true);
       const inserted = await seedPreSalesDisqualificationReasons(orgId, pipeline.id);
