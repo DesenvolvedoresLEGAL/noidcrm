@@ -344,6 +344,64 @@ export default function WinLossReasons() {
           </div>
         </div>
 
+        {matrixReport && (
+          <div className="rounded-md border bg-muted/30 p-4 text-sm space-y-2">
+            <div className="flex items-center justify-between">
+              <strong>Relatório da matriz aplicada</strong>
+              <Button variant="ghost" size="sm" onClick={() => setMatrixReport(null)}>
+                Fechar
+              </Button>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+              <div>
+                <div className="text-muted-foreground">Atualizados</div>
+                <div className="text-lg font-semibold">{matrixReport.updated.length}</div>
+              </div>
+              <div>
+                <div className="text-muted-foreground">Criados</div>
+                <div className="text-lg font-semibold">{matrixReport.created.length}</div>
+              </div>
+              <div>
+                <div className="text-muted-foreground">Ainda "Todos os funis"</div>
+                <div className="text-lg font-semibold">
+                  {matrixReport.still_all_funnels.length}
+                </div>
+              </div>
+              <div>
+                <div className="text-muted-foreground">Não mapeados</div>
+                <div className="text-lg font-semibold">{matrixReport.unmapped.length}</div>
+              </div>
+            </div>
+            {matrixReport.still_all_funnels.length > 0 && (
+              <details className="text-xs">
+                <summary className="cursor-pointer text-muted-foreground">
+                  Motivos ainda em Todos os funis ({matrixReport.still_all_funnels.length})
+                </summary>
+                <ul className="mt-1 ml-4 list-disc">
+                  {matrixReport.still_all_funnels.map((n) => (
+                    <li key={n}>{n}</li>
+                  ))}
+                </ul>
+              </details>
+            )}
+            <div className="text-xs text-muted-foreground pt-2 border-t">
+              Loss: total {matrixReport.summary_loss_reasons.total} • ativos{' '}
+              {matrixReport.summary_loss_reasons.active} • PRÉ VENDAS{' '}
+              {matrixReport.summary_loss_reasons.qual} • VENDAS{' '}
+              {matrixReport.summary_loss_reasons.sales} • Todos{' '}
+              {matrixReport.summary_loss_reasons.all_funnels}
+              {' • '}desqualificação {matrixReport.summary_loss_reasons.disqualification}
+            </div>
+            <div className="text-xs text-muted-foreground">
+              Win: total {matrixReport.summary_win_reasons.total} • PRÉ VENDAS{' '}
+              {matrixReport.summary_win_reasons.qual} • VENDAS{' '}
+              {matrixReport.summary_win_reasons.sales} • Todos{' '}
+              {matrixReport.summary_win_reasons.all_funnels}
+            </div>
+          </div>
+        )}
+
+
         <div className="flex gap-4">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
