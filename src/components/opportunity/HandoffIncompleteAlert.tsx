@@ -17,8 +17,8 @@ export function HandoffIncompleteAlert({
   sourceOpportunityId,
   onRevertToPreSales,
 }: HandoffIncompleteAlertProps) {
-  const { isAdmin, isOwner } = useUserRole();
-  const canRevert = isAdmin || isOwner;
+  const { isAdmin } = useUserRole();
+  const canRevert = isAdmin;
 
   return (
     <Alert variant="destructive" className="border-destructive/60">
