@@ -332,7 +332,36 @@ serve(async (req) => {
           case 'duplicate':
             if (opportunity) {
               const targetPipelineId = action.config?.target_pipeline_id || opportunity.pipeline_id;
-              
+
+              // P0 HOTFIX — Server-side qualification gate.
+              // Pre-check before INSERT so we can log a clear skip reason.
+              // The DB trigger `trg_opportunities_qualification_gate` is the
+              // ultimate enforcer; this just gives us a friendlier log line.
+              try {
+                const { data: pipelineTarget } = await supabase
+                  .from('pipelines')
+                  .select('pipeline_type')
+                  .eq('id', targetPipelineId)
+                  .maybeSingle();
+                if (pipelineTarget?.pipeline_type === 'sales') {
+                  const { data: gateData, error: gateErr } = await supabase
+                    .rpc('crm_check_qualification_gate', { _opportunity_id: opportunity.id });
+                  if (!gateErr && gateData && (gateData as any).ok === false) {
+                    console.log(`[execute-workflow] SKIPPING DUPLICATE: qualification gate blocked for source ${opportunity.id}:`, JSON.stringify((gateData as any).blockers));
+                    result = {
+                      action: 'duplicate',
+                      success: false,
+                      skipped: true,
+                      reason: 'QUALIFICATION_GATE_BLOCKED',
+                      blockers: (gateData as any).blockers,
+                    };
+                    break;
+                  }
+                }
+              } catch (gateCheckErr) {
+                console.error('[execute-workflow] Gate pre-check failed (continuing — trigger will enforce):', gateCheckErr);
+              }
+
               // CRITICAL: Check for duplicates in target pipeline to prevent redundant duplications.
               // Canonical key = source_opportunity_id (race-safe, also enforced by partial UNIQUE INDEX
               // opportunities_no_duplicate_handoff_uidx). Also matches by title to catch legacy duplicates
@@ -362,6 +391,7 @@ serve(async (req) => {
                 };
                 break;
               }
+
               
               // Determine the owner for the new opportunity (SDR/CS handoff support).
               // Resilient resolution:
