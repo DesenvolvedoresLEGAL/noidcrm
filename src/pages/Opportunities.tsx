@@ -119,13 +119,25 @@ export default function Opportunities() {
       await moveOpportunity(oppId, newStageId);
       await processPendingWorkflows(oppId);
       toast({ title: 'Sucesso', description: 'Oportunidade movida com sucesso' });
-    } catch (error) {
+    } catch (error: any) {
       // Rollback
       queryClient.setQueryData(opportunitiesQueryKey, { data: previousOpportunities, total: previousOpportunities.length });
       console.error('Erro ao mover oportunidade:', error);
-      toast({ title: 'Erro', description: 'Erro ao mover oportunidade', variant: 'destructive' });
+      const msg = String(error?.message || '');
+      if (msg.includes('QUALIFICATION_GATE_BLOCKED')) {
+        // Extract blockers list after the last colon for a friendlier toast.
+        const detail = msg.split('QUALIFICATION_GATE_BLOCKED:').pop()?.trim() || '';
+        toast({
+          title: 'Lead ainda não pode avançar',
+          description: `Checklist obrigatório de qualificação incompleto. ${detail}`,
+          variant: 'destructive',
+        });
+      } else {
+        toast({ title: 'Erro', description: 'Erro ao mover oportunidade', variant: 'destructive' });
+      }
     }
   };
+
 
   const handleCreateOpportunity = async (data: any) => {
     try {
