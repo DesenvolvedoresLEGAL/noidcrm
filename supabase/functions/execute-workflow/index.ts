@@ -636,6 +636,62 @@ serve(async (req) => {
                   console.error('[execute-workflow] Error copying custom field values:', cfvError);
                 }
 
+                // P0 HOTFIX — Clone custom_form_values (qualification checklist)
+                // from source PRE-VENDAS opp to new VENDAS opp as READ-ONLY handoff.
+                // Without this, the Forms tab in Sales shows "Nenhum formulário".
+                try {
+                  const { data: srcFormValues } = await supabase
+                    .from('custom_form_values')
+                    .select('*')
+                    .eq('entity_id', opportunity.id)
+                    .eq('entity_type', 'opportunity');
+                  if (srcFormValues?.length) {
+                    const toInsert = srcFormValues.map((fv: any) => ({
+                      organization_id: fv.organization_id,
+                      custom_form_id: fv.custom_form_id,
+                      entity_id: data.id,
+                      entity_type: 'opportunity',
+                      values: fv.values,
+                      filled_by: fv.filled_by,
+                      filled_at: fv.filled_at,
+                      source_opportunity_id: opportunity.id,
+                      is_readonly_handoff: true,
+                    }));
+                    const { error: fvErr } = await supabase
+                      .from('custom_form_values')
+                      .insert(toInsert);
+                    if (fvErr) {
+                      console.error('[execute-workflow] Error cloning custom_form_values:', fvErr);
+                    } else {
+                      console.log(`[execute-workflow] Cloned ${srcFormValues.length} custom_form_values (read-only handoff) to new opp ${data.id}`);
+                      // Audit: checklist transferred
+                      await supabase.from('audit_log').insert({
+                        organization_id: opportunity.organization_id,
+                        actor_user_id: opportunity.owner_user_id,
+                        action: 'checklist_transferred',
+                        entity_type: 'opportunity',
+                        entity_id: data.id,
+                        metadata: {
+                          source_opportunity_id: opportunity.id,
+                          forms_count: srcFormValues.length,
+                          read_only: true,
+                        },
+                      });
+                    }
+                  }
+                } catch (e: any) {
+                  console.error('[execute-workflow] Error cloning custom_form_values:', e);
+                }
+
+                // Mark new opp as approved handoff (gate passed since INSERT succeeded).
+                try {
+                  await supabase
+                    .from('opportunities')
+                    .update({ handoff_status: 'approved' })
+                    .eq('id', data.id);
+                } catch (_e) { /* non-fatal */ }
+
+
                 // ✅ Não clonar propostas no handoff Comercial → Operacional.
                 // A proposta válida é a aprovada pelo cliente, na opp de origem.
                 // Vinculamos a opp operacional via opportunities.accepted_proposal_id.
