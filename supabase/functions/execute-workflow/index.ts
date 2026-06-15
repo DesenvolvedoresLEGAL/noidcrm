@@ -527,6 +527,24 @@ serve(async (req) => {
                 break;
               }
 
+              // P0 HOTFIX — Qualification gate trigger blocked the INSERT.
+              // ERRCODE 23514 = check_violation, raised by trg_opportunities_qualification_gate.
+              if (error && (
+                (error as any).code === '23514'
+                || String((error as any).message || '').includes('QUALIFICATION_GATE_BLOCKED')
+              )) {
+                console.log(`[execute-workflow] SKIPPING DUPLICATE: qualification gate (DB trigger) blocked handoff for source ${opportunity.id}: ${(error as any).message}`);
+                result = {
+                  action: 'duplicate',
+                  success: false,
+                  skipped: true,
+                  reason: 'QUALIFICATION_GATE_BLOCKED',
+                  detail: (error as any).message,
+                };
+                break;
+              }
+
+
               if (data?.id) {
                 lastDuplicatedOpportunityId = data.id;
                 
