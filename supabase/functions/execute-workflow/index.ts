@@ -332,7 +332,36 @@ serve(async (req) => {
           case 'duplicate':
             if (opportunity) {
               const targetPipelineId = action.config?.target_pipeline_id || opportunity.pipeline_id;
-              
+
+              // P0 HOTFIX — Server-side qualification gate.
+              // Pre-check before INSERT so we can log a clear skip reason.
+              // The DB trigger `trg_opportunities_qualification_gate` is the
+              // ultimate enforcer; this just gives us a friendlier log line.
+              try {
+                const { data: pipelineTarget } = await supabase
+                  .from('pipelines')
+                  .select('pipeline_type')
+                  .eq('id', targetPipelineId)
+                  .maybeSingle();
+                if (pipelineTarget?.pipeline_type === 'sales') {
+                  const { data: gateData, error: gateErr } = await supabase
+                    .rpc('crm_check_qualification_gate', { _opportunity_id: opportunity.id });
+                  if (!gateErr && gateData && (gateData as any).ok === false) {
+                    console.log(`[execute-workflow] SKIPPING DUPLICATE: qualification gate blocked for source ${opportunity.id}:`, JSON.stringify((gateData as any).blockers));
+                    result = {
+                      action: 'duplicate',
+                      success: false,
+                      skipped: true,
+                      reason: 'QUALIFICATION_GATE_BLOCKED',
+                      blockers: (gateData as any).blockers,
+                    };
+                    break;
+                  }
+                }
+              } catch (gateCheckErr) {
+                console.error('[execute-workflow] Gate pre-check failed (continuing — trigger will enforce):', gateCheckErr);
+              }
+
               // CRITICAL: Check for duplicates in target pipeline to prevent redundant duplications.
               // Canonical key = source_opportunity_id (race-safe, also enforced by partial UNIQUE INDEX
               // opportunities_no_duplicate_handoff_uidx). Also matches by title to catch legacy duplicates
@@ -362,6 +391,7 @@ serve(async (req) => {
                 };
                 break;
               }
+
               
               // Determine the owner for the new opportunity (SDR/CS handoff support).
               // Resilient resolution:
@@ -497,6 +527,24 @@ serve(async (req) => {
                 break;
               }
 
+              // P0 HOTFIX — Qualification gate trigger blocked the INSERT.
+              // ERRCODE 23514 = check_violation, raised by trg_opportunities_qualification_gate.
+              if (error && (
+                (error as any).code === '23514'
+                || String((error as any).message || '').includes('QUALIFICATION_GATE_BLOCKED')
+              )) {
+                console.log(`[execute-workflow] SKIPPING DUPLICATE: qualification gate (DB trigger) blocked handoff for source ${opportunity.id}: ${(error as any).message}`);
+                result = {
+                  action: 'duplicate',
+                  success: false,
+                  skipped: true,
+                  reason: 'QUALIFICATION_GATE_BLOCKED',
+                  detail: (error as any).message,
+                };
+                break;
+              }
+
+
               if (data?.id) {
                 lastDuplicatedOpportunityId = data.id;
                 
@@ -587,6 +635,62 @@ serve(async (req) => {
                 } catch (cfvError) {
                   console.error('[execute-workflow] Error copying custom field values:', cfvError);
                 }
+
+                // P0 HOTFIX — Clone custom_form_values (qualification checklist)
+                // from source PRE-VENDAS opp to new VENDAS opp as READ-ONLY handoff.
+                // Without this, the Forms tab in Sales shows "Nenhum formulário".
+                try {
+                  const { data: srcFormValues } = await supabase
+                    .from('custom_form_values')
+                    .select('*')
+                    .eq('entity_id', opportunity.id)
+                    .eq('entity_type', 'opportunity');
+                  if (srcFormValues?.length) {
+                    const toInsert = srcFormValues.map((fv: any) => ({
+                      organization_id: fv.organization_id,
+                      custom_form_id: fv.custom_form_id,
+                      entity_id: data.id,
+                      entity_type: 'opportunity',
+                      values: fv.values,
+                      filled_by: fv.filled_by,
+                      filled_at: fv.filled_at,
+                      source_opportunity_id: opportunity.id,
+                      is_readonly_handoff: true,
+                    }));
+                    const { error: fvErr } = await supabase
+                      .from('custom_form_values')
+                      .insert(toInsert);
+                    if (fvErr) {
+                      console.error('[execute-workflow] Error cloning custom_form_values:', fvErr);
+                    } else {
+                      console.log(`[execute-workflow] Cloned ${srcFormValues.length} custom_form_values (read-only handoff) to new opp ${data.id}`);
+                      // Audit: checklist transferred
+                      await supabase.from('audit_log').insert({
+                        organization_id: opportunity.organization_id,
+                        actor_user_id: opportunity.owner_user_id,
+                        action: 'checklist_transferred',
+                        entity_type: 'opportunity',
+                        entity_id: data.id,
+                        metadata: {
+                          source_opportunity_id: opportunity.id,
+                          forms_count: srcFormValues.length,
+                          read_only: true,
+                        },
+                      });
+                    }
+                  }
+                } catch (e: any) {
+                  console.error('[execute-workflow] Error cloning custom_form_values:', e);
+                }
+
+                // Mark new opp as approved handoff (gate passed since INSERT succeeded).
+                try {
+                  await supabase
+                    .from('opportunities')
+                    .update({ handoff_status: 'approved' })
+                    .eq('id', data.id);
+                } catch (_e) { /* non-fatal */ }
+
 
                 // ✅ Não clonar propostas no handoff Comercial → Operacional.
                 // A proposta válida é a aprovada pelo cliente, na opp de origem.

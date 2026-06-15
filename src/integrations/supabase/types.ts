@@ -9154,7 +9154,9 @@ export type Database = {
           filled_at: string | null
           filled_by: string | null
           id: string
+          is_readonly_handoff: boolean
           organization_id: string
+          source_opportunity_id: string | null
           updated_at: string | null
           values: Json
         }
@@ -9165,7 +9167,9 @@ export type Database = {
           filled_at?: string | null
           filled_by?: string | null
           id?: string
+          is_readonly_handoff?: boolean
           organization_id: string
+          source_opportunity_id?: string | null
           updated_at?: string | null
           values?: Json
         }
@@ -9176,7 +9180,9 @@ export type Database = {
           filled_at?: string | null
           filled_by?: string | null
           id?: string
+          is_readonly_handoff?: boolean
           organization_id?: string
+          source_opportunity_id?: string | null
           updated_at?: string | null
           values?: Json
         }
@@ -18105,6 +18111,7 @@ export type Database = {
           event_start_date: string | null
           fonte: string | null
           forecast_hygiene_eligible: boolean | null
+          handoff_status: string | null
           id: string
           indicators_updated_at: string | null
           is_recoverable: string | null
@@ -18219,6 +18226,7 @@ export type Database = {
           event_start_date?: string | null
           fonte?: string | null
           forecast_hygiene_eligible?: boolean | null
+          handoff_status?: string | null
           id?: string
           indicators_updated_at?: string | null
           is_recoverable?: string | null
@@ -18333,6 +18341,7 @@ export type Database = {
           event_start_date?: string | null
           fonte?: string | null
           forecast_hygiene_eligible?: boolean | null
+          handoff_status?: string | null
           id?: string
           indicators_updated_at?: string | null
           is_recoverable?: string | null
@@ -29792,6 +29801,7 @@ export type Database = {
           created_at: string | null
           description: string | null
           id: string
+          is_qualified_stage: boolean
           name: string
           order_index: number
           organization_id: string
@@ -29807,6 +29817,7 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           id: string
+          is_qualified_stage?: boolean
           name: string
           order_index: number
           organization_id: string
@@ -29822,6 +29833,7 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           id?: string
+          is_qualified_stage?: boolean
           name?: string
           order_index?: number
           organization_id?: string
@@ -36511,6 +36523,10 @@ export type Database = {
           p_user_id: string
         }
         Returns: string
+      }
+      crm_check_qualification_gate: {
+        Args: { _opportunity_id: string }
+        Returns: Json
       }
       crm_disable_all_closer_dashboard_pilots: {
         Args: { p_reason?: string; p_tenant_id: string }
