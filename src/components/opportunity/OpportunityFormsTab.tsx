@@ -120,8 +120,10 @@ export function OpportunityFormsTab({
         <QualificationScoreCard score={qualScore} />
       )}
 
-      {/* P0.4: Read-only checklist cloned from PRÉ VENDAS */}
-      {handoffBundles.map((bundle) => (
+      {/* P0.4: Read-only checklist cloned from PRÉ VENDAS.
+          Hidden when QualificationSummaryCard is shown — the summary already
+          consolidates every relevant field, so the raw form would be redundant. */}
+      {!showSummary && handoffBundles.map((bundle) => (
         <Card key={bundle.valuesRow.id} className="border-primary/30">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between gap-2 flex-wrap">
