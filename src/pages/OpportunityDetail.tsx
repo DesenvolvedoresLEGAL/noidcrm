@@ -465,76 +465,102 @@ export default function OpportunityDetail() {
                   </TabsList>
 
                   <TabsContent value="history" className="mt-4">
-                    <OpportunityHistoryTab opportunityId={opportunity.id} />
+                    <ErrorBoundary section="histórico">
+                      <OpportunityHistoryTab opportunityId={opportunity.id} />
+                    </ErrorBoundary>
                   </TabsContent>
 
                   <TabsContent value="intelligence" className="mt-4">
-                    <OpportunityIntelligenceTab 
-                      opportunityId={opportunity.id}
-                      opportunityTitle={opportunity.title}
-                      organizationId={(opportunity as any).organization_id}
-                    />
+                    <ErrorBoundary section="inteligência">
+                      <OpportunityIntelligenceTab 
+                        opportunityId={opportunity.id}
+                        opportunityTitle={opportunity.title}
+                        organizationId={(opportunity as any).organization_id}
+                      />
+                    </ErrorBoundary>
                   </TabsContent>
 
                   <TabsContent value="notes" className="mt-4">
-                    <OpportunityNotesTab opportunityId={opportunity.id} />
+                    <ErrorBoundary section="notas">
+                      <OpportunityNotesTab opportunityId={opportunity.id} />
+                    </ErrorBoundary>
                   </TabsContent>
 
                   <TabsContent value="activities" className="mt-4">
-                    <OpportunityActivitiesTab opportunityId={opportunity.id} />
+                    <ErrorBoundary section="atividades">
+                      <OpportunityActivitiesTab opportunityId={opportunity.id} />
+                    </ErrorBoundary>
                   </TabsContent>
 
                   <TabsContent value="files" className="mt-4">
-                    <OpportunityFilesTab opportunityId={opportunity.id} />
+                    <ErrorBoundary section="arquivos">
+                      <OpportunityFilesTab opportunityId={opportunity.id} />
+                    </ErrorBoundary>
                   </TabsContent>
 
                   <TabsContent value="emails" className="mt-4">
-                    <OpportunityEmailsTab opportunityId={opportunity.id} />
+                    <ErrorBoundary section="e-mails">
+                      <OpportunityEmailsTab opportunityId={opportunity.id} />
+                    </ErrorBoundary>
                   </TabsContent>
 
                   {showProposals && (
                     <TabsContent value="proposals" className="mt-4">
-                      <OpportunityProposalsTab 
-                        opportunityId={opportunity.id} 
-                        pipelineType={opportunity.pipeline?.pipeline_type}
-                        onNavigateToAnalytics={() => setActiveTab('analytics')}
-                      />
+                      <ErrorBoundary section="propostas">
+                        <OpportunityProposalsTab 
+                          opportunityId={opportunity.id} 
+                          pipelineType={opportunity.pipeline?.pipeline_type}
+                          onNavigateToAnalytics={() => setActiveTab('analytics')}
+                        />
+                      </ErrorBoundary>
                     </TabsContent>
                   )}
 
                   {showAnalytics && (
                     <TabsContent value="analytics" className="mt-4">
-                      <OpportunityAnalyticsTab opportunityId={opportunity.id} />
+                      <ErrorBoundary section="analytics">
+                        <OpportunityAnalyticsTab opportunityId={opportunity.id} />
+                      </ErrorBoundary>
                     </TabsContent>
                   )}
 
                   <TabsContent value="forms" className="mt-4">
-                    <OpportunityFormsTab 
-                      opportunityId={opportunity.id}
-                      pipelineId={opportunity.pipeline_id}
-                      opportunity={opportunity}
-                      account={opportunity.account}
-                      contact={opportunity.contact}
-                    />
+                    <ErrorBoundary section="formulários">
+                      <OpportunityFormsTab 
+                        opportunityId={opportunity.id}
+                        pipelineId={opportunity.pipeline_id}
+                        opportunity={opportunity}
+                        account={opportunity.account}
+                        contact={opportunity.contact}
+                      />
+                    </ErrorBoundary>
                   </TabsContent>
 
                   <TabsContent value="team" className="mt-4">
-                    <DealParticipantsManager opportunityId={opportunity.id} />
+                    <ErrorBoundary section="equipe">
+                      <DealParticipantsManager opportunityId={opportunity.id} />
+                    </ErrorBoundary>
                   </TabsContent>
 
                   <TabsContent value="graph" className="mt-4">
-                    <OpportunityGraphSignals opportunityId={opportunity.id} />
+                    <ErrorBoundary section="rede">
+                      <OpportunityGraphSignals opportunityId={opportunity.id} />
+                    </ErrorBoundary>
                   </TabsContent>
 
                   <TabsContent value="memories" className="mt-4">
-                    <DealMemoryPanel 
-                      opportunityId={opportunity.id}
-                      stage={opportunity.stage_id}
-                    />
+                    <ErrorBoundary section="memórias">
+                      <DealMemoryPanel 
+                        opportunityId={opportunity.id}
+                        stage={opportunity.stage_id}
+                      />
+                    </ErrorBoundary>
                   </TabsContent>
 
                   <TabsContent value="diagnostic" className="mt-4">
-                    <OpportunityDiagnosticTab opportunityId={opportunity.id} />
+                    <ErrorBoundary section="diagnóstico">
+                      <OpportunityDiagnosticTab opportunityId={opportunity.id} />
+                    </ErrorBoundary>
                   </TabsContent>
                 </Tabs>
               );
