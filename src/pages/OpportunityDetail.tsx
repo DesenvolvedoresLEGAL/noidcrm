@@ -3,6 +3,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { OpportunityDetailHeader } from '@/components/opportunity/OpportunityDetailHeader';
 import { OpportunitySidebar } from '@/components/opportunity/OpportunitySidebar';
 import { OpportunityHistoryTab } from '@/components/opportunity/OpportunityHistoryTab';
@@ -370,29 +371,33 @@ export default function OpportunityDetail() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
           {/* Left Sidebar - 3 cols */}
           <div className="lg:col-span-3 xl:col-span-2">
-            <OpportunitySidebar 
-              opportunity={opportunityForSidebar} 
-              onUpdateField={handleUpdateField}
-              onUpdateTitle={handleUpdateTitle}
-              onWon={handleWon}
-              onLost={handleLost}
-              onEdit={() => setEditModalOpen(true)}
-              onDelete={() => setDeleteDialogOpen(true)}
-              onReopen={handleReopen}
-              userRole={membership?.org_role || undefined}
-              onNavigateToIntelligence={() => setActiveTab('intelligence')}
-            />
+            <ErrorBoundary section="painel lateral">
+              <OpportunitySidebar 
+                opportunity={opportunityForSidebar} 
+                onUpdateField={handleUpdateField}
+                onUpdateTitle={handleUpdateTitle}
+                onWon={handleWon}
+                onLost={handleLost}
+                onEdit={() => setEditModalOpen(true)}
+                onDelete={() => setDeleteDialogOpen(true)}
+                onReopen={handleReopen}
+                userRole={membership?.org_role || undefined}
+                onNavigateToIntelligence={() => setActiveTab('intelligence')}
+              />
+            </ErrorBoundary>
           </div>
 
           {/* Main Content - 9 cols */}
           <div className="lg:col-span-9 xl:col-span-10 space-y-4">
             {/* Header compacto - alinhado com tabs */}
-            <OpportunityDetailHeader 
-              opportunity={opportunity} 
-              onStageChange={async (stageId) => {
-                await updateMutation.mutateAsync({ stage_id: stageId });
-              }}
-            />
+            <ErrorBoundary section="cabeçalho">
+              <OpportunityDetailHeader 
+                opportunity={opportunity} 
+                onStageChange={async (stageId) => {
+                  await updateMutation.mutateAsync({ stage_id: stageId });
+                }}
+              />
+            </ErrorBoundary>
             {/* Oculta tab Propostas para pipelines de qualificação (PRÉ VENDAS) */}
             {(() => {
               const showProposals = opportunity.pipeline?.pipeline_type !== 'qualification';
