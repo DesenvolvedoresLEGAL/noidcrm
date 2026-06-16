@@ -51,12 +51,12 @@ export function ErrorFallback({ error, section, onRetry, onReload }: ErrorFallba
             </div>
           )}
           
-          {/* Always show error message for module errors, and in dev for others */}
-          {(isModuleError || isDev) && error && (
+          {/* Always show error message so users can share it with support */}
+          {error && (
             <div className="mt-4 p-3 bg-muted rounded-lg text-left">
               <div className="flex items-center gap-2 text-sm font-medium text-destructive mb-1">
                 <Bug className="h-4 w-4" />
-                <span>{isModuleError ? 'Detalhes do erro' : 'Debug Info (dev only)'}</span>
+                <span>{isModuleError ? 'Detalhes do erro' : (isDev ? 'Debug Info (dev only)' : 'Detalhes técnicos')}</span>
               </div>
               <p className="text-xs font-mono text-muted-foreground break-all">
                 {error.message}

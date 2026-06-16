@@ -33,7 +33,10 @@ export function OpportunityFormsTab({
   const { data: forms = [], isLoading } = useCustomFormsByPipeline(pipelineId);
   const { data: publicForms = [], isLoading: loadingPublicForms } = useOpportunityPublicForms(opportunityId);
   const { togglePublicForm, isToggling } = useOpportunityPublicFormMutations();
-  const { data: handoffBundles = [], isLoading: loadingHandoff } = useHandoffFormValues(opportunityId);
+  const { data: handoffBundles = [], isLoading: loadingHandoff } = useHandoffFormValues(
+    opportunityId,
+    opportunity?.source_opportunity_id ?? null,
+  );
 
   const pipelineType = opportunity?.pipeline?.pipeline_type;
   const isQualificationPipeline = pipelineType === 'qualification';
