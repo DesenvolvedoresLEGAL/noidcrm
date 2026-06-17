@@ -1,6 +1,4 @@
-import { useEffect, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { useSupabaseAuth } from './useSupabaseAuth';
+import { useCurrentUser } from './useCurrentUser';
 
 export interface Organization {
   id: string;
@@ -30,82 +28,30 @@ export interface OrganizationMember {
   created_at: string;
 }
 
+/**
+ * HOTFIX: Antes este hook fazia consultas diretas a `organizations` e
+ * `organization_members` via cliente Supabase. Em condições de corrida (logo
+ * após signIn, antes de o Authorization header propagar ou em refresh de
+ * token), a request saía como anon e a RLS retornava 0 linhas — gerando
+ * PGRST116 / 406 em loop e impedindo o usuário de acessar o sistema.
+ *
+ * Agora consome a fonte única `useCurrentUser`, que usa a edge function
+ * `get-current-user` (service role) e já entrega organização + membership
+ * de forma consistente, com cache, retry e revalidação.
+ */
 export function useCurrentOrganization() {
-  const { user, loading: authLoading } = useSupabaseAuth();
-  const [organization, setOrganization] = useState<Organization | null>(null);
-  const [membership, setMembership] = useState<OrganizationMember | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { organization, membership, loading } = useCurrentUser();
 
-  useEffect(() => {
-    // AUTH.1.3: enquanto o boot do Supabase Auth não termina, não decide nada.
-    // Evita falso "sem organização" durante restauração de sessão.
-    if (authLoading) {
-      setLoading(true);
-      return;
-    }
+  const org = (organization ?? null) as unknown as Organization | null;
+  const mem = (membership ?? null) as unknown as OrganizationMember | null;
 
-    if (!user) {
-      setOrganization(null);
-      setMembership(null);
-      setLoading(false);
-      return;
-    }
-
-    const fetchOrganization = async () => {
-      try {
-        // Fetch all active memberships and get the first one
-        // (ordered by joined_at to get the primary organization)
-        const { data: memberships, error: membershipError } = await supabase
-          .from('organization_members')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('status', 'active')
-          .order('joined_at', { ascending: false, nullsFirst: false })
-          .limit(1);
-
-        if (membershipError) throw membershipError;
-
-        const membershipData = memberships?.[0];
-        
-        if (!membershipData) {
-          setOrganization(null);
-          setMembership(null);
-          setLoading(false);
-          return;
-        }
-
-        setMembership(membershipData as OrganizationMember);
-
-        if (membershipData?.organization_id) {
-          const { data: orgData, error: orgError } = await supabase
-            .from('organizations')
-            .select('*')
-            .eq('id', membershipData.organization_id)
-            .single();
-
-          if (orgError) throw orgError;
-          setOrganization(orgData as Organization);
-        }
-      } catch (error) {
-        console.error('Error fetching organization:', error);
-        setOrganization(null);
-        setMembership(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchOrganization();
-  }, [user, authLoading]);
-
-  // Unificado: usar org_role (campo correto da tabela organization_members)
-  const isOwner = membership?.org_role === 'owner';
-  const isAdmin = membership?.org_role === 'owner' || membership?.org_role === 'admin';
-  const isCS = membership?.org_role === 'cs';
+  const isOwner = mem?.org_role === 'owner';
+  const isAdmin = mem?.org_role === 'owner' || mem?.org_role === 'admin';
+  const isCS = mem?.org_role === 'cs';
 
   return {
-    organization,
-    membership,
+    organization: org,
+    membership: mem,
     loading,
     isOwner,
     isAdmin,
