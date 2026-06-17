@@ -56,104 +56,59 @@ export interface CurrentUserData {
 }
 
 async function fetchCurrentUser(): Promise<CurrentUserData | null> {
-  // Verificar se há sessão ativa
+  // Apenas leitura local da sessão — NÃO dispara refresh manual.
   const { data: { session } } = await supabase.auth.getSession();
 
   if (!session) {
     return null;
   }
 
-  // Verificar se o token não está expirado (verificação local antes de chamar edge function)
-  const expiresAt = session.expires_at;
-  if (expiresAt && expiresAt * 1000 < Date.now()) {
-    // Token expirado - tentar refresh silenciosamente
-    const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
-    if (refreshError || !refreshData.session) {
-      // Refresh falhou - sessão inválida
-      return null;
-    }
-  }
+  // IMPORTANTE: NÃO chamamos `supabase.auth.refreshSession()` aqui.
+  // O cliente Supabase já tem `autoRefreshToken: true` e gerencia o refresh
+  // em background. Chamar refreshSession manualmente em paralelo causava
+  // uma tempestade de POSTs `/auth/v1/token?grant_type=refresh_token` que o
+  // GoTrue rapidamente rate-limitava (HTTP 429), travando o usuário fora do
+  // sistema (visto em produção: rate limit reached para gustavo.lacerda@*).
 
-  // O cliente Supabase já injeta automaticamente o Authorization header quando há sessão ativa
   const { data: userData, error: functionError } = await supabase.functions.invoke(
     'get-current-user'
   );
 
-  // Verificar erro na resposta (pode estar em functionError ou em data.error)
   const responseError = userData?.error;
   const hasError = functionError || responseError;
-  
+
   if (hasError) {
-    // Tentar extrair mensagem de erro de várias fontes
     let errorDetails = '';
-    
-    // Se functionError existe, tentar extrair o corpo da resposta
     if (functionError) {
       try {
-        // FunctionsHttpError pode ter context com a resposta
         const context = (functionError as any)?.context;
         if (context?.json) {
           const jsonBody = await context.json();
           errorDetails = jsonBody?.error || JSON.stringify(jsonBody);
         }
       } catch {
-        // Ignorar erro ao extrair contexto
+        // ignore
       }
     }
-    
+
     const errorMessage = String(functionError?.message || responseError || errorDetails || '');
     const allErrorText = `${errorMessage} ${responseError || ''} ${errorDetails}`.toLowerCase();
-    
-    // Se o erro for 401 (não autenticado), é um erro esperado quando sessão é inválida
-    const isAuthError = 
-      allErrorText.includes('401') || 
+
+    const isAuthError =
+      allErrorText.includes('401') ||
       allErrorText.includes('não autenticado') ||
       allErrorText.includes('not authenticated') ||
       allErrorText.includes('unauthorized') ||
       (functionError && errorMessage.includes('non-2xx'));
-    
+
     if (isAuthError) {
-      // Auth error esperado - tentar refresh silenciosamente UMA vez.
-      // Se falhar de novo, NÃO tentamos novamente nesta chamada — propagamos
-      // erro para o React Query parar (o retry da query já está desabilitado
-      // para 401), evitando o loop de POSTs 401 visto em produção.
-      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
-
-      if (refreshError || !refreshData.session) {
-        // HARDENING: NÃO deslogar automaticamente em falha de refresh.
-        // Erros transitórios (522/CORS/timeout do backend) faziam o app
-        // chutar todo mundo pra /login. A sessão local pode continuar
-        // válida — apenas reportamos o erro pro React Query e deixamos
-        // o usuário no app. Logout só acontece via ação explícita ou
-        // quando getSession() comprovar ausência de sessão.
-        const refreshMsg = String(refreshError?.message || '').toLowerCase();
-        const isTransient =
-          !refreshError ||
-          refreshMsg.includes('fetch') ||
-          refreshMsg.includes('network') ||
-          refreshMsg.includes('timeout') ||
-          refreshMsg.includes('522') ||
-          refreshMsg.includes('failed');
-        if (isTransient) {
-          throw new Error('transient_auth_error');
-        }
-        return null;
-      }
-
-      // Token renovado - retry silencioso (única tentativa)
-      const { data: retryData, error: retryError } = await supabase.functions.invoke('get-current-user');
-
-      if (retryError || retryData?.error) {
-        // Não retornar null aqui — lançar erro para o React Query marcar como
-        // "errored" e respeitar o `retry: false` para 401, parando a cascata.
-        throw new Error('unauthenticated');
-      }
-
-      return retryData;
+      // Não tentamos refresh manual — o cliente Supabase já cuida disso.
+      // Propagamos para o React Query parar (retry desabilitado em 401).
+      throw new Error('unauthenticated');
     }
 
-    // Para outros erros, apenas retornar null
-    return null;
+    // Outros erros (5xx/timeout) — propagar para retry controlado.
+    throw new Error(errorMessage || 'profile_fetch_failed');
   }
 
   if (!userData) {
