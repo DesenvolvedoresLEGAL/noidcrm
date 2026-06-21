@@ -5390,16 +5390,24 @@ export type Database = {
           allowed_icps: string[] | null
           allowed_quality_labels: string[]
           allowed_relationship_status: string[]
+          auto_reveal_both: boolean
           auto_reveal_contact: boolean
+          auto_reveal_email: boolean
+          auto_reveal_phone: boolean
           auto_select_primary_contact: boolean
           created_at: string
+          email_reveal_min_score: number
           enabled: boolean
+          fallback_to_email_if_no_phone: boolean
           id: string
           max_apollo_credits_per_batch: number
           max_apollo_credits_per_day: number
           max_contacts_per_company: number
+          max_email_reveals_per_company: number
+          max_phone_reveals_per_company: number
           minimum_priority_score: number
           organization_id: string
+          phone_reveal_min_score: number
           required_domain: boolean
           updated_at: string
         }
@@ -5407,16 +5415,24 @@ export type Database = {
           allowed_icps?: string[] | null
           allowed_quality_labels?: string[]
           allowed_relationship_status?: string[]
+          auto_reveal_both?: boolean
           auto_reveal_contact?: boolean
+          auto_reveal_email?: boolean
+          auto_reveal_phone?: boolean
           auto_select_primary_contact?: boolean
           created_at?: string
+          email_reveal_min_score?: number
           enabled?: boolean
+          fallback_to_email_if_no_phone?: boolean
           id?: string
           max_apollo_credits_per_batch?: number
           max_apollo_credits_per_day?: number
           max_contacts_per_company?: number
+          max_email_reveals_per_company?: number
+          max_phone_reveals_per_company?: number
           minimum_priority_score?: number
           organization_id: string
+          phone_reveal_min_score?: number
           required_domain?: boolean
           updated_at?: string
         }
@@ -5424,16 +5440,24 @@ export type Database = {
           allowed_icps?: string[] | null
           allowed_quality_labels?: string[]
           allowed_relationship_status?: string[]
+          auto_reveal_both?: boolean
           auto_reveal_contact?: boolean
+          auto_reveal_email?: boolean
+          auto_reveal_phone?: boolean
           auto_select_primary_contact?: boolean
           created_at?: string
+          email_reveal_min_score?: number
           enabled?: boolean
+          fallback_to_email_if_no_phone?: boolean
           id?: string
           max_apollo_credits_per_batch?: number
           max_apollo_credits_per_day?: number
           max_contacts_per_company?: number
+          max_email_reveals_per_company?: number
+          max_phone_reveals_per_company?: number
           minimum_priority_score?: number
           organization_id?: string
+          phone_reveal_min_score?: number
           required_domain?: boolean
           updated_at?: string
         }
@@ -5496,6 +5520,75 @@ export type Database = {
           priority_score?: number | null
           prospect_id?: string
           skip_reason?: string | null
+        }
+        Relationships: []
+      }
+      apollo_reveal_audit: {
+        Row: {
+          contact_id: string | null
+          created_at: string
+          credits_estimated: number
+          credits_used: number
+          email_after: string | null
+          email_before: string | null
+          id: string
+          job_id: string | null
+          organization_id: string
+          phone_after: string | null
+          phone_before: string | null
+          prospect_id: string | null
+          provider: string
+          raw_response: Json | null
+          reason: string | null
+          requested_by: string | null
+          requested_channel: string | null
+          requested_data_type: string
+          source: string | null
+          status: string
+        }
+        Insert: {
+          contact_id?: string | null
+          created_at?: string
+          credits_estimated?: number
+          credits_used?: number
+          email_after?: string | null
+          email_before?: string | null
+          id?: string
+          job_id?: string | null
+          organization_id: string
+          phone_after?: string | null
+          phone_before?: string | null
+          prospect_id?: string | null
+          provider?: string
+          raw_response?: Json | null
+          reason?: string | null
+          requested_by?: string | null
+          requested_channel?: string | null
+          requested_data_type: string
+          source?: string | null
+          status: string
+        }
+        Update: {
+          contact_id?: string | null
+          created_at?: string
+          credits_estimated?: number
+          credits_used?: number
+          email_after?: string | null
+          email_before?: string | null
+          id?: string
+          job_id?: string | null
+          organization_id?: string
+          phone_after?: string | null
+          phone_before?: string | null
+          prospect_id?: string | null
+          provider?: string
+          raw_response?: Json | null
+          reason?: string | null
+          requested_by?: string | null
+          requested_channel?: string | null
+          requested_data_type?: string
+          source?: string | null
+          status?: string
         }
         Relationships: []
       }
@@ -10645,7 +10738,11 @@ export type Database = {
           created_at: string | null
           department: string | null
           email: string | null
+          email_credits_used: number
           email_normalized: string | null
+          email_reveal_status: string
+          email_revealed: boolean
+          email_revealed_at: string | null
           email_status: string | null
           first_name: string | null
           full_name: string | null
@@ -10654,14 +10751,22 @@ export type Database = {
           is_primary: boolean | null
           last_name: string | null
           last_reveal_attempt_at: string | null
+          last_reveal_job_id: string | null
           linkedin_url: string | null
           merged_into: string | null
           phone: string | null
+          phone_credits_used: number
+          phone_reveal_status: string
+          phone_revealed: boolean
+          phone_revealed_at: string | null
+          preferred_channel: string | null
+          profile_credits_used: number
           prospect_id: string | null
           provider: string | null
           provider_priority: Json | null
           raw: Json | null
           reveal_credits_used: number
+          reveal_source: string | null
           reveal_status: string | null
           revealed_at: string | null
           role_title: string | null
@@ -10677,7 +10782,11 @@ export type Database = {
           created_at?: string | null
           department?: string | null
           email?: string | null
+          email_credits_used?: number
           email_normalized?: string | null
+          email_reveal_status?: string
+          email_revealed?: boolean
+          email_revealed_at?: string | null
           email_status?: string | null
           first_name?: string | null
           full_name?: string | null
@@ -10686,14 +10795,22 @@ export type Database = {
           is_primary?: boolean | null
           last_name?: string | null
           last_reveal_attempt_at?: string | null
+          last_reveal_job_id?: string | null
           linkedin_url?: string | null
           merged_into?: string | null
           phone?: string | null
+          phone_credits_used?: number
+          phone_reveal_status?: string
+          phone_revealed?: boolean
+          phone_revealed_at?: string | null
+          preferred_channel?: string | null
+          profile_credits_used?: number
           prospect_id?: string | null
           provider?: string | null
           provider_priority?: Json | null
           raw?: Json | null
           reveal_credits_used?: number
+          reveal_source?: string | null
           reveal_status?: string | null
           revealed_at?: string | null
           role_title?: string | null
@@ -10709,7 +10826,11 @@ export type Database = {
           created_at?: string | null
           department?: string | null
           email?: string | null
+          email_credits_used?: number
           email_normalized?: string | null
+          email_reveal_status?: string
+          email_revealed?: boolean
+          email_revealed_at?: string | null
           email_status?: string | null
           first_name?: string | null
           full_name?: string | null
@@ -10718,14 +10839,22 @@ export type Database = {
           is_primary?: boolean | null
           last_name?: string | null
           last_reveal_attempt_at?: string | null
+          last_reveal_job_id?: string | null
           linkedin_url?: string | null
           merged_into?: string | null
           phone?: string | null
+          phone_credits_used?: number
+          phone_reveal_status?: string
+          phone_revealed?: boolean
+          phone_revealed_at?: string | null
+          preferred_channel?: string | null
+          profile_credits_used?: number
           prospect_id?: string | null
           provider?: string | null
           provider_priority?: Json | null
           raw?: Json | null
           reveal_credits_used?: number
+          reveal_source?: string | null
           reveal_status?: string | null
           revealed_at?: string | null
           role_title?: string | null
@@ -10774,8 +10903,10 @@ export type Database = {
       enrichment_jobs: {
         Row: {
           completed_at: string | null
+          contact_id: string | null
           contacts_found: number | null
           created_at: string | null
+          credits_estimated: number | null
           credits_used: number | null
           decision_makers_found: number | null
           error: string | null
@@ -10784,6 +10915,8 @@ export type Database = {
           prospect_id: string | null
           provider: string
           request: Json | null
+          requested_channel: string | null
+          requested_data_type: string | null
           response: Json | null
           response_summary: Json | null
           skip_reason: string | null
@@ -10793,8 +10926,10 @@ export type Database = {
         }
         Insert: {
           completed_at?: string | null
+          contact_id?: string | null
           contacts_found?: number | null
           created_at?: string | null
+          credits_estimated?: number | null
           credits_used?: number | null
           decision_makers_found?: number | null
           error?: string | null
@@ -10803,6 +10938,8 @@ export type Database = {
           prospect_id?: string | null
           provider: string
           request?: Json | null
+          requested_channel?: string | null
+          requested_data_type?: string | null
           response?: Json | null
           response_summary?: Json | null
           skip_reason?: string | null
@@ -10812,8 +10949,10 @@ export type Database = {
         }
         Update: {
           completed_at?: string | null
+          contact_id?: string | null
           contacts_found?: number | null
           created_at?: string | null
+          credits_estimated?: number | null
           credits_used?: number | null
           decision_makers_found?: number | null
           error?: string | null
@@ -10822,6 +10961,8 @@ export type Database = {
           prospect_id?: string | null
           provider?: string
           request?: Json | null
+          requested_channel?: string | null
+          requested_data_type?: string | null
           response?: Json | null
           response_summary?: Json | null
           skip_reason?: string | null

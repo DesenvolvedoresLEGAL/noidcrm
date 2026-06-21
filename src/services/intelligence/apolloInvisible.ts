@@ -14,8 +14,44 @@ export interface ApolloRules {
   max_apollo_credits_per_batch: number;
   auto_select_primary_contact: boolean;
   auto_reveal_contact: boolean;
+  // KAI.15.1 — Reveal Governance
+  auto_reveal_email: boolean;
+  auto_reveal_phone: boolean;
+  auto_reveal_both: boolean;
+  email_reveal_min_score: number;
+  phone_reveal_min_score: number;
+  max_email_reveals_per_company: number;
+  max_phone_reveals_per_company: number;
+  fallback_to_email_if_no_phone: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export type RevealDataType = 'profile_only' | 'email' | 'phone' | 'both';
+
+export interface RevealResult {
+  status: 'revealed' | 'pending' | 'not_found' | 'failed' | 'skipped';
+  contact_id?: string;
+  requested_data_type?: RevealDataType;
+  credits_estimated?: number;
+  credits_used?: number;
+  email?: string | null;
+  phone?: string | null;
+  phone_pending?: boolean;
+  preferred_channel?: string;
+  audit_id?: string | null;
+  reason?: string;
+}
+
+export async function revealContact(params: {
+  contact_id: string;
+  prospect_id?: string;
+  requested_data_type: RevealDataType;
+  source?: 'manual' | 'autopilot' | 'sdr_agent' | 'apollo_invisible';
+}): Promise<RevealResult> {
+  const { data, error } = await supabase.functions.invoke('kairos-apollo-reveal-contact', { body: params });
+  if (error) throw error;
+  return data as RevealResult;
 }
 
 export interface ApolloAuditRow {

@@ -85,12 +85,20 @@ export interface EnrichedContact {
   revealed_at?: string | null;
   reveal_status?: string | null;
   last_reveal_attempt_at?: string | null;
+  // KAI.15.1 — Reveal Governance
+  email_revealed?: boolean | null;
+  phone_revealed?: boolean | null;
+  email_reveal_status?: string | null;
+  phone_reveal_status?: string | null;
+  email_revealed_at?: string | null;
+  phone_revealed_at?: string | null;
+  preferred_channel?: string | null;
 }
 
 export async function listEnrichedContacts(prospectId: string): Promise<EnrichedContact[]> {
   const { data, error } = await (supabase
     .from("enriched_contact_profiles") as any)
-    .select("id, prospect_id, full_name, first_name, last_name, role_title, seniority, department, email, email_status, phone, linkedin_url, provider, confidence_score, is_primary, created_at, revealed_at, reveal_status, last_reveal_attempt_at")
+    .select("id, prospect_id, full_name, first_name, last_name, role_title, seniority, department, email, email_status, phone, linkedin_url, provider, confidence_score, is_primary, created_at, revealed_at, reveal_status, last_reveal_attempt_at, email_revealed, phone_revealed, email_reveal_status, phone_reveal_status, email_revealed_at, phone_revealed_at, preferred_channel")
     .eq("prospect_id", prospectId)
     .eq("is_merged", false)
     .order("is_primary", { ascending: false })

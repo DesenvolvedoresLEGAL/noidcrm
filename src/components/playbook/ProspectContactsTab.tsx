@@ -3,16 +3,18 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Sparkles, Loader2, Star, Mail, Phone, Linkedin, Copy, CheckCircle2, AlertCircle, PackageCheck, Eye } from "lucide-react";
+import { Sparkles, Loader2, Star, Mail, Phone, Linkedin, Copy, CheckCircle2, AlertCircle, PackageCheck } from "lucide-react";
 import { toast } from "sonner";
 import { useEnrichedContacts } from "@/hooks/useEnrichedContacts";
 import { useSyncEnrichedContacts } from "@/hooks/useSyncEnrichedContacts";
-import { useRevealApolloContact } from "@/hooks/useRevealApolloContact";
+import { useRevealContact } from "@/hooks/intelligence/useRevealContact";
 import { ApolloConfirmModal } from "./enrichment/ApolloConfirmModal";
+import { RevealConfirmModal } from "./enrichment/RevealConfirmModal";
 import { ContactsQualityPanel } from "./enrichment/ContactsQualityPanel";
 import { MergedContactsAccordion } from "./enrichment/MergedContactsAccordion";
 import { useQuery } from "@tanstack/react-query";
 import { listMergedContacts } from "@/services/enrichment/apolloService";
+import type { RevealDataType } from "@/services/intelligence/apolloInvisible";
 import { cn } from "@/lib/utils";
 
 interface ProspectContactsTabProps {
@@ -66,17 +68,30 @@ export function ProspectContactsTab({
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const sync = useSyncEnrichedContacts();
-  const reveal = useRevealApolloContact();
-  const [revealingId, setRevealingId] = useState<string | null>(null);
+  const reveal = useRevealContact();
+  const [revealingKey, setRevealingKey] = useState<string | null>(null);
+  const [confirmReveal, setConfirmReveal] = useState<{
+    contactId: string;
+    contactName: string | null;
+    dataType: RevealDataType;
+    emailStatus: string | null;
+    phoneStatus: string | null;
+  } | null>(null);
 
-  const handleReveal = (contact: { id: string; full_name: string | null }) => {
-    const name = contact.full_name ?? "este contato";
-    if (!window.confirm(`Revelar email e telefone de ${name}?\n\nIsso consome até 2 créditos da Apollo.`)) return;
-    setRevealingId(contact.id);
-    reveal.mutate(
-      { contactId: contact.id, prospectId, contactName: contact.full_name ?? undefined },
-      { onSettled: () => setRevealingId(null) },
-    );
+  const runReveal = async (contactId: string, dataType: RevealDataType, name: string | null) => {
+    const key = `${contactId}:${dataType}`;
+    setRevealingKey(key);
+    try {
+      await reveal.mutateAsync({
+        contactId,
+        prospectId,
+        requestedDataType: dataType,
+        contactName: name ?? undefined,
+        source: 'manual',
+      });
+    } finally {
+      setRevealingKey(null);
+    }
   };
 
   // Default selection: primary + decisores (c_level/vp/director/manager) com email
@@ -186,6 +201,21 @@ export function ProspectContactsTab({
         isRunning={enrich.isPending}
       />
 
+      {confirmReveal && (
+        <RevealConfirmModal
+          open={!!confirmReveal}
+          onOpenChange={(v) => !v && setConfirmReveal(null)}
+          contactName={confirmReveal.contactName}
+          requestedDataType={confirmReveal.dataType}
+          emailStatus={confirmReveal.emailStatus}
+          phoneStatus={confirmReveal.phoneStatus}
+          isRunning={reveal.isPending}
+          onConfirm={async () => {
+            await runReveal(confirmReveal.contactId, confirmReveal.dataType, confirmReveal.contactName);
+          }}
+        />
+      )}
+
       {isLoading && <div className="text-sm text-muted-foreground py-4 text-center">Carregando contatos…</div>}
 
       {!isLoading && contacts.length > 0 && (
@@ -283,31 +313,86 @@ export function ProspectContactsTab({
               )}
             </div>
 
-            {(!c.email || !c.phone) && (
-              <div className="pl-6 pt-1">
-                {c.reveal_status === "no_data" && !c.email && !c.phone ? (
-                  <div className="text-[11px] text-muted-foreground/70 italic">
-                    Apollo não tem email/telefone deste contato.
+            {(() => {
+              const phoneStatus = c.phone_reveal_status ?? (c.phone ? "revealed" : "not_requested");
+              const emailStatus = c.email_reveal_status ?? (c.email ? "revealed" : "not_requested");
+              const phoneRevealed = !!(c.phone_revealed ?? c.phone);
+              const emailRevealed = !!(c.email_revealed ?? c.email);
+              const phoneBlocked = phoneStatus === "not_found";
+              const emailBlocked = emailStatus === "not_found";
+
+              const phoneBadge: Record<string, { label: string; cls: string }> = {
+                not_requested: { label: "Telefone: não solicitado", cls: "bg-muted text-muted-foreground" },
+                requested: { label: "Telefone: aguardando", cls: "bg-blue-500/10 text-blue-600 border-blue-500/30" },
+                revealed: { label: "Telefone revelado", cls: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30" },
+                not_found: { label: "Telefone não encontrado", cls: "bg-red-500/10 text-red-600 border-red-500/30" },
+                failed: { label: "Telefone falhou", cls: "bg-red-500/10 text-red-600 border-red-500/30" },
+                skipped: { label: "Telefone: pulado", cls: "bg-muted text-muted-foreground" },
+              };
+              const emailBadge: Record<string, { label: string; cls: string }> = {
+                not_requested: { label: "E-mail: não solicitado", cls: "bg-muted text-muted-foreground" },
+                requested: { label: "E-mail: aguardando", cls: "bg-blue-500/10 text-blue-600 border-blue-500/30" },
+                revealed: { label: c.email_status === "verified" ? "E-mail verificado" : "E-mail revelado", cls: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30" },
+                not_found: { label: "E-mail não encontrado", cls: "bg-red-500/10 text-red-600 border-red-500/30" },
+                failed: { label: "E-mail falhou", cls: "bg-red-500/10 text-red-600 border-red-500/30" },
+                skipped: { label: "E-mail: pulado", cls: "bg-muted text-muted-foreground" },
+              };
+              const pCfg = phoneBadge[phoneStatus] ?? phoneBadge.not_requested;
+              const eCfg = emailBadge[emailStatus] ?? emailBadge.not_requested;
+
+              const openConfirm = (dt: RevealDataType) =>
+                setConfirmReveal({
+                  contactId: c.id,
+                  contactName: c.full_name,
+                  dataType: dt,
+                  emailStatus,
+                  phoneStatus,
+                });
+
+              const phoneKey = `${c.id}:phone`;
+              const emailKey = `${c.id}:email`;
+              const bothKey = `${c.id}:both`;
+
+              return (
+                <div className="pl-6 pt-1 space-y-2">
+                  <div className="flex flex-wrap gap-1">
+                    <Badge variant="outline" className={cn("text-[10px]", pCfg.cls)}>{pCfg.label}</Badge>
+                    <Badge variant="outline" className={cn("text-[10px]", eCfg.cls)}>{eCfg.label}</Badge>
                   </div>
-                ) : (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-7 text-[11px] gap-1.5 w-full justify-center border-primary/30 text-primary hover:bg-primary/5"
-                    onClick={() => handleReveal({ id: c.id, full_name: c.full_name })}
-                    disabled={reveal.isPending && revealingId === c.id}
-                  >
-                    {reveal.isPending && revealingId === c.id ? (
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                    ) : (
-                      <Eye className="h-3 w-3" />
-                    )}
-                    {c.email || c.phone ? "Revelar restante" : "Revelar email + telefone"}
-                    <span className="opacity-60 ml-1">· até 2 créditos</span>
-                  </Button>
-                )}
-              </div>
-            )}
+                  {(!phoneRevealed || !emailRevealed) && (
+                    <div className="grid grid-cols-3 gap-1.5">
+                      <Button
+                        size="sm" variant="outline"
+                        className="h-7 text-[11px] gap-1"
+                        onClick={() => openConfirm("phone")}
+                        disabled={phoneRevealed || phoneBlocked || reveal.isPending}
+                      >
+                        {revealingKey === phoneKey ? <Loader2 className="h-3 w-3 animate-spin" /> : <Phone className="h-3 w-3" />}
+                        Telefone
+                      </Button>
+                      <Button
+                        size="sm" variant="outline"
+                        className="h-7 text-[11px] gap-1"
+                        onClick={() => openConfirm("email")}
+                        disabled={emailRevealed || emailBlocked || reveal.isPending}
+                      >
+                        {revealingKey === emailKey ? <Loader2 className="h-3 w-3 animate-spin" /> : <Mail className="h-3 w-3" />}
+                        E-mail
+                      </Button>
+                      <Button
+                        size="sm" variant="default"
+                        className="h-7 text-[11px] gap-1"
+                        onClick={() => openConfirm("both")}
+                        disabled={(phoneRevealed && emailRevealed) || reveal.isPending}
+                      >
+                        {revealingKey === bothKey ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                        Ambos
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {!c.is_primary && (
               <div className="flex justify-end pt-1">

@@ -1,0 +1,374 @@
+// kairos-apollo-reveal-contact (KAI.15.1)
+// Revela seletivamente apenas o dado solicitado (perfil / telefone / e-mail / ambos)
+// via Apollo people/match. Audita em apollo_reveal_audit e atualiza enriched_contact_profiles.
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
+const APOLLO_MATCH_URL = "https://api.apollo.io/api/v1/people/match";
+const APOLLO_TIMEOUT_MS = 12_000;
+
+type DataType = "profile_only" | "email" | "phone" | "both";
+
+interface Body {
+  contact_id: string;
+  prospect_id?: string;
+  requested_data_type: DataType;
+  source?: "manual" | "autopilot" | "sdr_agent" | "apollo_invisible";
+}
+
+function json(status: number, body: unknown) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+function pickPhone(person: any): string | null {
+  if (!person) return null;
+  if (Array.isArray(person.phone_numbers) && person.phone_numbers.length > 0) {
+    const p = person.phone_numbers.find((x: any) => x?.sanitized_number) ?? person.phone_numbers[0];
+    return p?.sanitized_number ?? p?.raw_number ?? null;
+  }
+  return person.sanitized_phone ?? person.organization?.phone ?? null;
+}
+
+function estimateCredits(dt: DataType): number {
+  if (dt === "profile_only") return 0;
+  if (dt === "both") return 2;
+  return 1;
+}
+
+function nextPreferredChannel(phone_revealed: boolean, email_revealed: boolean, linkedin: boolean): string {
+  if (phone_revealed) return "whatsapp";
+  if (email_revealed) return "email";
+  if (linkedin) return "linkedin";
+  return "unknown";
+}
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  try {
+    const APOLLO_API_KEY = Deno.env.get("APOLLO_API_KEY");
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+    const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const ANON = Deno.env.get("SUPABASE_ANON_KEY")!;
+    if (!APOLLO_API_KEY) return json(500, { error: "APOLLO_API_KEY not configured" });
+
+    const body = (await req.json().catch(() => ({}))) as Body;
+    if (!body?.contact_id) return json(400, { error: "contact_id required" });
+    const dataType: DataType = body.requested_data_type ?? "both";
+    if (!["profile_only", "email", "phone", "both"].includes(dataType)) {
+      return json(400, { error: "invalid requested_data_type" });
+    }
+
+    const admin = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false } });
+
+    // Resolve user (optional — source=autopilot/apollo_invisible chamam via service role sem JWT)
+    const authHeader = req.headers.get("Authorization") ?? "";
+    let requestedBy: string | null = null;
+    if (authHeader && authHeader.toLowerCase().startsWith("bearer ")) {
+      const userClient = createClient(SUPABASE_URL, ANON, {
+        global: { headers: { Authorization: authHeader } },
+        auth: { persistSession: false },
+      });
+      const { data: userRes } = await userClient.auth.getUser();
+      requestedBy = userRes?.user?.id ?? null;
+    }
+
+    // Load contact
+    const { data: contact, error: cErr } = await admin
+      .from("enriched_contact_profiles")
+      .select(
+        "id, prospect_id, workspace_id, first_name, last_name, full_name, email, email_status, phone, linkedin_url, apollo_person_id, email_revealed, phone_revealed, email_reveal_status, phone_reveal_status, profile_credits_used, email_credits_used, phone_credits_used, preferred_channel",
+      )
+      .eq("id", body.contact_id)
+      .maybeSingle();
+    if (cErr || !contact) return json(404, { error: "contact_not_found" });
+
+    const prospectId = body.prospect_id ?? contact.prospect_id;
+    const { data: prospect } = await admin
+      .from("prospects")
+      .select("id, organization_id, company_name, normalized_domain, website")
+      .eq("id", prospectId)
+      .maybeSingle();
+
+    const orgId = prospect?.organization_id ?? contact.workspace_id;
+    if (!orgId) return json(400, { error: "organization_not_resolved" });
+
+    // Skip rules
+    const wantsEmail = dataType === "email" || dataType === "both";
+    const wantsPhone = dataType === "phone" || dataType === "both";
+
+    const emailAlready = contact.email_revealed && !!contact.email;
+    const phoneAlready = contact.phone_revealed && !!contact.phone;
+
+    if (dataType === "email" && emailAlready) {
+      const auditId = await writeAudit(admin, {
+        organization_id: orgId, prospect_id: prospectId, contact_id: contact.id,
+        requested_data_type: dataType, status: "skipped",
+        reason: "email_already_revealed", requested_by: requestedBy,
+        source: body.source ?? "manual",
+        email_before: contact.email, phone_before: contact.phone,
+      });
+      return json(200, { status: "skipped", reason: "email_already_revealed", audit_id: auditId });
+    }
+    if (dataType === "phone" && phoneAlready) {
+      const auditId = await writeAudit(admin, {
+        organization_id: orgId, prospect_id: prospectId, contact_id: contact.id,
+        requested_data_type: dataType, status: "skipped",
+        reason: "phone_already_revealed", requested_by: requestedBy,
+        source: body.source ?? "manual",
+        email_before: contact.email, phone_before: contact.phone,
+      });
+      return json(200, { status: "skipped", reason: "phone_already_revealed", audit_id: auditId });
+    }
+    if (dataType === "both" && emailAlready && phoneAlready) {
+      const auditId = await writeAudit(admin, {
+        organization_id: orgId, prospect_id: prospectId, contact_id: contact.id,
+        requested_data_type: dataType, status: "skipped",
+        reason: "all_requested_data_already_revealed", requested_by: requestedBy,
+        source: body.source ?? "manual",
+        email_before: contact.email, phone_before: contact.phone,
+      });
+      return json(200, { status: "skipped", reason: "all_requested_data_already_revealed", audit_id: auditId });
+    }
+
+    // Build Apollo payload (only flags for what we want)
+    const webhookToken = Deno.env.get("APOLLO_WEBHOOK_TOKEN") ?? "";
+    const webhookBase = `${SUPABASE_URL}/functions/v1/apollo-phone-webhook`;
+    const webhookUrl = `${webhookBase}?contact_id=${encodeURIComponent(contact.id)}${webhookToken ? `&token=${encodeURIComponent(webhookToken)}` : ""}`;
+
+    const payload: Record<string, unknown> = {
+      reveal_personal_emails: wantsEmail && !emailAlready,
+      reveal_phone_number: wantsPhone && !phoneAlready,
+    };
+    if (wantsPhone && !phoneAlready) payload.webhook_url = webhookUrl;
+
+    if (contact.apollo_person_id) {
+      payload.id = contact.apollo_person_id;
+    } else {
+      if (contact.first_name) payload.first_name = contact.first_name;
+      if (contact.last_name) payload.last_name = contact.last_name;
+      if (!payload.first_name && contact.full_name) payload.name = contact.full_name;
+      if (prospect?.company_name) payload.organization_name = prospect.company_name;
+      const domain = prospect?.normalized_domain ?? (prospect?.website
+        ? (() => { try { const u = new URL(prospect.website!.startsWith("http") ? prospect.website! : `https://${prospect.website}`); return u.hostname.replace(/^www\./, ""); } catch { return null; } })()
+        : null);
+      if (domain) payload.domain = domain;
+    }
+
+    // Create job
+    const { data: jobRow } = await admin.from("enrichment_jobs").insert({
+      workspace_id: contact.workspace_id,
+      prospect_id: prospectId,
+      contact_id: contact.id,
+      provider: "apollo_reveal",
+      status: "running",
+      trigger_source: body.source ?? "manual",
+      requested_data_type: dataType,
+      requested_channel: wantsPhone ? "phone" : wantsEmail ? "email" : "profile",
+      credits_estimated: estimateCredits(dataType),
+      request: { contact_id: contact.id, requested_data_type: dataType },
+    }).select("id").maybeSingle();
+    const jobId = jobRow?.id ?? null;
+
+    // Call Apollo
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), APOLLO_TIMEOUT_MS);
+    let apolloStatus = 0;
+    let apolloOk = false;
+    let apolloResp: any = null;
+    let apolloError: string | undefined;
+    try {
+      const r = await fetch(APOLLO_MATCH_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-api-key": APOLLO_API_KEY },
+        signal: ctrl.signal,
+        body: JSON.stringify(payload),
+      });
+      apolloStatus = r.status;
+      apolloOk = r.ok;
+      apolloResp = await r.json().catch(() => ({}));
+      if (!r.ok) apolloError = apolloResp?.error || apolloResp?.message || `HTTP ${r.status}`;
+    } catch (e) {
+      apolloError = String(e);
+    } finally {
+      clearTimeout(timer);
+    }
+
+    const nowIso = new Date().toISOString();
+
+    if (!apolloOk) {
+      await admin.from("enrichment_jobs").update({
+        status: "failed",
+        credits_used: 0,
+        error: apolloError ?? "Apollo error",
+        response: { status: apolloStatus, body: apolloResp },
+        completed_at: nowIso,
+      }).eq("id", jobId);
+
+      // Update contact statuses for failed reveal
+      const upd: Record<string, unknown> = {};
+      if (wantsEmail && !emailAlready) upd.email_reveal_status = "failed";
+      if (wantsPhone && !phoneAlready) upd.phone_reveal_status = "failed";
+      if (Object.keys(upd).length) await admin.from("enriched_contact_profiles").update(upd).eq("id", contact.id);
+
+      const auditId = await writeAudit(admin, {
+        organization_id: orgId, prospect_id: prospectId, contact_id: contact.id,
+        job_id: jobId, requested_data_type: dataType, status: "failed",
+        credits_estimated: estimateCredits(dataType), credits_used: 0,
+        reason: apolloError ?? "apollo_error",
+        email_before: contact.email, phone_before: contact.phone,
+        raw_response: { status: apolloStatus, body: apolloResp },
+        requested_by: requestedBy, source: body.source ?? "manual",
+      });
+      await emitRevenueEvent(admin, orgId, "apollo_reveal_failed", { contact_id: contact.id, requested_data_type: dataType, reason: apolloError });
+      return json(200, { status: "failed", reason: apolloError, audit_id: auditId });
+    }
+
+    const person = apolloResp?.person ?? null;
+    const revealedEmail = wantsEmail && !emailAlready ? (person?.email ?? null) : null;
+    const revealedPhone = wantsPhone && !phoneAlready ? pickPhone(person) : null;
+    const apolloPersonId = person?.id ?? person?.person_id ?? contact.apollo_person_id ?? null;
+    const phonePending = wantsPhone && !phoneAlready && !revealedPhone; // virá pelo webhook
+
+    const update: Record<string, unknown> = {
+      last_reveal_attempt_at: nowIso,
+      last_reveal_job_id: jobId,
+      reveal_source: body.source ?? "manual",
+    };
+    let creditsUsed = 0;
+
+    if (wantsEmail && !emailAlready) {
+      if (revealedEmail) {
+        update.email = revealedEmail;
+        update.email_revealed = true;
+        update.email_reveal_status = "revealed";
+        update.email_revealed_at = nowIso;
+        if (person?.email_status) update.email_status = person.email_status;
+        update.email_credits_used = (contact.email_credits_used ?? 0) + 1;
+        creditsUsed += 1;
+      } else {
+        update.email_reveal_status = "not_found";
+      }
+    }
+    if (wantsPhone && !phoneAlready) {
+      if (revealedPhone) {
+        update.phone = revealedPhone;
+        update.phone_revealed = true;
+        update.phone_reveal_status = "revealed";
+        update.phone_revealed_at = nowIso;
+        update.phone_credits_used = (contact.phone_credits_used ?? 0) + 1;
+        creditsUsed += 1;
+      } else if (phonePending) {
+        update.phone_reveal_status = "requested"; // webhook completará
+      } else {
+        update.phone_reveal_status = "not_found";
+      }
+    }
+    if (apolloPersonId && !contact.apollo_person_id) update.apollo_person_id = apolloPersonId;
+
+    const phoneRevealedFinal = !!(update.phone_revealed ?? contact.phone_revealed);
+    const emailRevealedFinal = !!(update.email_revealed ?? contact.email_revealed);
+    update.preferred_channel = nextPreferredChannel(phoneRevealedFinal, emailRevealedFinal, !!contact.linkedin_url);
+
+    await admin.from("enriched_contact_profiles").update(update).eq("id", contact.id);
+
+    // Re-resolve primary
+    try { await admin.rpc("resolve_primary_contact", { p_prospect_id: prospectId }); } catch {/*noop*/}
+
+    let finalStatus: string;
+    if (phonePending) finalStatus = "pending";
+    else if (revealedEmail || revealedPhone) finalStatus = "revealed";
+    else finalStatus = "not_found";
+
+    await admin.from("enrichment_jobs").update({
+      status: phonePending ? "running" : "done",
+      credits_used: creditsUsed,
+      contacts_found: revealedEmail || revealedPhone ? 1 : 0,
+      response: { status: apolloStatus, person_id: apolloPersonId },
+      response_summary: {
+        revealed_email: !!revealedEmail,
+        revealed_phone: !!revealedPhone,
+        phone_pending: phonePending,
+      },
+      completed_at: phonePending ? null : nowIso,
+    }).eq("id", jobId);
+
+    const auditId = await writeAudit(admin, {
+      organization_id: orgId, prospect_id: prospectId, contact_id: contact.id, job_id: jobId,
+      requested_data_type: dataType, status: finalStatus,
+      credits_estimated: estimateCredits(dataType), credits_used: creditsUsed,
+      email_before: contact.email, email_after: revealedEmail ?? contact.email,
+      phone_before: contact.phone, phone_after: revealedPhone ?? contact.phone,
+      requested_by: requestedBy, source: body.source ?? "manual",
+      raw_response: { status: apolloStatus, person_id: apolloPersonId },
+    });
+
+    // Revenue events
+    if (revealedEmail) await emitRevenueEvent(admin, orgId, "apollo_email_revealed", { contact_id: contact.id });
+    if (wantsEmail && !revealedEmail && !emailAlready) await emitRevenueEvent(admin, orgId, "apollo_email_not_found", { contact_id: contact.id });
+    if (revealedPhone) await emitRevenueEvent(admin, orgId, "apollo_phone_revealed", { contact_id: contact.id });
+    if (wantsPhone && !revealedPhone && !phonePending && !phoneAlready) await emitRevenueEvent(admin, orgId, "apollo_phone_not_found", { contact_id: contact.id });
+
+    // Update kairos_qualified_queue with channel + flags
+    try {
+      await admin.from("kairos_qualified_queue").update({
+        primary_contact_score: null, // let trigger/score recompute
+        // expose flags if columns exist; ignore failure silently
+        phone_revealed: phoneRevealedFinal,
+        email_revealed: emailRevealedFinal,
+        preferred_channel: update.preferred_channel,
+      }).eq("prospect_id", prospectId);
+    } catch {/*column may not exist in older schema*/}
+
+    return json(200, {
+      status: finalStatus,
+      contact_id: contact.id,
+      requested_data_type: dataType,
+      credits_estimated: estimateCredits(dataType),
+      credits_used: creditsUsed,
+      email: revealedEmail,
+      phone: revealedPhone,
+      phone_pending: phonePending,
+      preferred_channel: update.preferred_channel,
+      audit_id: auditId,
+    });
+  } catch (e) {
+    console.error("kairos-apollo-reveal-contact error:", e);
+    return json(500, { error: String(e) });
+  }
+});
+
+async function writeAudit(admin: any, row: Record<string, unknown>): Promise<string | null> {
+  try {
+    const { data } = await admin.from("apollo_reveal_audit").insert(row).select("id").maybeSingle();
+    return data?.id ?? null;
+  } catch (e) {
+    console.warn("apollo_reveal_audit insert failed:", e);
+    return null;
+  }
+}
+
+async function emitRevenueEvent(admin: any, orgId: string, kind: string, payload: Record<string, unknown>) {
+  try {
+    await admin.from("revenue_events").insert({
+      organization_id: orgId,
+      event_type: kind,
+      payload,
+    });
+  } catch {/*noop*/}
+  try {
+    await admin.from("system_events").insert({
+      organization_id: orgId,
+      event_type: kind,
+      payload,
+    });
+  } catch {/*noop*/}
+}

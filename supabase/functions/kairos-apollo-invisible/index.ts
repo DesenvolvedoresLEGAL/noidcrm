@@ -195,14 +195,61 @@ Deno.serve(async (req) => {
     let revealed = 0;
     let primary: any = null;
 
+    // Per-company caps
+    let phoneRevealsThisRun = 0;
+    let emailRevealsThisRun = 0;
+    const maxPhonePerCompany = effectiveRules?.max_phone_reveals_per_company ?? 2;
+    const maxEmailPerCompany = effectiveRules?.max_email_reveals_per_company ?? 0;
+    const phoneMinScore = effectiveRules?.phone_reveal_min_score ?? 180;
+    const emailMinScore = effectiveRules?.email_reveal_min_score ?? 220;
+    const fallbackEmail = effectiveRules?.fallback_to_email_if_no_phone ?? false;
+    const autoPhone = effectiveRules?.auto_reveal_phone ?? true;
+    const autoEmail = effectiveRules?.auto_reveal_email ?? false;
+    // Legacy flag still respected: if auto_reveal_contact is true, treat as both
+    const legacyBoth = effectiveRules?.auto_reveal_contact === true && !autoPhone && !autoEmail;
+
     for (const c of toProcess) {
       if (titleSeniorityScore(c.seniority || c.role_title) >= 60 && !primary) primary = c;
-      if (effectiveRules?.auto_reveal_contact) {
+
+      const score = c._score ?? 0;
+      const wantPhone = (autoPhone || legacyBoth) && score >= phoneMinScore && phoneRevealsThisRun < maxPhonePerCompany;
+      const wantEmail = (autoEmail || legacyBoth) && score >= emailMinScore && emailRevealsThisRun < maxEmailPerCompany;
+
+      // Decide data type
+      let dataType: 'phone' | 'email' | 'both' | null = null;
+      if (wantPhone && wantEmail) dataType = 'both';
+      else if (wantPhone) dataType = 'phone';
+      else if (wantEmail) dataType = 'email';
+
+      if (dataType) {
         try {
-          await admin.functions.invoke("reveal-apollo-contact", { body: { contact_id: c.id } });
-          revealed += 1;
-          creditsUsed += 1;
-          await emitEvent(admin, orgId, "contact_revealed", { prospect_id: body.prospect_id, contact_id: c.id });
+          const { data: revealRes } = await admin.functions.invoke("kairos-apollo-reveal-contact", {
+            body: {
+              contact_id: c.id,
+              prospect_id: body.prospect_id,
+              requested_data_type: dataType,
+              source: 'apollo_invisible',
+            },
+          });
+          const r = revealRes as any;
+          if (r?.status === 'revealed' || r?.status === 'pending') {
+            revealed += 1;
+            if (dataType === 'phone' || dataType === 'both') phoneRevealsThisRun += 1;
+            if (dataType === 'email' || dataType === 'both') emailRevealsThisRun += 1;
+            creditsUsed += r?.credits_used ?? 0;
+            await emitEvent(admin, orgId, "contact_revealed", { prospect_id: body.prospect_id, contact_id: c.id, data_type: dataType });
+          } else if (r?.status === 'not_found' && dataType === 'phone' && fallbackEmail && (autoEmail || legacyBoth) && emailRevealsThisRun < maxEmailPerCompany && score >= emailMinScore) {
+            // Fallback: telefone não encontrado, tentar e-mail
+            const { data: fbRes } = await admin.functions.invoke("kairos-apollo-reveal-contact", {
+              body: { contact_id: c.id, prospect_id: body.prospect_id, requested_data_type: 'email', source: 'apollo_invisible' },
+            });
+            const fr = fbRes as any;
+            if (fr?.status === 'revealed') {
+              revealed += 1;
+              emailRevealsThisRun += 1;
+              creditsUsed += fr?.credits_used ?? 0;
+            }
+          }
         } catch (err) {
           console.warn("[apollo-invisible] reveal fail", err);
         }
