@@ -20,6 +20,15 @@ export function ApolloInvisibleSettingsCard() {
     max_apollo_credits_per_batch: 200,
     auto_select_primary_contact: true,
     auto_reveal_contact: true,
+    // KAI.15.1 governance
+    auto_reveal_phone: true,
+    auto_reveal_email: false,
+    auto_reveal_both: false,
+    phone_reveal_min_score: 180,
+    email_reveal_min_score: 220,
+    max_phone_reveals_per_company: 2,
+    max_email_reveals_per_company: 0,
+    fallback_to_email_if_no_phone: true,
   });
 
   useEffect(() => {
@@ -33,6 +42,14 @@ export function ApolloInvisibleSettingsCard() {
         max_apollo_credits_per_batch: data.max_apollo_credits_per_batch,
         auto_select_primary_contact: data.auto_select_primary_contact,
         auto_reveal_contact: data.auto_reveal_contact,
+        auto_reveal_phone: data.auto_reveal_phone ?? true,
+        auto_reveal_email: data.auto_reveal_email ?? false,
+        auto_reveal_both: data.auto_reveal_both ?? false,
+        phone_reveal_min_score: data.phone_reveal_min_score ?? 180,
+        email_reveal_min_score: data.email_reveal_min_score ?? 220,
+        max_phone_reveals_per_company: data.max_phone_reveals_per_company ?? 2,
+        max_email_reveals_per_company: data.max_email_reveals_per_company ?? 0,
+        fallback_to_email_if_no_phone: data.fallback_to_email_if_no_phone ?? true,
       });
     }
   }, [data]);
