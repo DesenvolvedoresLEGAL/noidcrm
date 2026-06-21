@@ -201,6 +201,21 @@ export function ProspectContactsTab({
         isRunning={enrich.isPending}
       />
 
+      {confirmReveal && (
+        <RevealConfirmModal
+          open={!!confirmReveal}
+          onOpenChange={(v) => !v && setConfirmReveal(null)}
+          contactName={confirmReveal.contactName}
+          requestedDataType={confirmReveal.dataType}
+          emailStatus={confirmReveal.emailStatus}
+          phoneStatus={confirmReveal.phoneStatus}
+          isRunning={reveal.isPending}
+          onConfirm={async () => {
+            await runReveal(confirmReveal.contactId, confirmReveal.dataType, confirmReveal.contactName);
+          }}
+        />
+      )}
+
       {isLoading && <div className="text-sm text-muted-foreground py-4 text-center">Carregando contatos…</div>}
 
       {!isLoading && contacts.length > 0 && (
