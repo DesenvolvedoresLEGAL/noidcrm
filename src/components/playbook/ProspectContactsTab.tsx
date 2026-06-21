@@ -298,31 +298,86 @@ export function ProspectContactsTab({
               )}
             </div>
 
-            {(!c.email || !c.phone) && (
-              <div className="pl-6 pt-1">
-                {c.reveal_status === "no_data" && !c.email && !c.phone ? (
-                  <div className="text-[11px] text-muted-foreground/70 italic">
-                    Apollo não tem email/telefone deste contato.
+            {(() => {
+              const phoneStatus = c.phone_reveal_status ?? (c.phone ? "revealed" : "not_requested");
+              const emailStatus = c.email_reveal_status ?? (c.email ? "revealed" : "not_requested");
+              const phoneRevealed = !!(c.phone_revealed ?? c.phone);
+              const emailRevealed = !!(c.email_revealed ?? c.email);
+              const phoneBlocked = phoneStatus === "not_found";
+              const emailBlocked = emailStatus === "not_found";
+
+              const phoneBadge: Record<string, { label: string; cls: string }> = {
+                not_requested: { label: "Telefone: não solicitado", cls: "bg-muted text-muted-foreground" },
+                requested: { label: "Telefone: aguardando", cls: "bg-blue-500/10 text-blue-600 border-blue-500/30" },
+                revealed: { label: "Telefone revelado", cls: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30" },
+                not_found: { label: "Telefone não encontrado", cls: "bg-red-500/10 text-red-600 border-red-500/30" },
+                failed: { label: "Telefone falhou", cls: "bg-red-500/10 text-red-600 border-red-500/30" },
+                skipped: { label: "Telefone: pulado", cls: "bg-muted text-muted-foreground" },
+              };
+              const emailBadge: Record<string, { label: string; cls: string }> = {
+                not_requested: { label: "E-mail: não solicitado", cls: "bg-muted text-muted-foreground" },
+                requested: { label: "E-mail: aguardando", cls: "bg-blue-500/10 text-blue-600 border-blue-500/30" },
+                revealed: { label: c.email_status === "verified" ? "E-mail verificado" : "E-mail revelado", cls: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30" },
+                not_found: { label: "E-mail não encontrado", cls: "bg-red-500/10 text-red-600 border-red-500/30" },
+                failed: { label: "E-mail falhou", cls: "bg-red-500/10 text-red-600 border-red-500/30" },
+                skipped: { label: "E-mail: pulado", cls: "bg-muted text-muted-foreground" },
+              };
+              const pCfg = phoneBadge[phoneStatus] ?? phoneBadge.not_requested;
+              const eCfg = emailBadge[emailStatus] ?? emailBadge.not_requested;
+
+              const openConfirm = (dt: RevealDataType) =>
+                setConfirmReveal({
+                  contactId: c.id,
+                  contactName: c.full_name,
+                  dataType: dt,
+                  emailStatus,
+                  phoneStatus,
+                });
+
+              const phoneKey = `${c.id}:phone`;
+              const emailKey = `${c.id}:email`;
+              const bothKey = `${c.id}:both`;
+
+              return (
+                <div className="pl-6 pt-1 space-y-2">
+                  <div className="flex flex-wrap gap-1">
+                    <Badge variant="outline" className={cn("text-[10px]", pCfg.cls)}>{pCfg.label}</Badge>
+                    <Badge variant="outline" className={cn("text-[10px]", eCfg.cls)}>{eCfg.label}</Badge>
                   </div>
-                ) : (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-7 text-[11px] gap-1.5 w-full justify-center border-primary/30 text-primary hover:bg-primary/5"
-                    onClick={() => handleReveal({ id: c.id, full_name: c.full_name })}
-                    disabled={reveal.isPending && revealingId === c.id}
-                  >
-                    {reveal.isPending && revealingId === c.id ? (
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                    ) : (
-                      <Eye className="h-3 w-3" />
-                    )}
-                    {c.email || c.phone ? "Revelar restante" : "Revelar email + telefone"}
-                    <span className="opacity-60 ml-1">· até 2 créditos</span>
-                  </Button>
-                )}
-              </div>
-            )}
+                  {(!phoneRevealed || !emailRevealed) && (
+                    <div className="grid grid-cols-3 gap-1.5">
+                      <Button
+                        size="sm" variant="outline"
+                        className="h-7 text-[11px] gap-1"
+                        onClick={() => openConfirm("phone")}
+                        disabled={phoneRevealed || phoneBlocked || reveal.isPending}
+                      >
+                        {revealingKey === phoneKey ? <Loader2 className="h-3 w-3 animate-spin" /> : <Phone className="h-3 w-3" />}
+                        Telefone
+                      </Button>
+                      <Button
+                        size="sm" variant="outline"
+                        className="h-7 text-[11px] gap-1"
+                        onClick={() => openConfirm("email")}
+                        disabled={emailRevealed || emailBlocked || reveal.isPending}
+                      >
+                        {revealingKey === emailKey ? <Loader2 className="h-3 w-3 animate-spin" /> : <Mail className="h-3 w-3" />}
+                        E-mail
+                      </Button>
+                      <Button
+                        size="sm" variant="default"
+                        className="h-7 text-[11px] gap-1"
+                        onClick={() => openConfirm("both")}
+                        disabled={(phoneRevealed && emailRevealed) || reveal.isPending}
+                      >
+                        {revealingKey === bothKey ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                        Ambos
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {!c.is_primary && (
               <div className="flex justify-end pt-1">
