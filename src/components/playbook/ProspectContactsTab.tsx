@@ -3,16 +3,18 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Sparkles, Loader2, Star, Mail, Phone, Linkedin, Copy, CheckCircle2, AlertCircle, PackageCheck, Eye } from "lucide-react";
+import { Sparkles, Loader2, Star, Mail, Phone, Linkedin, Copy, CheckCircle2, AlertCircle, PackageCheck } from "lucide-react";
 import { toast } from "sonner";
 import { useEnrichedContacts } from "@/hooks/useEnrichedContacts";
 import { useSyncEnrichedContacts } from "@/hooks/useSyncEnrichedContacts";
-import { useRevealApolloContact } from "@/hooks/useRevealApolloContact";
+import { useRevealContact } from "@/hooks/intelligence/useRevealContact";
 import { ApolloConfirmModal } from "./enrichment/ApolloConfirmModal";
+import { RevealConfirmModal } from "./enrichment/RevealConfirmModal";
 import { ContactsQualityPanel } from "./enrichment/ContactsQualityPanel";
 import { MergedContactsAccordion } from "./enrichment/MergedContactsAccordion";
 import { useQuery } from "@tanstack/react-query";
 import { listMergedContacts } from "@/services/enrichment/apolloService";
+import type { RevealDataType } from "@/services/intelligence/apolloInvisible";
 import { cn } from "@/lib/utils";
 
 interface ProspectContactsTabProps {
