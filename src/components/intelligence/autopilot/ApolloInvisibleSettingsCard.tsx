@@ -112,9 +112,57 @@ export function ApolloInvisibleSettingsCard() {
               onCheckedChange={(v) => setForm({ ...form, auto_select_primary_contact: v })} />
           </div>
           <div className="flex items-center justify-between md:col-span-2">
-            <Label>Revelar contatos automaticamente</Label>
+            <Label>Revelar contatos automaticamente (legado)</Label>
             <Switch checked={form.auto_reveal_contact}
               onCheckedChange={(v) => setForm({ ...form, auto_reveal_contact: v })} />
+          </div>
+        </div>
+      )}
+
+      {!isLoading && (
+        <div className="space-y-3 pt-3 border-t">
+          <div>
+            <h4 className="font-semibold text-sm">Governança de Revelação</h4>
+            <p className="text-xs text-muted-foreground">
+              Separe perfil, telefone e e-mail. Apollo só consome crédito do canal que a operação usa.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="flex items-center justify-between md:col-span-2">
+              <Label>Revelar telefone automaticamente</Label>
+              <Switch checked={form.auto_reveal_phone}
+                onCheckedChange={(v) => setForm({ ...form, auto_reveal_phone: v })} />
+            </div>
+            <div className="flex items-center justify-between md:col-span-2">
+              <Label>Revelar e-mail automaticamente</Label>
+              <Switch checked={form.auto_reveal_email}
+                onCheckedChange={(v) => setForm({ ...form, auto_reveal_email: v })} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Score mínimo para telefone</Label>
+              <Input type="number" value={form.phone_reveal_min_score}
+                onChange={(e) => setForm({ ...form, phone_reveal_min_score: Number(e.target.value) })} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Score mínimo para e-mail</Label>
+              <Input type="number" value={form.email_reveal_min_score}
+                onChange={(e) => setForm({ ...form, email_reveal_min_score: Number(e.target.value) })} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Máx telefones por empresa</Label>
+              <Input type="number" value={form.max_phone_reveals_per_company}
+                onChange={(e) => setForm({ ...form, max_phone_reveals_per_company: Number(e.target.value) })} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Máx e-mails por empresa</Label>
+              <Input type="number" value={form.max_email_reveals_per_company}
+                onChange={(e) => setForm({ ...form, max_email_reveals_per_company: Number(e.target.value) })} />
+            </div>
+            <div className="flex items-center justify-between md:col-span-2">
+              <Label>Fallback para e-mail se telefone não encontrado</Label>
+              <Switch checked={form.fallback_to_email_if_no_phone}
+                onCheckedChange={(v) => setForm({ ...form, fallback_to_email_if_no_phone: v })} />
+            </div>
           </div>
         </div>
       )}
