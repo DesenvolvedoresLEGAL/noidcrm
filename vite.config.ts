@@ -35,8 +35,8 @@ export default defineConfig(async ({ mode, command }) => {
   plugins: [
     react(),
     ...devOnlyPlugins,
-    VitePWA({
-      disable: isDevelopmentBuild,
+    !isDevelopmentBuild && VitePWA({
+      disable: false,
       registerType: "autoUpdate",
       includeAssets: ["favicon.ico"],
       manifest: {

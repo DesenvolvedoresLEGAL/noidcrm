@@ -1,6 +1,5 @@
 import { createRoot } from "react-dom/client";
 import { HelmetProvider } from "react-helmet-async";
-import { registerSW } from "virtual:pwa-register";
 import App from "./App.tsx";
 import "./index.css";
 import "./i18n"; // Initialize i18n
@@ -11,8 +10,8 @@ createRoot(document.getElementById("root")!).render(
   </HelmetProvider>
 );
 
-// Register service worker for PWA using vite-plugin-pwa's unified approach
-// This replaces manual navigator.serviceWorker.register to avoid duplicate SW conflicts
+// Register service worker only in production. Avoid importing virtual:pwa-register
+// during build:dev because that virtual module requires the PWA plugin build path.
 if (import.meta.env.PROD) {
   // One-time cleanup: deleta caches antigos do SW que continham respostas Supabase
   // (refresh tokens velhos cacheados causavam 401 + loop infinito de "Carregando perfil...").
@@ -24,24 +23,18 @@ if (import.meta.env.PROD) {
     }).catch(() => {});
   }
 
-  const updateSW = registerSW({
-    onNeedRefresh() {
-      console.log("[PWA] New version available, updating...");
-      updateSW(true);
-    },
-    onOfflineReady() {
-      console.log("[PWA] App ready to work offline");
-    },
-    onRegisteredSW(swUrl, registration) {
-      console.log("[PWA] Service worker registered:", swUrl);
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("/sw.js").then((registration) => {
+        console.log("[PWA] Service worker registered:", registration.scope);
       if (registration) {
         setInterval(() => {
           registration.update();
         }, 5 * 60 * 1000);
       }
-    },
-    onRegisterError(error) {
-      console.log("[PWA] Service worker registration failed:", error);
-    },
-  });
+      }).catch((error) => {
+        console.log("[PWA] Service worker registration failed:", error);
+      });
+    });
+  }
 }
