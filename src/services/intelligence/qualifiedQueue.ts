@@ -43,6 +43,10 @@ export interface QualifiedQueueItem {
   imported_contact_id: string | null;
   created_at: string;
   updated_at: string;
+  coverage_score?: number | null;
+  coverage_class?: 'complete' | 'good' | 'partial' | 'weak' | 'new' | null;
+  missing_items?: string[] | null;
+  next_best_action?: string | null;
 }
 
 export interface QualifiedQueueFilters {
