@@ -10,9 +10,23 @@ createRoot(document.getElementById("root")!).render(
   </HelmetProvider>
 );
 
-// Register service worker only in production. Avoid importing virtual:pwa-register
-// during build:dev because that virtual module requires the PWA plugin build path.
-if (import.meta.env.PROD) {
+const isPreviewHost = () => {
+  const { hostname } = window.location;
+  return (
+    window.self !== window.top ||
+    hostname.startsWith("id-preview--") ||
+    hostname.startsWith("preview--") ||
+    hostname === "lovableproject.com" ||
+    hostname.endsWith(".lovableproject.com") ||
+    hostname === "lovableproject-dev.com" ||
+    hostname.endsWith(".lovableproject-dev.com") ||
+    hostname === "beta.lovable.dev" ||
+    hostname.endsWith(".beta.lovable.dev")
+  );
+};
+
+// Register service worker only when PWA was explicitly enabled for production.
+if (import.meta.env.PROD && import.meta.env.VITE_ENABLE_PWA === "true" && !isPreviewHost()) {
   // One-time cleanup: deleta caches antigos do SW que continham respostas Supabase
   // (refresh tokens velhos cacheados causavam 401 + loop infinito de "Carregando perfil...").
   if ("caches" in window) {

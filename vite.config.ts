@@ -1,43 +1,35 @@
-import { defineConfig } from "vite";
+import { defineConfig, type PluginOption } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
-import { VitePWA } from "vite-plugin-pwa";
 
 // https://vitejs.dev/config/
 // Build trigger: remove manualChunks entirely to eliminate TDZ errors
 export default defineConfig(async ({ mode, command }) => {
-  const devOnlyPlugins = [];
-  const isDevelopmentBuild = command === "build" && mode === "development";
+  const devOnlyPlugins: PluginOption[] = [];
+  const isCi = process.env.CI === "true" || process.env.GITHUB_ACTIONS === "true";
+  const isLovableEnvironment = Object.keys(process.env).some((key) =>
+    key.startsWith("LOVABLE_") || key.startsWith("VITE_LOVABLE_") || key === "LOVABLE_PROJECT_ID"
+  );
+  const shouldEnablePWA =
+    command === "build" &&
+    mode === "production" &&
+    process.env.VITE_ENABLE_PWA === "true" &&
+    !isCi &&
+    !isLovableEnvironment;
 
   if (command === "serve" && mode === "development") {
     const { componentTagger } = await import("lovable-tagger");
     devOnlyPlugins.push(componentTagger());
   }
 
-  return {
-  // Inject a deterministic build marker to confirm published version
-  define: {
-    "import.meta.env.VITE_BUILD_TIME": JSON.stringify(new Date().toISOString()),
-  },
-  server: {
-    host: "::",
-    port: 8080,
-  },
-  build: {
-    // Reduz custo/tempo no pipeline e evita trabalho extra durante publish
-    reportCompressedSize: false,
-    // Aumentar limite de aviso para chunks grandes (vendors)
-    chunkSizeWarningLimit: 1500,
-    // manualChunks REMOVIDO: causava TDZ "Cannot access 'X' before initialization"
-    // por circular dependencies entre chunks vendor. Rollup faz code-splitting
-    // automático correto baseado nos dynamic imports (lazy() nas rotas + await import()).
-  },
-  plugins: [
-    react(),
-    ...devOnlyPlugins,
-    !isDevelopmentBuild && VitePWA({
+  const pwaPlugins: PluginOption[] = [];
+
+  if (shouldEnablePWA) {
+    const { VitePWA } = await import("vite-plugin-pwa");
+    pwaPlugins.push(VitePWA({
       disable: false,
       registerType: "autoUpdate",
+      injectRegister: null,
       includeAssets: ["favicon.ico"],
       manifest: {
         name: "NOID CRM",
@@ -61,22 +53,13 @@ export default defineConfig(async ({ mode, command }) => {
         ],
       },
       workbox: {
-        // Force immediate activation of new service worker
         skipWaiting: true,
         clientsClaim: true,
-        // Clean old caches on update
         cleanupOutdatedCaches: true,
-        // Do not pre-cache or navigate-fallback to index.html (causes non-precached-url errors)
         navigateFallback: null,
-        // Allow large bundles
         maximumFileSizeToCacheInBytes: 10 * 1024 * 1024,
-        // Não cachear HTML evita mismatch entre index antigo e assets JS novos
         globPatterns: ["**/*.{js,css,ico,png,svg,woff2}"],
         runtimeCaching: [
-          // IMPORTANTE: NUNCA cachear chamadas do Supabase (auth, rest, functions, realtime).
-          // Cache de /auth/v1/token serve refresh tokens velhos -> 401 + CORS + loop infinito
-          // de "Carregando perfil...". Cache de rest/functions mascara stale data.
-          // Se quiser cache de leitura, faça no React Query (in-memory), nunca no SW.
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
             handler: "CacheFirst",
@@ -84,14 +67,38 @@ export default defineConfig(async ({ mode, command }) => {
               cacheName: "google-fonts-cache",
               expiration: {
                 maxEntries: 10,
-                maxAgeSeconds: 60 * 60 * 24 * 365, // 1 year
+                maxAgeSeconds: 60 * 60 * 24 * 365,
               },
             },
           },
         ],
       },
-    }),
-  ].filter(Boolean),
+    }));
+  }
+
+  return {
+  // Inject a deterministic build marker to confirm published version
+  define: {
+    "import.meta.env.VITE_BUILD_TIME": JSON.stringify(new Date().toISOString()),
+  },
+  server: {
+    host: "::",
+    port: 8080,
+  },
+  build: {
+    // Reduz custo/tempo no pipeline e evita trabalho extra durante publish
+    reportCompressedSize: false,
+    // Aumentar limite de aviso para chunks grandes (vendors)
+    chunkSizeWarningLimit: 1500,
+    // manualChunks REMOVIDO: causava TDZ "Cannot access 'X' before initialization"
+    // por circular dependencies entre chunks vendor. Rollup faz code-splitting
+    // automático correto baseado nos dynamic imports (lazy() nas rotas + await import()).
+  },
+  plugins: [
+    react(),
+    ...devOnlyPlugins,
+    ...pwaPlugins,
+  ],
   resolve: {
     // Ensure single React instance across all dependencies
     dedupe: ["react", "react-dom"],
