@@ -1,6 +1,5 @@
 import { createRoot } from "react-dom/client";
 import { HelmetProvider } from "react-helmet-async";
-import { registerSW } from "virtual:pwa-register";
 import App from "./App.tsx";
 import "./index.css";
 import "./i18n"; // Initialize i18n
@@ -24,7 +23,8 @@ if (import.meta.env.PROD) {
     }).catch(() => {});
   }
 
-  const updateSW = registerSW({
+  import("virtual:pwa-register").then(({ registerSW }) => {
+    const updateSW = registerSW({
     onNeedRefresh() {
       console.log("[PWA] New version available, updating...");
       updateSW(true);
@@ -43,5 +43,8 @@ if (import.meta.env.PROD) {
     onRegisterError(error) {
       console.log("[PWA] Service worker registration failed:", error);
     },
+  });
+  }).catch((error) => {
+    console.log("[PWA] Service worker registration module failed:", error);
   });
 }
