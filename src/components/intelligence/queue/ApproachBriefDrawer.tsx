@@ -30,7 +30,12 @@ export function ApproachBriefDrawer({ item, onClose }: Props) {
         <SheetHeader>
           <SheetTitle>{item.company_name}</SheetTitle>
         </SheetHeader>
-        <div className="mt-4 space-y-4 text-sm">
+        <Tabs defaultValue="brief" className="mt-4">
+          <TabsList className="grid grid-cols-2 w-full">
+            <TabsTrigger value="brief">Brief</TabsTrigger>
+            <TabsTrigger value="coverage">Smart Coverage</TabsTrigger>
+          </TabsList>
+          <TabsContent value="brief" className="space-y-4 text-sm mt-4">
           {brief.angulo && (
             <section>
               <div className="font-semibold mb-1">Ângulo de abordagem</div>
@@ -82,7 +87,11 @@ export function ApproachBriefDrawer({ item, onClose }: Props) {
               </p>
             )}
           </div>
-        </div>
+          </TabsContent>
+          <TabsContent value="coverage">
+            <SmartCoverageTab prospectId={item.prospect_id} />
+          </TabsContent>
+        </Tabs>
       </SheetContent>
     </Sheet>
   );
