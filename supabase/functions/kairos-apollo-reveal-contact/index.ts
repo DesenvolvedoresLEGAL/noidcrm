@@ -101,6 +101,50 @@ Deno.serve(async (req) => {
     const orgId = prospect?.organization_id ?? contact.workspace_id;
     if (!orgId) return json(400, { error: "organization_not_resolved" });
 
+    // KAI.18 — Smart Coverage gate: bloqueia Apollo se cobertura já está completa
+    if (prospectId) {
+      try {
+        const { data: cov } = await admin
+          .from("kairos_coverage_analysis")
+          .select("coverage_score, coverage_class, apollo_blocked, phone_exists, expires_at")
+          .eq("prospect_id", prospectId)
+          .order("analyzed_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        const fresh = cov && new Date(cov.expires_at).getTime() > Date.now();
+        if (fresh && cov.apollo_blocked) {
+          const auditId = await writeAudit(admin, {
+            organization_id: orgId, prospect_id: prospectId, contact_id: contact.id,
+            requested_data_type: dataType, status: "skipped",
+            reason: "coverage_complete", requested_by: requestedBy,
+            source: body.source ?? "manual",
+            email_before: contact.email, phone_before: contact.phone,
+          });
+          await emitRevenueEvent(admin, orgId, "apollo_skipped_by_coverage", {
+            prospect_id: prospectId, contact_id: contact.id,
+            coverage_score: cov.coverage_score, credits_saved: estimateCredits(dataType),
+          });
+          return json(200, { status: "skipped", reason: "coverage_complete", coverage_score: cov.coverage_score, audit_id: auditId });
+        }
+        // Skip granular: pediu telefone e cobertura já indica phone_exists
+        if (fresh && dataType === "phone" && cov.phone_exists) {
+          const auditId = await writeAudit(admin, {
+            organization_id: orgId, prospect_id: prospectId, contact_id: contact.id,
+            requested_data_type: dataType, status: "skipped",
+            reason: "phone_already_in_crm", requested_by: requestedBy,
+            source: body.source ?? "manual",
+            email_before: contact.email, phone_before: contact.phone,
+          });
+          await emitRevenueEvent(admin, orgId, "apollo_skipped_by_coverage", {
+            prospect_id: prospectId, contact_id: contact.id, reason: "phone_already_in_crm", credits_saved: 1,
+          });
+          return json(200, { status: "skipped", reason: "phone_already_in_crm", audit_id: auditId });
+        }
+      } catch (e) {
+        console.warn("coverage gate skipped:", e);
+      }
+    }
+
     // Skip rules
     const wantsEmail = dataType === "email" || dataType === "both";
     const wantsPhone = dataType === "phone" || dataType === "both";
