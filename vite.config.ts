@@ -1,12 +1,19 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
-import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
 
 // https://vitejs.dev/config/
 // Build trigger: remove manualChunks entirely to eliminate TDZ errors
-export default defineConfig(({ mode, command }) => ({
+export default defineConfig(async ({ mode, command }) => {
+  const devOnlyPlugins = [];
+
+  if (command === "serve" && mode === "development") {
+    const { componentTagger } = await import("lovable-tagger");
+    devOnlyPlugins.push(componentTagger());
+  }
+
+  return {
   // Inject a deterministic build marker to confirm published version
   define: {
     "import.meta.env.VITE_BUILD_TIME": JSON.stringify(new Date().toISOString()),
@@ -26,7 +33,7 @@ export default defineConfig(({ mode, command }) => ({
   },
   plugins: [
     react(),
-    command === "serve" && mode === "development" && componentTagger(),
+    ...devOnlyPlugins,
     VitePWA({
       registerType: "autoUpdate",
       includeAssets: ["favicon.ico"],
@@ -82,7 +89,7 @@ export default defineConfig(({ mode, command }) => ({
         ],
       },
     }),
-  ].filter(Boolean),
+  ],
   resolve: {
     // Ensure single React instance across all dependencies
     dedupe: ["react", "react-dom"],
@@ -94,4 +101,5 @@ export default defineConfig(({ mode, command }) => ({
     // Pre-bundle React to avoid ESM/CJS interop issues
     include: ["react", "react-dom"],
   },
-}));
+  };
+});
