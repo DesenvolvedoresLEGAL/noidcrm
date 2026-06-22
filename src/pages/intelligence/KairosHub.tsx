@@ -59,12 +59,13 @@ export default function KairosHub() {
 
         <Tabs value={activeTab} onValueChange={handleTabChange}>
           <div className="w-full overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 md:overflow-visible">
-            <TabsList className="inline-flex w-max md:grid md:w-full md:grid-cols-9 md:max-w-6xl gap-1">
+            <TabsList className="inline-flex w-max md:grid md:w-full md:grid-cols-10 md:max-w-6xl gap-1">
               <TabsTrigger value="icp" className="whitespace-nowrap">🎯 ICP Intelligence</TabsTrigger>
               <TabsTrigger value="queue" className="whitespace-nowrap">📥 Qualified Queue</TabsTrigger>
               <TabsTrigger value="autopilot" className="whitespace-nowrap">🚀 Autopilot</TabsTrigger>
               <TabsTrigger value="revenue" className="whitespace-nowrap">💰 Revenue Attribution</TabsTrigger>
               <TabsTrigger value="gtm" className="whitespace-nowrap">📊 GTM Performance</TabsTrigger>
+              <TabsTrigger value="sdr" className="whitespace-nowrap">🤝 SDR Copilot</TabsTrigger>
               <TabsTrigger value="sourcing" className="whitespace-nowrap">🧭 Sourcing</TabsTrigger>
               <TabsTrigger value="optimization" className="whitespace-nowrap">⚡ Optimization</TabsTrigger>
               <TabsTrigger value="experiments" className="whitespace-nowrap">🧪 Experiments</TabsTrigger>
