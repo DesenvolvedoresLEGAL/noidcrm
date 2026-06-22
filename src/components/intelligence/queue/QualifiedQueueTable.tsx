@@ -71,6 +71,7 @@ export function QualifiedQueueTable({ items, onOpenBrief }: Props) {
           <TableRow>
             <TableHead>Empresa</TableHead>
             <TableHead>ICP</TableHead>
+            <TableHead>Cobertura</TableHead>
             <TableHead>Relacionamento</TableHead>
             <TableHead>Score</TableHead>
             <TableHead>Grade</TableHead>
