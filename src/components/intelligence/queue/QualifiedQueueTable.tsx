@@ -9,6 +9,8 @@ import {
 } from '@/components/ui/table';
 import type { QualifiedQueueItem, QualificationStatus } from '@/services/intelligence/qualifiedQueue';
 import { QualifiedQueueRowActions } from './QualifiedQueueRowActions';
+import { CoverageBadge } from '@/components/intelligence/coverage/CoverageBadge';
+import type { CoverageClass } from '@/services/intelligence/coverage';
 
 function relationshipBadge(rel?: string | null) {
   switch (rel) {
