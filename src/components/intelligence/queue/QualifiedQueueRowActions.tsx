@@ -61,6 +61,10 @@ export function QualifiedQueueRowActions({ item, onOpenBrief }: Props) {
           Abrir brief
         </DropdownMenuItem>
         <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={handleCreateSdrTask} disabled={!canCreateSdrTask}>
+          🤝 Criar tarefa SDR Copilot
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={() => promote.mutate(item)}
           disabled={!canPromote}
