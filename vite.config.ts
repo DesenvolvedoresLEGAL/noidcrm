@@ -6,7 +6,7 @@ import { VitePWA } from "vite-plugin-pwa";
 
 // https://vitejs.dev/config/
 // Build trigger: remove manualChunks entirely to eliminate TDZ errors
-export default defineConfig(({ mode }) => ({
+export default defineConfig(({ mode, command }) => ({
   // Inject a deterministic build marker to confirm published version
   define: {
     "import.meta.env.VITE_BUILD_TIME": JSON.stringify(new Date().toISOString()),
@@ -26,7 +26,7 @@ export default defineConfig(({ mode }) => ({
   },
   plugins: [
     react(),
-    mode === "development" && componentTagger(),
+    command === "serve" && mode === "development" && componentTagger(),
     VitePWA({
       registerType: "autoUpdate",
       includeAssets: ["favicon.ico"],
