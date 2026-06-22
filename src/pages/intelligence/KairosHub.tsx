@@ -93,6 +93,10 @@ export default function KairosHub() {
             <GtmPerformancePanel />
           </TabsContent>
 
+          <TabsContent value="sdr" className="space-y-4 md:space-y-6 mt-4">
+            <SDRCopilotPanel />
+          </TabsContent>
+
 
 
 
