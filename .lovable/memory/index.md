@@ -27,6 +27,7 @@ Updated: now
 - Kairós GTM Performance Hub (KAI.17) interpreta atribuição em decisões via view `kairos_gtm_performance_summary` + `kairos_gtm_recommendations` (dedup_key idempotente). Cron 04:00/04:05 BRT. Apenas leitura de fontes oficiais — nunca altera Forecast/OTE/Receita.
 
 ## Memories
+- [Smart Coverage Engine](mem://architectural-decision/intelligence/smart-coverage-engine) — KAI.18: kairos_coverage_analysis + edge kairos-analyze-coverage. Score 0-100, ≥90 bloqueia Apollo (apollo_skipped_by_coverage + credits_saved). Badge + drawer Smart Coverage. Snapshot em qualified_queue e revenue_attribution.
 - [Kairos GTM Performance Hub](mem://architectural-decision/intelligence/kairos-gtm-performance-hub) — KAI.17: summary view + recommendations table + 2 edges + cron 04:00 BRT. Bottlenecks heurísticos, rankings com CSV, ack/resolve/dismiss.
 - [Kairos Revenue Attribution](mem://architectural-decision/intelligence/kairos-revenue-attribution) — KAI.16: tabela + status enum, trigger proposals/opportunities, edge sync idempotente, cron 03:30 BRT, summary view.
 - [Kairos Qualified Queue](mem://features/intelligence/kairos-qualified-queue) — KAI.13: kairos_qualified_queue + trigger score/grade/sdr_ready. Importação ao CRM proibida fora de kairos-promote-to-crm. useProspectImport chama kairos-enqueue-prospect.
