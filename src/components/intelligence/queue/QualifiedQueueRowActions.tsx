@@ -15,6 +15,8 @@ import {
   useRunEnrichment,
   useSendToReview,
 } from '@/hooks/intelligence/useQualifiedQueueActions';
+import { useCreateSDRCopilotTask } from '@/hooks/intelligence/useSDRCopilotTasks';
+import { toast } from 'sonner';
 import type { QualifiedQueueItem } from '@/services/intelligence/qualifiedQueue';
 
 interface Props {
