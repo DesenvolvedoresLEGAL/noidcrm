@@ -90,7 +90,14 @@ export function QualifiedQueueTable({ items, onOpenBrief }: Props) {
                 <div className="font-medium">{i.company_name}</div>
                 {i.domain && <div className="text-xs text-muted-foreground">{i.domain}</div>}
               </TableCell>
-              <TableCell>{i.icp_match ? <Badge variant="secondary">ICP</Badge> : <span className="text-xs text-muted-foreground">—</span>}</TableCell>
+              <TableCell>
+                <CoverageBadge
+                  score={(i as any).coverage_score ?? null}
+                  coverageClass={((i as any).coverage_class as CoverageClass | null) ?? null}
+                  missing={(i as any).missing_items ?? []}
+                  compact
+                />
+              </TableCell>
               <TableCell>{relationshipBadge(i.relationship_status)}</TableCell>
               <TableCell><span className="font-semibold">{i.score}</span></TableCell>
               <TableCell>{i.grade ?? '—'}</TableCell>
