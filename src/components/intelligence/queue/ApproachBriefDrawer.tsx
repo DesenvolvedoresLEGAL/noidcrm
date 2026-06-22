@@ -2,6 +2,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { Button } from '@/components/ui/button';
 import type { QualifiedQueueItem } from '@/services/intelligence/qualifiedQueue';
 import { usePromoteToCrm } from '@/hooks/intelligence/useQualifiedQueueActions';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { SmartCoverageTab } from '@/components/intelligence/coverage/SmartCoverageTab';
 
 interface Brief {
   dores?: string[];
