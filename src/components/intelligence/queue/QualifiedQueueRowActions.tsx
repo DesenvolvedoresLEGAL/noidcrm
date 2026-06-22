@@ -32,7 +32,19 @@ export function QualifiedQueueRowActions({ item, onOpenBrief }: Props) {
   const discard = useDiscardQueueItem();
   const review = useSendToReview();
 
+  const createSdrTask = useCreateSDRCopilotTask();
+
   const canPromote = item.qualification_status === 'ready_for_sdr' || item.sdr_ready;
+  const canCreateSdrTask = item.sdr_ready || ['human_review', 'approach_ready', 'contact_revealed', 'ready_for_sdr'].includes(item.qualification_status);
+
+  const handleCreateSdrTask = async () => {
+    try {
+      const r = await createSdrTask.mutateAsync({ queueId: item.id });
+      toast.success(r.reused ? 'Tarefa SDR já existia — reaberta.' : 'Tarefa SDR criada no Copilot.');
+    } catch (e: any) {
+      toast.error(e?.message ?? 'Falha ao criar tarefa SDR.');
+    }
+  };
 
   return (
     <DropdownMenu>
