@@ -1,101 +1,130 @@
-## KAI.15.1 — Apollo Reveal Governance
+# KAI.18 — Smart Coverage Engine
 
-Separar enriquecimento Apollo em três camadas (perfil, telefone, e-mail) para parar de consumir crédito em dados que a operação não usa. Para LEGAL, foco em telefone/WhatsApp.
+Diagnostica o que já existe no NOID sobre uma empresa **antes** de gastar Apollo/SDR/tempo. Score 0–100 + classe + recomendação acionável. Bloqueia Apollo quando cobertura ≥ 90.
 
-### 1. Migração de banco
+## Arquitetura
 
-**`enriched_contact_profiles`** — adicionar:
-- `email_revealed bool default false`, `phone_revealed bool default false`
-- `email_credits_used int default 0`, `phone_credits_used int default 0`, `profile_credits_used int default 0`
-- `email_reveal_status text` (not_requested/requested/revealed/not_found/failed/skipped)
-- `phone_reveal_status text` (idem)
-- `email_revealed_at timestamptz`, `phone_revealed_at timestamptz`
-- `preferred_channel text` (phone/whatsapp/email/linkedin/unknown)
-- `reveal_source text` (manual/apollo_invisible/autopilot/sdr_agent)
-- `last_reveal_job_id uuid`
+```text
+Prospect → Coverage (NOID lookup) → Decisão → Apollo (se necessário) → Qualified Queue
+```
 
-**`enrichment_jobs`** — adicionar:
-- `requested_data_type text` (profile_only/email/phone/both)
-- `contact_id uuid`, `requested_channel text`
-- `credits_estimated int`, `credits_used int`
-- `skip_reason text`, `response_summary jsonb`
+Coverage é **leitura-only** sobre tabelas existentes (`accounts`, `contacts`, `opportunities`, `proposals`, `enriched_contact_profiles`, `commercial_won_revenue_view`). Não cria/edita CRM. Não toca Forecast, OTE, Revenue Command.
 
-**`apollo_reveal_audit`** (nova) — id, organization_id, prospect_id, contact_id, job_id, requested_data_type, requested_channel, provider, status, credits_estimated, credits_used, email_before/after, phone_before/after, requested_by, source, reason, raw_response jsonb, created_at. RLS por organização + GRANT.
+## 1. Banco
 
-**`apollo_auto_enrichment_rules`** — adicionar:
-- `auto_reveal_email bool default false`
-- `auto_reveal_phone bool default true`
-- `auto_reveal_both bool default false`
-- `email_reveal_min_score int default 220`
-- `phone_reveal_min_score int default 180`
-- `max_email_reveals_per_company int default 0`
-- `max_phone_reveals_per_company int default 2`
-- `fallback_to_email_if_no_phone bool default true`
+### Nova tabela `kairos_coverage_analysis`
+- Identificação: `organization_id`, `prospect_id` (FK), `account_id` (nullable), `company_name`, `normalized_domain`, `cnpj`
+- Flags: `account_exists`, `contact_exists` (`none|partial|complete`), `decision_maker_exists` (`found|partial|absent`), `phone_exists`, `whatsapp_ready` (`ready|unknown`), `opportunity_status` (`open|won|lost|none`), `proposal_status` (`sent|viewed|accepted|declined|none`), `customer_status` (`active|former|never`)
+- Score: `coverage_score` (int), `coverage_class` (`complete|good|partial|weak|new`)
+- Output: `missing_items` (jsonb array), `recommendations` (jsonb array), `next_best_action` (text), `apollo_blocked` (bool)
+- Metadados: `analyzed_at`, `expires_at` (default `now() + 24h` para cache), `signature` (hash dos inputs)
+- Índices: `(prospect_id, analyzed_at desc)`, `(organization_id, coverage_class)`, unique `(prospect_id, signature)`
+- RLS: org members read; service_role write. Grants padrão.
 
-### 2. Edge functions
+### Alterações em tabelas existentes
+- `kairos_qualified_queue`: adicionar `coverage_score int`, `coverage_class text`, `missing_items jsonb`, `next_best_action text`
+- `kairos_revenue_attribution`: adicionar `coverage_score_at_capture int`, `coverage_class_at_capture text` (snapshot imutável)
+- `apollo_auto_enrichment_rules`: adicionar `min_coverage_gap_score int default 30` (só dispara Apollo se cobertura < 70 OU faltar dado solicitado)
 
-**Nova `kairos-apollo-reveal-contact`**: input `{contact_id, prospect_id, requested_data_type, source}`. Valida org/permissão, checa skip (já revelado), estima créditos, chama Apollo só para o dado pedido, atualiza `enriched_contact_profiles`, recalcula Contact Score, registra `apollo_reveal_audit`, atualiza `kairos_qualified_queue` (preferred_channel), grava `revenue_events`.
+## 2. Edge Function `kairos-analyze-coverage`
 
-**Atualizar `kairos-apollo-invisible`**: deixar de revelar pacote completo. Fluxo novo:
-1. Buscar decisores (profile only) → status `profile_identified`
-2. Selecionar primary
-3. Se regra `auto_reveal_phone` e score ≥ `phone_reveal_min_score` e abaixo do cap → revelar telefone
-4. Se regra `auto_reveal_email` e score ≥ `email_reveal_min_score` e abaixo do cap → revelar e-mail
-5. Fallback para e-mail se telefone não encontrado e regra ativa
-6. Atualiza queue + audit
+Input: `{ prospect_id, force_refresh?: boolean }`
 
-**Atualizar `kairos-apollo-estimate`**: separar `profile_search_credits_estimated`, `phone_reveal_credits_estimated`, `email_reveal_credits_estimated`, `total_credits_estimated`.
+Fluxo:
+1. Carrega `prospects` row (organization_id, company_name, normalized_domain, cnpj)
+2. Cache: se existe análise < 24h e `!force_refresh`, retorna
+3. Match de conta:
+   - CNPJ exato em `accounts.cnpj`
+   - Domínio em `accounts.website`/`accounts.normalized_domain`
+   - `pg_trgm` em `accounts.razao_social`/`nome_fantasia` (≥ 0.7)
+4. Se conta existe:
+   - `contacts` da conta → conta total + filtragem por `department`/`role` dos 6 departamentos LEGAL
+   - `opportunities` mais recente por status (open/won/lost via `closed_at`)
+   - `proposals` mais recente (sent/viewed/accepted/declined)
+   - `commercial_won_revenue_view` → `customer_status` (active = won < 12m, former = won ≥ 12m, never)
+   - `phone_exists` = qualquer contact com phone NOT NULL
+   - `whatsapp_ready` = phone começa com `+55` celular (heurística: 9 dígitos após DDD)
+5. Se conta NÃO existe: também olhar `enriched_contact_profiles` pelo prospect_id (já enriquecido fora do CRM)
+6. Calcula score (pesos da spec: 10+15+20+20+10+10+5+10 = 100)
+7. Define classe: ≥90 complete | 70–89 good | 40–69 partial | 20–39 weak | <20 new
+8. Monta `missing_items` (lista textual: "Head de Marketing", "Telefone celular", etc.)
+9. `recommendations`: derivadas das lacunas (`reveal_phone`, `find_decision_maker`, `create_opportunity`, `reactivate_relationship`, `none`)
+10. `apollo_blocked = coverage_score >= 90`
+11. Upsert em `kairos_coverage_analysis` (por `prospect_id + signature`)
+12. Atualiza `kairos_qualified_queue` (coverage_score/class/missing/next_best_action) se houver linha
+13. Retorna `{ score, class, missing, recommendation, apollo_blocked, analysis_id }`
 
-### 3. Contact Score recalibrado
+Output: `{ score: 72, class: "good", missing: [...], recommendation: "reveal_phone", apollo_blocked: false }`
 
-Atualizar shared `apollo-contact-score.ts`:
-- +20 senioridade compatível, +15 dept compatível, +15 LinkedIn
-- +20 telefone revelado, +15 telefone válido
-- +15 e-mail revelado, +10 e-mail válido
-- +10 cargo match — cap 100
+## 3. Integração Apollo (governance gate)
 
-### 4. SDR Ready ajustado
+Em `kairos-apollo-reveal-contact` e `kairos-apollo-invisible`:
+- **Antes** de chamar Apollo, invocar `kairos-analyze-coverage` (ou ler análise cacheada do prospect)
+- Se `apollo_blocked` = true → retornar `{ status: "skipped", reason: "coverage_complete" }`, registrar em `apollo_reveal_audit` com `reason="coverage_complete"`, **0 crédito gasto**
+- Se cobertura `good` (70–89) e o dado pedido já existe (ex: phone_exists e pedido = phone) → skip também
+- Em `kairos-apollo-invisible` (autopilot batch): rodar coverage **primeiro** para cada prospect do lote; pular Apollo para os bloqueados; emitir `revenue_events: apollo_skipped_by_coverage` com `credits_saved`
 
-`kairos-qualified-queue` trigger: SDR ready = decisor + ao menos um canal acionável (phone_revealed OR email_revealed OR linkedin_url). Prioridade maior se phone_revealed.
+## 4. Frontend
 
-### 5. Frontend
+### Badge nos resultados (sourcing)
+- `src/components/intelligence/sourcing/ProspectCard.tsx` (ou similar): adicionar badge ao lado do nome
+- Cores: 🟢 complete/good, 🟡 partial, 🟠 weak, 🔴 new
+- Hook `useCoverageAnalysis(prospect_id)` (React Query, staleTime 5min)
 
-**Service `apolloInvisible.ts`** — adicionar `revealContact()` wrapper.
+### Drawer aba "Smart Coverage"
+- Novo componente `SmartCoverageTab.tsx` no drawer do prospect/account
+- Seções: **O que temos** (lista ✅), **O que falta** (lista ❌), **Recomendação** (botão CTA conforme `next_best_action`)
+- Botão "Recalcular cobertura" (chama com `force_refresh: true`)
 
-**Novo hook `useRevealContact`** (substitui/estende `useRevealApolloContact`).
+### Qualified Queue
+- Coluna nova: badge de coverage + tooltip com missing_items
+- Ordenação por coverage_class disponível
 
-**`ContactsTab` (oportunidade)** — para cada contato:
-- Mostrar nome, cargo, senioridade, dept, LinkedIn, score
-- Badges separados para status de telefone e e-mail
-- Botões: "Revelar telefone", "Revelar e-mail", "Revelar ambos"
-- Modal de confirmação antes de revelar: contato, empresa, dado, créditos estimados, status atual, aviso de custo
-- Botão bloqueado durante chamada
+### Settings/Apollo Governance
+- Card "Smart Coverage" em `ApolloInvisibleSettingsCard.tsx`: toggle "Bloquear Apollo quando cobertura ≥ 90" (já default true) + slider `min_coverage_gap_score`
 
-**Settings — Apollo Invisible (Autopilot tab)** — nova seção "Governança de Revelação" com os 7 campos novos da regra.
+## 5. KPIs (ApolloRoi + KairosHub)
 
-**`Apollo ROI`** — KPIs novos: créditos perfil/telefone/e-mail, custo por telefone/e-mail revelado, telefones úteis, e-mails úteis, canal mais usado.
+Adicionar painel "Smart Coverage":
+- Empresas analisadas (período)
+- Distribuição por classe (donut)
+- Apollo evitado (count)
+- Créditos economizados (sum estimado: 1 por reveal evitado)
+- Telefones/decisores faltantes (gaps)
 
-### 6. Revenue events
+Fonte: queries agregadas sobre `kairos_coverage_analysis` + `apollo_reveal_audit` (rows com `reason='coverage_complete'`).
 
-Registrar: `apollo_profile_identified`, `apollo_phone_reveal_requested/revealed/not_found`, `apollo_email_reveal_requested/revealed/not_found`, `apollo_reveal_failed`.
+## 6. Revenue Attribution
 
-### Garantias mantidas
-- Apollo nunca cria opp/conta/contato CRM.
-- Backend é fonte da verdade (UI só dispara).
-- Forecast/OTE/Win-Loss/Receita não tocados.
+Trigger ou hook no enfileiramento da queue: copiar `coverage_score`/`coverage_class` para `kairos_revenue_attribution.coverage_score_at_capture`/`coverage_class_at_capture` (snapshot imutável). Permite análise futura: "leads com cobertura alta convertem mais?".
 
-### Arquivos impactados (estimativa)
-- 1 migração SQL
-- `supabase/functions/kairos-apollo-reveal-contact/index.ts` (novo)
-- `supabase/functions/kairos-apollo-invisible/index.ts` (refactor)
-- `supabase/functions/kairos-apollo-estimate/index.ts` (split de créditos)
-- `supabase/functions/_shared/apollo-contact-score.ts` (recalibrar)
-- `src/services/intelligence/apolloInvisible.ts` (+ revealContact, tipos novos)
-- `src/hooks/intelligence/useRevealContact.ts` (novo)
-- `src/components/opportunity/contacts/*` (botões + badges + modal)
-- `src/pages/settings/.../ApolloInvisibleSettings` (governança)
-- `src/pages/intelligence/ApolloRoi.tsx` (novos KPIs)
+## Critérios de aceite
 
-### Risco
-- Trigger de qualified queue mexe em sdr_ready: precisa testar com regra phone-only LEGAL.
-- Backward compat: registros antigos com `decision_maker_status='revealed'` recebem `phone_revealed=true` no backfill se já tinham phone, idem email.
+- [x] Cada prospect recebe score 0–100 via `kairos-analyze-coverage`
+- [x] Badge colorido aparece nos resultados de sourcing
+- [x] Drawer "Smart Coverage" lista temos/falta/recomendação
+- [x] Apollo reveal e Apollo invisible consultam coverage antes de gastar crédito
+- [x] `coverage_score ≥ 90` bloqueia Apollo com mensagem padronizada e 0 crédito
+- [x] `kairos_qualified_queue` recebe coverage_score/class/missing/next_best_action
+- [x] `kairos_revenue_attribution` recebe snapshot de cobertura na captura
+- [x] Painel "Créditos economizados" disponível em ApolloRoi
+- [x] Zero alteração em CRM (accounts/opportunities/proposals), Forecast, OTE, Revenue Command (apenas leitura)
+
+## Risco / fora de escopo
+
+- **Não** cria contas/contatos/oportunidades automaticamente — só recomenda.
+- **Não** sobrescreve dados do CRM com dados Apollo.
+- Heurística WhatsApp = celular brasileiro; refinar depois com validação real.
+- Match account por trigram pode dar falso positivo; threshold conservador (0.7) + log para auditoria.
+- Migração só adiciona colunas opcionais; código antigo continua funcionando.
+
+## Arquivos previstos
+
+- 1 migração SQL (nova tabela + colunas em 3 tabelas existentes + grants/RLS/índices)
+- 1 nova edge function `kairos-analyze-coverage/index.ts`
+- 2 edge functions editadas (gate Apollo): `kairos-apollo-reveal-contact`, `kairos-apollo-invisible`
+- 1 hook novo `useCoverageAnalysis.ts`
+- 1 service `coverageService.ts`
+- 3 componentes UI: `CoverageBadge.tsx`, `SmartCoverageTab.tsx`, atualização em `ProspectCard` + Qualified Queue + ApolloInvisibleSettingsCard
+- Atualizações em `ApolloRoi.tsx` (painel novo) e `KairosHub.tsx` (KPIs)
+- Memória: 1 entrada em `mem://architectural-decision/intelligence/smart-coverage-engine`

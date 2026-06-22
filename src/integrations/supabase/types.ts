@@ -5395,6 +5395,8 @@ export type Database = {
           auto_reveal_email: boolean
           auto_reveal_phone: boolean
           auto_select_primary_contact: boolean
+          block_apollo_when_covered: boolean
+          coverage_block_threshold: number
           created_at: string
           email_reveal_min_score: number
           enabled: boolean
@@ -5420,6 +5422,8 @@ export type Database = {
           auto_reveal_email?: boolean
           auto_reveal_phone?: boolean
           auto_select_primary_contact?: boolean
+          block_apollo_when_covered?: boolean
+          coverage_block_threshold?: number
           created_at?: string
           email_reveal_min_score?: number
           enabled?: boolean
@@ -5445,6 +5449,8 @@ export type Database = {
           auto_reveal_email?: boolean
           auto_reveal_phone?: boolean
           auto_select_primary_contact?: boolean
+          block_apollo_when_covered?: boolean
+          coverage_block_threshold?: number
           created_at?: string
           email_reveal_min_score?: number
           enabled?: boolean
@@ -15364,6 +15370,93 @@ export type Database = {
         }
         Relationships: []
       }
+      kairos_coverage_analysis: {
+        Row: {
+          account_exists: boolean
+          account_id: string | null
+          analyzed_at: string
+          apollo_blocked: boolean
+          cnpj: string | null
+          company_name: string | null
+          contact_status: string
+          coverage_class: string
+          coverage_score: number
+          created_at: string
+          customer_status: string
+          decision_maker_status: string
+          expires_at: string
+          id: string
+          missing_items: Json
+          next_best_action: string | null
+          normalized_domain: string | null
+          opportunity_status: string
+          organization_id: string
+          phone_exists: boolean
+          proposal_status: string
+          prospect_id: string
+          recommendations: Json
+          signature: string
+          updated_at: string
+          whatsapp_status: string
+        }
+        Insert: {
+          account_exists?: boolean
+          account_id?: string | null
+          analyzed_at?: string
+          apollo_blocked?: boolean
+          cnpj?: string | null
+          company_name?: string | null
+          contact_status?: string
+          coverage_class?: string
+          coverage_score?: number
+          created_at?: string
+          customer_status?: string
+          decision_maker_status?: string
+          expires_at?: string
+          id?: string
+          missing_items?: Json
+          next_best_action?: string | null
+          normalized_domain?: string | null
+          opportunity_status?: string
+          organization_id: string
+          phone_exists?: boolean
+          proposal_status?: string
+          prospect_id: string
+          recommendations?: Json
+          signature: string
+          updated_at?: string
+          whatsapp_status?: string
+        }
+        Update: {
+          account_exists?: boolean
+          account_id?: string | null
+          analyzed_at?: string
+          apollo_blocked?: boolean
+          cnpj?: string | null
+          company_name?: string | null
+          contact_status?: string
+          coverage_class?: string
+          coverage_score?: number
+          created_at?: string
+          customer_status?: string
+          decision_maker_status?: string
+          expires_at?: string
+          id?: string
+          missing_items?: Json
+          next_best_action?: string | null
+          normalized_domain?: string | null
+          opportunity_status?: string
+          organization_id?: string
+          phone_exists?: boolean
+          proposal_status?: string
+          prospect_id?: string
+          recommendations?: Json
+          signature?: string
+          updated_at?: string
+          whatsapp_status?: string
+        }
+        Relationships: []
+      }
       kairos_gtm_recommendations: {
         Row: {
           confidence_score: number | null
@@ -15444,6 +15537,8 @@ export type Database = {
           confidence: number | null
           contact_status: string | null
           contacts_found: number
+          coverage_class: string | null
+          coverage_score: number | null
           created_at: string
           decision_maker_status: string | null
           discard_reason: string | null
@@ -15457,6 +15552,8 @@ export type Database = {
           imported_at: string | null
           imported_contact_id: string | null
           imported_opportunity_id: string | null
+          missing_items: Json | null
+          next_best_action: string | null
           organization_id: string
           owner_id: string | null
           primary_contact_name: string | null
@@ -15479,6 +15576,8 @@ export type Database = {
           confidence?: number | null
           contact_status?: string | null
           contacts_found?: number
+          coverage_class?: string | null
+          coverage_score?: number | null
           created_at?: string
           decision_maker_status?: string | null
           discard_reason?: string | null
@@ -15492,6 +15591,8 @@ export type Database = {
           imported_at?: string | null
           imported_contact_id?: string | null
           imported_opportunity_id?: string | null
+          missing_items?: Json | null
+          next_best_action?: string | null
           organization_id: string
           owner_id?: string | null
           primary_contact_name?: string | null
@@ -15514,6 +15615,8 @@ export type Database = {
           confidence?: number | null
           contact_status?: string | null
           contacts_found?: number
+          coverage_class?: string | null
+          coverage_score?: number | null
           created_at?: string
           decision_maker_status?: string | null
           discard_reason?: string | null
@@ -15527,6 +15630,8 @@ export type Database = {
           imported_at?: string | null
           imported_contact_id?: string | null
           imported_opportunity_id?: string | null
+          missing_items?: Json | null
+          next_best_action?: string | null
           organization_id?: string
           owner_id?: string | null
           primary_contact_name?: string | null
@@ -15573,6 +15678,8 @@ export type Database = {
           batch_run_id: string | null
           contact_id: string | null
           contract_id: string | null
+          coverage_class_at_capture: string | null
+          coverage_score_at_capture: number | null
           created_at: string
           event_id: string | null
           event_name: string | null
@@ -15608,6 +15715,8 @@ export type Database = {
           batch_run_id?: string | null
           contact_id?: string | null
           contract_id?: string | null
+          coverage_class_at_capture?: string | null
+          coverage_score_at_capture?: number | null
           created_at?: string
           event_id?: string | null
           event_name?: string | null
@@ -15643,6 +15752,8 @@ export type Database = {
           batch_run_id?: string | null
           contact_id?: string | null
           contract_id?: string | null
+          coverage_class_at_capture?: string | null
+          coverage_score_at_capture?: number | null
           created_at?: string
           event_id?: string | null
           event_name?: string | null
