@@ -7,6 +7,7 @@ import { VitePWA } from "vite-plugin-pwa";
 // Build trigger: remove manualChunks entirely to eliminate TDZ errors
 export default defineConfig(async ({ mode, command }) => {
   const devOnlyPlugins = [];
+  const isDevelopmentBuild = command === "build" && mode === "development";
 
   if (command === "serve" && mode === "development") {
     const { componentTagger } = await import("lovable-tagger");
@@ -35,6 +36,7 @@ export default defineConfig(async ({ mode, command }) => {
     react(),
     ...devOnlyPlugins,
     VitePWA({
+      disable: isDevelopmentBuild,
       registerType: "autoUpdate",
       includeAssets: ["favicon.ico"],
       manifest: {
@@ -89,7 +91,7 @@ export default defineConfig(async ({ mode, command }) => {
         ],
       },
     }),
-  ],
+  ].filter(Boolean),
   resolve: {
     // Ensure single React instance across all dependencies
     dedupe: ["react", "react-dom"],
