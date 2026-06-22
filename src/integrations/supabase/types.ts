@@ -15905,6 +15905,188 @@ export type Database = {
           },
         ]
       }
+      kairos_sdr_copilot_tasks: {
+        Row: {
+          account_id: string | null
+          assigned_to: string | null
+          commercial_brief: Json
+          completed_at: string | null
+          contact_id: string | null
+          created_at: string
+          cta: string | null
+          id: string
+          next_best_action: string | null
+          objections: Json
+          opportunity_id: string | null
+          organization_id: string
+          preferred_channel: string | null
+          priority_score: number
+          prospect_id: string | null
+          queue_id: string
+          reason: string | null
+          status: string
+          suggested_messages: Json
+          updated_at: string
+        }
+        Insert: {
+          account_id?: string | null
+          assigned_to?: string | null
+          commercial_brief?: Json
+          completed_at?: string | null
+          contact_id?: string | null
+          created_at?: string
+          cta?: string | null
+          id?: string
+          next_best_action?: string | null
+          objections?: Json
+          opportunity_id?: string | null
+          organization_id: string
+          preferred_channel?: string | null
+          priority_score?: number
+          prospect_id?: string | null
+          queue_id: string
+          reason?: string | null
+          status?: string
+          suggested_messages?: Json
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string | null
+          assigned_to?: string | null
+          commercial_brief?: Json
+          completed_at?: string | null
+          contact_id?: string | null
+          created_at?: string
+          cta?: string | null
+          id?: string
+          next_best_action?: string | null
+          objections?: Json
+          opportunity_id?: string | null
+          organization_id?: string
+          preferred_channel?: string | null
+          priority_score?: number
+          prospect_id?: string | null
+          queue_id?: string
+          reason?: string | null
+          status?: string
+          suggested_messages?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kairos_sdr_copilot_tasks_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kairos_sdr_copilot_tasks_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kairos_sdr_copilot_tasks_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kairos_sdr_copilot_tasks_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_ai_reports_context_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "kairos_sdr_copilot_tasks_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_loss_classification_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "kairos_sdr_copilot_tasks_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_loss_semantic_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "kairos_sdr_copilot_tasks_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "kairos_sdr_copilot_tasks_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "kairos_sdr_copilot_tasks_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunities_hygiene_base"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kairos_sdr_copilot_tasks_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "kairos_sdr_copilot_tasks_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_stage_age_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "kairos_sdr_copilot_tasks_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_report_losses_detail_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "kairos_sdr_copilot_tasks_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_report_qualification_quality_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "kairos_sdr_copilot_tasks_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_reporting_opportunities_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "kairos_sdr_copilot_tasks_prospect_id_fkey"
+            columns: ["prospect_id"]
+            isOneToOne: false
+            referencedRelation: "prospects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kairos_sdr_copilot_tasks_queue_id_fkey"
+            columns: ["queue_id"]
+            isOneToOne: false
+            referencedRelation: "kairos_qualified_queue"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lead_emotional_memory: {
         Row: {
           account_id: string | null

@@ -18,9 +18,10 @@ import { QualifiedQueuePanel } from '@/components/intelligence/queue/QualifiedQu
 import { AutopilotPanel } from '@/components/intelligence/autopilot/AutopilotPanel';
 import { RevenueAttributionPanel } from '@/components/intelligence/revenue/RevenueAttributionPanel';
 import { GtmPerformancePanel } from '@/components/intelligence/gtm/GtmPerformancePanel';
+import { SDRCopilotPanel } from '@/components/intelligence/sdr-copilot/SDRCopilotPanel';
 import { Compass, Sparkles } from 'lucide-react';
 
-const VALID_TABS = ['icp', 'queue', 'autopilot', 'revenue', 'gtm', 'sourcing', 'optimization', 'experiments', 'performance'] as const;
+const VALID_TABS = ['icp', 'queue', 'autopilot', 'revenue', 'gtm', 'sdr', 'sourcing', 'optimization', 'experiments', 'performance'] as const;
 type KairosTab = (typeof VALID_TABS)[number];
 
 export default function KairosHub() {
@@ -58,12 +59,13 @@ export default function KairosHub() {
 
         <Tabs value={activeTab} onValueChange={handleTabChange}>
           <div className="w-full overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 md:overflow-visible">
-            <TabsList className="inline-flex w-max md:grid md:w-full md:grid-cols-9 md:max-w-6xl gap-1">
+            <TabsList className="inline-flex w-max md:grid md:w-full md:grid-cols-10 md:max-w-6xl gap-1">
               <TabsTrigger value="icp" className="whitespace-nowrap">🎯 ICP Intelligence</TabsTrigger>
               <TabsTrigger value="queue" className="whitespace-nowrap">📥 Qualified Queue</TabsTrigger>
               <TabsTrigger value="autopilot" className="whitespace-nowrap">🚀 Autopilot</TabsTrigger>
               <TabsTrigger value="revenue" className="whitespace-nowrap">💰 Revenue Attribution</TabsTrigger>
               <TabsTrigger value="gtm" className="whitespace-nowrap">📊 GTM Performance</TabsTrigger>
+              <TabsTrigger value="sdr" className="whitespace-nowrap">🤝 SDR Copilot</TabsTrigger>
               <TabsTrigger value="sourcing" className="whitespace-nowrap">🧭 Sourcing</TabsTrigger>
               <TabsTrigger value="optimization" className="whitespace-nowrap">⚡ Optimization</TabsTrigger>
               <TabsTrigger value="experiments" className="whitespace-nowrap">🧪 Experiments</TabsTrigger>
@@ -89,6 +91,10 @@ export default function KairosHub() {
 
           <TabsContent value="gtm" className="space-y-4 md:space-y-6 mt-4">
             <GtmPerformancePanel />
+          </TabsContent>
+
+          <TabsContent value="sdr" className="space-y-4 md:space-y-6 mt-4">
+            <SDRCopilotPanel />
           </TabsContent>
 
 

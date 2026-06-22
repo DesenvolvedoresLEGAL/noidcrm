@@ -28,6 +28,7 @@ Updated: now
 
 ## Memories
 - [Smart Coverage Engine](mem://architectural-decision/intelligence/smart-coverage-engine) — KAI.18: kairos_coverage_analysis + edge kairos-analyze-coverage. Score 0-100, ≥90 bloqueia Apollo (apollo_skipped_by_coverage + credits_saved). Badge + drawer Smart Coverage. Snapshot em qualified_queue e revenue_attribution.
+- [SDR Copilot](mem://architectural-decision/intelligence/sdr-copilot) — KAI.19: kairos_sdr_copilot_tasks + edges kairos-create-sdr-copilot-task / kairos-generate-sdr-message. Aba 🤝 SDR Copilot. Assistivo: prepara contato/canal/mensagem mas NUNCA envia. Unique active por queue_id. Mensagens cacheadas em suggested_messages JSONB.
 - [Kairos GTM Performance Hub](mem://architectural-decision/intelligence/kairos-gtm-performance-hub) — KAI.17: summary view + recommendations table + 2 edges + cron 04:00 BRT. Bottlenecks heurísticos, rankings com CSV, ack/resolve/dismiss.
 - [Kairos Revenue Attribution](mem://architectural-decision/intelligence/kairos-revenue-attribution) — KAI.16: tabela + status enum, trigger proposals/opportunities, edge sync idempotente, cron 03:30 BRT, summary view.
 - [Kairos Qualified Queue](mem://features/intelligence/kairos-qualified-queue) — KAI.13: kairos_qualified_queue + trigger score/grade/sdr_ready. Importação ao CRM proibida fora de kairos-promote-to-crm. useProspectImport chama kairos-enqueue-prospect.

@@ -1,130 +1,109 @@
-# KAI.18 — Smart Coverage Engine
 
-Diagnostica o que já existe no NOID sobre uma empresa **antes** de gastar Apollo/SDR/tempo. Score 0–100 + classe + recomendação acionável. Bloqueia Apollo quando cobertura ≥ 90.
+# KAI.19 — SDR Copilot
 
-## Arquitetura
+Camada operacional que entrega ao SDR um lead pronto para agir: contexto, canal, mensagem e próxima ação. **Nada é enviado automaticamente** — o agente prepara, o humano decide, o sistema registra.
 
-```text
-Prospect → Coverage (NOID lookup) → Decisão → Apollo (se necessário) → Qualified Queue
-```
+## 1. Banco de dados (1 migration)
 
-Coverage é **leitura-only** sobre tabelas existentes (`accounts`, `contacts`, `opportunities`, `proposals`, `enriched_contact_profiles`, `commercial_won_revenue_view`). Não cria/edita CRM. Não toca Forecast, OTE, Revenue Command.
+### Nova tabela `kairos_sdr_copilot_tasks`
+Campos principais: `id`, `organization_id`, `queue_id` (FK `kairos_qualified_queue`), `prospect_id`, `account_id`, `contact_id`, `opportunity_id`, `assigned_to`, `status`, `priority_score`, `preferred_channel`, `next_best_action`, `reason`, `commercial_brief` (jsonb), `suggested_messages` (jsonb por canal — cache), `objections` (jsonb), `cta`, `created_at`, `updated_at`, `completed_at`.
 
-## 1. Banco
+- Unique parcial em `(queue_id)` onde `status NOT IN ('completed','dismissed','promoted_to_crm')` — evita duplicar task ativa.
+- Enums (CHECK):
+  - `status`: pending | in_review | approved | activity_created | promoted_to_crm | dismissed | completed
+  - `preferred_channel`: whatsapp | email | linkedin | call
+  - `next_best_action`: call | whatsapp | email | linkedin | create_activity | promote_to_crm | reactivate_customer | review_duplicate | discard
+- Índices: `(organization_id, status, priority_score DESC)`, `(assigned_to, status)`, `(queue_id)`.
+- GRANT SELECT/INSERT/UPDATE para `authenticated`, ALL para `service_role`.
+- RLS:
+  - SELECT: membros da org (Owner/Admin/Manager veem todos; SDR vê próprias via `assigned_to = auth.uid()` OR `assigned_to IS NULL`).
+  - INSERT/UPDATE: org members; UPDATE de `assigned_to` só Owner/Admin/Manager (via `has_role`).
+- Trigger `update_updated_at_column`.
 
-### Nova tabela `kairos_coverage_analysis`
-- Identificação: `organization_id`, `prospect_id` (FK), `account_id` (nullable), `company_name`, `normalized_domain`, `cnpj`
-- Flags: `account_exists`, `contact_exists` (`none|partial|complete`), `decision_maker_exists` (`found|partial|absent`), `phone_exists`, `whatsapp_ready` (`ready|unknown`), `opportunity_status` (`open|won|lost|none`), `proposal_status` (`sent|viewed|accepted|declined|none`), `customer_status` (`active|former|never`)
-- Score: `coverage_score` (int), `coverage_class` (`complete|good|partial|weak|new`)
-- Output: `missing_items` (jsonb array), `recommendations` (jsonb array), `next_best_action` (text), `apollo_blocked` (bool)
-- Metadados: `analyzed_at`, `expires_at` (default `now() + 24h` para cache), `signature` (hash dos inputs)
-- Índices: `(prospect_id, analyzed_at desc)`, `(organization_id, coverage_class)`, unique `(prospect_id, signature)`
-- RLS: org members read; service_role write. Grants padrão.
+Sem alteração em CRM, Forecast, OTE, Revenue.
 
-### Alterações em tabelas existentes
-- `kairos_qualified_queue`: adicionar `coverage_score int`, `coverage_class text`, `missing_items jsonb`, `next_best_action text`
-- `kairos_revenue_attribution`: adicionar `coverage_score_at_capture int`, `coverage_class_at_capture text` (snapshot imutável)
-- `apollo_auto_enrichment_rules`: adicionar `min_coverage_gap_score int default 30` (só dispara Apollo se cobertura < 70 OU faltar dado solicitado)
+## 2. Edge Functions (2 novas)
 
-## 2. Edge Function `kairos-analyze-coverage`
+### `kairos-create-sdr-copilot-task`
+Input `{ queue_id }`. Fluxo:
+1. Validar JWT, resolver org do usuário.
+2. Buscar queue item (deve ter `sdr_ready = true` ou status equivalente).
+3. Verificar task ativa (unique constraint cobre, mas checa antes para retornar idempotente).
+4. Carregar Smart Coverage (`kairos_coverage_analysis`), `commercial_briefs`, contato principal (`contacts` com `is_primary`), enriched profile.
+5. Resolver `preferred_channel` (regra: phone→whatsapp; email→email; linkedin→linkedin; cliente antigo→call).
+6. Resolver `next_best_action` (heurística por coverage_class + canal).
+7. Calcular `sdr_priority_score` = queue.priority_score (40%) + coverage_gap (15%) + contact_score (15%) + event_importance (10%) + revenue_potential (15%) + recency (5%).
+8. Insert task, emit `revenue_events: sdr_copilot_task_created`.
 
-Input: `{ prospect_id, force_refresh?: boolean }`
+### `kairos-generate-sdr-message`
+Input `{ task_id, channel }`. Usa OpenAI (wrapper `_shared/ai-client.ts`):
+- Carrega task + brief + empresa + evento + dor + produto da org (organization_settings).
+- Prompt por canal:
+  - whatsapp: tom humano, ≤500 chars, sem textão.
+  - email: assunto objetivo + corpo ≤120 palavras + CTA.
+  - linkedin: ≤300 chars, conexão consultiva.
+  - call: roteiro (abertura, pergunta principal, 2 objeções prováveis, fechamento).
+- Persiste em `suggested_messages[channel]` na task (cache). Emit `sdr_message_generated`.
+- Não envia nada.
 
-Fluxo:
-1. Carrega `prospects` row (organization_id, company_name, normalized_domain, cnpj)
-2. Cache: se existe análise < 24h e `!force_refresh`, retorna
-3. Match de conta:
-   - CNPJ exato em `accounts.cnpj`
-   - Domínio em `accounts.website`/`accounts.normalized_domain`
-   - `pg_trgm` em `accounts.razao_social`/`nome_fantasia` (≥ 0.7)
-4. Se conta existe:
-   - `contacts` da conta → conta total + filtragem por `department`/`role` dos 6 departamentos LEGAL
-   - `opportunities` mais recente por status (open/won/lost via `closed_at`)
-   - `proposals` mais recente (sent/viewed/accepted/declined)
-   - `commercial_won_revenue_view` → `customer_status` (active = won < 12m, former = won ≥ 12m, never)
-   - `phone_exists` = qualquer contact com phone NOT NULL
-   - `whatsapp_ready` = phone começa com `+55` celular (heurística: 9 dígitos após DDD)
-5. Se conta NÃO existe: também olhar `enriched_contact_profiles` pelo prospect_id (já enriquecido fora do CRM)
-6. Calcula score (pesos da spec: 10+15+20+20+10+10+5+10 = 100)
-7. Define classe: ≥90 complete | 70–89 good | 40–69 partial | 20–39 weak | <20 new
-8. Monta `missing_items` (lista textual: "Head de Marketing", "Telefone celular", etc.)
-9. `recommendations`: derivadas das lacunas (`reveal_phone`, `find_decision_maker`, `create_opportunity`, `reactivate_relationship`, `none`)
-10. `apollo_blocked = coverage_score >= 90`
-11. Upsert em `kairos_coverage_analysis` (por `prospect_id + signature`)
-12. Atualiza `kairos_qualified_queue` (coverage_score/class/missing/next_best_action) se houver linha
-13. Retorna `{ score, class, missing, recommendation, apollo_blocked, analysis_id }`
+## 3. Frontend
 
-Output: `{ score: 72, class: "good", missing: [...], recommendation: "reveal_phone", apollo_blocked: false }`
+### Nova rota/aba no Kairós Hub
+`src/pages/intelligence/KairosHub.tsx` — adicionar aba "SDR Copilot" 🤝 após Smart Coverage / GTM Performance.
 
-## 3. Integração Apollo (governance gate)
+### Componentes (`src/components/intelligence/sdr-copilot/`)
+- `SDRCopilotKpiBar.tsx` — KPIs: Prontos para ação, Com telefone, Com WhatsApp, Com brief, Promovidos hoje, Atividades criadas, Dismissed.
+- `SDRCopilotTaskList.tsx` — colunas: Empresa, Evento, ICP, Prioridade, Contato, Canal (badge), Próxima ação, Status, Responsável. Filtros: Evento, ICP, Status, SDR, Canal, Com telefone, Com brief, Score mínimo, Coverage class.
+- `SDRCopilotDrawer.tsx` — resumo empresa, `<CoverageBadge/>`, contato principal (phone/email/linkedin), brief, dores, objeções, mensagem sugerida (tabs por canal com geração on-demand), botões de ação.
+- `SDRCopilotActions.tsx` — Copiar WhatsApp / Copiar e-mail / Copiar roteiro / Criar atividade / Promover CRM / Marcar como feito / Descartar.
 
-Em `kairos-apollo-reveal-contact` e `kairos-apollo-invisible`:
-- **Antes** de chamar Apollo, invocar `kairos-analyze-coverage` (ou ler análise cacheada do prospect)
-- Se `apollo_blocked` = true → retornar `{ status: "skipped", reason: "coverage_complete" }`, registrar em `apollo_reveal_audit` com `reason="coverage_complete"`, **0 crédito gasto**
-- Se cobertura `good` (70–89) e o dado pedido já existe (ex: phone_exists e pedido = phone) → skip também
-- Em `kairos-apollo-invisible` (autopilot batch): rodar coverage **primeiro** para cada prospect do lote; pular Apollo para os bloqueados; emitir `revenue_events: apollo_skipped_by_coverage` com `credits_saved`
+### Serviços/Hooks
+- `src/services/intelligence/sdrCopilot.ts` — CRUD da tabela + invoke das edges.
+- `src/hooks/intelligence/useSDRCopilotTasks.ts` — lista + filtros + realtime.
+- `src/hooks/intelligence/useSDRCopilotActions.ts` — gerar msg, criar activity, promover, dismiss.
 
-## 4. Frontend
+### Ações
+- **Copiar mensagem**: chama `kairos-generate-sdr-message` se não cacheada, copia para clipboard, emite `sdr_message_generated`.
+- **Criar atividade**: reusa `activities` table (tipo/canal/responsável/data/observação com mensagem + link queue) — `activity_created` status, emit `sdr_activity_created`. Nada enviado.
+- **Promover CRM**: reusa edge `kairos-promote-to-crm` existente. Status `promoted_to_crm`, emit `sdr_promoted_to_crm`.
+- **Marcar feito**: `completed`, `completed_at = now()`, emit `sdr_task_completed`.
+- **Descartar**: `dismissed`, emit `sdr_task_dismissed`.
 
-### Badge nos resultados (sourcing)
-- `src/components/intelligence/sourcing/ProspectCard.tsx` (ou similar): adicionar badge ao lado do nome
-- Cores: 🟢 complete/good, 🟡 partial, 🟠 weak, 🔴 new
-- Hook `useCoverageAnalysis(prospect_id)` (React Query, staleTime 5min)
+### Geração automática de task
+Botão "Criar tarefa SDR" na `QualifiedQueueTable` (linha) → invoca `kairos-create-sdr-copilot-task`. (Sem trigger DB automático nesta sprint — mantém controle humano.)
 
-### Drawer aba "Smart Coverage"
-- Novo componente `SmartCoverageTab.tsx` no drawer do prospect/account
-- Seções: **O que temos** (lista ✅), **O que falta** (lista ❌), **Recomendação** (botão CTA conforme `next_best_action`)
-- Botão "Recalcular cobertura" (chama com `force_refresh: true`)
+## 4. Learning Loop / Eventos
+Todos eventos em `revenue_events` com `event_type` listado, payload contendo `queue_id`, `task_id`, `channel`, `next_best_action`.
 
-### Qualified Queue
-- Coluna nova: badge de coverage + tooltip com missing_items
-- Ordenação por coverage_class disponível
+## 5. Memória arquitetural
+Criar `.lovable/memory/architectural-decision/intelligence/sdr-copilot.md` + entrada no índice:
+- SDR Copilot é assistente, nunca executor automático.
+- Mensagens são copiáveis; envio só via canais CRM existentes acionados manualmente.
+- Tasks únicas por queue_id ativo.
+- Score composto definido.
 
-### Settings/Apollo Governance
-- Card "Smart Coverage" em `ApolloInvisibleSettingsCard.tsx`: toggle "Bloquear Apollo quando cobertura ≥ 90" (já default true) + slider `min_coverage_gap_score`
+## 6. Riscos & não-objetivos
+- **Não** envia WhatsApp/email/LinkedIn.
+- **Não** cria oportunidade sem ação humana.
+- **Não** altera owner, Forecast, OTE, Receita.
+- LGPD: mensagens geradas usam apenas dados já presentes no CRM/enrichment.
+- Custo OpenAI: mensagens cacheadas em `suggested_messages`; regeneração explícita.
 
-## 5. KPIs (ApolloRoi + KairosHub)
+## Arquivos
 
-Adicionar painel "Smart Coverage":
-- Empresas analisadas (período)
-- Distribuição por classe (donut)
-- Apollo evitado (count)
-- Créditos economizados (sum estimado: 1 por reveal evitado)
-- Telefones/decisores faltantes (gaps)
+**Criar (~12):**
+- 1 migration SQL
+- 2 edge functions (`kairos-create-sdr-copilot-task`, `kairos-generate-sdr-message`)
+- 4 componentes UI (`SDRCopilotKpiBar`, `SDRCopilotTaskList`, `SDRCopilotDrawer`, `SDRCopilotActions`)
+- 1 service (`sdrCopilot.ts`)
+- 2 hooks
+- 1 doc memória
 
-Fonte: queries agregadas sobre `kairos_coverage_analysis` + `apollo_reveal_audit` (rows com `reason='coverage_complete'`).
+**Editar (~4):**
+- `KairosHub.tsx` (nova aba)
+- `QualifiedQueueTable.tsx` (botão criar task)
+- `.lovable/memory/index.md`
+- `src/integrations/supabase/types.ts` (auto após migration)
 
-## 6. Revenue Attribution
-
-Trigger ou hook no enfileiramento da queue: copiar `coverage_score`/`coverage_class` para `kairos_revenue_attribution.coverage_score_at_capture`/`coverage_class_at_capture` (snapshot imutável). Permite análise futura: "leads com cobertura alta convertem mais?".
-
-## Critérios de aceite
-
-- [x] Cada prospect recebe score 0–100 via `kairos-analyze-coverage`
-- [x] Badge colorido aparece nos resultados de sourcing
-- [x] Drawer "Smart Coverage" lista temos/falta/recomendação
-- [x] Apollo reveal e Apollo invisible consultam coverage antes de gastar crédito
-- [x] `coverage_score ≥ 90` bloqueia Apollo com mensagem padronizada e 0 crédito
-- [x] `kairos_qualified_queue` recebe coverage_score/class/missing/next_best_action
-- [x] `kairos_revenue_attribution` recebe snapshot de cobertura na captura
-- [x] Painel "Créditos economizados" disponível em ApolloRoi
-- [x] Zero alteração em CRM (accounts/opportunities/proposals), Forecast, OTE, Revenue Command (apenas leitura)
-
-## Risco / fora de escopo
-
-- **Não** cria contas/contatos/oportunidades automaticamente — só recomenda.
-- **Não** sobrescreve dados do CRM com dados Apollo.
-- Heurística WhatsApp = celular brasileiro; refinar depois com validação real.
-- Match account por trigram pode dar falso positivo; threshold conservador (0.7) + log para auditoria.
-- Migração só adiciona colunas opcionais; código antigo continua funcionando.
-
-## Arquivos previstos
-
-- 1 migração SQL (nova tabela + colunas em 3 tabelas existentes + grants/RLS/índices)
-- 1 nova edge function `kairos-analyze-coverage/index.ts`
-- 2 edge functions editadas (gate Apollo): `kairos-apollo-reveal-contact`, `kairos-apollo-invisible`
-- 1 hook novo `useCoverageAnalysis.ts`
-- 1 service `coverageService.ts`
-- 3 componentes UI: `CoverageBadge.tsx`, `SmartCoverageTab.tsx`, atualização em `ProspectCard` + Qualified Queue + ApolloInvisibleSettingsCard
-- Atualizações em `ApolloRoi.tsx` (painel novo) e `KairosHub.tsx` (KPIs)
-- Memória: 1 entrada em `mem://architectural-decision/intelligence/smart-coverage-engine`
+## Próximos passos
+Aprovar plano → executo migration → ao confirmar, implemento edges + UI em paralelo.

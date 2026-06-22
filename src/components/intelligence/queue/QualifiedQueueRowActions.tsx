@@ -15,6 +15,8 @@ import {
   useRunEnrichment,
   useSendToReview,
 } from '@/hooks/intelligence/useQualifiedQueueActions';
+import { useCreateSDRCopilotTask } from '@/hooks/intelligence/useSDRCopilotTasks';
+import { toast } from 'sonner';
 import type { QualifiedQueueItem } from '@/services/intelligence/qualifiedQueue';
 
 interface Props {
@@ -30,7 +32,19 @@ export function QualifiedQueueRowActions({ item, onOpenBrief }: Props) {
   const discard = useDiscardQueueItem();
   const review = useSendToReview();
 
+  const createSdrTask = useCreateSDRCopilotTask();
+
   const canPromote = item.qualification_status === 'ready_for_sdr' || item.sdr_ready;
+  const canCreateSdrTask = item.sdr_ready || ['human_review', 'approach_ready', 'contact_revealed', 'ready_for_sdr'].includes(item.qualification_status);
+
+  const handleCreateSdrTask = async () => {
+    try {
+      const r = await createSdrTask.mutateAsync({ queueId: item.id });
+      toast.success(r.reused ? 'Tarefa SDR já existia — reaberta.' : 'Tarefa SDR criada no Copilot.');
+    } catch (e: any) {
+      toast.error(e?.message ?? 'Falha ao criar tarefa SDR.');
+    }
+  };
 
   return (
     <DropdownMenu>
@@ -45,6 +59,10 @@ export function QualifiedQueueRowActions({ item, onOpenBrief }: Props) {
         <DropdownMenuItem onClick={() => brief.mutate(item)}>Gerar brief de abordagem</DropdownMenuItem>
         <DropdownMenuItem onClick={() => onOpenBrief(item)} disabled={!item.approach_brief}>
           Abrir brief
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={handleCreateSdrTask} disabled={!canCreateSdrTask}>
+          🤝 Criar tarefa SDR Copilot
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
