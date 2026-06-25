@@ -150,8 +150,12 @@ function extractAnchorImagePairs(html: string, pageHost: string): LogoWallSponso
     }
     if (!/^https?:$/.test(absHref.protocol)) continue;
     const linkHost = stripWww(absHref.hostname);
-    if (!linkHost || linkHost === stripWww(pageHost)) continue;
+    if (!linkHost) continue;
     if (GENERIC_HOSTS.has(linkHost) || GENERIC_HOSTS.has(absHref.hostname.toLowerCase())) continue;
+    // Same-host anchors are allowed (e.g. Expert XP routes sponsors to /produtos/...);
+    // we still dedupe per logo filename below so multiple sponsors on the same host
+    // are kept as separate entries.
+    const sameHost = linkHost === stripWww(pageHost);
 
     const imgMatch = anchor.match(/<img\b[^>]*>/i);
     if (!imgMatch) continue;
@@ -172,11 +176,23 @@ function extractAnchorImagePairs(html: string, pageHost: string): LogoWallSponso
       name = clean;
       break;
     }
-    if (!name) name = nameFromDomain(absHref.hostname);
+    // For same-host anchors prefer the filename; the domain name would collapse all
+    // sponsors that link back to e.g. xpi.com.br into a single "Xpi" entry.
+    if (!name && src) name = nameFromFilename(src);
+    if (!name && !sameHost) name = nameFromDomain(absHref.hostname);
+    if (!name) continue;
     if (isBlacklistedName(name)) continue;
 
-    const website = `${absHref.protocol}//${absHref.hostname}${absHref.pathname === "/" ? "" : absHref.pathname}`;
-    const dedupeKey = linkHost;
+    const website = sameHost
+      ? null
+      : `${absHref.protocol}//${absHref.hostname}${absHref.pathname === "/" ? "" : absHref.pathname}`;
+    // Dedupe key combines normalized name with the image filename so a sponsor
+    // with no link host (or a shared host) is still kept once per logo asset.
+    let imgBase = "";
+    if (src) {
+      try { imgBase = new URL(src, `https://${pageHost}/`).pathname.split("/").pop() || ""; } catch { imgBase = ""; }
+    }
+    const dedupeKey = `${name.toLowerCase()}::${imgBase || (sameHost ? absHref.pathname : linkHost)}`;
     if (seen.has(dedupeKey)) continue;
     seen.add(dedupeKey);
 
