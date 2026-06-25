@@ -101,7 +101,7 @@ export function calculatePace({ monthlyTarget, qualifiedMonth, today = new Date(
     paceGap,
     projectedMonthEnd,
     status,
-    message: messageFor(status, requiredDailyPace),
+    message: messageFor(status, requiredDailyPace, missingLeads),
     period: {
       month: today.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }),
       startDate: start.toISOString().slice(0, 10),
