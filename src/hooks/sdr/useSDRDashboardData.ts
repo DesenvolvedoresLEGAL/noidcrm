@@ -151,7 +151,7 @@ export function useSDRDashboardData() {
         // Plano de ataque — oportunidades abertas do usuário (top 30 p/ ranquear local)
         supabase
           .from('opportunities')
-          .select('id, titulo, stage_id, updated_at, created_at, status')
+          .select('id, title, stage_id, updated_at, created_at, status')
           .eq('organization_id', orgId!)
           .eq('owner_user_id', userId!)
           .is('deleted_at', null)
@@ -187,7 +187,7 @@ export function useSDRDashboardData() {
       // Plano de Ataque: top 5 por priorityScore (dias parado + sem fechamento)
       const now = Date.now();
       const opps = (opportunitiesRes.data ?? []) as Array<{
-        id: string; titulo: string; stage_id: string | null; updated_at: string;
+        id: string; title: string; stage_id: string | null; updated_at: string;
       }>;
       const attackPlan: AttackPlanItem[] = opps
         .map(o => {
@@ -202,7 +202,7 @@ export function useSDRDashboardData() {
           return {
             id: o.id,
             opportunityId: o.id,
-            name: o.titulo || 'Sem título',
+            name: o.title || 'Sem título',
             stage: o.stage_id ?? undefined,
             daysWithoutUpdate: days,
             priorityScore: score,
