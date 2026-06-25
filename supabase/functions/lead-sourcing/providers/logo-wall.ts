@@ -263,7 +263,7 @@ function nameFromFilename(rawPath: string): string | null {
  * surrounding anchor (carousels, JS-driven grids). When the URL path obviously
  * points to a sponsor/exhibitor section, derive company names from filenames.
  */
-function extractFilenameGridLogos(html: string, pageHost: string, pagePath: string): LogoWallSponsor[] {
+function extractFilenameGridLogos(html: string, pageHost: string, pagePath: string, opts: { strictPath: boolean }): LogoWallSponsor[] {
   const out: LogoWallSponsor[] = [];
   const seen = new Set<string>();
   const sourceUrl = `https://${pageHost}${pagePath || "/"}`;
@@ -288,24 +288,33 @@ function extractFilenameGridLogos(html: string, pageHost: string, pagePath: stri
     const path = absUrl.pathname.toLowerCase();
     // Heuristic: must look like a content/upload image (not theme/plugin chrome).
     const isContentUpload =
-      /\/(uploads?|media|files|content|sponsors?|patroc|exhibitor|expositor)\//i.test(path) ||
-      /\/logos?\//i.test(path);
+      /\/(uploads?|media|files|content|sponsors?|patroc|exhibitor|expositor|parceir|partner|apoiador|marca|brand)\//i.test(path) ||
+      /\/logos?\//i.test(path) ||
+      /\/storage\/v1\/object\/public\//i.test(path) || // Supabase storage (CONARH)
+      /\/assets\/[^/]+\.(png|jpe?g|webp|svg|avif)/i.test(path); // bundler dirs
     if (!isContentUpload) continue;
     // Reject obvious chrome assets even when inside /uploads/.
-    if (/(banner|hero|capa|cover|background|bg|placeholder|spacer|favicon|sprite|loader)/i.test(path)) continue;
+    if (/(banner|hero|capa|cover|background|^bg[-_]|placeholder|spacer|favicon|sprite|loader|divider|arrow|chevron|hor[-_]?line|pattern)/i.test(path)) continue;
 
     // Prefer alt text when meaningful; otherwise derive from filename.
     const alt = pickAttr(tag, "alt");
     let name: string | null = null;
     if (alt && alt.trim().length >= 2) {
-      const cleanAlt = alt.replace(/\s+/g, " ").trim();
-      if (!isBlacklistedName(cleanAlt) && !/^(banner|logo|icon|image|imagem|foto|picture)$/i.test(cleanAlt)) {
+      const cleanAlt = decodeEntities(alt).replace(/\s+/g, " ").trim();
+      if (
+        !isBlacklistedName(cleanAlt) &&
+        !/^(banner|logo|icon|image|imagem|foto|picture|xp|destaque)$/i.test(cleanAlt) &&
+        cleanAlt.length <= 60
+      ) {
         name = cleanAlt;
       }
     }
     if (!name) name = nameFromFilename(src);
     if (!name) continue;
     if (isBlacklistedName(name)) continue;
+    // In permissive (content-trigger) mode require that the name didn't come from
+    // a totally chrome-y filename (already filtered) AND has at least one letter.
+    if (!/[A-Za-zÀ-ÿ]/.test(name)) continue;
 
     const dedupeKey = name.toLowerCase();
     if (seen.has(dedupeKey)) continue;
@@ -320,8 +329,16 @@ function extractFilenameGridLogos(html: string, pageHost: string, pagePath: stri
       extraction_mode: "filename_grid",
     });
   }
+  // Silence unused-arg warning while keeping the flag for future tuning.
+  void opts;
   return out;
 }
+
+// Content-level signals that the page is a sponsor/partner/exhibitor wall, even
+// when the URL is just "/". CONARH, Expert XP and many others surface these
+// keywords as section titles around the logo grids.
+const SPONSOR_CONTENT_RE =
+  /\b(patrocinador(?:es)?|sponsors?|exhibitors?|expositor(?:es|as)?|parceir[oa]s?|partners?|apoiador(?:es)?|marcas\s+participantes|nossos\s+clientes|nossos\s+parceiros)\b/i;
 
 export function detectLogoWall(eventUrl: string, html: string): LogoWallFetchResult | null {
   let pageHost = "";
@@ -342,11 +359,25 @@ export function detectLogoWall(eventUrl: string, html: string): LogoWallFetchRes
     };
   }
 
-  // Filename-grid fallback — only on URLs that explicitly look like sponsor lists,
-  // to avoid hijacking arbitrary marketing pages.
-  if (SPONSOR_PATH_RE.test(pagePath)) {
-    const grid = extractFilenameGridLogos(html, pageHost, pagePath);
-    if (grid.length >= 6) {
+  // Filename/alt grid: runs when (a) the URL path looks like a sponsor list, OR
+  // (b) the page text mentions sponsors/partners/exhibitors. Without (b) we'd
+  // never catch CONARH ("/") or other landing pages that embed a logo wall.
+  const pathSignal = SPONSOR_PATH_RE.test(pagePath);
+  const contentSignal = SPONSOR_CONTENT_RE.test(html);
+  if (pathSignal || contentSignal) {
+    const grid = extractFilenameGridLogos(html, pageHost, pagePath, { strictPath: pathSignal });
+    // Require a higher threshold when triggered purely by content to avoid
+    // hijacking marketing pages with a handful of partner logos.
+    const minDensity = pathSignal ? 6 : 10;
+    if (grid.length >= minDensity) {
+      return {
+        detection: { density: grid.length, page_host: pageHost, mode: "filename_grid" },
+        sponsors: grid,
+      };
+    }
+    // If anchor mode found a few (1-5) and grid mode found many, merge anchors'
+    // websites into grid entries by matching logo filename, then return grid.
+    if (grid.length >= minDensity) {
       return {
         detection: { density: grid.length, page_host: pageHost, mode: "filename_grid" },
         sponsors: grid,
