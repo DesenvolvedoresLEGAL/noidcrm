@@ -407,7 +407,40 @@ export async function tryLogoWallFromUrl(eventUrl: string): Promise<{
     return { result: null, error: `host fetch failed: ${(e as Error).message}` };
   }
 
-  const detected = detectLogoWall(eventUrl, html);
+  let detected = detectLogoWall(eventUrl, html);
+
+  // SPA shell fallback: when the raw HTML is too small (Vite/React/Next shell)
+  // we won't see any sponsor <img>. Re-render via Firecrawl and retry. Examples
+  // hitting this branch: conarh.org.br (Vite SPA, ~1.3KB raw HTML).
+  const looksLikeShell = (html.length < 5000) || (!/<img\b/i.test(html));
+  if (!detected && looksLikeShell) {
+    const apiKey = (globalThis as any).Deno?.env?.get?.("FIRECRAWL_API_KEY");
+    if (apiKey) {
+      try {
+        const fcResp = await fetch("https://api.firecrawl.dev/v2/scrape", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            url: eventUrl,
+            formats: ["html"],
+            onlyMainContent: false,
+            waitFor: 4000,
+            timeout: 60000,
+          }),
+          signal: AbortSignal.timeout(75_000),
+        });
+        const fcData = await fcResp.json();
+        const renderedHtml = fcData?.data?.html || fcData?.html || "";
+        if (renderedHtml && renderedHtml.length > html.length) {
+          html = renderedHtml;
+          detected = detectLogoWall(eventUrl, html);
+        }
+      } catch (e) {
+        return { result: detected, error: `firecrawl render failed: ${(e as Error).message}` };
+      }
+    }
+  }
+
   if (!detected) return { result: null };
   return { result: detected };
 }
