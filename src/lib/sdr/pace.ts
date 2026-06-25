@@ -52,18 +52,18 @@ function classify(gap: number): PaceStatus {
   return 'critical';
 }
 
-function messageFor(status: PaceStatus, requiredDaily: number): string {
+function messageFor(status: PaceStatus, requiredDaily: number, missingLeads: number): string {
   switch (status) {
     case 'accelerated':
       return 'Você está acima do ritmo. Mantenha a cadência e priorize qualidade.';
     case 'on_track':
-      return 'Você está no ritmo da meta. Proteja o pace de hoje.';
+      return `Você está no ritmo da meta. Mantenha ${requiredDaily} lead(s)/dia útil restante.`;
     case 'attention':
-      return `Você está levemente abaixo do pace. Qualifique ${requiredDaily} lead(s) hoje para recuperar.`;
+      return `Levemente abaixo do pace. Qualifique ${requiredDaily} lead(s) hoje para recuperar.`;
     case 'risk':
-      return 'Você está abaixo do ritmo. Foque nos leads com maior intenção agora.';
+      return `Abaixo do ritmo. Faltam ${missingLeads} leads e o pace exige ${requiredDaily}/dia útil restante.`;
     case 'critical':
-      return 'Meta em risco. Ataque leads prontos e limpe handoffs incompletos.';
+      return `Meta em risco. Faltam ${missingLeads} leads — pace necessário: ${requiredDaily}/dia útil restante.`;
   }
 }
 
@@ -101,7 +101,7 @@ export function calculatePace({ monthlyTarget, qualifiedMonth, today = new Date(
     paceGap,
     projectedMonthEnd,
     status,
-    message: messageFor(status, requiredDailyPace),
+    message: messageFor(status, requiredDailyPace, missingLeads),
     period: {
       month: today.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }),
       startDate: start.toISOString().slice(0, 10),
