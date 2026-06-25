@@ -61,39 +61,46 @@ export default function Dashboard() {
   /**
    * Dashboard Routing Logic:
    *
+   * Priority 0: Owner/Admin permission_set ALWAYS wins — executives keep their
+   *             executive dashboard even when also flagged as SDR/AE in `sellers`.
    * Priority 1: seller_role (SDR/BDR/Hunter → SDRCommandCenter; AE/Closer → AEDashboard; CS → CSEngine)
-   *             This overrides RepDashboard defaults so pre-sales users land on their command center.
-   * Priority 2: defaultDashboard from permission_set (Owner/Admin/Manager/CS/Finance/Rep)
+   * Priority 2: defaultDashboard from permission_set (Manager/CS/Finance/Rep)
    * Priority 3: GTM dashboards explicitly set via defaultDashboard
    */
 
   const renderDashboard = () => {
     const role = sellerRole as SellerRole;
+    const isExecutive =
+      defaultDashboard === 'OwnerDashboard' || defaultDashboard === 'AdminDashboard';
 
     // Priority 1: seller_role drives GTM routing for sales/CS personas
-    switch (role) {
-      case 'SDR':
-      case 'BDR':
-      case 'Hunter':
-        return (
-          <Suspense fallback={<DashboardLoader />}>
-            <SDRCommandCenter />
-          </Suspense>
-        );
-      case 'AE':
-      case 'Closer':
-        return (
-          <Suspense fallback={<DashboardLoader />}>
-            <AEDashboard />
-          </Suspense>
-        );
-      case 'CS':
-        return (
-          <Suspense fallback={<DashboardLoader />}>
-            <CSEngineDashboard />
-          </Suspense>
-        );
+    // (skipped for Owner/Admin so executives keep the executive dashboard)
+    if (!isExecutive) {
+      switch (role) {
+        case 'SDR':
+        case 'BDR':
+        case 'Hunter':
+          return (
+            <Suspense fallback={<DashboardLoader />}>
+              <SDRCommandCenter />
+            </Suspense>
+          );
+        case 'AE':
+        case 'Closer':
+          return (
+            <Suspense fallback={<DashboardLoader />}>
+              <AEDashboard />
+            </Suspense>
+          );
+        case 'CS':
+          return (
+            <Suspense fallback={<DashboardLoader />}>
+              <CSEngineDashboard />
+            </Suspense>
+          );
+      }
     }
+
 
     // Priority 2: defaultDashboard maps to a direct component
     if (DASHBOARD_COMPONENTS[defaultDashboard]) {
