@@ -1186,6 +1186,9 @@ async function handleEventFirecrawl(
           (metrics as any).informa_total_count = informa.result.total_count;
           (metrics as any).informa_pages_fetched = informa.result.pages_fetched;
           (metrics as any).informa_resolved_url = informa.resolved_url ?? eventUrl;
+          try {
+            (metrics as any).informa_host = new URL(informa.resolved_url ?? eventUrl).hostname;
+          } catch { /* ignore */ }
           await logRunEvent(supabase, organizationId, run.id, "info",
             `Informa Markets forneceu ${informa.result.exhibitors.length}/${informa.result.total_count ?? "?"} expositores em ${informa.result.pages_fetched} páginas — pulando Firecrawl`,
             { provider: "informa-markets", count: informa.result.exhibitors.length }

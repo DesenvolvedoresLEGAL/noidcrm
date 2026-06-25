@@ -16,11 +16,17 @@ const PERSISTED_QUERY_HASH =
   "b3cb76208b6de3d96c5ba1a8f02e6be6135d5ff1db0a2eecd64b7d15e7e6b5e2";
 const CLIENT_VERSION = "2.310.75";
 
-const HOST_RE = /(?:^|\.)informamarkets\.com(?:\.br)?$/i;
+// Hosts conhecidos servidos pelo mesmo Next.js + Apollo + Swapcard.
+// Todos respondem à mesma persisted query em `/api/graphql` e usam o mesmo
+// `EventExhibitorListViewConnectionQuery`. Validado por probe em:
+//   - app.informamarkets.com.br (Fispal, ProFood Tech, etc.)
+//   - visitor.figlobal.com      (FI South America, Vitafoods, Food Ingredients globais)
+const HOST_RE = /(?:^|\.)(?:informamarkets\.com(?:\.br)?|figlobal\.com)$/i;
 // /event/<slug>/exhibitors/<base64ViewId>  OR  /widget/event/<slug>/exhibitors/<base64ViewId>
-// Marketing sites (ex.: fispaltecnologia.com.br) embedam o iframe `/widget/event/...`,
-// que é o mesmo Next.js shell SSRed pela Informa — só muda o prefixo da rota.
+// Marketing sites (ex.: fispaltecnologia.com.br, fi-events.com.br) embedam o iframe
+// `/widget/event/...`, que é o mesmo Next.js shell SSRed — só muda o prefixo da rota.
 const URL_RE = /\/(?:widget\/)?event\/([^/]+)\/exhibitors\/([^/?#]+)/i;
+
 
 export interface InformaMarketsDetection {
   origin: string;            // e.g. "https://app.informamarkets.com.br"
@@ -79,7 +85,7 @@ export function detectInformaMarkets(eventUrl: string): InformaMarketsDetection 
  */
 export function findInformaMarketsLinkInHtml(html: string): string | null {
   // Aceita tanto /event/... quanto /widget/event/... (iframe embed em sites de marketing).
-  const re = /https?:\/\/[a-z0-9.-]*informamarkets\.com(?:\.br)?\/(?:widget\/)?event\/[^"'\s<>]+\/exhibitors\/[^"'\s<>]+/gi;
+  const re = /https?:\/\/[a-z0-9.-]*(?:informamarkets\.com(?:\.br)?|figlobal\.com)\/(?:widget\/)?event\/[^"'\s<>]+\/exhibitors\/[^"'\s<>]+/gi;
   const matches = html.match(re);
   if (!matches || matches.length === 0) return null;
   // Prioriza o link "canônico" (sem /widget) se existir; senão usa o primeiro (widget serve igual).
