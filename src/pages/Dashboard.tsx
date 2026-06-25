@@ -44,10 +44,11 @@ const DASHBOARD_COMPONENTS: Record<string, React.ComponentType> = {
 export default function Dashboard() {
   const { loading: userLoading } = useCurrentUser();
   const { defaultDashboard, loading: permLoading } = usePermissions();
-  const needsSellerRole = !permLoading && !DASHBOARD_COMPONENTS[defaultDashboard] && !['SDRCommandCenter', 'AEDashboard', 'CSEngineDashboard'].includes(defaultDashboard);
-  const { sellerRole, isLoading: sellerLoading } = useSellerRole(needsSellerRole);
+  // Always fetch seller_role so SDR/BDR/Hunter/AE/Closer/CS get GTM dashboards
+  // even when their permission_set defaults to RepDashboard.
+  const { sellerRole, isLoading: sellerLoading } = useSellerRole(true);
 
-  const loading = userLoading || permLoading || (needsSellerRole && sellerLoading);
+  const loading = userLoading || permLoading || sellerLoading;
 
   if (loading) {
     return (
@@ -59,43 +60,17 @@ export default function Dashboard() {
 
   /**
    * Dashboard Routing Logic:
-   * 
-   * Priority 1: Use defaultDashboard from permission_set (configurable via Settings)
-   * Priority 2: Fallback to seller_role based routing for lazy-loaded GTM dashboards
+   *
+   * Priority 1: seller_role (SDR/BDR/Hunter → SDRCommandCenter; AE/Closer → AEDashboard; CS → CSEngine)
+   *             This overrides RepDashboard defaults so pre-sales users land on their command center.
+   * Priority 2: defaultDashboard from permission_set (Owner/Admin/Manager/CS/Finance/Rep)
+   * Priority 3: GTM dashboards explicitly set via defaultDashboard
    */
-  
+
   const renderDashboard = () => {
-    // Check if defaultDashboard maps to a direct component
-    if (DASHBOARD_COMPONENTS[defaultDashboard]) {
-      const DashboardComponent = DASHBOARD_COMPONENTS[defaultDashboard];
-      return <DashboardComponent />;
-    }
-
-    // Handle lazy-loaded GTM dashboards based on defaultDashboard
-    switch (defaultDashboard) {
-      case 'SDRCommandCenter':
-        return (
-          <Suspense fallback={<DashboardLoader />}>
-            <SDRCommandCenter />
-          </Suspense>
-        );
-      case 'AEDashboard':
-        return (
-          <Suspense fallback={<DashboardLoader />}>
-            <AEDashboard />
-          </Suspense>
-        );
-      case 'CSEngineDashboard':
-        return (
-          <Suspense fallback={<DashboardLoader />}>
-            <CSEngineDashboard />
-          </Suspense>
-        );
-    }
-
-    // Fallback: seller_role based routing for GTM dashboards
     const role = sellerRole as SellerRole;
-    
+
+    // Priority 1: seller_role drives GTM routing for sales/CS personas
     switch (role) {
       case 'SDR':
       case 'BDR':
@@ -118,12 +93,39 @@ export default function Dashboard() {
             <CSEngineDashboard />
           </Suspense>
         );
-      case 'AM':
-      case 'Farmer':
-      default:
-        return <RepDashboard />;
     }
+
+    // Priority 2: defaultDashboard maps to a direct component
+    if (DASHBOARD_COMPONENTS[defaultDashboard]) {
+      const DashboardComponent = DASHBOARD_COMPONENTS[defaultDashboard];
+      return <DashboardComponent />;
+    }
+
+    // Priority 3: lazy-loaded GTM dashboards via defaultDashboard
+    switch (defaultDashboard) {
+      case 'SDRCommandCenter':
+        return (
+          <Suspense fallback={<DashboardLoader />}>
+            <SDRCommandCenter />
+          </Suspense>
+        );
+      case 'AEDashboard':
+        return (
+          <Suspense fallback={<DashboardLoader />}>
+            <AEDashboard />
+          </Suspense>
+        );
+      case 'CSEngineDashboard':
+        return (
+          <Suspense fallback={<DashboardLoader />}>
+            <CSEngineDashboard />
+          </Suspense>
+        );
+    }
+
+    return <RepDashboard />;
   };
+
 
   return (
     <Layout>
