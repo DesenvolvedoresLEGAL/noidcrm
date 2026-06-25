@@ -1685,13 +1685,14 @@ async function handleEventFirecrawl(
             exhibitor_profile_url: s.source_url,
             signals: [
               "logo_wall",
-              "external_domain",
+              s.website ? "external_domain" : null,
               s.tier ? "has_tier" : null,
+              (s as any).extraction_mode === "filename_grid" ? "name_from_filename" : null,
             ].filter(Boolean) as string[],
-            confidence: 80,
+            confidence: (s as any).extraction_mode === "filename_grid" ? 55 : 80,
             _source_url: s.source_url,
             _page_type: "sponsor_wall",
-            _extraction_method: "logo_wall_dom",
+            _extraction_method: (s as any).extraction_mode === "filename_grid" ? "logo_wall_filename" : "logo_wall_dom",
             _logo_url: s.logo_url,
             _sponsor_tier: s.tier,
           });
@@ -1701,10 +1702,12 @@ async function handleEventFirecrawl(
         metrics.html_hybrid_extracted = allExhibitors.length;
         (metrics as any).provider = "logo-wall";
         (metrics as any).logo_wall_density = lw.result.detection.density;
+        (metrics as any).logo_wall_mode = lw.result.detection.mode;
         await logRunEvent(supabase, organizationId, run.id, "info",
-          `Logo-wall extraiu ${lw.result.sponsors.length} patrocinadores via DOM — pulando Firecrawl`,
-          { provider: "logo-wall", count: lw.result.sponsors.length }
+          `Logo-wall extraiu ${lw.result.sponsors.length} patrocinadores via DOM (${lw.result.detection.mode}) — pulando Firecrawl`,
+          { provider: "logo-wall", count: lw.result.sponsors.length, mode: lw.result.detection.mode }
         );
+
       } else if (lw.error) {
         await logRunEvent(supabase, organizationId, run.id, "warn",
           "Logo-wall provider falhou no fetch — seguindo com Firecrawl",
