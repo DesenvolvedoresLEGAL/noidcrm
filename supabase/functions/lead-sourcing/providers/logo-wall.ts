@@ -28,21 +28,24 @@ const GENERIC_HOSTS = new Set([
 
 export interface LogoWallSponsor {
   name: string;
-  website: string;            // external link from <a href>
+  website: string | null;     // external link from <a href>, null when extracted by filename
   logo_url: string | null;    // <img src>
   tier?: string | null;       // closest preceding h1/h2/h3 (DIAMANTE, OURO…)
   source_url: string;         // page where the logo was found
+  extraction_mode?: "anchor_image" | "filename_grid";
 }
 
 export interface LogoWallDetection {
   density: number;            // number of external-link logo pairs found
   page_host: string;
+  mode: "anchor_image" | "filename_grid";
 }
 
 export interface LogoWallFetchResult {
   detection: LogoWallDetection;
   sponsors: LogoWallSponsor[];
 }
+
 
 function decodeEntities(str: string): string {
   return str
