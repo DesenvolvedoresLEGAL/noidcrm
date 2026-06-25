@@ -349,9 +349,11 @@ export async function tryLogoWallFromUrl(eventUrl: string): Promise<{
   let html = "";
   try {
     const resp = await fetch(eventUrl, {
-      headers: { "User-Agent": BROWSER_UA, "Accept": "text/html,*/*" },
+      headers: BROWSER_HEADERS,
       redirect: "follow",
+      signal: AbortSignal.timeout(20_000),
     });
+
     if (!resp.ok) return { result: null, error: `host fetch HTTP ${resp.status}` };
     html = await resp.text();
   } catch (e) {
