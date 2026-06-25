@@ -13,7 +13,7 @@ import { lazy, Suspense } from 'react';
 import { DynamicDashboardRuntimeGate } from '@/components/dashboard/runtime/DynamicDashboardRuntimeGate';
 
 // Lazy load GTM dashboards (from pages/gtm)
-const SDRCommandCenter = lazy(() => import('@/pages/gtm/SDRCommandCenter'));
+const SDRCommandCenter = lazy(() => import('@/components/dashboards/sdr/SDRCommandCenterDashboard'));
 const AEDashboard = lazy(() => import('@/pages/gtm/AEDashboard'));
 const CSEngineDashboard = lazy(() => import('@/pages/gtm/CSDashboard'));
 
@@ -99,6 +99,7 @@ export default function Dashboard() {
     switch (role) {
       case 'SDR':
       case 'BDR':
+      case 'Hunter':
         return (
           <Suspense fallback={<DashboardLoader />}>
             <SDRCommandCenter />
@@ -106,7 +107,6 @@ export default function Dashboard() {
         );
       case 'AE':
       case 'Closer':
-      case 'Hunter':
         return (
           <Suspense fallback={<DashboardLoader />}>
             <AEDashboard />
