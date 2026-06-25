@@ -150,8 +150,12 @@ function extractAnchorImagePairs(html: string, pageHost: string): LogoWallSponso
     }
     if (!/^https?:$/.test(absHref.protocol)) continue;
     const linkHost = stripWww(absHref.hostname);
-    if (!linkHost || linkHost === stripWww(pageHost)) continue;
+    if (!linkHost) continue;
     if (GENERIC_HOSTS.has(linkHost) || GENERIC_HOSTS.has(absHref.hostname.toLowerCase())) continue;
+    // Same-host anchors are allowed (e.g. Expert XP routes sponsors to /produtos/...);
+    // we still dedupe per logo filename below so multiple sponsors on the same host
+    // are kept as separate entries.
+    const sameHost = linkHost === stripWww(pageHost);
 
     const imgMatch = anchor.match(/<img\b[^>]*>/i);
     if (!imgMatch) continue;
@@ -172,11 +176,23 @@ function extractAnchorImagePairs(html: string, pageHost: string): LogoWallSponso
       name = clean;
       break;
     }
-    if (!name) name = nameFromDomain(absHref.hostname);
+    // For same-host anchors prefer the filename; the domain name would collapse all
+    // sponsors that link back to e.g. xpi.com.br into a single "Xpi" entry.
+    if (!name && src) name = nameFromFilename(src);
+    if (!name && !sameHost) name = nameFromDomain(absHref.hostname);
+    if (!name) continue;
     if (isBlacklistedName(name)) continue;
 
-    const website = `${absHref.protocol}//${absHref.hostname}${absHref.pathname === "/" ? "" : absHref.pathname}`;
-    const dedupeKey = linkHost;
+    const website = sameHost
+      ? null
+      : `${absHref.protocol}//${absHref.hostname}${absHref.pathname === "/" ? "" : absHref.pathname}`;
+    // Dedupe key combines normalized name with the image filename so a sponsor
+    // with no link host (or a shared host) is still kept once per logo asset.
+    let imgBase = "";
+    if (src) {
+      try { imgBase = new URL(src, `https://${pageHost}/`).pathname.split("/").pop() || ""; } catch { imgBase = ""; }
+    }
+    const dedupeKey = `${name.toLowerCase()}::${imgBase || (sameHost ? absHref.pathname : linkHost)}`;
     if (seen.has(dedupeKey)) continue;
     seen.add(dedupeKey);
 
@@ -247,7 +263,7 @@ function nameFromFilename(rawPath: string): string | null {
  * surrounding anchor (carousels, JS-driven grids). When the URL path obviously
  * points to a sponsor/exhibitor section, derive company names from filenames.
  */
-function extractFilenameGridLogos(html: string, pageHost: string, pagePath: string): LogoWallSponsor[] {
+function extractFilenameGridLogos(html: string, pageHost: string, pagePath: string, opts: { strictPath: boolean }): LogoWallSponsor[] {
   const out: LogoWallSponsor[] = [];
   const seen = new Set<string>();
   const sourceUrl = `https://${pageHost}${pagePath || "/"}`;
@@ -272,24 +288,33 @@ function extractFilenameGridLogos(html: string, pageHost: string, pagePath: stri
     const path = absUrl.pathname.toLowerCase();
     // Heuristic: must look like a content/upload image (not theme/plugin chrome).
     const isContentUpload =
-      /\/(uploads?|media|files|content|sponsors?|patroc|exhibitor|expositor)\//i.test(path) ||
-      /\/logos?\//i.test(path);
+      /\/(uploads?|media|files|content|sponsors?|patroc|exhibitor|expositor|parceir|partner|apoiador|marca|brand)\//i.test(path) ||
+      /\/logos?\//i.test(path) ||
+      /\/storage\/v1\/object\/public\//i.test(path) || // Supabase storage (CONARH)
+      /\/assets\/[^/]+\.(png|jpe?g|webp|svg|avif)/i.test(path); // bundler dirs
     if (!isContentUpload) continue;
     // Reject obvious chrome assets even when inside /uploads/.
-    if (/(banner|hero|capa|cover|background|bg|placeholder|spacer|favicon|sprite|loader)/i.test(path)) continue;
+    if (/(banner|hero|capa|cover|background|^bg[-_]|placeholder|spacer|favicon|sprite|loader|divider|arrow|chevron|hor[-_]?line|pattern)/i.test(path)) continue;
 
     // Prefer alt text when meaningful; otherwise derive from filename.
     const alt = pickAttr(tag, "alt");
     let name: string | null = null;
     if (alt && alt.trim().length >= 2) {
-      const cleanAlt = alt.replace(/\s+/g, " ").trim();
-      if (!isBlacklistedName(cleanAlt) && !/^(banner|logo|icon|image|imagem|foto|picture)$/i.test(cleanAlt)) {
+      const cleanAlt = decodeEntities(alt).replace(/\s+/g, " ").trim();
+      if (
+        !isBlacklistedName(cleanAlt) &&
+        !/^(banner|logo|icon|image|imagem|foto|picture|xp|destaque)$/i.test(cleanAlt) &&
+        cleanAlt.length <= 60
+      ) {
         name = cleanAlt;
       }
     }
     if (!name) name = nameFromFilename(src);
     if (!name) continue;
     if (isBlacklistedName(name)) continue;
+    // In permissive (content-trigger) mode require that the name didn't come from
+    // a totally chrome-y filename (already filtered) AND has at least one letter.
+    if (!/[A-Za-zÀ-ÿ]/.test(name)) continue;
 
     const dedupeKey = name.toLowerCase();
     if (seen.has(dedupeKey)) continue;
@@ -304,8 +329,16 @@ function extractFilenameGridLogos(html: string, pageHost: string, pagePath: stri
       extraction_mode: "filename_grid",
     });
   }
+  // Silence unused-arg warning while keeping the flag for future tuning.
+  void opts;
   return out;
 }
+
+// Content-level signals that the page is a sponsor/partner/exhibitor wall, even
+// when the URL is just "/". CONARH, Expert XP and many others surface these
+// keywords as section titles around the logo grids.
+const SPONSOR_CONTENT_RE =
+  /\b(patrocinador(?:es)?|sponsors?|exhibitors?|expositor(?:es|as)?|parceir[oa]s?|partners?|apoiador(?:es)?|marcas\s+participantes|nossos\s+clientes|nossos\s+parceiros)\b/i;
 
 export function detectLogoWall(eventUrl: string, html: string): LogoWallFetchResult | null {
   let pageHost = "";
@@ -326,11 +359,25 @@ export function detectLogoWall(eventUrl: string, html: string): LogoWallFetchRes
     };
   }
 
-  // Filename-grid fallback — only on URLs that explicitly look like sponsor lists,
-  // to avoid hijacking arbitrary marketing pages.
-  if (SPONSOR_PATH_RE.test(pagePath)) {
-    const grid = extractFilenameGridLogos(html, pageHost, pagePath);
-    if (grid.length >= 6) {
+  // Filename/alt grid: runs when (a) the URL path looks like a sponsor list, OR
+  // (b) the page text mentions sponsors/partners/exhibitors. Without (b) we'd
+  // never catch CONARH ("/") or other landing pages that embed a logo wall.
+  const pathSignal = SPONSOR_PATH_RE.test(pagePath);
+  const contentSignal = SPONSOR_CONTENT_RE.test(html);
+  if (pathSignal || contentSignal) {
+    const grid = extractFilenameGridLogos(html, pageHost, pagePath, { strictPath: pathSignal });
+    // Require a higher threshold when triggered purely by content to avoid
+    // hijacking marketing pages with a handful of partner logos.
+    const minDensity = pathSignal ? 6 : 10;
+    if (grid.length >= minDensity) {
+      return {
+        detection: { density: grid.length, page_host: pageHost, mode: "filename_grid" },
+        sponsors: grid,
+      };
+    }
+    // If anchor mode found a few (1-5) and grid mode found many, merge anchors'
+    // websites into grid entries by matching logo filename, then return grid.
+    if (grid.length >= minDensity) {
       return {
         detection: { density: grid.length, page_host: pageHost, mode: "filename_grid" },
         sponsors: grid,
@@ -360,7 +407,40 @@ export async function tryLogoWallFromUrl(eventUrl: string): Promise<{
     return { result: null, error: `host fetch failed: ${(e as Error).message}` };
   }
 
-  const detected = detectLogoWall(eventUrl, html);
+  let detected = detectLogoWall(eventUrl, html);
+
+  // SPA shell fallback: when the raw HTML is too small (Vite/React/Next shell)
+  // we won't see any sponsor <img>. Re-render via Firecrawl and retry. Examples
+  // hitting this branch: conarh.org.br (Vite SPA, ~1.3KB raw HTML).
+  const looksLikeShell = (html.length < 5000) || (!/<img\b/i.test(html));
+  if (!detected && looksLikeShell) {
+    const apiKey = (globalThis as any).Deno?.env?.get?.("FIRECRAWL_API_KEY");
+    if (apiKey) {
+      try {
+        const fcResp = await fetch("https://api.firecrawl.dev/v2/scrape", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            url: eventUrl,
+            formats: ["html"],
+            onlyMainContent: false,
+            waitFor: 4000,
+            timeout: 60000,
+          }),
+          signal: AbortSignal.timeout(75_000),
+        });
+        const fcData = await fcResp.json();
+        const renderedHtml = fcData?.data?.html || fcData?.html || "";
+        if (renderedHtml && renderedHtml.length > html.length) {
+          html = renderedHtml;
+          detected = detectLogoWall(eventUrl, html);
+        }
+      } catch (e) {
+        return { result: detected, error: `firecrawl render failed: ${(e as Error).message}` };
+      }
+    }
+  }
+
   if (!detected) return { result: null };
   return { result: detected };
 }
