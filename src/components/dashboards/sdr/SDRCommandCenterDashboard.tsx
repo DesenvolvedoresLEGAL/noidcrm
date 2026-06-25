@@ -23,7 +23,7 @@ export function SDRCommandCenterDashboard() {
   const navigate = useNavigate();
   const { data, isLoading } = useSDRDashboardData();
 
-  const firstName = (user?.user_metadata?.full_name || user?.email || 'SDR').split(' ')[0];
+  const firstName = (user?.email || 'SDR').split('@')[0].split('.')[0];
 
   if (isLoading || !data) {
     return (
