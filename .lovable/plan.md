@@ -1,49 +1,40 @@
+## Plano de correção imediata
 
-## Diagnóstico
+**Problema confirmado**
+- `CONARH 2026` lista as marcas na página principal como imagens/logos, com nomes no `alt` e URLs em storage (`images-programacao/parceiros/...`), sem página `/patrocinadores` no path.
+- `Expert XP` tem muitos logos como imagem dentro de seções de patrocinadores; alguns não têm link externo e o fallback atual só roda quando o path parece sponsor. Quando cai no pipeline genérico, ele captura banner/CTA como lead.
+- O `logo-wall.ts` atual só ativa `filename_grid` se a URL tiver `/patrocinadores`, `/sponsors`, `/parceiros`, etc.; por isso falha no CONARH `/` e pode deixar o Expert XP escorrer para parser genérico.
 
-A página `fi-events.com.br/quero-visitar/lista-de-expositores/` é só uma casca de marketing. O conteúdo real vem de um iframe Swapcard:
+## Implementação proposta
 
-```
-https://visitor.figlobal.com/widget/event/fi-south-america-2026/exhibitors/RXZlbnRWaWV3XzEyMzQ1Mzk=?paginationMode=infinite
-```
+1. **Fortalecer `logo-wall.ts`**
+   - Detectar páginas de logo-wall também por conteúdo, não só por path:
+     - headings/textos como `PATROCINADORES`, `PARCEIROS`, `EXPOSITORES`, `+300 estandes`, `230+ patrocinadores`;
+     - alta densidade de imagens em diretórios como `/parceiros/`, `/patrocinadores/`, `/sponsors/`, `/logos/`, `/wp-content/uploads/`.
+   - Extrair nomes diretamente do `alt` quando for útil (ex.: `Totvs`, `Gupy`, `SulAmérica`, `Senior`, `Caju`, `Beneo`, etc.).
+   - Usar filename apenas como fallback quando `alt` vier vazio/genérico.
+   - Preservar dedupe por nome para grids sem website e por domínio para links externos.
+   - Filtrar ruídos como `banner xp`, `hero`, `hor-line`, `xp`, imagens de palestrantes e assets de layout.
 
-`visitor.figlobal.com` é **o mesmo Next.js + Apollo + Swapcard** que `app.informamarkets.com.br` (mesmo `/api/graphql`, mesma persisted query `b3cb76208b…`, mesmo `EventExhibitorListViewConnectionQuery`, mesmo schema de resposta). Confirmei por probe direto: retorna `totalCount: 191` exibidores ("3D Essence Food", "Ad Foods", "ADICEL"…).
+2. **Ajustar gatilho do provider no pipeline**
+   - Manter o provider `logo-wall` antes do Firecrawl/AI.
+   - Se `logo-wall` retornar >= 6 logos, usar esse resultado determinístico e pular Firecrawl/AI, igual ao fluxo atual.
+   - Se retornar pouco, cair nos providers existentes sem bloquear outros eventos.
 
-O provider `informa-markets.ts` hoje só dispara quando o host casa `informamarkets.com(.br)` (regex `HOST_RE`) ou quando o HTML da página de marketing contém um link para esse host (regex `findInformaMarketsLinkInHtml`). FI Events linka para `visitor.figlobal.com` → nenhum provider dispara → cai no Firecrawl genérico → falha igual ao caso Informa antigo.
+3. **Validar localmente com HTML real**
+   - Testar `https://conarh.org.br/` e confirmar dezenas/centenas de marcas extraídas, não `Banner`.
+   - Testar `https://www.expertxp.com.br/patrocinadores/` e confirmar que não fica em 1 lead e que nomes como `Kapitalo`, `Mapfre`, `BTG`, `Bradesco`, `Vinci Compass` aparecem.
 
-## Correção (mínima, cirúrgica)
+4. **Deploy da edge function**
+   - Deployar apenas `lead-sourcing` após o patch.
 
-Generalizar o provider Informa para reconhecer **todos os hosts Swapcard-powered conhecidos**, sem mexer em mais nada do pipeline.
+## Arquivos impactados
+- `supabase/functions/lead-sourcing/providers/logo-wall.ts`
+- Possivelmente `supabase/functions/lead-sourcing/index.ts` apenas se for necessário registrar métricas adicionais do novo modo de detecção.
 
-### Arquivo: `supabase/functions/lead-sourcing/providers/informa-markets.ts`
+## Riscos
+- Baixo: mudança isolada no provider determinístico de logo-wall.
+- Mitigação: ativação exige densidade alta de logos e sinais de página de patrocinadores/parceiros/expositores, evitando capturar imagens comuns de landing pages.
 
-1. Substituir `HOST_RE` por uma lista/regex de hosts suportados:
-   - `informamarkets.com` / `informamarkets.com.br` (mantém)
-   - `visitor.figlobal.com` (novo — FI Events, Vitafoods, Food Ingredients globais)
-   - Manter aberto a adicionar outros subdomínios `*.figlobal.com` se aparecerem.
-
-2. `findInformaMarketsLinkInHtml`: aceitar também links `https://visitor.figlobal.com/(widget/)?event/.../exhibitors/...`. Continua priorizando link canônico (sem `/widget/`) quando existir.
-
-3. `detectInformaMarkets`: já lê origin do URL — sem mudança lógica, apenas passa o novo host. O `origin` resultante (`https://visitor.figlobal.com`) será usado no `fetch` ao `/api/graphql`, no `x-client-origin` e nas tentativas SSR (`/event/...` e `/widget/event/...`).
-
-4. Nada muda em `fetchPage`, `normalizeExhibitor`, headers (Swapcard aceita o mesmo `x-client-platform: Event App` e a mesma persisted query — validado).
-
-### Arquivo: `supabase/functions/lead-sourcing/index.ts`
-
-Renomear apenas labels/logs onde aparece "Informa Markets" para algo mais genérico, **opcional e cosmético** — sem mudar nomes de provider expostos (`providerUsed = "informa-markets"`) para não quebrar dashboards/feedback loop existentes. Preferência: manter `providerUsed = "informa-markets"` e adicionar `metrics.informa_host` para distinguir nas métricas.
-
-## Risco
-
-- **Persisted query hash**: se a Informa rotacionar, o probe atual confirmou que `visitor.figlobal.com` aceita o mesmo hash hoje. Fallback existente (`PersistedQueryNotFound` → falha graciosa → Firecrawl) continua válido para os dois hosts.
-- **Nada toca**: ExpoFP, logo-wall, demais providers, índice de prospects, RLS.
-
-## Validação
-
-1. Probe local já feito: `visitor.figlobal.com/api/graphql` com `viewId=RXZlbnRWaWV3XzEyMzQ1Mzk=` retorna 191 exhibitors corretos.
-2. Após deploy, re-rodar sourcing em `https://www.fi-events.com.br/quero-visitar/lista-de-expositores/` e conferir métricas: `provider=informa-markets`, `informa_total_count≈191`.
-3. Smoke test em URL Informa já suportada (ex.: Fispal) para garantir que não regrediu.
-
-## Próximos passos depois do fix
-
-- Pedir ao usuário para limpar os leads incorretos do FI Events (mesma rotina usada após o ajuste da Expert XP).
-- Considerar memory entry “Swapcard providers (figlobal + informamarkets)” na próxima sprint de governança.
+## Próximo passo
+Aprovar o plano para eu aplicar o patch e deployar a função `lead-sourcing`.
