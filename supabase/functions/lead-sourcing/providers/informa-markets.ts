@@ -85,7 +85,7 @@ export function detectInformaMarkets(eventUrl: string): InformaMarketsDetection 
  */
 export function findInformaMarketsLinkInHtml(html: string): string | null {
   // Aceita tanto /event/... quanto /widget/event/... (iframe embed em sites de marketing).
-  const re = /https?:\/\/[a-z0-9.-]*informamarkets\.com(?:\.br)?\/(?:widget\/)?event\/[^"'\s<>]+\/exhibitors\/[^"'\s<>]+/gi;
+  const re = /https?:\/\/[a-z0-9.-]*(?:informamarkets\.com(?:\.br)?|figlobal\.com)\/(?:widget\/)?event\/[^"'\s<>]+\/exhibitors\/[^"'\s<>]+/gi;
   const matches = html.match(re);
   if (!matches || matches.length === 0) return null;
   // Prioriza o link "canônico" (sem /widget) se existir; senão usa o primeiro (widget serve igual).
