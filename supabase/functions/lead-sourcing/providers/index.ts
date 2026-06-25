@@ -54,3 +54,6 @@ export type {
   InformaConnectExhibitor,
   InformaConnectFetchResult,
 } from "./informa-connect.ts";
+
+export { detectLogoWall, tryLogoWallFromUrl } from "./logo-wall.ts";
+export type { LogoWallDetection, LogoWallFetchResult, LogoWallSponsor } from "./logo-wall.ts";
