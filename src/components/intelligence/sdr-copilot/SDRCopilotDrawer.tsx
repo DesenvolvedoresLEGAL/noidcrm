@@ -8,7 +8,7 @@ import { Loader2, Copy, CheckCircle2, Trash2, Send, ClipboardList, RefreshCw } f
 import { toast } from 'sonner';
 import { useGenerateSDRMessage, useUpdateSDRCopilotStatus } from '@/hooks/intelligence/useSDRCopilotTasks';
 import { CHANNEL_LABEL, NEXT_ACTION_LABEL, STATUS_LABEL, type SDRCopilotChannel, type SDRCopilotTask } from '@/services/intelligence/sdrCopilot';
-import { SmartCoverageTab } from '@/components/intelligence/coverage/SmartCoverageTab';
+import { SmartCoverageTab } from '@/components/intelligence/smart-coverage/SmartCoverageTab';
 
 interface Props {
   task: SDRCopilotTask;
