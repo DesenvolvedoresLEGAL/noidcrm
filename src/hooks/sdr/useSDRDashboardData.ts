@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
-import { calculatePace, type PaceResult } from '@/lib/sdr/pace';
+import { calculatePace, countBusinessDays, type PaceResult } from '@/lib/sdr/pace';
 
 export interface SDRScoreboard {
   calls: { target: number; done: number };
@@ -27,6 +27,9 @@ export interface AttackPlanItem {
 export interface SDRDashboardData {
   pace: PaceResult | null;
   hasGoal: boolean;
+  goalSource: 'ote_seller_config' | 'sales_goals' | 'seller_targets' | null;
+  dailyLeadsTarget: number;
+  dailyCallsTarget: number;
   scoreboard: SDRScoreboard;
   attackPlan: AttackPlanItem[];
 }
@@ -58,15 +61,20 @@ export function useSDRDashboardData() {
     enabled: !!userId && !!orgId,
     staleTime: 60_000,
     queryFn: async () => {
+      const today = new Date();
+      const todayDateStr = today.toISOString().slice(0, 10);
       const monthStart = startOfMonthISO();
       const monthEnd = endOfMonthISO();
       const todayStart = startOfTodayISO();
       const todayEnd = endOfTodayISO();
       const monthStartDate = monthStart.slice(0, 10);
+      const monthEndDate = monthEnd.slice(0, 10);
 
       const [
-        goalRes,
+        oteConfigRes,
+        salesGoalsRes,
         sellerTargetsRes,
+        salesConfigRes,
         qualifiedMonthRes,
         qualifiedTodayRes,
         callsTodayRes,
@@ -75,7 +83,18 @@ export function useSDRDashboardData() {
         dueTodayRes,
         opportunitiesRes,
       ] = await Promise.all([
-        // Meta mensal SDR — sales_goals pipeline qualification do mês corrente
+        // Fonte oficial de meta de pré-vendas (mesma exibida em Configurações de Vendas > Vendedores)
+        supabase
+          .from('ote_seller_config')
+          .select('daily_leads_target, daily_calls_target, daily_sales_target, daily_revenue_target, effective_date, end_date')
+          .eq('organization_id', orgId!)
+          .eq('user_id', userId!)
+          .lte('effective_date', todayDateStr)
+          .or(`end_date.is.null,end_date.gte.${todayDateStr}`)
+          .order('effective_date', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        // Fallback: meta mensal em sales_goals (se gestor optou por sobrescrever)
         supabase
           .from('sales_goals')
           .select('target_deals, target_value, period_start, period_end, pipeline_id')
@@ -84,7 +103,7 @@ export function useSDRDashboardData() {
           .lte('period_start', monthStartDate)
           .gte('period_end', monthStartDate)
           .maybeSingle(),
-        // Fallback diário
+        // Fallback histórico
         supabase
           .from('seller_targets')
           .select('daily_calls_target, daily_leads_target, daily_proposals_target')
@@ -93,7 +112,13 @@ export function useSDRDashboardData() {
           .order('period_month', { ascending: false })
           .limit(1)
           .maybeSingle(),
-        // Qualified leads no mês
+        // Dias úteis configurados pela operação
+        supabase
+          .from('sales_config')
+          .select('working_days_per_month')
+          .eq('organization_id', orgId!)
+          .maybeSingle(),
+        // Qualified leads no mês (oficial)
         supabase
           .from('opportunity_qualification_history')
           .select('id', { count: 'exact', head: true })
@@ -109,7 +134,7 @@ export function useSDRDashboardData() {
           .eq('qualified_by_user_id', userId!)
           .gte('qualification_at', todayStart)
           .lte('qualification_at', todayEnd),
-        // Ligações hoje
+        // Ligações hoje (programadas + concluídas)
         supabase
           .from('activities')
           .select('id, status', { count: 'exact' })
@@ -148,23 +173,59 @@ export function useSDRDashboardData() {
           .is('deleted_at', null)
           .gte('scheduled_date', todayStart)
           .lte('scheduled_date', todayEnd),
-        // Plano de ataque — oportunidades abertas do usuário (top 30 p/ ranquear local)
+        // Plano de Ataque — APENAS oportunidades em aberto sob responsabilidade do usuário logado.
+        // Ownership oficial = opportunities.owner_user_id (mesmo campo do pipeline/atividades).
+        // Sem fallback global: se owner_user_id != usuário, não entra na lista.
         supabase
           .from('opportunities')
           .select('id, title, stage_id, updated_at, created_at, status')
           .eq('organization_id', orgId!)
           .eq('owner_user_id', userId!)
+          .eq('status', 'open')
           .is('deleted_at', null)
           .is('closed_at', null)
           .order('updated_at', { ascending: true })
           .limit(30),
       ]);
 
-      const monthlyTarget = goalRes.data?.target_deals ?? 0;
+      // Resolução de meta — prioridade: sales_goals (override do gestor) > ote_seller_config > seller_targets legado
+      const businessDaysTotal = countBusinessDays(
+        new Date(today.getFullYear(), today.getMonth(), 1),
+        new Date(today.getFullYear(), today.getMonth() + 1, 0),
+      );
+      const workingDays = salesConfigRes.data?.working_days_per_month ?? businessDaysTotal;
+
+      let monthlyTarget = 0;
+      let dailyLeadsTarget = 0;
+      let dailyCallsTarget = 0;
+      let goalSource: SDRDashboardData['goalSource'] = null;
+
+      if (salesGoalsRes.data?.target_deals && salesGoalsRes.data.target_deals > 0) {
+        monthlyTarget = salesGoalsRes.data.target_deals;
+        dailyLeadsTarget = Math.ceil(monthlyTarget / Math.max(workingDays, 1));
+        goalSource = 'sales_goals';
+      } else if (oteConfigRes.data?.daily_leads_target && oteConfigRes.data.daily_leads_target > 0) {
+        dailyLeadsTarget = oteConfigRes.data.daily_leads_target;
+        dailyCallsTarget = oteConfigRes.data.daily_calls_target ?? 0;
+        monthlyTarget = dailyLeadsTarget * workingDays;
+        goalSource = 'ote_seller_config';
+      } else if (sellerTargetsRes.data?.daily_leads_target && sellerTargetsRes.data.daily_leads_target > 0) {
+        dailyLeadsTarget = sellerTargetsRes.data.daily_leads_target;
+        dailyCallsTarget = sellerTargetsRes.data.daily_calls_target ?? 0;
+        monthlyTarget = dailyLeadsTarget * workingDays;
+        goalSource = 'seller_targets';
+      }
+
+      if (!dailyCallsTarget) {
+        dailyCallsTarget =
+          oteConfigRes.data?.daily_calls_target ??
+          sellerTargetsRes.data?.daily_calls_target ??
+          0;
+      }
+
       const qualifiedMonth = qualifiedMonthRes.count ?? 0;
       const qualifiedToday = qualifiedTodayRes.count ?? 0;
       const hasGoal = monthlyTarget > 0;
-
       const pace = hasGoal ? calculatePace({ monthlyTarget, qualifiedMonth }) : null;
 
       const callsData = (callsTodayRes.data ?? []) as Array<{ status: string }>;
@@ -172,19 +233,17 @@ export function useSDRDashboardData() {
       const callsDone = callsData.filter(a => a.status === 'completed').length;
       const meetingsDone = meetingsData.filter(a => a.status === 'completed').length;
 
-      const dailyLeadsTarget = sellerTargetsRes.data?.daily_leads_target ?? (pace?.requiredDailyPace ?? 0);
-      const dailyCallsTarget = sellerTargetsRes.data?.daily_calls_target ?? 0;
-
       const scoreboard: SDRScoreboard = {
-        calls: { target: dailyCallsTarget, done: callsDone },
-        effectiveContacts: { target: 0, done: 0 },
+        calls: { target: dailyCallsTarget, done: callsData.length },
+        // Proxy de contato efetivo = ligação concluída (sem campo de outcome no schema atual)
+        effectiveContacts: { target: 0, done: callsDone },
         qualifiedLeadsToday: { target: dailyLeadsTarget, done: qualifiedToday },
         meetings: { target: 0, done: meetingsDone },
         overdueActivities: overdueRes.count ?? 0,
         dueTodayActivities: dueTodayRes.count ?? 0,
       };
 
-      // Plano de Ataque: top 5 por priorityScore (dias parado + sem fechamento)
+      // Plano de Ataque: ranqueia top 5 entre as oportunidades já filtradas por ownership.
       const now = Date.now();
       const opps = (opportunitiesRes.data ?? []) as Array<{
         id: string; title: string; stage_id: string | null; updated_at: string;
@@ -214,7 +273,7 @@ export function useSDRDashboardData() {
         .sort((a, b) => b.priorityScore - a.priorityScore)
         .slice(0, 5);
 
-      return { pace, hasGoal, scoreboard, attackPlan };
+      return { pace, hasGoal, goalSource, dailyLeadsTarget, dailyCallsTarget, scoreboard, attackPlan };
     },
   });
 }
