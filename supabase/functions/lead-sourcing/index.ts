@@ -1658,6 +1658,64 @@ async function handleEventFirecrawl(
     }
   }
 
+  // ── Step 0g: Logo-wall provider (sponsor/partner pages) ──
+  // For static pages that render a grid of <a href="external"><img></a> with no
+  // company name in the surrounding text (e.g. expertxp.com.br/patrocinadores).
+  // The AI/markdown extractor on these pages captures sponsorship tier titles
+  // (DIAMANTE, OURO, PRATA…) as if they were companies — pure garbage. This
+  // deterministic provider reads the DOM, dedupes by external domain, and skips
+  // Firecrawl entirely when it finds ≥6 logos.
+  if (allExhibitors.length === 0) {
+    try {
+      const { tryLogoWallFromUrl } = await import("./providers/index.ts");
+      const lw = await tryLogoWallFromUrl(eventUrl);
+      if (lw.result && lw.result.sponsors.length >= 6) {
+        for (const s of lw.result.sponsors) {
+          allExhibitors.push({
+            company_name: s.name,
+            website: s.website,
+            category: null,
+            description: null,
+            booth: null,
+            country: null,
+            city: null,
+            exhibitor_profile_url: s.source_url,
+            signals: [
+              "logo_wall",
+              "external_domain",
+              s.tier ? "has_tier" : null,
+            ].filter(Boolean) as string[],
+            confidence: 80,
+            _source_url: s.source_url,
+            _page_type: "sponsor_wall",
+            _extraction_method: "logo_wall_dom",
+            _logo_url: s.logo_url,
+            _sponsor_tier: s.tier,
+          });
+        }
+        providerUsed = "logo-wall";
+        metrics.exhibitors_extracted_raw = allExhibitors.length;
+        metrics.html_hybrid_extracted = allExhibitors.length;
+        (metrics as any).provider = "logo-wall";
+        (metrics as any).logo_wall_density = lw.result.detection.density;
+        await logRunEvent(supabase, organizationId, run.id, "info",
+          `Logo-wall extraiu ${lw.result.sponsors.length} patrocinadores via DOM — pulando Firecrawl`,
+          { provider: "logo-wall", count: lw.result.sponsors.length }
+        );
+      } else if (lw.error) {
+        await logRunEvent(supabase, organizationId, run.id, "warn",
+          "Logo-wall provider falhou no fetch — seguindo com Firecrawl",
+          { error: lw.error }
+        );
+      }
+    } catch (providerErr) {
+      await logRunEvent(supabase, organizationId, run.id, "warn",
+        "Erro ao tentar provider logo-wall — seguindo com Firecrawl",
+        { error: String(providerErr) }
+      );
+    }
+  }
+
   (metrics as any).provider = providerUsed;
   const providerHandled = allExhibitors.length > 0;
   const expofpHandled = providerHandled; // legacy var name used downstream
