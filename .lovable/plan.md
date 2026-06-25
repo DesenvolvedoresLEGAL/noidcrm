@@ -1,76 +1,49 @@
-# Fix: Sourcing de páginas de patrocinadores tipo "logo wall"
 
 ## Diagnóstico
 
-A página `https://www.expertxp.com.br/patrocinadores/` (e várias outras como Concrete Show, Feiplar, CONARH, Fenabrave) é uma **grade de logos clicáveis**:
+A página `fi-events.com.br/quero-visitar/lista-de-expositores/` é só uma casca de marketing. O conteúdo real vem de um iframe Swapcard:
 
-```html
-<a href="https://www.icatuvanguarda.com.br">
-  <img src=".../icatu-vanguarda.png" alt="Icatu Vanguarda" />
-</a>
+```
+https://visitor.figlobal.com/widget/event/fi-south-america-2026/exhibitors/RXZlbnRWaWV3XzEyMzQ1Mzk=?paginationMode=infinite
 ```
 
-O HTML/markdown **não contém o nome da empresa em texto** — apenas a imagem e o link. O pipeline atual envia o markdown convertido pro AI, que então capturou os **títulos das cotas** (`COTA SEGMENTO EXCLUSIVO`, `DIAMANTE`, `OURO`, `PRATA`, `BRONZE`, `COBRE`, `3 DIAS`) como se fossem empresas. Resultado: 19 leads completamente errados.
+`visitor.figlobal.com` é **o mesmo Next.js + Apollo + Swapcard** que `app.informamarkets.com.br` (mesmo `/api/graphql`, mesma persisted query `b3cb76208b…`, mesmo `EventExhibitorListViewConnectionQuery`, mesmo schema de resposta). Confirmei por probe direto: retorna `totalCount: 191` exibidores ("3D Essence Food", "Ad Foods", "ADICEL"…).
 
-A solução real é detectar logo walls e extrair os patrocinadores **diretamente do DOM**, sem AI:
-- **Nome**: do `alt` do `<img>` (quando preenchido) OU derivado do **domínio** do `<a href>` externo.
-- **Site**: do próprio `<a href>`.
-- **Logo**: do `<img src>`.
+O provider `informa-markets.ts` hoje só dispara quando o host casa `informamarkets.com(.br)` (regex `HOST_RE`) ou quando o HTML da página de marketing contém um link para esse host (regex `findInformaMarketsLinkInHtml`). FI Events linka para `visitor.figlobal.com` → nenhum provider dispara → cai no Firecrawl genérico → falha igual ao caso Informa antigo.
 
-## Mudanças
+## Correção (mínima, cirúrgica)
 
-### 1. Novo provider `logo-wall.ts`
-`supabase/functions/lead-sourcing/providers/logo-wall.ts`
+Generalizar o provider Informa para reconhecer **todos os hosts Swapcard-powered conhecidos**, sem mexer em mais nada do pipeline.
 
-- Entrada: HTML cru da página (Firecrawl com `formats: ['html']`).
-- Heurística de detecção: agrupar `<a><img></a>` onde o `href` aponta para **domínio externo** (≠ host da página), em densidade ≥ 6 ocorrências, e os `<a>` estão concentrados em uma mesma região DOM.
-- Para cada par:
-  - `external_domain = new URL(href).hostname` (remover `www.`).
-  - `name`:
-    1. `img.alt` se não vazio, ≥ 3 chars e não bater em blacklist (`logo`, `patrocinador`, `sponsor`, nomes de tier `diamante|ouro|prata|bronze|cobre`).
-    2. fallback: `title` do `<a>`.
-    3. fallback final: derivar do domínio (segmento principal sem TLD, capitalizado).
-  - `website = href` normalizado.
-  - `logo_url = img.src`.
-  - `tier` (opcional): captar último `<h2>/<h3>` antes do bloco (ex.: "DIAMANTE", "OURO") como metadado, não como nome.
-- Saída no formato padrão do pipeline (`{ name, website, logo_url, signals: ['logo_wall', 'external_domain'], _page_type: 'sponsor_wall', tier? }`).
-- Deduplicar por domínio.
+### Arquivo: `supabase/functions/lead-sourcing/providers/informa-markets.ts`
 
-### 2. Roteamento no `lead-sourcing/index.ts`
+1. Substituir `HOST_RE` por uma lista/regex de hosts suportados:
+   - `informamarkets.com` / `informamarkets.com.br` (mantém)
+   - `visitor.figlobal.com` (novo — FI Events, Vitafoods, Food Ingredients globais)
+   - Manter aberto a adicionar outros subdomínios `*.figlobal.com` se aparecerem.
 
-- Antes de cair no extrator AI/markdown genérico, rodar `detectLogoWall(html)`:
-  - Se densidade ≥ 6 logos externos: usar **somente** `logo-wall` provider e pular o caminho AI/markdown para evitar contaminação.
-  - Se < 6: manter fluxo atual.
-- Adicionar `signals: ['logo_wall']` com peso (ex.: 12) e `extraction_method: 'logo_wall'` nas métricas.
+2. `findInformaMarketsLinkInHtml`: aceitar também links `https://visitor.figlobal.com/(widget/)?event/.../exhibitors/...`. Continua priorizando link canônico (sem `/widget/`) quando existir.
 
-### 3. Guardrails no extrator AI atual
+3. `detectInformaMarkets`: já lê origin do URL — sem mudança lógica, apenas passa o novo host. O `origin` resultante (`https://visitor.figlobal.com`) será usado no `fetch` ao `/api/graphql`, no `x-client-origin` e nas tentativas SSR (`/event/...` e `/widget/event/...`).
 
-No prompt/normalizer que produz prospects a partir de markdown:
+4. Nada muda em `fetchPage`, `normalizeExhibitor`, headers (Swapcard aceita o mesmo `x-client-platform: Event App` e a mesma persisted query — validado).
 
-- Blacklist absoluta de nomes que são **cotas/tiers de patrocínio** ou seções estruturais:
-  `diamante, ouro, prata, bronze, cobre, platina, master, premium, exclusivo, segmento exclusivo, 3 dias, novo na base, todos`.
-- Rejeitar candidatos com `name.length ≤ 3` puramente alfabético sem domínio associado.
-- Quando o `_page_type` for `sponsor_wall`, **descartar** itens vindos do caminho AI.
+### Arquivo: `supabase/functions/lead-sourcing/index.ts`
 
-### 4. Limpeza dos 19 leads falsos
+Renomear apenas labels/logs onde aparece "Informa Markets" para algo mais genérico, **opcional e cosmético** — sem mudar nomes de provider expostos (`providerUsed = "informa-markets"`) para não quebrar dashboards/feedback loop existentes. Preferência: manter `providerUsed = "informa-markets"` e adicionar `metrics.informa_host` para distinguir nas métricas.
 
-- RPC admin one-shot para marcar como `discarded` os prospects da última run do Expert XP cujo `name` ∈ blacklist OU `confidence ≤ 1` E `website IS NULL`.
-- Não bloqueante: pode ser feito manualmente após validação.
+## Risco
 
-## Arquivos impactados
-
-- `supabase/functions/lead-sourcing/providers/logo-wall.ts` (novo)
-- `supabase/functions/lead-sourcing/index.ts` (roteamento + guardrails)
-- migration opcional: marcar os 19 leads atuais como descartados.
-
-## Riscos
-
-- Páginas com logos puramente decorativos (parceiros, certificações) podem ser capturados. Mitigação: limiar de densidade ≥ 6 + exigir domínio externo distinto do host.
-- `alt` vazio é comum; o fallback por domínio resolve (`icatuvanguarda.com.br` → "Icatuvanguarda" — aceitável; enriquecimento posterior corrige).
-- ExpoFP e outros provedores específicos continuam tendo prioridade (não muda).
+- **Persisted query hash**: se a Informa rotacionar, o probe atual confirmou que `visitor.figlobal.com` aceita o mesmo hash hoje. Fallback existente (`PersistedQueryNotFound` → falha graciosa → Firecrawl) continua válido para os dois hosts.
+- **Nada toca**: ExpoFP, logo-wall, demais providers, índice de prospects, RLS.
 
 ## Validação
 
-1. Rodar sourcing em `expertxp.com.br/patrocinadores/` → esperar ~70+ patrocinadores reais (Accor, B3, BYD, Localiza Meoo, Icatu, Bradesco, Mapfre, MetLife, etc).
-2. Conferir que nenhum lead se chama "DIAMANTE", "OURO", "PRATA", "BRONZE", "COBRE", "3 DIAS".
-3. Smoke em outra página tipo wall (ex.: Concrete Show patrocinadores) — sem regressão nos providers existentes (ExpoFP, Swapcard).
+1. Probe local já feito: `visitor.figlobal.com/api/graphql` com `viewId=RXZlbnRWaWV3XzEyMzQ1Mzk=` retorna 191 exhibitors corretos.
+2. Após deploy, re-rodar sourcing em `https://www.fi-events.com.br/quero-visitar/lista-de-expositores/` e conferir métricas: `provider=informa-markets`, `informa_total_count≈191`.
+3. Smoke test em URL Informa já suportada (ex.: Fispal) para garantir que não regrediu.
+
+## Próximos passos depois do fix
+
+- Pedir ao usuário para limpar os leads incorretos do FI Events (mesma rotina usada após o ajuste da Expert XP).
+- Considerar memory entry “Swapcard providers (figlobal + informamarkets)” na próxima sprint de governança.
