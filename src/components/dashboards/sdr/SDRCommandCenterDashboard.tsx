@@ -270,18 +270,46 @@ export function SDRCommandCenterDashboard() {
                 <button
                   key={item.id}
                   onClick={() => navigate(item.ctaHref)}
-                  className="w-full flex items-center gap-3 p-3 rounded-lg border hover:bg-accent/50 transition-colors text-left"
+                  className="w-full flex items-start gap-3 p-3 rounded-lg border hover:bg-accent/50 transition-colors text-left"
                 >
                   <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-bold text-sm shrink-0">
                     {idx + 1}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{item.name}</p>
-                    <p className="text-xs text-muted-foreground truncate">
-                      {item.priorityReasons.join(' · ') || 'priorize'} · {item.recommendedAction}
+                  <div className="flex-1 min-w-0 space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-medium truncate">{item.name}</p>
+                      {item.stage && (
+                        <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
+                          {item.stage}
+                        </Badge>
+                      )}
+                      <Badge variant="outline" className="text-[10px] bg-muted/40">
+                        {item.daysWithoutUpdate}d sem update
+                      </Badge>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {item.priorityReasons.map(r => (
+                        <span
+                          key={r}
+                          className={`text-[10px] px-1.5 py-0.5 rounded border ${
+                            r.includes('vencida')
+                              ? 'border-red-500/40 bg-red-500/10 text-red-400'
+                              : r.includes('sem próximo')
+                              ? 'border-amber-500/40 bg-amber-500/10 text-amber-400'
+                              : r.includes('dias sem')
+                              ? 'border-orange-500/40 bg-orange-500/10 text-orange-400'
+                              : 'border-muted bg-muted/30 text-muted-foreground'
+                          }`}
+                        >
+                          {r}
+                        </span>
+                      ))}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Recomendado: <span className="text-foreground">{item.recommendedAction}</span>
                     </p>
                   </div>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0 mt-1" />
                 </button>
               ))}
             </div>
