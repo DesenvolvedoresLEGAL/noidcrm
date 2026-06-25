@@ -66,7 +66,7 @@ export function useSDRDashboardData() {
 
       const [
         goalRes,
-        seller targetsRes,
+        sellerTargetsRes,
         qualifiedMonthRes,
         qualifiedTodayRes,
         callsTodayRes,
