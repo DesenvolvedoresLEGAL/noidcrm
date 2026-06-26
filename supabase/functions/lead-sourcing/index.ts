@@ -1706,6 +1706,66 @@ async function handleEventFirecrawl(
     }
   }
 
+  // ── Step 0e5: JetEngine listing provider (Elementor + JetEngine grids) ──
+  // WordPress sites built with Elementor + JetEngine (e.g. Expolazer) render
+  // exhibitors as `jet-listing-grid__item` cards (not <table>), so the
+  // exhibitor-table and logo-wall providers can't see them. Each card holds
+  // one or more `<h2 class="elementor-heading-title">` widgets — the first is
+  // the exhibitor name — plus an `<a class="elementor-button…">` SITE button.
+  if (allExhibitors.length === 0) {
+    try {
+      const { tryJetEngineListingFromUrl } = await import("./providers/index.ts");
+      const jet = await tryJetEngineListingFromUrl(eventUrl);
+      if (jet.result && jet.result.sponsors.length >= 6) {
+        for (const s of jet.result.sponsors) {
+          allExhibitors.push({
+            company_name: s.name,
+            website: s.website,
+            category: s.category,
+            description: null,
+            booth: s.booth,
+            country: null,
+            city: null,
+            // Shared source page (one grid for all items) → null to avoid
+            // dedupe collapse onto the event URL.
+            exhibitor_profile_url: null,
+            signals: [
+              "jet_engine_listing",
+              s.booth ? "has_booth" : null,
+              s.website ? "external_domain" : null,
+              s.category ? "has_category" : null,
+            ].filter(Boolean) as string[],
+            confidence: 85,
+            _source_url: s.source_url,
+            _page_type: "jet_engine_listing",
+            _extraction_method: "html_jet_listing",
+          });
+        }
+        providerUsed = "jet-engine-listing";
+        metrics.exhibitors_extracted_raw = allExhibitors.length;
+        metrics.html_hybrid_extracted = allExhibitors.length;
+        (metrics as any).provider = "jet-engine-listing";
+        (metrics as any).jet_engine_grids = jet.result.detection.grids_found;
+        (metrics as any).jet_engine_items_kept = jet.result.detection.items_kept;
+        await logRunEvent(supabase, organizationId, run.id, "info",
+          `JetEngine listing extraiu ${jet.result.sponsors.length} expositores via Elementor grid — pulando logo-wall/SPA/Firecrawl/IA`,
+          { provider: "jet-engine-listing", count: jet.result.sponsors.length, detection: jet.result.detection }
+        );
+      } else if (jet.error && jet.error !== "no_jet_listing" && jet.error !== "no_jet_listing_items") {
+        await logRunEvent(supabase, organizationId, run.id, "warn",
+          "JetEngine listing provider falhou no fetch — seguindo para logo-wall",
+          { error: jet.error }
+        );
+      }
+    } catch (providerErr) {
+      await logRunEvent(supabase, organizationId, run.id, "warn",
+        "Erro ao tentar provider JetEngine listing — seguindo para logo-wall",
+        { error: String(providerErr) }
+      );
+    }
+  }
+
+
   // ── Step 0f: Logo-wall provider (sponsor/partner pages) ──
   // Runs before generic SPA so CONARH/Expert-style logo walls do not waste
   // Firecrawl/AI credits or capture speakers/banners as companies.

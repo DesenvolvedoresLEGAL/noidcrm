@@ -71,3 +71,10 @@ export type {
   ExhibitorTableFetchResult,
   ExhibitorTableSponsor,
 } from "./exhibitor-table.ts";
+
+export { tryJetEngineListingFromUrl } from "./jet-engine-listing.ts";
+export type {
+  JetEngineListingDetection,
+  JetEngineListingFetchResult,
+  JetEngineListingSponsor,
+} from "./jet-engine-listing.ts";
