@@ -35,6 +35,9 @@ const TIER_BLACKLIST = new Set([
   "logos", "todos", "novo na base", "3 dias", "2 dias", "1 dia",
   "segmento financeiro", "diamond", "gold", "silver", "bronze",
   "banner", "banner xp", "banner expert xp", "hero", "destaque",
+  "todos os cursos", "curso", "cursos", "cosmetologia", "farmácia",
+  "farmacia", "gestão e marketing", "gestao e marketing", "medicina",
+  "nutrição", "nutricao", "veterinária", "veterinaria",
 ]);
 
 const GENERIC_HOSTS = new Set([
@@ -120,7 +123,12 @@ function isRejectedLogoAsset(rawUrl: string, rawName = ""): boolean {
 }
 
 function nameFromDomain(host: string): string {
-  const clean = stripWww(host).split(".")[0] || host;
+  const cleanHost = stripWww(host);
+  const parts = cleanHost.split(".").filter(Boolean);
+  const brSecondLevel = new Set(["com", "org", "net", "edu", "gov", "tec", "ind", "adm", "art", "eco", "far"]);
+  const clean = parts.length >= 3 && parts[parts.length - 1] === "br" && brSecondLevel.has(parts[parts.length - 2])
+    ? parts[parts.length - 3]
+    : (parts.length >= 2 ? parts[parts.length - 2] : parts[0]) || host;
   if (!clean) return host;
   return clean
     .replace(/[-_]+/g, " ")
@@ -128,6 +136,29 @@ function nameFromDomain(host: string): string {
     .filter(Boolean)
     .map((w) => (w.length <= 3 ? w.toUpperCase() : w[0].toUpperCase() + w.slice(1)))
     .join(" ");
+}
+
+function nameFromSocialUrl(url: URL): string | null {
+  const host = stripWww(url.hostname);
+  if (!GENERIC_HOSTS.has(host) && !GENERIC_HOSTS.has(url.hostname.toLowerCase())) return null;
+
+  const pathParts = url.pathname.split("/").map((p) => p.trim()).filter(Boolean);
+  let handle = pathParts[0] || "";
+  if (/^(company|in|school|pages?|share|reel|p|tv|status)$/i.test(handle)) {
+    handle = pathParts[1] || "";
+  }
+  handle = handle.replace(/^@/, "").replace(/[?#].*$/, "");
+  if (!handle || /^profile\.php$/i.test(handle)) return null;
+
+  const name = handle
+    .replace(/(oficial|official|brasil|brazil|industria|industry|pharma|farmacia|magistral)$/i, "")
+    .replace(/[._-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!name || name.length < 2) return null;
+  return cleanCompanyNameCandidate(
+    name.split(" ").map((w) => (w.length <= 3 ? w.toUpperCase() : w[0].toUpperCase() + w.slice(1).toLowerCase())).join(" "),
+  );
 }
 
 function pickAttr(tag: string, name: string): string | null {
@@ -175,7 +206,6 @@ function extractAnchorImagePairs(html: string, pageHost: string): LogoWallSponso
     if (!/^https?:$/.test(absHref.protocol)) continue;
     const linkHost = stripWww(absHref.hostname);
     if (!linkHost) continue;
-    if (GENERIC_HOSTS.has(linkHost) || GENERIC_HOSTS.has(absHref.hostname.toLowerCase())) continue;
     // Same-host anchors are allowed (e.g. Expert XP routes sponsors to /produtos/...);
     // we still dedupe per logo filename below so multiple sponsors on the same host
     // are kept as separate entries.
@@ -189,6 +219,13 @@ function extractAnchorImagePairs(html: string, pageHost: string): LogoWallSponso
     const title = pickAttr(aTag, "title");
     if (src && isRejectedLogoAsset(src, alt || title || "")) continue;
 
+    const srcPath = src ? (() => {
+      try { return new URL(src, `https://${pageHost}/`).pathname.toLowerCase(); } catch { return ""; }
+    })() : "";
+    const exhibitorAsset = /\/(expositor(?:es)?|exhibitor(?:s)?|sponsor(?:s)?|patroc|parceir|partner|apoiador)\//i.test(srcPath);
+    const genericHost = GENERIC_HOSTS.has(linkHost) || GENERIC_HOSTS.has(absHref.hostname.toLowerCase());
+    if (genericHost && !exhibitorAsset) continue;
+
     // Candidate name resolution
     let name: string | null = null;
     const candidates = [alt, title].filter((x): x is string => !!x && x.trim().length >= 2);
@@ -201,7 +238,8 @@ function extractAnchorImagePairs(html: string, pageHost: string): LogoWallSponso
     // For same-host anchors prefer the filename; the domain name would collapse all
     // sponsors that link back to e.g. xpi.com.br into a single "Xpi" entry.
     if (!name && src) name = nameFromFilename(src);
-    if (!name && !sameHost) name = nameFromDomain(absHref.hostname);
+    if (!name && genericHost && exhibitorAsset) name = nameFromSocialUrl(absHref);
+    if (!name && !sameHost && !genericHost) name = nameFromDomain(absHref.hostname);
     if (!name) continue;
     if (isBlacklistedName(name)) continue;
 
