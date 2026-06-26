@@ -172,10 +172,11 @@ function pickAttr(tag: string, name: string): string | null {
  * targets an external domain. Captures the closest preceding heading text as
  * tier metadata.
  */
-function extractAnchorImagePairs(html: string, pageHost: string): LogoWallSponsor[] {
+function extractAnchorImagePairs(html: string, pageHost: string, pagePath = "/"): LogoWallSponsor[] {
   const out: LogoWallSponsor[] = [];
   const seen = new Set<string>();
   let currentTier: string | null = null;
+  const sourceUrl = `https://${pageHost}${pagePath || "/"}`;
 
   // Walk a single regex across the document: headings update currentTier; <a>…</a>
   // blocks containing an <img> become candidates.
@@ -268,7 +269,7 @@ function extractAnchorImagePairs(html: string, pageHost: string): LogoWallSponso
       website,
       logo_url: logoUrl,
       tier: currentTier,
-      source_url: `https://${pageHost}/`,
+      source_url: sourceUrl,
     });
   }
 
@@ -471,7 +472,7 @@ export function detectLogoWall(eventUrl: string, html: string): LogoWallFetchRes
   } catch { return null; }
   if (!pageHost) return null;
 
-  const anchorSponsors = extractAnchorImagePairs(html, pageHost);
+  const anchorSponsors = extractAnchorImagePairs(html, pageHost, pagePath);
   for (const s of anchorSponsors) s.extraction_mode = "anchor_image";
   if (anchorSponsors.length >= 6) {
     return {
