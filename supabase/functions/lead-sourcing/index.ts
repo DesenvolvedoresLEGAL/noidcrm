@@ -1594,6 +1594,58 @@ async function handleEventFirecrawl(
     }
   }
 
+  // ── Step 0e: PDF floorplan / exhibitor list provider ──
+  // Quando o evento publica a lista de expositores apenas como PDF (planta baixa,
+  // brochura) — ex.: FEIPLAR/FEIPUR — nenhum scraping HTML funciona. Tenta
+  // extração nativa (unpdf) e, se vier pobre, cai para Gemini Vision via gateway.
+  if (allExhibitors.length === 0) {
+    try {
+      const { tryPdfFloorplanFromUrl, isPdfUrl } = await import("./providers/index.ts");
+      if (isPdfUrl(eventUrl)) {
+        const pdf = await tryPdfFloorplanFromUrl(eventUrl);
+        if (pdf.result && pdf.result.sponsors.length >= 6) {
+          for (const s of pdf.result.sponsors) {
+            allExhibitors.push({
+              company_name: s.name,
+              website: null,
+              category: null,
+              description: null,
+              booth: null,
+              country: null,
+              city: null,
+              exhibitor_profile_url: s.source_url,
+              signals: ["pdf_floorplan", s.extraction_mode],
+              confidence: s.extraction_mode === "pdf_native" ? 75 : 65,
+              _source_url: s.source_url,
+              _page_type: "pdf_floorplan",
+              _extraction_method: s.extraction_mode,
+              _logo_url: null,
+            } as any);
+          }
+          providerUsed = "pdf-floorplan";
+          metrics.exhibitors_extracted_raw = allExhibitors.length;
+          metrics.html_hybrid_extracted = allExhibitors.length;
+          (metrics as any).provider = "pdf-floorplan";
+          (metrics as any).pdf_mode = pdf.result.detection.mode;
+          await logRunEvent(supabase, organizationId, run.id, "info",
+            `PDF floorplan extraiu ${pdf.result.sponsors.length} expositores (${pdf.result.detection.mode}) — pulando demais providers`,
+            { provider: "pdf-floorplan", count: pdf.result.sponsors.length, mode: pdf.result.detection.mode }
+          );
+        } else if (pdf.error) {
+          await logRunEvent(supabase, organizationId, run.id, "warn",
+            "PDF floorplan falhou — seguindo para próximos providers",
+            { error: pdf.error }
+          );
+        }
+      }
+    } catch (providerErr) {
+      await logRunEvent(supabase, organizationId, run.id, "warn",
+        "Erro ao tentar provider PDF floorplan — seguindo",
+        { error: String(providerErr) }
+      );
+    }
+  }
+
   // ── Step 0f: Logo-wall provider (sponsor/partner pages) ──
   // Runs before generic SPA so CONARH/Expert-style logo walls do not waste
   // Firecrawl/AI credits or capture speakers/banners as companies.
