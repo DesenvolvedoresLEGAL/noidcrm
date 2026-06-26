@@ -151,7 +151,7 @@ function nameFromSocialUrl(url: URL): string | null {
   if (!handle || /^profile\.php$/i.test(handle)) return null;
 
   const name = handle
-    .replace(/(oficial|official|brasil|brazil|industria|industry|pharma|farmacia|magistral)$/i, "")
+      .replace(/(oficial|official|brasil|brazil|industria|industry|pharma|farmacia|magistral|chemicals)$/i, "")
     .replace(/[._-]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
@@ -243,7 +243,7 @@ function extractAnchorImagePairs(html: string, pageHost: string): LogoWallSponso
     if (!name) continue;
     if (isBlacklistedName(name)) continue;
 
-    const website = sameHost
+    const website = sameHost || genericHost
       ? null
       : `${absHref.protocol}//${absHref.hostname}${absHref.pathname === "/" ? "" : absHref.pathname}`;
     // Dedupe key combines normalized name with the image filename so a sponsor
@@ -290,7 +290,7 @@ function nameFromFilename(rawPath: string): string | null {
     const u = new URL(rawPath, "https://x.invalid/");
     const base = u.pathname.split("/").pop() || "";
     if (!base) return null;
-    let stem = base.replace(/\.(png|jpe?g|webp|svg|gif|avif|bmp|ico)$/i, "");
+    let stem = base.replace(/\.(png|jpe?g|jfif|webp|svg|gif|avif|bmp|ico)$/i, "");
     // Strip cache-busting hashes (8+ hex), size suffixes, leading "logo_"/"logotipo_".
     stem = stem.replace(/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/gi, "");
     stem = stem.replace(/[-_][a-f0-9]{6,}$/i, "");
