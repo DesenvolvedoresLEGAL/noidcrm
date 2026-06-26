@@ -34,6 +34,7 @@ const TIER_BLACKLIST = new Set([
   "apoiadores", "parceiro", "parceiros", "partner", "partners", "logo",
   "logos", "todos", "novo na base", "3 dias", "2 dias", "1 dia",
   "segmento financeiro", "diamond", "gold", "silver", "bronze",
+  "banner", "banner xp", "banner expert xp", "hero", "destaque",
 ]);
 
 const GENERIC_HOSTS = new Set([
@@ -93,6 +94,29 @@ function isBlacklistedName(raw: string): boolean {
     if (k === tier || k === tier + "s" || k === tier + ":") return true;
   }
   return false;
+}
+
+function cleanCompanyNameCandidate(raw: string): string | null {
+  const cleaned = decodeEntities(raw)
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\b\d{2,5}\s*x\s*\d{2,5}\b/gi, " ")
+    .replace(/\b(?:quality|strip|resize|crop|fit|auto|format|webp|png|jpg|jpeg)\b/gi, " ")
+    .replace(/\b[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}\b/gi, " ")
+    .replace(/\s+\d+$/g, "")
+    .replace(/\s+/g, " ")
+    .replace(/^[-_\s]+|[-_\s]+$/g, "")
+    .trim();
+  if (!cleaned || cleaned.length < 2 || cleaned.length > 80) return null;
+  if (isBlacklistedName(cleaned)) return null;
+  if (/^(logo|icon|image|imagem|foto|picture|banner|hero|destaque|xp)$/i.test(cleaned)) return null;
+  return cleaned;
+}
+
+function isRejectedLogoAsset(rawUrl: string, rawName = ""): boolean {
+  const haystack = `${rawUrl} ${rawName}`.toLowerCase();
+  return /(^|[\/_.-])(banner|hero|capa|cover|background|bg|placeholder|spacer|favicon|sprite|loader|divider|arrow|chevron|hor[-_]?line|pattern)([\/_.-]|$)/i.test(haystack) ||
+    /\/(palestrantes?|speakers?|programacao|agenda|sessions?|comite|committee|ingressos?)\//i.test(haystack) ||
+    /(logo[-_]?conarh|conarhlogo|conarh[-_]?agro|festival[-_]?do[-_]?trabalho|destaque[-_]?tech|arena|audit[oó]rio)/i.test(haystack);
 }
 
 function nameFromDomain(host: string): string {
@@ -163,16 +187,14 @@ function extractAnchorImagePairs(html: string, pageHost: string): LogoWallSponso
     const src = pickAttr(imgTag, "src") || pickAttr(imgTag, "data-src") || pickAttr(imgTag, "data-lazy-src");
     const alt = pickAttr(imgTag, "alt");
     const title = pickAttr(aTag, "title");
+    if (src && isRejectedLogoAsset(src, alt || title || "")) continue;
 
     // Candidate name resolution
     let name: string | null = null;
     const candidates = [alt, title].filter((x): x is string => !!x && x.trim().length >= 2);
     for (const c of candidates) {
-      const clean = c.replace(/\s+/g, " ").trim();
-      if (clean.length < 2) continue;
-      if (isBlacklistedName(clean)) continue;
-      // skip generic alt like "logo" / "icon" / "image"
-      if (/^(logo|icon|image|imagem|foto|picture)$/i.test(clean)) continue;
+      const clean = cleanCompanyNameCandidate(c);
+      if (!clean) continue;
       name = clean;
       break;
     }
@@ -222,7 +244,7 @@ const SPONSOR_PATH_RE =
 
 // Filename tokens that should never become a company name on their own.
 const FILENAME_NOISE_RE =
-  /^(logo|logotipo|brand|brandmark|wordmark|symbol|icon|ic|imagem|image|img|banner|hero|placeholder|default|spacer|pixel|blank|transparent|sprite|untitled|prancheta|asset[s]?\d*)$/i;
+  /^(logo|logotipo|brand|brandmark|wordmark|symbol|icon|ic|imagem|image|img|banner|hero|placeholder|default|spacer|pixel|blank|transparent|sprite|untitled|prancheta|asset[s]?\d*|parceiro|partner|sponsor|patrocinador)$/i;
 
 /** Convert a filename like `logo_vinci_compass-2x.jpg` → "Vinci Compass". */
 function nameFromFilename(rawPath: string): string | null {
@@ -232,8 +254,9 @@ function nameFromFilename(rawPath: string): string | null {
     if (!base) return null;
     let stem = base.replace(/\.(png|jpe?g|webp|svg|gif|avif|bmp|ico)$/i, "");
     // Strip cache-busting hashes (8+ hex), size suffixes, leading "logo_"/"logotipo_".
+    stem = stem.replace(/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/gi, "");
     stem = stem.replace(/[-_][a-f0-9]{6,}$/i, "");
-    stem = stem.replace(/[-_]?\d+x\d+$/i, "");
+    stem = stem.replace(/[-_]?\d{2,5}x\d{2,5}/gi, "");
     stem = stem.replace(/[-_]?(\d{2,4})x?$/i, "");
     stem = stem.replace(/^(logo|logotipo|brand|marca|symbol)[-_]+/i, "");
     stem = stem.replace(/[-_]+(logo|logotipo|brand|marca)$/i, "");
@@ -241,7 +264,7 @@ function nameFromFilename(rawPath: string): string | null {
     const tokens = stem
       .split(/[\s_\-.]+/)
       .map((t) => t.trim())
-      .filter((t) => t && !/^\d+$/.test(t));
+      .filter((t) => t && !/^\d+$/.test(t) && !/^(?=.*\d)[a-f0-9]{4,}$/i.test(t));
     if (tokens.length === 0) return null;
     // Reject if every token is noise (e.g. "logo", "banner_hero").
     if (tokens.every((t) => FILENAME_NOISE_RE.test(t))) return null;
@@ -251,8 +274,75 @@ function nameFromFilename(rawPath: string): string | null {
       .map((t) => (t.length <= 3 ? t.toUpperCase() : t[0].toUpperCase() + t.slice(1).toLowerCase()))
       .join(" ")
       .trim();
-    if (!name || name.length < 2 || name.length > 60) return null;
-    return name;
+    return cleanCompanyNameCandidate(name);
+  } catch {
+    return null;
+  }
+}
+
+async function fetchConarhPartners(eventUrl: string, html: string): Promise<LogoWallFetchResult | null> {
+  let page: URL;
+  try { page = new URL(eventUrl); } catch { return null; }
+  if (!/(^|\.)conarh\.org\.br$/i.test(page.hostname)) return null;
+
+  const scriptSrc = Array.from(html.matchAll(/<script\b[^>]*\bsrc=["']([^"']+\/assets\/index-[^"']+\.js)["'][^>]*>/gi))
+    .map((m) => m[1])
+    .find(Boolean);
+  if (!scriptSrc) return null;
+
+  let js = "";
+  try {
+    const bundleUrl = new URL(scriptSrc, page.origin).toString();
+    const bundleResp = await fetch(bundleUrl, { headers: BROWSER_HEADERS, redirect: "follow", signal: AbortSignal.timeout(20_000) });
+    if (!bundleResp.ok) return null;
+    js = await bundleResp.text();
+  } catch {
+    return null;
+  }
+
+  const supabaseUrl = js.match(/https:\/\/[a-z0-9-]+\.supabase\.co/i)?.[0];
+  const publishableKey = js.match(/sb_publishable_[A-Za-z0-9_-]+/)?.[0];
+  if (!supabaseUrl || !publishableKey) return null;
+
+  try {
+    const apiUrl = `${supabaseUrl}/rest/v1/parceiros?select=name,logo_url,tier,order_index,active&active=eq.true&order=order_index.asc`;
+    const resp = await fetch(apiUrl, {
+      headers: {
+        apikey: publishableKey,
+        Authorization: `Bearer ${publishableKey}`,
+        Accept: "application/json",
+      },
+      signal: AbortSignal.timeout(20_000),
+    });
+    if (!resp.ok) return null;
+    const rows = await resp.json();
+    if (!Array.isArray(rows)) return null;
+
+    const seen = new Set<string>();
+    const sponsors: LogoWallSponsor[] = [];
+    for (const row of rows) {
+      const name = cleanCompanyNameCandidate(String(row?.name ?? ""));
+      if (!name || isBlacklistedName(name)) continue;
+      const logoUrl = typeof row?.logo_url === "string" ? row.logo_url : null;
+      if (logoUrl && isRejectedLogoAsset(logoUrl, name)) continue;
+      const key = name.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      sponsors.push({
+        name,
+        website: null,
+        logo_url: logoUrl,
+        tier: typeof row?.tier === "string" ? row.tier : null,
+        source_url: page.toString(),
+        extraction_mode: "filename_grid",
+      });
+    }
+
+    if (sponsors.length < 6) return null;
+    return {
+      detection: { density: sponsors.length, page_host: page.hostname, mode: "filename_grid" },
+      sponsors,
+    };
   } catch {
     return null;
   }
@@ -286,28 +376,23 @@ function extractFilenameGridLogos(html: string, pageHost: string, pagePath: stri
     } catch { continue; }
 
     const path = absUrl.pathname.toLowerCase();
+    const sponsorAssetPath = /\/(sponsors?|patroc|exhibitor|expositor|parceir|partner|apoiador|marcas?|brands?|logos?)\//i.test(path);
     // Heuristic: must look like a content/upload image (not theme/plugin chrome).
-    const isContentUpload =
-      /\/(uploads?|media|files|content|sponsors?|patroc|exhibitor|expositor|parceir|partner|apoiador|marca|brand)\//i.test(path) ||
-      /\/logos?\//i.test(path) ||
-      /\/storage\/v1\/object\/public\//i.test(path) || // Supabase storage (CONARH)
-      /\/assets\/[^/]+\.(png|jpe?g|webp|svg|avif)/i.test(path); // bundler dirs
+    const isContentUpload = opts.strictPath
+      ? (/\/(uploads?|media|files|content|sponsors?|patroc|exhibitor|expositor|parceir|partner|apoiador|marca|brand)\//i.test(path) ||
+        /\/logos?\//i.test(path) ||
+        /\/storage\/v1\/object\/public\//i.test(path) ||
+        /\/assets\/[^/]+\.(png|jpe?g|webp|svg|avif)/i.test(path))
+      : sponsorAssetPath;
     if (!isContentUpload) continue;
     // Reject obvious chrome assets even when inside /uploads/.
-    if (/(banner|hero|capa|cover|background|^bg[-_]|placeholder|spacer|favicon|sprite|loader|divider|arrow|chevron|hor[-_]?line|pattern)/i.test(path)) continue;
+    if (isRejectedLogoAsset(absUrl.toString(), pickAttr(tag, "alt") || "")) continue;
 
     // Prefer alt text when meaningful; otherwise derive from filename.
     const alt = pickAttr(tag, "alt");
     let name: string | null = null;
     if (alt && alt.trim().length >= 2) {
-      const cleanAlt = decodeEntities(alt).replace(/\s+/g, " ").trim();
-      if (
-        !isBlacklistedName(cleanAlt) &&
-        !/^(banner|logo|icon|image|imagem|foto|picture|xp|destaque)$/i.test(cleanAlt) &&
-        cleanAlt.length <= 60
-      ) {
-        name = cleanAlt;
-      }
+      name = cleanCompanyNameCandidate(alt);
     }
     if (!name) name = nameFromFilename(src);
     if (!name) continue;
@@ -329,8 +414,6 @@ function extractFilenameGridLogos(html: string, pageHost: string, pagePath: stri
       extraction_mode: "filename_grid",
     });
   }
-  // Silence unused-arg warning while keeping the flag for future tuning.
-  void opts;
   return out;
 }
 
@@ -408,6 +491,10 @@ export async function tryLogoWallFromUrl(eventUrl: string): Promise<{
   }
 
   let detected = detectLogoWall(eventUrl, html);
+
+  if (!detected) {
+    detected = await fetchConarhPartners(eventUrl, html);
+  }
 
   // SPA shell fallback: when the raw HTML is too small (Vite/React/Next shell)
   // we won't see any sponsor <img>. Re-render via Firecrawl and retry. Examples
