@@ -57,3 +57,10 @@ export type {
 
 export { detectLogoWall, tryLogoWallFromUrl } from "./logo-wall.ts";
 export type { LogoWallDetection, LogoWallFetchResult, LogoWallSponsor } from "./logo-wall.ts";
+
+export { isPdfUrl, tryPdfFloorplanFromUrl } from "./pdf-floorplan.ts";
+export type {
+  PdfFloorplanDetection,
+  PdfFloorplanExhibitor,
+  PdfFloorplanFetchResult,
+} from "./pdf-floorplan.ts";
