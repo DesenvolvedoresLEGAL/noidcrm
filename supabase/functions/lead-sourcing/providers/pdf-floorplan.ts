@@ -280,23 +280,39 @@ export async function tryPdfFloorplanFromUrl(eventUrl: string): Promise<PdfFloor
 
     const bytes = await fetchPdfBytes(eventUrl);
 
-    // 1) Native extraction
-    let names: string[] = [];
-    let mode: "pdf_native" | "pdf_vision" = "pdf_native";
+    // 1) Native text extraction (unpdf)
+    let rawText = "";
     let pages = 1;
     try {
       const { text, pages: p } = await extractNative(bytes);
       pages = p;
-      names = extractCandidatesFromText(text);
+      rawText = text;
     } catch (e) {
-      // ignore — fallback to vision
       console.warn("[pdf-floorplan] native extraction failed:", String(e));
     }
 
-    // 2) Vision fallback when native yields too few names
+    // 2) Heuristic candidate filter (zero LLM cost when it works)
+    let names = extractCandidatesFromText(rawText);
+    let mode: "pdf_native" | "pdf_vision" = "pdf_native";
+
+    // 3) LLM cleanup on extracted text (cheap — no vision) when noise is too high
+    //    Plantas baixas misturam dimensões com nomes, então quase sempre cai aqui.
+    if (rawText.length > 200) {
+      try {
+        const llmNames = await extractNamesWithLLM(rawText, null);
+        if (llmNames.length > names.length) {
+          names = llmNames;
+          mode = "pdf_native";
+        }
+      } catch (e) {
+        console.warn("[pdf-floorplan] LLM text extraction failed:", String(e));
+      }
+    }
+
+    // 4) Vision fallback only if everything else failed (scanned PDFs / image-only)
     if (names.length < 8) {
       try {
-        const visionNames = await extractWithVision(bytes, eventUrl);
+        const visionNames = await extractNamesWithLLM(rawText, { bytes });
         if (visionNames.length > names.length) {
           names = visionNames;
           mode = "pdf_vision";
