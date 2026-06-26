@@ -174,7 +174,7 @@ export async function tryJetEngineListingFromUrl(
     result: {
       sponsors,
       detection: {
-        grids_found: grids.length,
+        grids_found: starts.length,
         items_parsed: parsed,
         items_kept: sponsors.length,
       },
