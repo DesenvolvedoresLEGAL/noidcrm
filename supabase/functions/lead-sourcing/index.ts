@@ -1613,7 +1613,11 @@ async function handleEventFirecrawl(
               booth: null,
               country: null,
               city: null,
-              exhibitor_profile_url: s.source_url,
+              // Logo-wall pages expose every logo on the same event URL. Using
+              // that common URL as `exhibitor_profile_url` makes the run-level
+              // dedupe keep only the first sponsor. Keep the event page in
+              // `_source_url` and do not set a per-company profile URL here.
+              exhibitor_profile_url: null,
               signals: ["pdf_floorplan", s.extraction_mode],
               confidence: s.extraction_mode === "pdf_native" ? 75 : 65,
               _source_url: s.source_url,
@@ -1663,7 +1667,9 @@ async function handleEventFirecrawl(
             booth: null,
             country: null,
             city: null,
-            exhibitor_profile_url: s.source_url,
+            // PDF floorplans are one shared source document, not one profile per
+            // company. Reusing the PDF URL here collapses the whole run to 1 lead.
+            exhibitor_profile_url: null,
             signals: [
               "logo_wall",
               s.website ? "external_domain" : null,
