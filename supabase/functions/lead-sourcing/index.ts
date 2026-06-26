@@ -1650,6 +1650,62 @@ async function handleEventFirecrawl(
     }
   }
 
+  // ── Step 0e4: Exhibitor HTML table provider ──
+  // WordPress sites (e.g. Expolamo) frequently publish exhibitors as a plain
+  // <table> with company name + booth, no logos or links. logo-wall needs
+  // image density and AI/Firecrawl tends to collapse the page to a single
+  // lead. This deterministic provider closes that gap.
+  if (allExhibitors.length === 0) {
+    try {
+      const { tryExhibitorTableFromUrl } = await import("./providers/index.ts");
+      const tbl = await tryExhibitorTableFromUrl(eventUrl);
+      if (tbl.result && tbl.result.sponsors.length >= 6) {
+        for (const s of tbl.result.sponsors) {
+          allExhibitors.push({
+            company_name: s.name,
+            website: s.website,
+            category: null,
+            description: null,
+            booth: s.booth,
+            country: null,
+            city: null,
+            // Shared source page (one table for all rows) → null to avoid
+            // dedupe collapse onto the event URL.
+            exhibitor_profile_url: null,
+            signals: [
+              "exhibitor_table",
+              s.booth ? "has_booth" : null,
+              s.website ? "external_domain" : null,
+            ].filter(Boolean) as string[],
+            confidence: 85,
+            _source_url: s.source_url,
+            _page_type: "exhibitor_table",
+            _extraction_method: "html_table",
+          });
+        }
+        providerUsed = "exhibitor-table";
+        metrics.exhibitors_extracted_raw = allExhibitors.length;
+        metrics.html_hybrid_extracted = allExhibitors.length;
+        (metrics as any).provider = "exhibitor-table";
+        (metrics as any).exhibitor_table_rows = tbl.result.detection.matched_table_rows;
+        await logRunEvent(supabase, organizationId, run.id, "info",
+          `Exhibitor-table extraiu ${tbl.result.sponsors.length} expositores via HTML table — pulando logo-wall/SPA/Firecrawl/IA`,
+          { provider: "exhibitor-table", count: tbl.result.sponsors.length, detection: tbl.result.detection }
+        );
+      } else if (tbl.error && tbl.error !== "no_matching_table" && tbl.error !== "no_tables") {
+        await logRunEvent(supabase, organizationId, run.id, "warn",
+          "Exhibitor-table provider falhou no fetch — seguindo para logo-wall",
+          { error: tbl.error }
+        );
+      }
+    } catch (providerErr) {
+      await logRunEvent(supabase, organizationId, run.id, "warn",
+        "Erro ao tentar provider exhibitor-table — seguindo para logo-wall",
+        { error: String(providerErr) }
+      );
+    }
+  }
+
   // ── Step 0f: Logo-wall provider (sponsor/partner pages) ──
   // Runs before generic SPA so CONARH/Expert-style logo walls do not waste
   // Firecrawl/AI credits or capture speakers/banners as companies.
