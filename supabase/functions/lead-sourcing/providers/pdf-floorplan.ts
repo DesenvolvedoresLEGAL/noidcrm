@@ -172,80 +172,92 @@ function extractCandidatesFromText(text: string): string[] {
 }
 
 // ─────────────────────────────────────────────
-// Vision fallback (Gemini via Lovable AI Gateway)
+// LLM-assisted extraction (cheap: text-only, no vision unless needed)
 // ─────────────────────────────────────────────
-async function extractWithVision(bytes: Uint8Array, sourceUrl: string): Promise<string[]> {
-  const apiKey = Deno.env.get("LOVABLE_API_KEY") ?? Deno.env.get("OPENAI_API_KEY");
-  if (!apiKey) throw new Error("LOVABLE_API_KEY not configured for PDF vision fallback");
+async function extractNamesWithLLM(rawText: string, useVision: { bytes: Uint8Array } | null): Promise<string[]> {
+  const apiKey = Deno.env.get("OPENAI_API_KEY") ?? Deno.env.get("LOVABLE_API_KEY");
+  if (!apiKey) throw new Error("OPENAI_API_KEY / LOVABLE_API_KEY not configured for PDF LLM extraction");
 
-  // Convert to base64 in chunks (avoid stack overflow on big PDFs)
-  let binary = "";
-  const chunk = 0x8000;
-  for (let i = 0; i < bytes.length; i += chunk) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
-  }
-  const base64 = btoa(binary);
+  const isOpenAI = !!Deno.env.get("OPENAI_API_KEY");
+  const endpoint = isOpenAI
+    ? "https://api.openai.com/v1/chat/completions"
+    : "https://ai.gateway.lovable.dev/v1/chat/completions";
+  const model = isOpenAI ? "gpt-4o-mini" : "google/gemini-2.5-flash";
 
-  const body = {
-    model: "google/gemini-2.5-flash",
-    messages: [
+  const systemPrompt =
+    "Você extrai nomes de empresas expositoras e patrocinadoras de plantas baixas de feiras. " +
+    "Ignore TUDO que for: dimensão (9m, 117m²), referência de grid (A1, B25, G81, F43), " +
+    "áreas comuns (auditório, lanchonete, restaurante, área VIP, rodadas de negócios, workshops, imprensa, coffee-breaks, credenciamento, entrada, saída, WC, banheiro, anexo), " +
+    "rótulos genéricos (stand, rua, projeção, caixa, mais dessecantes, megapatrocinadores), " +
+    "endereços (São Paulo, Pavilhão 5, Brasil), datas. " +
+    "Retorne SOMENTE um array JSON de strings com os nomes únicos das empresas/marcas, sem markdown e sem texto extra. " +
+    'Exemplo: ["EMPRESA A", "MARCA B", "BRAND C"]';
+
+  let userContent: any;
+  if (useVision) {
+    let binary = "";
+    const chunk = 0x8000;
+    for (let i = 0; i < useVision.bytes.length; i += chunk) {
+      binary += String.fromCharCode(...useVision.bytes.subarray(i, i + chunk));
+    }
+    const base64 = btoa(binary);
+    userContent = [
+      { type: "text", text: "Planta baixa em PDF. Extraia somente nomes de expositores/marcas conforme as regras." },
       {
-        role: "user",
-        content: [
-          {
-            type: "text",
-            text:
-              "Este PDF é uma planta baixa / lista de expositores de uma feira. " +
-              "Extraia APENAS os nomes de empresas/marcas expositoras e patrocinadoras. " +
-              "Ignore áreas comuns (auditório, lanchonete, área VIP, rodadas de negócios, workshops, imprensa, coffee-breaks), " +
-              "dimensões (9m, 117m²), referências de grid (A1, B25, G81) e palavras genéricas (stand, rua, entrada). " +
-              "Retorne SOMENTE um array JSON de strings, sem markdown, sem comentário, sem explicação. " +
-              "Exemplo: [\"Empresa A\", \"Marca B\", \"Brand C\"]",
-          },
-          {
-            type: "file",
-            file: {
-              filename: "exhibitors.pdf",
-              file_data: `data:application/pdf;base64,${base64}`,
-            },
-          },
-        ],
+        type: "file",
+        file: {
+          filename: "exhibitors.pdf",
+          file_data: `data:application/pdf;base64,${base64}`,
+        },
       },
-    ],
-  };
+    ];
+  } else {
+    // Cheap path: send already-extracted text
+    const truncated = rawText.length > 60000 ? rawText.slice(0, 60000) : rawText;
+    userContent = `Texto bruto extraído de planta baixa de feira (mistura nomes de expositores com dimensões e rótulos de área). Aplique as regras e retorne o array JSON:\n\n${truncated}`;
+  }
 
-  const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+  const body: Record<string, unknown> = {
+    model,
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userContent },
+    ],
+    temperature: 0,
+  };
+  if (isOpenAI) (body as any).response_format = { type: "json_object" };
+
+  const resp = await fetch(endpoint, {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
   if (!resp.ok) {
     const t = await resp.text().catch(() => "");
-    throw new Error(`Vision gateway falhou (${resp.status}): ${t.slice(0, 300)}`);
+    throw new Error(`PDF LLM extraction failed (${resp.status}): ${t.slice(0, 300)}`);
   }
   const data = await resp.json();
-  const raw: string = data?.choices?.[0]?.message?.content ?? "";
-  // Strip possible markdown fences
-  const clean = raw.replace(/```json|```/gi, "").trim();
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(clean);
-  } catch {
-    // Try to find a JSON array in the response
-    const match = clean.match(/\[[\s\S]*\]/);
-    if (!match) return [];
-    try {
-      parsed = JSON.parse(match[0]);
-    } catch {
-      return [];
+  let raw: string = data?.choices?.[0]?.message?.content ?? "";
+  raw = raw.replace(/```json|```/gi, "").trim();
+
+  let parsed: unknown = null;
+  try { parsed = JSON.parse(raw); } catch { /* try below */ }
+  if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+    // OpenAI json_object mode wraps the array — find first array property
+    for (const v of Object.values(parsed as Record<string, unknown>)) {
+      if (Array.isArray(v)) { parsed = v; break; }
+    }
+  }
+  if (!Array.isArray(parsed)) {
+    const m = raw.match(/\[[\s\S]*\]/);
+    if (m) {
+      try { parsed = JSON.parse(m[0]); } catch { /* noop */ }
     }
   }
   if (!Array.isArray(parsed)) return [];
-  const out: string[] = [];
+
   const seen = new Set<string>();
+  const out: string[] = [];
   for (const item of parsed) {
     if (typeof item !== "string") continue;
     const name = normalizeName(item);
