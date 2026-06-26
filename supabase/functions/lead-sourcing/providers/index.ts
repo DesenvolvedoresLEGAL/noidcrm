@@ -64,3 +64,10 @@ export type {
   PdfFloorplanExhibitor,
   PdfFloorplanFetchResult,
 } from "./pdf-floorplan.ts";
+
+export { tryExhibitorTableFromUrl } from "./exhibitor-table.ts";
+export type {
+  ExhibitorTableDetection,
+  ExhibitorTableFetchResult,
+  ExhibitorTableSponsor,
+} from "./exhibitor-table.ts";
