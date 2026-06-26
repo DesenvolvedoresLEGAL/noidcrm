@@ -285,7 +285,7 @@ async function fetchConarhPartners(eventUrl: string, html: string): Promise<Logo
   try { page = new URL(eventUrl); } catch { return null; }
   if (!/(^|\.)conarh\.org\.br$/i.test(page.hostname)) return null;
 
-  const scriptSrc = Array.from(html.matchAll(/<script\b[^>]*\bsrc=["']([^"']+\/assets\/index-[^"']+\.js)["'][^>]*>/gi))
+  const scriptSrc = Array.from(html.matchAll(/<script\b[^>]*\bsrc=["']([^"']*\/assets\/index-[^"']+\.js)["'][^>]*>/gi))
     .map((m) => m[1])
     .find(Boolean);
   if (!scriptSrc) return null;
