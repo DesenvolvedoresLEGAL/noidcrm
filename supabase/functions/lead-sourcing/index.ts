@@ -2867,7 +2867,19 @@ ${chunk}`,
     if (!companyName || companyName.length < 2) continue;
 
     const normalizedName = normalizeCompanyName(companyName);
-    const stableProviderId = ex._informa_connect_external_id ? `informa-connect:${ex._informa_connect_external_id}` : null;
+    const sharedSourceProvider =
+      ex._page_type === "pdf_floorplan" ||
+      ex._page_type === "logo_wall" ||
+      ex._extraction_method === "pdf_native" ||
+      ex._extraction_method === "pdf_vision" ||
+      ex.signals?.includes?.("pdf_floorplan") ||
+      ex.signals?.includes?.("logo_wall");
+
+    const stableProviderId = ex._informa_connect_external_id
+      ? `informa-connect:${ex._informa_connect_external_id}`
+      : sharedSourceProvider
+        ? `${ex._page_type || ex._extraction_method || "shared-source"}:${normalizedName}`
+        : null;
 
     // Intra-run dedupe by name + domain + profile URL
     const nameDedupeKey = stableProviderId ? `${normalizedName}::${stableProviderId}` : normalizedName;
@@ -2876,7 +2888,8 @@ ${chunk}`,
     const domain = extractDomain(ex.website || "");
     if (!stableProviderId && domain && seenDomains.has(domain)) { metrics.deduped_in_run++; continue; }
 
-    const profileUrl = ex.exhibitor_profile_url || null;
+    const rawProfileUrl = ex.exhibitor_profile_url || null;
+    const profileUrl = sharedSourceProvider || rawProfileUrl === eventUrl ? null : rawProfileUrl;
     if (profileUrl && seenProfileUrls.has(profileUrl)) { metrics.deduped_in_run++; continue; }
 
     seenNames.add(nameDedupeKey);
@@ -2931,7 +2944,7 @@ ${chunk}`,
       industry: ex.category || null,
       summary: ex.description || null,
       confidence: ex.confidence || null,
-      exhibitorProfileUrl: ex.exhibitor_profile_url || null,
+      exhibitorProfileUrl: profileUrl,
       booth: ex.booth || null,
       icpFit,
       signalScore,
