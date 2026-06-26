@@ -109,68 +109,62 @@ export async function tryJetEngineListingFromUrl(
     return { result: null, error: "no_jet_listing" };
   }
 
-  // Find every jet-listing-grid container, then split each by `data-post-id`
-  // markers that bracket the individual items.
-  const grids = [...html.matchAll(
-    /jet-listing-grid--\d+[^>]*>([\s\S]*?)(?=jet-listing-grid--\d+|$)/gi,
-  )];
+  // Find every jet-listing-grid__item card across the page, then walk from
+  // one item-start marker to the next. We deliberately ignore the wrapping
+  // grid id (the same page can mix several `jet-listing-grid--<id>` themes
+  // and Elementor often nests them).
+  const itemStartRe =
+    /<div class="jet-listing-grid__item\b[^"]*"[^>]*>/gi;
+
+  const starts: number[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = itemStartRe.exec(html)) !== null) {
+    starts.push(m.index + m[0].length);
+  }
+  if (starts.length === 0) return { result: null, error: "no_jet_listing_items" };
 
   const sponsors: JetEngineListingSponsor[] = [];
   const seen = new Set<string>();
   let parsed = 0;
 
-  const itemSplitRe =
-    /<div class="jet-listing-grid__item[^"]*"[^>]*data-post-id="\d+"[^>]*>/gi;
+  for (let i = 0; i < starts.length; i++) {
+    const start = starts[i];
+    const end = i + 1 < starts.length ? html.indexOf("<div class=\"jet-listing-grid__item", start) : html.length;
+    const body = html.slice(start, end < 0 ? html.length : end);
 
-  for (const grid of grids) {
-    const inner = grid[1] ?? "";
-    const matches: number[] = [];
-    let m: RegExpExecArray | null;
-    while ((m = itemSplitRe.exec(inner)) !== null) {
-      matches.push(m.index + m[0].length);
-    }
-    if (matches.length === 0) continue;
+    const h2s = [...body.matchAll(
+      /<h2 class="elementor-heading-title[^"]*">([\s\S]*?)<\/h2>/gi,
+    )].map((x) => stripTags(x[1]));
 
-    for (let i = 0; i < matches.length; i++) {
-      const start = matches[i];
-      const end = i + 1 < matches.length ? matches[i + 1] : inner.length;
-      const body = inner.slice(start, end);
+    if (h2s.length === 0) continue;
+    parsed++;
 
-      const h2s = [...body.matchAll(
-        /<h2 class="elementor-heading-title[^"]*">([\s\S]*?)<\/h2>/gi,
-      )].map((x) => stripTags(x[1]));
+    const nameRaw = h2s[0];
+    const name = cleanName(nameRaw);
+    if (!name) continue;
 
-      if (h2s.length === 0) continue;
-      parsed++;
+    const key = name.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
 
-      const nameRaw = h2s[0];
-      const name = cleanName(nameRaw);
-      if (!name) continue;
+    // Expolazer template: [NOME, MARCA, PRODUTO, LOCALIZAÇÃO].
+    const category = h2s[2] && !NOISE_RE.test(h2s[2]) ? h2s[2] : null;
+    const booth = cleanBooth(h2s[3] ?? null);
 
-      const key = name.toLowerCase();
-      if (seen.has(key)) continue;
-      seen.add(key);
+    const hrefMatch = body.match(
+      /<a [^>]*class="elementor-button[^"]*"[^>]*href="([^"]+)"/i,
+    ) ?? body.match(/<a [^>]*href="(https?:\/\/[^"]+)"/i);
+    const website = hrefMatch ? normalizeWebsite(decodeEntities(hrefMatch[1]), pageUrl) : null;
 
-      // Heuristic: with the Expolazer template the columns are
-      // [NOME, MARCA, PRODUTO, LOCALIZAÇÃO]. The 3rd is the category and
-      // the 4th the booth. Be defensive in case fewer h2s exist.
-      const category = h2s[2] && !NOISE_RE.test(h2s[2]) ? h2s[2] : null;
-      const booth = cleanBooth(h2s[3] ?? null);
-
-      const hrefMatch = body.match(
-        /<a [^>]*class="elementor-button[^"]*"[^>]*href="([^"]+)"/i,
-      ) ?? body.match(/<a [^>]*href="(https?:\/\/[^"]+)"/i);
-      const website = hrefMatch ? normalizeWebsite(decodeEntities(hrefMatch[1]), pageUrl) : null;
-
-      sponsors.push({
-        name,
-        booth,
-        website,
-        category,
-        source_url: pageUrl,
-      });
-    }
+    sponsors.push({
+      name,
+      booth,
+      website,
+      category,
+      source_url: pageUrl,
+    });
   }
+
 
   if (sponsors.length < 6) {
     return { result: null, error: "no_jet_listing_items" };
