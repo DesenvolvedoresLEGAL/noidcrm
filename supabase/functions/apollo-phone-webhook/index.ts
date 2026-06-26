@@ -90,7 +90,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: existing } = await sb
       .from("enriched_contact_profiles")
-      .select("id, workspace_id, prospect_id, email, phone, reveal_credits_used, apollo_person_id")
+      .select("id, workspace_id, prospect_id, email, phone, email_revealed, phone_revealed, phone_credits_used, reveal_credits_used, apollo_person_id, linkedin_url")
       .eq("id", contactId)
       .maybeSingle();
 
@@ -118,13 +118,29 @@ Deno.serve(async (req: Request) => {
     };
 
     if (phone) {
+      // Legacy fields
       update.phone = phone;
       update.revealed_at = nowIso;
       update.reveal_status = existing.email ? "revealed" : "partial";
       update.reveal_credits_used = ((existing as any).reveal_credits_used ?? 0) + creditsConsumed;
+      // KAI.15.1 governance fields (used by UI)
+      update.phone_revealed = true;
+      update.phone_reveal_status = "revealed";
+      update.phone_revealed_at = nowIso;
+      update.phone_credits_used = ((existing as any).phone_credits_used ?? 0) + creditsConsumed;
+      // Recompute preferred channel
+      update.preferred_channel = "whatsapp";
     } else {
-      // Sem telefone — manter status anterior se já tinha email
+      // Sem telefone — Apollo não tem dado disponível
       update.reveal_status = existing.email ? "partial" : "no_data";
+      update.phone_reveal_status = "not_found";
+      if (!existing.phone_revealed) {
+        update.preferred_channel = existing.email_revealed
+          ? "email"
+          : (existing as any).linkedin_url
+            ? "linkedin"
+            : "unknown";
+      }
     }
 
     const { error: updateError } = await sb.from("enriched_contact_profiles").update(update).eq("id", contactId);
@@ -133,6 +149,33 @@ Deno.serve(async (req: Request) => {
       return new Response(JSON.stringify({ error: "failed to update contact" }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    // Atualizar audit pendente mais recente para este contato (status='pending')
+    try {
+      const { data: pendingAudit } = await sb
+        .from("apollo_reveal_audit")
+        .select("id, phone_before")
+        .eq("contact_id", contactId)
+        .eq("status", "pending")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (pendingAudit?.id) {
+        await sb.from("apollo_reveal_audit").update({
+          status: phone ? "revealed" : "not_found",
+          credits_used: creditsConsumed,
+          phone_after: phone ?? (pendingAudit as any).phone_before,
+          raw_response: { webhook: true, person_id: person?.id ?? person?.person_id ?? null, phone_received: !!phone },
+        }).eq("id", pendingAudit.id);
+      }
+    } catch (e) {
+      console.warn("apollo-phone-webhook audit update failed:", e);
+    }
+
+    // Reasignar primary contact se telefone chegou
+    if (phone && (existing as any).prospect_id) {
+      try { await sb.rpc("resolve_primary_contact", { p_prospect_id: (existing as any).prospect_id }); } catch {/*noop*/}
     }
 
     await sb.from("enrichment_jobs").insert({
