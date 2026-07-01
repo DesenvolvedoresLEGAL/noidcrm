@@ -153,6 +153,9 @@ const AgentOutcomesPage = lazy(() => import("./pages/settings/noid-intelligence/
 const DecisionRulesPage = lazy(() => import("./pages/settings/noid-intelligence/DecisionRulesPage"));
 const LearningPerformancePage = lazy(() => import("./pages/settings/noid-intelligence/LearningPerformancePage"));
 const HeadlessHumanoidLabPage = lazy(() => import("./pages/settings/noid-intelligence/HeadlessHumanoidLabPage"));
+const SkillsLibraryPage = lazy(() => import("./pages/intelligence/skills/SkillsLibraryPage"));
+const SkillDetailPage = lazy(() => import("./pages/intelligence/skills/SkillDetailPage"));
+const SkillPlaygroundPage = lazy(() => import("./pages/intelligence/skills/SkillPlaygroundPage"));
 
 // GTM Routes - Revenue Operating System
 const SDRCommandCenter = lazy(() => import("./pages/gtm/SDRCommandCenter"));
@@ -946,6 +949,12 @@ const App = () => (
                 <Route path="/app/settings/noid-intelligence/learning" element={<LearningPerformancePage />} />
                 <Route path="/app/settings/noid-intelligence/hh-lab" element={<HeadlessHumanoidLabPage />} />
               </Route>
+
+              {/* NOID Skills Engine */}
+              <Route path="/app/intelligence/skills" element={<ProtectedRoute><LazyRoute><SkillsLibraryPage /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/intelligence/skills/:id" element={<ProtectedRoute><LazyRoute><SkillDetailPage /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/intelligence/skills/:id/playground" element={<ProtectedRoute><LazyRoute><SkillPlaygroundPage /></LazyRoute></ProtectedRoute>} />
+
 
               {/* Individual System Settings Pages */}
               <Route

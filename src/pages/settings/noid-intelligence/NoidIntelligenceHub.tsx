@@ -2,13 +2,22 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   Bot, Workflow, ShieldCheck, ScrollText, BarChart3,
-  Wrench, Brain, Server, ArrowRight, Construction, Network, TrendingUp, FlaskConical
+  Wrench, Brain, Server, ArrowRight, Construction, Network, TrendingUp, FlaskConical, Sparkles
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useApprovalQueueCount } from '@/hooks/useApprovalQueueCount';
 
 const hubItems = [
+  {
+    id: 'skills',
+    title: 'Skills',
+    description: 'Habilidades comerciais reutilizáveis por agentes',
+    icon: Sparkles,
+    path: '/app/intelligence/skills',
+    available: true,
+    badge: 'Novo',
+  },
   {
     id: 'agents',
     title: 'Agentes',
