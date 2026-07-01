@@ -6352,6 +6352,7 @@ export type Database = {
           message_content: string | null
           metadata: Json | null
           opportunity_id: string | null
+          organization_id: string | null
           status: string
         }
         Insert: {
@@ -6365,6 +6366,7 @@ export type Database = {
           message_content?: string | null
           metadata?: Json | null
           opportunity_id?: string | null
+          organization_id?: string | null
           status?: string
         }
         Update: {
@@ -6378,6 +6380,7 @@ export type Database = {
           message_content?: string | null
           metadata?: Json | null
           opportunity_id?: string | null
+          organization_id?: string | null
           status?: string
         }
         Relationships: [
