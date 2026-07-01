@@ -81,11 +81,17 @@ export function SDRCopilotTaskList() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading && (
-                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-6">Carregando…</TableCell></TableRow>
-              )}
+              {isLoading && Array.from({ length: 4 }).map((_, i) => (
+                <TableRow key={`sk-${i}`}>
+                  {Array.from({ length: 7 }).map((__, c) => (
+                    <TableCell key={c}><div className="h-4 w-full bg-muted animate-pulse rounded" /></TableCell>
+                  ))}
+                </TableRow>
+              ))}
               {!isLoading && filtered.length === 0 && (
-                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-6">Nenhuma tarefa.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-10 text-sm">
+                  Nenhuma tarefa na fila do SDR Copilot com os filtros atuais.
+                </TableCell></TableRow>
               )}
               {filtered.map((t) => (
                 <TableRow key={t.id}>
