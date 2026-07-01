@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
-import { PageHeader } from '@/components/ui/page-header';
 import { LeadSourcingEngine } from '@/components/playbook/LeadSourcingEngine';
 import { PlaybookPerformance } from '@/components/playbook/PlaybookPerformance';
 import { ImpactSummaryCard } from '@/components/intelligence/optimization/ImpactSummaryCard';
@@ -19,8 +18,11 @@ import { RevenueAttributionPanel } from '@/components/intelligence/revenue/Reven
 import { GtmPerformancePanel } from '@/components/intelligence/gtm/GtmPerformancePanel';
 import { SDRCopilotPanel } from '@/components/intelligence/sdr-copilot/SDRCopilotPanel';
 import SkillsLibraryPage from '@/pages/intelligence/skills/SkillsLibraryPage';
-import { Compass, Sparkles } from 'lucide-react';
+import { Command as CommandIcon } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { KairosPremiumNavigation } from '@/components/intelligence/kairos/KairosPremiumNavigation';
+import { KairosExecutiveHeader } from '@/components/intelligence/kairos/KairosExecutiveHeader';
+import { KairosCommandPalette } from '@/components/intelligence/kairos/KairosCommandPalette';
 import {
   resolveKairosTab,
   type KairosTabId,
@@ -32,6 +34,7 @@ import {
 
 export default function KairosHub() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<KairosTabId>(() =>
     resolveKairosTab(searchParams.get('tab')),
   );
