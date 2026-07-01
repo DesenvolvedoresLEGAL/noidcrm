@@ -36,20 +36,8 @@ function fmtPct(v: number) {
   return `${(v * 100).toFixed(1)}%`;
 }
 
-function KpiCard({ icon: Icon, label, value, hint }: { icon: any; label: string; value: string; hint?: string }) {
-  return (
-    <Card>
-      <CardContent className="p-4">
-        <div className="flex items-center gap-2 text-muted-foreground text-xs">
-          <Icon className="h-3.5 w-3.5" />
-          {label}
-        </div>
-        <div className="mt-1 text-xl font-semibold">{value}</div>
-        {hint ? <div className="mt-0.5 text-[11px] text-muted-foreground">{hint}</div> : null}
-      </CardContent>
-    </Card>
-  );
-}
+import { PremiumKpi, ModuleHeader, TableSkeleton, PremiumEmpty } from "@/components/intelligence/kairos/premium";
+import { LineChart } from "lucide-react";
 
 function RankTable({ title, rows, keyLabel }: { title: string; rows: RankRow[]; keyLabel: string }) {
   return (
@@ -120,11 +108,31 @@ export function RevenueAttributionPanel() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
+      <ModuleHeader
+        icon={LineChart}
+        eyebrow="Kairós · Receita"
+        title="Revenue Attribution"
+        description="Atribua receita real aos eventos, ICPs, batches e SDRs que originaram cada oportunidade."
+        accent="emerald"
+        actions={
+          <>
+            <Button variant="outline" size="sm" onClick={() => sync.mutate(undefined)} disabled={sync.isPending}>
+              <RefreshCw className={`h-3.5 w-3.5 mr-1 ${sync.isPending ? "animate-spin" : ""}`} />
+              Reconciliar
+            </Button>
+            <Button variant="outline" size="sm" onClick={downloadCsv} disabled={rows.length === 0}>
+              <Download className="h-3.5 w-3.5 mr-1" />
+              CSV
+            </Button>
+          </>
+        }
+      />
+
       <RevenueSsotBanner surface="Kairós · Revenue Attribution" />
 
       {/* Filters */}
-      <Card>
+      <Card className="rounded-xl">
         <CardContent className="p-4 flex flex-wrap items-end gap-3">
           <div className="space-y-1">
             <label className="text-[11px] text-muted-foreground">De</label>
@@ -159,26 +167,17 @@ export function RevenueAttributionPanel() {
               </SelectContent>
             </Select>
           </div>
-          <div className="ml-auto flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => sync.mutate(undefined)} disabled={sync.isPending}>
-              <RefreshCw className={`h-3.5 w-3.5 mr-1 ${sync.isPending ? "animate-spin" : ""}`} />
-              Reconciliar
-            </Button>
-            <Button variant="outline" size="sm" onClick={downloadCsv} disabled={rows.length === 0}>
-              <Download className="h-3.5 w-3.5 mr-1" />
-              CSV
-            </Button>
-          </div>
         </CardContent>
       </Card>
 
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <KpiCard icon={DollarSign} label="Receita atribuída" value={fmtBRL(kpis.revenue_total)} hint="commercial_won_revenue_view" />
-        <KpiCard icon={CheckCircle2} label="Receita válida" value={fmtBRL(kpis.valid_revenue_total)} hint="líquido de cancelamentos" />
-        <KpiCard icon={Target} label="Vendas ganhas" value={String(kpis.won)} hint={`${fmtPct(kpis.conversion_rate)} de conversão`} />
-        <KpiCard icon={TrendingUp} label="Ticket médio" value={fmtBRL(kpis.avg_ticket)} />
+        <PremiumKpi icon={DollarSign} label="Receita atribuída" value={fmtBRL(kpis.revenue_total)} hint="commercial_won_revenue_view" accent="emerald" loading={isLoading} />
+        <PremiumKpi icon={CheckCircle2} label="Receita válida" value={fmtBRL(kpis.valid_revenue_total)} hint="líquido de cancelamentos" accent="emerald" loading={isLoading} />
+        <PremiumKpi icon={Target} label="Vendas ganhas" value={String(kpis.won)} hint={`${fmtPct(kpis.conversion_rate)} de conversão`} accent="violet" loading={isLoading} />
+        <PremiumKpi icon={TrendingUp} label="Ticket médio" value={fmtBRL(kpis.avg_ticket)} accent="blue" loading={isLoading} />
       </div>
+
 
       {/* Funnel */}
       <Card>

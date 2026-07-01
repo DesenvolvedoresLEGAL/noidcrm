@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { Plus, Search as SearchIcon, History } from 'lucide-react';
+import { Plus, Search as SearchIcon, History, Radar } from 'lucide-react';
+import { ModuleHeader, PremiumEmpty } from '@/components/intelligence/kairos/premium';
 import { LeadSearchForm } from './LeadSearchForm';
 import { LeadResultsTable } from './LeadResultsTable';
 import { RecentRunsList } from './RecentRunsList';
@@ -131,26 +131,26 @@ export function LeadSourcingEngine() {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-xl font-bold">Lead Sourcing Engine</h2>
-          <p className="text-sm text-muted-foreground">
-            Descubra novas oportunidades automaticamente com base no seu ICP
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => { setShowHistory(!showHistory); setShowForm(false); }}>
-            <History className="h-4 w-4 mr-2" />
-            Histórico
-          </Button>
-          <Button onClick={() => { setShowForm(!showForm); setShowHistory(false); }}>
-            <Plus className="h-4 w-4 mr-2" />
-            Nova Busca
-          </Button>
-        </div>
-      </div>
+    <div className="space-y-5">
+      <ModuleHeader
+        icon={Radar}
+        eyebrow="Kairós · Inteligência"
+        title="Lead Sourcing Engine"
+        description="Descubra novas oportunidades automaticamente com base no seu ICP."
+        accent="violet"
+        actions={
+          <>
+            <Button variant="outline" size="sm" onClick={() => { setShowHistory(!showHistory); setShowForm(false); }}>
+              <History className="h-4 w-4 mr-2" />
+              Histórico
+            </Button>
+            <Button size="sm" onClick={() => { setShowForm(!showForm); setShowHistory(false); }}>
+              <Plus className="h-4 w-4 mr-2" />
+              Nova Busca
+            </Button>
+          </>
+        }
+      />
 
       {/* Event Progress Stepper */}
       {isEventRunning && (
@@ -198,19 +198,17 @@ export function LeadSourcingEngine() {
 
       {/* Empty State */}
       {!showForm && !showHistory && runs.length === 0 && !runsLoading && (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-16">
-            <SearchIcon className="h-12 w-12 text-muted-foreground/40 mb-4" />
-            <div className="text-lg font-medium mb-1">Nenhuma busca realizada</div>
-            <div className="text-sm text-muted-foreground mb-4">
-              Comece descobrindo novos leads com base no seu ICP
-            </div>
+        <PremiumEmpty
+          icon={SearchIcon}
+          title="Nenhuma busca realizada"
+          description="Comece descobrindo novos leads com base no seu ICP."
+          action={
             <Button onClick={() => setShowForm(true)}>
               <Plus className="h-4 w-4 mr-2" />
               Nova Busca de Leads
             </Button>
-          </CardContent>
-        </Card>
+          }
+        />
       )}
 
       {/* Detail Drawer */}

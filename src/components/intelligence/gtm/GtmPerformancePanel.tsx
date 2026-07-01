@@ -17,24 +17,12 @@ import {
   type GtmFilters, type RankRow,
 } from "@/services/intelligence/gtmPerformance";
 import { RevenueSsotBanner } from "@/components/revenue/RevenueSsotBanner";
+import { ModuleHeader, PremiumKpi, TableSkeleton } from "@/components/intelligence/kairos/premium";
+import { BarChart3 } from "lucide-react";
 
 const fmtBRL = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(v || 0);
 const fmtPct = (v: number) => `${(v * 100).toFixed(1)}%`;
-
-function Kpi({ icon: Icon, label, value, hint }: { icon: any; label: string; value: string; hint?: string }) {
-  return (
-    <Card>
-      <CardContent className="p-4">
-        <div className="flex items-center gap-2 text-muted-foreground text-xs">
-          <Icon className="h-3.5 w-3.5" /> {label}
-        </div>
-        <div className="mt-1 text-xl font-semibold">{value}</div>
-        {hint && <div className="mt-0.5 text-[11px] text-muted-foreground">{hint}</div>}
-      </CardContent>
-    </Card>
-  );
-}
 
 function RankTable({ title, rows, keyLabel, onExport }: { title: string; rows: RankRow[]; keyLabel: string; onExport: () => void }) {
   return (
@@ -115,11 +103,25 @@ export function GtmPerformancePanel() {
     : "border-muted bg-muted/30";
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
+      <ModuleHeader
+        icon={BarChart3}
+        eyebrow="Kairós · Receita"
+        title="GTM Performance"
+        description="Diagnóstico do funil ponta a ponta: captura, qualificação, propostas e receita — com detecção de gargalos e recomendações."
+        accent="blue"
+        actions={
+          <Button onClick={() => refresh.mutate()} disabled={refresh.isPending} size="sm">
+            <RefreshCw className={`h-3.5 w-3.5 mr-1 ${refresh.isPending ? "animate-spin" : ""}`} />
+            Atualizar performance
+          </Button>
+        }
+      />
+
       <RevenueSsotBanner surface="Kairós · GTM Performance" />
 
-      {/* Filters + refresh */}
-      <Card>
+      {/* Filters */}
+      <Card className="rounded-xl">
         <CardContent className="p-4 flex flex-wrap items-end gap-3">
           <div className="space-y-1">
             <label className="text-[11px] text-muted-foreground">Evento (id)</label>
@@ -129,23 +131,18 @@ export function GtmPerformancePanel() {
             <label className="text-[11px] text-muted-foreground">Departamento</label>
             <Input className="h-9 w-44" value={filters.department ?? ""} onChange={(e) => setFilters((f) => ({ ...f, department: e.target.value || undefined }))} />
           </div>
-          <div className="ml-auto">
-            <Button onClick={() => refresh.mutate()} disabled={refresh.isPending}>
-              <RefreshCw className={`h-3.5 w-3.5 mr-1 ${refresh.isPending ? "animate-spin" : ""}`} />
-              Atualizar performance
-            </Button>
-          </div>
         </CardContent>
       </Card>
 
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <Kpi icon={DollarSign} label="Receita válida" value={fmtBRL(kpis.valid_revenue)} />
-        <Kpi icon={Target} label="Capturados" value={String(kpis.captured)} />
-        <Kpi icon={CheckCircle2} label="SDR Ready" value={String(kpis.sdr_ready)} hint={fmtPct(kpis.capture_to_sdr_ready) + " conv."} />
-        <Kpi icon={Zap} label="Vendas" value={String(kpis.won)} hint={fmtPct(kpis.proposal_to_won) + " proposta→venda"} />
-        <Kpi icon={TrendingDown} label="Apollo R$/crédito" value={kpis.apollo_credits ? fmtBRL(kpis.revenue_per_credit) : "—"} hint={`${kpis.apollo_credits} créditos`} />
+        <PremiumKpi icon={DollarSign} label="Receita válida" value={fmtBRL(kpis.valid_revenue)} accent="emerald" loading={isLoading} />
+        <PremiumKpi icon={Target} label="Capturados" value={String(kpis.captured)} accent="blue" loading={isLoading} />
+        <PremiumKpi icon={CheckCircle2} label="SDR Ready" value={String(kpis.sdr_ready)} hint={fmtPct(kpis.capture_to_sdr_ready) + " conv."} accent="violet" loading={isLoading} />
+        <PremiumKpi icon={Zap} label="Vendas" value={String(kpis.won)} hint={fmtPct(kpis.proposal_to_won) + " proposta→venda"} accent="emerald" loading={isLoading} />
+        <PremiumKpi icon={TrendingDown} label="Apollo R$/crédito" value={kpis.apollo_credits ? fmtBRL(kpis.revenue_per_credit) : "—"} hint={`${kpis.apollo_credits} créditos`} accent="amber" loading={isLoading} />
       </div>
+
 
       {/* Funnel */}
       <Card>
@@ -263,7 +260,7 @@ export function GtmPerformancePanel() {
         </TabsContent>
       </Tabs>
 
-      {isLoading && <div className="text-xs text-muted-foreground text-center py-2">Carregando…</div>}
+      {isLoading && <TableSkeleton rows={4} cols={6} />}
     </div>
   );
 }
