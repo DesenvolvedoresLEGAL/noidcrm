@@ -198,19 +198,17 @@ export function LeadSourcingEngine() {
 
       {/* Empty State */}
       {!showForm && !showHistory && runs.length === 0 && !runsLoading && (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-16">
-            <SearchIcon className="h-12 w-12 text-muted-foreground/40 mb-4" />
-            <div className="text-lg font-medium mb-1">Nenhuma busca realizada</div>
-            <div className="text-sm text-muted-foreground mb-4">
-              Comece descobrindo novos leads com base no seu ICP
-            </div>
+        <PremiumEmpty
+          icon={SearchIcon}
+          title="Nenhuma busca realizada"
+          description="Comece descobrindo novos leads com base no seu ICP."
+          action={
             <Button onClick={() => setShowForm(true)}>
               <Plus className="h-4 w-4 mr-2" />
               Nova Busca de Leads
             </Button>
-          </CardContent>
-        </Card>
+          }
+        />
       )}
 
       {/* Detail Drawer */}
