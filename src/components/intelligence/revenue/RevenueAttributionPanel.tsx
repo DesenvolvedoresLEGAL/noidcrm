@@ -36,20 +36,8 @@ function fmtPct(v: number) {
   return `${(v * 100).toFixed(1)}%`;
 }
 
-function KpiCard({ icon: Icon, label, value, hint }: { icon: any; label: string; value: string; hint?: string }) {
-  return (
-    <Card>
-      <CardContent className="p-4">
-        <div className="flex items-center gap-2 text-muted-foreground text-xs">
-          <Icon className="h-3.5 w-3.5" />
-          {label}
-        </div>
-        <div className="mt-1 text-xl font-semibold">{value}</div>
-        {hint ? <div className="mt-0.5 text-[11px] text-muted-foreground">{hint}</div> : null}
-      </CardContent>
-    </Card>
-  );
-}
+import { PremiumKpi, ModuleHeader, TableSkeleton, PremiumEmpty } from "@/components/intelligence/kairos/premium";
+import { LineChart } from "lucide-react";
 
 function RankTable({ title, rows, keyLabel }: { title: string; rows: RankRow[]; keyLabel: string }) {
   return (
