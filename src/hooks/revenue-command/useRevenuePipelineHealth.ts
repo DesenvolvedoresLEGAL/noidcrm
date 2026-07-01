@@ -219,8 +219,37 @@ export function useRevenuePipelineHealth() {
         });
       }
 
+      // 4) Activities — fonte primária de "próxima atividade".
+      //    Uma oportunidade tem próxima atividade válida se existir activity
+      //    vinculada com status pendente/agendado, não concluída, não cancelada,
+      //    não deletada e agendada para hoje ou futuro.
+      const oppIds = opps.map((o) => o.id);
+      const oppsWithNextActivity = new Set<string>();
+      if (oppIds.length > 0) {
+        const startOfToday = new Date();
+        startOfToday.setHours(0, 0, 0, 0);
+        // Chunk para evitar URLs gigantes no .in()
+        const CHUNK = 200;
+        for (let i = 0; i < oppIds.length; i += CHUNK) {
+          const slice = oppIds.slice(i, i + CHUNK);
+          const actQ = await supabase
+            .from('activities')
+            .select('opportunity_id')
+            .eq('organization_id', orgId!)
+            .in('opportunity_id', slice)
+            .in('status', ['pending', 'open', 'scheduled'])
+            .is('completed_at', null)
+            .is('cancelled_at', null)
+            .is('deleted_at', null)
+            .gte('scheduled_date', startOfToday.toISOString());
+          if (actQ.error) throw actQ.error;
+          (actQ.data ?? []).forEach((a: any) => {
+            if (a.opportunity_id) oppsWithNextActivity.add(String(a.opportunity_id));
+          });
+        }
+      }
 
-      return { opps, stagesMap, profilesMap };
+      return { opps, stagesMap, profilesMap, oppsWithNextActivity };
     },
   });
 
