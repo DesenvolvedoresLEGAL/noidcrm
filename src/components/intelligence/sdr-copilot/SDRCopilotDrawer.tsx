@@ -43,6 +43,7 @@ function formatMessage(channel: SDRCopilotChannel, msg: unknown): string {
 
 export function SDRCopilotDrawer({ task, open, onOpenChange }: Props) {
   const [channel, setChannel] = useState<SDRCopilotChannel>(task.preferred_channel ?? 'whatsapp');
+  const [objectionOpen, setObjectionOpen] = useState(false);
   const gen = useGenerateSDRMessage();
   const upd = useUpdateSDRCopilotStatus();
 
