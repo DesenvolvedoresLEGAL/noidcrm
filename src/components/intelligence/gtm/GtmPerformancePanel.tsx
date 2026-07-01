@@ -260,7 +260,7 @@ export function GtmPerformancePanel() {
         </TabsContent>
       </Tabs>
 
-      {isLoading && <div className="text-xs text-muted-foreground text-center py-2">Carregando…</div>}
+      {isLoading && <TableSkeleton rows={4} cols={6} />}
     </div>
   );
 }
