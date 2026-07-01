@@ -183,6 +183,8 @@ export function SDRCopilotDrawer({ task, open, onOpenChange }: Props) {
             </Button>
           </div>
         </div>
+
+        <ObjectionResponseModal task={task} open={objectionOpen} onOpenChange={setObjectionOpen} />
       </SheetContent>
     </Sheet>
   );
