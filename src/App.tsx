@@ -950,6 +950,12 @@ const App = () => (
                 <Route path="/app/settings/noid-intelligence/hh-lab" element={<HeadlessHumanoidLabPage />} />
               </Route>
 
+              {/* NOID Skills Engine */}
+              <Route path="/app/intelligence/skills" element={<ProtectedRoute><LazyRoute><SkillsLibraryPage /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/intelligence/skills/:id" element={<ProtectedRoute><LazyRoute><SkillDetailPage /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/intelligence/skills/:id/playground" element={<ProtectedRoute><LazyRoute><SkillPlaygroundPage /></LazyRoute></ProtectedRoute>} />
+
+
               {/* Individual System Settings Pages */}
               <Route
                 path="/app/settings/celebracoes"
