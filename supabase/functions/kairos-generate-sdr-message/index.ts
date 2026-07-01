@@ -183,7 +183,7 @@ Deno.serve(async (req) => {
       console.warn("[sdr-copilot] skill router failed, falling back:", (e as Error).message);
     }
 
-
+    const ai = await callAI({
       messages: [
         { role: "system", content: SYSTEM_BY_CHANNEL[body.channel] },
         { role: "user", content: userPrompt },
