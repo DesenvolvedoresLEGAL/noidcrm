@@ -296,7 +296,7 @@ export function useRevenuePipelineHealth() {
       };
     }
 
-    const { opps, stagesMap, profilesMap } = query.data;
+    const { opps, stagesMap, profilesMap, oppsWithNextActivity } = query.data;
     const now = Date.now();
     const STALE_MS = STALE_DAYS * 86_400_000;
 
