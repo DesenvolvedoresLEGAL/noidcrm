@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { Plus, Search as SearchIcon, History } from 'lucide-react';
+import { Plus, Search as SearchIcon, History, Radar } from 'lucide-react';
+import { ModuleHeader, PremiumEmpty } from '@/components/intelligence/kairos/premium';
 import { LeadSearchForm } from './LeadSearchForm';
 import { LeadResultsTable } from './LeadResultsTable';
 import { RecentRunsList } from './RecentRunsList';
