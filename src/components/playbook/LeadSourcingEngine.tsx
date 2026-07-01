@@ -131,26 +131,26 @@ export function LeadSourcingEngine() {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-xl font-bold">Lead Sourcing Engine</h2>
-          <p className="text-sm text-muted-foreground">
-            Descubra novas oportunidades automaticamente com base no seu ICP
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => { setShowHistory(!showHistory); setShowForm(false); }}>
-            <History className="h-4 w-4 mr-2" />
-            Histórico
-          </Button>
-          <Button onClick={() => { setShowForm(!showForm); setShowHistory(false); }}>
-            <Plus className="h-4 w-4 mr-2" />
-            Nova Busca
-          </Button>
-        </div>
-      </div>
+    <div className="space-y-5">
+      <ModuleHeader
+        icon={Radar}
+        eyebrow="Kairós · Inteligência"
+        title="Lead Sourcing Engine"
+        description="Descubra novas oportunidades automaticamente com base no seu ICP."
+        accent="violet"
+        actions={
+          <>
+            <Button variant="outline" size="sm" onClick={() => { setShowHistory(!showHistory); setShowForm(false); }}>
+              <History className="h-4 w-4 mr-2" />
+              Histórico
+            </Button>
+            <Button size="sm" onClick={() => { setShowForm(!showForm); setShowHistory(false); }}>
+              <Plus className="h-4 w-4 mr-2" />
+              Nova Busca
+            </Button>
+          </>
+        }
+      />
 
       {/* Event Progress Stepper */}
       {isEventRunning && (
