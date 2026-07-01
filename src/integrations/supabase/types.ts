@@ -17927,6 +17927,240 @@ export type Database = {
           },
         ]
       }
+      noid_skill_feedback: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          feedback_notes: string | null
+          feedback_type: Database["public"]["Enums"]["noid_skill_feedback_type"]
+          id: string
+          organization_id: string | null
+          outcome_event_id: string | null
+          rating: number | null
+          skill_run_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          feedback_notes?: string | null
+          feedback_type: Database["public"]["Enums"]["noid_skill_feedback_type"]
+          id?: string
+          organization_id?: string | null
+          outcome_event_id?: string | null
+          rating?: number | null
+          skill_run_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          feedback_notes?: string | null
+          feedback_type?: Database["public"]["Enums"]["noid_skill_feedback_type"]
+          id?: string
+          organization_id?: string | null
+          outcome_event_id?: string | null
+          rating?: number | null
+          skill_run_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "noid_skill_feedback_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "noid_skill_feedback_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_report_legacy_retirement_readiness_v2"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "noid_skill_feedback_skill_run_id_fkey"
+            columns: ["skill_run_id"]
+            isOneToOne: false
+            referencedRelation: "noid_skill_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      noid_skill_runs: {
+        Row: {
+          account_id: string | null
+          confidence_score: number | null
+          contact_id: string | null
+          created_at: string
+          created_by: string | null
+          error_message: string | null
+          id: string
+          input_payload: Json
+          latency_ms: number | null
+          model_used: string | null
+          opportunity_id: string | null
+          organization_id: string | null
+          output_payload: Json | null
+          prospect_id: string | null
+          quality_score: number | null
+          skill_id: string
+          source_module: string | null
+          status: Database["public"]["Enums"]["noid_skill_run_status"]
+        }
+        Insert: {
+          account_id?: string | null
+          confidence_score?: number | null
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          error_message?: string | null
+          id?: string
+          input_payload?: Json
+          latency_ms?: number | null
+          model_used?: string | null
+          opportunity_id?: string | null
+          organization_id?: string | null
+          output_payload?: Json | null
+          prospect_id?: string | null
+          quality_score?: number | null
+          skill_id: string
+          source_module?: string | null
+          status?: Database["public"]["Enums"]["noid_skill_run_status"]
+        }
+        Update: {
+          account_id?: string | null
+          confidence_score?: number | null
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          error_message?: string | null
+          id?: string
+          input_payload?: Json
+          latency_ms?: number | null
+          model_used?: string | null
+          opportunity_id?: string | null
+          organization_id?: string | null
+          output_payload?: Json | null
+          prospect_id?: string | null
+          quality_score?: number | null
+          skill_id?: string
+          source_module?: string | null
+          status?: Database["public"]["Enums"]["noid_skill_run_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "noid_skill_runs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "noid_skill_runs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_report_legacy_retirement_readiness_v2"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "noid_skill_runs_skill_id_fkey"
+            columns: ["skill_id"]
+            isOneToOne: false
+            referencedRelation: "noid_skills"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "noid_skill_runs_skill_id_fkey"
+            columns: ["skill_id"]
+            isOneToOne: false
+            referencedRelation: "v_noid_skill_metrics"
+            referencedColumns: ["skill_id"]
+          },
+        ]
+      }
+      noid_skills: {
+        Row: {
+          category: Database["public"]["Enums"]["noid_skill_category"]
+          created_at: string
+          created_by: string | null
+          description: string | null
+          examples: Json
+          failure_modes: Json
+          guardrails: Json
+          id: string
+          input_schema: Json
+          name: string
+          organization_id: string | null
+          output_schema: Json
+          skill_type: Database["public"]["Enums"]["noid_skill_type"]
+          slug: string
+          status: Database["public"]["Enums"]["noid_skill_status"]
+          success_criteria: Json
+          system_prompt: string
+          task_prompt: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          category: Database["public"]["Enums"]["noid_skill_category"]
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          examples?: Json
+          failure_modes?: Json
+          guardrails?: Json
+          id?: string
+          input_schema?: Json
+          name: string
+          organization_id?: string | null
+          output_schema?: Json
+          skill_type: Database["public"]["Enums"]["noid_skill_type"]
+          slug: string
+          status?: Database["public"]["Enums"]["noid_skill_status"]
+          success_criteria?: Json
+          system_prompt?: string
+          task_prompt?: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          category?: Database["public"]["Enums"]["noid_skill_category"]
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          examples?: Json
+          failure_modes?: Json
+          guardrails?: Json
+          id?: string
+          input_schema?: Json
+          name?: string
+          organization_id?: string | null
+          output_schema?: Json
+          skill_type?: Database["public"]["Enums"]["noid_skill_type"]
+          slug?: string
+          status?: Database["public"]["Enums"]["noid_skill_status"]
+          success_criteria?: Json
+          system_prompt?: string
+          task_prompt?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "noid_skills_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "noid_skills_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_report_legacy_retirement_readiness_v2"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
       notification_dedup_keys: {
         Row: {
           created_at: string
@@ -34652,6 +34886,41 @@ export type Database = {
           },
         ]
       }
+      v_noid_skill_metrics: {
+        Row: {
+          category: Database["public"]["Enums"]["noid_skill_category"] | null
+          edited_count: number | null
+          last_run_at: string | null
+          latency_p50_ms: number | null
+          name: string | null
+          negative_feedback: number | null
+          organization_id: string | null
+          positive_feedback: number | null
+          run_count: number | null
+          skill_id: string | null
+          skill_type: Database["public"]["Enums"]["noid_skill_type"] | null
+          slug: string | null
+          status: Database["public"]["Enums"]["noid_skill_status"] | null
+          success_count: number | null
+          version: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "noid_skills_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "noid_skills_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_report_legacy_retirement_readiness_v2"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
       v_opportunities_hygiene_base: {
         Row: {
           account_id: string | null
@@ -38660,6 +38929,41 @@ export type Database = {
         | "churn_signal"
         | "converting_language"
         | "countermeasure"
+      noid_skill_category:
+        | "prospecting"
+        | "qualification"
+        | "objection_handling"
+        | "negotiation"
+        | "follow_up"
+        | "reactivation"
+        | "proposal"
+        | "technical_explanation"
+        | "pricing"
+        | "handoff"
+        | "next_best_action"
+      noid_skill_feedback_type:
+        | "positive"
+        | "negative"
+        | "edited_by_user"
+        | "used_in_outreach"
+        | "ignored"
+        | "converted"
+        | "failed"
+      noid_skill_run_status:
+        | "success"
+        | "schema_invalid"
+        | "guardrail_blocked"
+        | "error"
+        | "playground"
+      noid_skill_status: "draft" | "active" | "deprecated" | "archived"
+      noid_skill_type:
+        | "message_generation"
+        | "classification"
+        | "recommendation"
+        | "objection_response"
+        | "qualification_question"
+        | "summary"
+        | "next_best_action"
       notification_channel: "in_app" | "email" | "push"
       notification_priority: "low" | "medium" | "high" | "critical"
       notification_status_v2:
@@ -39040,6 +39344,45 @@ export const Constants = {
         "churn_signal",
         "converting_language",
         "countermeasure",
+      ],
+      noid_skill_category: [
+        "prospecting",
+        "qualification",
+        "objection_handling",
+        "negotiation",
+        "follow_up",
+        "reactivation",
+        "proposal",
+        "technical_explanation",
+        "pricing",
+        "handoff",
+        "next_best_action",
+      ],
+      noid_skill_feedback_type: [
+        "positive",
+        "negative",
+        "edited_by_user",
+        "used_in_outreach",
+        "ignored",
+        "converted",
+        "failed",
+      ],
+      noid_skill_run_status: [
+        "success",
+        "schema_invalid",
+        "guardrail_blocked",
+        "error",
+        "playground",
+      ],
+      noid_skill_status: ["draft", "active", "deprecated", "archived"],
+      noid_skill_type: [
+        "message_generation",
+        "classification",
+        "recommendation",
+        "objection_response",
+        "qualification_question",
+        "summary",
+        "next_best_action",
       ],
       notification_channel: ["in_app", "email", "push"],
       notification_priority: ["low", "medium", "high", "critical"],
