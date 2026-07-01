@@ -56,15 +56,32 @@ export default function KairosHub() {
   return (
     <Layout pageTitle="Kairós">
       <div className="p-4 md:p-6 space-y-4 md:space-y-6">
-        <PageHeader
-          icon={Compass}
-          title="Kairós"
-          subtitle="Sourcing, otimização, experimentos e performance — no momento certo"
-          badge={{ label: 'Inteligência', icon: Sparkles }}
-          variant="indigo"
-        />
+        <KairosExecutiveHeader />
+
+        <div className="flex justify-end">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPaletteOpen(true)}
+            className="gap-2 h-9"
+            aria-label="Abrir Command Palette"
+          >
+            <CommandIcon className="h-3.5 w-3.5" aria-hidden />
+            <span className="hidden sm:inline">Buscar…</span>
+            <kbd className="ml-1 hidden sm:inline-flex items-center gap-0.5 rounded border bg-muted px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground">
+              ⌘K
+            </kbd>
+          </Button>
+        </div>
 
         <KairosPremiumNavigation activeTab={activeTab} onTabChange={handleTabChange} />
+
+        <KairosCommandPalette
+          open={paletteOpen}
+          onOpenChange={setPaletteOpen}
+          onNavigate={handleTabChange}
+        />
+
 
         <div className="space-y-4 md:space-y-6">
           {activeTab === 'overview' && <KairosOverviewPanel onNavigate={handleTabChange} />}
