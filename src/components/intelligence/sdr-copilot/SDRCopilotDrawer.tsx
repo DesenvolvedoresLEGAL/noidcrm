@@ -4,11 +4,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { Loader2, Copy, CheckCircle2, Trash2, Send, ClipboardList, RefreshCw } from 'lucide-react';
+import { Loader2, Copy, CheckCircle2, Trash2, Send, ClipboardList, RefreshCw, MessageSquareWarning } from 'lucide-react';
 import { toast } from 'sonner';
 import { useGenerateSDRMessage, useUpdateSDRCopilotStatus } from '@/hooks/intelligence/useSDRCopilotTasks';
 import { CHANNEL_LABEL, NEXT_ACTION_LABEL, STATUS_LABEL, type SDRCopilotChannel, type SDRCopilotTask } from '@/services/intelligence/sdrCopilot';
 import { SmartCoverageTab } from '@/components/intelligence/smart-coverage/SmartCoverageTab';
+import { ObjectionResponseModal } from './ObjectionResponseModal';
 
 interface Props {
   task: SDRCopilotTask;
@@ -42,6 +43,7 @@ function formatMessage(channel: SDRCopilotChannel, msg: unknown): string {
 
 export function SDRCopilotDrawer({ task, open, onOpenChange }: Props) {
   const [channel, setChannel] = useState<SDRCopilotChannel>(task.preferred_channel ?? 'whatsapp');
+  const [objectionOpen, setObjectionOpen] = useState(false);
   const gen = useGenerateSDRMessage();
   const upd = useUpdateSDRCopilotStatus();
 
@@ -167,6 +169,9 @@ export function SDRCopilotDrawer({ task, open, onOpenChange }: Props) {
             <Button variant="default" onClick={() => setStatus('activity_created', 'Atividade criada manualmente no CRM.')}>
               <ClipboardList className="h-4 w-4 mr-1" /> Criar atividade
             </Button>
+            <Button variant="outline" onClick={() => setObjectionOpen(true)}>
+              <MessageSquareWarning className="h-4 w-4 mr-1" /> Responder objeção
+            </Button>
             <Button variant="secondary" onClick={() => setStatus('promoted_to_crm', 'Marcada como promovida ao CRM.')}>
               Promover ao CRM
             </Button>
@@ -178,6 +183,8 @@ export function SDRCopilotDrawer({ task, open, onOpenChange }: Props) {
             </Button>
           </div>
         </div>
+
+        <ObjectionResponseModal task={task} open={objectionOpen} onOpenChange={setObjectionOpen} />
       </SheetContent>
     </Sheet>
   );
