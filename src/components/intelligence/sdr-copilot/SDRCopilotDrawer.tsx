@@ -169,6 +169,9 @@ export function SDRCopilotDrawer({ task, open, onOpenChange }: Props) {
             <Button variant="default" onClick={() => setStatus('activity_created', 'Atividade criada manualmente no CRM.')}>
               <ClipboardList className="h-4 w-4 mr-1" /> Criar atividade
             </Button>
+            <Button variant="outline" onClick={() => setObjectionOpen(true)}>
+              <MessageSquareWarning className="h-4 w-4 mr-1" /> Responder objeção
+            </Button>
             <Button variant="secondary" onClick={() => setStatus('promoted_to_crm', 'Marcada como promovida ao CRM.')}>
               Promover ao CRM
             </Button>
