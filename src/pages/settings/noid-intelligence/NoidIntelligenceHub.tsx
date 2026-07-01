@@ -10,6 +10,15 @@ import { useApprovalQueueCount } from '@/hooks/useApprovalQueueCount';
 
 const hubItems = [
   {
+    id: 'skills',
+    title: 'Skills',
+    description: 'Habilidades comerciais reutilizáveis por agentes',
+    icon: Sparkles,
+    path: '/app/intelligence/skills',
+    available: true,
+    badge: 'Novo',
+  },
+  {
     id: 'agents',
     title: 'Agentes',
     description: 'Crie e gerencie agentes inteligentes',
