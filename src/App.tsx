@@ -153,6 +153,9 @@ const AgentOutcomesPage = lazy(() => import("./pages/settings/noid-intelligence/
 const DecisionRulesPage = lazy(() => import("./pages/settings/noid-intelligence/DecisionRulesPage"));
 const LearningPerformancePage = lazy(() => import("./pages/settings/noid-intelligence/LearningPerformancePage"));
 const HeadlessHumanoidLabPage = lazy(() => import("./pages/settings/noid-intelligence/HeadlessHumanoidLabPage"));
+const SkillsLibraryPage = lazy(() => import("./pages/intelligence/skills/SkillsLibraryPage"));
+const SkillDetailPage = lazy(() => import("./pages/intelligence/skills/SkillDetailPage"));
+const SkillPlaygroundPage = lazy(() => import("./pages/intelligence/skills/SkillPlaygroundPage"));
 
 // GTM Routes - Revenue Operating System
 const SDRCommandCenter = lazy(() => import("./pages/gtm/SDRCommandCenter"));
