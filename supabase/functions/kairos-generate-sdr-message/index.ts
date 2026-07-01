@@ -71,6 +71,15 @@ Deno.serve(async (req) => {
       return json(200, { channel: body.channel, message: cached, cached: true });
     }
 
+    // --- Skills Engine (NS.01): tentar router antes do prompt fixo ---
+    const GOAL_BY_CHANNEL: Record<Channel, string> = {
+      whatsapp: "generate_whatsapp_message",
+      email: "generate_email_message",
+      call: "generate_call_script",
+      linkedin: "generate_whatsapp_message", // nota curta de conexão usa mesmo padrão
+    };
+
+
     // Contexto
     const { data: prospect } = await admin
       .from("prospects")
