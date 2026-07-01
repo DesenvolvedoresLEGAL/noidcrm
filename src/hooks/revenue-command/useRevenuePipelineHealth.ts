@@ -330,7 +330,10 @@ export function useRevenuePipelineHealth() {
       if (!o.owner_user_id) tags.push('no_owner');
       const val = Number(o.valor_previsto ?? 0);
       if (!o.valor_previsto || val <= 0) tags.push('no_value');
-      if (!o.next_followup_date) tags.push('no_next_activity');
+      // Fonte primária: tabela activities. Fallback: next_followup_date.
+      const hasActivity = oppsWithNextActivity.has(o.id);
+      const hasFollowup = !!o.next_followup_date && new Date(o.next_followup_date).getTime() >= now - 86_400_000;
+      if (!hasActivity && !hasFollowup) tags.push('no_next_activity');
 
       const updated = o.updated_at ? new Date(o.updated_at).getTime() : 0;
       if (updated && now - updated > STALE_MS) tags.push('stale');
