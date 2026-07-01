@@ -17,24 +17,12 @@ import {
   type GtmFilters, type RankRow,
 } from "@/services/intelligence/gtmPerformance";
 import { RevenueSsotBanner } from "@/components/revenue/RevenueSsotBanner";
+import { ModuleHeader, PremiumKpi, TableSkeleton } from "@/components/intelligence/kairos/premium";
+import { BarChart3 } from "lucide-react";
 
 const fmtBRL = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(v || 0);
 const fmtPct = (v: number) => `${(v * 100).toFixed(1)}%`;
-
-function Kpi({ icon: Icon, label, value, hint }: { icon: any; label: string; value: string; hint?: string }) {
-  return (
-    <Card>
-      <CardContent className="p-4">
-        <div className="flex items-center gap-2 text-muted-foreground text-xs">
-          <Icon className="h-3.5 w-3.5" /> {label}
-        </div>
-        <div className="mt-1 text-xl font-semibold">{value}</div>
-        {hint && <div className="mt-0.5 text-[11px] text-muted-foreground">{hint}</div>}
-      </CardContent>
-    </Card>
-  );
-}
 
 function RankTable({ title, rows, keyLabel, onExport }: { title: string; rows: RankRow[]; keyLabel: string; onExport: () => void }) {
   return (
