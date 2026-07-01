@@ -219,8 +219,37 @@ export function useRevenuePipelineHealth() {
         });
       }
 
+      // 4) Activities — fonte primária de "próxima atividade".
+      //    Uma oportunidade tem próxima atividade válida se existir activity
+      //    vinculada com status pendente/agendado, não concluída, não cancelada,
+      //    não deletada e agendada para hoje ou futuro.
+      const oppIds = opps.map((o) => o.id);
+      const oppsWithNextActivity = new Set<string>();
+      if (oppIds.length > 0) {
+        const startOfToday = new Date();
+        startOfToday.setHours(0, 0, 0, 0);
+        // Chunk para evitar URLs gigantes no .in()
+        const CHUNK = 200;
+        for (let i = 0; i < oppIds.length; i += CHUNK) {
+          const slice = oppIds.slice(i, i + CHUNK);
+          const actQ = await supabase
+            .from('activities')
+            .select('opportunity_id')
+            .eq('organization_id', orgId!)
+            .in('opportunity_id', slice)
+            .in('status', ['pending', 'open', 'scheduled'])
+            .is('completed_at', null)
+            .is('cancelled_at', null)
+            .is('deleted_at', null)
+            .gte('scheduled_date', startOfToday.toISOString());
+          if (actQ.error) throw actQ.error;
+          (actQ.data ?? []).forEach((a: any) => {
+            if (a.opportunity_id) oppsWithNextActivity.add(String(a.opportunity_id));
+          });
+        }
+      }
 
-      return { opps, stagesMap, profilesMap };
+      return { opps, stagesMap, profilesMap, oppsWithNextActivity };
     },
   });
 
@@ -267,7 +296,7 @@ export function useRevenuePipelineHealth() {
       };
     }
 
-    const { opps, stagesMap, profilesMap } = query.data;
+    const { opps, stagesMap, profilesMap, oppsWithNextActivity } = query.data;
     const now = Date.now();
     const STALE_MS = STALE_DAYS * 86_400_000;
 
@@ -301,7 +330,10 @@ export function useRevenuePipelineHealth() {
       if (!o.owner_user_id) tags.push('no_owner');
       const val = Number(o.valor_previsto ?? 0);
       if (!o.valor_previsto || val <= 0) tags.push('no_value');
-      if (!o.next_followup_date) tags.push('no_next_activity');
+      // Fonte primária: tabela activities. Fallback: next_followup_date.
+      const hasActivity = oppsWithNextActivity.has(o.id);
+      const hasFollowup = !!o.next_followup_date && new Date(o.next_followup_date).getTime() >= now - 86_400_000;
+      if (!hasActivity && !hasFollowup) tags.push('no_next_activity');
 
       const updated = o.updated_at ? new Date(o.updated_at).getTime() : 0;
       if (updated && now - updated > STALE_MS) tags.push('stale');
