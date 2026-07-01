@@ -5,7 +5,8 @@ import { QualifiedQueueTable } from './QualifiedQueueTable';
 import { ApproachBriefDrawer } from './ApproachBriefDrawer';
 import { AcquisitionPipelineCard } from './AcquisitionPipelineCard';
 import { useQualifiedQueue } from '@/hooks/intelligence/useQualifiedQueue';
-import { Skeleton } from '@/components/ui/skeleton';
+import { ModuleHeader, TableSkeleton, PremiumEmpty } from '@/components/intelligence/kairos/premium';
+import { Inbox, ListChecks } from 'lucide-react';
 import type { QualifiedQueueFilters, QualifiedQueueItem } from '@/services/intelligence/qualifiedQueue';
 
 export function QualifiedQueuePanel() {
@@ -14,12 +15,25 @@ export function QualifiedQueuePanel() {
   const { data, isLoading } = useQualifiedQueue(filters);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
+      <ModuleHeader
+        icon={Inbox}
+        eyebrow="Kairós · Operação"
+        title="Qualified Queue"
+        description="Prospects capturados, enriquecidos e prontos para SDR. Priorize e promova ao CRM."
+        accent="violet"
+      />
       <QualifiedQueueKpiBar />
       <AcquisitionPipelineCard />
       <QualifiedQueueFiltersBar value={filters} onChange={setFilters} />
       {isLoading ? (
-        <Skeleton className="h-64 w-full" />
+        <TableSkeleton rows={6} cols={8} />
+      ) : (data?.length ?? 0) === 0 ? (
+        <PremiumEmpty
+          icon={ListChecks}
+          title="Nenhum item na fila"
+          description="Ajuste os filtros ou execute um Autopilot para capturar e qualificar novos prospects."
+        />
       ) : (
         <QualifiedQueueTable items={data ?? []} onOpenBrief={setActiveBrief} />
       )}
