@@ -30,10 +30,10 @@ export function KairosPremiumNavigation({ activeTab, onTabChange }: Props) {
   return (
     <nav
       aria-label="Kairós navegação principal"
-      className="border-b border-border/60 bg-card/60 backdrop-blur-sm rounded-lg"
+      className="border border-border/60 bg-card/70 backdrop-blur-sm rounded-xl shadow-sm"
     >
       {/* Desktop / Tablet */}
-      <div className="hidden md:flex items-center gap-1 px-2 py-1.5">
+      <div className="hidden md:flex items-center gap-1 px-2 py-2">
         {kairosNavigationConfig.map((group) => {
           const isActive = activeGroup?.id === group.id;
           const Icon = group.icon;
@@ -46,14 +46,14 @@ export function KairosPremiumNavigation({ activeTab, onTabChange }: Props) {
                 onClick={() => onTabChange(group.tab)}
                 aria-current={isActive ? 'page' : undefined}
                 className={cn(
-                  'inline-flex items-center gap-2 h-11 px-3 rounded-md text-sm font-medium transition-colors',
+                  'inline-flex items-center gap-2 h-12 px-4 rounded-lg text-[13px] font-semibold transition-all duration-150',
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                   isActive
-                    ? 'bg-primary/10 text-primary'
-                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                    ? 'bg-primary/10 text-primary shadow-sm'
+                    : 'text-muted-foreground hover:bg-accent hover:text-foreground',
                 )}
               >
-                <Icon className="h-4 w-4" aria-hidden />
+                <Icon className="h-[18px] w-[18px]" aria-hidden />
                 <span>{group.label}</span>
               </button>
             );
@@ -67,57 +67,71 @@ export function KairosPremiumNavigation({ activeTab, onTabChange }: Props) {
                   aria-haspopup="menu"
                   aria-expanded={isActive ? true : undefined}
                   className={cn(
-                    'inline-flex items-center gap-2 h-11 px-3 rounded-md text-sm font-medium transition-colors',
+                    'inline-flex items-center gap-2 h-12 px-4 rounded-lg text-[13px] font-semibold transition-all duration-150',
                     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                     isActive
-                      ? 'bg-primary/10 text-primary'
-                      : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                      ? 'bg-primary/10 text-primary shadow-sm'
+                      : 'text-muted-foreground hover:bg-accent hover:text-foreground',
                   )}
                 >
-                  <Icon className="h-4 w-4" aria-hidden />
+                  <Icon className="h-[18px] w-[18px]" aria-hidden />
                   <span>{group.label}</span>
                   {isActive && activeItem ? (
-                    <span className="hidden lg:inline text-xs text-primary/80">
+                    <span className="hidden lg:inline text-xs font-normal text-primary/80">
                       · {activeItem.label}
                     </span>
                   ) : null}
-                  <ChevronDown className="h-3.5 w-3.5 opacity-70" aria-hidden />
+                  <ChevronDown className="h-3.5 w-3.5 opacity-70 transition-transform duration-150 group-data-[state=open]:rotate-180" aria-hidden />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-64" role="menu">
-                <DropdownMenuLabel className="text-xs uppercase tracking-wide text-muted-foreground">
+              <DropdownMenuContent
+                align="start"
+                sideOffset={8}
+                className="w-[340px] p-2 rounded-xl shadow-lg border-border/60 animate-scale-in"
+                role="menu"
+              >
+                <DropdownMenuLabel className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground px-2 py-1.5">
                   {group.label}
                 </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {group.items.map((item) => {
-                  const ItemIcon = item.icon;
-                  const itemActive = item.tab === activeTab;
-                  return (
-                    <DropdownMenuItem
-                      key={item.tab}
-                      onSelect={() => onTabChange(item.tab)}
-                      role="menuitem"
-                      aria-current={itemActive ? 'page' : undefined}
-                      className={cn(
-                        'flex items-start gap-3 py-2.5 cursor-pointer',
-                        itemActive && 'bg-primary/10 text-primary focus:bg-primary/15',
-                      )}
-                    >
-                      <ItemIcon className="h-4 w-4 mt-0.5 shrink-0" aria-hidden />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium truncate">{item.label}</span>
-                          {itemActive && <Check className="h-3.5 w-3.5 text-primary" aria-hidden />}
-                        </div>
-                        {item.description && (
-                          <p className="text-xs text-muted-foreground truncate">
-                            {item.description}
-                          </p>
+                <DropdownMenuSeparator className="mb-1" />
+                <div className="space-y-0.5">
+                  {group.items.map((item) => {
+                    const ItemIcon = item.icon;
+                    const itemActive = item.tab === activeTab;
+                    return (
+                      <DropdownMenuItem
+                        key={item.tab}
+                        onSelect={() => onTabChange(item.tab)}
+                        role="menuitem"
+                        aria-current={itemActive ? 'page' : undefined}
+                        className={cn(
+                          'flex items-start gap-3 py-2.5 px-2.5 rounded-lg cursor-pointer transition-colors duration-150',
+                          itemActive
+                            ? 'bg-primary/10 text-primary focus:bg-primary/15'
+                            : 'hover:bg-accent focus:bg-accent',
                         )}
-                      </div>
-                    </DropdownMenuItem>
-                  );
-                })}
+                      >
+                        <div className={cn(
+                          'h-9 w-9 rounded-lg flex items-center justify-center shrink-0',
+                          itemActive ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground',
+                        )}>
+                          <ItemIcon className="h-[18px] w-[18px]" aria-hidden />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-semibold truncate">{item.label}</span>
+                            {itemActive && <Check className="h-3.5 w-3.5 text-primary" aria-hidden />}
+                          </div>
+                          {item.description && (
+                            <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
+                              {item.description}
+                            </p>
+                          )}
+                        </div>
+                      </DropdownMenuItem>
+                    );
+                  })}
+                </div>
               </DropdownMenuContent>
             </DropdownMenu>
           );

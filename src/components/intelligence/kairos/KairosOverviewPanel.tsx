@@ -62,10 +62,14 @@ const DOMAINS: { title: string; description: string; icon: LucideIcon; tabs: Kai
   },
 ];
 
+import { KairosCommandCenter } from './KairosCommandCenter';
+
 export function KairosOverviewPanel({ onNavigate }: Props) {
   return (
     <div className="space-y-6">
-      <Card>
+      <KairosCommandCenter onNavigate={onNavigate} />
+
+      <Card className="rounded-xl transition-shadow hover:shadow-sm">
         <CardHeader>
           <CardTitle className="text-xl">Kairós — Visão Geral</CardTitle>
           <p className="text-sm text-muted-foreground">
