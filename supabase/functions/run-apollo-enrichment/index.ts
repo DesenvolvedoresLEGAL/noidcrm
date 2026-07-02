@@ -334,13 +334,42 @@ Deno.serve(async (req: Request) => {
     //    - accessible & has results -> use it
     //    - accessible & empty -> try next
     //    - inaccessible (403/API_INACCESSIBLE) -> log and try next, do NOT abort
-    const attempts: Array<{ endpoint: string; status: number; ok: boolean; inaccessible: boolean; count: number; error?: string }> = [];
+    // KAI.18.6 Wiretap: cada tentativa carrega latência e RAW completo.
+    const attempts: Array<{
+      endpoint: string;
+      status: number;
+      ok: boolean;
+      inaccessible: boolean;
+      count: number;
+      latency_ms: number;
+      apollo_request_id: string | null;
+      raw?: unknown;
+      error?: string;
+    }> = [];
     const titlesKeyword = customTitles.length > 0 ? customTitles.slice(0, 3).join(" OR ") : "";
     const searchKeywords = [prospect.company_name, domain, titlesKeyword].filter(Boolean).join(" ") || domain;
 
     let people: any[] = [];
     let endpointUsed: string | null = null;
     let credits_used = 0;
+    let firstApolloRequestId: string | null = null;
+    let totalLatency = 0;
+
+    const pushAttempt = (endpoint: string, r: ApolloCallResult, count: number) => {
+      attempts.push({
+        endpoint,
+        status: r.status,
+        ok: r.ok,
+        inaccessible: r.inaccessible,
+        count,
+        latency_ms: r.latency_ms,
+        apollo_request_id: r.apollo_request_id,
+        raw: r.json,
+        error: r.errorMessage,
+      });
+      if (!firstApolloRequestId) firstApolloRequestId = r.apollo_request_id;
+      totalLatency += r.latency_ms;
+    };
 
     // Attempt 1: mixed_people/api_search by domain + decision-maker titles
     {
@@ -351,20 +380,15 @@ Deno.serve(async (req: Request) => {
         per_page: 10,
       }, APOLLO_API_KEY);
       const list: any[] = r.json?.people ?? r.json?.contacts ?? [];
-      attempts.push({
-        endpoint: "mixed_people/api_search",
-        status: r.status, ok: r.ok, inaccessible: r.inaccessible,
-        count: list.length, error: r.errorMessage,
-      });
+      pushAttempt("mixed_people/api_search", r, list.length);
       if (r.ok && list.length > 0) {
         people = list; endpointUsed = "mixed_people/api_search"; credits_used += ESTIMATED_CREDITS;
       } else if (r.ok) {
-        // accessible but empty — counts as a credit consumed
         credits_used += ESTIMATED_CREDITS;
       }
     }
 
-    // Attempt 2: contacts/search by keywords (account contacts already in your Apollo)
+    // Attempt 2: contacts/search by keywords
     if (!endpointUsed) {
       const r = await callApollo(APOLLO_CONTACTS_URL, {
         q_keywords: searchKeywords,
@@ -372,11 +396,7 @@ Deno.serve(async (req: Request) => {
         per_page: 25,
       }, APOLLO_API_KEY);
       const list: any[] = r.json?.contacts ?? r.json?.people ?? [];
-      attempts.push({
-        endpoint: "contacts/search",
-        status: r.status, ok: r.ok, inaccessible: r.inaccessible,
-        count: list.length, error: r.errorMessage,
-      });
+      pushAttempt("contacts/search", r, list.length);
       if (r.ok && list.length > 0) {
         people = list; endpointUsed = "contacts/search"; credits_used += ESTIMATED_CREDITS;
       } else if (r.ok) {
@@ -384,7 +404,7 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Attempt 3: contacts/search by domain only (broader)
+    // Attempt 3: contacts/search by domain only
     if (!endpointUsed) {
       const r = await callApollo(APOLLO_CONTACTS_URL, {
         q_keywords: domain,
@@ -392,11 +412,7 @@ Deno.serve(async (req: Request) => {
         per_page: 25,
       }, APOLLO_API_KEY);
       const list: any[] = r.json?.contacts ?? r.json?.people ?? [];
-      attempts.push({
-        endpoint: "contacts/search:domain",
-        status: r.status, ok: r.ok, inaccessible: r.inaccessible,
-        count: list.length, error: r.errorMessage,
-      });
+      pushAttempt("contacts/search:domain", r, list.length);
       if (r.ok && list.length > 0) {
         people = list; endpointUsed = "contacts/search:domain"; credits_used += ESTIMATED_CREDITS;
       } else if (r.ok) {
@@ -404,19 +420,16 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Attempt 4: organizations/enrich — at least pull company-level info
+    // Attempt 4: organizations/enrich
     let orgEnrichment: any = null;
     {
       const r = await callApollo(APOLLO_ORG_ENRICH_URL, { domain }, APOLLO_API_KEY, "GET");
-      attempts.push({
-        endpoint: "organizations/enrich",
-        status: r.status, ok: r.ok, inaccessible: r.inaccessible,
-        count: r.json?.organization ? 1 : 0, error: r.errorMessage,
-      });
+      pushAttempt("organizations/enrich", r, r.json?.organization ? 1 : 0);
       if (r.ok && r.json?.organization) {
         orgEnrichment = r.json.organization;
       }
     }
+
 
     const allAttemptsFailed = attempts.every((a) => !a.ok);
     const allInaccessible = attempts.every((a) => a.inaccessible);
