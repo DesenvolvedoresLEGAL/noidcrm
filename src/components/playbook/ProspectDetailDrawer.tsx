@@ -20,6 +20,8 @@ import { DecisionDetailPanel } from '@/components/decision-engine/DecisionDetail
 import { ProspectLifecycleTimeline } from '@/components/learning/ProspectLifecycleTimeline';
 import { ProspectContactsTab } from './ProspectContactsTab';
 import { EnrichmentJobsTable } from './enrichment/EnrichmentJobsTable';
+import { ApolloInspectorTab } from './ApolloInspectorTab';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 
 interface ProspectDetailDrawerProps {
   prospect: Prospect | null;
