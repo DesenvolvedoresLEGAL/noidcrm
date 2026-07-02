@@ -30,14 +30,19 @@ export interface ApolloRules {
 export type RevealDataType = 'profile_only' | 'email' | 'phone' | 'both';
 
 export interface RevealResult {
-  status: 'revealed' | 'pending' | 'not_found' | 'failed' | 'skipped';
+  status: 'revealed' | 'pending' | 'not_found' | 'rejected_company_phone' | 'failed' | 'skipped';
+  success?: boolean;
   contact_id?: string;
   requested_data_type?: RevealDataType;
+  phone_reveal_status?: string | null;
+  phone_revealed?: boolean;
+  phone_source_type?: 'person_mobile' | 'person_direct' | 'company_main' | 'unknown' | null;
   credits_estimated?: number;
   credits_used?: number;
   email?: string | null;
   phone?: string | null;
   phone_pending?: boolean;
+  company_phone_rejected?: boolean;
   preferred_channel?: string;
   audit_id?: string | null;
   reason?: string;
