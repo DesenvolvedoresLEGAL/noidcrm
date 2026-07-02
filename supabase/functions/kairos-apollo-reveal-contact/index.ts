@@ -333,10 +333,10 @@ Deno.serve(async (req) => {
         creditsUsed += 1;
       } else if (companyPhoneRejected) {
         // Apollo devolveu apenas telefone corporativo — nunca salvar como telefone da pessoa.
-        update.phone_reveal_status = "not_found";
+        update.phone_reveal_status = "rejected_company_phone";
         update.phone_source_type = "company_main";
       } else if (phonePending) {
-        update.phone_reveal_status = "requested"; // webhook completará
+        update.phone_reveal_status = "requested"; // webhook completará (cron limpa se >10min)
       } else {
         update.phone_reveal_status = "not_found";
       }
