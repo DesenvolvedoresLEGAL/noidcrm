@@ -314,8 +314,19 @@ Deno.serve(async (req) => {
     const companyPhoneRejected = !revealedPhone && !!phoneQual?.rejected_company_phone;
 
     const apolloPersonId = person?.id ?? person?.person_id ?? contact.apollo_person_id ?? null;
-    // Phone still pending only when Apollo didn't return anything (person or company).
-    const phonePending = wantsPhone && !phoneAlready && !revealedPhone && !companyPhoneRejected;
+    // KAI.15.3 — só marca pending quando Apollo sinalizou fetch async real.
+    // Padrão observado: person.phone_numbers com entry(ies) sem sanitized_number/raw_number
+    // (Apollo enfileirou e chamará o webhook depois). Se phone_numbers estiver vazio/ausente,
+    // Apollo NÃO vai callback — marcar como not_found imediato.
+    const rawPhoneNumbers: any[] = Array.isArray(person?.phone_numbers) ? person.phone_numbers : [];
+    const hasAsyncPending = rawPhoneNumbers.some((p: any) => {
+      if (!p || typeof p !== "object") return false;
+      const noNumber = !p.sanitized_number && !p.raw_number && !p.number;
+      const pendingFlag = String(p.status ?? p.dnc_status ?? "").toLowerCase().includes("pend")
+        || p.is_pending === true;
+      return noNumber && (pendingFlag || rawPhoneNumbers.length > 0 && !p.sanitized_number);
+    });
+    const phonePending = wantsPhone && !phoneAlready && !revealedPhone && !companyPhoneRejected && hasAsyncPending;
 
     const update: Record<string, unknown> = {
       last_reveal_attempt_at: nowIso,
