@@ -22,6 +22,7 @@ import { ProspectContactsTab } from './ProspectContactsTab';
 import { EnrichmentJobsTable } from './enrichment/EnrichmentJobsTable';
 import { ApolloInspectorTab } from './ApolloInspectorTab';
 import { ApolloBrowserParityTab } from './ApolloBrowserParityTab';
+import { ApolloEndpointMatrixTab } from './ApolloEndpointMatrixTab';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 
 interface ProspectDetailDrawerProps {
