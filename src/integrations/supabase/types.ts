@@ -37157,6 +37157,7 @@ export type Database = {
       cleanup_expired_oauth_nonces: { Args: never; Returns: number }
       cleanup_expired_snapshots: { Args: never; Returns: number }
       cleanup_orphaned_playbook_runs: { Args: never; Returns: number }
+      cleanup_stale_phone_reveal_requests: { Args: never; Returns: number }
       complete_action_execution: {
         Args: {
           p_after_state?: Json
