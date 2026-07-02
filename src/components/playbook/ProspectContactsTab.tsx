@@ -340,11 +340,30 @@ export function ProspectContactsTab({
         </Card>
       )}
 
-      {contacts.map((c) => {
+      {/* KAI.18.5 — mensagem quando Apollo retornou mas nenhum passou nas recomendações */}
+      {!isLoading && recommendedContacts.length === 0 && hiddenContacts.length > 0 && !showHidden && (
+        <Card className="p-3 text-xs bg-amber-500/5 border-amber-500/30">
+          <div className="font-medium text-amber-800 mb-1">
+            Apollo encontrou {hiddenContacts.length} contato(s), mas nenhum passou nas recomendações do Kairós.
+          </div>
+          <button
+            className="text-primary hover:underline"
+            onClick={() => setShowHidden(true)}
+          >
+            Ver contatos brutos →
+          </button>
+        </Card>
+      )}
+
+      {visibleContacts.map((c: any) => {
         const isSelected = selected.has(c.id);
         const hasData = !!(c.email || c.phone);
+        const isHidden = !!c.is_hidden_recommendation;
         return (
-          <Card key={c.id} className={cn("p-3 space-y-2", c.is_primary && "ring-1 ring-primary/40 bg-primary/5", isSelected && "border-primary/40")}>
+          <Card key={c.id} className={cn("p-3 space-y-2", c.is_primary && "ring-1 ring-primary/40 bg-primary/5", isSelected && "border-primary/40", isHidden && "opacity-80 border-dashed")}>
+            {isHidden && (
+              <HiddenRecommendationBadges reasons={c.hidden_reasons} />
+            )}
             <div className="flex items-start justify-between gap-2">
               <div className="flex items-start gap-2 min-w-0">
                 <Checkbox
