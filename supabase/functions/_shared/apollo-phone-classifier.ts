@@ -1,7 +1,7 @@
-// KAI.15.1 — Apollo Phone Quality Guard
-// Classifica telefones retornados pelo Apollo em pessoa (mobile/direct) vs empresa.
-// Rejeita telefones herdados de organization/account/company para nunca cair no
-// registro do decisor. Retorna a fonte para auditoria e para o Contact Score.
+// KAI.15.1 / KAI.15.2 — Apollo Phone Quality Guard
+// Classifica telefones retornados pelo Apollo em pessoa (mobile/direct/whatsapp)
+// vs empresa (reception/main). Rejeita telefones herdados de organization/account.
+// Também computa qualidade, confiança e prontidão WhatsApp.
 
 export type PhoneSourceType =
   | "person_mobile"
@@ -9,10 +9,45 @@ export type PhoneSourceType =
   | "company_main"
   | "unknown";
 
+export type PhoneMatchQuality =
+  | "person_whatsapp"
+  | "person_mobile"
+  | "person_direct"
+  | "company_reception"
+  | "company_main"
+  | "unknown";
+
+export type PhoneType =
+  | "mobile"
+  | "direct"
+  | "whatsapp"
+  | "company_main"
+  | "company_reception"
+  | "unknown";
+
+export type PhoneValidationStatus =
+  | "valid"
+  | "likely_valid"
+  | "unknown"
+  | "invalid"
+  | "stale";
+
 export interface PhoneClassification {
   phone: string | null;
   sourceType: PhoneSourceType;
   rejectedCompanyPhone: string | null;
+}
+
+export interface PhoneQuality {
+  phone: string | null;
+  phone_source: "apollo" | "manual" | "crm" | "imported" | "unknown";
+  phone_type: PhoneType;
+  phone_match_quality: PhoneMatchQuality;
+  phone_confidence: number;
+  is_whatsapp_ready: boolean;
+  phone_validation_status: PhoneValidationStatus;
+  reason: string;
+  rejected_company_phone: string | null;
 }
 
 const PERSON_TYPES = new Set([
