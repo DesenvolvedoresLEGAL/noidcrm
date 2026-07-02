@@ -47,6 +47,10 @@ function nextPreferredChannel(phone_revealed: boolean, email_revealed: boolean, 
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  let safetyContactId: string | null = null;
+  let safetyAdmin: any = null;
+  let safetyWantsPhone = false;
+  let safetyWantsEmail = false;
   try {
     const APOLLO_API_KEY = Deno.env.get("APOLLO_API_KEY");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
