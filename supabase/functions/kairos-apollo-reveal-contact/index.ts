@@ -413,27 +413,49 @@ Deno.serve(async (req) => {
       requested_by: requestedBy, source: body.source ?? "manual",
       reason: auditReason,
       phone_source_type: wantsPhone ? phoneSourceType : null,
+      phone_source: phoneQual?.phone_source ?? null,
+      phone_type: phoneQual?.phone_type ?? null,
+      phone_match_quality: phoneQual?.phone_match_quality ?? null,
+      phone_confidence: phoneQual?.phone_confidence ?? null,
+      is_whatsapp_ready: !!phoneQual?.is_whatsapp_ready,
+      phone_quality_reason: phoneQual?.reason ?? null,
       raw_response: {
         status: apolloStatus,
         person_id: apolloPersonId,
         phone_source_type: phoneSourceType,
+        phone_match_quality: phoneQual?.phone_match_quality ?? null,
+        phone_confidence: phoneQual?.phone_confidence ?? null,
         company_phone_rejected: companyPhoneRejected,
-        rejected_company_phone: phoneClass.rejectedCompanyPhone ?? null,
+        rejected_company_phone: phoneQual?.rejected_company_phone ?? null,
       },
     });
 
-    // Revenue events
+    // KAI.15.2 — Revenue events granulares por qualidade
     if (revealedEmail) await emitRevenueEvent(admin, orgId, "apollo_email_revealed", { contact_id: contact.id });
     if (wantsEmail && !revealedEmail && !emailAlready) await emitRevenueEvent(admin, orgId, "apollo_email_not_found", { contact_id: contact.id });
-    if (revealedPhone) await emitRevenueEvent(admin, orgId, "apollo_phone_revealed", { contact_id: contact.id, phone_source_type: phoneSourceType });
-    if (companyPhoneRejected) await emitRevenueEvent(admin, orgId, "apollo_phone_company_rejected", { contact_id: contact.id });
+    if (revealedPhone && phoneQual) {
+      await emitRevenueEvent(admin, orgId, "phone_quality_scored", {
+        contact_id: contact.id,
+        phone_match_quality: phoneQual.phone_match_quality,
+        phone_confidence: phoneQual.phone_confidence,
+        is_whatsapp_ready: phoneQual.is_whatsapp_ready,
+      });
+      if (phoneQual.phone_match_quality === "person_mobile") {
+        await emitRevenueEvent(admin, orgId, "phone_person_mobile_revealed", { contact_id: contact.id });
+      } else if (phoneQual.phone_match_quality === "person_direct") {
+        await emitRevenueEvent(admin, orgId, "phone_person_direct_revealed", { contact_id: contact.id });
+      }
+      if (phoneQual.is_whatsapp_ready) {
+        await emitRevenueEvent(admin, orgId, "phone_person_whatsapp_revealed", { contact_id: contact.id });
+      }
+    }
+    if (companyPhoneRejected) await emitRevenueEvent(admin, orgId, "phone_company_rejected", { contact_id: contact.id });
     if (wantsPhone && !revealedPhone && !companyPhoneRejected && !phonePending && !phoneAlready) await emitRevenueEvent(admin, orgId, "apollo_phone_not_found", { contact_id: contact.id });
 
     // Update kairos_qualified_queue with channel + flags
     try {
       await admin.from("kairos_qualified_queue").update({
-        primary_contact_score: null, // let trigger/score recompute
-        // expose flags if columns exist; ignore failure silently
+        primary_contact_score: null,
         phone_revealed: phoneRevealedFinal,
         email_revealed: emailRevealedFinal,
         preferred_channel: update.preferred_channel,
@@ -448,13 +470,17 @@ Deno.serve(async (req) => {
       phone_reveal_status: (update.phone_reveal_status ?? contact.phone_reveal_status ?? null) as string | null,
       phone_revealed: !!(update.phone_revealed ?? contact.phone_revealed),
       phone_source_type: (wantsPhone ? phoneSourceType : null) as string | null,
+      phone_type: phoneQual?.phone_type ?? null,
+      phone_match_quality: phoneQual?.phone_match_quality ?? null,
+      phone_confidence: phoneQual?.phone_confidence ?? null,
+      is_whatsapp_ready: !!phoneQual?.is_whatsapp_ready,
       credits_estimated: estimateCredits(dataType),
       credits_used: creditsUsed,
       email: revealedEmail,
       phone: revealedPhone,
       phone_pending: phonePending,
       company_phone_rejected: companyPhoneRejected,
-      reason: auditReason ?? null,
+      reason: auditReason ?? phoneQual?.reason ?? null,
       preferred_channel: update.preferred_channel,
       audit_id: auditId,
     });
