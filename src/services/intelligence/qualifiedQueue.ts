@@ -47,6 +47,23 @@ export interface QualifiedQueueItem {
   coverage_class?: 'complete' | 'good' | 'partial' | 'weak' | 'new' | null;
   missing_items?: string[] | null;
   next_best_action?: string | null;
+  company_intelligence_score?: number | null;
+  company_grade?: 'A+' | 'A' | 'B' | 'C' | 'D' | 'F' | null;
+  company_next_best_action?: string | null;
+  company_recommended_strategy?: string | null;
+  apollo_recommended?: boolean | null;
+  sdr_recommended?: boolean | null;
+  company_human_review_required?: boolean | null;
+}
+
+export type CompanyGrade = 'A+' | 'A' | 'B' | 'C' | 'D' | 'F';
+
+export async function computeCompanyIntelligence(prospectId: string, forceRecompute = false) {
+  const { data, error } = await supabase.functions.invoke('kairos-compute-company-intelligence', {
+    body: { prospect_id: prospectId, force_recompute: forceRecompute },
+  });
+  if (error) throw error;
+  return data;
 }
 
 export interface QualifiedQueueFilters {
@@ -60,6 +77,9 @@ export interface QualifiedQueueFilters {
   humanReviewOnly?: boolean;
   search?: string;
   limit?: number;
+  companyGrades?: CompanyGrade[];
+  apolloRecommended?: boolean;
+  sdrRecommended?: boolean;
 }
 
 export async function listQualifiedQueue(
@@ -85,6 +105,9 @@ export async function listQualifiedQueue(
   if (filters.sdrReadyOnly) q = q.eq('sdr_ready', true);
   if (filters.humanReviewOnly) q = q.eq('qualification_status', 'human_review');
   if (filters.search?.trim()) q = q.ilike('company_name', `%${filters.search.trim()}%`);
+  if (filters.companyGrades?.length) q = q.in('company_grade', filters.companyGrades);
+  if (filters.apolloRecommended === true) q = q.eq('apollo_recommended', true);
+  if (filters.sdrRecommended === true) q = q.eq('sdr_recommended', true);
 
   const { data, error } = await q;
   if (error) throw error;

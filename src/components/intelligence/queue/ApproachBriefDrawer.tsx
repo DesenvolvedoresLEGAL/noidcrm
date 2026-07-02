@@ -4,6 +4,7 @@ import type { QualifiedQueueItem } from '@/services/intelligence/qualifiedQueue'
 import { usePromoteToCrm } from '@/hooks/intelligence/useQualifiedQueueActions';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SmartCoverageTab } from '@/components/intelligence/smart-coverage/SmartCoverageTab';
+import { CompanyIntelligenceTab } from './CompanyIntelligenceTab';
 
 interface Brief {
   dores?: string[];
@@ -31,8 +32,9 @@ export function ApproachBriefDrawer({ item, onClose }: Props) {
           <SheetTitle>{item.company_name}</SheetTitle>
         </SheetHeader>
         <Tabs defaultValue="brief" className="mt-4">
-          <TabsList className="grid grid-cols-2 w-full">
+          <TabsList className="grid grid-cols-3 w-full">
             <TabsTrigger value="brief">Brief</TabsTrigger>
+            <TabsTrigger value="intelligence">Company Intelligence</TabsTrigger>
             <TabsTrigger value="coverage">Smart Coverage</TabsTrigger>
           </TabsList>
           <TabsContent value="brief" className="space-y-4 text-sm mt-4">
@@ -87,6 +89,9 @@ export function ApproachBriefDrawer({ item, onClose }: Props) {
               </p>
             )}
           </div>
+          </TabsContent>
+          <TabsContent value="intelligence">
+            <CompanyIntelligenceTab prospectId={item.prospect_id} />
           </TabsContent>
           <TabsContent value="coverage">
             <SmartCoverageTab prospectId={item.prospect_id} />

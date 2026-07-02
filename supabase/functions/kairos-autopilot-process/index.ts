@@ -82,6 +82,18 @@ async function processItem(admin: SupabaseClient, runId: string, item: any, conf
     }
   }
 
+  // Step 4b (KAI.19): Company Intelligence — deterministic gate before Apollo
+  await admin.from("kairos_batch_run_items").update({ current_stage: "company_intelligence" }).eq("id", item.id);
+  try {
+    await admin.functions.invoke("kairos-compute-company-intelligence", {
+      body: { prospect_id: prospectId },
+      headers: { Authorization: `Bearer ${serviceKey}` },
+    });
+    await log(admin, runId, orgId, prospectId, "company_intelligence", "ok");
+  } catch (e) {
+    await log(admin, runId, orgId, prospectId, "company_intelligence", "failed", { error: String(e) });
+  }
+
   // Step 5: Apollo Invisible Mode (decisão é interna; respeita rules + score + limites)
   const apolloLimit = config.max_apollo_credits ?? 0;
   if (config.allow_apollo && creditsUsedRef.v < apolloLimit) {
