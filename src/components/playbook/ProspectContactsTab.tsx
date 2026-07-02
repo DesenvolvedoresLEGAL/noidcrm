@@ -16,6 +16,8 @@ import { ApolloConfirmModal } from "./enrichment/ApolloConfirmModal";
 import { RevealConfirmModal } from "./enrichment/RevealConfirmModal";
 import { ContactsQualityPanel } from "./enrichment/ContactsQualityPanel";
 import { MergedContactsAccordion } from "./enrichment/MergedContactsAccordion";
+import { HiddenRecommendationBadges } from "./HiddenRecommendationBadges";
+import { useApolloRaw } from "@/hooks/intelligence/useApolloQueryLogs";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { listMergedContacts } from "@/services/enrichment/apolloService";
@@ -72,8 +74,10 @@ export function ProspectContactsTab({
   });
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [showHidden, setShowHidden] = useState(false); // KAI.18.5 — Apollo Raw view toggle
   const sync = useSyncEnrichedContacts();
   const reveal = useRevealContact();
+  const rawSearch = useApolloRaw(prospectId);
   const [revealingKey, setRevealingKey] = useState<string | null>(null);
   const [confirmReveal, setConfirmReveal] = useState<{
     contactId: string;
@@ -82,6 +86,17 @@ export function ProspectContactsTab({
     emailStatus: string | null;
     phoneStatus: string | null;
   } | null>(null);
+
+  // KAI.18.5 — separação recomendado x escondido (nunca oculta de verdade)
+  const recommendedContacts = useMemo(
+    () => contacts.filter((c: any) => !c.is_hidden_recommendation),
+    [contacts],
+  );
+  const hiddenContacts = useMemo(
+    () => contacts.filter((c: any) => !!c.is_hidden_recommendation),
+    [contacts],
+  );
+  const visibleContacts = showHidden ? contacts : recommendedContacts;
 
   const runReveal = async (contactId: string, dataType: RevealDataType, name: string | null) => {
     const key = `${contactId}:${dataType}`;
@@ -210,17 +225,71 @@ export function ProspectContactsTab({
             <Badge variant="secondary" className="text-[10px]">{enrichmentStatus}</Badge>
           )}
         </div>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => setConfirmOpen(true)}
-          disabled={enrich.isPending}
-          className="gap-1.5"
-        >
-          {enrich.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-          Enriquecer (Apollo)
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setConfirmOpen(true)}
+            disabled={enrich.isPending}
+            className="gap-1.5"
+          >
+            {enrich.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+            Enriquecer (Apollo)
+          </Button>
+          <Button
+            size="sm"
+            variant={showHidden ? 'default' : 'ghost'}
+            onClick={async () => {
+              if (!showHidden && hiddenContacts.length === 0 && contacts.length === 0) {
+                try {
+                  await rawSearch.mutateAsync(undefined);
+                  toast.success('Apollo Raw executado');
+                } catch (e: any) {
+                  toast.error(e?.message ?? 'Falha no Apollo Raw');
+                  return;
+                }
+              }
+              setShowHidden((v) => !v);
+            }}
+            disabled={rawSearch.isPending}
+            className="gap-1.5"
+            title="Ignora recomendações do Kairós e mostra tudo que o Apollo retornou"
+          >
+            {rawSearch.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+            {showHidden ? 'Modo inteligente' : 'Apollo Raw'}
+          </Button>
+        </div>
       </div>
+
+      {/* KAI.18.5 — Indicador de confiança Apollo vs Kairós */}
+      {!isLoading && contacts.length > 0 && (
+        <div className="rounded-md border bg-muted/30 px-3 py-2 flex items-center justify-between text-xs">
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              Apollo encontrou <strong className="text-foreground">{contacts.length}</strong>
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-blue-500" />
+              Kairós recomenda <strong className="text-foreground">{recommendedContacts.length}</strong>
+            </span>
+            {hiddenContacts.length > 0 && (
+              <span className="flex items-center gap-1.5 text-amber-700">
+                <span className="h-2 w-2 rounded-full bg-amber-500" />
+                {hiddenContacts.length} com ressalvas
+              </span>
+            )}
+          </div>
+          {hiddenContacts.length > 0 && (
+            <button
+              className="text-primary hover:underline text-[11px]"
+              onClick={() => setShowHidden((v) => !v)}
+            >
+              {showHidden ? 'Mostrar só recomendados' : 'Mostrar todos'}
+            </button>
+          )}
+        </div>
+      )}
 
       <ApolloConfirmModal
         open={confirmOpen}
@@ -271,11 +340,30 @@ export function ProspectContactsTab({
         </Card>
       )}
 
-      {contacts.map((c) => {
+      {/* KAI.18.5 — mensagem quando Apollo retornou mas nenhum passou nas recomendações */}
+      {!isLoading && recommendedContacts.length === 0 && hiddenContacts.length > 0 && !showHidden && (
+        <Card className="p-3 text-xs bg-amber-500/5 border-amber-500/30">
+          <div className="font-medium text-amber-800 mb-1">
+            Apollo encontrou {hiddenContacts.length} contato(s), mas nenhum passou nas recomendações do Kairós.
+          </div>
+          <button
+            className="text-primary hover:underline"
+            onClick={() => setShowHidden(true)}
+          >
+            Ver contatos brutos →
+          </button>
+        </Card>
+      )}
+
+      {visibleContacts.map((c: any) => {
         const isSelected = selected.has(c.id);
         const hasData = !!(c.email || c.phone);
+        const isHidden = !!c.is_hidden_recommendation;
         return (
-          <Card key={c.id} className={cn("p-3 space-y-2", c.is_primary && "ring-1 ring-primary/40 bg-primary/5", isSelected && "border-primary/40")}>
+          <Card key={c.id} className={cn("p-3 space-y-2", c.is_primary && "ring-1 ring-primary/40 bg-primary/5", isSelected && "border-primary/40", isHidden && "opacity-80 border-dashed")}>
+            {isHidden && (
+              <HiddenRecommendationBadges reasons={c.hidden_reasons} />
+            )}
             <div className="flex items-start justify-between gap-2">
               <div className="flex items-start gap-2 min-w-0">
                 <Checkbox

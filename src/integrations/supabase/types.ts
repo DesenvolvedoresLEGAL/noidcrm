@@ -5529,6 +5529,95 @@ export type Database = {
         }
         Relationships: []
       }
+      apollo_query_logs: {
+        Row: {
+          apollo_request_id: string | null
+          cache_status: string
+          created_at: string
+          credits_used: number
+          endpoint: string
+          error_message: string | null
+          fallback_used: boolean
+          hidden_reasons: Json
+          id: string
+          latency_ms: number | null
+          mode: string
+          organization_id: string
+          people_hidden: number
+          people_recommended: number
+          people_returned: number
+          prospect_id: string | null
+          replay_of: string | null
+          request_headers_safe: Json
+          request_payload: Json
+          response_body: Json | null
+          response_status: number | null
+          retries: number
+          status: string
+          triggered_by: string | null
+        }
+        Insert: {
+          apollo_request_id?: string | null
+          cache_status?: string
+          created_at?: string
+          credits_used?: number
+          endpoint: string
+          error_message?: string | null
+          fallback_used?: boolean
+          hidden_reasons?: Json
+          id?: string
+          latency_ms?: number | null
+          mode?: string
+          organization_id: string
+          people_hidden?: number
+          people_recommended?: number
+          people_returned?: number
+          prospect_id?: string | null
+          replay_of?: string | null
+          request_headers_safe?: Json
+          request_payload?: Json
+          response_body?: Json | null
+          response_status?: number | null
+          retries?: number
+          status?: string
+          triggered_by?: string | null
+        }
+        Update: {
+          apollo_request_id?: string | null
+          cache_status?: string
+          created_at?: string
+          credits_used?: number
+          endpoint?: string
+          error_message?: string | null
+          fallback_used?: boolean
+          hidden_reasons?: Json
+          id?: string
+          latency_ms?: number | null
+          mode?: string
+          organization_id?: string
+          people_hidden?: number
+          people_recommended?: number
+          people_returned?: number
+          prospect_id?: string | null
+          replay_of?: string | null
+          request_headers_safe?: Json
+          request_payload?: Json
+          response_body?: Json | null
+          response_status?: number | null
+          retries?: number
+          status?: string
+          triggered_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "apollo_query_logs_replay_of_fkey"
+            columns: ["replay_of"]
+            isOneToOne: false
+            referencedRelation: "apollo_query_logs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       apollo_reveal_audit: {
         Row: {
           contact_id: string | null
@@ -10776,7 +10865,9 @@ export type Database = {
           email_status: string | null
           first_name: string | null
           full_name: string | null
+          hidden_reasons: string[]
           id: string
+          is_hidden_recommendation: boolean
           is_merged: boolean
           is_primary: boolean | null
           is_whatsapp_ready: boolean
@@ -10805,12 +10896,14 @@ export type Database = {
           provider: string | null
           provider_priority: Json | null
           raw: Json | null
+          requested_titles: string[]
           reveal_credits_used: number
           reveal_source: string | null
           reveal_status: string | null
           revealed_at: string | null
           role_title: string | null
           seniority: string | null
+          title_match_score: number | null
           updated_at: string | null
           workspace_id: string
         }
@@ -10830,7 +10923,9 @@ export type Database = {
           email_status?: string | null
           first_name?: string | null
           full_name?: string | null
+          hidden_reasons?: string[]
           id?: string
+          is_hidden_recommendation?: boolean
           is_merged?: boolean
           is_primary?: boolean | null
           is_whatsapp_ready?: boolean
@@ -10859,12 +10954,14 @@ export type Database = {
           provider?: string | null
           provider_priority?: Json | null
           raw?: Json | null
+          requested_titles?: string[]
           reveal_credits_used?: number
           reveal_source?: string | null
           reveal_status?: string | null
           revealed_at?: string | null
           role_title?: string | null
           seniority?: string | null
+          title_match_score?: number | null
           updated_at?: string | null
           workspace_id: string
         }
@@ -10884,7 +10981,9 @@ export type Database = {
           email_status?: string | null
           first_name?: string | null
           full_name?: string | null
+          hidden_reasons?: string[]
           id?: string
+          is_hidden_recommendation?: boolean
           is_merged?: boolean
           is_primary?: boolean | null
           is_whatsapp_ready?: boolean
@@ -10913,12 +11012,14 @@ export type Database = {
           provider?: string | null
           provider_priority?: Json | null
           raw?: Json | null
+          requested_titles?: string[]
           reveal_credits_used?: number
           reveal_source?: string | null
           reveal_status?: string | null
           revealed_at?: string | null
           role_title?: string | null
           seniority?: string | null
+          title_match_score?: number | null
           updated_at?: string | null
           workspace_id?: string
         }
@@ -37378,6 +37479,7 @@ export type Database = {
         }
         Returns: string
       }
+      cleanup_apollo_query_logs: { Args: never; Returns: number }
       cleanup_expired_dedup_keys: { Args: never; Returns: number }
       cleanup_expired_oauth_nonces: { Args: never; Returns: number }
       cleanup_expired_snapshots: { Args: never; Returns: number }

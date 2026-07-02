@@ -103,12 +103,17 @@ export interface EnrichedContact {
   phone_validation_status?: string | null;
   phone_quality_reason?: string | null;
   is_whatsapp_ready?: boolean | null;
+  // KAI.18.5 — Apollo Reveal Governance
+  is_hidden_recommendation?: boolean | null;
+  hidden_reasons?: string[] | null;
+  requested_titles?: string[] | null;
+  title_match_score?: number | null;
 }
 
 export async function listEnrichedContacts(prospectId: string): Promise<EnrichedContact[]> {
   const { data, error } = await (supabase
     .from("enriched_contact_profiles") as any)
-    .select("id, prospect_id, full_name, first_name, last_name, role_title, seniority, department, email, email_status, phone, linkedin_url, provider, confidence_score, is_primary, created_at, revealed_at, reveal_status, last_reveal_attempt_at, email_revealed, phone_revealed, email_reveal_status, phone_reveal_status, email_revealed_at, phone_revealed_at, preferred_channel, phone_source, phone_type, phone_match_quality, phone_confidence, phone_verified_at, phone_last_validation_at, phone_validation_status, phone_quality_reason, is_whatsapp_ready")
+    .select("id, prospect_id, full_name, first_name, last_name, role_title, seniority, department, email, email_status, phone, linkedin_url, provider, confidence_score, is_primary, created_at, revealed_at, reveal_status, last_reveal_attempt_at, email_revealed, phone_revealed, email_reveal_status, phone_reveal_status, email_revealed_at, phone_revealed_at, preferred_channel, phone_source, phone_type, phone_match_quality, phone_confidence, phone_verified_at, phone_last_validation_at, phone_validation_status, phone_quality_reason, is_whatsapp_ready, is_hidden_recommendation, hidden_reasons, requested_titles, title_match_score")
     .eq("prospect_id", prospectId)
     .eq("is_merged", false)
     .order("is_primary", { ascending: false })
