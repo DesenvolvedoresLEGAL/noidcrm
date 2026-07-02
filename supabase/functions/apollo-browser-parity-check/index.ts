@@ -241,6 +241,81 @@ Deno.serve(async (req: Request) => {
       }] : []),
     ]);
 
+    // KAI.18.8 — persist endpoint matrix entries (web from HAR + last api call)
+    try {
+      const matrixRows: any[] = [];
+
+      // Web entries from HAR
+      for (const h of harCandidates) {
+        let epath = "";
+        try {
+          epath = new URL(h.url).pathname.replace(/^\/api\/v?\d*\//, "").replace(/^\//, "");
+        } catch { epath = h.url ?? ""; }
+        matrixRows.push({
+          organization_id: prospect.organization_id,
+          prospect_id,
+          parity_log_id: inserted?.id ?? null,
+          endpoint: epath || "unknown",
+          method: h.method ?? "POST",
+          http_status: h.status ?? null,
+          payload: h.payload ?? null,
+          response_summary: h.response_summary ?? null,
+          returned_contacts: h.response_summary?.people_count ?? null,
+          latency_ms: h.time_ms ?? null,
+          source: "web",
+          strategy: "har_import",
+        });
+      }
+
+      // Kairós last api call
+      if (lastLog) {
+        let apath = String(lastLog.endpoint ?? "");
+        try { apath = new URL(apath).pathname.replace(/^\/api\/v?\d*\//, "").replace(/^\//, ""); } catch { /* keep */ }
+        matrixRows.push({
+          organization_id: prospect.organization_id,
+          prospect_id,
+          query_log_id: lastLog.id,
+          parity_log_id: inserted?.id ?? null,
+          endpoint: apath || "unknown",
+          method: "POST",
+          http_status: 200,
+          payload: lastLog.request_payload ?? null,
+          response_summary: lastLog.response_body ?? null,
+          returned_contacts: lastLog.people_returned ?? 0,
+          credits_used: lastLog.credits_used ?? null,
+          latency_ms: lastLog.latency_ms ?? null,
+          source: "api",
+          strategy: "current_backend",
+        });
+      }
+
+      // Compute ranking + recommendation (highest returned_contacts, then lowest credits, then lowest latency)
+      if (matrixRows.length > 0) {
+        const sorted = [...matrixRows].sort((a, b) => {
+          const ac = a.returned_contacts ?? -1, bc = b.returned_contacts ?? -1;
+          if (bc !== ac) return bc - ac;
+          const acr = a.credits_used ?? 9999, bcr = b.credits_used ?? 9999;
+          if (acr !== bcr) return acr - bcr;
+          const al = a.latency_ms ?? 9999, bl = b.latency_ms ?? 9999;
+          return al - bl;
+        });
+        sorted.forEach((row, i) => {
+          row.ranking = i + 1;
+          const contacts = row.returned_contacts ?? 0;
+          const topContacts = sorted[0]?.returned_contacts ?? 0;
+          const efficiency = topContacts > 0 ? contacts / topContacts : 0;
+          row.stars = Math.max(0, Math.min(5, Math.round(efficiency * 5)));
+          row.recommended = i === 0 && contacts > 0;
+          row.confidence_score = Number((efficiency * 100).toFixed(2));
+        });
+
+        await sb.from("apollo_endpoint_matrix").insert(matrixRows);
+      }
+    } catch (e) {
+      console.error("endpoint matrix persist error:", e);
+    }
+
+
     return new Response(JSON.stringify({
       id: inserted?.id,
       parity_status,

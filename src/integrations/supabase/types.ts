@@ -5556,6 +5556,144 @@ export type Database = {
         }
         Relationships: []
       }
+      apollo_endpoint_discovery: {
+        Row: {
+          available: boolean
+          created_at: string
+          documentation_url: string | null
+          endpoint: string
+          graphql: boolean
+          id: string
+          internal_only: boolean
+          last_seen_at: string | null
+          method: string
+          notes: string | null
+          public_only: boolean
+          requires_auth_scope: string | null
+          requires_cookie: boolean
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          available?: boolean
+          created_at?: string
+          documentation_url?: string | null
+          endpoint: string
+          graphql?: boolean
+          id?: string
+          internal_only?: boolean
+          last_seen_at?: string | null
+          method?: string
+          notes?: string | null
+          public_only?: boolean
+          requires_auth_scope?: string | null
+          requires_cookie?: boolean
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          available?: boolean
+          created_at?: string
+          documentation_url?: string | null
+          endpoint?: string
+          graphql?: boolean
+          id?: string
+          internal_only?: boolean
+          last_seen_at?: string | null
+          method?: string
+          notes?: string | null
+          public_only?: boolean
+          requires_auth_scope?: string | null
+          requires_cookie?: boolean
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      apollo_endpoint_matrix: {
+        Row: {
+          confidence_score: number | null
+          created_at: string
+          credits_used: number | null
+          endpoint: string
+          executed_by: string | null
+          headers_seen: Json | null
+          http_status: number | null
+          id: string
+          latency_ms: number | null
+          method: string
+          notes: string | null
+          organization_id: string
+          parity_log_id: string | null
+          payload: Json | null
+          prospect_id: string | null
+          query_log_id: string | null
+          ranking: number | null
+          recommended: boolean
+          response_summary: Json | null
+          returned_companies: number | null
+          returned_contacts: number | null
+          source: string
+          stars: number | null
+          strategy: string | null
+          updated_at: string
+        }
+        Insert: {
+          confidence_score?: number | null
+          created_at?: string
+          credits_used?: number | null
+          endpoint: string
+          executed_by?: string | null
+          headers_seen?: Json | null
+          http_status?: number | null
+          id?: string
+          latency_ms?: number | null
+          method?: string
+          notes?: string | null
+          organization_id: string
+          parity_log_id?: string | null
+          payload?: Json | null
+          prospect_id?: string | null
+          query_log_id?: string | null
+          ranking?: number | null
+          recommended?: boolean
+          response_summary?: Json | null
+          returned_companies?: number | null
+          returned_contacts?: number | null
+          source?: string
+          stars?: number | null
+          strategy?: string | null
+          updated_at?: string
+        }
+        Update: {
+          confidence_score?: number | null
+          created_at?: string
+          credits_used?: number | null
+          endpoint?: string
+          executed_by?: string | null
+          headers_seen?: Json | null
+          http_status?: number | null
+          id?: string
+          latency_ms?: number | null
+          method?: string
+          notes?: string | null
+          organization_id?: string
+          parity_log_id?: string | null
+          payload?: Json | null
+          prospect_id?: string | null
+          query_log_id?: string | null
+          ranking?: number | null
+          recommended?: boolean
+          response_summary?: Json | null
+          returned_companies?: number | null
+          returned_contacts?: number | null
+          source?: string
+          stars?: number | null
+          strategy?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       apollo_enrichment_audit: {
         Row: {
           apollo_status: string
@@ -21643,6 +21781,7 @@ export type Database = {
       organization_settings: {
         Row: {
           annual_revenue_goal: number
+          apollo_endpoint_strategy: string
           created_at: string
           monthly_revenue_goal: number
           organization_id: string
@@ -21652,6 +21791,7 @@ export type Database = {
         }
         Insert: {
           annual_revenue_goal?: number
+          apollo_endpoint_strategy?: string
           created_at?: string
           monthly_revenue_goal?: number
           organization_id: string
@@ -21661,6 +21801,7 @@ export type Database = {
         }
         Update: {
           annual_revenue_goal?: number
+          apollo_endpoint_strategy?: string
           created_at?: string
           monthly_revenue_goal?: number
           organization_id?: string

@@ -22,6 +22,7 @@ import { ProspectContactsTab } from './ProspectContactsTab';
 import { EnrichmentJobsTable } from './enrichment/EnrichmentJobsTable';
 import { ApolloInspectorTab } from './ApolloInspectorTab';
 import { ApolloBrowserParityTab } from './ApolloBrowserParityTab';
+import { ApolloEndpointMatrixTab } from './ApolloEndpointMatrixTab';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 
 interface ProspectDetailDrawerProps {
@@ -149,6 +150,7 @@ export function ProspectDetailDrawer({
             <TabsTrigger value="contacts" className="flex-1">Contatos</TabsTrigger>
             <TabsTrigger value="apollo" className="flex-1">Apollo</TabsTrigger>
             <TabsTrigger value="parity" className="flex-1">Parity</TabsTrigger>
+            <TabsTrigger value="matrix" className="flex-1">Matrix</TabsTrigger>
             <TabsTrigger value="history" className="flex-1">Histórico</TabsTrigger>
             <TabsTrigger value="enrichment" className="flex-1">Enrichment</TabsTrigger>
             <TabsTrigger value="decision" className="flex-1">Decisão</TabsTrigger>
@@ -168,6 +170,12 @@ export function ProspectDetailDrawer({
                 companyName={prospect.company_name}
                 domain={(prospect as any).normalized_domain}
               />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="matrix">
+            <div className="py-4">
+              <ApolloEndpointMatrixTab prospectId={prospect.id} />
             </div>
           </TabsContent>
 
