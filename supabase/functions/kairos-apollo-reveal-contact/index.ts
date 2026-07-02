@@ -412,23 +412,45 @@ Deno.serve(async (req) => {
     } catch {/*column may not exist in older schema*/}
 
     return json(200, {
+      success: true,
       status: finalStatus,
       contact_id: contact.id,
       requested_data_type: dataType,
+      phone_reveal_status: (update.phone_reveal_status ?? contact.phone_reveal_status ?? null) as string | null,
+      phone_revealed: !!(update.phone_revealed ?? contact.phone_revealed),
+      phone_source_type: (wantsPhone ? phoneSourceType : null) as string | null,
       credits_estimated: estimateCredits(dataType),
       credits_used: creditsUsed,
       email: revealedEmail,
       phone: revealedPhone,
       phone_pending: phonePending,
-      phone_source_type: phoneSourceType,
       company_phone_rejected: companyPhoneRejected,
-      reason: auditReason,
+      reason: auditReason ?? null,
       preferred_channel: update.preferred_channel,
       audit_id: auditId,
     });
   } catch (e) {
     console.error("kairos-apollo-reveal-contact error:", e);
-    return json(500, { error: String(e) });
+    // Safety net: ensure contact never stays stuck if we threw mid-flight.
+    const reason = String((e as any)?.message ?? e);
+    try {
+      if (safetyAdmin && safetyContactId) {
+        const upd: Record<string, unknown> = { last_reveal_attempt_at: new Date().toISOString() };
+        if (safetyWantsPhone) { upd.phone_reveal_status = "failed"; upd.phone_revealed = false; }
+        if (safetyWantsEmail) { upd.email_reveal_status = "failed"; }
+        await safetyAdmin.from("enriched_contact_profiles").update(upd).eq("id", safetyContactId);
+      }
+    } catch {/*noop*/}
+    return json(200, {
+      success: false,
+      status: "failed",
+      contact_id: safetyContactId,
+      phone_reveal_status: safetyWantsPhone ? "failed" : null,
+      phone_revealed: false,
+      phone_source_type: null,
+      credits_used: 0,
+      reason,
+    });
   }
 });
 
