@@ -105,6 +105,9 @@ export async function listQualifiedQueue(
   if (filters.sdrReadyOnly) q = q.eq('sdr_ready', true);
   if (filters.humanReviewOnly) q = q.eq('qualification_status', 'human_review');
   if (filters.search?.trim()) q = q.ilike('company_name', `%${filters.search.trim()}%`);
+  if (filters.companyGrades?.length) q = q.in('company_grade', filters.companyGrades);
+  if (filters.apolloRecommended === true) q = q.eq('apollo_recommended', true);
+  if (filters.sdrRecommended === true) q = q.eq('sdr_recommended', true);
 
   const { data, error } = await q;
   if (error) throw error;
