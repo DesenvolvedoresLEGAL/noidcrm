@@ -14,6 +14,7 @@ const corsHeaders = {
 const APOLLO_PEOPLE_URL = "https://api.apollo.io/api/v1/mixed_people/api_search";
 const APOLLO_CONTACTS_URL = "https://api.apollo.io/api/v1/contacts/search";
 const APOLLO_ORG_ENRICH_URL = "https://api.apollo.io/api/v1/organizations/enrich";
+const APOLLO_ORG_SEARCH_URL = "https://api.apollo.io/api/v1/mixed_companies/search";
 const ESTIMATED_CREDITS = 2;
 const ANTI_SPAM_HOURS = 24;
 const RATE_LIMIT_PER_MIN = 20;
