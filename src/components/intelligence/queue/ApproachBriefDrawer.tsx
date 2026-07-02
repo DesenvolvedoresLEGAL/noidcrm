@@ -32,8 +32,9 @@ export function ApproachBriefDrawer({ item, onClose }: Props) {
           <SheetTitle>{item.company_name}</SheetTitle>
         </SheetHeader>
         <Tabs defaultValue="brief" className="mt-4">
-          <TabsList className="grid grid-cols-2 w-full">
+          <TabsList className="grid grid-cols-3 w-full">
             <TabsTrigger value="brief">Brief</TabsTrigger>
+            <TabsTrigger value="intelligence">Company Intelligence</TabsTrigger>
             <TabsTrigger value="coverage">Smart Coverage</TabsTrigger>
           </TabsList>
           <TabsContent value="brief" className="space-y-4 text-sm mt-4">
