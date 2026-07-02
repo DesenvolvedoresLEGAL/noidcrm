@@ -275,7 +275,17 @@ Deno.serve(async (req) => {
         requested_by: requestedBy, source: body.source ?? "manual",
       });
       await emitRevenueEvent(admin, orgId, "apollo_reveal_failed", { contact_id: contact.id, requested_data_type: dataType, reason: apolloError });
-      return json(200, { status: "failed", reason: apolloError, audit_id: auditId });
+      return json(200, {
+        success: false,
+        status: "failed",
+        contact_id: contact.id,
+        phone_reveal_status: wantsPhone && !phoneAlready ? "failed" : null,
+        phone_revealed: !!contact.phone_revealed,
+        phone_source_type: null,
+        credits_used: 0,
+        reason: apolloError ?? "apollo_error",
+        audit_id: auditId,
+      });
     }
 
     const person = apolloResp?.person ?? null;
