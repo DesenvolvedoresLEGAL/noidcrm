@@ -193,8 +193,91 @@ async function maybeCompressRaw(raw: unknown): Promise<{ full: unknown | null; c
   } catch (e) {
     console.warn("[wiretap] compression failed", e);
     return { full: null, compressed: null, size, wasCompressed: false };
-  }
 }
+
+// KAI.18.7 — Resolve Apollo Organization ID antes de buscar pessoas
+interface ApolloOrgResolution {
+  organization_id: string | null;
+  name: string | null;
+  domain: string | null;
+  confidence: number;
+  source: string;
+  candidates: any[];
+  attempts: any[];
+}
+async function resolveApolloOrganization(
+  apiKey: string,
+  domain: string | null,
+  companyName: string | null,
+): Promise<ApolloOrgResolution> {
+  const attempts: any[] = [];
+  const record = (strategy: string, r: ApolloCallResult, count: number) => {
+    attempts.push({ strategy, status: r.status, ok: r.ok, count, latency_ms: r.latency_ms });
+  };
+
+  // 1) organizations/enrich by domain
+  if (domain) {
+    const r = await callApollo(APOLLO_ORG_ENRICH_URL, { domain }, apiKey, "GET");
+    const org = r.json?.organization;
+    record("enrich_by_domain", r, org ? 1 : 0);
+    if (r.ok && org?.id) {
+      return {
+        organization_id: org.id,
+        name: org.name ?? null,
+        domain: org.primary_domain ?? org.website_url ?? domain,
+        confidence: 95,
+        source: "enrich_by_domain",
+        candidates: [org],
+        attempts,
+      };
+    }
+  }
+
+  // 2) mixed_companies/search by domain
+  if (domain) {
+    const r = await callApollo(APOLLO_ORG_SEARCH_URL, {
+      q_organization_domains: domain, page: 1, per_page: 5,
+    }, apiKey);
+    const orgs: any[] = r.json?.organizations ?? r.json?.accounts ?? [];
+    record("search_by_domain", r, orgs.length);
+    if (r.ok && orgs.length > 0) {
+      const best = orgs[0];
+      return {
+        organization_id: best.id ?? best.organization_id ?? null,
+        name: best.name ?? null,
+        domain: best.primary_domain ?? best.website_url ?? domain,
+        confidence: 85,
+        source: "search_by_domain",
+        candidates: orgs,
+        attempts,
+      };
+    }
+  }
+
+  // 3) mixed_companies/search by name
+  if (companyName) {
+    const r = await callApollo(APOLLO_ORG_SEARCH_URL, {
+      q_organization_name: companyName, page: 1, per_page: 5,
+    }, apiKey);
+    const orgs: any[] = r.json?.organizations ?? r.json?.accounts ?? [];
+    record("search_by_name", r, orgs.length);
+    if (r.ok && orgs.length > 0) {
+      const best = orgs[0];
+      return {
+        organization_id: best.id ?? best.organization_id ?? null,
+        name: best.name ?? null,
+        domain: best.primary_domain ?? best.website_url ?? null,
+        confidence: 60,
+        source: "search_by_name",
+        candidates: orgs,
+        attempts,
+      };
+    }
+  }
+
+  return { organization_id: null, name: null, domain: null, confidence: 0, source: "unresolved", candidates: [], attempts };
+}
+
 
 
 Deno.serve(async (req: Request) => {
