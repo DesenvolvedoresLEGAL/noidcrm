@@ -111,6 +111,8 @@ interface ApolloCallResult {
   json: any;
   inaccessible: boolean;
   errorMessage?: string;
+  latency_ms: number;
+  apollo_request_id: string | null;
 }
 
 async function callApollo(
@@ -121,6 +123,7 @@ async function callApollo(
 ): Promise<ApolloCallResult> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), APOLLO_TIMEOUT_MS);
+  const started = Date.now();
   try {
     const init: RequestInit = {
       method,
@@ -155,6 +158,8 @@ async function callApollo(
       json,
       inaccessible,
       errorMessage: !r.ok ? (json?.error || json?.message || `HTTP ${r.status}`) : undefined,
+      latency_ms: Date.now() - started,
+      apollo_request_id: r.headers.get("x-request-id") ?? r.headers.get("x-apollo-request-id") ?? null,
     };
   } catch (e) {
     return {
@@ -163,11 +168,33 @@ async function callApollo(
       json: { error: String(e) },
       inaccessible: false,
       errorMessage: String(e),
+      latency_ms: Date.now() - started,
+      apollo_request_id: null,
     };
   } finally {
     clearTimeout(timer);
   }
 }
+
+// KAI.18.6 — Apollo Wiretap: compressão base64+gzip para RAW acima de 200KB
+async function maybeCompressRaw(raw: unknown): Promise<{ full: unknown | null; compressed: string | null; size: number; wasCompressed: boolean }> {
+  const serialized = JSON.stringify(raw ?? null);
+  const size = new TextEncoder().encode(serialized).length;
+  if (size <= 200 * 1024) {
+    return { full: raw ?? null, compressed: null, size, wasCompressed: false };
+  }
+  try {
+    const stream = new Blob([serialized]).stream().pipeThrough(new CompressionStream("gzip"));
+    const buf = new Uint8Array(await new Response(stream).arrayBuffer());
+    let bin = "";
+    for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
+    return { full: null, compressed: btoa(bin), size, wasCompressed: true };
+  } catch (e) {
+    console.warn("[wiretap] compression failed", e);
+    return { full: null, compressed: null, size, wasCompressed: false };
+  }
+}
+
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
