@@ -99,6 +99,30 @@ export function ProspectContactsTab({
     }
   };
 
+  const qc = useQueryClient();
+  const markPhoneInvalid = async (contactId: string) => {
+    const reason = window.prompt("Motivo (opcional):", "invalido_pelo_sdr");
+    if (reason === null) return;
+    const { data, error } = await (supabase.rpc as any)("mark_contact_phone_invalid", {
+      p_contact_id: contactId,
+      p_reason: reason || null,
+    });
+    if (error || (data && data.success === false)) {
+      toast.error("Falha ao marcar telefone como inválido");
+      return;
+    }
+    toast.success("Telefone marcado como inválido");
+    qc.invalidateQueries({ queryKey: ["enriched-contacts", prospectId] });
+  };
+
+  const digitsOnly = (p: string) => p.replace(/\D/g, "");
+  const openWhatsApp = (phone: string) => {
+    window.open(`https://wa.me/${digitsOnly(phone)}`, "_blank", "noopener");
+  };
+  const callPhone = (phone: string) => {
+    window.location.href = `tel:${phone}`;
+  };
+
   // Default selection: primary + decisores (c_level/vp/director/manager) com email
   useEffect(() => {
     if (contacts.length === 0) return;
