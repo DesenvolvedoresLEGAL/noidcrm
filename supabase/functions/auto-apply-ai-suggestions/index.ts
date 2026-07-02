@@ -22,7 +22,6 @@ serve(async (req) => {
     // Validate internal secret for CRON calls
     const internalSecret = req.headers.get("x-internal-secret");
     const expectedSecret = Deno.env.get("INTERNAL_WORKFLOW_SECRET");
-    const authHeaderCheck = req.headers.get("authorization");
     if (!authHeaderCheck && (!internalSecret || !expectedSecret || internalSecret !== expectedSecret)) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
