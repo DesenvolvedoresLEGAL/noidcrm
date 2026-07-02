@@ -93,6 +93,12 @@ export function QualifiedQueueTable({ items, onOpenBrief }: Props) {
                 {i.domain && <div className="text-xs text-muted-foreground">{i.domain}</div>}
               </TableCell>
               <TableCell>
+                <CompanyGradeBadge
+                  grade={(i.company_grade as CompanyGrade | null) ?? null}
+                  score={i.company_intelligence_score ?? null}
+                />
+              </TableCell>
+              <TableCell>
                 <CoverageBadge
                   score={(i as any).coverage_score ?? null}
                   coverageClass={((i as any).coverage_class as CoverageClass | null) ?? null}
@@ -103,6 +109,7 @@ export function QualifiedQueueTable({ items, onOpenBrief }: Props) {
               <TableCell>{relationshipBadge(i.relationship_status)}</TableCell>
               <TableCell><span className="font-semibold">{i.score}</span></TableCell>
               <TableCell>{i.grade ?? '—'}</TableCell>
+              <TableCell className="text-xs">{i.company_next_best_action ?? '—'}</TableCell>
               <TableCell className="text-xs">{i.enrichment_status ?? '—'}</TableCell>
               <TableCell className="text-xs">{i.decision_maker_status ?? '—'}</TableCell>
               <TableCell className="text-xs">{i.contact_status ?? '—'}</TableCell>
