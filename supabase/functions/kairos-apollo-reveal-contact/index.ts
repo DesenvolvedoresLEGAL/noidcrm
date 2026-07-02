@@ -437,6 +437,9 @@ Deno.serve(async (req) => {
         phone_confidence: phoneQual?.phone_confidence ?? null,
         company_phone_rejected: companyPhoneRejected,
         rejected_company_phone: phoneQual?.rejected_company_phone ?? null,
+        // KAI.15.3 — telemetria bruta do Apollo p/ afinar classificador
+        raw_phone_numbers: rawPhoneNumbers,
+        has_async_pending: hasAsyncPending,
       },
     });
 
