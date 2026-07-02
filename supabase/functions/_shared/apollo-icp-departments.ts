@@ -60,17 +60,22 @@ export interface ContactScoreInput {
   email?: string | null;
   email_status?: string | null;
   phone?: string | null;
+  phone_source_type?: string | null; // KAI.15.1 phone quality
   seniority?: string | null;
   role_title?: string | null;
   linkedin_url?: string | null;
   icp_match?: boolean;
 }
 
-// Contact Score: email valid 30 + phone 20 + seniority 20 + linkedin 15 + icp role match 15
+// Contact Score: email valid 30 + phone(person) 20 + seniority 20 + linkedin 15 + icp role match 15
+// KAI.15.1: telefone só pontua quando for person_mobile ou person_direct.
 export function computeContactScore(c: ContactScoreInput): number {
   let s = 0;
   if (c.email && c.email.includes("@") && c.email_status !== "invalid") s += 30;
-  if (c.phone) s += 20;
+  const personPhone =
+    !!c.phone &&
+    (c.phone_source_type === "person_mobile" || c.phone_source_type === "person_direct");
+  if (personPhone) s += 20;
   const senScore = titleSeniorityScore(c.seniority || c.role_title);
   if (senScore >= 60) s += 20;
   else if (senScore >= 30) s += 10;
@@ -78,3 +83,4 @@ export function computeContactScore(c: ContactScoreInput): number {
   if (c.icp_match) s += 15;
   return s;
 }
+

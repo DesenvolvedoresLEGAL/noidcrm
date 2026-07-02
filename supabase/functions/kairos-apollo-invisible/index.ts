@@ -165,7 +165,7 @@ Deno.serve(async (req) => {
     // Fetch contacts (already merged-free)
     const { data: contacts } = await admin
       .from("enriched_contact_profiles")
-      .select("id, full_name, role_title, seniority, department, email, email_status, phone, linkedin_url, is_primary, confidence_score")
+      .select("id, full_name, role_title, seniority, department, email, email_status, phone, phone_source_type, linkedin_url, is_primary, confidence_score")
       .eq("prospect_id", body.prospect_id)
       .eq("is_merged", false)
       .order("confidence_score", { ascending: false });
@@ -181,6 +181,7 @@ Deno.serve(async (req) => {
           email: c.email,
           email_status: c.email_status,
           phone: c.phone,
+          phone_source_type: c.phone_source_type,
           seniority: c.seniority,
           role_title: c.role_title,
           linkedin_url: c.linkedin_url,
