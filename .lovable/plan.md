@@ -1,110 +1,64 @@
 
-# NOID Skills Engine — Sprint NS.01
+## Diagnóstico
 
-Camada de habilidades comerciais reutilizáveis. Playbook é estratégia, Skill é capacidade operacional, Agente decide quando usar. Skills geram recomendação — nunca enviam mensagem nem alteram CRM.
+Puxei os últimos 3h da base + auditoria e o problema tem duas caras — nenhuma é bug do Apollo em si, é como a gente interpreta a resposta.
 
-## 1. Backend — Schema
+- **Aguardando infinito**: em 3h houve **26 stale_pending_cleanup** e **0 chamadas do webhook** do Apollo. Ou seja, marcamos `phone_reveal_status = 'requested'` esperando um webhook assíncrono que **nunca vem**, e só o cron de 5min mata como "failed". Confirmado nos contatos das 19:09: `phone_match_quality=unknown`, `phone_confidence=0`, `phone_quality_reason=no_person_phone_returned` — Apollo respondeu 200 OK, **sem telefone algum**, e a função de reveal considerou isso como "pendente async". Não é: quando Apollo não devolve `phone_numbers`, ele não vai chamar webhook depois.
+- **Rejeita alguns**: os `rejected_company_phone` (Vaccinar, etc.) são casos em que o Apollo devolveu somente o telefone da matriz/recepção. A classificação está correta (KAI.15.1), mas o toast atual (`Telefone da empresa rejeitado`) parece "falha do sistema" para o usuário e não deixa claro que **nenhum crédito foi cobrado** nem por que aconteceu.
 
-Migration única com 3 tabelas + GRANTs + RLS por organização.
+## Correções
 
-**`noid_skills`** — biblioteca versionada
-- Campos-chave: `organization_id`, `name`, `slug` (único por org+versão), `category`, `skill_type`, `status` (draft|active|deprecated|archived), `description`, `input_schema` jsonb, `output_schema` jsonb, `system_prompt`, `task_prompt`, `guardrails` jsonb, `examples` jsonb, `success_criteria` jsonb, `failure_modes` jsonb, `version` int, `created_by`, timestamps.
-- Índices: `(organization_id, status)`, `(organization_id, category)`, `(organization_id, slug, version)` unique.
+### 1. Edge `kairos-apollo-reveal-contact` — só marcar `pending` quando Apollo realmente enfileirou async
 
-**`noid_skill_runs`** — histórico de execuções
-- `skill_id`, `prospect_id`, `account_id`, `opportunity_id`, `contact_id`, `source_module`, `input_payload`, `output_payload`, `model_used`, `status` (success|schema_invalid|guardrail_blocked|error), `confidence_score`, `quality_score`, `latency_ms`, `error_message`, `created_by`, `created_at`.
+Trocar a heurística atual (`phonePending = wantsPhone && !revealedPhone && !companyPhoneRejected`) por uma detecção baseada no payload do Apollo:
 
-**`noid_skill_feedback`**
-- `skill_run_id`, `rating` (-1..1), `feedback_type` (positive|negative|edited_by_user|used_in_outreach|ignored|converted|failed), `feedback_notes`, `outcome_event_id`, `created_by`, `created_at`.
+- Considerar pendente **apenas se** `person.phone_numbers` existir e tiver ao menos uma entrada com `sanitized_number == null && raw_number == null` (padrão do Apollo em pending assíncrono) **e** o campo `dnc_status`/`status` indicar fetch pendente.
+- Caso contrário (`phone_numbers` vazio/ausente ou só com company): marcar direto como `not_found` (ou `rejected_company_phone`), fechando o job e o audit no mesmo tick.
+- Persistir `raw_phone_numbers` no `apollo_reveal_audit.raw_response` para termos telemetria real das próximas revelações.
 
-**RLS** (via `has_role`/`is_org_member`):
-- `noid_skills`: SELECT membros da org. INSERT/UPDATE owner/admin. Draft nunca é retornado pelo router.
-- `noid_skill_runs`: SELECT org; INSERT autenticado da org; sem UPDATE cliente (service_role only).
-- `noid_skill_feedback`: SELECT/INSERT membros da org.
+### 2. Edge `kairos-apollo-reveal-contact` — não enviar `webhook_url` quando não há chance de callback
 
-GRANTs padrão authenticated + service_role.
+Só incluir `payload.webhook_url` quando o próprio Apollo tiver retornado sinal de pending numa chamada anterior. Isso evita continuar "esperando" retorno que nunca chega. (Simplificação: manter `webhook_url` só como fallback; a decisão de pending passa a ser exclusivamente pela leitura da resposta síncrona.)
 
-## 2. Backend — Edge Functions
+### 3. Hook `useRevealContact.ts` — polling curto e mensagem clara
 
-**`supabase/functions/_shared/skills.ts`** — helpers: load skill, validar payload contra JSON schema (Ajv leve manual — checar `required` e tipos), aplicar guardrails textuais (maxLength, blocklist), formatar output.
+- Reduzir o polling de 90s → 30s (5 tentativas × 6s) — se em 30s não terminou, cai para `not_found` no toast (não "erro").
+- Quando status final for `rejected_company_phone`, exibir toast **informativo**, não warning de erro:
+  > "Apollo só encontrou o telefone da empresa para {contato}. Nenhum crédito cobrado."
+- Quando `not_found`, mensagem clara: "Apollo não tem telefone individual desse contato."
 
-**`noid-run-skill`**
-- Input: `{ skill_id, context, source_module?, links?: {prospect_id, opportunity_id, ...} }`
-- Fluxo: carrega skill ativa → valida input_schema → monta prompt (system + task + context) → chama OpenAI via `_shared/ai-client.ts` com `response_format: json_object` → valida output_schema → aplica guardrails → grava `noid_skill_runs` → retorna `{ run_id, output, confidence, status }`.
-- Skill em `draft`/`deprecated`/`archived` → 400 (exceto se `allow_draft=true` do playground e o caller for admin).
+### 4. UI `ProspectContactsTab.tsx` — badge coerente
 
-**`noid-skill-router`**
-- Input: `{ source_module, goal, context, preferred_category? }`
-- Mapa `goal → { category, skill_type, slug_hint? }`. Ex.: `generate_whatsapp_message → (prospecting, message_generation, slug='first-touch-whatsapp-expositor')`.
-- Seleciona skill ativa de maior versão que combine; fallback pelo slug_hint. Chama `noid-run-skill` internamente. Retorna `{ skill_id, skill_slug, run_id, output }`.
+O badge `Buscando telefone...` já existe. Adicionar tooltip para os estados terminais:
+- `rejected_company_phone`: "Apollo só encontrou telefone da empresa — não salvamos."
+- `not_found`: "Apollo não tem telefone individual desse contato."
 
-Ambas com CORS, verificação JWT em código, uso de `openai` via wrapper compartilhado, `dateContextPrompt()` quando aplicável.
+Sem mudanças estruturais na UI, só cópia + tooltip.
 
-## 3. Seed — 10 skills iniciais
+### 5. Migration — backfill dos travados atuais
 
-Insert data (via `supabase--insert` após aprovar migration) das 10 skills descritas no briefing, todas `status='active'`, `version=1`, `organization_id = null` (globais) — RLS permite SELECT quando `organization_id IS NULL` (skills de plataforma).
+Migration única que:
+- Marca como `not_found` (com `phone_quality_reason='resolved_stuck_requested'`) todo `enriched_contact_profiles` com `phone_reveal_status IN ('requested','pending')` e `last_reveal_attempt_at < now() - interval '2 minutes'`.
+- Fecha o `apollo_reveal_audit` correspondente com `status='not_found'`, `reason='resolved_stuck_requested'`.
+- Reaproveita a função existente de cleanup (já roda a cada 5min) — só reduzir a janela para 2min para dar feedback mais rápido em novos casos que escaparem.
 
-Slugs:
-1. `first-touch-whatsapp-expositor`
-2. `first-touch-email-expositor`
-3. `call-script-expositor`
-4. `objection-already-has-vendor`
-5. `objection-price-too-high`
-6. `objection-will-think-about-it`
-7. `explain-professional-event-internet`
-8. `qualification-questions-expositor`
-9. `reactivate-stale-lead`
-10. `next-best-action`
+## Arquivos impactados
 
-Cada uma com `input_schema`, `output_schema`, `system_prompt` (herda master prompt), `task_prompt`, `guardrails` (maxLength, tom, sem SLA/desconto inventado).
+- `supabase/functions/kairos-apollo-reveal-contact/index.ts` — nova detecção de pending, remoção do `webhook_url` incondicional, telemetria em audit.
+- `supabase/functions/apollo-phone-webhook/index.ts` — nenhum change funcional, só ajustar log para caso o Apollo eventualmente chame.
+- `src/hooks/intelligence/useRevealContact.ts` — polling 30s, toasts refinados.
+- `src/components/playbook/ProspectContactsTab.tsx` — tooltip nos badges terminais.
+- `supabase/migrations/<timestamp>_fix_stuck_phone_reveals.sql` — backfill + ajuste da janela do cron.
 
-## 4. Frontend — Intelligence > Skills
+## Riscos
 
-Rotas em `src/pages/intelligence/skills/`:
-- `SkillsLibraryPage.tsx` — tabela com nome, categoria, tipo, status, versão, execuções (join count), % feedback positivo, última run. Filtros por categoria/status/tipo. Botão "Nova skill" (owner/admin).
-- `SkillDetailPage.tsx` — abas Visão Geral, Prompts, Schemas, Guardrails, Exemplos, Runs recentes, Feedback, Versões. Owner/admin editam se `status='draft'` (nova versão cria linha nova mantendo histórico imutável).
-- `SkillPlaygroundPage.tsx` — formulário dinâmico a partir de `input_schema`, botão Executar chama `noid-run-skill` com `dry_run=true` (não persiste run com `source_module='playground'` mas marca `status='playground'`), exibe output JSON + copiar.
+- **Baixo**. A detecção nova de pending é mais estrita → no pior caso trocamos "espera infinita" por "not_found" imediato, que é o comportamento correto.
+- Se algum dia o Apollo passar a devolver phone assíncrono de fato, a leitura de `phone_numbers[].sanitized_number == null` cobre o caso e o webhook continua funcional.
+- Nenhuma alteração de RLS, schema (fora backfill) ou modelo multi-tenant.
 
-Serviços em `src/services/intelligence/skills.ts` + hooks em `src/hooks/intelligence/useSkills.ts` (React Query, mesmo padrão do SDR Copilot).
+## Próximos passos após aprovação
 
-Menu: adicionar item "Skills" em `NoidIntelligenceHub.tsx` com badge `Novo`.
-
-## 5. Integração SDR Copilot
-
-Refatorar `kairos-generate-sdr-message`:
-- Antes: prompt fixo por canal.
-- Depois: chama `noid-skill-router` com `goal ∈ {generate_whatsapp_message, generate_email_message, generate_call_script}`, `context = { company_name, contact_name, event_name, pain_hypothesis, product_context, tone, brief }`.
-- Cacheia em `kairos_sdr_copilot_tasks.suggested_messages[channel] = { skill_slug, run_id, output, generated_at }`.
-- Fallback ao prompt antigo se router falhar (log em `system_events`).
-
-## 6. Permissões e Guardrails
-
-- `usePermissions`: owner/admin criam/editam/ativam; manager vê+playground; SDR usa+feedback.
-- Router recusa skills `draft`. Executor sempre grava run. Nenhum envio automático, nenhum write no CRM.
-- Feedback via botões nas mensagens do SDR Copilot (👍/👎/editei/usei/ignorei) → `noid_skill_feedback` linkado ao `run_id`.
-
-## 7. Learning loop (mínimo viável nesta sprint)
-
-- `revenue_events`: novos tipos `skill_run_created`, `skill_output_used`, `skill_output_edited`, `skill_output_ignored`, `skill_converted`.
-- View `v_skill_metrics` (nome, execuções, %positivo, %editado, latência p50) para a tabela da Library.
-
-## 8. Fora do escopo NS.01
-
-- Roleplay/voz/WhatsApp agents (só preparação; consumo real vem em sprint dedicada).
-- Auto-versionamento por A/B (registrar hipóteses em `experiment_hypotheses` fica para NS.02).
-- Skills por unidade de negócio ou território.
-
-## Aceite
-
-Tabelas + RLS + GRANTs criadas · router + executor deployados · 10 skills ativas · Library/Detail/Playground funcionais · SDR Copilot consumindo router com fallback · runs e feedback persistindo · nenhuma skill envia mensagem nem altera CRM.
-
-## Ordem de execução
-
-1. Migration (schema + RLS + GRANTs + view de métricas).
-2. Seed das 10 skills (insert tool).
-3. Edge functions `_shared/skills.ts`, `noid-run-skill`, `noid-skill-router`.
-4. Serviços/hooks + páginas Library/Detail/Playground + rota no Hub.
-5. Refactor `kairos-generate-sdr-message` + feedback UI no SDR Copilot.
-6. Verificação: playground + 1 task SDR Copilot ponta-a-ponta.
-
-Confirma pra eu tocar?
+1. Aplicar a migration de backfill (destrava os 2 contatos parados agora).
+2. Deploy das 2 edge functions.
+3. Publicar as mudanças de frontend.
+4. Monitorar `apollo_reveal_audit` por 30min para confirmar que `stale_pending_cleanup` some.

@@ -314,8 +314,18 @@ Deno.serve(async (req) => {
     const companyPhoneRejected = !revealedPhone && !!phoneQual?.rejected_company_phone;
 
     const apolloPersonId = person?.id ?? person?.person_id ?? contact.apollo_person_id ?? null;
-    // Phone still pending only when Apollo didn't return anything (person or company).
-    const phonePending = wantsPhone && !phoneAlready && !revealedPhone && !companyPhoneRejected;
+    // KAI.15.3 — só marca pending quando Apollo sinalizou fetch async real.
+    // Padrão observado: person.phone_numbers com entry(ies) sem sanitized_number/raw_number
+    // (Apollo enfileirou e chamará o webhook depois). Se phone_numbers estiver vazio/ausente,
+    // Apollo NÃO vai callback — marcar como not_found imediato.
+    const rawPhoneNumbers: any[] = Array.isArray(person?.phone_numbers) ? person.phone_numbers : [];
+    // Apollo async signal: array não-vazio com entrada sem sanitized_number/raw_number.
+    // Se array vier vazio/ausente, Apollo não fará callback — resolver como not_found agora.
+    const hasAsyncPending = rawPhoneNumbers.some((p: any) =>
+      p && typeof p === "object" && !p.sanitized_number && !p.raw_number && !p.number,
+    );
+    const phonePending = wantsPhone && !phoneAlready && !revealedPhone && !companyPhoneRejected && hasAsyncPending;
+    const phonePending = wantsPhone && !phoneAlready && !revealedPhone && !companyPhoneRejected && hasAsyncPending;
 
     const update: Record<string, unknown> = {
       last_reveal_attempt_at: nowIso,
@@ -427,6 +437,9 @@ Deno.serve(async (req) => {
         phone_confidence: phoneQual?.phone_confidence ?? null,
         company_phone_rejected: companyPhoneRejected,
         rejected_company_phone: phoneQual?.rejected_company_phone ?? null,
+        // KAI.15.3 — telemetria bruta do Apollo p/ afinar classificador
+        raw_phone_numbers: rawPhoneNumbers,
+        has_async_pending: hasAsyncPending,
       },
     });
 
