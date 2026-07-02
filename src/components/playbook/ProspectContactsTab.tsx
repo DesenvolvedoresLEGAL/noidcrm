@@ -319,7 +319,7 @@ export function ProspectContactsTab({
               const phoneSource: string | null = (c as any).phone_source_type ?? null;
               const phoneRevealed = !!(c.phone_revealed ?? c.phone);
               const emailRevealed = !!(c.email_revealed ?? c.email);
-              const phoneBlocked = phoneStatus === "not_found";
+              const phoneBlocked = phoneStatus === "not_found" || phoneStatus === "rejected_company_phone";
               const emailBlocked = emailStatus === "not_found";
 
               // KAI.15.1: variar rótulo conforme fonte do telefone (pessoa vs empresa).
