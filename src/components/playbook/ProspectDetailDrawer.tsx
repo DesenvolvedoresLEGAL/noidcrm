@@ -21,6 +21,7 @@ import { ProspectLifecycleTimeline } from '@/components/learning/ProspectLifecyc
 import { ProspectContactsTab } from './ProspectContactsTab';
 import { EnrichmentJobsTable } from './enrichment/EnrichmentJobsTable';
 import { ApolloInspectorTab } from './ApolloInspectorTab';
+import { ApolloBrowserParityTab } from './ApolloBrowserParityTab';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 
 interface ProspectDetailDrawerProps {
