@@ -336,11 +336,14 @@ export function ProspectContactsTab({
 
               const phoneBadge: Record<string, { label: string; cls: string }> = {
                 not_requested: { label: "Telefone: não solicitado", cls: "bg-muted text-muted-foreground" },
-                requested: { label: "Telefone: aguardando", cls: "bg-blue-500/10 text-blue-600 border-blue-500/30" },
+                requested: { label: "Buscando telefone...", cls: "bg-blue-500/10 text-blue-600 border-blue-500/30" },
+                awaiting: { label: "Buscando telefone...", cls: "bg-blue-500/10 text-blue-600 border-blue-500/30" },
+                pending: { label: "Buscando telefone...", cls: "bg-blue-500/10 text-blue-600 border-blue-500/30" },
                 revealed: { label: phoneRevealedLabel, cls: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30" },
                 not_found: { label: phoneNotFoundLabel, cls: "bg-red-500/10 text-red-600 border-red-500/30" },
-                failed: { label: "Telefone falhou", cls: "bg-red-500/10 text-red-600 border-red-500/30" },
-                skipped: { label: "Telefone: pulado", cls: "bg-muted text-muted-foreground" },
+                rejected_company_phone: { label: "Telefone da empresa rejeitado", cls: "bg-red-500/10 text-red-600 border-red-500/30" },
+                failed: { label: "Falha ao revelar", cls: "bg-red-500/10 text-red-600 border-red-500/30" },
+                skipped: { label: "Já revelado / ignorado", cls: "bg-muted text-muted-foreground" },
               };
               const emailBadge: Record<string, { label: string; cls: string }> = {
                 not_requested: { label: "E-mail: não solicitado", cls: "bg-muted text-muted-foreground" },
