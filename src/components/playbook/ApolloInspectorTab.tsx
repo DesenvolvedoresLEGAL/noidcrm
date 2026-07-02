@@ -171,12 +171,22 @@ function LogCard({ log, isAdmin }: { log: ApolloQueryLog; isAdmin?: boolean }) {
       </CardHeader>
 
       <CardContent className="pt-0 pb-3">
-        <div className="grid grid-cols-4 gap-2 text-center text-[11px] mb-2">
-          <Metric label="Retornou" value={log.people_returned} tone="text-emerald-700" />
-          <Metric label="Recomendou" value={log.people_recommended} tone="text-blue-700" />
+        <div className="grid grid-cols-5 gap-2 text-center text-[11px] mb-2">
+          <Metric label="Apollo" value={log.people_returned} tone="text-emerald-700" />
+          <Metric label="Parser" value={log.parser_count ?? log.people_returned} tone="text-slate-700" />
+          <Metric label="Filtro" value={log.filter_count ?? log.people_recommended} tone="text-blue-700" />
           <Metric label="Escondeu" value={log.people_hidden} tone="text-amber-700" />
           <Metric label="Créditos" value={log.credits_used} tone="text-muted-foreground" />
         </div>
+
+        {log.people_returned > 0 && log.filter_count === 0 && (
+          <div className="mb-2 rounded-md bg-red-500/5 border border-red-500/30 px-2 py-1.5 text-[11px] text-red-800">
+            <strong>Apollo retornou {log.people_returned} contatos, mas o filtro derrubou todos.</strong>
+            <div className="mt-1">
+              Motivos: {Object.entries(log.hidden_reasons ?? {}).filter(([, c]) => (c as number) > 0).map(([r, c]) => `${c} ${r}`).join(' · ') || '—'}
+            </div>
+          </div>
+        )}
 
         {log.people_hidden > 0 && (
           <div className="mb-2 rounded-md bg-amber-500/5 border border-amber-500/20 px-2 py-1.5">
@@ -185,7 +195,7 @@ function LogCard({ log, isAdmin }: { log: ApolloQueryLog; isAdmin?: boolean }) {
             </div>
             <div className="flex flex-wrap gap-1">
               {Object.entries(log.hidden_reasons ?? {}).map(([reason, count]) =>
-                count > 0 ? (
+                (count as number) > 0 ? (
                   <Badge key={reason} variant="outline" className="text-[10px]">
                     {reason}: {String(count)}
                   </Badge>
@@ -195,8 +205,37 @@ function LogCard({ log, isAdmin }: { log: ApolloQueryLog; isAdmin?: boolean }) {
           </div>
         )}
 
+
         {expanded && (
           <div className="space-y-2 mt-3 border-t pt-3">
+            {log.eliminated_contacts && log.eliminated_contacts.length > 0 && (
+              <div>
+                <div className="text-[10px] font-semibold text-red-700 uppercase mb-1">
+                  Contatos eliminados ({log.eliminated_contacts.length})
+                </div>
+                <div className="max-h-56 overflow-y-auto rounded border border-red-500/20 bg-red-500/5 divide-y divide-red-500/10">
+                  {log.eliminated_contacts.map((c, i) => (
+                    <div key={i} className="px-2 py-1.5 text-[11px]">
+                      <div className="font-medium text-slate-800">
+                        {c.name || c.email || c.apollo_id || 'sem nome'}
+                        {c.title ? <span className="text-muted-foreground"> · {c.title}</span> : null}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground">
+                        {c.company ?? '—'}
+                      </div>
+                      <div className="mt-0.5 flex flex-wrap gap-1">
+                        {c.reasons.map((r) => (
+                          <Badge key={r} variant="outline" className="text-[9px] bg-red-500/10 text-red-700 border-red-500/30">
+                            {r}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div>
               <div className="text-[10px] font-semibold text-muted-foreground uppercase mb-1">
                 Payload enviado
@@ -208,12 +247,18 @@ function LogCard({ log, isAdmin }: { log: ApolloQueryLog; isAdmin?: boolean }) {
 
             <div>
               <div className="text-[10px] font-semibold text-muted-foreground uppercase mb-1">
-                Resposta Apollo (amostra)
+                Resposta Apollo{log.raw_response_compressed_bool ? ' (comprimida — amostra abaixo)' : ' (amostra)'}
               </div>
               <pre className="text-[10px] bg-muted/40 rounded p-2 overflow-x-auto max-h-52">
                 {JSON.stringify(log.response_body, null, 2)}
               </pre>
+              {log.raw_response_size_bytes != null && (
+                <div className="text-[10px] text-muted-foreground mt-1">
+                  RAW: {(log.raw_response_size_bytes / 1024).toFixed(1)} KB {log.raw_response_compressed_bool ? '· armazenado gzip+base64' : '· armazenado bruto'}
+                </div>
+              )}
             </div>
+
 
             {log.error_message && (
               <div>

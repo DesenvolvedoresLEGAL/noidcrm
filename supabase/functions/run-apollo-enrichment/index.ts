@@ -111,6 +111,8 @@ interface ApolloCallResult {
   json: any;
   inaccessible: boolean;
   errorMessage?: string;
+  latency_ms: number;
+  apollo_request_id: string | null;
 }
 
 async function callApollo(
@@ -121,6 +123,7 @@ async function callApollo(
 ): Promise<ApolloCallResult> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), APOLLO_TIMEOUT_MS);
+  const started = Date.now();
   try {
     const init: RequestInit = {
       method,
@@ -155,6 +158,8 @@ async function callApollo(
       json,
       inaccessible,
       errorMessage: !r.ok ? (json?.error || json?.message || `HTTP ${r.status}`) : undefined,
+      latency_ms: Date.now() - started,
+      apollo_request_id: r.headers.get("x-request-id") ?? r.headers.get("x-apollo-request-id") ?? null,
     };
   } catch (e) {
     return {
@@ -163,11 +168,33 @@ async function callApollo(
       json: { error: String(e) },
       inaccessible: false,
       errorMessage: String(e),
+      latency_ms: Date.now() - started,
+      apollo_request_id: null,
     };
   } finally {
     clearTimeout(timer);
   }
 }
+
+// KAI.18.6 — Apollo Wiretap: compressão base64+gzip para RAW acima de 200KB
+async function maybeCompressRaw(raw: unknown): Promise<{ full: unknown | null; compressed: string | null; size: number; wasCompressed: boolean }> {
+  const serialized = JSON.stringify(raw ?? null);
+  const size = new TextEncoder().encode(serialized).length;
+  if (size <= 200 * 1024) {
+    return { full: raw ?? null, compressed: null, size, wasCompressed: false };
+  }
+  try {
+    const stream = new Blob([serialized]).stream().pipeThrough(new CompressionStream("gzip"));
+    const buf = new Uint8Array(await new Response(stream).arrayBuffer());
+    let bin = "";
+    for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
+    return { full: null, compressed: btoa(bin), size, wasCompressed: true };
+  } catch (e) {
+    console.warn("[wiretap] compression failed", e);
+    return { full: null, compressed: null, size, wasCompressed: false };
+  }
+}
+
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -307,13 +334,42 @@ Deno.serve(async (req: Request) => {
     //    - accessible & has results -> use it
     //    - accessible & empty -> try next
     //    - inaccessible (403/API_INACCESSIBLE) -> log and try next, do NOT abort
-    const attempts: Array<{ endpoint: string; status: number; ok: boolean; inaccessible: boolean; count: number; error?: string }> = [];
+    // KAI.18.6 Wiretap: cada tentativa carrega latência e RAW completo.
+    const attempts: Array<{
+      endpoint: string;
+      status: number;
+      ok: boolean;
+      inaccessible: boolean;
+      count: number;
+      latency_ms: number;
+      apollo_request_id: string | null;
+      raw?: unknown;
+      error?: string;
+    }> = [];
     const titlesKeyword = customTitles.length > 0 ? customTitles.slice(0, 3).join(" OR ") : "";
     const searchKeywords = [prospect.company_name, domain, titlesKeyword].filter(Boolean).join(" ") || domain;
 
     let people: any[] = [];
     let endpointUsed: string | null = null;
     let credits_used = 0;
+    let firstApolloRequestId: string | null = null;
+    let totalLatency = 0;
+
+    const pushAttempt = (endpoint: string, r: ApolloCallResult, count: number) => {
+      attempts.push({
+        endpoint,
+        status: r.status,
+        ok: r.ok,
+        inaccessible: r.inaccessible,
+        count,
+        latency_ms: r.latency_ms,
+        apollo_request_id: r.apollo_request_id,
+        raw: r.json,
+        error: r.errorMessage,
+      });
+      if (!firstApolloRequestId) firstApolloRequestId = r.apollo_request_id;
+      totalLatency += r.latency_ms;
+    };
 
     // Attempt 1: mixed_people/api_search by domain + decision-maker titles
     {
@@ -324,20 +380,15 @@ Deno.serve(async (req: Request) => {
         per_page: 10,
       }, APOLLO_API_KEY);
       const list: any[] = r.json?.people ?? r.json?.contacts ?? [];
-      attempts.push({
-        endpoint: "mixed_people/api_search",
-        status: r.status, ok: r.ok, inaccessible: r.inaccessible,
-        count: list.length, error: r.errorMessage,
-      });
+      pushAttempt("mixed_people/api_search", r, list.length);
       if (r.ok && list.length > 0) {
         people = list; endpointUsed = "mixed_people/api_search"; credits_used += ESTIMATED_CREDITS;
       } else if (r.ok) {
-        // accessible but empty — counts as a credit consumed
         credits_used += ESTIMATED_CREDITS;
       }
     }
 
-    // Attempt 2: contacts/search by keywords (account contacts already in your Apollo)
+    // Attempt 2: contacts/search by keywords
     if (!endpointUsed) {
       const r = await callApollo(APOLLO_CONTACTS_URL, {
         q_keywords: searchKeywords,
@@ -345,11 +396,7 @@ Deno.serve(async (req: Request) => {
         per_page: 25,
       }, APOLLO_API_KEY);
       const list: any[] = r.json?.contacts ?? r.json?.people ?? [];
-      attempts.push({
-        endpoint: "contacts/search",
-        status: r.status, ok: r.ok, inaccessible: r.inaccessible,
-        count: list.length, error: r.errorMessage,
-      });
+      pushAttempt("contacts/search", r, list.length);
       if (r.ok && list.length > 0) {
         people = list; endpointUsed = "contacts/search"; credits_used += ESTIMATED_CREDITS;
       } else if (r.ok) {
@@ -357,7 +404,7 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Attempt 3: contacts/search by domain only (broader)
+    // Attempt 3: contacts/search by domain only
     if (!endpointUsed) {
       const r = await callApollo(APOLLO_CONTACTS_URL, {
         q_keywords: domain,
@@ -365,11 +412,7 @@ Deno.serve(async (req: Request) => {
         per_page: 25,
       }, APOLLO_API_KEY);
       const list: any[] = r.json?.contacts ?? r.json?.people ?? [];
-      attempts.push({
-        endpoint: "contacts/search:domain",
-        status: r.status, ok: r.ok, inaccessible: r.inaccessible,
-        count: list.length, error: r.errorMessage,
-      });
+      pushAttempt("contacts/search:domain", r, list.length);
       if (r.ok && list.length > 0) {
         people = list; endpointUsed = "contacts/search:domain"; credits_used += ESTIMATED_CREDITS;
       } else if (r.ok) {
@@ -377,19 +420,16 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Attempt 4: organizations/enrich — at least pull company-level info
+    // Attempt 4: organizations/enrich
     let orgEnrichment: any = null;
     {
       const r = await callApollo(APOLLO_ORG_ENRICH_URL, { domain }, APOLLO_API_KEY, "GET");
-      attempts.push({
-        endpoint: "organizations/enrich",
-        status: r.status, ok: r.ok, inaccessible: r.inaccessible,
-        count: r.json?.organization ? 1 : 0, error: r.errorMessage,
-      });
+      pushAttempt("organizations/enrich", r, r.json?.organization ? 1 : 0);
       if (r.ok && r.json?.organization) {
         orgEnrichment = r.json.organization;
       }
     }
+
 
     const allAttemptsFailed = attempts.every((a) => !a.ok);
     const allInaccessible = attempts.every((a) => a.inaccessible);
@@ -431,6 +471,17 @@ Deno.serve(async (req: Request) => {
     let topSeniority: string | null = null;
     let topSeniorityRank = 0;
 
+    // KAI.18.6 — Wiretap por contato: para cada pessoa registramos motivo exato.
+    const eliminatedContacts: Array<{
+      apollo_id: string | null;
+      name: string | null;
+      title: string | null;
+      company: string | null;
+      email: string | null;
+      reasons: string[];
+    }> = [];
+    const seenEmails = new Set<string>();
+
     const rows = people.map((person) => {
       const reasons: string[] = [];
 
@@ -452,7 +503,7 @@ Deno.serve(async (req: Request) => {
         domainMismatchCount += 1;
       }
 
-      // title relevance (only in smart mode is a rec, always logged)
+      // title relevance
       const titleOk = isRelevantTitle(person.title, titlesToUse) || !!person.email || !!person.linkedin_url;
       if (!titleOk) {
         reasons.push("role_mismatch");
@@ -467,7 +518,27 @@ Deno.serve(async (req: Request) => {
         companyPhoneOnlyCount += 1;
       }
 
+      // duplicate (same email dentro do mesmo batch)
+      const emailKey = (person.email ?? "").toLowerCase().trim();
+      if (emailKey) {
+        if (seenEmails.has(emailKey)) reasons.push("duplicate");
+        else seenEmails.add(emailKey);
+      }
+
       const isHidden = reasons.length > 0;
+      const fullName = person.name ?? [person.first_name, person.last_name].filter(Boolean).join(" ") ?? null;
+      const companyName = person?.organization?.name ?? person?.account?.name ?? null;
+
+      if (isHidden) {
+        eliminatedContacts.push({
+          apollo_id: person.person_id ?? person.id ?? null,
+          name: fullName || null,
+          title: person.title ?? null,
+          company: companyName,
+          email: person.email ?? null,
+          reasons,
+        });
+      }
 
       const cScore = computeContactScore(person);
       const seniority = detectSeniority(person.title);
@@ -482,7 +553,7 @@ Deno.serve(async (req: Request) => {
       return {
         workspace_id: prospect.organization_id,
         prospect_id,
-        full_name: person.name ?? [person.first_name, person.last_name].filter(Boolean).join(" "),
+        full_name: fullName,
         first_name: person.first_name ?? null,
         last_name: person.last_name ?? null,
         role_title: person.title ?? null,
@@ -502,30 +573,17 @@ Deno.serve(async (req: Request) => {
       };
     });
 
-    if (domainMismatchCount > 0) {
-      attempts.push({
-        endpoint: "domain_mismatch_flag",
-        status: 200, ok: true, inaccessible: false,
-        count: domainMismatchCount,
-        error: `Flagged ${domainMismatchCount} contact(s) whose Apollo org domain != ${prospectDomain} (não descartado)`,
-      });
-    }
-    if (titleMismatchCount > 0) {
-      attempts.push({
-        endpoint: "role_mismatch_flag",
-        status: 200, ok: true, inaccessible: false,
-        count: titleMismatchCount,
-        error: `Flagged ${titleMismatchCount} contact(s) with role outside requested titles (não descartado)`,
-      });
-    }
-    if (companyPhoneOnlyCount > 0) {
-      attempts.push({
-        endpoint: "company_phone_only_flag",
-        status: 200, ok: true, inaccessible: false,
-        count: companyPhoneOnlyCount,
-        error: `Flagged ${companyPhoneOnlyCount} contact(s) with company phone only (não descartado)`,
-      });
-    }
+    const parserCount = rows.length;
+    const filterCount = rows.filter((r) => !r.is_hidden_recommendation).length;
+
+
+    const pushFlag = (endpoint: string, count: number, msg: string) => {
+      attempts.push({ endpoint, status: 200, ok: true, inaccessible: false, count, latency_ms: 0, apollo_request_id: null, error: msg });
+    };
+    if (domainMismatchCount > 0) pushFlag("domain_mismatch_flag", domainMismatchCount, `Flagged ${domainMismatchCount} contact(s) whose Apollo org domain != ${prospectDomain} (não descartado)`);
+    if (titleMismatchCount > 0) pushFlag("role_mismatch_flag", titleMismatchCount, `Flagged ${titleMismatchCount} contact(s) with role outside requested titles (não descartado)`);
+    if (companyPhoneOnlyCount > 0) pushFlag("company_phone_only_flag", companyPhoneOnlyCount, `Flagged ${companyPhoneOnlyCount} contact(s) with company phone only (não descartado)`);
+
 
     let inserted = 0;
     if (rows.length > 0) {
@@ -593,8 +651,10 @@ Deno.serve(async (req: Request) => {
       completed_at: new Date().toISOString(),
     }).eq("id", jobRow!.id);
 
-    // KAI.18.5 — Apollo Query Log (transparência total)
+    // KAI.18.6 — Apollo Wiretap: log ultra-detalhado.
     try {
+      const rawFull = { attempts, organization: orgEnrichment ?? null };
+      const compressed = await maybeCompressRaw(rawFull);
       await sb.from("apollo_query_logs").insert({
         organization_id: prospect.organization_id,
         prospect_id,
@@ -606,11 +666,23 @@ Deno.serve(async (req: Request) => {
           custom_titles_used: customTitles.length > 0,
           trigger_source,
           bypass_cache: bypassCache,
+          endpoints_tried: attempts.map((a) => ({ endpoint: a.endpoint, status: a.status, latency_ms: a.latency_ms, count: a.count })),
         },
         request_headers_safe: { "x-api-key": "***", "Content-Type": "application/json" },
         response_status: attempts.find((a) => a.endpoint === endpointUsed)?.status ?? 200,
-        response_body: { people_sample: people.slice(0, 3), attempts, organization: orgEnrichment ? { name: orgEnrichment.name, domain } : null },
-        apollo_request_id: null,
+        response_body: {
+          people_sample: people.slice(0, 3),
+          attempts: attempts.map(({ raw: _raw, ...rest }) => rest),
+          organization: orgEnrichment ? { name: orgEnrichment.name, domain } : null,
+        },
+        raw_response_full: compressed.full,
+        raw_response_compressed: compressed.compressed,
+        raw_response_size_bytes: compressed.size,
+        raw_response_compressed_bool: compressed.wasCompressed,
+        parser_count: parserCount,
+        filter_count: filterCount,
+        eliminated_contacts: eliminatedContacts,
+        apollo_request_id: firstApolloRequestId,
         people_returned: people.length,
         people_recommended: recommendedCount,
         people_hidden: hiddenCount,
@@ -618,15 +690,18 @@ Deno.serve(async (req: Request) => {
           domain_mismatch: domainMismatchCount,
           role_mismatch: titleMismatchCount,
           company_phone_only: companyPhoneOnlyCount,
+          duplicate: eliminatedContacts.filter((c) => c.reasons.includes("duplicate")).length,
         },
         credits_used,
         cache_status: bypassCache ? "bypass" : "miss",
         fallback_used: attempts.length > 1,
+        latency_ms: totalLatency,
         status: "ok",
       });
     } catch (e) {
       console.warn("[apollo_query_logs] insert failed", e);
     }
+
 
     await trackEvent(sb, prospect.organization_id, "apollo_enrichment_completed", {
       prospect_id, job_id: jobRow?.id, ...response_summary, credits_used,

@@ -29,6 +29,21 @@ export interface ApolloQueryLog {
   status: 'ok' | 'error' | 'timeout' | 'rate_limited';
   error_message: string | null;
   created_at: string;
+  // KAI.18.6 — Apollo Wiretap
+  parser_count: number | null;
+  filter_count: number | null;
+  eliminated_contacts: Array<{
+    apollo_id: string | null;
+    name: string | null;
+    title: string | null;
+    company: string | null;
+    email: string | null;
+    reasons: string[];
+  }>;
+  raw_response_full: unknown | null;
+  raw_response_compressed: string | null;
+  raw_response_size_bytes: number | null;
+  raw_response_compressed_bool: boolean;
 }
 
 export async function listApolloQueryLogs(
