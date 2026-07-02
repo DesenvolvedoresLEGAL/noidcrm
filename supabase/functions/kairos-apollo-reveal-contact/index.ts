@@ -319,13 +319,12 @@ Deno.serve(async (req) => {
     // (Apollo enfileirou e chamará o webhook depois). Se phone_numbers estiver vazio/ausente,
     // Apollo NÃO vai callback — marcar como not_found imediato.
     const rawPhoneNumbers: any[] = Array.isArray(person?.phone_numbers) ? person.phone_numbers : [];
-    const hasAsyncPending = rawPhoneNumbers.some((p: any) => {
-      if (!p || typeof p !== "object") return false;
-      const noNumber = !p.sanitized_number && !p.raw_number && !p.number;
-      const pendingFlag = String(p.status ?? p.dnc_status ?? "").toLowerCase().includes("pend")
-        || p.is_pending === true;
-      return noNumber && (pendingFlag || rawPhoneNumbers.length > 0 && !p.sanitized_number);
-    });
+    // Apollo async signal: array não-vazio com entrada sem sanitized_number/raw_number.
+    // Se array vier vazio/ausente, Apollo não fará callback — resolver como not_found agora.
+    const hasAsyncPending = rawPhoneNumbers.some((p: any) =>
+      p && typeof p === "object" && !p.sanitized_number && !p.raw_number && !p.number,
+    );
+    const phonePending = wantsPhone && !phoneAlready && !revealedPhone && !companyPhoneRejected && hasAsyncPending;
     const phonePending = wantsPhone && !phoneAlready && !revealedPhone && !companyPhoneRejected && hasAsyncPending;
 
     const update: Record<string, unknown> = {
