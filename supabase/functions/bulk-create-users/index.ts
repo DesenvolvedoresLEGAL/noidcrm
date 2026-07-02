@@ -210,7 +210,7 @@ serve(async (req: Request) => {
             results.push({
               email: userInput.email,
               success: false,
-              error: "Usuário já é membro desta organização",
+              error: "Não foi possível processar este cadastro",
             });
             continue;
           } else {

@@ -273,6 +273,11 @@ function buildRecommendations(rows: Row[]): Rec[] {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
+    const internalSecret = req.headers.get("x-internal-secret");
+    const expectedSecret = Deno.env.get("INTERNAL_WORKFLOW_SECRET");
+    if (!expectedSecret || internalSecret !== expectedSecret) {
+      return json(401, { error: "Unauthorized" });
+    }
     const url = Deno.env.get("SUPABASE_URL")!;
     const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const admin = createClient(url, key);

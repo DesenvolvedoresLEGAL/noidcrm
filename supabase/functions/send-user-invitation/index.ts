@@ -91,7 +91,7 @@ serve(async (req: Request) => {
         // Invitation is still valid - return error without exposing token
         console.log(`[Invitation] Pending invitation exists for ${email}, expires at ${existingInvitation.expires_at}`);
         return new Response(JSON.stringify({ 
-          error: "Já existe um convite pendente para este email",
+          error: "Não foi possível enviar o convite",
           existingInvitation: true
           // Token intentionally omitted for security
         }), {

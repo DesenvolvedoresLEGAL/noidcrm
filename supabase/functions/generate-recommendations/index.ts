@@ -70,10 +70,7 @@ Deno.serve(async (req) => {
 
   const internalSecret = req.headers.get('x-internal-secret');
   const expectedSecret = Deno.env.get('INTERNAL_WORKFLOW_SECRET');
-  const authHeader = req.headers.get('authorization');
-  const hasInternal = expectedSecret && internalSecret === expectedSecret;
-  const hasAuth = !!authHeader && authHeader.toLowerCase().startsWith('bearer ');
-  if (!hasInternal && !hasAuth) {
+  if (!expectedSecret || internalSecret !== expectedSecret) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
       status: 401,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
