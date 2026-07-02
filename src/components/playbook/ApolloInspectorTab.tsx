@@ -208,6 +208,34 @@ function LogCard({ log, isAdmin }: { log: ApolloQueryLog; isAdmin?: boolean }) {
 
         {expanded && (
           <div className="space-y-2 mt-3 border-t pt-3">
+            {log.eliminated_contacts && log.eliminated_contacts.length > 0 && (
+              <div>
+                <div className="text-[10px] font-semibold text-red-700 uppercase mb-1">
+                  Contatos eliminados ({log.eliminated_contacts.length})
+                </div>
+                <div className="max-h-56 overflow-y-auto rounded border border-red-500/20 bg-red-500/5 divide-y divide-red-500/10">
+                  {log.eliminated_contacts.map((c, i) => (
+                    <div key={i} className="px-2 py-1.5 text-[11px]">
+                      <div className="font-medium text-slate-800">
+                        {c.name || c.email || c.apollo_id || 'sem nome'}
+                        {c.title ? <span className="text-muted-foreground"> · {c.title}</span> : null}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground">
+                        {c.company ?? '—'}
+                      </div>
+                      <div className="mt-0.5 flex flex-wrap gap-1">
+                        {c.reasons.map((r) => (
+                          <Badge key={r} variant="outline" className="text-[9px] bg-red-500/10 text-red-700 border-red-500/30">
+                            {r}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div>
               <div className="text-[10px] font-semibold text-muted-foreground uppercase mb-1">
                 Payload enviado
@@ -218,6 +246,19 @@ function LogCard({ log, isAdmin }: { log: ApolloQueryLog; isAdmin?: boolean }) {
             </div>
 
             <div>
+              <div className="text-[10px] font-semibold text-muted-foreground uppercase mb-1">
+                Resposta Apollo{log.raw_response_compressed_bool ? ' (comprimida — amostra abaixo)' : ' (amostra)'}
+              </div>
+              <pre className="text-[10px] bg-muted/40 rounded p-2 overflow-x-auto max-h-52">
+                {JSON.stringify(log.response_body, null, 2)}
+              </pre>
+              {log.raw_response_size_bytes != null && (
+                <div className="text-[10px] text-muted-foreground mt-1">
+                  RAW: {(log.raw_response_size_bytes / 1024).toFixed(1)} KB {log.raw_response_compressed_bool ? '· armazenado gzip+base64' : '· armazenado bruto'}
+                </div>
+              )}
+            </div>
+
               <div className="text-[10px] font-semibold text-muted-foreground uppercase mb-1">
                 Resposta Apollo (amostra)
               </div>
