@@ -38039,6 +38039,20 @@ export type Database = {
         Args: { _user_id?: string }
         Returns: Database["public"]["Enums"]["platform_admin_role"]
       }
+      get_profile_sensitive_fields: {
+        Args: { _target_user_id: string }
+        Returns: {
+          birth_date: string
+          cpf: string
+        }[]
+      }
+      get_proposal_acceptor_sensitive: {
+        Args: { _proposal_id: string }
+        Returns: {
+          acceptor_document: string
+          acceptor_ip: string
+        }[]
+      }
       get_proposal_ai_insights_cache: {
         Args: { p_proposal_id: string }
         Returns: Json
