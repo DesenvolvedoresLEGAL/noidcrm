@@ -38311,7 +38311,7 @@ export type Database = {
       }
       mark_contact_phone_invalid: {
         Args: { p_contact_id: string; p_reason?: string }
-        Returns: undefined
+        Returns: Json
       }
       mark_operational_proposal_clone: {
         Args: { p_clone_proposal_id: string; p_original_proposal_id: string }
@@ -38485,6 +38485,10 @@ export type Database = {
       recalculate_proposal_pricing_ledger: {
         Args: { p_proposal_id: string }
         Returns: Json
+      }
+      recompute_primary_contact: {
+        Args: { p_prospect_id: string }
+        Returns: string
       }
       record_memory_read: {
         Args: {
