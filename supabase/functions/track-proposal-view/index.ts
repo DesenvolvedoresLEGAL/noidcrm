@@ -786,39 +786,17 @@ async function createProposalViewedNotification(supabase: any, proposalId: strin
         companyName = acc?.nome_fantasia || acc?.razao_social || 'Cliente';
       }
 
-      // Resolve manager
+      // Resolve manager via team membership (teams.manager_id references auth.users.id directly)
       if (ownerId) {
-        const { data: sellerProfile } = await supabase
-          .from('profiles')
-          .select('id')
+        const { data: teamRows } = await supabase
+          .from('team_members')
+          .select('teams!inner(manager_id)')
           .eq('user_id', ownerId)
-          .single();
+          .eq('organization_id', proposal.organization_id);
 
-        if (sellerProfile) {
-          const { data: sellerRecord } = await supabase
-            .from('sellers')
-            .select('team_id')
-            .eq('profile_id', sellerProfile.id)
-            .eq('organization_id', proposal.organization_id)
-            .single();
-
-          if (sellerRecord?.team_id) {
-            const { data: team } = await supabase
-              .from('teams')
-              .select('manager_id')
-              .eq('id', sellerRecord.team_id)
-              .single();
-
-            if (team?.manager_id) {
-              const { data: mgrProfile } = await supabase
-                .from('profiles')
-                .select('user_id')
-                .eq('id', team.manager_id)
-                .single();
-              managerId = mgrProfile?.user_id || null;
-            }
-          }
-        }
+        managerId = (teamRows || [])
+          .map((r: any) => r.teams?.manager_id)
+          .find((m: string | null) => m && m !== ownerId) || null;
       }
     }
 

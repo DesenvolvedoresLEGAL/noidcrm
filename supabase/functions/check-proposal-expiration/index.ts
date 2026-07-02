@@ -184,17 +184,18 @@ Deno.serve(async (req) => {
 
       const ownerId = opp.owner_user_id;
 
-      // Get manager
-      const { data: seller } = await supabase
-        .from("sellers")
-        .select("manager_id")
+      // Get manager via team membership (teams.manager_id)
+      const { data: teamRows } = await supabase
+        .from("team_members")
+        .select("teams!inner(manager_id)")
         .eq("user_id", ownerId)
-        .eq("organization_id", proposal.organization_id)
-        .maybeSingle();
+        .eq("organization_id", proposal.organization_id);
 
-      const recipientIds = [ownerId, seller?.manager_id].filter(
-        Boolean
-      ) as string[];
+      const managerId = (teamRows || [])
+        .map((r: any) => r.teams?.manager_id)
+        .find((m: string | null) => m && m !== ownerId) || null;
+
+      const recipientIds = [ownerId, managerId].filter(Boolean) as string[];
       const uniqueRecipients = [...new Set(recipientIds)];
 
       // Build notification message
