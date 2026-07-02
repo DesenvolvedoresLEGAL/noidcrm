@@ -259,13 +259,6 @@ function LogCard({ log, isAdmin }: { log: ApolloQueryLog; isAdmin?: boolean }) {
               )}
             </div>
 
-              <div className="text-[10px] font-semibold text-muted-foreground uppercase mb-1">
-                Resposta Apollo (amostra)
-              </div>
-              <pre className="text-[10px] bg-muted/40 rounded p-2 overflow-x-auto max-h-52">
-                {JSON.stringify(log.response_body, null, 2)}
-              </pre>
-            </div>
 
             {log.error_message && (
               <div>
