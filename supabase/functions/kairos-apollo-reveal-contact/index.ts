@@ -66,6 +66,10 @@ Deno.serve(async (req) => {
     }
 
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false } });
+    safetyAdmin = admin;
+    safetyContactId = body.contact_id;
+    safetyWantsPhone = dataType === "phone" || dataType === "both";
+    safetyWantsEmail = dataType === "email" || dataType === "both";
 
     // Resolve user (optional — source=autopilot/apollo_invisible chamam via service role sem JWT)
     const authHeader = req.headers.get("Authorization") ?? "";
