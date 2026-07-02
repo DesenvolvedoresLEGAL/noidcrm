@@ -5469,6 +5469,93 @@ export type Database = {
         }
         Relationships: []
       }
+      apollo_browser_parity_logs: {
+        Row: {
+          apollo_web_contacts_count: number | null
+          apollo_web_url: string | null
+          company_name: string | null
+          created_at: string
+          created_by: string | null
+          diff_summary: Json | null
+          domain: string | null
+          har_candidate_requests: Json | null
+          har_summary: Json | null
+          har_uploaded: boolean
+          id: string
+          kairos_contacts_count: number | null
+          kairos_credits_used: number | null
+          kairos_endpoint: string | null
+          kairos_filter_count: number | null
+          kairos_parser_count: number | null
+          kairos_payload: Json | null
+          kairos_request_id: string | null
+          kairos_response_summary: Json | null
+          kairos_status: string | null
+          organization_id: string
+          parity_status: string
+          prospect_id: string | null
+          root_cause: string | null
+          selected_har_request: Json | null
+          updated_at: string
+        }
+        Insert: {
+          apollo_web_contacts_count?: number | null
+          apollo_web_url?: string | null
+          company_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          diff_summary?: Json | null
+          domain?: string | null
+          har_candidate_requests?: Json | null
+          har_summary?: Json | null
+          har_uploaded?: boolean
+          id?: string
+          kairos_contacts_count?: number | null
+          kairos_credits_used?: number | null
+          kairos_endpoint?: string | null
+          kairos_filter_count?: number | null
+          kairos_parser_count?: number | null
+          kairos_payload?: Json | null
+          kairos_request_id?: string | null
+          kairos_response_summary?: Json | null
+          kairos_status?: string | null
+          organization_id: string
+          parity_status?: string
+          prospect_id?: string | null
+          root_cause?: string | null
+          selected_har_request?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          apollo_web_contacts_count?: number | null
+          apollo_web_url?: string | null
+          company_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          diff_summary?: Json | null
+          domain?: string | null
+          har_candidate_requests?: Json | null
+          har_summary?: Json | null
+          har_uploaded?: boolean
+          id?: string
+          kairos_contacts_count?: number | null
+          kairos_credits_used?: number | null
+          kairos_endpoint?: string | null
+          kairos_filter_count?: number | null
+          kairos_parser_count?: number | null
+          kairos_payload?: Json | null
+          kairos_request_id?: string | null
+          kairos_response_summary?: Json | null
+          kairos_status?: string | null
+          organization_id?: string
+          parity_status?: string
+          prospect_id?: string | null
+          root_cause?: string | null
+          selected_har_request?: Json | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       apollo_enrichment_audit: {
         Row: {
           apollo_status: string
@@ -5545,6 +5632,7 @@ export type Database = {
           latency_ms: number | null
           mode: string
           organization_id: string
+          organization_resolution: Json | null
           parser_count: number | null
           people_hidden: number
           people_recommended: number
@@ -5561,7 +5649,9 @@ export type Database = {
           response_status: number | null
           retries: number
           status: string
+          strategies_tried: Json | null
           triggered_by: string | null
+          zero_result_with_credits: boolean | null
         }
         Insert: {
           apollo_request_id?: string | null
@@ -5578,6 +5668,7 @@ export type Database = {
           latency_ms?: number | null
           mode?: string
           organization_id: string
+          organization_resolution?: Json | null
           parser_count?: number | null
           people_hidden?: number
           people_recommended?: number
@@ -5594,7 +5685,9 @@ export type Database = {
           response_status?: number | null
           retries?: number
           status?: string
+          strategies_tried?: Json | null
           triggered_by?: string | null
+          zero_result_with_credits?: boolean | null
         }
         Update: {
           apollo_request_id?: string | null
@@ -5611,6 +5704,7 @@ export type Database = {
           latency_ms?: number | null
           mode?: string
           organization_id?: string
+          organization_resolution?: Json | null
           parser_count?: number | null
           people_hidden?: number
           people_recommended?: number
@@ -5627,7 +5721,9 @@ export type Database = {
           response_status?: number | null
           retries?: number
           status?: string
+          strategies_tried?: Json | null
           triggered_by?: string | null
+          zero_result_with_credits?: boolean | null
         }
         Relationships: [
           {
@@ -10765,6 +10861,12 @@ export type Database = {
       enriched_company_profiles: {
         Row: {
           account_id: string | null
+          apollo_organization_confidence: number | null
+          apollo_organization_domain: string | null
+          apollo_organization_id: string | null
+          apollo_organization_name: string | null
+          apollo_organization_resolution_source: string | null
+          apollo_organization_resolved_at: string | null
           business_model: string | null
           canonical_company_name: string | null
           canonical_domain: string | null
@@ -10790,6 +10892,12 @@ export type Database = {
         }
         Insert: {
           account_id?: string | null
+          apollo_organization_confidence?: number | null
+          apollo_organization_domain?: string | null
+          apollo_organization_id?: string | null
+          apollo_organization_name?: string | null
+          apollo_organization_resolution_source?: string | null
+          apollo_organization_resolved_at?: string | null
           business_model?: string | null
           canonical_company_name?: string | null
           canonical_domain?: string | null
@@ -10815,6 +10923,12 @@ export type Database = {
         }
         Update: {
           account_id?: string | null
+          apollo_organization_confidence?: number | null
+          apollo_organization_domain?: string | null
+          apollo_organization_id?: string | null
+          apollo_organization_name?: string | null
+          apollo_organization_resolution_source?: string | null
+          apollo_organization_resolved_at?: string | null
           business_model?: string | null
           canonical_company_name?: string | null
           canonical_domain?: string | null
@@ -10888,6 +11002,7 @@ export type Database = {
           full_name: string | null
           hidden_reasons: string[]
           id: string
+          import_note: string | null
           is_hidden_recommendation: boolean
           is_merged: boolean
           is_primary: boolean | null
@@ -10896,6 +11011,7 @@ export type Database = {
           last_reveal_attempt_at: string | null
           last_reveal_job_id: string | null
           linkedin_url: string | null
+          manual_import: boolean | null
           merged_into: string | null
           phone: string | null
           phone_confidence: number
@@ -10918,6 +11034,7 @@ export type Database = {
           provider_priority: Json | null
           raw: Json | null
           requested_titles: string[]
+          requires_validation: boolean | null
           reveal_credits_used: number
           reveal_source: string | null
           reveal_status: string | null
@@ -10946,6 +11063,7 @@ export type Database = {
           full_name?: string | null
           hidden_reasons?: string[]
           id?: string
+          import_note?: string | null
           is_hidden_recommendation?: boolean
           is_merged?: boolean
           is_primary?: boolean | null
@@ -10954,6 +11072,7 @@ export type Database = {
           last_reveal_attempt_at?: string | null
           last_reveal_job_id?: string | null
           linkedin_url?: string | null
+          manual_import?: boolean | null
           merged_into?: string | null
           phone?: string | null
           phone_confidence?: number
@@ -10976,6 +11095,7 @@ export type Database = {
           provider_priority?: Json | null
           raw?: Json | null
           requested_titles?: string[]
+          requires_validation?: boolean | null
           reveal_credits_used?: number
           reveal_source?: string | null
           reveal_status?: string | null
@@ -11004,6 +11124,7 @@ export type Database = {
           full_name?: string | null
           hidden_reasons?: string[]
           id?: string
+          import_note?: string | null
           is_hidden_recommendation?: boolean
           is_merged?: boolean
           is_primary?: boolean | null
@@ -11012,6 +11133,7 @@ export type Database = {
           last_reveal_attempt_at?: string | null
           last_reveal_job_id?: string | null
           linkedin_url?: string | null
+          manual_import?: boolean | null
           merged_into?: string | null
           phone?: string | null
           phone_confidence?: number
@@ -11034,6 +11156,7 @@ export type Database = {
           provider_priority?: Json | null
           raw?: Json | null
           requested_titles?: string[]
+          requires_validation?: boolean | null
           reveal_credits_used?: number
           reveal_source?: string | null
           reveal_status?: string | null
