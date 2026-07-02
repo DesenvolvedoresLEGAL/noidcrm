@@ -315,15 +315,50 @@ export function ProspectContactsTab({
                   <Mail className="h-3 w-3" /> sem e-mail
                 </div>
               )}
-              {c.phone ? (
-                <button
-                  onClick={() => copy(c.phone!, "Telefone")}
-                  className="flex items-center gap-1.5 w-full hover:bg-muted/50 rounded px-1 py-0.5 -mx-1 group"
-                >
-                  <Phone className="h-3 w-3 text-muted-foreground" />
-                  <span className="font-mono">{c.phone}</span>
-                  <Copy className="h-3 w-3 ml-auto opacity-0 group-hover:opacity-50" />
-                </button>
+              {c.phone && c.phone_revealed && (c.phone_validation_status !== "invalid") ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="flex items-center gap-1.5 w-full hover:bg-muted/50 rounded px-1 py-0.5 -mx-1 group text-left">
+                      {c.is_whatsapp_ready ? (
+                        <MessageCircle className="h-3 w-3 text-emerald-600" />
+                      ) : (
+                        <Phone className="h-3 w-3 text-muted-foreground" />
+                      )}
+                      <span className="font-mono">{c.phone}</span>
+                      <ChevronDown className="h-3 w-3 ml-auto opacity-60" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-64">
+                    <DropdownMenuLabel className="text-[10px] font-normal text-muted-foreground leading-tight">
+                      <div className="font-mono text-foreground text-xs mb-1">{c.phone}</div>
+                      <div>Origem: {c.phone_source ?? "apollo"}</div>
+                      <div>Tipo: {c.phone_match_quality ?? c.phone_type ?? "—"}</div>
+                      <div>Confiança: {c.phone_confidence ?? 0}%</div>
+                      {c.phone_verified_at && (
+                        <div>Validado: {new Date(c.phone_verified_at).toLocaleDateString("pt-BR")}</div>
+                      )}
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => copy(c.phone!, "Telefone")}>
+                      <Copy className="h-3.5 w-3.5 mr-2" /> Copiar número
+                    </DropdownMenuItem>
+                    {c.is_whatsapp_ready && (
+                      <DropdownMenuItem onClick={() => openWhatsApp(c.phone!)}>
+                        <MessageCircle className="h-3.5 w-3.5 mr-2 text-emerald-600" /> Abrir WhatsApp
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuItem onClick={() => callPhone(c.phone!)}>
+                      <PhoneCall className="h-3.5 w-3.5 mr-2" /> Ligar
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      className="text-red-600 focus:text-red-600"
+                      onClick={() => markPhoneInvalid(c.id)}
+                    >
+                      <XCircle className="h-3.5 w-3.5 mr-2" /> Marcar como inválido
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               ) : (
                 <div className="flex items-center gap-1.5 text-muted-foreground/60 italic">
                   <Phone className="h-3 w-3" /> sem telefone
