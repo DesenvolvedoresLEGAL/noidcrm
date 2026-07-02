@@ -2,7 +2,7 @@
 // Apollo chama este endpoint quando reveal_phone_number=true completa.
 // KAI.15.1 phone quality: rejeita telefones corporativos, aceita só mobile/direct pessoais.
 import { createClient } from "npm:@supabase/supabase-js@2.45.0";
-import { classifyApolloPhone } from "../_shared/apollo-phone-classifier.ts";
+import { computePhoneQuality } from "../_shared/apollo-phone-classifier.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
