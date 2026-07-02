@@ -59,7 +59,7 @@ interface Props {
 
 export function ApolloEndpointMatrixTab({ prospectId }: Props) {
   const { data: user } = useCurrentUser();
-  const orgId = user?.organization?.organization_id as string | undefined;
+  const orgId = user?.organization?.id as string | undefined;
 
   const [rows, setRows] = useState<EndpointMatrixRow[]>([]);
   const [discovery, setDiscovery] = useState<EndpointDiscoveryRow[]>([]);
