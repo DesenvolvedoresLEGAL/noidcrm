@@ -171,12 +171,22 @@ function LogCard({ log, isAdmin }: { log: ApolloQueryLog; isAdmin?: boolean }) {
       </CardHeader>
 
       <CardContent className="pt-0 pb-3">
-        <div className="grid grid-cols-4 gap-2 text-center text-[11px] mb-2">
-          <Metric label="Retornou" value={log.people_returned} tone="text-emerald-700" />
-          <Metric label="Recomendou" value={log.people_recommended} tone="text-blue-700" />
+        <div className="grid grid-cols-5 gap-2 text-center text-[11px] mb-2">
+          <Metric label="Apollo" value={log.people_returned} tone="text-emerald-700" />
+          <Metric label="Parser" value={log.parser_count ?? log.people_returned} tone="text-slate-700" />
+          <Metric label="Filtro" value={log.filter_count ?? log.people_recommended} tone="text-blue-700" />
           <Metric label="Escondeu" value={log.people_hidden} tone="text-amber-700" />
           <Metric label="Créditos" value={log.credits_used} tone="text-muted-foreground" />
         </div>
+
+        {log.people_returned > 0 && log.filter_count === 0 && (
+          <div className="mb-2 rounded-md bg-red-500/5 border border-red-500/30 px-2 py-1.5 text-[11px] text-red-800">
+            <strong>Apollo retornou {log.people_returned} contatos, mas o filtro derrubou todos.</strong>
+            <div className="mt-1">
+              Motivos: {Object.entries(log.hidden_reasons ?? {}).filter(([, c]) => (c as number) > 0).map(([r, c]) => `${c} ${r}`).join(' · ') || '—'}
+            </div>
+          </div>
+        )}
 
         {log.people_hidden > 0 && (
           <div className="mb-2 rounded-md bg-amber-500/5 border border-amber-500/20 px-2 py-1.5">
@@ -185,7 +195,7 @@ function LogCard({ log, isAdmin }: { log: ApolloQueryLog; isAdmin?: boolean }) {
             </div>
             <div className="flex flex-wrap gap-1">
               {Object.entries(log.hidden_reasons ?? {}).map(([reason, count]) =>
-                count > 0 ? (
+                (count as number) > 0 ? (
                   <Badge key={reason} variant="outline" className="text-[10px]">
                     {reason}: {String(count)}
                   </Badge>
@@ -194,6 +204,7 @@ function LogCard({ log, isAdmin }: { log: ApolloQueryLog; isAdmin?: boolean }) {
             </div>
           </div>
         )}
+
 
         {expanded && (
           <div className="space-y-2 mt-3 border-t pt-3">
