@@ -74,8 +74,10 @@ export function ProspectContactsTab({
   });
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [showHidden, setShowHidden] = useState(false); // KAI.18.5 — Apollo Raw view toggle
   const sync = useSyncEnrichedContacts();
   const reveal = useRevealContact();
+  const rawSearch = useApolloRaw(prospectId);
   const [revealingKey, setRevealingKey] = useState<string | null>(null);
   const [confirmReveal, setConfirmReveal] = useState<{
     contactId: string;
@@ -84,6 +86,17 @@ export function ProspectContactsTab({
     emailStatus: string | null;
     phoneStatus: string | null;
   } | null>(null);
+
+  // KAI.18.5 — separação recomendado x escondido (nunca oculta de verdade)
+  const recommendedContacts = useMemo(
+    () => contacts.filter((c: any) => !c.is_hidden_recommendation),
+    [contacts],
+  );
+  const hiddenContacts = useMemo(
+    () => contacts.filter((c: any) => !!c.is_hidden_recommendation),
+    [contacts],
+  );
+  const visibleContacts = showHidden ? contacts : recommendedContacts;
 
   const runReveal = async (contactId: string, dataType: RevealDataType, name: string | null) => {
     const key = `${contactId}:${dataType}`;
