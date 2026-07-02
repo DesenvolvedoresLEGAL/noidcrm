@@ -115,8 +115,20 @@ export function ContactCombobox({
 
       if (accountId) insertData.account_id = accountId;
       if (newContactCargo.trim()) insertData.cargo = newContactCargo.trim();
-      if (newContactEmail.trim()) insertData.emails = [newContactEmail.trim()];
-      if (newContactPhone.trim()) insertData.telefones = [newContactPhone.trim()];
+      if (newContactEmail.trim()) {
+        insertData.emails = [{
+          value: newContactEmail.trim(),
+          type: 'work',
+          is_primary: true,
+        }];
+      }
+      if (newContactPhone.trim()) {
+        insertData.telefones = [{
+          value: newContactPhone.trim(),
+          type: 'mobile',
+          is_primary: true,
+        }];
+      }
 
       const { data, error } = await supabase
         .from('contacts')
