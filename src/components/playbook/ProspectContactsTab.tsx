@@ -386,15 +386,21 @@ export function ProspectContactsTab({
               const phoneBlocked = phoneStatus === "not_found" || phoneStatus === "rejected_company_phone";
               const emailBlocked = emailStatus === "not_found";
 
-              // KAI.15.1: variar rótulo conforme fonte do telefone (pessoa vs empresa).
+              // KAI.15.2: label prioriza phone_match_quality; fallback para phone_source_type
+              const quality: string | null = (c as any).phone_match_quality ?? phoneSource;
+              const isWA = !!(c as any).is_whatsapp_ready;
               const phoneRevealedLabel =
-                phoneSource === "person_mobile"
-                  ? "Celular revelado"
-                  : phoneSource === "person_direct"
-                    ? "Direto revelado"
-                    : "Telefone revelado";
+                isWA
+                  ? "WhatsApp pronto"
+                  : quality === "person_mobile"
+                    ? "Celular revelado"
+                    : quality === "person_direct"
+                      ? "Direto revelado"
+                      : quality === "person_whatsapp"
+                        ? "WhatsApp pronto"
+                        : "Telefone revelado";
               const phoneNotFoundLabel =
-                phoneSource === "company_main"
+                quality === "company_main" || quality === "company_reception"
                   ? "Telefone da empresa rejeitado"
                   : "Telefone não encontrado";
 
