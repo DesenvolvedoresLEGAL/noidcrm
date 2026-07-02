@@ -6,7 +6,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.45.0";
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-authorization, prefer, accept, accept-profile, content-profile",
+    "authorization, x-client-info, apikey, content-type, x-supabase-authorization, x-requested-with, prefer, accept, accept-profile, content-profile",
   "Access-Control-Allow-Methods": "POST, OPTIONS, GET",
   "Access-Control-Max-Age": "86400",
   "Vary": "Origin",
