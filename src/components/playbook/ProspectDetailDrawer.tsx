@@ -21,6 +21,7 @@ import { ProspectLifecycleTimeline } from '@/components/learning/ProspectLifecyc
 import { ProspectContactsTab } from './ProspectContactsTab';
 import { EnrichmentJobsTable } from './enrichment/EnrichmentJobsTable';
 import { ApolloInspectorTab } from './ApolloInspectorTab';
+import { ApolloBrowserParityTab } from './ApolloBrowserParityTab';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 
 interface ProspectDetailDrawerProps {
@@ -143,10 +144,11 @@ export function ProspectDetailDrawer({
         </SheetHeader>
 
         <Tabs defaultValue="details" className="mt-2">
-          <TabsList className="w-full">
+          <TabsList className="w-full flex-wrap">
             <TabsTrigger value="details" className="flex-1">Detalhes</TabsTrigger>
             <TabsTrigger value="contacts" className="flex-1">Contatos</TabsTrigger>
             <TabsTrigger value="apollo" className="flex-1">Apollo</TabsTrigger>
+            <TabsTrigger value="parity" className="flex-1">Parity</TabsTrigger>
             <TabsTrigger value="history" className="flex-1">Histórico</TabsTrigger>
             <TabsTrigger value="enrichment" className="flex-1">Enrichment</TabsTrigger>
             <TabsTrigger value="decision" className="flex-1">Decisão</TabsTrigger>
@@ -158,6 +160,17 @@ export function ProspectDetailDrawer({
               <ApolloInspectorInline prospectId={prospect.id} />
             </div>
           </TabsContent>
+
+          <TabsContent value="parity">
+            <div className="py-4">
+              <ApolloBrowserParityTab
+                prospectId={prospect.id}
+                companyName={prospect.company_name}
+                domain={(prospect as any).normalized_domain}
+              />
+            </div>
+          </TabsContent>
+
 
           <TabsContent value="contacts">
             <ProspectContactsTab

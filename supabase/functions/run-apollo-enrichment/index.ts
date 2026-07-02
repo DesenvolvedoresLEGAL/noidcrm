@@ -14,6 +14,7 @@ const corsHeaders = {
 const APOLLO_PEOPLE_URL = "https://api.apollo.io/api/v1/mixed_people/api_search";
 const APOLLO_CONTACTS_URL = "https://api.apollo.io/api/v1/contacts/search";
 const APOLLO_ORG_ENRICH_URL = "https://api.apollo.io/api/v1/organizations/enrich";
+const APOLLO_ORG_SEARCH_URL = "https://api.apollo.io/api/v1/mixed_companies/search";
 const ESTIMATED_CREDITS = 2;
 const ANTI_SPAM_HOURS = 24;
 const RATE_LIMIT_PER_MIN = 20;
@@ -192,8 +193,91 @@ async function maybeCompressRaw(raw: unknown): Promise<{ full: unknown | null; c
   } catch (e) {
     console.warn("[wiretap] compression failed", e);
     return { full: null, compressed: null, size, wasCompressed: false };
-  }
 }
+
+// KAI.18.7 — Resolve Apollo Organization ID antes de buscar pessoas
+interface ApolloOrgResolution {
+  organization_id: string | null;
+  name: string | null;
+  domain: string | null;
+  confidence: number;
+  source: string;
+  candidates: any[];
+  attempts: any[];
+}
+async function resolveApolloOrganization(
+  apiKey: string,
+  domain: string | null,
+  companyName: string | null,
+): Promise<ApolloOrgResolution> {
+  const attempts: any[] = [];
+  const record = (strategy: string, r: ApolloCallResult, count: number) => {
+    attempts.push({ strategy, status: r.status, ok: r.ok, count, latency_ms: r.latency_ms });
+  };
+
+  // 1) organizations/enrich by domain
+  if (domain) {
+    const r = await callApollo(APOLLO_ORG_ENRICH_URL, { domain }, apiKey, "GET");
+    const org = r.json?.organization;
+    record("enrich_by_domain", r, org ? 1 : 0);
+    if (r.ok && org?.id) {
+      return {
+        organization_id: org.id,
+        name: org.name ?? null,
+        domain: org.primary_domain ?? org.website_url ?? domain,
+        confidence: 95,
+        source: "enrich_by_domain",
+        candidates: [org],
+        attempts,
+      };
+    }
+  }
+
+  // 2) mixed_companies/search by domain
+  if (domain) {
+    const r = await callApollo(APOLLO_ORG_SEARCH_URL, {
+      q_organization_domains: domain, page: 1, per_page: 5,
+    }, apiKey);
+    const orgs: any[] = r.json?.organizations ?? r.json?.accounts ?? [];
+    record("search_by_domain", r, orgs.length);
+    if (r.ok && orgs.length > 0) {
+      const best = orgs[0];
+      return {
+        organization_id: best.id ?? best.organization_id ?? null,
+        name: best.name ?? null,
+        domain: best.primary_domain ?? best.website_url ?? domain,
+        confidence: 85,
+        source: "search_by_domain",
+        candidates: orgs,
+        attempts,
+      };
+    }
+  }
+
+  // 3) mixed_companies/search by name
+  if (companyName) {
+    const r = await callApollo(APOLLO_ORG_SEARCH_URL, {
+      q_organization_name: companyName, page: 1, per_page: 5,
+    }, apiKey);
+    const orgs: any[] = r.json?.organizations ?? r.json?.accounts ?? [];
+    record("search_by_name", r, orgs.length);
+    if (r.ok && orgs.length > 0) {
+      const best = orgs[0];
+      return {
+        organization_id: best.id ?? best.organization_id ?? null,
+        name: best.name ?? null,
+        domain: best.primary_domain ?? best.website_url ?? null,
+        confidence: 60,
+        source: "search_by_name",
+        candidates: orgs,
+        attempts,
+      };
+    }
+  }
+
+  return { organization_id: null, name: null, domain: null, confidence: 0, source: "unresolved", candidates: [], attempts };
+}
+
 
 
 Deno.serve(async (req: Request) => {
@@ -318,25 +402,43 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // KAI.18.7 — Proteção de créditos: bloqueia após 2 zero-result-with-credits em 24h
+    if (mode !== "replay") {
+      const cutoff24h = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+      const { count: zrwcCount } = await sb
+        .from("apollo_query_logs")
+        .select("id", { count: "exact", head: true })
+        .eq("prospect_id", prospect_id)
+        .eq("zero_result_with_credits", true)
+        .gte("created_at", cutoff24h);
+      const forceAdmin = trigger_source === "user" && (body.force_admin === true);
+      if ((zrwcCount ?? 0) >= 2 && !forceAdmin) {
+        await trackEvent(sb, prospect.organization_id, "apollo_zero_result_with_credits", {
+          prospect_id, blocked: true, zrwc_count: zrwcCount,
+        });
+        return await skip(
+          "credit_protection",
+          `Bloqueado: Apollo retornou 0 com consumo de créditos ${zrwcCount}x nas últimas 24h. Use Browser Parity ou abra Apollo Web.`,
+        );
+      }
+    }
+
     // 5. Create running job
     const { data: jobRow } = await sb.from("enrichment_jobs").insert({
       workspace_id: prospect.organization_id,
       prospect_id, provider: "apollo", status: "running",
       trigger_source, estimated_credits: ESTIMATED_CREDITS,
-      request: { domain, person_titles: titlesToUse, custom_titles_used: customTitles.length > 0, review_required, quality_label: qLabel, trigger_source },
+      request: { domain, person_titles: titlesToUse, mode, custom_titles_used: customTitles.length > 0, review_required, quality_label: qLabel, trigger_source },
     }).select("id").single();
 
     await trackEvent(sb, prospect.organization_id, "apollo_enrichment_started", {
-      prospect_id, job_id: jobRow?.id, domain, trigger_source, review_required, quality_label: qLabel,
+      prospect_id, job_id: jobRow?.id, domain, trigger_source, mode, review_required, quality_label: qLabel,
     });
 
-    // 6. Try Apollo endpoints in order. Each endpoint can be:
-    //    - accessible & has results -> use it
-    //    - accessible & empty -> try next
-    //    - inaccessible (403/API_INACCESSIBLE) -> log and try next, do NOT abort
-    // KAI.18.6 Wiretap: cada tentativa carrega latência e RAW completo.
+    // KAI.18.6 Wiretap + KAI.18.7 org resolution & multi-strategy
     const attempts: Array<{
       endpoint: string;
+      strategy?: string;
       status: number;
       ok: boolean;
       inaccessible: boolean;
@@ -346,18 +448,17 @@ Deno.serve(async (req: Request) => {
       raw?: unknown;
       error?: string;
     }> = [];
-    const titlesKeyword = customTitles.length > 0 ? customTitles.slice(0, 3).join(" OR ") : "";
-    const searchKeywords = [prospect.company_name, domain, titlesKeyword].filter(Boolean).join(" ") || domain;
 
     let people: any[] = [];
     let endpointUsed: string | null = null;
+    let strategyUsed: string | null = null;
     let credits_used = 0;
     let firstApolloRequestId: string | null = null;
     let totalLatency = 0;
 
-    const pushAttempt = (endpoint: string, r: ApolloCallResult, count: number) => {
+    const pushAttempt = (endpoint: string, strategy: string, r: ApolloCallResult, count: number) => {
       attempts.push({
-        endpoint,
+        endpoint, strategy,
         status: r.status,
         ok: r.ok,
         inaccessible: r.inaccessible,
@@ -371,64 +472,95 @@ Deno.serve(async (req: Request) => {
       totalLatency += r.latency_ms;
     };
 
-    // Attempt 1: mixed_people/api_search by domain + decision-maker titles
-    {
-      const r = await callApollo(APOLLO_PEOPLE_URL, {
-        q_organization_domains: domain,
-        person_titles: titlesToUse,
-        page: 1,
-        per_page: 10,
-      }, APOLLO_API_KEY);
+    // KAI.18.7 Part 6 — Resolve Apollo Organization first
+    const orgResolution = await resolveApolloOrganization(APOLLO_API_KEY, domain, prospect.company_name ?? null);
+    for (const a of orgResolution.attempts) {
+      attempts.push({
+        endpoint: `org_resolution:${a.strategy}`,
+        strategy: "resolve_organization",
+        status: a.status, ok: a.ok, inaccessible: false,
+        count: a.count, latency_ms: a.latency_ms, apollo_request_id: null,
+      });
+      totalLatency += a.latency_ms;
+    }
+
+    // Persist resolved org
+    if (orgResolution.organization_id) {
+      try {
+        await sb.from("enriched_company_profiles").upsert({
+          prospect_id,
+          workspace_id: prospect.organization_id,
+          apollo_organization_id: orgResolution.organization_id,
+          apollo_organization_name: orgResolution.name,
+          apollo_organization_domain: orgResolution.domain,
+          apollo_organization_confidence: orgResolution.confidence,
+          apollo_organization_resolution_source: orgResolution.source,
+          apollo_organization_resolved_at: new Date().toISOString(),
+        }, { onConflict: "prospect_id" });
+        await trackEvent(sb, prospect.organization_id, "apollo_organization_resolved", {
+          prospect_id, apollo_organization_id: orgResolution.organization_id,
+          source: orgResolution.source, confidence: orgResolution.confidence,
+        });
+      } catch (e) { console.warn("[org_resolution] persist failed", e); }
+    } else {
+      await trackEvent(sb, prospect.organization_id, "apollo_organization_resolution_failed", {
+        prospect_id, domain, company_name: prospect.company_name,
+      });
+    }
+
+    // KAI.18.7 Part 8 — Strict raw payload: sem filtros restritivos
+    const isRaw = mode === "raw";
+    if (isRaw) {
+      await trackEvent(sb, prospect.organization_id, "apollo_strict_raw_used", {
+        prospect_id, has_org_id: !!orgResolution.organization_id,
+      });
+    }
+
+    // KAI.18.7 Part 7 — Multi-strategy People Search
+    const strategiesLog: any[] = [];
+    // Strategy A: organization_id
+    if (orgResolution.organization_id) {
+      const payload: Record<string, unknown> = {
+        organization_ids: [orgResolution.organization_id],
+        page: 1, per_page: isRaw ? 25 : 10,
+      };
+      if (!isRaw) payload.person_titles = titlesToUse;
+      const r = await callApollo(APOLLO_PEOPLE_URL, payload, APOLLO_API_KEY);
       const list: any[] = r.json?.people ?? r.json?.contacts ?? [];
-      pushAttempt("mixed_people/api_search", r, list.length);
-      if (r.ok && list.length > 0) {
-        people = list; endpointUsed = "mixed_people/api_search"; credits_used += ESTIMATED_CREDITS;
-      } else if (r.ok) {
-        credits_used += ESTIMATED_CREDITS;
-      }
+      pushAttempt("mixed_people/api_search", "organization_id", r, list.length);
+      strategiesLog.push({ strategy: "organization_id", endpoint: "mixed_people/api_search", status: r.status, count: list.length });
+      if (r.ok) credits_used += ESTIMATED_CREDITS;
+      if (r.ok && list.length > 0) { people = list; endpointUsed = "mixed_people/api_search"; strategyUsed = "organization_id"; }
     }
 
-    // Attempt 2: contacts/search by keywords
+    // Strategy B: domain
     if (!endpointUsed) {
+      const payload: Record<string, unknown> = {
+        q_organization_domains: domain, page: 1, per_page: isRaw ? 25 : 10,
+      };
+      if (!isRaw) payload.person_titles = titlesToUse;
+      const r = await callApollo(APOLLO_PEOPLE_URL, payload, APOLLO_API_KEY);
+      const list: any[] = r.json?.people ?? r.json?.contacts ?? [];
+      pushAttempt("mixed_people/api_search", "domain", r, list.length);
+      strategiesLog.push({ strategy: "domain", endpoint: "mixed_people/api_search", status: r.status, count: list.length });
+      if (r.ok) credits_used += ESTIMATED_CREDITS;
+      if (r.ok && list.length > 0) { people = list; endpointUsed = "mixed_people/api_search"; strategyUsed = "domain"; }
+    }
+
+    // Strategy C: company_name via contacts/search
+    if (!endpointUsed && prospect.company_name) {
       const r = await callApollo(APOLLO_CONTACTS_URL, {
-        q_keywords: searchKeywords,
-        page: 1,
-        per_page: 25,
+        q_keywords: prospect.company_name, page: 1, per_page: 25,
       }, APOLLO_API_KEY);
       const list: any[] = r.json?.contacts ?? r.json?.people ?? [];
-      pushAttempt("contacts/search", r, list.length);
-      if (r.ok && list.length > 0) {
-        people = list; endpointUsed = "contacts/search"; credits_used += ESTIMATED_CREDITS;
-      } else if (r.ok) {
-        credits_used += ESTIMATED_CREDITS;
-      }
+      pushAttempt("contacts/search", "company_name", r, list.length);
+      strategiesLog.push({ strategy: "company_name", endpoint: "contacts/search", status: r.status, count: list.length });
+      if (r.ok) credits_used += ESTIMATED_CREDITS;
+      if (r.ok && list.length > 0) { people = list; endpointUsed = "contacts/search"; strategyUsed = "company_name"; }
     }
 
-    // Attempt 3: contacts/search by domain only
-    if (!endpointUsed) {
-      const r = await callApollo(APOLLO_CONTACTS_URL, {
-        q_keywords: domain,
-        page: 1,
-        per_page: 25,
-      }, APOLLO_API_KEY);
-      const list: any[] = r.json?.contacts ?? r.json?.people ?? [];
-      pushAttempt("contacts/search:domain", r, list.length);
-      if (r.ok && list.length > 0) {
-        people = list; endpointUsed = "contacts/search:domain"; credits_used += ESTIMATED_CREDITS;
-      } else if (r.ok) {
-        credits_used += ESTIMATED_CREDITS;
-      }
-    }
+    const orgEnrichment = orgResolution.candidates[0] ?? null;
 
-    // Attempt 4: organizations/enrich
-    let orgEnrichment: any = null;
-    {
-      const r = await callApollo(APOLLO_ORG_ENRICH_URL, { domain }, APOLLO_API_KEY, "GET");
-      pushAttempt("organizations/enrich", r, r.json?.organization ? 1 : 0);
-      if (r.ok && r.json?.organization) {
-        orgEnrichment = r.json.organization;
-      }
-    }
 
 
     const allAttemptsFailed = attempts.every((a) => !a.ok);
@@ -697,6 +829,15 @@ Deno.serve(async (req: Request) => {
         fallback_used: attempts.length > 1,
         latency_ms: totalLatency,
         status: "ok",
+        zero_result_with_credits: people.length === 0 && credits_used > 0,
+        strategies_tried: strategiesLog,
+        organization_resolution: {
+          organization_id: orgResolution.organization_id,
+          name: orgResolution.name,
+          domain: orgResolution.domain,
+          confidence: orgResolution.confidence,
+          source: orgResolution.source,
+        },
       });
     } catch (e) {
       console.warn("[apollo_query_logs] insert failed", e);
