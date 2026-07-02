@@ -7,9 +7,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import type { QualifiedQueueItem, QualificationStatus } from '@/services/intelligence/qualifiedQueue';
+import type { QualifiedQueueItem, QualificationStatus, CompanyGrade } from '@/services/intelligence/qualifiedQueue';
 import { QualifiedQueueRowActions } from './QualifiedQueueRowActions';
 import { CoverageBadge } from '@/components/intelligence/smart-coverage/CoverageBadge';
+import { CompanyGradeBadge } from './CompanyGradeBadge';
 import type { CoverageClass } from '@/services/intelligence/coverage';
 
 function relationshipBadge(rel?: string | null) {
