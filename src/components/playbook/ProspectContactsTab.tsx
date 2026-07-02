@@ -16,6 +16,8 @@ import { ApolloConfirmModal } from "./enrichment/ApolloConfirmModal";
 import { RevealConfirmModal } from "./enrichment/RevealConfirmModal";
 import { ContactsQualityPanel } from "./enrichment/ContactsQualityPanel";
 import { MergedContactsAccordion } from "./enrichment/MergedContactsAccordion";
+import { HiddenRecommendationBadges } from "./HiddenRecommendationBadges";
+import { useApolloRaw } from "@/hooks/intelligence/useApolloQueryLogs";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { listMergedContacts } from "@/services/enrichment/apolloService";
