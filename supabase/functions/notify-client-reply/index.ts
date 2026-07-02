@@ -130,15 +130,18 @@ Deno.serve(async (req) => {
     const recipientIds: string[] = [];
     if (opp.owner_user_id) recipientIds.push(opp.owner_user_id);
 
-    // Get manager
-    const { data: seller } = await supabase
-      .from("sellers")
-      .select("manager_id")
+    // Get manager via team membership (teams.manager_id)
+    const { data: teamRows } = await supabase
+      .from("team_members")
+      .select("teams!inner(manager_id)")
       .eq("user_id", opp.owner_user_id)
-      .eq("organization_id", opp.organization_id)
-      .maybeSingle();
+      .eq("organization_id", opp.organization_id);
 
-    if (seller?.manager_id) recipientIds.push(seller.manager_id);
+    const managerId = (teamRows || [])
+      .map((r: any) => r.teams?.manager_id)
+      .find((m: string | null) => m && m !== opp.owner_user_id) || null;
+
+    if (managerId) recipientIds.push(managerId);
 
     // Channel responsible user
     if (channel_user_id) recipientIds.push(channel_user_id);
