@@ -829,6 +829,15 @@ Deno.serve(async (req: Request) => {
         fallback_used: attempts.length > 1,
         latency_ms: totalLatency,
         status: "ok",
+        zero_result_with_credits: people.length === 0 && credits_used > 0,
+        strategies_tried: strategiesLog,
+        organization_resolution: {
+          organization_id: orgResolution.organization_id,
+          name: orgResolution.name,
+          domain: orgResolution.domain,
+          confidence: orgResolution.confidence,
+          source: orgResolution.source,
+        },
       });
     } catch (e) {
       console.warn("[apollo_query_logs] insert failed", e);
