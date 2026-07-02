@@ -77,6 +77,9 @@ export interface QualifiedQueueFilters {
   humanReviewOnly?: boolean;
   search?: string;
   limit?: number;
+  companyGrades?: CompanyGrade[];
+  apolloRecommended?: boolean;
+  sdrRecommended?: boolean;
 }
 
 export async function listQualifiedQueue(
