@@ -90,6 +90,9 @@ export function ApproachBriefDrawer({ item, onClose }: Props) {
             )}
           </div>
           </TabsContent>
+          <TabsContent value="intelligence">
+            <CompanyIntelligenceTab prospectId={item.prospect_id} />
+          </TabsContent>
           <TabsContent value="coverage">
             <SmartCoverageTab prospectId={item.prospect_id} />
           </TabsContent>
