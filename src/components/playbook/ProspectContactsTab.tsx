@@ -3,7 +3,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Sparkles, Loader2, Star, Mail, Phone, Linkedin, Copy, CheckCircle2, AlertCircle, PackageCheck } from "lucide-react";
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
+  DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu";
+import { Sparkles, Loader2, Star, Mail, Phone, Linkedin, Copy, CheckCircle2, AlertCircle, PackageCheck, MessageCircle, PhoneCall, ChevronDown, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useEnrichedContacts } from "@/hooks/useEnrichedContacts";
 import { useSyncEnrichedContacts } from "@/hooks/useSyncEnrichedContacts";
@@ -12,7 +16,8 @@ import { ApolloConfirmModal } from "./enrichment/ApolloConfirmModal";
 import { RevealConfirmModal } from "./enrichment/RevealConfirmModal";
 import { ContactsQualityPanel } from "./enrichment/ContactsQualityPanel";
 import { MergedContactsAccordion } from "./enrichment/MergedContactsAccordion";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { listMergedContacts } from "@/services/enrichment/apolloService";
 import type { RevealDataType } from "@/services/intelligence/apolloInvisible";
 import { cn } from "@/lib/utils";
