@@ -87,6 +87,35 @@ export function QualifiedQueueFiltersBar({ value, onChange }: Props) {
       >
         ICP
       </Toggle>
+      <Select
+        value={value.companyGrades?.[0] ?? 'all'}
+        onValueChange={(v) =>
+          onChange({ ...value, companyGrades: v === 'all' ? undefined : [v as any] })
+        }
+      >
+        <SelectTrigger className="w-40"><SelectValue placeholder="Company Grade" /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">Todas grades</SelectItem>
+          <SelectItem value="A+">A+ · Máxima</SelectItem>
+          <SelectItem value="A">A · Muito quente</SelectItem>
+          <SelectItem value="B">B · Boa</SelectItem>
+          <SelectItem value="C">C · Monitorar</SelectItem>
+          <SelectItem value="D">D · Baixa</SelectItem>
+          <SelectItem value="F">F · Não gastar</SelectItem>
+        </SelectContent>
+      </Select>
+      <Toggle
+        pressed={!!value.apolloRecommended}
+        onPressedChange={(p) => onChange({ ...value, apolloRecommended: p || undefined })}
+      >
+        Apollo rec.
+      </Toggle>
+      <Toggle
+        pressed={!!value.sdrRecommended}
+        onPressedChange={(p) => onChange({ ...value, sdrRecommended: p || undefined })}
+      >
+        SDR rec.
+      </Toggle>
     </div>
   );
 }
