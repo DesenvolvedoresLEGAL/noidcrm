@@ -449,3 +449,9 @@ export function ProspectDetailDrawer({
     </Sheet>
   );
 }
+
+function ApolloInspectorInline({ prospectId }: { prospectId: string }) {
+  const { role } = useCurrentUser();
+  const isAdmin = role === 'admin' || role === 'owner';
+  return <ApolloInspectorTab prospectId={prospectId} isAdmin={isAdmin} />;
+}
