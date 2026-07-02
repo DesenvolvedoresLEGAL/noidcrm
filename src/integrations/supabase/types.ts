@@ -15424,6 +15424,165 @@ export type Database = {
         }
         Relationships: []
       }
+      kairos_company_intelligence: {
+        Row: {
+          account_id: string | null
+          apollo_recommended: boolean | null
+          business_model: string | null
+          buying_signal_score: number | null
+          buying_signals: Json | null
+          cnpj: string | null
+          company_grade: string
+          company_industry: string | null
+          company_intelligence_score: number
+          company_name: string
+          company_region: string | null
+          company_segment: string | null
+          company_size: string | null
+          confidence_score: number | null
+          coverage_class: string | null
+          coverage_score: number | null
+          created_at: string
+          digital_maturity: string | null
+          digital_presence_score: number | null
+          domain: string | null
+          estimated_ltv_range: string | null
+          estimated_ticket_range: string | null
+          event_id: string | null
+          event_name: string | null
+          event_participation_level: string | null
+          event_relevance_score: number | null
+          evidence: Json | null
+          fit_score: number | null
+          human_review_required: boolean | null
+          icp_cluster_id: string | null
+          icp_cluster_name: string | null
+          id: string
+          market_score: number | null
+          missing_fields: Json | null
+          next_best_action: string | null
+          opportunity_hypotheses: Json | null
+          organization_id: string
+          prompt_version: string | null
+          prospect_id: string
+          recommended_strategy: string | null
+          relationship_score: number | null
+          relationship_status: string | null
+          revenue_potential_score: number | null
+          risk_signals: Json | null
+          sdr_recommended: boolean | null
+          size_score: number | null
+          source_name: string | null
+          source_type: string | null
+          updated_at: string
+          urgency_score: number | null
+        }
+        Insert: {
+          account_id?: string | null
+          apollo_recommended?: boolean | null
+          business_model?: string | null
+          buying_signal_score?: number | null
+          buying_signals?: Json | null
+          cnpj?: string | null
+          company_grade?: string
+          company_industry?: string | null
+          company_intelligence_score?: number
+          company_name: string
+          company_region?: string | null
+          company_segment?: string | null
+          company_size?: string | null
+          confidence_score?: number | null
+          coverage_class?: string | null
+          coverage_score?: number | null
+          created_at?: string
+          digital_maturity?: string | null
+          digital_presence_score?: number | null
+          domain?: string | null
+          estimated_ltv_range?: string | null
+          estimated_ticket_range?: string | null
+          event_id?: string | null
+          event_name?: string | null
+          event_participation_level?: string | null
+          event_relevance_score?: number | null
+          evidence?: Json | null
+          fit_score?: number | null
+          human_review_required?: boolean | null
+          icp_cluster_id?: string | null
+          icp_cluster_name?: string | null
+          id?: string
+          market_score?: number | null
+          missing_fields?: Json | null
+          next_best_action?: string | null
+          opportunity_hypotheses?: Json | null
+          organization_id: string
+          prompt_version?: string | null
+          prospect_id: string
+          recommended_strategy?: string | null
+          relationship_score?: number | null
+          relationship_status?: string | null
+          revenue_potential_score?: number | null
+          risk_signals?: Json | null
+          sdr_recommended?: boolean | null
+          size_score?: number | null
+          source_name?: string | null
+          source_type?: string | null
+          updated_at?: string
+          urgency_score?: number | null
+        }
+        Update: {
+          account_id?: string | null
+          apollo_recommended?: boolean | null
+          business_model?: string | null
+          buying_signal_score?: number | null
+          buying_signals?: Json | null
+          cnpj?: string | null
+          company_grade?: string
+          company_industry?: string | null
+          company_intelligence_score?: number
+          company_name?: string
+          company_region?: string | null
+          company_segment?: string | null
+          company_size?: string | null
+          confidence_score?: number | null
+          coverage_class?: string | null
+          coverage_score?: number | null
+          created_at?: string
+          digital_maturity?: string | null
+          digital_presence_score?: number | null
+          domain?: string | null
+          estimated_ltv_range?: string | null
+          estimated_ticket_range?: string | null
+          event_id?: string | null
+          event_name?: string | null
+          event_participation_level?: string | null
+          event_relevance_score?: number | null
+          evidence?: Json | null
+          fit_score?: number | null
+          human_review_required?: boolean | null
+          icp_cluster_id?: string | null
+          icp_cluster_name?: string | null
+          id?: string
+          market_score?: number | null
+          missing_fields?: Json | null
+          next_best_action?: string | null
+          opportunity_hypotheses?: Json | null
+          organization_id?: string
+          prompt_version?: string | null
+          prospect_id?: string
+          recommended_strategy?: string | null
+          relationship_score?: number | null
+          relationship_status?: string | null
+          revenue_potential_score?: number | null
+          risk_signals?: Json | null
+          sdr_recommended?: boolean | null
+          size_score?: number | null
+          source_name?: string | null
+          source_type?: string | null
+          updated_at?: string
+          urgency_score?: number | null
+        }
+        Relationships: []
+      }
       kairos_coverage_analysis: {
         Row: {
           account_exists: boolean
@@ -15585,9 +15744,15 @@ export type Database = {
       }
       kairos_qualified_queue: {
         Row: {
+          apollo_recommended: boolean | null
           apollo_status: string | null
           approach_brief: Json | null
+          company_grade: string | null
+          company_human_review_required: boolean | null
+          company_intelligence_score: number | null
           company_name: string
+          company_next_best_action: string | null
+          company_recommended_strategy: string | null
           confidence: number | null
           contact_status: string | null
           contacts_found: number
@@ -15619,14 +15784,21 @@ export type Database = {
           review_reason: string | null
           score: number
           sdr_ready: boolean
+          sdr_recommended: boolean | null
           source: string | null
           source_type: string | null
           updated_at: string
         }
         Insert: {
+          apollo_recommended?: boolean | null
           apollo_status?: string | null
           approach_brief?: Json | null
+          company_grade?: string | null
+          company_human_review_required?: boolean | null
+          company_intelligence_score?: number | null
           company_name: string
+          company_next_best_action?: string | null
+          company_recommended_strategy?: string | null
           confidence?: number | null
           contact_status?: string | null
           contacts_found?: number
@@ -15658,14 +15830,21 @@ export type Database = {
           review_reason?: string | null
           score?: number
           sdr_ready?: boolean
+          sdr_recommended?: boolean | null
           source?: string | null
           source_type?: string | null
           updated_at?: string
         }
         Update: {
+          apollo_recommended?: boolean | null
           apollo_status?: string | null
           approach_brief?: Json | null
+          company_grade?: string | null
+          company_human_review_required?: boolean | null
+          company_intelligence_score?: number | null
           company_name?: string
+          company_next_best_action?: string | null
+          company_recommended_strategy?: string | null
           confidence?: number | null
           contact_status?: string | null
           contacts_found?: number
@@ -15697,6 +15876,7 @@ export type Database = {
           review_reason?: string | null
           score?: number
           sdr_ready?: boolean
+          sdr_recommended?: boolean | null
           source?: string | null
           source_type?: string | null
           updated_at?: string
