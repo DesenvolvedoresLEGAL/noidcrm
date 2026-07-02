@@ -188,6 +188,14 @@ Deno.serve(async (req: Request) => {
     const trigger_source: string = body.trigger_source ?? "user";
     const customTitles = sanitizeCustomTitles(body.custom_titles);
     const titlesToUse = customTitles.length > 0 ? customTitles : RELEVANT_TITLES;
+    // KAI.18.5 — modo Apollo Raw / Replay / Smart.
+    // raw: sem filtros de cargo/domínio, sempre bypass cache, retorna tudo.
+    // replay: mesmo payload de um log anterior, bypass cache.
+    // smart (default): mantém pipeline, mas marca contatos escondidos em vez de descartar.
+    const mode: "smart" | "raw" | "replay" = (["raw", "replay", "smart"] as const).includes(body.mode)
+      ? body.mode
+      : "smart";
+    const bypassCache: boolean = mode !== "smart" || !!body.bypass_cache;
     if (!prospect_id) {
       return new Response(JSON.stringify({ error: "prospect_id required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -250,15 +258,17 @@ Deno.serve(async (req: Request) => {
     }
     const review_required = qLabel !== "high_confidence";
 
-    // 3. Anti-spam 24h
-    const cutoff = new Date(Date.now() - ANTI_SPAM_HOURS * 3600 * 1000).toISOString();
-    const { data: recent } = await sb
-      .from("enrichment_jobs")
-      .select("id, status, contacts_found")
-      .eq("prospect_id", prospect_id).eq("provider", "apollo")
-      .gte("created_at", cutoff)
-      .or("status.eq.running,and(status.eq.done,contacts_found.gt.0)");
-    if (recent && recent.length > 0) return await skip("already_enriched", `apollo successful/running job exists in last ${ANTI_SPAM_HOURS}h`);
+    // 3. Anti-spam 24h — KAI.18.5: bypass em modo raw/replay (usuário pediu explicitamente)
+    if (mode === "smart" && !bypassCache) {
+      const cutoff = new Date(Date.now() - ANTI_SPAM_HOURS * 3600 * 1000).toISOString();
+      const { data: recent } = await sb
+        .from("enrichment_jobs")
+        .select("id, status, contacts_found")
+        .eq("prospect_id", prospect_id).eq("provider", "apollo")
+        .gte("created_at", cutoff)
+        .or("status.eq.running,and(status.eq.done,contacts_found.gt.0)");
+      if (recent && recent.length > 0) return await skip("already_enriched", `apollo successful/running job exists in last ${ANTI_SPAM_HOURS}h`);
+    }
 
     // 4. Rate-limit per workspace (20/min)
     const oneMinAgo = new Date(Date.now() - 60_000).toISOString();
@@ -406,37 +416,13 @@ Deno.serve(async (req: Request) => {
       }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // 7. Process contacts — accept everything, but score by relevance.
-    // SANITY CHECK: discard people whose Apollo organization domain does not
-    // match the prospect's domain (root cause of the JusBrasil/Luisa bug —
-    // wrong prospect domain returned employees of the aggregator itself).
+    // 7. KAI.18.5 — NUNCA descartar contatos silenciosamente.
+    // Cada pessoa recebe hidden_reasons[] indicando por que o Kairós NÃO recomenda.
+    // Em modo `raw`, os motivos são anotados mas o UI mostra tudo por padrão.
     const prospectDomain = normalizeHostname(domain) ?? domain;
-    let domainMismatchFiltered = 0;
-    const matched = people.filter((p) => {
-      const orgDomain =
-        normalizeHostname(p?.organization?.primary_domain) ??
-        normalizeHostname(p?.organization?.website_url) ??
-        normalizeHostname(p?.organization?.domain) ??
-        normalizeHostname(p?.account?.primary_domain) ??
-        normalizeHostname(p?.account?.website_url) ??
-        null;
-      if (!orgDomain) return true; // Apollo did not return org info — keep
-      const ok = orgDomain === prospectDomain ||
-        orgDomain.endsWith(`.${prospectDomain}`) ||
-        prospectDomain.endsWith(`.${orgDomain}`);
-      if (!ok) domainMismatchFiltered += 1;
-      return ok;
-    });
-    if (domainMismatchFiltered > 0) {
-      attempts.push({
-        endpoint: "domain_mismatch_filter",
-        status: 200, ok: true, inaccessible: false,
-        count: domainMismatchFiltered,
-        error: `Discarded ${domainMismatchFiltered} contact(s) whose Apollo org domain != ${prospectDomain}`,
-      });
-    }
-
-    const filtered = matched.filter((p) => isRelevantTitle(p.title, titlesToUse) || p.email || p.linkedin_url);
+    let domainMismatchCount = 0;
+    let titleMismatchCount = 0;
+    let companyPhoneOnlyCount = 0;
 
     let decisionMakers = 0;
     let emailsFound = 0;
@@ -445,20 +431,53 @@ Deno.serve(async (req: Request) => {
     let topSeniority: string | null = null;
     let topSeniorityRank = 0;
 
-    const rows = filtered.map((person) => {
+    const rows = people.map((person) => {
+      const reasons: string[] = [];
+
+      // domain mismatch
+      const orgDomain =
+        normalizeHostname(person?.organization?.primary_domain) ??
+        normalizeHostname(person?.organization?.website_url) ??
+        normalizeHostname(person?.organization?.domain) ??
+        normalizeHostname(person?.account?.primary_domain) ??
+        normalizeHostname(person?.account?.website_url) ??
+        null;
+      const domainOk =
+        !orgDomain ||
+        orgDomain === prospectDomain ||
+        orgDomain.endsWith(`.${prospectDomain}`) ||
+        prospectDomain.endsWith(`.${orgDomain}`);
+      if (!domainOk) {
+        reasons.push("domain_mismatch");
+        domainMismatchCount += 1;
+      }
+
+      // title relevance (only in smart mode is a rec, always logged)
+      const titleOk = isRelevantTitle(person.title, titlesToUse) || !!person.email || !!person.linkedin_url;
+      if (!titleOk) {
+        reasons.push("role_mismatch");
+        titleMismatchCount += 1;
+      }
+
+      // company-only phone signal
+      const personPhone = person.phone_numbers?.[0]?.sanitized_number ?? person.sanitized_phone ?? null;
+      const hasCompanyPhone = !!(person?.organization?.phone || person?.account?.phone);
+      if (!personPhone && hasCompanyPhone) {
+        reasons.push("company_phone_only");
+        companyPhoneOnlyCount += 1;
+      }
+
+      const isHidden = reasons.length > 0;
+
       const cScore = computeContactScore(person);
       const seniority = detectSeniority(person.title);
       const isDM = seniority === "c_level" || seniority === "vp" || seniority === "director";
-      if (isDM) decisionMakers += 1;
-      if (person.email) emailsFound += 1;
-      // IMPORTANT: never fall back to organization.phone / account.phone — that
-      // is the COMPANY phone, not the person's. Mixing the two produced false
-      // positives like Luisa carrying the JusBrasil switchboard number.
-      const phone = person.phone_numbers?.[0]?.sanitized_number ?? person.sanitized_phone ?? null;
-      if (phone) phonesFound += 1;
+      if (!isHidden && isDM) decisionMakers += 1;
+      if (!isHidden && person.email) emailsFound += 1;
+      if (!isHidden && personPhone) phonesFound += 1;
       const rank = SENIORITY_RANK[seniority ?? "ic"] ?? 0;
-      if (rank > topSeniorityRank) { topSeniorityRank = rank; topSeniority = seniority; }
-      if (cScore > maxScore) maxScore = cScore;
+      if (!isHidden && rank > topSeniorityRank) { topSeniorityRank = rank; topSeniority = seniority; }
+      if (!isHidden && cScore > maxScore) maxScore = cScore;
 
       return {
         workspace_id: prospect.organization_id,
@@ -471,14 +490,42 @@ Deno.serve(async (req: Request) => {
         department: person.departments?.[0] ?? null,
         email: person.email ?? null,
         email_status: person.email_status ?? null,
-        phone,
+        phone: personPhone,
         linkedin_url: person.linkedin_url ?? null,
         provider: "apollo",
         confidence_score: cScore,
         apollo_person_id: person.person_id ?? person.id ?? null,
+        is_hidden_recommendation: isHidden,
+        hidden_reasons: reasons,
+        requested_titles: titlesToUse,
         raw: person,
       };
     });
+
+    if (domainMismatchCount > 0) {
+      attempts.push({
+        endpoint: "domain_mismatch_flag",
+        status: 200, ok: true, inaccessible: false,
+        count: domainMismatchCount,
+        error: `Flagged ${domainMismatchCount} contact(s) whose Apollo org domain != ${prospectDomain} (não descartado)`,
+      });
+    }
+    if (titleMismatchCount > 0) {
+      attempts.push({
+        endpoint: "role_mismatch_flag",
+        status: 200, ok: true, inaccessible: false,
+        count: titleMismatchCount,
+        error: `Flagged ${titleMismatchCount} contact(s) with role outside requested titles (não descartado)`,
+      });
+    }
+    if (companyPhoneOnlyCount > 0) {
+      attempts.push({
+        endpoint: "company_phone_only_flag",
+        status: 200, ok: true, inaccessible: false,
+        count: companyPhoneOnlyCount,
+        error: `Flagged ${companyPhoneOnlyCount} contact(s) with company phone only (não descartado)`,
+      });
+    }
 
     let inserted = 0;
     if (rows.length > 0) {
@@ -533,18 +580,57 @@ Deno.serve(async (req: Request) => {
       org_enrichment_found: !!orgEnrichment,
     };
 
+    const recommendedCount = rows.filter((r) => !r.is_hidden_recommendation).length;
+    const hiddenCount = rows.length - recommendedCount;
+
     await sb.from("enrichment_jobs").update({
       status: "done",
       credits_used,
       contacts_found: inserted,
       decision_makers_found: decisionMakers,
-      response: { total_returned: people.length, filtered: filtered.length, inserted, endpoint_used: endpointUsed, attempts, organization: orgEnrichment },
+      response: { total_returned: people.length, recommended: recommendedCount, hidden: hiddenCount, inserted, endpoint_used: endpointUsed, attempts, organization: orgEnrichment },
       response_summary,
       completed_at: new Date().toISOString(),
     }).eq("id", jobRow!.id);
 
+    // KAI.18.5 — Apollo Query Log (transparência total)
+    try {
+      await sb.from("apollo_query_logs").insert({
+        organization_id: prospect.organization_id,
+        prospect_id,
+        endpoint: endpointUsed ?? "mixed_people/api_search",
+        mode,
+        request_payload: {
+          domain,
+          person_titles: titlesToUse,
+          custom_titles_used: customTitles.length > 0,
+          trigger_source,
+          bypass_cache: bypassCache,
+        },
+        request_headers_safe: { "x-api-key": "***", "Content-Type": "application/json" },
+        response_status: attempts.find((a) => a.endpoint === endpointUsed)?.status ?? 200,
+        response_body: { people_sample: people.slice(0, 3), attempts, organization: orgEnrichment ? { name: orgEnrichment.name, domain } : null },
+        apollo_request_id: null,
+        people_returned: people.length,
+        people_recommended: recommendedCount,
+        people_hidden: hiddenCount,
+        hidden_reasons: {
+          domain_mismatch: domainMismatchCount,
+          role_mismatch: titleMismatchCount,
+          company_phone_only: companyPhoneOnlyCount,
+        },
+        credits_used,
+        cache_status: bypassCache ? "bypass" : "miss",
+        fallback_used: attempts.length > 1,
+        status: "ok",
+      });
+    } catch (e) {
+      console.warn("[apollo_query_logs] insert failed", e);
+    }
+
     await trackEvent(sb, prospect.organization_id, "apollo_enrichment_completed", {
       prospect_id, job_id: jobRow?.id, ...response_summary, credits_used,
+      mode, people_returned: people.length, recommended: recommendedCount, hidden: hiddenCount,
     });
     if (decisionMakers > 0) {
       await trackEvent(sb, prospect.organization_id, "decision_maker_found", {
@@ -554,7 +640,11 @@ Deno.serve(async (req: Request) => {
 
     return new Response(JSON.stringify({
       status: finalStatus,
+      mode,
       contacts_found: inserted,
+      people_returned: people.length,
+      people_recommended: recommendedCount,
+      people_hidden: hiddenCount,
       decision_makers_found: decisionMakers,
       max_contact_score: maxScore,
       endpoint_used: endpointUsed,

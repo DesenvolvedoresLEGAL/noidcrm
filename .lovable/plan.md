@@ -1,64 +1,161 @@
 
-## Diagnóstico
+# KAI.18.5 — Apollo Reliability & Transparency
 
-Puxei os últimos 3h da base + auditoria e o problema tem duas caras — nenhuma é bug do Apollo em si, é como a gente interpreta a resposta.
+Objetivo: Kairós volta a ser tão confiável quanto o Apollo direto. Filtros viram recomendações, tudo é explicável e o usuário nunca mais vê "Nenhum contato encontrado" quando o Apollo retornou pessoas.
 
-- **Aguardando infinito**: em 3h houve **26 stale_pending_cleanup** e **0 chamadas do webhook** do Apollo. Ou seja, marcamos `phone_reveal_status = 'requested'` esperando um webhook assíncrono que **nunca vem**, e só o cron de 5min mata como "failed". Confirmado nos contatos das 19:09: `phone_match_quality=unknown`, `phone_confidence=0`, `phone_quality_reason=no_person_phone_returned` — Apollo respondeu 200 OK, **sem telefone algum**, e a função de reveal considerou isso como "pendente async". Não é: quando Apollo não devolve `phone_numbers`, ele não vai chamar webhook depois.
-- **Rejeita alguns**: os `rejected_company_phone` (Vaccinar, etc.) são casos em que o Apollo devolveu somente o telefone da matriz/recepção. A classificação está correta (KAI.15.1), mas o toast atual (`Telefone da empresa rejeitado`) parece "falha do sistema" para o usuário e não deixa claro que **nenhum crédito foi cobrado** nem por que aconteceu.
+Escopo: **apenas** enriquecimento Apollo (edge functions + UI do drawer/prospect). Não toca CRM, OTE, Forecast, Revenue Command, Skills.
 
-## Correções
+---
 
-### 1. Edge `kairos-apollo-reveal-contact` — só marcar `pending` quando Apollo realmente enfileirou async
+## 1. Backend — Logging e Raw Mode
 
-Trocar a heurística atual (`phonePending = wantsPhone && !revealedPhone && !companyPhoneRejected`) por uma detecção baseada no payload do Apollo:
+### 1.1 Nova tabela `apollo_query_logs`
+Migration criando tabela para persistir toda chamada Apollo:
+- `organization_id`, `prospect_id`, `triggered_by` (user_id)
+- `endpoint` (`mixed_people_search` | `people_match` | `organization_enrich` | `reveal`)
+- `mode` (`smart` | `raw` | `replay`)
+- `request_payload` (jsonb), `request_headers_safe` (jsonb, sem API key)
+- `response_status`, `response_body` (jsonb), `apollo_request_id`
+- `people_returned`, `people_recommended`, `people_hidden`
+- `hidden_reasons` (jsonb: `{role_mismatch: n, company_phone_only: n, score_min: n, dedupe: n, coverage: n, ai: n, other: n}`)
+- `credits_used`, `cache_status` (`hit` | `miss` | `expired` | `bypass`)
+- `fallback_used` (bool), `latency_ms`, `retries`
+- RLS: org members leem; admin vê tudo; edge functions gravam via service_role.
+- GRANTs padrão + service_role ALL.
 
-- Considerar pendente **apenas se** `person.phone_numbers` existir e tiver ao menos uma entrada com `sanitized_number == null && raw_number == null` (padrão do Apollo em pending assíncrono) **e** o campo `dnc_status`/`status` indicar fetch pendente.
-- Caso contrário (`phone_numbers` vazio/ausente ou só com company): marcar direto como `not_found` (ou `rejected_company_phone`), fechando o job e o audit no mesmo tick.
-- Persistir `raw_phone_numbers` no `apollo_reveal_audit.raw_response` para termos telemetria real das próximas revelações.
+### 1.2 Edge function `kairos-apollo-search` (nova, unificada)
+Envolve `mixed_people_search` do Apollo. Aceita `mode: 'smart' | 'raw' | 'replay'`:
+- **raw**: chama Apollo, retorna todos os contatos sem qualquer filtro/coverage/score/ICP/skill/governance/heurística. `bypass_cache = true`.
+- **smart** (default): mantém pipeline atual, mas em vez de **descartar** contatos, anota `hidden: true` + `hidden_reason` para cada um. Retorna `{people: [...all], recommended_ids: [...], hidden_reasons_summary: {...}}`.
+- **replay**: reexecuta payload de um log existente, bypass cache, grava novo log linkado ao original (`replay_of`).
+- Sempre persiste em `apollo_query_logs` com `request_id` do Apollo (header `x-request-id`), latência real e créditos.
 
-### 2. Edge `kairos-apollo-reveal-contact` — não enviar `webhook_url` quando não há chance de callback
+### 1.3 Cache
+- TTL 30 min (hoje suspeita-se de cache negativo indefinido).
+- Chave: `hash(endpoint + payload_normalizado)` com escopo por org.
+- **Nunca cachear resposta vazia** (`people.length === 0`) por mais de 60s.
+- `bypass_cache: true` sempre que `mode !== 'smart'` ou botão "Tentar novamente".
+- Registrar `cache_status` no log.
 
-Só incluir `payload.webhook_url` quando o próprio Apollo tiver retornado sinal de pending numa chamada anterior. Isso evita continuar "esperando" retorno que nunca chega. (Simplificação: manter `webhook_url` só como fallback; a decisão de pending passa a ser exclusivamente pela leitura da resposta síncrona.)
+### 1.4 Ajuste em edge functions existentes
+- `kairos-apollo-invisible` e `run-apollo-enrichment` passam a chamar `kairos-apollo-search` internamente para reutilizar cache/log/raw handling.
+- `kairos-apollo-reveal-contact` grava log com `endpoint=reveal` (não muda lógica; só instrumenta).
+- Filtros existentes (cargo, telefone corporativo, score, coverage, IA, governance) deixam de **remover** — passam a **marcar** `hidden_reason`. A decisão final "esconder no default view" fica na UI.
 
-### 3. Hook `useRevealContact.ts` — polling curto e mensagem clara
+---
 
-- Reduzir o polling de 90s → 30s (5 tentativas × 6s) — se em 30s não terminou, cai para `not_found` no toast (não "erro").
-- Quando status final for `rejected_company_phone`, exibir toast **informativo**, não warning de erro:
-  > "Apollo só encontrou o telefone da empresa para {contato}. Nenhum crédito cobrado."
-- Quando `not_found`, mensagem clara: "Apollo não tem telefone individual desse contato."
+## 2. Frontend — Drawer do Prospect
 
-### 4. UI `ProspectContactsTab.tsx` — badge coerente
+Arquivos principais: `src/components/playbook/ProspectContactsTab.tsx`, `enrichment/*`, novo hook `useApolloSearch`.
 
-O badge `Buscando telefone...` já existe. Adicionar tooltip para os estados terminais:
-- `rejected_company_phone`: "Apollo só encontrou telefone da empresa — não salvamos."
-- `not_found`: "Apollo não tem telefone individual desse contato."
+### 2.1 Toggle de modo (topo do drawer)
+Segmented control:
+- `● Verde  Apollo Raw` — resultado bruto
+- `● Azul  Kairós` (default) — recomendado
 
-Sem mudanças estruturais na UI, só cópia + tooltip.
+Ao lado, resumo:
+```
+Apollo encontrou 12  ·  Kairós recomenda 4  ·  [Mostrar todos]
+```
 
-### 5. Migration — backfill dos travados atuais
+### 2.2 Lista de contatos
+Renderiza **todos** os contatos retornados (raw ou smart). Em modo smart, contatos com `hidden=true` aparecem em seção "Não recomendados (N)" colapsada, com badges explicando por quê:
+- "Cargo diferente do solicitado (Finance vs Marketing) — 31% match"
+- "Apenas telefone corporativo"
+- "Score abaixo do mínimo"
+- "Duplicado"
+- "Fora do coverage"
 
-Migration única que:
-- Marca como `not_found` (com `phone_quality_reason='resolved_stuck_requested'`) todo `enriched_contact_profiles` com `phone_reveal_status IN ('requested','pending')` e `last_reveal_attempt_at < now() - interval '2 minutes'`.
-- Fecha o `apollo_reveal_audit` correspondente com `status='not_found'`, `reason='resolved_stuck_requested'`.
-- Reaproveita a função existente de cleanup (já roda a cada 5min) — só reduzir a janela para 2min para dar feedback mais rápido em novos casos que escaparem.
+Cada card de contato ganha metadados de origem:
+- Origem: Apollo · Tipo: Pessoa · Cargo solicitado / encontrado · Compatibilidade % · Tipo de telefone.
 
-## Arquivos impactados
+### 2.3 Estado vazio real
+Só mostra "Nenhum contato encontrado" quando `people_returned === 0`. Caso contrário: "Apollo encontrou N contatos. Nenhum passou nas recomendações do Kairós. [Ver contatos brutos]".
 
-- `supabase/functions/kairos-apollo-reveal-contact/index.ts` — nova detecção de pending, remoção do `webhook_url` incondicional, telemetria em audit.
-- `supabase/functions/apollo-phone-webhook/index.ts` — nenhum change funcional, só ajustar log para caso o Apollo eventualmente chame.
-- `src/hooks/intelligence/useRevealContact.ts` — polling 30s, toasts refinados.
-- `src/components/playbook/ProspectContactsTab.tsx` — tooltip nos badges terminais.
-- `supabase/migrations/<timestamp>_fix_stuck_phone_reveals.sql` — backfill + ajuste da janela do cron.
+### 2.4 Aba "Apollo Inspector" (nova, dentro do drawer)
+Componente `ApolloInspectorTab.tsx` lista os últimos `apollo_query_logs` do prospect. Cada linha expande em:
+- Empresa, domínio, endpoint, tempo, cache status, fallback, status.
+- Payload enviado (JSON expandível, copiável).
+- Resposta Apollo (JSON expandível).
+- Contadores: retornados / exibidos / descartados + breakdown de motivos.
+- Créditos.
+- Botões: **Reproduzir Busca** (chama `mode=replay`) e **Copiar Request ID**.
+
+### 2.5 Enrichment Timeline
+Novo componente ao lado dos contatos, alimentado pelos logs em ordem cronológica:
+```
+09:21 · Consulta Apollo ✓
+09:21 · 2 contatos retornados ✓
+09:21 · Coverage executado ✓
+09:21 · 1 descartado — telefone corporativo
+09:21 · 1 descartado — cargo incompatível
+Resultado: 0 exibidos (padrão) · 2 disponíveis (raw)
+```
+
+### 2.6 Card "Qualidade Apollo"
+No topo do drawer:
+- Empresa encontrada / Domínio válido / Funcionários / Perfis públicos / Contatos encontrados / Aproveitados / Aproveitamento % / Motivo principal.
+
+### 2.7 Painel Apollo Debug (admin only)
+Rota `/kairos/apollo-debug` (ou aba escondida atrás de `platform_admin`): tabela paginada de `apollo_query_logs` cross-org com filtros por endpoint/status/latência/cache/fallback. Detalhe com headers seguros, request/response completos, latência, retries.
+
+---
+
+## 3. Telemetria
+Emitir em `system_events` (canal existente):
+`apollo_raw_opened`, `apollo_show_all`, `apollo_contacts_hidden`, `apollo_contacts_recommended`, `apollo_filter_reason`, `apollo_cache_hit`, `apollo_cache_miss`, `apollo_replay_search`.
+
+Payload: `{prospect_id, mode, returned, recommended, hidden, reasons}`.
+
+---
+
+## 4. Testes (vitest + edge tests)
+
+1. Apollo retorna Finance quando pediu Marketing → contato aparece em "Não recomendados" com badge de cargo diferente.
+2. Apollo retorna 10, Kairós recomenda 3 → header mostra "10 encontrados · 3 recomendados", lista raw exibe 10.
+3. Apollo retorna 0 → estado vazio real.
+4. Cache MISS → replay força consulta → cache atualizado, contatos aparecem.
+5. Só telefone corporativo → contato aparece, badge "Apenas telefone corporativo", nunca oculto.
+6. Log persistido para cada chamada, com `apollo_request_id` presente.
+
+---
+
+## Detalhes técnicos
+
+- **Sem breaking changes** na API pública: `useApolloEstimate`, `useApolloRules`, `revealContact` mantêm assinatura. Só muda o payload interno de `kairos-apollo-invisible` que passa a devolver `hidden` em vez de omitir.
+- **Compat**: enquanto `apollo_query_logs` está vazio, Inspector mostra empty state amigável, sem quebrar.
+- **Segurança**: `response_body` pode conter e-mail/telefone; RLS restringe a membros da org do prospect. Headers Apollo são salvos sem `X-Api-Key`.
+- **Performance**: índice em `apollo_query_logs(prospect_id, created_at DESC)` e `(organization_id, created_at DESC)`.
+- **Rollout**: feature flag `kairos.apollo_raw_mode` (default ON) para permitir desligar rapidamente se necessário.
+
+---
+
+## Arquivos afetados (resumo)
+
+Backend:
+- `supabase/migrations/<ts>_apollo_query_logs.sql` (nova)
+- `supabase/functions/kairos-apollo-search/index.ts` (nova)
+- `supabase/functions/_shared/apollo-log.ts` (nova — helper de log/cache)
+- `supabase/functions/kairos-apollo-invisible/index.ts` (marcar hidden em vez de filtrar)
+- `supabase/functions/kairos-apollo-reveal-contact/index.ts` (instrumentar log)
+- `supabase/functions/run-apollo-enrichment/index.ts` (instrumentar log)
+
+Frontend:
+- `src/services/intelligence/apolloInvisible.ts` (novos endpoints raw/replay/logs)
+- `src/hooks/intelligence/useApolloSearch.ts` (novo)
+- `src/hooks/intelligence/useApolloQueryLogs.ts` (novo)
+- `src/components/playbook/ProspectContactsTab.tsx` (toggle, sections, badges)
+- `src/components/playbook/enrichment/ApolloModeToggle.tsx` (novo)
+- `src/components/playbook/enrichment/ApolloInspectorTab.tsx` (novo)
+- `src/components/playbook/enrichment/ApolloQualityCard.tsx` (novo)
+- `src/components/playbook/enrichment/EnrichmentTimeline.tsx` (ampliar com dados do log)
+- `src/components/playbook/enrichment/ContactCard.tsx` (badges de origem/motivo)
+- `src/pages/admin/ApolloDebug.tsx` (novo, admin-only)
 
 ## Riscos
+- Aumento de volume no banco (logs) → mitigado por retenção de 30 dias via cron.
+- UI mais densa → Não-recomendados vem colapsado por padrão.
+- Cache bypass em replay pode aumentar consumo de créditos → botão claramente rotulado e telemetria.
 
-- **Baixo**. A detecção nova de pending é mais estrita → no pior caso trocamos "espera infinita" por "not_found" imediato, que é o comportamento correto.
-- Se algum dia o Apollo passar a devolver phone assíncrono de fato, a leitura de `phone_numbers[].sanitized_number == null` cobre o caso e o webhook continua funcional.
-- Nenhuma alteração de RLS, schema (fora backfill) ou modelo multi-tenant.
-
-## Próximos passos após aprovação
-
-1. Aplicar a migration de backfill (destrava os 2 contatos parados agora).
-2. Deploy das 2 edge functions.
-3. Publicar as mudanças de frontend.
-4. Monitorar `apollo_reveal_audit` por 30min para confirmar que `stale_pending_cleanup` some.
+## Próximos passos
+Confirmar plano e partir para implementação em ordem: migration → edge function unificada → refactor invisible → UI (toggle + inspector) → admin debug → testes.

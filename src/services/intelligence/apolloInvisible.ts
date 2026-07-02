@@ -1,5 +1,69 @@
 import { supabase } from '@/integrations/supabase/client';
 
+// KAI.18.5 — Apollo Query Logs (transparência total)
+export type ApolloQueryMode = 'smart' | 'raw' | 'replay' | 'system';
+export type ApolloCacheStatus = 'hit' | 'miss' | 'expired' | 'bypass' | 'invalidated';
+
+export interface ApolloQueryLog {
+  id: string;
+  organization_id: string;
+  prospect_id: string | null;
+  triggered_by: string | null;
+  endpoint: string;
+  mode: ApolloQueryMode;
+  replay_of: string | null;
+  request_payload: Record<string, unknown>;
+  request_headers_safe: Record<string, unknown>;
+  response_status: number | null;
+  response_body: Record<string, unknown> | null;
+  apollo_request_id: string | null;
+  people_returned: number;
+  people_recommended: number;
+  people_hidden: number;
+  hidden_reasons: Record<string, number>;
+  credits_used: number;
+  cache_status: ApolloCacheStatus;
+  fallback_used: boolean;
+  latency_ms: number | null;
+  retries: number;
+  status: 'ok' | 'error' | 'timeout' | 'rate_limited';
+  error_message: string | null;
+  created_at: string;
+}
+
+export async function listApolloQueryLogs(
+  filters: { prospect_id?: string; organization_id?: string; limit?: number } = {},
+): Promise<ApolloQueryLog[]> {
+  let q = (supabase as any)
+    .from('apollo_query_logs')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(filters.limit ?? 50);
+  if (filters.prospect_id) q = q.eq('prospect_id', filters.prospect_id);
+  if (filters.organization_id) q = q.eq('organization_id', filters.organization_id);
+  const { data, error } = await q;
+  if (error) throw error;
+  return (data ?? []) as ApolloQueryLog[];
+}
+
+export async function replayApolloQuery(prospect_id: string): Promise<any> {
+  const { data, error } = await supabase.functions.invoke('run-apollo-enrichment', {
+    body: { prospect_id, trigger_source: 'user', mode: 'replay', bypass_cache: true },
+  });
+  if (error) throw error;
+  return data;
+}
+
+export async function runApolloRaw(prospect_id: string, custom_titles?: string[]): Promise<any> {
+  const { data, error } = await supabase.functions.invoke('run-apollo-enrichment', {
+    body: { prospect_id, trigger_source: 'user', mode: 'raw', bypass_cache: true, custom_titles },
+  });
+  if (error) throw error;
+  return data;
+}
+
+
+
 export interface ApolloRules {
   id: string;
   organization_id: string;
