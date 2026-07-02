@@ -4,6 +4,7 @@ import type { QualifiedQueueItem } from '@/services/intelligence/qualifiedQueue'
 import { usePromoteToCrm } from '@/hooks/intelligence/useQualifiedQueueActions';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SmartCoverageTab } from '@/components/intelligence/smart-coverage/SmartCoverageTab';
+import { CompanyIntelligenceTab } from './CompanyIntelligenceTab';
 
 interface Brief {
   dores?: string[];
