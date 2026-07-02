@@ -95,6 +95,37 @@ Deno.serve(async (req) => {
       icpCategory = icp?.category ?? null;
     }
 
+    // KAI.19 gate — Company Intelligence
+    const { data: ci } = await admin
+      .from("kairos_company_intelligence")
+      .select("company_grade, apollo_recommended, coverage_score")
+      .eq("prospect_id", body.prospect_id)
+      .maybeSingle();
+    if (ci) {
+      const grade = ci.company_grade;
+      const blockedGrade = ["D", "F"].includes(grade ?? "");
+      if (blockedGrade || ci.apollo_recommended === false) {
+        await admin.from("apollo_enrichment_audit").insert({
+          organization_id: orgId,
+          batch_run_id: body.batch_run_id ?? null,
+          prospect_id: body.prospect_id,
+          company_name: companyName,
+          apollo_status: "skipped",
+          skip_reason: `company_grade:${grade}`,
+          priority_score: priorityScore,
+          icp_id: prospect.icp_id,
+          icp_category: icpCategory,
+        });
+        await admin
+          .from("kairos_qualified_queue")
+          .update({ apollo_status: "skipped" })
+          .eq("prospect_id", body.prospect_id)
+          .eq("organization_id", orgId);
+        await emitEvent(admin, orgId, "apollo_skipped_by_company_grade", { prospect_id: body.prospect_id, grade });
+        return json(200, { status: "skipped", reason: `company_grade:${grade}` });
+      }
+    }
+
     if (!e?.eligible) {
       await admin.from("apollo_enrichment_audit").insert({
         organization_id: orgId,
