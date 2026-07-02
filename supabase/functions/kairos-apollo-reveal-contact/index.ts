@@ -12,7 +12,7 @@ const corsHeaders = {
 };
 
 const APOLLO_MATCH_URL = "https://api.apollo.io/api/v1/people/match";
-const APOLLO_TIMEOUT_MS = 12_000;
+const APOLLO_TIMEOUT_MS = 45_000;
 
 type DataType = "profile_only" | "email" | "phone" | "both";
 
