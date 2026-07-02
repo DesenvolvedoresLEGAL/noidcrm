@@ -577,30 +577,13 @@ Deno.serve(async (req: Request) => {
     const filterCount = rows.filter((r) => !r.is_hidden_recommendation).length;
 
 
-    if (domainMismatchCount > 0) {
-      attempts.push({
-        endpoint: "domain_mismatch_flag",
-        status: 200, ok: true, inaccessible: false,
-        count: domainMismatchCount,
-        error: `Flagged ${domainMismatchCount} contact(s) whose Apollo org domain != ${prospectDomain} (não descartado)`,
-      });
-    }
-    if (titleMismatchCount > 0) {
-      attempts.push({
-        endpoint: "role_mismatch_flag",
-        status: 200, ok: true, inaccessible: false,
-        count: titleMismatchCount,
-        error: `Flagged ${titleMismatchCount} contact(s) with role outside requested titles (não descartado)`,
-      });
-    }
-    if (companyPhoneOnlyCount > 0) {
-      attempts.push({
-        endpoint: "company_phone_only_flag",
-        status: 200, ok: true, inaccessible: false,
-        count: companyPhoneOnlyCount,
-        error: `Flagged ${companyPhoneOnlyCount} contact(s) with company phone only (não descartado)`,
-      });
-    }
+    const pushFlag = (endpoint: string, count: number, msg: string) => {
+      attempts.push({ endpoint, status: 200, ok: true, inaccessible: false, count, latency_ms: 0, apollo_request_id: null, error: msg });
+    };
+    if (domainMismatchCount > 0) pushFlag("domain_mismatch_flag", domainMismatchCount, `Flagged ${domainMismatchCount} contact(s) whose Apollo org domain != ${prospectDomain} (não descartado)`);
+    if (titleMismatchCount > 0) pushFlag("role_mismatch_flag", titleMismatchCount, `Flagged ${titleMismatchCount} contact(s) with role outside requested titles (não descartado)`);
+    if (companyPhoneOnlyCount > 0) pushFlag("company_phone_only_flag", companyPhoneOnlyCount, `Flagged ${companyPhoneOnlyCount} contact(s) with company phone only (não descartado)`);
+
 
     let inserted = 0;
     if (rows.length > 0) {
