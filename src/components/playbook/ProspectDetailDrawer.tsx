@@ -172,6 +172,12 @@ export function ProspectDetailDrawer({
             </div>
           </TabsContent>
 
+          <TabsContent value="matrix">
+            <div className="py-4">
+              <ApolloEndpointMatrixTab prospectId={prospect.id} />
+            </div>
+          </TabsContent>
+
 
           <TabsContent value="contacts">
             <ProspectContactsTab
