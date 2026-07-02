@@ -353,7 +353,8 @@ Deno.serve(async (req) => {
     try { await admin.rpc("resolve_primary_contact", { p_prospect_id: prospectId }); } catch {/*noop*/}
 
     let finalStatus: string;
-    if (phonePending) finalStatus = "pending";
+    if (companyPhoneRejected && !revealedEmail) finalStatus = "rejected_company_phone";
+    else if (phonePending) finalStatus = "pending";
     else if (revealedEmail || revealedPhone) finalStatus = "revealed";
     else finalStatus = "not_found";
 
