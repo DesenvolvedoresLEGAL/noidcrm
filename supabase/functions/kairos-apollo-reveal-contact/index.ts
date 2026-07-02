@@ -301,12 +301,17 @@ Deno.serve(async (req) => {
         .maybeSingle();
       if (comp?.phone) extraCompanyPhones.push(String(comp.phone));
     } catch { /* noop */ }
-    const phoneClass = wantsPhone && !phoneAlready
-      ? classifyApolloPhone(person, extraCompanyPhones)
-      : { phone: null, sourceType: "unknown" as const, rejectedCompanyPhone: null };
-    const revealedPhone = phoneClass.phone;
-    const phoneSourceType = phoneClass.sourceType;
-    const companyPhoneRejected = !revealedPhone && !!phoneClass.rejectedCompanyPhone;
+    const phoneQual = wantsPhone && !phoneAlready
+      ? computePhoneQuality(person, extraCompanyPhones, "apollo")
+      : null;
+    const revealedPhone = phoneQual?.phone ?? null;
+    const phoneSourceType = phoneQual
+      ? (phoneQual.phone_match_quality === "person_mobile" ? "person_mobile"
+          : phoneQual.phone_match_quality === "person_direct" ? "person_direct"
+          : phoneQual.phone_match_quality === "company_main" ? "company_main"
+          : "unknown")
+      : "unknown";
+    const companyPhoneRejected = !revealedPhone && !!phoneQual?.rejected_company_phone;
 
     const apolloPersonId = person?.id ?? person?.person_id ?? contact.apollo_person_id ?? null;
     // Phone still pending only when Apollo didn't return anything (person or company).
@@ -332,23 +337,37 @@ Deno.serve(async (req) => {
         update.email_reveal_status = "not_found";
       }
     }
-    if (wantsPhone && !phoneAlready) {
-      if (revealedPhone) {
+    if (wantsPhone && !phoneAlready && phoneQual) {
+      // KAI.15.2 — sempre persiste metadados de qualidade (mesmo em rejeitado/not_found)
+      update.phone_source = phoneQual.phone_source;
+      update.phone_type = phoneQual.phone_type;
+      update.phone_match_quality = phoneQual.phone_match_quality;
+      update.phone_confidence = phoneQual.phone_confidence;
+      update.phone_quality_reason = phoneQual.reason;
+      update.is_whatsapp_ready = phoneQual.is_whatsapp_ready;
+      update.phone_validation_status = phoneQual.phone_validation_status;
+      update.phone_last_validation_at = nowIso;
+      update.phone_source_type = phoneSourceType;
+
+      if (revealedPhone && phoneQual.phone_confidence >= 80) {
         update.phone = revealedPhone;
         update.phone_revealed = true;
         update.phone_reveal_status = "revealed";
         update.phone_revealed_at = nowIso;
-        update.phone_source_type = phoneSourceType;
+        update.phone_verified_at = nowIso;
         update.phone_credits_used = (contact.phone_credits_used ?? 0) + 1;
         creditsUsed += 1;
       } else if (companyPhoneRejected) {
-        // Apollo devolveu apenas telefone corporativo — nunca salvar como telefone da pessoa.
+        // Apollo devolveu apenas telefone corporativo — nunca salvar como pessoa.
         update.phone_reveal_status = "rejected_company_phone";
-        update.phone_source_type = "company_main";
+        update.phone_revealed = false;
+        update.is_whatsapp_ready = false;
       } else if (phonePending) {
-        update.phone_reveal_status = "requested"; // webhook completará (cron limpa se >10min)
+        update.phone_reveal_status = "requested"; // webhook completará
       } else {
         update.phone_reveal_status = "not_found";
+        update.phone_revealed = false;
+        update.is_whatsapp_ready = false;
       }
     }
     if (apolloPersonId && !contact.apollo_person_id) update.apollo_person_id = apolloPersonId;
