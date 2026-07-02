@@ -668,8 +668,10 @@ Deno.serve(async (req: Request) => {
       completed_at: new Date().toISOString(),
     }).eq("id", jobRow!.id);
 
-    // KAI.18.5 — Apollo Query Log (transparência total)
+    // KAI.18.6 — Apollo Wiretap: log ultra-detalhado.
     try {
+      const rawFull = { attempts, organization: orgEnrichment ?? null };
+      const compressed = await maybeCompressRaw(rawFull);
       await sb.from("apollo_query_logs").insert({
         organization_id: prospect.organization_id,
         prospect_id,
@@ -681,11 +683,23 @@ Deno.serve(async (req: Request) => {
           custom_titles_used: customTitles.length > 0,
           trigger_source,
           bypass_cache: bypassCache,
+          endpoints_tried: attempts.map((a) => ({ endpoint: a.endpoint, status: a.status, latency_ms: a.latency_ms, count: a.count })),
         },
         request_headers_safe: { "x-api-key": "***", "Content-Type": "application/json" },
         response_status: attempts.find((a) => a.endpoint === endpointUsed)?.status ?? 200,
-        response_body: { people_sample: people.slice(0, 3), attempts, organization: orgEnrichment ? { name: orgEnrichment.name, domain } : null },
-        apollo_request_id: null,
+        response_body: {
+          people_sample: people.slice(0, 3),
+          attempts: attempts.map(({ raw: _raw, ...rest }) => rest),
+          organization: orgEnrichment ? { name: orgEnrichment.name, domain } : null,
+        },
+        raw_response_full: compressed.full,
+        raw_response_compressed: compressed.compressed,
+        raw_response_size_bytes: compressed.size,
+        raw_response_compressed_bool: compressed.wasCompressed,
+        parser_count: parserCount,
+        filter_count: filterCount,
+        eliminated_contacts: eliminatedContacts,
+        apollo_request_id: firstApolloRequestId,
         people_returned: people.length,
         people_recommended: recommendedCount,
         people_hidden: hiddenCount,
@@ -693,15 +707,18 @@ Deno.serve(async (req: Request) => {
           domain_mismatch: domainMismatchCount,
           role_mismatch: titleMismatchCount,
           company_phone_only: companyPhoneOnlyCount,
+          duplicate: eliminatedContacts.filter((c) => c.reasons.includes("duplicate")).length,
         },
         credits_used,
         cache_status: bypassCache ? "bypass" : "miss",
         fallback_used: attempts.length > 1,
+        latency_ms: totalLatency,
         status: "ok",
       });
     } catch (e) {
       console.warn("[apollo_query_logs] insert failed", e);
     }
+
 
     await trackEvent(sb, prospect.organization_id, "apollo_enrichment_completed", {
       prospect_id, job_id: jobRow?.id, ...response_summary, credits_used,
