@@ -146,11 +146,18 @@ export function ProspectDetailDrawer({
           <TabsList className="w-full">
             <TabsTrigger value="details" className="flex-1">Detalhes</TabsTrigger>
             <TabsTrigger value="contacts" className="flex-1">Contatos</TabsTrigger>
+            <TabsTrigger value="apollo" className="flex-1">Apollo</TabsTrigger>
             <TabsTrigger value="history" className="flex-1">Histórico</TabsTrigger>
             <TabsTrigger value="enrichment" className="flex-1">Enrichment</TabsTrigger>
             <TabsTrigger value="decision" className="flex-1">Decisão</TabsTrigger>
             <TabsTrigger value="timeline" className="flex-1">Timeline</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="apollo">
+            <div className="py-4">
+              <ApolloInspectorInline prospectId={prospect.id} />
+            </div>
+          </TabsContent>
 
           <TabsContent value="contacts">
             <ProspectContactsTab
