@@ -471,6 +471,17 @@ Deno.serve(async (req: Request) => {
     let topSeniority: string | null = null;
     let topSeniorityRank = 0;
 
+    // KAI.18.6 — Wiretap por contato: para cada pessoa registramos motivo exato.
+    const eliminatedContacts: Array<{
+      apollo_id: string | null;
+      name: string | null;
+      title: string | null;
+      company: string | null;
+      email: string | null;
+      reasons: string[];
+    }> = [];
+    const seenEmails = new Set<string>();
+
     const rows = people.map((person) => {
       const reasons: string[] = [];
 
@@ -492,7 +503,7 @@ Deno.serve(async (req: Request) => {
         domainMismatchCount += 1;
       }
 
-      // title relevance (only in smart mode is a rec, always logged)
+      // title relevance
       const titleOk = isRelevantTitle(person.title, titlesToUse) || !!person.email || !!person.linkedin_url;
       if (!titleOk) {
         reasons.push("role_mismatch");
@@ -507,7 +518,27 @@ Deno.serve(async (req: Request) => {
         companyPhoneOnlyCount += 1;
       }
 
+      // duplicate (same email dentro do mesmo batch)
+      const emailKey = (person.email ?? "").toLowerCase().trim();
+      if (emailKey) {
+        if (seenEmails.has(emailKey)) reasons.push("duplicate");
+        else seenEmails.add(emailKey);
+      }
+
       const isHidden = reasons.length > 0;
+      const fullName = person.name ?? [person.first_name, person.last_name].filter(Boolean).join(" ") ?? null;
+      const companyName = person?.organization?.name ?? person?.account?.name ?? null;
+
+      if (isHidden) {
+        eliminatedContacts.push({
+          apollo_id: person.person_id ?? person.id ?? null,
+          name: fullName || null,
+          title: person.title ?? null,
+          company: companyName,
+          email: person.email ?? null,
+          reasons,
+        });
+      }
 
       const cScore = computeContactScore(person);
       const seniority = detectSeniority(person.title);
@@ -522,7 +553,7 @@ Deno.serve(async (req: Request) => {
       return {
         workspace_id: prospect.organization_id,
         prospect_id,
-        full_name: person.name ?? [person.first_name, person.last_name].filter(Boolean).join(" "),
+        full_name: fullName,
         first_name: person.first_name ?? null,
         last_name: person.last_name ?? null,
         role_title: person.title ?? null,
@@ -541,6 +572,10 @@ Deno.serve(async (req: Request) => {
         raw: person,
       };
     });
+
+    const parserCount = rows.length;
+    const filterCount = rows.filter((r) => !r.is_hidden_recommendation).length;
+
 
     if (domainMismatchCount > 0) {
       attempts.push({
