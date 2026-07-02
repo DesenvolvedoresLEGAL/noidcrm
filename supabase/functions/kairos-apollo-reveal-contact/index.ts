@@ -2,6 +2,7 @@
 // Revela seletivamente apenas o dado solicitado (perfil / telefone / e-mail / ambos)
 // via Apollo people/match. Audita em apollo_reveal_audit e atualiza enriched_contact_profiles.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { classifyApolloPhone } from "../_shared/apollo-phone-classifier.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -29,14 +30,7 @@ function json(status: number, body: unknown) {
   });
 }
 
-function pickPhone(person: any): string | null {
-  if (!person) return null;
-  if (Array.isArray(person.phone_numbers) && person.phone_numbers.length > 0) {
-    const p = person.phone_numbers.find((x: any) => x?.sanitized_number) ?? person.phone_numbers[0];
-    return p?.sanitized_number ?? p?.raw_number ?? null;
-  }
-  return person.sanitized_phone ?? person.organization?.phone ?? null;
-}
+// Phone classification moved to _shared/apollo-phone-classifier.ts (KAI.15.1 phone quality guard).
 
 function estimateCredits(dt: DataType): number {
   if (dt === "profile_only") return 0;
@@ -278,9 +272,27 @@ Deno.serve(async (req) => {
 
     const person = apolloResp?.person ?? null;
     const revealedEmail = wantsEmail && !emailAlready ? (person?.email ?? null) : null;
-    const revealedPhone = wantsPhone && !phoneAlready ? pickPhone(person) : null;
+
+    // KAI.15.1 phone quality: only accept person-owned phones. Reject any org/company phone.
+    let extraCompanyPhones: string[] = [];
+    try {
+      const { data: comp } = await admin
+        .from("enriched_company_profiles")
+        .select("phone")
+        .eq("prospect_id", prospectId)
+        .maybeSingle();
+      if (comp?.phone) extraCompanyPhones.push(String(comp.phone));
+    } catch { /* noop */ }
+    const phoneClass = wantsPhone && !phoneAlready
+      ? classifyApolloPhone(person, extraCompanyPhones)
+      : { phone: null, sourceType: "unknown" as const, rejectedCompanyPhone: null };
+    const revealedPhone = phoneClass.phone;
+    const phoneSourceType = phoneClass.sourceType;
+    const companyPhoneRejected = !revealedPhone && !!phoneClass.rejectedCompanyPhone;
+
     const apolloPersonId = person?.id ?? person?.person_id ?? contact.apollo_person_id ?? null;
-    const phonePending = wantsPhone && !phoneAlready && !revealedPhone; // virá pelo webhook
+    // Phone still pending only when Apollo didn't return anything (person or company).
+    const phonePending = wantsPhone && !phoneAlready && !revealedPhone && !companyPhoneRejected;
 
     const update: Record<string, unknown> = {
       last_reveal_attempt_at: nowIso,
@@ -308,8 +320,13 @@ Deno.serve(async (req) => {
         update.phone_revealed = true;
         update.phone_reveal_status = "revealed";
         update.phone_revealed_at = nowIso;
+        update.phone_source_type = phoneSourceType;
         update.phone_credits_used = (contact.phone_credits_used ?? 0) + 1;
         creditsUsed += 1;
+      } else if (companyPhoneRejected) {
+        // Apollo devolveu apenas telefone corporativo — nunca salvar como telefone da pessoa.
+        update.phone_reveal_status = "not_found";
+        update.phone_source_type = "company_main";
       } else if (phonePending) {
         update.phone_reveal_status = "requested"; // webhook completará
       } else {
@@ -345,6 +362,10 @@ Deno.serve(async (req) => {
       completed_at: phonePending ? null : nowIso,
     }).eq("id", jobId);
 
+    const auditReason = companyPhoneRejected
+      ? "company_phone_rejected"
+      : (finalStatus === "not_found" && wantsPhone ? "no_person_phone_returned" : undefined);
+
     const auditId = await writeAudit(admin, {
       organization_id: orgId, prospect_id: prospectId, contact_id: contact.id, job_id: jobId,
       requested_data_type: dataType, status: finalStatus,
@@ -352,14 +373,23 @@ Deno.serve(async (req) => {
       email_before: contact.email, email_after: revealedEmail ?? contact.email,
       phone_before: contact.phone, phone_after: revealedPhone ?? contact.phone,
       requested_by: requestedBy, source: body.source ?? "manual",
-      raw_response: { status: apolloStatus, person_id: apolloPersonId },
+      reason: auditReason,
+      phone_source_type: wantsPhone ? phoneSourceType : null,
+      raw_response: {
+        status: apolloStatus,
+        person_id: apolloPersonId,
+        phone_source_type: phoneSourceType,
+        company_phone_rejected: companyPhoneRejected,
+        rejected_company_phone: phoneClass.rejectedCompanyPhone ?? null,
+      },
     });
 
     // Revenue events
     if (revealedEmail) await emitRevenueEvent(admin, orgId, "apollo_email_revealed", { contact_id: contact.id });
     if (wantsEmail && !revealedEmail && !emailAlready) await emitRevenueEvent(admin, orgId, "apollo_email_not_found", { contact_id: contact.id });
-    if (revealedPhone) await emitRevenueEvent(admin, orgId, "apollo_phone_revealed", { contact_id: contact.id });
-    if (wantsPhone && !revealedPhone && !phonePending && !phoneAlready) await emitRevenueEvent(admin, orgId, "apollo_phone_not_found", { contact_id: contact.id });
+    if (revealedPhone) await emitRevenueEvent(admin, orgId, "apollo_phone_revealed", { contact_id: contact.id, phone_source_type: phoneSourceType });
+    if (companyPhoneRejected) await emitRevenueEvent(admin, orgId, "apollo_phone_company_rejected", { contact_id: contact.id });
+    if (wantsPhone && !revealedPhone && !companyPhoneRejected && !phonePending && !phoneAlready) await emitRevenueEvent(admin, orgId, "apollo_phone_not_found", { contact_id: contact.id });
 
     // Update kairos_qualified_queue with channel + flags
     try {
@@ -381,6 +411,9 @@ Deno.serve(async (req) => {
       email: revealedEmail,
       phone: revealedPhone,
       phone_pending: phonePending,
+      phone_source_type: phoneSourceType,
+      company_phone_rejected: companyPhoneRejected,
+      reason: auditReason,
       preferred_channel: update.preferred_channel,
       audit_id: auditId,
     });

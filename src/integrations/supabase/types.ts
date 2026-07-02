@@ -5542,6 +5542,7 @@ export type Database = {
           organization_id: string
           phone_after: string | null
           phone_before: string | null
+          phone_source_type: string | null
           prospect_id: string | null
           provider: string
           raw_response: Json | null
@@ -5564,6 +5565,7 @@ export type Database = {
           organization_id: string
           phone_after?: string | null
           phone_before?: string | null
+          phone_source_type?: string | null
           prospect_id?: string | null
           provider?: string
           raw_response?: Json | null
@@ -5586,6 +5588,7 @@ export type Database = {
           organization_id?: string
           phone_after?: string | null
           phone_before?: string | null
+          phone_source_type?: string | null
           prospect_id?: string | null
           provider?: string
           raw_response?: Json | null
@@ -10768,6 +10771,7 @@ export type Database = {
           phone_reveal_status: string
           phone_revealed: boolean
           phone_revealed_at: string | null
+          phone_source_type: string | null
           preferred_channel: string | null
           profile_credits_used: number
           prospect_id: string | null
@@ -10812,6 +10816,7 @@ export type Database = {
           phone_reveal_status?: string
           phone_revealed?: boolean
           phone_revealed_at?: string | null
+          phone_source_type?: string | null
           preferred_channel?: string | null
           profile_credits_used?: number
           prospect_id?: string | null
@@ -10856,6 +10861,7 @@ export type Database = {
           phone_reveal_status?: string
           phone_revealed?: boolean
           phone_revealed_at?: string | null
+          phone_source_type?: string | null
           preferred_channel?: string | null
           profile_credits_used?: number
           prospect_id?: string | null
