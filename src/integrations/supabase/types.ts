@@ -5535,18 +5535,25 @@ export type Database = {
           cache_status: string
           created_at: string
           credits_used: number
+          eliminated_contacts: Json
           endpoint: string
           error_message: string | null
           fallback_used: boolean
+          filter_count: number | null
           hidden_reasons: Json
           id: string
           latency_ms: number | null
           mode: string
           organization_id: string
+          parser_count: number | null
           people_hidden: number
           people_recommended: number
           people_returned: number
           prospect_id: string | null
+          raw_response_compressed: string | null
+          raw_response_compressed_bool: boolean
+          raw_response_full: Json | null
+          raw_response_size_bytes: number | null
           replay_of: string | null
           request_headers_safe: Json
           request_payload: Json
@@ -5561,18 +5568,25 @@ export type Database = {
           cache_status?: string
           created_at?: string
           credits_used?: number
+          eliminated_contacts?: Json
           endpoint: string
           error_message?: string | null
           fallback_used?: boolean
+          filter_count?: number | null
           hidden_reasons?: Json
           id?: string
           latency_ms?: number | null
           mode?: string
           organization_id: string
+          parser_count?: number | null
           people_hidden?: number
           people_recommended?: number
           people_returned?: number
           prospect_id?: string | null
+          raw_response_compressed?: string | null
+          raw_response_compressed_bool?: boolean
+          raw_response_full?: Json | null
+          raw_response_size_bytes?: number | null
           replay_of?: string | null
           request_headers_safe?: Json
           request_payload?: Json
@@ -5587,18 +5601,25 @@ export type Database = {
           cache_status?: string
           created_at?: string
           credits_used?: number
+          eliminated_contacts?: Json
           endpoint?: string
           error_message?: string | null
           fallback_used?: boolean
+          filter_count?: number | null
           hidden_reasons?: Json
           id?: string
           latency_ms?: number | null
           mode?: string
           organization_id?: string
+          parser_count?: number | null
           people_hidden?: number
           people_recommended?: number
           people_returned?: number
           prospect_id?: string | null
+          raw_response_compressed?: string | null
+          raw_response_compressed_bool?: boolean
+          raw_response_full?: Json | null
+          raw_response_size_bytes?: number | null
           replay_of?: string | null
           request_headers_safe?: Json
           request_payload?: Json
