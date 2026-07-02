@@ -3,12 +3,15 @@
 // and classifies the parity_status + root_cause.
 import { createClient } from "npm:@supabase/supabase-js@2.45.0";
 
-const corsHeaders = {
+const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "authorization, x-client-info, apikey, content-type, x-supabase-authorization, prefer, accept, accept-profile, content-profile",
+  "Access-Control-Allow-Methods": "POST, OPTIONS, GET",
+  "Access-Control-Max-Age": "86400",
+  "Vary": "Origin",
 };
+
 
 const APOLLO_URL_HINTS = [
   "people", "mixed_people", "organizations", "suggested",
@@ -107,7 +110,9 @@ function classify(
 }
 
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { status: 200, headers: corsHeaders });
+  }
 
   try {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
