@@ -234,15 +234,18 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      const { data: seller } = await supabase
-        .from("sellers")
-        .select("manager_id")
+      const { data: teamRows } = await supabase
+        .from("team_members")
+        .select("teams!inner(manager_id)")
         .eq("user_id", opp.owner_user_id)
-        .eq("organization_id", proposal.organization_id)
-        .maybeSingle();
+        .eq("organization_id", proposal.organization_id);
+
+      const managerId = (teamRows || [])
+        .map((r: any) => r.teams?.manager_id)
+        .find((m: string | null) => m && m !== opp.owner_user_id) || null;
 
       const recipients = [...new Set(
-        [opp.owner_user_id, seller?.manager_id].filter(Boolean) as string[],
+        [opp.owner_user_id, managerId].filter(Boolean) as string[],
       )];
 
       // Mensagem elegante — comunica atualização AUTOMÁTICA (não exige ação manual).
