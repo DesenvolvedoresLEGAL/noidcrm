@@ -149,6 +149,7 @@ export function ProspectDetailDrawer({
             <TabsTrigger value="contacts" className="flex-1">Contatos</TabsTrigger>
             <TabsTrigger value="apollo" className="flex-1">Apollo</TabsTrigger>
             <TabsTrigger value="parity" className="flex-1">Parity</TabsTrigger>
+            <TabsTrigger value="matrix" className="flex-1">Matrix</TabsTrigger>
             <TabsTrigger value="history" className="flex-1">Histórico</TabsTrigger>
             <TabsTrigger value="enrichment" className="flex-1">Enrichment</TabsTrigger>
             <TabsTrigger value="decision" className="flex-1">Decisão</TabsTrigger>
