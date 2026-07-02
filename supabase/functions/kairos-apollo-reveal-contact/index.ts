@@ -2,7 +2,7 @@
 // Revela seletivamente apenas o dado solicitado (perfil / telefone / e-mail / ambos)
 // via Apollo people/match. Audita em apollo_reveal_audit e atualiza enriched_contact_profiles.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { classifyApolloPhone } from "../_shared/apollo-phone-classifier.ts";
+import { classifyApolloPhone, computePhoneQuality } from "../_shared/apollo-phone-classifier.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
