@@ -2,7 +2,7 @@
 // Revela seletivamente apenas o dado solicitado (perfil / telefone / e-mail / ambos)
 // via Apollo people/match. Audita em apollo_reveal_audit e atualiza enriched_contact_profiles.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { classifyApolloPhone } from "../_shared/apollo-phone-classifier.ts";
+import { classifyApolloPhone, computePhoneQuality } from "../_shared/apollo-phone-classifier.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -301,12 +301,17 @@ Deno.serve(async (req) => {
         .maybeSingle();
       if (comp?.phone) extraCompanyPhones.push(String(comp.phone));
     } catch { /* noop */ }
-    const phoneClass = wantsPhone && !phoneAlready
-      ? classifyApolloPhone(person, extraCompanyPhones)
-      : { phone: null, sourceType: "unknown" as const, rejectedCompanyPhone: null };
-    const revealedPhone = phoneClass.phone;
-    const phoneSourceType = phoneClass.sourceType;
-    const companyPhoneRejected = !revealedPhone && !!phoneClass.rejectedCompanyPhone;
+    const phoneQual = wantsPhone && !phoneAlready
+      ? computePhoneQuality(person, extraCompanyPhones, "apollo")
+      : null;
+    const revealedPhone = phoneQual?.phone ?? null;
+    const phoneSourceType = phoneQual
+      ? (phoneQual.phone_match_quality === "person_mobile" ? "person_mobile"
+          : phoneQual.phone_match_quality === "person_direct" ? "person_direct"
+          : phoneQual.phone_match_quality === "company_main" ? "company_main"
+          : "unknown")
+      : "unknown";
+    const companyPhoneRejected = !revealedPhone && !!phoneQual?.rejected_company_phone;
 
     const apolloPersonId = person?.id ?? person?.person_id ?? contact.apollo_person_id ?? null;
     // Phone still pending only when Apollo didn't return anything (person or company).
@@ -332,23 +337,37 @@ Deno.serve(async (req) => {
         update.email_reveal_status = "not_found";
       }
     }
-    if (wantsPhone && !phoneAlready) {
-      if (revealedPhone) {
+    if (wantsPhone && !phoneAlready && phoneQual) {
+      // KAI.15.2 — sempre persiste metadados de qualidade (mesmo em rejeitado/not_found)
+      update.phone_source = phoneQual.phone_source;
+      update.phone_type = phoneQual.phone_type;
+      update.phone_match_quality = phoneQual.phone_match_quality;
+      update.phone_confidence = phoneQual.phone_confidence;
+      update.phone_quality_reason = phoneQual.reason;
+      update.is_whatsapp_ready = phoneQual.is_whatsapp_ready;
+      update.phone_validation_status = phoneQual.phone_validation_status;
+      update.phone_last_validation_at = nowIso;
+      update.phone_source_type = phoneSourceType;
+
+      if (revealedPhone && phoneQual.phone_confidence >= 80) {
         update.phone = revealedPhone;
         update.phone_revealed = true;
         update.phone_reveal_status = "revealed";
         update.phone_revealed_at = nowIso;
-        update.phone_source_type = phoneSourceType;
+        update.phone_verified_at = nowIso;
         update.phone_credits_used = (contact.phone_credits_used ?? 0) + 1;
         creditsUsed += 1;
       } else if (companyPhoneRejected) {
-        // Apollo devolveu apenas telefone corporativo — nunca salvar como telefone da pessoa.
+        // Apollo devolveu apenas telefone corporativo — nunca salvar como pessoa.
         update.phone_reveal_status = "rejected_company_phone";
-        update.phone_source_type = "company_main";
+        update.phone_revealed = false;
+        update.is_whatsapp_ready = false;
       } else if (phonePending) {
-        update.phone_reveal_status = "requested"; // webhook completará (cron limpa se >10min)
+        update.phone_reveal_status = "requested"; // webhook completará
       } else {
         update.phone_reveal_status = "not_found";
+        update.phone_revealed = false;
+        update.is_whatsapp_ready = false;
       }
     }
     if (apolloPersonId && !contact.apollo_person_id) update.apollo_person_id = apolloPersonId;
@@ -394,27 +413,49 @@ Deno.serve(async (req) => {
       requested_by: requestedBy, source: body.source ?? "manual",
       reason: auditReason,
       phone_source_type: wantsPhone ? phoneSourceType : null,
+      phone_source: phoneQual?.phone_source ?? null,
+      phone_type: phoneQual?.phone_type ?? null,
+      phone_match_quality: phoneQual?.phone_match_quality ?? null,
+      phone_confidence: phoneQual?.phone_confidence ?? null,
+      is_whatsapp_ready: !!phoneQual?.is_whatsapp_ready,
+      phone_quality_reason: phoneQual?.reason ?? null,
       raw_response: {
         status: apolloStatus,
         person_id: apolloPersonId,
         phone_source_type: phoneSourceType,
+        phone_match_quality: phoneQual?.phone_match_quality ?? null,
+        phone_confidence: phoneQual?.phone_confidence ?? null,
         company_phone_rejected: companyPhoneRejected,
-        rejected_company_phone: phoneClass.rejectedCompanyPhone ?? null,
+        rejected_company_phone: phoneQual?.rejected_company_phone ?? null,
       },
     });
 
-    // Revenue events
+    // KAI.15.2 — Revenue events granulares por qualidade
     if (revealedEmail) await emitRevenueEvent(admin, orgId, "apollo_email_revealed", { contact_id: contact.id });
     if (wantsEmail && !revealedEmail && !emailAlready) await emitRevenueEvent(admin, orgId, "apollo_email_not_found", { contact_id: contact.id });
-    if (revealedPhone) await emitRevenueEvent(admin, orgId, "apollo_phone_revealed", { contact_id: contact.id, phone_source_type: phoneSourceType });
-    if (companyPhoneRejected) await emitRevenueEvent(admin, orgId, "apollo_phone_company_rejected", { contact_id: contact.id });
+    if (revealedPhone && phoneQual) {
+      await emitRevenueEvent(admin, orgId, "phone_quality_scored", {
+        contact_id: contact.id,
+        phone_match_quality: phoneQual.phone_match_quality,
+        phone_confidence: phoneQual.phone_confidence,
+        is_whatsapp_ready: phoneQual.is_whatsapp_ready,
+      });
+      if (phoneQual.phone_match_quality === "person_mobile") {
+        await emitRevenueEvent(admin, orgId, "phone_person_mobile_revealed", { contact_id: contact.id });
+      } else if (phoneQual.phone_match_quality === "person_direct") {
+        await emitRevenueEvent(admin, orgId, "phone_person_direct_revealed", { contact_id: contact.id });
+      }
+      if (phoneQual.is_whatsapp_ready) {
+        await emitRevenueEvent(admin, orgId, "phone_person_whatsapp_revealed", { contact_id: contact.id });
+      }
+    }
+    if (companyPhoneRejected) await emitRevenueEvent(admin, orgId, "phone_company_rejected", { contact_id: contact.id });
     if (wantsPhone && !revealedPhone && !companyPhoneRejected && !phonePending && !phoneAlready) await emitRevenueEvent(admin, orgId, "apollo_phone_not_found", { contact_id: contact.id });
 
     // Update kairos_qualified_queue with channel + flags
     try {
       await admin.from("kairos_qualified_queue").update({
-        primary_contact_score: null, // let trigger/score recompute
-        // expose flags if columns exist; ignore failure silently
+        primary_contact_score: null,
         phone_revealed: phoneRevealedFinal,
         email_revealed: emailRevealedFinal,
         preferred_channel: update.preferred_channel,
@@ -429,13 +470,17 @@ Deno.serve(async (req) => {
       phone_reveal_status: (update.phone_reveal_status ?? contact.phone_reveal_status ?? null) as string | null,
       phone_revealed: !!(update.phone_revealed ?? contact.phone_revealed),
       phone_source_type: (wantsPhone ? phoneSourceType : null) as string | null,
+      phone_type: phoneQual?.phone_type ?? null,
+      phone_match_quality: phoneQual?.phone_match_quality ?? null,
+      phone_confidence: phoneQual?.phone_confidence ?? null,
+      is_whatsapp_ready: !!phoneQual?.is_whatsapp_ready,
       credits_estimated: estimateCredits(dataType),
       credits_used: creditsUsed,
       email: revealedEmail,
       phone: revealedPhone,
       phone_pending: phonePending,
       company_phone_rejected: companyPhoneRejected,
-      reason: auditReason ?? null,
+      reason: auditReason ?? phoneQual?.reason ?? null,
       preferred_channel: update.preferred_channel,
       audit_id: auditId,
     });

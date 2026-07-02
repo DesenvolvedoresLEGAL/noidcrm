@@ -153,7 +153,7 @@ Deno.serve(async (req) => {
     }
     // Considera também enriched_contact_profiles ligados ao prospect
     const { data: enriched } = await admin.from("enriched_contact_profiles")
-      .select("id, role_title, department, seniority, phone, email, phone_revealed, email_revealed, is_merged")
+      .select("id, role_title, department, seniority, phone, email, phone_revealed, email_revealed, is_merged, phone_match_quality, phone_confidence, is_whatsapp_ready")
       .eq("prospect_id", body.prospect_id);
     const enrichedRows = (enriched ?? []).filter((e: any) => !e.is_merged);
 
@@ -166,12 +166,19 @@ Deno.serve(async (req) => {
     ].filter(Boolean).length;
     const dmStatus: DMStatus = dmCount === 0 ? "absent" : dmCount === 1 ? "partial" : "found";
 
-    // 4) Telefone / WhatsApp
+    // 4) Telefone / WhatsApp — KAI.15.2: telefone só conta se acionável (qualidade ≥80, pessoa)
+    const ACTIONABLE_QUALITIES = new Set(["person_mobile", "person_direct", "person_whatsapp"]);
     const allPhones: string[] = [];
     for (const c of contacts) allPhones.push(...extractPhones(c.telefones));
-    for (const e of enrichedRows) if (e.phone) allPhones.push(e.phone);
+    // Enriched: só conta telefone acionável
+    const actionableEnriched = enrichedRows.filter((e: any) =>
+      e.phone && e.phone_revealed &&
+      ACTIONABLE_QUALITIES.has(e.phone_match_quality ?? "") &&
+      (e.phone_confidence ?? 0) >= 80
+    );
+    for (const e of actionableEnriched) allPhones.push(e.phone);
     const phoneExists = allPhones.some((p) => p && p.replace(/\D/g, "").length >= 8);
-    const whatsappReady = allPhones.some(isMobileBR);
+    const whatsappReady = actionableEnriched.some((e: any) => e.is_whatsapp_ready) || allPhones.some(isMobileBR);
 
     // 5) Oportunidades
     let oppStatus: OppStatus = "none";

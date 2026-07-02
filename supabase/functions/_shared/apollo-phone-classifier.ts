@@ -1,7 +1,7 @@
-// KAI.15.1 — Apollo Phone Quality Guard
-// Classifica telefones retornados pelo Apollo em pessoa (mobile/direct) vs empresa.
-// Rejeita telefones herdados de organization/account/company para nunca cair no
-// registro do decisor. Retorna a fonte para auditoria e para o Contact Score.
+// KAI.15.1 / KAI.15.2 — Apollo Phone Quality Guard
+// Classifica telefones retornados pelo Apollo em pessoa (mobile/direct/whatsapp)
+// vs empresa (reception/main). Rejeita telefones herdados de organization/account.
+// Também computa qualidade, confiança e prontidão WhatsApp.
 
 export type PhoneSourceType =
   | "person_mobile"
@@ -9,10 +9,45 @@ export type PhoneSourceType =
   | "company_main"
   | "unknown";
 
+export type PhoneMatchQuality =
+  | "person_whatsapp"
+  | "person_mobile"
+  | "person_direct"
+  | "company_reception"
+  | "company_main"
+  | "unknown";
+
+export type PhoneType =
+  | "mobile"
+  | "direct"
+  | "whatsapp"
+  | "company_main"
+  | "company_reception"
+  | "unknown";
+
+export type PhoneValidationStatus =
+  | "valid"
+  | "likely_valid"
+  | "unknown"
+  | "invalid"
+  | "stale";
+
 export interface PhoneClassification {
   phone: string | null;
   sourceType: PhoneSourceType;
   rejectedCompanyPhone: string | null;
+}
+
+export interface PhoneQuality {
+  phone: string | null;
+  phone_source: "apollo" | "manual" | "crm" | "imported" | "unknown";
+  phone_type: PhoneType;
+  phone_match_quality: PhoneMatchQuality;
+  phone_confidence: number;
+  is_whatsapp_ready: boolean;
+  phone_validation_status: PhoneValidationStatus;
+  reason: string;
+  rejected_company_phone: string | null;
 }
 
 const PERSON_TYPES = new Set([
@@ -206,5 +241,103 @@ export function classifyApolloPhone(
     phone: null,
     sourceType: rejected ? "company_main" : "unknown",
     rejectedCompanyPhone: rejected,
+  };
+}
+
+// KAI.15.2 — Mobile Brazilian pattern (9 na 3ª posição do número local)
+// Padrão internacional aceito: E.164 ou 55DDD9XXXXXXXX. Fora do Brasil, heurística
+// de 11 dígitos com "9" na posição 3 também vale para celular BR.
+function isMobileBRDigits(d: string): boolean {
+  const s = d.replace(/^55/, "");
+  if (s.length === 11 && s[2] === "9") return true;
+  if (s.length === 10) return false;
+  return false;
+}
+
+/**
+ * KAI.15.2 — Governança avançada. Retorna qualidade, tipo, confiança e prontidão WhatsApp.
+ * `source` default = "apollo". Para revelações manuais/CRM passar explicitamente.
+ */
+export function computePhoneQuality(
+  person: any,
+  extraCompanyPhones: (string | null | undefined)[] = [],
+  source: PhoneQuality["phone_source"] = "apollo",
+): PhoneQuality {
+  const cls = classifyApolloPhone(person, extraCompanyPhones);
+  const phone = cls.phone;
+
+  // Rejeitado (telefone da empresa) — nunca aceitar como pessoa
+  if (!phone && cls.rejectedCompanyPhone) {
+    return {
+      phone: null,
+      phone_source: source,
+      phone_type: "company_main",
+      phone_match_quality: "company_main",
+      phone_confidence: 10,
+      is_whatsapp_ready: false,
+      phone_validation_status: "invalid",
+      reason: "company_phone_rejected",
+      rejected_company_phone: cls.rejectedCompanyPhone,
+    };
+  }
+
+  // Não encontrou telefone
+  if (!phone) {
+    return {
+      phone: null,
+      phone_source: source,
+      phone_type: "unknown",
+      phone_match_quality: "unknown",
+      phone_confidence: 0,
+      is_whatsapp_ready: false,
+      phone_validation_status: "unknown",
+      reason: "no_person_phone_returned",
+      rejected_company_phone: null,
+    };
+  }
+
+  const d = digits(phone);
+  const isMobile = cls.sourceType === "person_mobile" || isMobileBRDigits(d);
+  const isDirect = cls.sourceType === "person_direct";
+
+  if (isMobile) {
+    return {
+      phone,
+      phone_source: source,
+      phone_type: "mobile",
+      phone_match_quality: "person_mobile",
+      phone_confidence: 95,
+      is_whatsapp_ready: true, // celular BR → WhatsApp pronto
+      phone_validation_status: "likely_valid",
+      reason: "person_mobile_detected",
+      rejected_company_phone: null,
+    };
+  }
+
+  if (isDirect) {
+    return {
+      phone,
+      phone_source: source,
+      phone_type: "direct",
+      phone_match_quality: "person_direct",
+      phone_confidence: 85,
+      is_whatsapp_ready: false,
+      phone_validation_status: "likely_valid",
+      reason: "person_direct_detected",
+      rejected_company_phone: null,
+    };
+  }
+
+  // Aceitou telefone mas fonte desconhecida
+  return {
+    phone,
+    phone_source: source,
+    phone_type: "unknown",
+    phone_match_quality: "unknown",
+    phone_confidence: 50,
+    is_whatsapp_ready: false,
+    phone_validation_status: "unknown",
+    reason: "person_phone_unclassified",
+    rejected_company_phone: null,
   };
 }

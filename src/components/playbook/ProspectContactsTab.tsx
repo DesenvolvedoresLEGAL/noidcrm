@@ -3,7 +3,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Sparkles, Loader2, Star, Mail, Phone, Linkedin, Copy, CheckCircle2, AlertCircle, PackageCheck } from "lucide-react";
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
+  DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu";
+import { Sparkles, Loader2, Star, Mail, Phone, Linkedin, Copy, CheckCircle2, AlertCircle, PackageCheck, MessageCircle, PhoneCall, ChevronDown, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useEnrichedContacts } from "@/hooks/useEnrichedContacts";
 import { useSyncEnrichedContacts } from "@/hooks/useSyncEnrichedContacts";
@@ -12,7 +16,8 @@ import { ApolloConfirmModal } from "./enrichment/ApolloConfirmModal";
 import { RevealConfirmModal } from "./enrichment/RevealConfirmModal";
 import { ContactsQualityPanel } from "./enrichment/ContactsQualityPanel";
 import { MergedContactsAccordion } from "./enrichment/MergedContactsAccordion";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { listMergedContacts } from "@/services/enrichment/apolloService";
 import type { RevealDataType } from "@/services/intelligence/apolloInvisible";
 import { cn } from "@/lib/utils";
@@ -92,6 +97,30 @@ export function ProspectContactsTab({
     } finally {
       setRevealingKey(null);
     }
+  };
+
+  const qc = useQueryClient();
+  const markPhoneInvalid = async (contactId: string) => {
+    const reason = window.prompt("Motivo (opcional):", "invalido_pelo_sdr");
+    if (reason === null) return;
+    const { data, error } = await (supabase.rpc as any)("mark_contact_phone_invalid", {
+      p_contact_id: contactId,
+      p_reason: reason || null,
+    });
+    if (error || (data && data.success === false)) {
+      toast.error("Falha ao marcar telefone como inválido");
+      return;
+    }
+    toast.success("Telefone marcado como inválido");
+    qc.invalidateQueries({ queryKey: ["enriched-contacts", prospectId] });
+  };
+
+  const digitsOnly = (p: string) => p.replace(/\D/g, "");
+  const openWhatsApp = (phone: string) => {
+    window.open(`https://wa.me/${digitsOnly(phone)}`, "_blank", "noopener");
+  };
+  const callPhone = (phone: string) => {
+    window.location.href = `tel:${phone}`;
   };
 
   // Default selection: primary + decisores (c_level/vp/director/manager) com email
@@ -286,15 +315,50 @@ export function ProspectContactsTab({
                   <Mail className="h-3 w-3" /> sem e-mail
                 </div>
               )}
-              {c.phone ? (
-                <button
-                  onClick={() => copy(c.phone!, "Telefone")}
-                  className="flex items-center gap-1.5 w-full hover:bg-muted/50 rounded px-1 py-0.5 -mx-1 group"
-                >
-                  <Phone className="h-3 w-3 text-muted-foreground" />
-                  <span className="font-mono">{c.phone}</span>
-                  <Copy className="h-3 w-3 ml-auto opacity-0 group-hover:opacity-50" />
-                </button>
+              {c.phone && c.phone_revealed && (c.phone_validation_status !== "invalid") ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="flex items-center gap-1.5 w-full hover:bg-muted/50 rounded px-1 py-0.5 -mx-1 group text-left">
+                      {c.is_whatsapp_ready ? (
+                        <MessageCircle className="h-3 w-3 text-emerald-600" />
+                      ) : (
+                        <Phone className="h-3 w-3 text-muted-foreground" />
+                      )}
+                      <span className="font-mono">{c.phone}</span>
+                      <ChevronDown className="h-3 w-3 ml-auto opacity-60" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-64">
+                    <DropdownMenuLabel className="text-[10px] font-normal text-muted-foreground leading-tight">
+                      <div className="font-mono text-foreground text-xs mb-1">{c.phone}</div>
+                      <div>Origem: {c.phone_source ?? "apollo"}</div>
+                      <div>Tipo: {c.phone_match_quality ?? c.phone_type ?? "—"}</div>
+                      <div>Confiança: {c.phone_confidence ?? 0}%</div>
+                      {c.phone_verified_at && (
+                        <div>Validado: {new Date(c.phone_verified_at).toLocaleDateString("pt-BR")}</div>
+                      )}
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => copy(c.phone!, "Telefone")}>
+                      <Copy className="h-3.5 w-3.5 mr-2" /> Copiar número
+                    </DropdownMenuItem>
+                    {c.is_whatsapp_ready && (
+                      <DropdownMenuItem onClick={() => openWhatsApp(c.phone!)}>
+                        <MessageCircle className="h-3.5 w-3.5 mr-2 text-emerald-600" /> Abrir WhatsApp
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuItem onClick={() => callPhone(c.phone!)}>
+                      <PhoneCall className="h-3.5 w-3.5 mr-2" /> Ligar
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      className="text-red-600 focus:text-red-600"
+                      onClick={() => markPhoneInvalid(c.id)}
+                    >
+                      <XCircle className="h-3.5 w-3.5 mr-2" /> Marcar como inválido
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               ) : (
                 <div className="flex items-center gap-1.5 text-muted-foreground/60 italic">
                   <Phone className="h-3 w-3" /> sem telefone
@@ -322,15 +386,21 @@ export function ProspectContactsTab({
               const phoneBlocked = phoneStatus === "not_found" || phoneStatus === "rejected_company_phone";
               const emailBlocked = emailStatus === "not_found";
 
-              // KAI.15.1: variar rótulo conforme fonte do telefone (pessoa vs empresa).
+              // KAI.15.2: label prioriza phone_match_quality; fallback para phone_source_type
+              const quality: string | null = (c as any).phone_match_quality ?? phoneSource;
+              const isWA = !!(c as any).is_whatsapp_ready;
               const phoneRevealedLabel =
-                phoneSource === "person_mobile"
-                  ? "Celular revelado"
-                  : phoneSource === "person_direct"
-                    ? "Direto revelado"
-                    : "Telefone revelado";
+                isWA
+                  ? "WhatsApp pronto"
+                  : quality === "person_mobile"
+                    ? "Celular revelado"
+                    : quality === "person_direct"
+                      ? "Direto revelado"
+                      : quality === "person_whatsapp"
+                        ? "WhatsApp pronto"
+                        : "Telefone revelado";
               const phoneNotFoundLabel =
-                phoneSource === "company_main"
+                quality === "company_main" || quality === "company_reception"
                   ? "Telefone da empresa rejeitado"
                   : "Telefone não encontrado";
 

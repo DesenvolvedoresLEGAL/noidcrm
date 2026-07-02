@@ -5538,11 +5538,17 @@ export type Database = {
           email_after: string | null
           email_before: string | null
           id: string
+          is_whatsapp_ready: boolean
           job_id: string | null
           organization_id: string
           phone_after: string | null
           phone_before: string | null
+          phone_confidence: number | null
+          phone_match_quality: string | null
+          phone_quality_reason: string | null
+          phone_source: string | null
           phone_source_type: string | null
+          phone_type: string | null
           prospect_id: string | null
           provider: string
           raw_response: Json | null
@@ -5561,11 +5567,17 @@ export type Database = {
           email_after?: string | null
           email_before?: string | null
           id?: string
+          is_whatsapp_ready?: boolean
           job_id?: string | null
           organization_id: string
           phone_after?: string | null
           phone_before?: string | null
+          phone_confidence?: number | null
+          phone_match_quality?: string | null
+          phone_quality_reason?: string | null
+          phone_source?: string | null
           phone_source_type?: string | null
+          phone_type?: string | null
           prospect_id?: string | null
           provider?: string
           raw_response?: Json | null
@@ -5584,11 +5596,17 @@ export type Database = {
           email_after?: string | null
           email_before?: string | null
           id?: string
+          is_whatsapp_ready?: boolean
           job_id?: string | null
           organization_id?: string
           phone_after?: string | null
           phone_before?: string | null
+          phone_confidence?: number | null
+          phone_match_quality?: string | null
+          phone_quality_reason?: string | null
+          phone_source?: string | null
           phone_source_type?: string | null
+          phone_type?: string | null
           prospect_id?: string | null
           provider?: string
           raw_response?: Json | null
@@ -10761,17 +10779,26 @@ export type Database = {
           id: string
           is_merged: boolean
           is_primary: boolean | null
+          is_whatsapp_ready: boolean
           last_name: string | null
           last_reveal_attempt_at: string | null
           last_reveal_job_id: string | null
           linkedin_url: string | null
           merged_into: string | null
           phone: string | null
+          phone_confidence: number
           phone_credits_used: number
+          phone_last_validation_at: string | null
+          phone_match_quality: string | null
+          phone_quality_reason: string | null
           phone_reveal_status: string
           phone_revealed: boolean
           phone_revealed_at: string | null
+          phone_source: string | null
           phone_source_type: string | null
+          phone_type: string | null
+          phone_validation_status: string
+          phone_verified_at: string | null
           preferred_channel: string | null
           profile_credits_used: number
           prospect_id: string | null
@@ -10806,17 +10833,26 @@ export type Database = {
           id?: string
           is_merged?: boolean
           is_primary?: boolean | null
+          is_whatsapp_ready?: boolean
           last_name?: string | null
           last_reveal_attempt_at?: string | null
           last_reveal_job_id?: string | null
           linkedin_url?: string | null
           merged_into?: string | null
           phone?: string | null
+          phone_confidence?: number
           phone_credits_used?: number
+          phone_last_validation_at?: string | null
+          phone_match_quality?: string | null
+          phone_quality_reason?: string | null
           phone_reveal_status?: string
           phone_revealed?: boolean
           phone_revealed_at?: string | null
+          phone_source?: string | null
           phone_source_type?: string | null
+          phone_type?: string | null
+          phone_validation_status?: string
+          phone_verified_at?: string | null
           preferred_channel?: string | null
           profile_credits_used?: number
           prospect_id?: string | null
@@ -10851,17 +10887,26 @@ export type Database = {
           id?: string
           is_merged?: boolean
           is_primary?: boolean | null
+          is_whatsapp_ready?: boolean
           last_name?: string | null
           last_reveal_attempt_at?: string | null
           last_reveal_job_id?: string | null
           linkedin_url?: string | null
           merged_into?: string | null
           phone?: string | null
+          phone_confidence?: number
           phone_credits_used?: number
+          phone_last_validation_at?: string | null
+          phone_match_quality?: string | null
+          phone_quality_reason?: string | null
           phone_reveal_status?: string
           phone_revealed?: boolean
           phone_revealed_at?: string | null
+          phone_source?: string | null
           phone_source_type?: string | null
+          phone_type?: string | null
+          phone_validation_status?: string
+          phone_verified_at?: string | null
           preferred_channel?: string | null
           profile_credits_used?: number
           prospect_id?: string | null
@@ -38264,6 +38309,10 @@ export type Database = {
         }
         Returns: string
       }
+      mark_contact_phone_invalid: {
+        Args: { p_contact_id: string; p_reason?: string }
+        Returns: Json
+      }
       mark_operational_proposal_clone: {
         Args: { p_clone_proposal_id: string; p_original_proposal_id: string }
         Returns: Json
@@ -38436,6 +38485,10 @@ export type Database = {
       recalculate_proposal_pricing_ledger: {
         Args: { p_proposal_id: string }
         Returns: Json
+      }
+      recompute_primary_contact: {
+        Args: { p_prospect_id: string }
+        Returns: string
       }
       record_memory_read: {
         Args: {

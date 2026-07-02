@@ -2,7 +2,7 @@
 // Apollo chama este endpoint quando reveal_phone_number=true completa.
 // KAI.15.1 phone quality: rejeita telefones corporativos, aceita só mobile/direct pessoais.
 import { createClient } from "npm:@supabase/supabase-js@2.45.0";
-import { classifyApolloPhone } from "../_shared/apollo-phone-classifier.ts";
+import { computePhoneQuality } from "../_shared/apollo-phone-classifier.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -83,10 +83,13 @@ Deno.serve(async (req: Request) => {
 
     const payload = await req.json().catch(() => ({} as any));
     const person = extractPerson(payload, contactId, (existing as any).apollo_person_id);
-    const cls = classifyApolloPhone(person, extraCompanyPhones);
-    const phone = cls.phone;
-    const phoneSourceType = cls.sourceType;
-    const companyPhoneRejected = !phone && !!cls.rejectedCompanyPhone;
+    const qual = computePhoneQuality(person, extraCompanyPhones, "apollo");
+    const phone = qual.phone && qual.phone_confidence >= 80 ? qual.phone : null;
+    const phoneSourceType = qual.phone_match_quality === "person_mobile" ? "person_mobile"
+      : qual.phone_match_quality === "person_direct" ? "person_direct"
+      : qual.phone_match_quality === "company_main" ? "company_main"
+      : "unknown";
+    const companyPhoneRejected = !phone && !!qual.rejected_company_phone;
     const creditsConsumed = Number(payload?.credits_consumed ?? payload?.credits_used ?? 0) || (phone ? 1 : 0);
 
     console.log("apollo-phone-webhook payload", {
@@ -94,12 +97,26 @@ Deno.serve(async (req: Request) => {
       keys: Object.keys(payload || {}),
       picked_person_id: person?.id ?? person?.person_id ?? null,
       phone_source_type: phoneSourceType,
+      phone_match_quality: qual.phone_match_quality,
+      phone_confidence: qual.phone_confidence,
       accepted: !!phone,
       company_rejected: companyPhoneRejected,
     });
 
     const nowIso = new Date().toISOString();
-    const update: Record<string, unknown> = { last_reveal_attempt_at: nowIso };
+    const update: Record<string, unknown> = {
+      last_reveal_attempt_at: nowIso,
+      // KAI.15.2 — sempre persiste metadados de qualidade
+      phone_source: qual.phone_source,
+      phone_type: qual.phone_type,
+      phone_match_quality: qual.phone_match_quality,
+      phone_confidence: qual.phone_confidence,
+      phone_quality_reason: qual.reason,
+      is_whatsapp_ready: qual.is_whatsapp_ready && !!phone,
+      phone_validation_status: qual.phone_validation_status,
+      phone_last_validation_at: nowIso,
+      phone_source_type: phoneSourceType,
+    };
 
     if (phone) {
       update.phone = phone;
@@ -109,14 +126,14 @@ Deno.serve(async (req: Request) => {
       update.phone_revealed = true;
       update.phone_reveal_status = "revealed";
       update.phone_revealed_at = nowIso;
-      update.phone_source_type = phoneSourceType;
+      update.phone_verified_at = nowIso;
       update.phone_credits_used = ((existing as any).phone_credits_used ?? 0) + creditsConsumed;
-      update.preferred_channel = "whatsapp";
+      update.preferred_channel = qual.is_whatsapp_ready ? "whatsapp" : "call";
     } else {
-      // Sem telefone pessoal — se veio telefone corporativo, marcar como rejeitado.
       update.reveal_status = existing.email ? "partial" : "no_data";
-      update.phone_reveal_status = "not_found";
-      if (companyPhoneRejected) update.phone_source_type = "company_main";
+      update.phone_revealed = false;
+      update.is_whatsapp_ready = false;
+      update.phone_reveal_status = companyPhoneRejected ? "rejected_company_phone" : "not_found";
       if (!existing.phone_revealed) {
         update.preferred_channel = existing.email_revealed
           ? "email"
@@ -134,7 +151,7 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // Atualizar audit pendente mais recente para este contato
+    // Atualizar audit pendente mais recente
     try {
       const { data: pendingAudit } = await sb
         .from("apollo_reveal_audit")
@@ -146,17 +163,25 @@ Deno.serve(async (req: Request) => {
         .maybeSingle();
       if (pendingAudit?.id) {
         await sb.from("apollo_reveal_audit").update({
-          status: phone ? "revealed" : "not_found",
+          status: phone ? "revealed" : (companyPhoneRejected ? "rejected_company_phone" : "not_found"),
           credits_used: creditsConsumed,
           phone_after: phone ?? (pendingAudit as any).phone_before,
           phone_source_type: phoneSourceType,
+          phone_source: qual.phone_source,
+          phone_type: qual.phone_type,
+          phone_match_quality: qual.phone_match_quality,
+          phone_confidence: qual.phone_confidence,
+          is_whatsapp_ready: qual.is_whatsapp_ready && !!phone,
+          phone_quality_reason: qual.reason,
           reason: companyPhoneRejected ? "company_phone_rejected" : (phone ? null : "no_person_phone_returned"),
           raw_response: {
             webhook: true,
             person_id: person?.id ?? person?.person_id ?? null,
             phone_source_type: phoneSourceType,
+            phone_match_quality: qual.phone_match_quality,
+            phone_confidence: qual.phone_confidence,
             company_phone_rejected: companyPhoneRejected,
-            rejected_company_phone: cls.rejectedCompanyPhone ?? null,
+            rejected_company_phone: qual.rejected_company_phone ?? null,
           },
         }).eq("id", pendingAudit.id);
       }
