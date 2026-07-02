@@ -93,6 +93,16 @@ export interface EnrichedContact {
   email_revealed_at?: string | null;
   phone_revealed_at?: string | null;
   preferred_channel?: string | null;
+  // KAI.15.2 — Phone Quality
+  phone_source?: string | null;
+  phone_type?: string | null;
+  phone_match_quality?: string | null;
+  phone_confidence?: number | null;
+  phone_verified_at?: string | null;
+  phone_last_validation_at?: string | null;
+  phone_validation_status?: string | null;
+  phone_quality_reason?: string | null;
+  is_whatsapp_ready?: boolean | null;
 }
 
 export async function listEnrichedContacts(prospectId: string): Promise<EnrichedContact[]> {
