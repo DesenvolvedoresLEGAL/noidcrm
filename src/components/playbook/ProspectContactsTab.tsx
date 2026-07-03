@@ -329,13 +329,22 @@ export function ProspectContactsTab({
         <ContactsQualityPanel contacts={contacts} mergedCount={mergedContacts.length} />
       )}
 
-      {!isLoading && contacts.length === 0 && (
+      {!isLoading && contacts.length === 0 && organizationId && (
+        <ApolloWebRecoveryPanel
+          prospectId={prospectId}
+          organizationId={organizationId}
+          companyName={companyName}
+          domain={domain}
+          apolloWebUrl={apolloWebUrl}
+          onRetryApi={() => setConfirmOpen(true)}
+          isRetrying={enrich.isPending}
+        />
+      )}
+
+      {!isLoading && contacts.length === 0 && !organizationId && (
         <Card className="p-6 text-center text-sm text-muted-foreground border-dashed">
           <AlertCircle className="h-5 w-5 mx-auto mb-2 opacity-50" />
           Nenhum decisor mapeado ainda. Use <strong>Enriquecer (Apollo)</strong> para buscar contatos.
-          <div className="text-xs mt-2 opacity-75">
-            Modo teste Kairós: enriquecimento manual liberado para qualquer qualidade.
-          </div>
         </Card>
       )}
 
