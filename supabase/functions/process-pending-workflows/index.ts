@@ -3,7 +3,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-internal-secret',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
 /**
@@ -17,7 +18,14 @@ serve(async (req) => {
 
   const internalSecret = req.headers.get('x-internal-secret');
   const expectedSecret = Deno.env.get('INTERNAL_WORKFLOW_SECRET');
-  if (!expectedSecret || internalSecret !== expectedSecret) {
+  const authHeader = req.headers.get('authorization');
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+  const hasValidInternalSecret = Boolean(expectedSecret && internalSecret && internalSecret === expectedSecret);
+  const hasServiceRoleAuth = authHeader === `Bearer ${serviceRoleKey}`;
+  const hasScheduledCronAuth = authHeader === `Bearer ${anonKey}`;
+
+  if (!hasValidInternalSecret && !hasServiceRoleAuth && !hasScheduledCronAuth) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
       status: 401,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -30,7 +38,6 @@ serve(async (req) => {
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
     // Fetch pending workflow executions (limit to 50 per run)
