@@ -42,7 +42,7 @@ Deno.serve(async (req) => {
       .from("proposals")
       .select(
         `id, proposal_number, title, client_name, accepted_at, declined_at, expires_at, opportunity_id, organization_id, total_amount,
-         opportunity:opportunities!inner(id, status, deleted_at, pipeline_id, pipelines:pipelines(pipeline_type))`
+         opportunity:opportunities!proposals_opportunity_id_fkey!inner(id, status, deleted_at, pipeline_id, pipelines:pipelines(pipeline_type))`
       )
       .not("expires_at", "is", null)
       .in("status", ["sent", "viewed"])
