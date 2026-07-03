@@ -79,6 +79,8 @@ export function ProspectDetailDrawer({
   isImporting,
   matchedAccountName,
 }: ProspectDetailDrawerProps) {
+  const { roles } = useCurrentUser();
+  const isAdmin = !!roles?.some((r: string) => ['admin', 'owner', 'platform_admin'].includes(r));
   if (!prospect) return null;
 
   const score = prospect.prospect_scores?.[0];
