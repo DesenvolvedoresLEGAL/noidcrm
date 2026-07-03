@@ -8,6 +8,7 @@ import {
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
@@ -344,11 +345,9 @@ Gere insights acionáveis baseados nos padrões observados.`;
           current_signature: currentSignature,
         }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
-      return new Response(JSON.stringify({
-        status: 'error',
-        error: 'ai_failed',
-        analyzed_at: new Date().toISOString(),
-      }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      content = JSON.stringify(generateFallbackAnalysis(behaviorContext));
+      modelUsed = 'deterministic-fallback';
+      usage = null;
     }
 
     if (!content) {
@@ -360,8 +359,8 @@ Gere insights acionáveis baseados nos padrões observados.`;
           analyzed_at: cacheRow.generated_at,
         }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
-      return new Response(JSON.stringify({ status: 'error', error: 'empty_ai_content' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      content = JSON.stringify(generateFallbackAnalysis(behaviorContext));
+      modelUsed = 'deterministic-fallback';
     }
 
     // Parse AI response
@@ -389,12 +388,16 @@ Gere insights acionáveis baseados nos padrões observados.`;
           analyzed_at: cacheRow.generated_at,
         }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
-      return new Response(JSON.stringify({ status: 'error', error: 'parse_failed' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      analysis = generateFallbackAnalysis(behaviorContext);
+      modelUsed = 'deterministic-fallback';
     }
 
+    const normalizedInsights = Array.isArray(analysis.insights) ? analysis.insights : [];
+    const normalizedActions = Array.isArray(analysis.recommended_actions) ? analysis.recommended_actions : [];
+    const normalizedConcerns = Array.isArray(analysis.concerns) ? analysis.concerns : [];
+
     // Store insights as alerts
-    const alertsToCreate = analysis.insights.map(insight => ({
+    const alertsToCreate = normalizedInsights.map(insight => ({
       proposal_id,
       organization_id: proposal.organization_id,
       alert_type: mapInsightTypeToAlertType(insight.type),
@@ -423,7 +426,7 @@ Gere insights acionáveis baseados nos padrões observados.`;
     const trendMap: Record<string, string> = { up: 'up', down: 'down', neutral: 'neutral' };
     const smartAlerts = Array.isArray((analysis as any).smart_alerts) && (analysis as any).smart_alerts.length > 0
       ? (analysis as any).smart_alerts
-      : analysis.insights;
+      : normalizedInsights;
 
     const insightsPayload = {
       scoring_version: PROPOSAL_ANALYTICS_SCORING_VERSION,
@@ -448,14 +451,14 @@ Gere insights acionáveis baseados nos padrões observados.`;
       days_to_delivery: scoring.days_to_delivery,
       days_to_expiration: scoring.days_to_expiration,
       recommended_followup_priority: scoring.recommended_followup_priority,
-      insights: analysis.insights,
-      recommended_actions: analysis.recommended_actions,
+      insights: normalizedInsights,
+      recommended_actions: normalizedActions,
       smart_alerts: smartAlerts,
       best_contact_time: analysis.best_contact_time,
       next_best_action: (analysis as any).next_best_action ?? null,
       followup_tone: (analysis as any).followup_tone ?? null,
       followup_timing: (analysis as any).followup_timing ?? null,
-      concerns: analysis.concerns,
+      concerns: normalizedConcerns,
       metrics: behaviorContext.metrics,
     };
 
@@ -474,7 +477,7 @@ Gere insights acionáveis baseados nos padrões observados.`;
         p_engagement_level: analysis.engagement_level,
         p_close_probability: scoring.close_probability,
         p_risk_level: scoring.risk_label,
-        p_recommended_actions: analysis.recommended_actions as any,
+        p_recommended_actions: normalizedActions as any,
         p_smart_alerts: smartAlerts as any,
         p_generated_summary: analysis.summary,
         p_model_used: modelUsed,
