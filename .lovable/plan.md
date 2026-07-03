@@ -1,161 +1,50 @@
+## Análise forense — o que quebrou
 
-# KAI.18.5 — Apollo Reliability & Transparency
+Rodei um probe HTTP em todas as 271 edge functions do projeto (POST em cada endpoint com `apikey` anônima). O resultado é o que está causando a cascata de erros:
 
-Objetivo: Kairós volta a ser tão confiável quanto o Apollo direto. Filtros viram recomendações, tudo é explicável e o usuário nunca mais vê "Nenhum contato encontrado" quando o Apollo retornou pessoas.
+- **253 funções retornam `404 NOT_FOUND_FUNCTION_BLOB`** — ou seja, o código está no repositório mas **não existe blob deployado** no runtime. Entre elas: `calculate-ote` (a do print), `orchestrate-proposal-financials`, todas as `report_*_v2`, todo o pacote Kairós, todas as `ai-*`, `send-*`, `track-*`, `report_forecast_v2`, `calculate-opportunity-scores`, `process-*-queue`, `notify-*`, `generate-*`, etc.
+- **18 funções respondem** (401 quando exigem JWT, ou 200/400 quando públicas). Entre elas as duas que redeployei manualmente na conversa anterior (`execute-workflow`, `process-pending-workflows`) e algumas antigas (`calculate-nrhs`, `get-current-user`, `track-proposal-view`, `analyze-proposal-behavior`, `send-smtp-email`…).
 
-Escopo: **apenas** enriquecimento Apollo (edge functions + UI do drawer/prospect). Não toca CRM, OTE, Forecast, Revenue Command, Skills.
+### Por que o print mostra "CORS blocked" em vez de "404"
+O browser dispara um preflight `OPTIONS` para `calculate-ote`. Como a função não existe no runtime, o gateway devolve **404 sem headers CORS**. O Chrome não vê `Access-Control-Allow-Origin` na resposta do preflight e reporta o erro como "CORS policy: Response to preflight request doesn't pass access control check". A mensagem é enganosa — **a causa real é 404, não CORS**. O mesmo padrão se aplica a todas as outras telas (OTE, Forecast, Relatórios V2, Kairós, IA, notificações, PDF, etc.).
 
----
+### Causa raiz
+O auto-deploy do Lovable Cloud dispara função-a-função a cada edit. Quando várias funções são editadas em rajada (foi o caso nas últimas sessões: `analyze-proposal-behavior`, `calculate-nrhs`, `track-proposal-view`, `execute-workflow`, `process-pending-workflows`, e muitas outras), alguns deploys entram em fila e falham silenciosamente — o blob antigo é invalidado antes do novo subir. Como só os 2 que redeployei manualmente na sessão anterior voltaram, e os que **não foram tocados há tempos** também estão em 404, a conclusão é que houve uma **invalidação em massa dos blobs** (provavelmente após um evento de manutenção/rotação do runtime). Não é bug do código — é estado de deploy.
 
-## 1. Backend — Logging e Raw Mode
+## Plano de reparo
 
-### 1.1 Nova tabela `apollo_query_logs`
-Migration criando tabela para persistir toda chamada Apollo:
-- `organization_id`, `prospect_id`, `triggered_by` (user_id)
-- `endpoint` (`mixed_people_search` | `people_match` | `organization_enrich` | `reveal`)
-- `mode` (`smart` | `raw` | `replay`)
-- `request_payload` (jsonb), `request_headers_safe` (jsonb, sem API key)
-- `response_status`, `response_body` (jsonb), `apollo_request_id`
-- `people_returned`, `people_recommended`, `people_hidden`
-- `hidden_reasons` (jsonb: `{role_mismatch: n, company_phone_only: n, score_min: n, dedupe: n, coverage: n, ai: n, other: n}`)
-- `credits_used`, `cache_status` (`hit` | `miss` | `expired` | `bypass`)
-- `fallback_used` (bool), `latency_ms`, `retries`
-- RLS: org members leem; admin vê tudo; edge functions gravam via service_role.
-- GRANTs padrão + service_role ALL.
+### 1. Redeploy em lote das 253 funções faltantes
+Usar `supabase--deploy_edge_functions` em batches de ~20 nomes (limite prático do tool). Ordem por criticidade para o CRM voltar a operar rápido:
 
-### 1.2 Edge function `kairos-apollo-search` (nova, unificada)
-Envolve `mixed_people_search` do Apollo. Aceita `mode: 'smart' | 'raw' | 'replay'`:
-- **raw**: chama Apollo, retorna todos os contatos sem qualquer filtro/coverage/score/ICP/skill/governance/heurística. `bypass_cache = true`.
-- **smart** (default): mantém pipeline atual, mas em vez de **descartar** contatos, anota `hidden: true` + `hidden_reason` para cada um. Retorna `{people: [...all], recommended_ids: [...], hidden_reasons_summary: {...}}`.
-- **replay**: reexecuta payload de um log existente, bypass cache, grava novo log linkado ao original (`replay_of`).
-- Sempre persiste em `apollo_query_logs` com `request_id` do Apollo (header `x-request-id`), latência real e créditos.
+1. **Bloco A — OTE / Comissão / Forecast** (desbloqueia o print): `calculate-ote`, `orchestrate-proposal-financials`, `calculate-opportunity-scores`, `calculate-opportunity-indicators`, `calculate-account-scores`, `calculate-health-drivers`, `calculate-explainable-probability`, `calculate-plg-score`, `calculate-revenue-impact`, `create-forecast-daily-snapshots`, `generate-forecast-prediction`, `record-forecast-outcome`, `ml-win-probability`, `process-nrhs-queue`, `process-opportunity-indicators-queue`, `process-opportunity-score-queue`, `process-lead-score-queue`.
+2. **Bloco B — Relatórios V2**: todas as `report_*_v2` (16 funções) + `report-qualification-quality-v2`.
+3. **Bloco C — Propostas / Pricing / PDF / Aceite**: `generate-pdf-export`, `generate-proposal-pdf`, `regenerate-proposal-pdfs`, `send-proposal-email`, `check-proposal-expiration`, `check-proposal-pricing-tier-transition`, `auto-refresh-dynamic-pricing-proposals`, `handle-proposal-decline`, `post-acceptance-effects`, `generate-acceptance-proof`, `ai-analyze-proposal`, `ai-proposal-suggestions`, `ai-generate-proposal-intro`, `og-proposal-meta`.
+4. **Bloco D — IA / Coaching / Sugestões**: todas as `ai-*` restantes (~30), `accept-ai-suggestion`, `auto-apply-ai-suggestions`, `execute-ai-action`, `apply-recommendation`, `generate-recommendations`, `sales-coach-notifications`, `ai-loss-semantic-analyzer`.
+5. **Bloco E — Notificações / Email / Push**: `notify-approval-request`, `notify-client-reply`, `notify-deal-won`, `process-notification-fallback`, `track-notification-click`, `send-daily-digest-email`, `send-browser-push`, `send-user-invitation`, `send-kairos-initial-email`, `send-smtp-email-internal`, `test-smtp-connection`, `test-slack`, `ingest-email-delivery-event`, `sync-emails`, `sync-email-replies`, `cron-index-emails`, `index-email-knowledge`, `search-email-knowledge`, `process-email-queue`, `compute-email-cadence-eligibility`, `advance-email-cadence-progress`, `run-email-agent-cadence-scheduler`, `execute-email-agent-run`, `approve-email-agent-action`, `reject-email-agent-action`, `enqueue-email-agent-triggers`, `aggregate-email-agent-metrics`, `track-email-open`, `track-email-click`.
+6. **Bloco F — Kairós / Sourcing / Enriquecimento**: todas as `kairos-*` (~17), `lead-sourcing`, `run-enrichment`, `enrich-prospect-identity`, `rescore-prospects`, `preview-apollo-enrichment`, `apollo-phone-webhook`, `backfill-decision-makers`, `refresh-segment-benchmarks`.
+7. **Bloco G — Admin / Auth / API pública / Onboarding / Trial / ERP**: `admin-cleanup-data`, `admin-reset-password`, `bulk-create-users`, `delete-user-with-transfer`, `accept-invitation`, `check-org-slug`, `onboarding-complete`, `check-trial-eligibility`, `expire-trials`, `send-trial-alerts`, `trial-expired-automation`, `trial-lifecycle-events`, `provision-client-organization`, `link-slg-organization`, `api-accounts`, `api-deals`, `api-products`, `api-keys-manage`, `get-public-form`, `submit-public-form`, `ingest-lead`, `ingest-landing-lead`, `get-public-loss-reasons`, `get-public-win-reasons`, `erp-create-charge`, `erp-payment-webhook`, `erp-sync-charge-status`, `sync-account-from-erp`, `import-products`, `export-products`, `execute-import`, `validate-import-data`, `backfill-accounts-segmento`, `abacatepay-checkout`, `abacatepay-webhook`.
+8. **Bloco H — Restante** (release notes, gamification, agentes, experimentos, misc): todas as ~40 funções remanescentes da lista de 253.
 
-### 1.3 Cache
-- TTL 30 min (hoje suspeita-se de cache negativo indefinido).
-- Chave: `hash(endpoint + payload_normalizado)` com escopo por org.
-- **Nunca cachear resposta vazia** (`people.length === 0`) por mais de 60s.
-- `bypass_cache: true` sempre que `mode !== 'smart'` ou botão "Tentar novamente".
-- Registrar `cache_status` no log.
+### 2. Validação pós-deploy
+Depois de cada bloco, rodar novamente o probe HTTP nas funções do bloco. Só passar ao próximo bloco quando **0 respostas 404** no bloco anterior. Log final: quantas voltaram, quais (se alguma) falharam no deploy e o motivo do log.
 
-### 1.4 Ajuste em edge functions existentes
-- `kairos-apollo-invisible` e `run-apollo-enrichment` passam a chamar `kairos-apollo-search` internamente para reutilizar cache/log/raw handling.
-- `kairos-apollo-reveal-contact` grava log com `endpoint=reveal` (não muda lógica; só instrumenta).
-- Filtros existentes (cargo, telefone corporativo, score, coverage, IA, governance) deixam de **remover** — passam a **marcar** `hidden_reason`. A decisão final "esconder no default view" fica na UI.
+### 3. Testes funcionais dirigidos
+- `calculate-ote` invocado com `periodMonth=2026-07` (usuário do print) → confirmar que a tela "Relatório OTE" calcula sem "Erro ao calcular OTE".
+- `report_forecast_v2` / `report_summary_v2` → validar Dashboard e Forecast.
+- `orchestrate-proposal-financials` → abrir uma proposta e confirmar recomputação de totais.
+- `notify-approval-request` → aprovar uma ação sensível e verificar Slack + inbox.
 
----
+### 4. Prevenção
+- Documentar no `mem://` que **auto-deploy em rajada pode falhar silenciosamente** e que qualquer edição em lote de edge functions deve terminar com um probe HTTP + `deploy_edge_functions` nas que retornam 404.
+- Nada de mudança de código de aplicação neste ciclo — o problema é exclusivamente estado de deploy do runtime.
 
-## 2. Frontend — Drawer do Prospect
+## Detalhes técnicos (para referência)
 
-Arquivos principais: `src/components/playbook/ProspectContactsTab.tsx`, `enrichment/*`, novo hook `useApolloSearch`.
+- Probe usado: `curl -X POST https://<ref>.supabase.co/functions/v1/<name>` com `apikey` anônima. Códigos esperados quando saudável: `401` (verify_jwt=true), `400` (valida body), `200`. Código sintoma: `404 NOT_FOUND_FUNCTION_BLOB`.
+- O erro "CORS preflight" no browser é **efeito colateral do 404**, não bug de headers. Todas as funções afetadas já têm CORS correto no código; elas só não estão rodando.
+- `supabase/config.toml` está íntegro (nenhum `verify_jwt` inconsistente entre funções); não precisa ser editado.
+- Nenhuma migração de banco ou mudança em código frontend faz parte deste reparo.
 
-### 2.1 Toggle de modo (topo do drawer)
-Segmented control:
-- `● Verde  Apollo Raw` — resultado bruto
-- `● Azul  Kairós` (default) — recomendado
-
-Ao lado, resumo:
-```
-Apollo encontrou 12  ·  Kairós recomenda 4  ·  [Mostrar todos]
-```
-
-### 2.2 Lista de contatos
-Renderiza **todos** os contatos retornados (raw ou smart). Em modo smart, contatos com `hidden=true` aparecem em seção "Não recomendados (N)" colapsada, com badges explicando por quê:
-- "Cargo diferente do solicitado (Finance vs Marketing) — 31% match"
-- "Apenas telefone corporativo"
-- "Score abaixo do mínimo"
-- "Duplicado"
-- "Fora do coverage"
-
-Cada card de contato ganha metadados de origem:
-- Origem: Apollo · Tipo: Pessoa · Cargo solicitado / encontrado · Compatibilidade % · Tipo de telefone.
-
-### 2.3 Estado vazio real
-Só mostra "Nenhum contato encontrado" quando `people_returned === 0`. Caso contrário: "Apollo encontrou N contatos. Nenhum passou nas recomendações do Kairós. [Ver contatos brutos]".
-
-### 2.4 Aba "Apollo Inspector" (nova, dentro do drawer)
-Componente `ApolloInspectorTab.tsx` lista os últimos `apollo_query_logs` do prospect. Cada linha expande em:
-- Empresa, domínio, endpoint, tempo, cache status, fallback, status.
-- Payload enviado (JSON expandível, copiável).
-- Resposta Apollo (JSON expandível).
-- Contadores: retornados / exibidos / descartados + breakdown de motivos.
-- Créditos.
-- Botões: **Reproduzir Busca** (chama `mode=replay`) e **Copiar Request ID**.
-
-### 2.5 Enrichment Timeline
-Novo componente ao lado dos contatos, alimentado pelos logs em ordem cronológica:
-```
-09:21 · Consulta Apollo ✓
-09:21 · 2 contatos retornados ✓
-09:21 · Coverage executado ✓
-09:21 · 1 descartado — telefone corporativo
-09:21 · 1 descartado — cargo incompatível
-Resultado: 0 exibidos (padrão) · 2 disponíveis (raw)
-```
-
-### 2.6 Card "Qualidade Apollo"
-No topo do drawer:
-- Empresa encontrada / Domínio válido / Funcionários / Perfis públicos / Contatos encontrados / Aproveitados / Aproveitamento % / Motivo principal.
-
-### 2.7 Painel Apollo Debug (admin only)
-Rota `/kairos/apollo-debug` (ou aba escondida atrás de `platform_admin`): tabela paginada de `apollo_query_logs` cross-org com filtros por endpoint/status/latência/cache/fallback. Detalhe com headers seguros, request/response completos, latência, retries.
-
----
-
-## 3. Telemetria
-Emitir em `system_events` (canal existente):
-`apollo_raw_opened`, `apollo_show_all`, `apollo_contacts_hidden`, `apollo_contacts_recommended`, `apollo_filter_reason`, `apollo_cache_hit`, `apollo_cache_miss`, `apollo_replay_search`.
-
-Payload: `{prospect_id, mode, returned, recommended, hidden, reasons}`.
-
----
-
-## 4. Testes (vitest + edge tests)
-
-1. Apollo retorna Finance quando pediu Marketing → contato aparece em "Não recomendados" com badge de cargo diferente.
-2. Apollo retorna 10, Kairós recomenda 3 → header mostra "10 encontrados · 3 recomendados", lista raw exibe 10.
-3. Apollo retorna 0 → estado vazio real.
-4. Cache MISS → replay força consulta → cache atualizado, contatos aparecem.
-5. Só telefone corporativo → contato aparece, badge "Apenas telefone corporativo", nunca oculto.
-6. Log persistido para cada chamada, com `apollo_request_id` presente.
-
----
-
-## Detalhes técnicos
-
-- **Sem breaking changes** na API pública: `useApolloEstimate`, `useApolloRules`, `revealContact` mantêm assinatura. Só muda o payload interno de `kairos-apollo-invisible` que passa a devolver `hidden` em vez de omitir.
-- **Compat**: enquanto `apollo_query_logs` está vazio, Inspector mostra empty state amigável, sem quebrar.
-- **Segurança**: `response_body` pode conter e-mail/telefone; RLS restringe a membros da org do prospect. Headers Apollo são salvos sem `X-Api-Key`.
-- **Performance**: índice em `apollo_query_logs(prospect_id, created_at DESC)` e `(organization_id, created_at DESC)`.
-- **Rollout**: feature flag `kairos.apollo_raw_mode` (default ON) para permitir desligar rapidamente se necessário.
-
----
-
-## Arquivos afetados (resumo)
-
-Backend:
-- `supabase/migrations/<ts>_apollo_query_logs.sql` (nova)
-- `supabase/functions/kairos-apollo-search/index.ts` (nova)
-- `supabase/functions/_shared/apollo-log.ts` (nova — helper de log/cache)
-- `supabase/functions/kairos-apollo-invisible/index.ts` (marcar hidden em vez de filtrar)
-- `supabase/functions/kairos-apollo-reveal-contact/index.ts` (instrumentar log)
-- `supabase/functions/run-apollo-enrichment/index.ts` (instrumentar log)
-
-Frontend:
-- `src/services/intelligence/apolloInvisible.ts` (novos endpoints raw/replay/logs)
-- `src/hooks/intelligence/useApolloSearch.ts` (novo)
-- `src/hooks/intelligence/useApolloQueryLogs.ts` (novo)
-- `src/components/playbook/ProspectContactsTab.tsx` (toggle, sections, badges)
-- `src/components/playbook/enrichment/ApolloModeToggle.tsx` (novo)
-- `src/components/playbook/enrichment/ApolloInspectorTab.tsx` (novo)
-- `src/components/playbook/enrichment/ApolloQualityCard.tsx` (novo)
-- `src/components/playbook/enrichment/EnrichmentTimeline.tsx` (ampliar com dados do log)
-- `src/components/playbook/enrichment/ContactCard.tsx` (badges de origem/motivo)
-- `src/pages/admin/ApolloDebug.tsx` (novo, admin-only)
-
-## Riscos
-- Aumento de volume no banco (logs) → mitigado por retenção de 30 dias via cron.
-- UI mais densa → Não-recomendados vem colapsado por padrão.
-- Cache bypass em replay pode aumentar consumo de créditos → botão claramente rotulado e telemetria.
-
-## Próximos passos
-Confirmar plano e partir para implementação em ordem: migration → edge function unificada → refactor invisible → UI (toggle + inspector) → admin debug → testes.
+## Risco / rollback
+- Redeploy é idempotente. Se um bloco falhar, o estado anterior (404) permanece — nenhum dado é tocado. Nenhum risco em RLS, tenant isolation ou dados.
+- Duração estimada: 8 blocos × ~30s cada = ~4-5 min de deploy total.
