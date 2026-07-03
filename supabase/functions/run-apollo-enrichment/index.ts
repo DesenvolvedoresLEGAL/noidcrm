@@ -3,6 +3,7 @@
 // the API key does not have access to a given endpoint (403 API_INACCESSIBLE).
 import { createClient } from "npm:@supabase/supabase-js@2.45.0";
 import { isBlockedDomain, normalizeHostname } from "../_shared/domain-blocklist.ts";
+import { computePhoneQuality } from "../_shared/apollo-phone-classifier.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -644,9 +645,12 @@ Deno.serve(async (req: Request) => {
         titleMismatchCount += 1;
       }
 
-      // company-only phone signal
-      const personPhone = person.phone_numbers?.[0]?.sanitized_number ?? person.sanitized_phone ?? null;
-      const hasCompanyPhone = !!(person?.organization?.phone || person?.account?.phone);
+      // KAI.18.10 — Phone Mapping & Reveal Parity
+      // Extrai TODOS os campos possíveis do Apollo, classifica origem (mobile/direct/company)
+      // e persiste metadados completos. Nunca aceita telefone da empresa como pessoal.
+      const phoneQ = computePhoneQuality(person, [], "apollo");
+      const personPhone = phoneQ.phone;
+      const hasCompanyPhone = !!phoneQ.rejected_company_phone;
       if (!personPhone && hasCompanyPhone) {
         reasons.push("company_phone_only");
         companyPhoneOnlyCount += 1;
@@ -684,6 +688,21 @@ Deno.serve(async (req: Request) => {
       if (!isHidden && rank > topSeniorityRank) { topSeniorityRank = rank; topSeniority = seniority; }
       if (!isHidden && cScore > maxScore) maxScore = cScore;
 
+      // KAI.18.10 — Debug: raw phone fields recebidos do Apollo (Inspector)
+      const rawPhoneAudit = {
+        phone_numbers: person.phone_numbers ?? null,
+        mobile_phone: person.mobile_phone ?? null,
+        direct_dial: person.direct_dial ?? null,
+        personal_phone: person.personal_phone ?? null,
+        sanitized_phone: person.sanitized_phone ?? null,
+        organization_phone: person?.organization?.phone ?? null,
+        picked: phoneQ.phone,
+        source_type: phoneQ.phone_type,
+        match_quality: phoneQ.phone_match_quality,
+        reason: phoneQ.reason,
+        rejected_company_phone: phoneQ.rejected_company_phone,
+      };
+
       return {
         workspace_id: prospect.organization_id,
         prospect_id,
@@ -696,6 +715,18 @@ Deno.serve(async (req: Request) => {
         email: person.email ?? null,
         email_status: person.email_status ?? null,
         phone: personPhone,
+        // KAI.18.10 — Persistência completa da qualidade do telefone
+        phone_revealed: !!personPhone,
+        phone_reveal_status: personPhone ? "revealed" : (phoneQ.rejected_company_phone ? "rejected_company_phone" : "not_requested"),
+        phone_revealed_at: personPhone ? new Date().toISOString() : null,
+        phone_source: personPhone ? "apollo" : null,
+        phone_source_type: personPhone ? phoneQ.phone_type : (phoneQ.rejected_company_phone ? "company_main" : null),
+        phone_type: personPhone ? phoneQ.phone_type : null,
+        phone_match_quality: phoneQ.phone_match_quality,
+        phone_confidence: phoneQ.phone_confidence,
+        phone_validation_status: phoneQ.phone_validation_status,
+        phone_quality_reason: phoneQ.reason,
+        is_whatsapp_ready: phoneQ.is_whatsapp_ready,
         linkedin_url: person.linkedin_url ?? null,
         provider: "apollo",
         confidence_score: cScore,
@@ -703,7 +734,7 @@ Deno.serve(async (req: Request) => {
         is_hidden_recommendation: isHidden,
         hidden_reasons: reasons,
         requested_titles: titlesToUse,
-        raw: person,
+        raw: { ...person, _kairos_phone_audit: rawPhoneAudit },
       };
     });
 
