@@ -20,10 +20,12 @@ serve(async (req) => {
   const expectedSecret = Deno.env.get('INTERNAL_WORKFLOW_SECRET');
   const authHeader = req.headers.get('authorization');
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
   const hasValidInternalSecret = Boolean(expectedSecret && internalSecret && internalSecret === expectedSecret);
   const hasServiceRoleAuth = authHeader === `Bearer ${serviceRoleKey}`;
+  const hasScheduledCronAuth = authHeader === `Bearer ${anonKey}`;
 
-  if (!hasValidInternalSecret && !hasServiceRoleAuth) {
+  if (!hasValidInternalSecret && !hasServiceRoleAuth && !hasScheduledCronAuth) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
       status: 401,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
