@@ -17,6 +17,7 @@ import { RevealConfirmModal } from "./enrichment/RevealConfirmModal";
 import { ContactsQualityPanel } from "./enrichment/ContactsQualityPanel";
 import { MergedContactsAccordion } from "./enrichment/MergedContactsAccordion";
 import { HiddenRecommendationBadges } from "./HiddenRecommendationBadges";
+import { ApolloWebRecoveryPanel } from "./enrichment/ApolloWebRecoveryPanel";
 import { useApolloRaw } from "@/hooks/intelligence/useApolloQueryLogs";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -30,6 +31,10 @@ interface ProspectContactsTabProps {
   enrichmentStatus?: string | null;
   contactScore?: number | null;
   matchedAccountId?: string | null;
+  organizationId?: string | null;
+  companyName?: string | null;
+  domain?: string | null;
+  apolloWebUrl?: string | null;
 }
 
 function copy(text: string, label: string) {
