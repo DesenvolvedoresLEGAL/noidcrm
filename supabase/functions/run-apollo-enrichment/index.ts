@@ -3,6 +3,7 @@
 // the API key does not have access to a given endpoint (403 API_INACCESSIBLE).
 import { createClient } from "npm:@supabase/supabase-js@2.45.0";
 import { isBlockedDomain, normalizeHostname } from "../_shared/domain-blocklist.ts";
+import { computePhoneQuality } from "../_shared/apollo-phone-classifier.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
