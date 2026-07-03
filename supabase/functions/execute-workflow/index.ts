@@ -1231,47 +1231,52 @@ serve(async (req) => {
 
             console.log(`[execute-workflow] trigger_email_agent: queued run ${runRow?.id} for opp ${oppId} (mode=${mode}/${executionMode})`);
 
-            // Invoke the executor right after queuing so the run actually progresses
-            // (otherwise the run sits in 'queued' forever).
-            let executorStatus: string = 'queued';
-            let executorError: string | null = null;
-            try {
-              const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-              const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-              const internalSecret = Deno.env.get('INTERNAL_WORKFLOW_SECRET') || '';
-              const execResp = await fetch(`${supabaseUrl}/functions/v1/execute-email-agent-run`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  Authorization: `Bearer ${serviceKey}`,
-                  apikey: serviceKey,
-                  'x-internal-secret': internalSecret,
-                },
-                body: JSON.stringify({ run_id: runRow!.id }),
-              });
-              const execJson = await execResp.json().catch(() => ({}));
-              if (!execResp.ok) {
-                executorError = execJson?.error || `HTTP ${execResp.status}`;
-                executorStatus = 'executor_failed';
-                console.error('[execute-workflow] execute-email-agent-run failed', execJson);
-              } else {
-                executorStatus = execJson?.status || execJson?.execution_status || 'executed';
-                console.log('[execute-workflow] execute-email-agent-run ok', { runId: runRow!.id, status: executorStatus });
+            // Fire-and-forget: dispatch executor in background so the LLM latency
+            // does not block the workflow execution (previously caused HTTP 504
+            // and marked the whole run as 'partial' even when everything else
+            // succeeded). The run is already queued in the DB.
+            const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+            const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+            const internalSecret = Deno.env.get('INTERNAL_WORKFLOW_SECRET') || '';
+            const dispatchExecutor = async () => {
+              try {
+                const execResp = await fetch(`${supabaseUrl}/functions/v1/execute-email-agent-run`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${serviceKey}`,
+                    apikey: serviceKey,
+                    'x-internal-secret': internalSecret,
+                  },
+                  body: JSON.stringify({ run_id: runRow!.id }),
+                });
+                if (!execResp.ok) {
+                  const body = await execResp.text().catch(() => '');
+                  console.error('[execute-workflow] async execute-email-agent-run failed', execResp.status, body);
+                } else {
+                  console.log('[execute-workflow] async execute-email-agent-run dispatched', { runId: runRow!.id });
+                }
+              } catch (e) {
+                console.error('[execute-workflow] async execute-email-agent-run threw', e);
               }
-            } catch (e: any) {
-              executorError = e?.message || String(e);
-              executorStatus = 'executor_failed';
-              console.error('[execute-workflow] execute-email-agent-run threw', e);
+            };
+            // @ts-ignore - EdgeRuntime is available in Supabase Edge runtime
+            if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime?.waitUntil) {
+              // @ts-ignore
+              EdgeRuntime.waitUntil(dispatchExecutor());
+            } else {
+              // Fallback: still non-blocking
+              dispatchExecutor();
             }
+            console.log(`[execute-workflow] trigger_email_agent: dispatched run ${runRow?.id} in background`);
 
             result = {
               action: 'trigger_email_agent',
-              success: !executorError,
+              success: true,
               run_id: runRow?.id,
               mode,
               execution_mode: executionMode,
-              executor_status: executorStatus,
-              ...(executorError ? { executor_error: executorError } : {}),
+              executor_status: 'dispatched',
             };
             break;
           }
