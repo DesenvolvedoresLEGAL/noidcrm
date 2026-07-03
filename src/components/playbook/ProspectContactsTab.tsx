@@ -70,6 +70,10 @@ export function ProspectContactsTab({
   enrichmentStatus,
   contactScore,
   matchedAccountId,
+  organizationId,
+  companyName,
+  domain,
+  apolloWebUrl,
 }: ProspectContactsTabProps) {
   const { data: contacts = [], isLoading, enrich, setPrimary } = useEnrichedContacts(prospectId);
   const { data: mergedContacts = [] } = useQuery({
