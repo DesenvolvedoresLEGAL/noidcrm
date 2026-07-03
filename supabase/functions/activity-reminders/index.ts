@@ -47,17 +47,28 @@ serve(async (req) => {
         email_to,
         email_cc,
         email_sent,
-        opportunity_id,
-        profiles:owner_user_id (
-          full_name,
-          email
-        )
+        opportunity_id
       `)
       .eq('status', 'pending')
       .gte('scheduled_date', startWindow.toISOString())
       .lte('scheduled_date', endWindow.toISOString());
 
     if (fetchError) throw fetchError;
+
+    // Fetch owner profiles separately (no FK relationship in schema cache)
+    const ownerIds = Array.from(new Set((activities || [])
+      .map((a: any) => a.owner_user_id)
+      .filter(Boolean))) as string[];
+    const profilesById = new Map<string, { full_name: string | null; email: string | null }>();
+    if (ownerIds.length > 0) {
+      const { data: profRows } = await supabase
+        .from('profiles')
+        .select('id, full_name, email')
+        .in('id', ownerIds);
+      for (const p of profRows || []) {
+        profilesById.set(p.id, { full_name: p.full_name, email: p.email });
+      }
+    }
 
     console.log(`[activity-reminders] Found ${activities?.length || 0} activities needing reminders`);
 
@@ -97,9 +108,7 @@ serve(async (req) => {
           continue;
         }
 
-        const profile = Array.isArray(activity.profiles) 
-          ? activity.profiles[0] 
-          : activity.profiles;
+        const profile = profilesById.get(activity.owner_user_id) ?? null;
 
         // AUTO-SEND: If it's an email activity with content, send it
         if (activity.type === 'email' && !activity.email_sent && activity.email_to?.length > 0 && activity.email_subject && activity.email_body) {
