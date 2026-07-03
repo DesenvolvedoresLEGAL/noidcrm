@@ -193,7 +193,9 @@ async function maybeCompressRaw(raw: unknown): Promise<{ full: unknown | null; c
   } catch (e) {
     console.warn("[wiretap] compression failed", e);
     return { full: null, compressed: null, size, wasCompressed: false };
+  }
 }
+
 
 // KAI.18.7 — Resolve Apollo Organization ID antes de buscar pessoas
 interface ApolloOrgResolution {

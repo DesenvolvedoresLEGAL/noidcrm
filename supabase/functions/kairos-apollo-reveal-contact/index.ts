@@ -325,7 +325,6 @@ Deno.serve(async (req) => {
       p && typeof p === "object" && !p.sanitized_number && !p.raw_number && !p.number,
     );
     const phonePending = wantsPhone && !phoneAlready && !revealedPhone && !companyPhoneRejected && hasAsyncPending;
-    const phonePending = wantsPhone && !phoneAlready && !revealedPhone && !companyPhoneRejected && hasAsyncPending;
 
     const update: Record<string, unknown> = {
       last_reveal_attempt_at: nowIso,
