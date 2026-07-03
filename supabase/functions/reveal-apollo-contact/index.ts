@@ -255,17 +255,21 @@ Deno.serve(async (req: Request) => {
 
     const person = apolloResp?.person ?? null;
     const revealedEmail = person?.email ?? null;
-    const revealedPhone = pickPhone(person);
+    // KAI.18.10 — Classificação completa: mobile > direct > company. Rejeita telefone da empresa.
+    const phoneQ = computePhoneQuality(person, [], "apollo");
+    const revealedPhone = phoneQ.phone;
+    const rejectedCompanyPhone = phoneQ.rejected_company_phone;
     const apolloPersonId = person?.id ?? person?.person_id ?? contact.apollo_person_id ?? null;
 
     // Apollo charges roughly 1 credit per email + 1 per phone reveal. Approximate when missing actual cost.
     // Telefone é assíncrono — virá pelo webhook (apollo-phone-webhook). Cobramos só email aqui.
-    const phonePending = !revealedPhone; // se não veio síncrono, está pendente via webhook
+    const phonePending = !revealedPhone && !rejectedCompanyPhone;
     const creditsCharged = (revealedEmail ? 1 : 0) + (revealedPhone ? 1 : 0);
 
     let nextStatus: string;
     if (revealedEmail && revealedPhone) nextStatus = "revealed";
-    else if (phonePending) nextStatus = "pending"; // telefone virá pelo webhook, mesmo quando o e-mail já veio síncrono
+    else if (rejectedCompanyPhone && !revealedPhone) nextStatus = revealedEmail ? "partial" : "rejected_company_phone";
+    else if (phonePending) nextStatus = "pending";
     else if (revealedEmail || revealedPhone) nextStatus = "partial";
     else nextStatus = "no_data";
 
@@ -274,9 +278,32 @@ Deno.serve(async (req: Request) => {
       reveal_status: nextStatus,
       reveal_credits_used: (contact as any).reveal_credits_used != null ? undefined : creditsCharged,
     };
-    if (revealedEmail) update.email = revealedEmail;
+    if (revealedEmail) {
+      update.email = revealedEmail;
+      update.email_revealed = true;
+      update.email_revealed_at = nowIso;
+      update.email_reveal_status = "revealed";
+    }
     if (person?.email_status) update.email_status = person.email_status;
-    if (revealedPhone) update.phone = revealedPhone;
+    if (revealedPhone) {
+      update.phone = revealedPhone;
+      update.phone_revealed = true;
+      update.phone_revealed_at = nowIso;
+      update.phone_reveal_status = "revealed";
+      update.phone_source = phoneQ.phone_source;
+      update.phone_source_type = phoneQ.phone_type;
+      update.phone_type = phoneQ.phone_type;
+      update.phone_match_quality = phoneQ.phone_match_quality;
+      update.phone_confidence = phoneQ.phone_confidence;
+      update.phone_validation_status = phoneQ.phone_validation_status;
+      update.phone_quality_reason = phoneQ.reason;
+      update.is_whatsapp_ready = phoneQ.is_whatsapp_ready;
+    } else if (rejectedCompanyPhone) {
+      update.phone_reveal_status = "rejected_company_phone";
+      update.phone_source_type = "company_main";
+      update.phone_match_quality = "company_main";
+      update.phone_quality_reason = "company_phone_rejected";
+    }
     if (apolloPersonId && !contact.apollo_person_id) update.apollo_person_id = apolloPersonId;
     if (revealedEmail || revealedPhone) update.revealed_at = nowIso;
 
