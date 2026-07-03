@@ -126,6 +126,23 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    // KAI.18.10 — Se telefone e email já foram revelados/persistidos pelo enrichment,
+    // não chamar Apollo de novo (sem consumir crédito).
+    const alreadyEmail = !!(contact.email && (contact as any).email_revealed);
+    const alreadyPhone = !!(contact.phone && (contact as any).phone_revealed);
+    if (alreadyEmail && alreadyPhone) {
+      return new Response(
+        JSON.stringify({
+          status: "skipped",
+          reason: "Contato já possui e-mail e telefone revelados pelo enrichment (sem custo extra).",
+          email: contact.email,
+          phone: contact.phone,
+          credits_used: 0,
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     // Anti-spam: 24h cooldown only when the contact is already complete.
     // If email arrived but phone is still missing, allow a new phone reveal attempt.
     const cutoff = new Date(Date.now() - ANTI_SPAM_HOURS * 3600 * 1000).toISOString();
