@@ -4,6 +4,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-internal-secret',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
 serve(async (req) => {
@@ -16,11 +17,13 @@ serve(async (req) => {
     const internalSecret = req.headers.get('x-internal-secret');
     const expectedSecret = Deno.env.get('INTERNAL_WORKFLOW_SECRET');
     const authHeader = req.headers.get('authorization');
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     
-    const hasValidInternalSecret = expectedSecret && internalSecret && internalSecret === expectedSecret;
+    const hasValidInternalSecret = Boolean(expectedSecret && internalSecret && internalSecret === expectedSecret);
+    const hasServiceRoleAuth = authHeader === `Bearer ${serviceRoleKey}`;
     
     // If no valid internal secret, check for valid JWT from frontend
-    if (!hasValidInternalSecret) {
+    if (!hasValidInternalSecret && !hasServiceRoleAuth) {
       if (!authHeader || !authHeader.startsWith('Bearer ')) {
         console.error('[execute-workflow] Unauthorized: No valid internal secret or JWT');
         return new Response(JSON.stringify({ error: 'Unauthorized' }), {
@@ -48,7 +51,7 @@ serve(async (req) => {
       
       console.log(`[execute-workflow] Authenticated via JWT for user: ${user.id}`);
     } else {
-      console.log('[execute-workflow] Authenticated via internal secret');
+      console.log(`[execute-workflow] Authenticated via ${hasServiceRoleAuth ? 'service role' : 'internal secret'}`);
     }
 
     const { execution_id } = await req.json();
@@ -61,7 +64,6 @@ serve(async (req) => {
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
     // Get execution with workflow rule
