@@ -79,6 +79,8 @@ export function ProspectDetailDrawer({
   isImporting,
   matchedAccountName,
 }: ProspectDetailDrawerProps) {
+  const { roles } = useCurrentUser();
+  const isAdmin = !!roles?.some((r: string) => ['admin', 'owner', 'platform_admin'].includes(r));
   if (!prospect) return null;
 
   const score = prospect.prospect_scores?.[0];
@@ -149,8 +151,8 @@ export function ProspectDetailDrawer({
             <TabsTrigger value="details" className="flex-1">Detalhes</TabsTrigger>
             <TabsTrigger value="contacts" className="flex-1">Contatos</TabsTrigger>
             <TabsTrigger value="apollo" className="flex-1">Apollo</TabsTrigger>
-            <TabsTrigger value="parity" className="flex-1">Parity</TabsTrigger>
-            <TabsTrigger value="matrix" className="flex-1">Matrix</TabsTrigger>
+            {isAdmin && <TabsTrigger value="parity" className="flex-1">Parity</TabsTrigger>}
+            {isAdmin && <TabsTrigger value="matrix" className="flex-1">Matrix</TabsTrigger>}
             <TabsTrigger value="history" className="flex-1">Histórico</TabsTrigger>
             <TabsTrigger value="enrichment" className="flex-1">Enrichment</TabsTrigger>
             <TabsTrigger value="decision" className="flex-1">Decisão</TabsTrigger>
@@ -163,21 +165,25 @@ export function ProspectDetailDrawer({
             </div>
           </TabsContent>
 
-          <TabsContent value="parity">
-            <div className="py-4">
-              <ApolloBrowserParityTab
-                prospectId={prospect.id}
-                companyName={prospect.company_name}
-                domain={(prospect as any).normalized_domain}
-              />
-            </div>
-          </TabsContent>
+          {isAdmin && (
+            <TabsContent value="parity">
+              <div className="py-4">
+                <ApolloBrowserParityTab
+                  prospectId={prospect.id}
+                  companyName={prospect.company_name}
+                  domain={(prospect as any).normalized_domain}
+                />
+              </div>
+            </TabsContent>
+          )}
 
-          <TabsContent value="matrix">
-            <div className="py-4">
-              <ApolloEndpointMatrixTab prospectId={prospect.id} />
-            </div>
-          </TabsContent>
+          {isAdmin && (
+            <TabsContent value="matrix">
+              <div className="py-4">
+                <ApolloEndpointMatrixTab prospectId={prospect.id} />
+              </div>
+            </TabsContent>
+          )}
 
 
           <TabsContent value="contacts">
@@ -187,6 +193,10 @@ export function ProspectDetailDrawer({
               enrichmentStatus={(prospect as any).enrichment_status}
               contactScore={(prospect as any).contact_score}
               matchedAccountId={prospect.matched_account_id}
+              organizationId={prospect.organization_id}
+              companyName={prospect.company_name}
+              domain={(prospect as any).normalized_domain}
+              apolloWebUrl={(companyProfile as any)?.apollo_web_url ?? null}
             />
           </TabsContent>
 
