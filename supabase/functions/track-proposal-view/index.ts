@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
@@ -277,11 +278,10 @@ async function handleCreateView(
   // Analyze behavior patterns and generate intelligent alerts
   await analyzeAndGenerateSmartAlerts(supabase, proposalId);
 
-  // Trigger workflow ONLY on FIRST external view
-  if (isFirstExternalView) {
-    console.log(`[track-proposal-view] Triggering proposal_viewed workflow for first external view`);
-    await triggerProposalViewedWorkflow(supabase, proposalId);
-  }
+  // Trigger workflow for every external view, but dedupe per rule/proposal inside the dispatcher.
+  // This repairs proposals whose first view happened while the workflow function was unavailable.
+  console.log(`[track-proposal-view] Checking proposal_viewed workflow dispatch`);
+  await triggerProposalViewedWorkflow(supabase, proposalId, isFirstExternalView);
 
   console.log('External view created successfully:', viewData.id);
 
@@ -292,7 +292,7 @@ async function handleCreateView(
 }
 
 // Trigger workflow rules for proposal_viewed event
-async function triggerProposalViewedWorkflow(supabase: any, proposalId: string) {
+async function triggerProposalViewedWorkflow(supabase: any, proposalId: string, isFirstExternalView: boolean) {
   try {
     // Get proposal with opportunity info
     const { data: proposal, error: proposalError } = await supabase
@@ -357,6 +357,26 @@ async function triggerProposalViewedWorkflow(supabase: any, proposalId: string) 
         }
       }
 
+      const { data: existingExecution, error: existingError } = await supabase
+        .from('workflow_executions')
+        .select('id, status')
+        .eq('workflow_rule_id', rule.id)
+        .eq('opportunity_id', proposal.opportunity_id)
+        .eq('trigger_type', 'proposal_viewed')
+        .contains('trigger_data', { proposal_id: proposalId })
+        .in('status', ['pending', 'running', 'completed', 'partial'])
+        .limit(1)
+        .maybeSingle();
+
+      if (existingError) {
+        console.error(`[track-proposal-view] Error checking existing workflow execution for rule ${rule.name}:`, existingError);
+      }
+
+      if (existingExecution) {
+        console.log(`[track-proposal-view] Workflow ${rule.name} already dispatched for proposal ${proposalId} (${existingExecution.status})`);
+        continue;
+      }
+
       // Create workflow execution
       const { data: execution, error: execError } = await supabase
         .from('workflow_executions')
@@ -368,7 +388,8 @@ async function triggerProposalViewedWorkflow(supabase: any, proposalId: string) 
           trigger_data: { 
             proposal_id: proposalId, 
             proposal_title: proposal.title,
-            first_external_view: true 
+            first_external_view: isFirstExternalView,
+            dispatch_reason: isFirstExternalView ? 'first_external_view' : 'retry_missing_execution',
           },
           status: 'pending',
         })
