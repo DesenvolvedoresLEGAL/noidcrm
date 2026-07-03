@@ -81,6 +81,16 @@ export function ProspectDetailDrawer({
 }: ProspectDetailDrawerProps) {
   const { roles } = useCurrentUser();
   const isAdmin = !!roles?.some((r: string) => ['admin', 'owner', 'platform_admin'].includes(r));
+
+  // Enrichment hooks — MUST run unconditionally to keep hook order stable.
+  const safeProspectId = prospect?.id ?? '';
+  const { data: enrichmentRun } = useEnrichmentRun(safeProspectId);
+  const { data: companyProfile } = useEnrichedCompanyProfile(safeProspectId);
+  const { data: commercialBrief } = useCommercialBrief(safeProspectId);
+  const { data: enrichmentSignals } = useEnrichmentSignals(safeProspectId);
+  const runEnrichment = useRunEnrichment();
+  const enrichIdentity = useEnrichProspectIdentity();
+
   if (!prospect) return null;
 
   const score = prospect.prospect_scores?.[0];
@@ -92,14 +102,6 @@ export function ProspectDetailDrawer({
 
   const isImported = prospect.approval_status === 'imported' || prospect.status === 'converted';
   const isApproved = prospect.status === 'approved' || prospect.approval_status === 'approved';
-
-  // Enrichment hooks
-  const { data: enrichmentRun } = useEnrichmentRun(prospect.id);
-  const { data: companyProfile } = useEnrichedCompanyProfile(prospect.id);
-  const { data: commercialBrief } = useCommercialBrief(prospect.id);
-  const { data: enrichmentSignals } = useEnrichmentSignals(prospect.id);
-  const runEnrichment = useRunEnrichment();
-  const enrichIdentity = useEnrichProspectIdentity();
 
   const minimumIdentity = hasMinimumIdentity(prospect);
   const identityEnriched = !!prospect.identity_enriched_at;
