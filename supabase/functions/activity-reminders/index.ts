@@ -108,9 +108,7 @@ serve(async (req) => {
           continue;
         }
 
-        const profile = Array.isArray(activity.profiles) 
-          ? activity.profiles[0] 
-          : activity.profiles;
+        const profile = profilesById.get(activity.owner_user_id) ?? null;
 
         // AUTO-SEND: If it's an email activity with content, send it
         if (activity.type === 'email' && !activity.email_sent && activity.email_to?.length > 0 && activity.email_subject && activity.email_body) {
