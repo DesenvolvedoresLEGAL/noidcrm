@@ -1,6 +1,9 @@
 // Apollo per-contact reveal — calls people/match to unlock email + phone for a single contact.
 // Consumes Apollo credits. Anti-spam: 24h cooldown per contact.
+// KAI.18.10 — Usa classificador compartilhado para mapear TODOS os campos possíveis
+// de telefone (mobile/direct/personal/company) e persiste metadados completos.
 import { createClient } from "npm:@supabase/supabase-js@2.45.0";
+import { computePhoneQuality } from "../_shared/apollo-phone-classifier.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -17,14 +20,6 @@ interface RevealBody {
   contact_id?: string;
 }
 
-function pickPhone(person: any): string | null {
-  if (!person) return null;
-  if (Array.isArray(person.phone_numbers) && person.phone_numbers.length > 0) {
-    const p = person.phone_numbers.find((x: any) => x?.sanitized_number) ?? person.phone_numbers[0];
-    return p?.sanitized_number ?? p?.raw_number ?? null;
-  }
-  return person.sanitized_phone ?? person.organization?.phone ?? person.account?.phone ?? null;
-}
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
