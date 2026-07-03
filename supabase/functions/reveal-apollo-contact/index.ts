@@ -63,7 +63,7 @@ Deno.serve(async (req: Request) => {
     const { data: contact, error: cErr } = await sb
       .from("enriched_contact_profiles")
       .select(
-        "id, prospect_id, workspace_id, first_name, last_name, full_name, email, phone, apollo_person_id, last_reveal_attempt_at, revealed_at, reveal_credits_used",
+        "id, prospect_id, workspace_id, first_name, last_name, full_name, email, phone, phone_revealed, phone_reveal_status, email_revealed, apollo_person_id, last_reveal_attempt_at, revealed_at, reveal_credits_used",
       )
       .eq("id", contact_id)
       .maybeSingle();
