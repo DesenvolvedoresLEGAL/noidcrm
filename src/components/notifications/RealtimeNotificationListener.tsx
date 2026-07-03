@@ -71,7 +71,7 @@ export function RealtimeNotificationListener() {
   const navigate = useNavigate();
   const location = useLocation();
   const userId = user?.id;
-  const organizationId = user?.organization_id;
+  const organizationId = user?.organization_id ?? null;
   const onPublicRoute = isPublicRoute(location.pathname);
 
   useEffect(() => {
