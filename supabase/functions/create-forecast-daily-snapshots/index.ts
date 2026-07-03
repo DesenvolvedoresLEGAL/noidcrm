@@ -168,7 +168,7 @@ serve(async (req) => {
           errors.push({ orgId: org.id, message: e?.message || String(e) });
         }
       }
-
+    }
   } catch (e: any) {
     console.error('[snapshot] fatal', e);
     if (logId) {
