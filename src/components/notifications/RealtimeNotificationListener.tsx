@@ -71,6 +71,7 @@ export function RealtimeNotificationListener() {
   const navigate = useNavigate();
   const location = useLocation();
   const userId = user?.id;
+  const organizationId = user?.organization_id;
   const onPublicRoute = isPublicRoute(location.pathname);
 
   useEffect(() => {
@@ -95,12 +96,12 @@ export function RealtimeNotificationListener() {
 
           // Invalidate notification center cache
           queryClient.invalidateQueries({ queryKey: ['notifications-center', userId] });
+          queryClient.invalidateQueries({ queryKey: ['unified-inbox', 'v2', userId] });
 
           // Trigger browser push only when user enabled push AND notification opted into push channel
           if (settings?.realtime_browser_push_enabled && row.channel_push === true) {
             triggerBrowserPush(row);
           } else if (PUSH_PRIORITY_TYPES.has(row.type)) {
-            // Defensive debug log to ease troubleshooting preference/channel expectations
             console.debug(
               '[notifications] browser push skipped: preference disabled or channel_push=false',
               {
@@ -147,6 +148,63 @@ export function RealtimeNotificationListener() {
     queryClient,
     navigate,
   ]);
+
+  // Global proposal_alerts listener — surfaces "cliente visualizando agora" popup
+  // in any screen, not only on the proposal detail page.
+  useEffect(() => {
+    if (onPublicRoute) return;
+    if (!organizationId || !settings?.realtime_in_app_enabled) return;
+
+    const shownIds = new Set<string>();
+
+    const channel = supabase
+      .channel(`proposal-alerts-global-${organizationId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'proposal_alerts',
+          filter: `organization_id=eq.${organizationId}`,
+        },
+        (payload) => {
+          const alert = payload.new as any;
+          if (!alert?.id || shownIds.has(alert.id)) return;
+          shownIds.add(alert.id);
+
+          const map: Record<string, { icon: string; headline: string }> = {
+            viewing_now: { icon: '🔴', headline: 'Cliente visualizando agora!' },
+            forwarded: { icon: '📤', headline: 'Proposta encaminhada' },
+            high_engagement: { icon: '🔥', headline: 'Alto engajamento' },
+            ready_to_close: { icon: '✅', headline: 'Pronto para fechar' },
+            competitor_signal: { icon: '⚔️', headline: 'Possível comparação' },
+            deadline_approaching: { icon: '⏰', headline: 'Validade próxima' },
+            price_focus: { icon: '💰', headline: 'Foco em preços' },
+          };
+          const cfg = map[alert.alert_type];
+          if (!cfg) return;
+
+          const toastFn = alert.severity === 'critical' ? toast.warning : toast.info;
+          toastFn(`${cfg.icon} ${alert.title || cfg.headline}`, {
+            description: alert.message || undefined,
+            duration: alert.alert_type === 'viewing_now' ? 12000 : 9000,
+            action: alert.proposal_id
+              ? {
+                  label: 'Abrir proposta',
+                  onClick: () => navigate(`/app/proposals/${alert.proposal_id}`),
+                }
+              : undefined,
+          });
+
+          queryClient.invalidateQueries({ queryKey: ['proposal-alerts'] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [onPublicRoute, organizationId, settings?.realtime_in_app_enabled, queryClient, navigate]);
 
   return null;
 }
