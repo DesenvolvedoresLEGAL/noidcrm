@@ -65,13 +65,13 @@ async function triggerBrowserPush(row: any) {
 }
 
 export function RealtimeNotificationListener() {
-  const { user } = useCurrentUser();
+  const { user, profile } = useCurrentUser();
   const { settings } = useNotificationSettings();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const location = useLocation();
   const userId = user?.id;
-  const organizationId = user?.organization_id ?? null;
+  const organizationId = profile?.organization_id ?? null;
   const onPublicRoute = isPublicRoute(location.pathname);
 
   useEffect(() => {
