@@ -117,6 +117,7 @@ const settingsCategories: SettingsCategory[] = [
       { id: 'proposal-settings', label: 'Configurações', description: 'Opções de propostas', icon: Settings, path: '/app/settings/proposal-settings', requiredLevel: 'full', keywords: ['configuração', 'opções', 'numeração', 'prefixo'] },
       { id: 'proposal-layouts', label: 'Modelos', description: 'Templates de propostas', icon: FileText, path: '/app/settings/proposal-layouts', requiredLevel: 'partial', keywords: ['modelo', 'template', 'layout'] },
       { id: 'proposal-financial-audit', label: 'Auditoria Financeira', description: 'Reconciliação de propostas aprovadas', icon: FileText, path: '/app/settings/auditoria-financeira-propostas', requiredLevel: 'full', keywords: ['auditoria', 'financeira', 'reconciliação', 'divergência', 'price audit'] },
+      { id: 'eventrix-inventory', label: 'Inventário Eventrix', description: 'Consumo de inventário conectado ao Eventrix', icon: Boxes, path: '/app/settings/eventrix-inventory', requiredLevel: 'full', keywords: ['inventário', 'eventrix', 'estoque', 'disponibilidade', 'ocupação'] },
     ],
   },
   // 7. Relatórios (NOVA CATEGORIA)
