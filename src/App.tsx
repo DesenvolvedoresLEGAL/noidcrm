@@ -118,6 +118,7 @@ const Origins = lazy(() => import("./pages/settings/Origins"));
 const WinLossReasons = lazy(() => import("./pages/settings/WinLossReasons"));
 const ProposalLayouts = lazy(() => import("./pages/settings/ProposalLayouts"));
 const ProposalSettings = lazy(() => import("./pages/settings/ProposalSettings"));
+const EventrixInventorySettings = lazy(() => import("./pages/settings/EventrixInventorySettings"));
 const ProposalTemplateEditor = lazy(() => import("./pages/settings/ProposalTemplateEditor"));
 const ReleaseNotes = lazy(() => import("./pages/ReleaseNotes"));
 const NotificationsHistory = lazy(() => import("./pages/NotificationsHistory"));
