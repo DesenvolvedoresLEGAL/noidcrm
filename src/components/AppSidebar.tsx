@@ -26,7 +26,7 @@ import {
   
   Sparkles,
   Compass,
-  Boxes,
+  // Boxes,
   Radar,
 } from 'lucide-react';
 import {
