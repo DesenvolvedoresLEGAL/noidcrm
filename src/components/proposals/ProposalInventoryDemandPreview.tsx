@@ -332,6 +332,164 @@ export function ProposalInventoryDemandPreview({ proposal, proposalItems }: Prop
           </Table>
         </div>
 
+        {/* Snapshot section */}
+        <div className="rounded-md border p-3 space-y-3">
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div>
+              <div className="font-medium text-sm flex items-center gap-2">
+                <Camera className="h-4 w-4 text-primary" />
+                Snapshot operacional
+              </div>
+              <p className="text-xs text-muted-foreground max-w-xl mt-0.5">
+                Congela a demanda operacional atual desta proposta para histórico e
+                validação futura.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              {comparison === 'aligned' && (
+                <Badge variant="secondary">Sem alterações</Badge>
+              )}
+              {comparison === 'changed' && (
+                <Badge variant="destructive">Preview alterado</Badge>
+              )}
+              <Button
+                size="sm"
+                onClick={handleSaveClick}
+                disabled={!canSaveSnapshot || createSnapshot.isPending}
+                title={disabledReason ?? 'Salvar snapshot'}
+              >
+                <Camera className="h-3 w-3 mr-1" />
+                {createSnapshot.isPending ? 'Salvando…' : 'Salvar snapshot'}
+              </Button>
+            </div>
+          </div>
+
+          {comparison === 'aligned' && (
+            <p className="text-xs text-muted-foreground">
+              O preview atual está alinhado com o último snapshot salvo.
+            </p>
+          )}
+          {comparison === 'changed' && (
+            <p className="text-xs text-muted-foreground">
+              A demanda operacional atual mudou desde o último snapshot salvo.
+            </p>
+          )}
+
+          {/* Latest snapshot card */}
+          <div className="rounded-md border bg-muted/30 p-3">
+            <div className="text-xs font-semibold uppercase text-muted-foreground mb-2">
+              Último snapshot salvo
+            </div>
+            {!latestSnapshot ? (
+              <div className="text-sm">
+                <div className="font-medium">Nenhum snapshot salvo ainda</div>
+                <p className="text-muted-foreground text-xs mt-1">
+                  Salve um snapshot para congelar a demanda operacional estimada desta
+                  proposta.
+                </p>
+              </div>
+            ) : (
+              <div className="text-sm space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-medium">Snapshot v{latestSnapshot.snapshot_version}</span>
+                  <Badge variant="outline" className="text-xs">
+                    {latestSnapshot.status === 'preview_snapshot' ? 'Preview' : latestSnapshot.status}
+                  </Badge>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Salvo em {new Date(latestSnapshot.created_at).toLocaleString('pt-BR')}
+                </div>
+                <div className="text-xs">
+                  Famílias exigidas: {(latestSnapshot.summary as any)?.required_families ?? 0}
+                  {' • '}
+                  Unidades estimadas: {(latestSnapshot.summary as any)?.total_required_units ?? 0}
+                  {' • '}
+                  Avisos: {Array.isArray(latestSnapshot.warnings) ? latestSnapshot.warnings.length : 0}
+                </div>
+                <div className="pt-1">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setDetailsSnapshot(latestSnapshot)}
+                  >
+                    <Eye className="h-3 w-3 mr-1" /> Ver detalhes
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* History */}
+          {snapshots.length > 0 && (
+            <Collapsible open={historyOpen} onOpenChange={setHistoryOpen}>
+              <CollapsibleTrigger asChild>
+                <button
+                  type="button"
+                  className="w-full flex items-center justify-between text-left text-sm py-1"
+                >
+                  <span className="font-medium">
+                    Histórico de snapshots ({snapshots.length})
+                  </span>
+                  {historyOpen ? (
+                    <ChevronDown className="h-4 w-4" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4" />
+                  )}
+                </button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="rounded-md border overflow-x-auto mt-2">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Versão</TableHead>
+                        <TableHead>Criado em</TableHead>
+                        <TableHead>Famílias</TableHead>
+                        <TableHead>Unidades</TableHead>
+                        <TableHead>Avisos</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Ações</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {snapshots.slice(0, 5).map((snap) => {
+                        const sum = snap.summary as any;
+                        return (
+                          <TableRow key={snap.id}>
+                            <TableCell className="font-medium">v{snap.snapshot_version}</TableCell>
+                            <TableCell className="text-xs">
+                              {new Date(snap.created_at).toLocaleString('pt-BR')}
+                            </TableCell>
+                            <TableCell>{sum?.required_families ?? 0}</TableCell>
+                            <TableCell>{sum?.total_required_units ?? 0}</TableCell>
+                            <TableCell>
+                              {Array.isArray(snap.warnings) ? snap.warnings.length : 0}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="text-xs">
+                                {snap.status === 'preview_snapshot' ? 'Preview' : snap.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setDetailsSnapshot(snap)}
+                              >
+                                <Eye className="h-3 w-3 mr-1" /> Ver payload
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          )}
+        </div>
+
         <Collapsible open={payloadOpen} onOpenChange={setPayloadOpen}>
           <div className="rounded-md border">
             <CollapsibleTrigger asChild>
@@ -364,6 +522,34 @@ export function ProposalInventoryDemandPreview({ proposal, proposalItems }: Prop
           </div>
         </Collapsible>
       </CardContent>
+
+      <ProposalInventoryDemandSnapshotDetails
+        open={!!detailsSnapshot}
+        onOpenChange={(o) => !o && setDetailsSnapshot(null)}
+        snapshot={detailsSnapshot}
+      />
+
+      <AlertDialog open={confirmIncomplete} onOpenChange={setConfirmIncomplete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Salvar snapshot mesmo assim?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Existem dados incompletos no preview. Deseja salvar o snapshot mesmo assim?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setConfirmIncomplete(false);
+                void doSaveSnapshot();
+              }}
+            >
+              Salvar snapshot
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }
