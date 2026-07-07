@@ -915,6 +915,7 @@ const App = () => (
                 <Route path="/app/settings/loss-reasons" element={<WinLossReasons />} />
                 <Route path="/app/settings/proposal-layouts" element={<ProposalLayouts />} />
                 <Route path="/app/settings/proposal-settings" element={<ProposalSettings />} />
+                <Route path="/app/settings/eventrix-inventory" element={<EventrixInventorySettings />} />
                 <Route path="/app/settings/proposal-templates" element={<ProposalLayouts />} />
                 <Route path="/app/settings/proposal-templates/new" element={<ProposalTemplateEditor />} />
                 <Route path="/app/settings/proposal-templates/:id/edit" element={<ProposalTemplateEditor />} />
