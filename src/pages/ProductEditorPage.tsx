@@ -26,6 +26,7 @@ import { useToast } from '@/hooks/use-toast';
 
 import { ImageUpload } from '@/components/products/ImageUpload';
 import { ProductBOMEditor } from '@/components/products/ProductBOMEditor';
+import { ProductInventoryRequirementsEditor } from '@/components/products/ProductInventoryRequirementsEditor';
 import { useProductCategories } from '@/hooks/useProductCategories';
 import { useMeasurementUnits } from '@/hooks/useMeasurementUnits';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
@@ -216,18 +217,10 @@ export default function ProductEditorPage() {
         saved = await createProduct(payload);
       }
 
-      // Persist BOM only for point_day products
-      if (data.billing_type === 'point_day' && organization?.id && saved?.id) {
-        try {
-          await replaceProductBomItems(organization.id, saved.id, bomItems);
-        } catch (err) {
-          toast({
-            variant: 'destructive',
-            title: 'Produto salvo, mas Composição de Inventário falhou',
-            description: (err as Error).message,
-          });
-        }
-      }
+      // Legacy BOM auto-persist removed. Composição de Inventário agora é
+      // gerenciada pelo ProductInventoryRequirementsEditor (Eventrix), que
+      // persiste diretamente em product_inventory_requirements. Dados antigos
+      // em product_bom_items são preservados e não são reescritos aqui.
       return saved;
     },
     onSuccess: (saved) => {
@@ -651,16 +644,25 @@ export default function ProductEditorPage() {
                 </CardContent>
               </Card>
 
-              {/* BOM (apenas ponto-dia) */}
-              {billingType === 'point_day' && organization?.id && (
+              {/* Composição de Inventário (Eventrix) */}
+              {organization?.id && (
                 <Card>
                   <CardContent className="pt-6">
-                    <ProductBOMEditor
-                      organizationId={organization.id}
-                      productId={product?.id ?? null}
-                      value={bomItems}
-                      onChange={setBomItems}
-                    />
+                    {isEdit && product?.id ? (
+                      <ProductInventoryRequirementsEditor
+                        organizationId={organization.id}
+                        productId={product.id}
+                        canEdit={true}
+                      />
+                    ) : (
+                      <div className="space-y-2">
+                        <Label className="text-base">Composição de Inventário</Label>
+                        <p className="text-xs text-muted-foreground">
+                          Salve o produto primeiro para configurar as
+                          categorias e famílias do Eventrix que ele exige.
+                        </p>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               )}

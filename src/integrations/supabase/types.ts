@@ -24536,6 +24536,83 @@ export type Database = {
           },
         ]
       }
+      product_inventory_requirements: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          eventrix_category_id: string
+          eventrix_category_name: string
+          eventrix_family_id: string
+          eventrix_family_name: string
+          eventrix_item_kind: string | null
+          id: string
+          is_active: boolean
+          is_required: boolean
+          label: string
+          metadata: Json
+          notes: string | null
+          organization_id: string
+          product_id: string
+          quantity: number
+          sort_order: number
+          unit_basis: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          eventrix_category_id: string
+          eventrix_category_name: string
+          eventrix_family_id: string
+          eventrix_family_name: string
+          eventrix_item_kind?: string | null
+          id?: string
+          is_active?: boolean
+          is_required?: boolean
+          label: string
+          metadata?: Json
+          notes?: string | null
+          organization_id: string
+          product_id: string
+          quantity?: number
+          sort_order?: number
+          unit_basis?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          eventrix_category_id?: string
+          eventrix_category_name?: string
+          eventrix_family_id?: string
+          eventrix_family_name?: string
+          eventrix_item_kind?: string | null
+          id?: string
+          is_active?: boolean
+          is_required?: boolean
+          label?: string
+          metadata?: Json
+          notes?: string | null
+          organization_id?: string
+          product_id?: string
+          quantity?: number
+          sort_order?: number
+          unit_basis?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_inventory_requirements_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_price_history: {
         Row: {
           changed_at: string
