@@ -26,6 +26,7 @@ import { useToast } from '@/hooks/use-toast';
 
 import { ImageUpload } from '@/components/products/ImageUpload';
 import { ProductBOMEditor } from '@/components/products/ProductBOMEditor';
+import { ProductInventoryRequirementsEditor } from '@/components/products/ProductInventoryRequirementsEditor';
 import { useProductCategories } from '@/hooks/useProductCategories';
 import { useMeasurementUnits } from '@/hooks/useMeasurementUnits';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
@@ -651,16 +652,25 @@ export default function ProductEditorPage() {
                 </CardContent>
               </Card>
 
-              {/* BOM (apenas ponto-dia) */}
-              {billingType === 'point_day' && organization?.id && (
+              {/* Composição de Inventário (Eventrix) */}
+              {organization?.id && (
                 <Card>
                   <CardContent className="pt-6">
-                    <ProductBOMEditor
-                      organizationId={organization.id}
-                      productId={product?.id ?? null}
-                      value={bomItems}
-                      onChange={setBomItems}
-                    />
+                    {isEdit && product?.id ? (
+                      <ProductInventoryRequirementsEditor
+                        organizationId={organization.id}
+                        productId={product.id}
+                        canEdit={true}
+                      />
+                    ) : (
+                      <div className="space-y-2">
+                        <Label className="text-base">Composição de Inventário</Label>
+                        <p className="text-xs text-muted-foreground">
+                          Salve o produto primeiro para configurar as
+                          categorias e famílias do Eventrix que ele exige.
+                        </p>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               )}
