@@ -25807,6 +25807,92 @@ export type Database = {
           },
         ]
       }
+      proposal_inventory_demand_snapshots: {
+        Row: {
+          algorithm_version: string
+          commercial_context: Json
+          created_at: string
+          created_by: string | null
+          hash: string | null
+          id: string
+          lines: Json
+          organization_id: string
+          payload: Json
+          proposal_id: string
+          snapshot_version: number
+          source_products: Json
+          source_requirements: Json
+          status: string
+          summary: Json
+          warnings: Json
+        }
+        Insert: {
+          algorithm_version?: string
+          commercial_context?: Json
+          created_at?: string
+          created_by?: string | null
+          hash?: string | null
+          id?: string
+          lines?: Json
+          organization_id: string
+          payload?: Json
+          proposal_id: string
+          snapshot_version?: number
+          source_products?: Json
+          source_requirements?: Json
+          status?: string
+          summary?: Json
+          warnings?: Json
+        }
+        Update: {
+          algorithm_version?: string
+          commercial_context?: Json
+          created_at?: string
+          created_by?: string | null
+          hash?: string | null
+          id?: string
+          lines?: Json
+          organization_id?: string
+          payload?: Json
+          proposal_id?: string
+          snapshot_version?: number
+          source_products?: Json
+          source_requirements?: Json
+          status?: string
+          summary?: Json
+          warnings?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposal_inventory_demand_snapshots_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "proposals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_inventory_demand_snapshots_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["latest_proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_inventory_demand_snapshots_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_latest_commercial_proposal_v2"
+            referencedColumns: ["proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_inventory_demand_snapshots_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_proposals_normalized_v2"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       proposal_items: {
         Row: {
           billing_days: number | null
