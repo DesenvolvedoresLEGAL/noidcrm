@@ -15,6 +15,7 @@ import { ProposalContextCards } from '@/components/proposals/ProposalContextCard
 import { ProposalVisualizarTab } from '@/components/proposals/ProposalVisualizarTab';
 import { ProposalParticipantsManager } from '@/components/proposals/ProposalParticipantsManager';
 import { ProposalInventoryPanel } from '@/components/proposals/ProposalInventoryPanel';
+import { ProposalInventoryDemandPreview } from '@/components/proposals/ProposalInventoryDemandPreview';
 import { ProposalDynamicPricingPanel } from '@/components/proposals/ProposalDynamicPricingPanel';
 import { ProposalPricingBreakdown } from '@/components/proposals/ProposalPricingBreakdown';
 import { ProposalPricingDivergenceAlert } from '@/components/proposals/ProposalPricingDivergenceAlert';
