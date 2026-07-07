@@ -100,7 +100,8 @@ const ALL_MENU_ITEMS: MenuItem[] = [
   { path: '/app/settings/sales', label: 'Configurações', icon: Settings2, section: 'objetivos' },
 
   // OPERAÇÕES
-  { path: '/app/operations/inventory', label: 'Inventário', icon: Boxes, section: 'operacoes' },
+  // Inventário reposicionado para Configurações > Propostas > Inventário Eventrix (Sprint NOID-INV-CONNECT 0.1)
+  // { path: '/app/operations/inventory', label: 'Inventário', icon: Boxes, section: 'operacoes' },
 ];
 
 const SECTION_LABELS: Record<string, string> = {
