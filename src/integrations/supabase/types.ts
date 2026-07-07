@@ -11942,6 +11942,117 @@ export type Database = {
           },
         ]
       }
+      eventrix_inventory_integration_settings: {
+        Row: {
+          api_key_secret_name: string | null
+          base_url: string | null
+          created_at: string
+          created_by: string | null
+          environment: string
+          id: string
+          is_enabled: boolean
+          last_connection_check_at: string | null
+          last_connection_message: string | null
+          last_connection_status: string | null
+          last_sync_at: string | null
+          last_sync_message: string | null
+          last_sync_status: string | null
+          organization_id: string
+          status: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          api_key_secret_name?: string | null
+          base_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          environment?: string
+          id?: string
+          is_enabled?: boolean
+          last_connection_check_at?: string | null
+          last_connection_message?: string | null
+          last_connection_status?: string | null
+          last_sync_at?: string | null
+          last_sync_message?: string | null
+          last_sync_status?: string | null
+          organization_id: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          api_key_secret_name?: string | null
+          base_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          environment?: string
+          id?: string
+          is_enabled?: boolean
+          last_connection_check_at?: string | null
+          last_connection_message?: string | null
+          last_connection_status?: string | null
+          last_sync_at?: string | null
+          last_sync_message?: string | null
+          last_sync_status?: string | null
+          organization_id?: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      eventrix_inventory_sync_cache: {
+        Row: {
+          control_mode: string | null
+          created_at: string
+          description: string | null
+          entity_type: string
+          eventrix_entity_id: string
+          id: string
+          is_active: boolean
+          item_kind: string | null
+          name: string
+          organization_id: string
+          parent_eventrix_entity_id: string | null
+          payload: Json
+          synced_at: string
+          updated_at: string
+        }
+        Insert: {
+          control_mode?: string | null
+          created_at?: string
+          description?: string | null
+          entity_type: string
+          eventrix_entity_id: string
+          id?: string
+          is_active?: boolean
+          item_kind?: string | null
+          name: string
+          organization_id: string
+          parent_eventrix_entity_id?: string | null
+          payload?: Json
+          synced_at?: string
+          updated_at?: string
+        }
+        Update: {
+          control_mode?: string | null
+          created_at?: string
+          description?: string | null
+          entity_type?: string
+          eventrix_entity_id?: string
+          id?: string
+          is_active?: boolean
+          item_kind?: string | null
+          name?: string
+          organization_id?: string
+          parent_eventrix_entity_id?: string | null
+          payload?: Json
+          synced_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       experiment_hypotheses: {
         Row: {
           completed_at: string | null
@@ -39375,6 +39486,10 @@ export type Database = {
       }
       user_can_access_proposal: {
         Args: { _opportunity_id: string; _organization_id: string }
+        Returns: boolean
+      }
+      user_can_read_eventrix_inventory: {
+        Args: { p_org_id: string }
         Returns: boolean
       }
       user_is_cs: { Args: { _org_id: string }; Returns: boolean }
