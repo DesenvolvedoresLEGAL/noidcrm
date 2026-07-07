@@ -13,7 +13,11 @@ import {
 export function useProposalInventoryDemandPreview(
   proposal: ProposalInventoryDemandInputProposal | null | undefined,
   proposalItems: ProposalInventoryDemandInputItem[],
-): { preview: ProposalInventoryDemandPreview; loading: boolean } {
+): {
+  preview: ProposalInventoryDemandPreview;
+  loading: boolean;
+  productRequirements: ProductInventoryRequirement[];
+} {
   const { organization } = useCurrentOrganization();
 
   const productIds = useMemo(
@@ -58,5 +62,5 @@ export function useProposalInventoryDemandPreview(
     [proposal, proposalItems, query.data, orgId],
   );
 
-  return { preview, loading: query.isLoading };
+  return { preview, loading: query.isLoading, productRequirements: query.data ?? [] };
 }

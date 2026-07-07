@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,16 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Boxes,
@@ -23,6 +33,8 @@ import {
   Copy,
   Info,
   AlertTriangle,
+  Camera,
+  Eye,
 } from 'lucide-react';
 import { useProposalInventoryDemandPreview } from '@/hooks/proposals/useProposalInventoryDemandPreview';
 import {
@@ -31,7 +43,21 @@ import {
   type ProposalInventoryDemandInputItem,
   type ProposalInventoryDemandInputProposal,
 } from '@/lib/proposals/inventoryDemandPreview';
+import {
+  useProposalInventoryDemandSnapshots,
+  useCreateProposalInventoryDemandSnapshot,
+} from '@/hooks/proposals/useProposalInventoryDemandSnapshots';
+import {
+  buildSnapshotSummary,
+  buildSourceProducts,
+  buildSourceRequirements,
+  comparePreviewToSnapshot,
+  computePreviewHash,
+} from '@/lib/proposals/inventoryDemandSnapshot';
+import { ProposalInventoryDemandSnapshotDetails } from './ProposalInventoryDemandSnapshotDetails';
+import type { ProposalInventoryDemandSnapshot } from '@/schemas/proposalInventoryDemandSnapshot';
 import { toast } from '@/hooks/use-toast';
+
 
 interface Props {
   proposal: ProposalInventoryDemandInputProposal | null | undefined;
@@ -39,9 +65,44 @@ interface Props {
 }
 
 export function ProposalInventoryDemandPreview({ proposal, proposalItems }: Props) {
-  const { preview, loading } = useProposalInventoryDemandPreview(proposal, proposalItems);
+  const { preview, loading, productRequirements } = useProposalInventoryDemandPreview(
+    proposal,
+    proposalItems,
+  );
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [payloadOpen, setPayloadOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [detailsSnapshot, setDetailsSnapshot] = useState<ProposalInventoryDemandSnapshot | null>(null);
+  const [confirmIncomplete, setConfirmIncomplete] = useState(false);
+
+  const proposalId = proposal?.id ?? null;
+  const snapshotsQuery = useProposalInventoryDemandSnapshots(proposalId);
+  const createSnapshot = useCreateProposalInventoryDemandSnapshot();
+
+  const snapshots = snapshotsQuery.data ?? [];
+  const latestSnapshot = snapshots[0] ?? null;
+
+  const comparison = useMemo(
+    () => comparePreviewToSnapshot(preview, latestSnapshot),
+    [preview, latestSnapshot],
+  );
+
+  const hasIncompleteOnly =
+    preview.lines.length > 0 &&
+    preview.lines.every((l) => l.status === 'incomplete' || l.status === 'manual');
+
+  const canSaveSnapshot =
+    !!proposalId &&
+    (preview.status === 'ready' || preview.status === 'incomplete') &&
+    preview.lines.length > 0;
+
+  const disabledReason = !proposalId
+    ? 'Salve a proposta antes de gerar um snapshot.'
+    : !proposalItems || proposalItems.length === 0
+    ? 'Adicione produtos à proposta antes de salvar um snapshot.'
+    : preview.lines.length === 0
+    ? 'Não há demanda operacional para salvar.'
+    : null;
 
   const toggle = (key: string) => {
     setExpanded((prev) => {
@@ -51,6 +112,40 @@ export function ProposalInventoryDemandPreview({ proposal, proposalItems }: Prop
       return next;
     });
   };
+
+  const doSaveSnapshot = async () => {
+    if (!proposalId) return;
+    try {
+      await createSnapshot.mutateAsync({
+        proposal_id: proposalId,
+        summary: buildSnapshotSummary(preview),
+        payload: preview.payload as any,
+        lines: preview.lines as any,
+        warnings: preview.warnings as any,
+        commercial_context: preview.payload.commercial_context as any,
+        source_products: buildSourceProducts(preview, proposalItems) as any,
+        source_requirements: buildSourceRequirements(preview, productRequirements) as any,
+        hash: computePreviewHash(preview),
+      });
+      toast({ title: 'Snapshot de demanda operacional salvo.' });
+    } catch (err: any) {
+      toast({
+        title: 'Não foi possível salvar o snapshot.',
+        description: err?.message,
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleSaveClick = () => {
+    if (!canSaveSnapshot) return;
+    if (hasIncompleteOnly || preview.lines.some((l) => l.status === 'incomplete')) {
+      setConfirmIncomplete(true);
+      return;
+    }
+    void doSaveSnapshot();
+  };
+
 
   const header = (
     <CardHeader>
@@ -237,6 +332,164 @@ export function ProposalInventoryDemandPreview({ proposal, proposalItems }: Prop
           </Table>
         </div>
 
+        {/* Snapshot section */}
+        <div className="rounded-md border p-3 space-y-3">
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div>
+              <div className="font-medium text-sm flex items-center gap-2">
+                <Camera className="h-4 w-4 text-primary" />
+                Snapshot operacional
+              </div>
+              <p className="text-xs text-muted-foreground max-w-xl mt-0.5">
+                Congela a demanda operacional atual desta proposta para histórico e
+                validação futura.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              {comparison === 'aligned' && (
+                <Badge variant="secondary">Sem alterações</Badge>
+              )}
+              {comparison === 'changed' && (
+                <Badge variant="destructive">Preview alterado</Badge>
+              )}
+              <Button
+                size="sm"
+                onClick={handleSaveClick}
+                disabled={!canSaveSnapshot || createSnapshot.isPending}
+                title={disabledReason ?? 'Salvar snapshot'}
+              >
+                <Camera className="h-3 w-3 mr-1" />
+                {createSnapshot.isPending ? 'Salvando…' : 'Salvar snapshot'}
+              </Button>
+            </div>
+          </div>
+
+          {comparison === 'aligned' && (
+            <p className="text-xs text-muted-foreground">
+              O preview atual está alinhado com o último snapshot salvo.
+            </p>
+          )}
+          {comparison === 'changed' && (
+            <p className="text-xs text-muted-foreground">
+              A demanda operacional atual mudou desde o último snapshot salvo.
+            </p>
+          )}
+
+          {/* Latest snapshot card */}
+          <div className="rounded-md border bg-muted/30 p-3">
+            <div className="text-xs font-semibold uppercase text-muted-foreground mb-2">
+              Último snapshot salvo
+            </div>
+            {!latestSnapshot ? (
+              <div className="text-sm">
+                <div className="font-medium">Nenhum snapshot salvo ainda</div>
+                <p className="text-muted-foreground text-xs mt-1">
+                  Salve um snapshot para congelar a demanda operacional estimada desta
+                  proposta.
+                </p>
+              </div>
+            ) : (
+              <div className="text-sm space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-medium">Snapshot v{latestSnapshot.snapshot_version}</span>
+                  <Badge variant="outline" className="text-xs">
+                    {latestSnapshot.status === 'preview_snapshot' ? 'Preview' : latestSnapshot.status}
+                  </Badge>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Salvo em {new Date(latestSnapshot.created_at).toLocaleString('pt-BR')}
+                </div>
+                <div className="text-xs">
+                  Famílias exigidas: {(latestSnapshot.summary as any)?.required_families ?? 0}
+                  {' • '}
+                  Unidades estimadas: {(latestSnapshot.summary as any)?.total_required_units ?? 0}
+                  {' • '}
+                  Avisos: {Array.isArray(latestSnapshot.warnings) ? latestSnapshot.warnings.length : 0}
+                </div>
+                <div className="pt-1">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setDetailsSnapshot(latestSnapshot)}
+                  >
+                    <Eye className="h-3 w-3 mr-1" /> Ver detalhes
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* History */}
+          {snapshots.length > 0 && (
+            <Collapsible open={historyOpen} onOpenChange={setHistoryOpen}>
+              <CollapsibleTrigger asChild>
+                <button
+                  type="button"
+                  className="w-full flex items-center justify-between text-left text-sm py-1"
+                >
+                  <span className="font-medium">
+                    Histórico de snapshots ({snapshots.length})
+                  </span>
+                  {historyOpen ? (
+                    <ChevronDown className="h-4 w-4" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4" />
+                  )}
+                </button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="rounded-md border overflow-x-auto mt-2">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Versão</TableHead>
+                        <TableHead>Criado em</TableHead>
+                        <TableHead>Famílias</TableHead>
+                        <TableHead>Unidades</TableHead>
+                        <TableHead>Avisos</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Ações</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {snapshots.slice(0, 5).map((snap) => {
+                        const sum = snap.summary as any;
+                        return (
+                          <TableRow key={snap.id}>
+                            <TableCell className="font-medium">v{snap.snapshot_version}</TableCell>
+                            <TableCell className="text-xs">
+                              {new Date(snap.created_at).toLocaleString('pt-BR')}
+                            </TableCell>
+                            <TableCell>{sum?.required_families ?? 0}</TableCell>
+                            <TableCell>{sum?.total_required_units ?? 0}</TableCell>
+                            <TableCell>
+                              {Array.isArray(snap.warnings) ? snap.warnings.length : 0}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="text-xs">
+                                {snap.status === 'preview_snapshot' ? 'Preview' : snap.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setDetailsSnapshot(snap)}
+                              >
+                                <Eye className="h-3 w-3 mr-1" /> Ver payload
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          )}
+        </div>
+
         <Collapsible open={payloadOpen} onOpenChange={setPayloadOpen}>
           <div className="rounded-md border">
             <CollapsibleTrigger asChild>
@@ -269,6 +522,34 @@ export function ProposalInventoryDemandPreview({ proposal, proposalItems }: Prop
           </div>
         </Collapsible>
       </CardContent>
+
+      <ProposalInventoryDemandSnapshotDetails
+        open={!!detailsSnapshot}
+        onOpenChange={(o) => !o && setDetailsSnapshot(null)}
+        snapshot={detailsSnapshot}
+      />
+
+      <AlertDialog open={confirmIncomplete} onOpenChange={setConfirmIncomplete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Salvar snapshot mesmo assim?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Existem dados incompletos no preview. Deseja salvar o snapshot mesmo assim?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setConfirmIncomplete(false);
+                void doSaveSnapshot();
+              }}
+            >
+              Salvar snapshot
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }
