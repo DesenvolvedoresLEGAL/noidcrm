@@ -569,7 +569,6 @@ const App = () => (
                 }
               />
               <Route
-              <Route
                 path="/app/operations/inventory"
                 element={<Navigate to="/app/settings/eventrix-inventory" replace />}
               />
