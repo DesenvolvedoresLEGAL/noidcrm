@@ -1,50 +1,95 @@
-## Análise forense — o que quebrou
+# Sprint NOID-INV-CONNECT 0.1 — Reposicionar Inventário como Consulta Eventrix
 
-Rodei um probe HTTP em todas as 271 edge functions do projeto (POST em cada endpoint com `apikey` anônima). O resultado é o que está causando a cascata de erros:
+## Objetivo
+Tirar o Inventário da posição de módulo operacional do NOID e reposicioná-lo como camada de consulta/configuração comercial dentro de **Configurações > Propostas > Inventário Eventrix**. Nenhuma integração real, nenhuma exclusão de dados, nenhuma alteração destrutiva.
 
-- **253 funções retornam `404 NOT_FOUND_FUNCTION_BLOB`** — ou seja, o código está no repositório mas **não existe blob deployado** no runtime. Entre elas: `calculate-ote` (a do print), `orchestrate-proposal-financials`, todas as `report_*_v2`, todo o pacote Kairós, todas as `ai-*`, `send-*`, `track-*`, `report_forecast_v2`, `calculate-opportunity-scores`, `process-*-queue`, `notify-*`, `generate-*`, etc.
-- **18 funções respondem** (401 quando exigem JWT, ou 200/400 quando públicas). Entre elas as duas que redeployei manualmente na conversa anterior (`execute-workflow`, `process-pending-workflows`) e algumas antigas (`calculate-nrhs`, `get-current-user`, `track-proposal-view`, `analyze-proposal-behavior`, `send-smtp-email`…).
+---
 
-### Por que o print mostra "CORS blocked" em vez de "404"
-O browser dispara um preflight `OPTIONS` para `calculate-ote`. Como a função não existe no runtime, o gateway devolve **404 sem headers CORS**. O Chrome não vê `Access-Control-Allow-Origin` na resposta do preflight e reporta o erro como "CORS policy: Response to preflight request doesn't pass access control check". A mensagem é enganosa — **a causa real é 404, não CORS**. O mesmo padrão se aplica a todas as outras telas (OTE, Forecast, Relatórios V2, Kairós, IA, notificações, PDF, etc.).
+## 1. Investigação prévia (antes de codar)
 
-### Causa raiz
-O auto-deploy do Lovable Cloud dispara função-a-função a cada edit. Quando várias funções são editadas em rajada (foi o caso nas últimas sessões: `analyze-proposal-behavior`, `calculate-nrhs`, `track-proposal-view`, `execute-workflow`, `process-pending-workflows`, e muitas outras), alguns deploys entram em fila e falham silenciosamente — o blob antigo é invalidado antes do novo subir. Como só os 2 que redeployei manualmente na sessão anterior voltaram, e os que **não foram tocados há tempos** também estão em 404, a conclusão é que houve uma **invalidação em massa dos blobs** (provavelmente após um evento de manutenção/rotação do runtime). Não é bug do código — é estado de deploy.
+Preciso mapear com precisão para não quebrar nada:
 
-## Plano de reparo
+- `src/components/Layout.tsx` / sidebar → onde está o item **Operações > Inventário**
+- `src/App.tsx` / router → rota `/app/operations/inventory`
+- `src/pages/operations/Inventory.tsx` → página atual (já vista)
+- Estrutura de **Configurações > Propostas** (procurar `settings/proposals` em `src/pages`)
+- Produto: bloco **Composição técnica (BOM)** — procurar `BOM` / `product-bom` no código
+- `src/hooks/usePermissions.ts` → roles disponíveis (`operations`, `commercial_manager`, etc.)
 
-### 1. Redeploy em lote das 253 funções faltantes
-Usar `supabase--deploy_edge_functions` em batches de ~20 nomes (limite prático do tool). Ordem por criticidade para o CRM voltar a operar rápido:
+Ferramentas: `rg` em paralelo antes de qualquer edit.
 
-1. **Bloco A — OTE / Comissão / Forecast** (desbloqueia o print): `calculate-ote`, `orchestrate-proposal-financials`, `calculate-opportunity-scores`, `calculate-opportunity-indicators`, `calculate-account-scores`, `calculate-health-drivers`, `calculate-explainable-probability`, `calculate-plg-score`, `calculate-revenue-impact`, `create-forecast-daily-snapshots`, `generate-forecast-prediction`, `record-forecast-outcome`, `ml-win-probability`, `process-nrhs-queue`, `process-opportunity-indicators-queue`, `process-opportunity-score-queue`, `process-lead-score-queue`.
-2. **Bloco B — Relatórios V2**: todas as `report_*_v2` (16 funções) + `report-qualification-quality-v2`.
-3. **Bloco C — Propostas / Pricing / PDF / Aceite**: `generate-pdf-export`, `generate-proposal-pdf`, `regenerate-proposal-pdfs`, `send-proposal-email`, `check-proposal-expiration`, `check-proposal-pricing-tier-transition`, `auto-refresh-dynamic-pricing-proposals`, `handle-proposal-decline`, `post-acceptance-effects`, `generate-acceptance-proof`, `ai-analyze-proposal`, `ai-proposal-suggestions`, `ai-generate-proposal-intro`, `og-proposal-meta`.
-4. **Bloco D — IA / Coaching / Sugestões**: todas as `ai-*` restantes (~30), `accept-ai-suggestion`, `auto-apply-ai-suggestions`, `execute-ai-action`, `apply-recommendation`, `generate-recommendations`, `sales-coach-notifications`, `ai-loss-semantic-analyzer`.
-5. **Bloco E — Notificações / Email / Push**: `notify-approval-request`, `notify-client-reply`, `notify-deal-won`, `process-notification-fallback`, `track-notification-click`, `send-daily-digest-email`, `send-browser-push`, `send-user-invitation`, `send-kairos-initial-email`, `send-smtp-email-internal`, `test-smtp-connection`, `test-slack`, `ingest-email-delivery-event`, `sync-emails`, `sync-email-replies`, `cron-index-emails`, `index-email-knowledge`, `search-email-knowledge`, `process-email-queue`, `compute-email-cadence-eligibility`, `advance-email-cadence-progress`, `run-email-agent-cadence-scheduler`, `execute-email-agent-run`, `approve-email-agent-action`, `reject-email-agent-action`, `enqueue-email-agent-triggers`, `aggregate-email-agent-metrics`, `track-email-open`, `track-email-click`.
-6. **Bloco F — Kairós / Sourcing / Enriquecimento**: todas as `kairos-*` (~17), `lead-sourcing`, `run-enrichment`, `enrich-prospect-identity`, `rescore-prospects`, `preview-apollo-enrichment`, `apollo-phone-webhook`, `backfill-decision-makers`, `refresh-segment-benchmarks`.
-7. **Bloco G — Admin / Auth / API pública / Onboarding / Trial / ERP**: `admin-cleanup-data`, `admin-reset-password`, `bulk-create-users`, `delete-user-with-transfer`, `accept-invitation`, `check-org-slug`, `onboarding-complete`, `check-trial-eligibility`, `expire-trials`, `send-trial-alerts`, `trial-expired-automation`, `trial-lifecycle-events`, `provision-client-organization`, `link-slg-organization`, `api-accounts`, `api-deals`, `api-products`, `api-keys-manage`, `get-public-form`, `submit-public-form`, `ingest-lead`, `ingest-landing-lead`, `get-public-loss-reasons`, `get-public-win-reasons`, `erp-create-charge`, `erp-payment-webhook`, `erp-sync-charge-status`, `sync-account-from-erp`, `import-products`, `export-products`, `execute-import`, `validate-import-data`, `backfill-accounts-segmento`, `abacatepay-checkout`, `abacatepay-webhook`.
-8. **Bloco H — Restante** (release notes, gamification, agentes, experimentos, misc): todas as ~40 funções remanescentes da lista de 253.
+## 2. Remoção do menu (não-destrutiva)
 
-### 2. Validação pós-deploy
-Depois de cada bloco, rodar novamente o probe HTTP nas funções do bloco. Só passar ao próximo bloco quando **0 respostas 404** no bloco anterior. Log final: quantas voltaram, quais (se alguma) falharam no deploy e o motivo do log.
+- Remover/comentar o item **Operações > Inventário** do menu lateral.
+- Manter os arquivos de página e componentes existentes intactos (podem servir de fallback futuro).
 
-### 3. Testes funcionais dirigidos
-- `calculate-ote` invocado com `periodMonth=2026-07` (usuário do print) → confirmar que a tela "Relatório OTE" calcula sem "Erro ao calcular OTE".
-- `report_forecast_v2` / `report_summary_v2` → validar Dashboard e Forecast.
-- `orchestrate-proposal-financials` → abrir uma proposta e confirmar recomputação de totais.
-- `notify-approval-request` → aprovar uma ação sensível e verificar Slack + inbox.
+## 3. Rota antiga `/app/operations/inventory`
 
-### 4. Prevenção
-- Documentar no `mem://` que **auto-deploy em rajada pode falhar silenciosamente** e que qualquer edição em lote de edge functions deve terminar com um probe HTTP + `deploy_edge_functions` nas que retornam 404.
-- Nada de mudança de código de aplicação neste ciclo — o problema é exclusivamente estado de deploy do runtime.
+- Substituir o componente da rota por um `<Navigate>` (redirect) para a nova rota de Configurações > Propostas > Inventário Eventrix.
+- Manter os componentes internos (`InventoryItemsTab`, `InventoryCategoriesTab`, etc.) no repo mas não renderizados.
 
-## Detalhes técnicos (para referência)
+## 4. Nova página `Inventário conectado ao Eventrix`
 
-- Probe usado: `curl -X POST https://<ref>.supabase.co/functions/v1/<name>` com `apikey` anônima. Códigos esperados quando saudável: `401` (verify_jwt=true), `400` (valida body), `200`. Código sintoma: `404 NOT_FOUND_FUNCTION_BLOB`.
-- O erro "CORS preflight" no browser é **efeito colateral do 404**, não bug de headers. Todas as funções afetadas já têm CORS correto no código; elas só não estão rodando.
-- `supabase/config.toml` está íntegro (nenhum `verify_jwt` inconsistente entre funções); não precisa ser editado.
-- Nenhuma migração de banco ou mudança em código frontend faz parte deste reparo.
+Local: dentro do padrão atual de **Configurações > Propostas** (aba nova ou sub-rota; decidir após investigar a estrutura existente).
 
-## Risco / rollback
-- Redeploy é idempotente. Se um bloco falhar, o estado anterior (404) permanece — nenhum dado é tocado. Nenhum risco em RLS, tenant isolation ou dados.
-- Duração estimada: 8 blocos × ~30s cada = ~4-5 min de deploy total.
+Rota alvo: `/app/settings/proposals/eventrix-inventory` (ou aba `?tab=eventrix-inventory`, o que casar com o padrão).
+
+Conteúdo (todos read-only, sem chamadas de rede):
+
+1. **Header** — Título "Inventário conectado ao Eventrix", subtítulo explicativo, badge "Eventrix master".
+2. **Status da integração** — Card "Aguardando conexão com Eventrix", badge "Em preparação".
+3. **Responsabilidades dos sistemas** — Tabela Eventrix / NOID CRM / ERP.
+4. **Dados consumidos do Eventrix** — Cards: Categorias, Famílias, Disponibilidade, Ocupação, Alertas comerciais (com badges "Futuro sync" / "Futura API").
+5. **Composição de Inventário dos Produtos** — Explicação + tabela exemplo (LEGAL Core Indoor etc.).
+6. **Fator de demanda por ocupação** — Tabela de faixas (<50%, 50-75%, 76-90%, >90%).
+7. **Fluxo futuro na proposta** — Lista numerada 1-6.
+8. **Endpoints planejados** — Lista com badge "Planejado" em cada.
+
+Componentização: uma página `EventrixInventorySettings.tsx` com sub-componentes/cards internos. Usar `SettingCard`, `PageContainer`, `PageHeader` já existentes.
+
+## 5. Permissões
+
+Reutilizar `SettingsGate` ou `usePermissions` seguindo padrão de Configurações > Propostas:
+- **Full**: owner, admin, operations
+- **Read-only** (se o padrão de Configurações > Propostas já permitir): commercial_manager, sales_manager
+- **Bloqueado**: seller, sdr, viewer, finance
+
+## 6. Renomear BOM → "Composição de Inventário"
+
+- Procurar componentes/telas de produto que renderizam "Composição técnica (BOM)" ou "BOM".
+- Trocar labels visíveis por **Composição de Inventário**.
+- Atualizar subtexto conforme o brief.
+- Substituir texto "Reserva total = pontos x quantidade aqui" (se existir) pelo novo texto.
+- Manter nomes técnicos internos (`product_bom_items`, `product-bom.ts`) — nenhuma mudança de schema.
+- Badge auxiliar "Fonte futura: Eventrix" nos selects de categoria/família se aplicável.
+
+## 7. NÃO fazer
+
+- Nenhuma migração SQL.
+- Nenhuma edge function.
+- Nenhum drop de tabela ou dado.
+- Nenhuma chamada de API externa.
+- Nenhuma alteração em Dashboard, Pipeline, Propostas, tabela dinâmica.
+
+## 8. Verificação
+
+- Confirmar que sidebar não mostra mais Operações > Inventário.
+- Navegar `/app/operations/inventory` → redireciona para nova área.
+- Nova área carrega sem erros de rede.
+- Produto abre e salva normalmente; rótulo BOM sumiu do título principal.
+- `tsgo` limpo.
+
+## Riscos
+
+- **Baixo**: mudanças são só de UI/rotas/labels; não toca banco.
+- **Atenção**: preciso confirmar o padrão de Configurações > Propostas antes de escolher entre "aba" vs "sub-rota" para não destoar do resto do app.
+
+## Arquivos que provavelmente serão tocados
+
+- Sidebar/menu do Layout (1 arquivo)
+- `src/App.tsx` (rota antiga vira redirect)
+- Nova página `src/pages/settings/proposals/EventrixInventorySettings.tsx` + sub-componentes
+- Página/rota de Configurações > Propostas (adicionar entrada de navegação)
+- Componentes de Produto (renomear BOM → Composição de Inventário)
+
+Nenhum dos arquivos de `src/pages/operations/Inventory.tsx`, `InventoryItemsTab.tsx` etc. será apagado.
