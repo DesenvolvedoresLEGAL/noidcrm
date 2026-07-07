@@ -15,6 +15,7 @@ import { ProposalContextCards } from '@/components/proposals/ProposalContextCard
 import { ProposalVisualizarTab } from '@/components/proposals/ProposalVisualizarTab';
 import { ProposalParticipantsManager } from '@/components/proposals/ProposalParticipantsManager';
 import { ProposalInventoryPanel } from '@/components/proposals/ProposalInventoryPanel';
+import { ProposalInventoryDemandPreview } from '@/components/proposals/ProposalInventoryDemandPreview';
 import { ProposalDynamicPricingPanel } from '@/components/proposals/ProposalDynamicPricingPanel';
 import { ProposalPricingBreakdown } from '@/components/proposals/ProposalPricingBreakdown';
 import { ProposalPricingDivergenceAlert } from '@/components/proposals/ProposalPricingDivergenceAlert';
@@ -1322,6 +1323,18 @@ export default function ProposalEditor() {
                   paymentDiscountPercent={paymentDiscountPercent}
                 />
                 <ProposalInventoryPanel proposalId={currentProposalId} />
+                <ProposalInventoryDemandPreview
+                  proposal={{
+                    id: currentProposalId,
+                    organization_id: (proposalData as any)?.organization_id ?? null,
+                    opportunity_id: (proposalData as any)?.opportunity_id ?? null,
+                    customer_id: (proposalData as any)?.customer_id ?? (proposalData as any)?.account_id ?? null,
+                    title: (proposalData as any)?.title ?? null,
+                    event_start_date: (watch as any)('event_start_date') ?? (proposalData as any)?.event_start_date ?? null,
+                    event_end_date: (watch as any)('event_end_date') ?? (proposalData as any)?.event_end_date ?? null,
+                  }}
+                  proposalItems={items as any}
+                />
               </TabsContent>
 
               <TabsContent value="payment-terms" className="space-y-4">
