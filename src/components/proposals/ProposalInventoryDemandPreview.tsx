@@ -65,9 +65,44 @@ interface Props {
 }
 
 export function ProposalInventoryDemandPreview({ proposal, proposalItems }: Props) {
-  const { preview, loading } = useProposalInventoryDemandPreview(proposal, proposalItems);
+  const { preview, loading, productRequirements } = useProposalInventoryDemandPreview(
+    proposal,
+    proposalItems,
+  );
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [payloadOpen, setPayloadOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [detailsSnapshot, setDetailsSnapshot] = useState<ProposalInventoryDemandSnapshot | null>(null);
+  const [confirmIncomplete, setConfirmIncomplete] = useState(false);
+
+  const proposalId = proposal?.id ?? null;
+  const snapshotsQuery = useProposalInventoryDemandSnapshots(proposalId);
+  const createSnapshot = useCreateProposalInventoryDemandSnapshot();
+
+  const snapshots = snapshotsQuery.data ?? [];
+  const latestSnapshot = snapshots[0] ?? null;
+
+  const comparison = useMemo(
+    () => comparePreviewToSnapshot(preview, latestSnapshot),
+    [preview, latestSnapshot],
+  );
+
+  const hasIncompleteOnly =
+    preview.lines.length > 0 &&
+    preview.lines.every((l) => l.status === 'incomplete' || l.status === 'manual');
+
+  const canSaveSnapshot =
+    !!proposalId &&
+    (preview.status === 'ready' || preview.status === 'incomplete') &&
+    preview.lines.length > 0;
+
+  const disabledReason = !proposalId
+    ? 'Salve a proposta antes de gerar um snapshot.'
+    : !proposalItems || proposalItems.length === 0
+    ? 'Adicione produtos à proposta antes de salvar um snapshot.'
+    : preview.lines.length === 0
+    ? 'Não há demanda operacional para salvar.'
+    : null;
 
   const toggle = (key: string) => {
     setExpanded((prev) => {
@@ -77,6 +112,40 @@ export function ProposalInventoryDemandPreview({ proposal, proposalItems }: Prop
       return next;
     });
   };
+
+  const doSaveSnapshot = async () => {
+    if (!proposalId) return;
+    try {
+      await createSnapshot.mutateAsync({
+        proposal_id: proposalId,
+        summary: buildSnapshotSummary(preview),
+        payload: preview.payload as any,
+        lines: preview.lines as any,
+        warnings: preview.warnings as any,
+        commercial_context: preview.payload.commercial_context as any,
+        source_products: buildSourceProducts(preview, proposalItems) as any,
+        source_requirements: buildSourceRequirements(preview, productRequirements) as any,
+        hash: computePreviewHash(preview),
+      });
+      toast({ title: 'Snapshot de demanda operacional salvo.' });
+    } catch (err: any) {
+      toast({
+        title: 'Não foi possível salvar o snapshot.',
+        description: err?.message,
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleSaveClick = () => {
+    if (!canSaveSnapshot) return;
+    if (hasIncompleteOnly || preview.lines.some((l) => l.status === 'incomplete')) {
+      setConfirmIncomplete(true);
+      return;
+    }
+    void doSaveSnapshot();
+  };
+
 
   const header = (
     <CardHeader>
