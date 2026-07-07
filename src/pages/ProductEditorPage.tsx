@@ -223,7 +223,7 @@ export default function ProductEditorPage() {
         } catch (err) {
           toast({
             variant: 'destructive',
-            title: 'Produto salvo, mas BOM falhou',
+            title: 'Produto salvo, mas Composição de Inventário falhou',
             description: (err as Error).message,
           });
         }
