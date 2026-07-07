@@ -6,7 +6,7 @@ import {
   Target, Database, FileText, Bot, Zap, Package, Layers, Settings,
   Activity, Link2, Sparkles, Crown, FileCheck, PartyPopper,
   TrendingUp, Hash, BarChart3, Download, FileSignature, Palette,
-  XCircle, Trophy, Folder, Trash2, Key, Tag as TagIcon
+  XCircle, Trophy, Folder, Trash2, Key, Tag as TagIcon, Boxes
 } from 'lucide-react';
 import { SettingsHeader } from '@/components/settings/SettingsHeader';
 import { SettingsSearch } from '@/components/settings/SettingsSearch';
