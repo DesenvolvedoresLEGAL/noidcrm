@@ -217,18 +217,10 @@ export default function ProductEditorPage() {
         saved = await createProduct(payload);
       }
 
-      // Persist BOM only for point_day products
-      if (data.billing_type === 'point_day' && organization?.id && saved?.id) {
-        try {
-          await replaceProductBomItems(organization.id, saved.id, bomItems);
-        } catch (err) {
-          toast({
-            variant: 'destructive',
-            title: 'Produto salvo, mas Composição de Inventário falhou',
-            description: (err as Error).message,
-          });
-        }
-      }
+      // Legacy BOM auto-persist removed. Composição de Inventário agora é
+      // gerenciada pelo ProductInventoryRequirementsEditor (Eventrix), que
+      // persiste diretamente em product_inventory_requirements. Dados antigos
+      // em product_bom_items são preservados e não são reescritos aqui.
       return saved;
     },
     onSuccess: (saved) => {
