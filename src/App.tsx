@@ -569,14 +569,13 @@ const App = () => (
                 }
               />
               <Route
+              <Route
                 path="/app/operations/inventory"
-                element={
-                  <ProtectedRoute>
-                    <LazyRoute>
-                      <Inventory />
-                    </LazyRoute>
-                  </ProtectedRoute>
-                }
+                element={<Navigate to="/app/settings/eventrix-inventory" replace />}
+              />
+              <Route
+                path="/app/operations/inventory/*"
+                element={<Navigate to="/app/settings/eventrix-inventory" replace />}
               />
               <Route
                 path="/app/forecast"
