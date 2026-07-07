@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,16 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Boxes,
@@ -23,6 +33,8 @@ import {
   Copy,
   Info,
   AlertTriangle,
+  Camera,
+  Eye,
 } from 'lucide-react';
 import { useProposalInventoryDemandPreview } from '@/hooks/proposals/useProposalInventoryDemandPreview';
 import {
@@ -31,7 +43,21 @@ import {
   type ProposalInventoryDemandInputItem,
   type ProposalInventoryDemandInputProposal,
 } from '@/lib/proposals/inventoryDemandPreview';
+import {
+  useProposalInventoryDemandSnapshots,
+  useCreateProposalInventoryDemandSnapshot,
+} from '@/hooks/proposals/useProposalInventoryDemandSnapshots';
+import {
+  buildSnapshotSummary,
+  buildSourceProducts,
+  buildSourceRequirements,
+  comparePreviewToSnapshot,
+  computePreviewHash,
+} from '@/lib/proposals/inventoryDemandSnapshot';
+import { ProposalInventoryDemandSnapshotDetails } from './ProposalInventoryDemandSnapshotDetails';
+import type { ProposalInventoryDemandSnapshot } from '@/schemas/proposalInventoryDemandSnapshot';
 import { toast } from '@/hooks/use-toast';
+
 
 interface Props {
   proposal: ProposalInventoryDemandInputProposal | null | undefined;
