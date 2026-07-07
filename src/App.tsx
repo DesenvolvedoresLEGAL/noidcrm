@@ -61,7 +61,8 @@ const AccountEditor = lazy(() => import("./pages/AccountEditor"));
 const OpportunityDetail = lazy(() => import("./pages/OpportunityDetail"));
 const Contacts = lazy(() => import("./pages/Contacts"));
 const Contracts = lazy(() => import("./pages/Contracts"));
-const Inventory = lazy(() => import("./pages/operations/Inventory"));
+// Inventory operacional removido do menu — reposicionado em Configurações > Propostas > Inventário Eventrix (Sprint NOID-INV-CONNECT 0.1)
+// const Inventory = lazy(() => import("./pages/operations/Inventory"));
 const Sequences = lazy(() => import("./pages/Sequences"));
 const Reports = lazy(() => import("./pages/Reports"));
 const Settings = lazy(() => import("./pages/Settings"));
@@ -118,6 +119,7 @@ const Origins = lazy(() => import("./pages/settings/Origins"));
 const WinLossReasons = lazy(() => import("./pages/settings/WinLossReasons"));
 const ProposalLayouts = lazy(() => import("./pages/settings/ProposalLayouts"));
 const ProposalSettings = lazy(() => import("./pages/settings/ProposalSettings"));
+const EventrixInventorySettings = lazy(() => import("./pages/settings/EventrixInventorySettings"));
 const ProposalTemplateEditor = lazy(() => import("./pages/settings/ProposalTemplateEditor"));
 const ReleaseNotes = lazy(() => import("./pages/ReleaseNotes"));
 const NotificationsHistory = lazy(() => import("./pages/NotificationsHistory"));
@@ -570,13 +572,11 @@ const App = () => (
               />
               <Route
                 path="/app/operations/inventory"
-                element={
-                  <ProtectedRoute>
-                    <LazyRoute>
-                      <Inventory />
-                    </LazyRoute>
-                  </ProtectedRoute>
-                }
+                element={<Navigate to="/app/settings/eventrix-inventory" replace />}
+              />
+              <Route
+                path="/app/operations/inventory/*"
+                element={<Navigate to="/app/settings/eventrix-inventory" replace />}
               />
               <Route
                 path="/app/forecast"
@@ -916,6 +916,7 @@ const App = () => (
                 <Route path="/app/settings/loss-reasons" element={<WinLossReasons />} />
                 <Route path="/app/settings/proposal-layouts" element={<ProposalLayouts />} />
                 <Route path="/app/settings/proposal-settings" element={<ProposalSettings />} />
+                <Route path="/app/settings/eventrix-inventory" element={<EventrixInventorySettings />} />
                 <Route path="/app/settings/proposal-templates" element={<ProposalLayouts />} />
                 <Route path="/app/settings/proposal-templates/new" element={<ProposalTemplateEditor />} />
                 <Route path="/app/settings/proposal-templates/:id/edit" element={<ProposalTemplateEditor />} />
