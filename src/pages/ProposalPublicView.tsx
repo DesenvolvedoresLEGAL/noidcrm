@@ -1543,7 +1543,55 @@ export default function ProposalPublicView() {
                               </tr>
                             </>
                           )}
-                          {showDpBreakdown ? (
+                          {ledgerFooterActive ? (
+                            <>
+                              <tr className="bg-muted/30">
+                                <td colSpan={3} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm text-muted-foreground sm:hidden">Subtotal dos Itens</td>
+                                <td colSpan={colSpanLabel} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm text-muted-foreground hidden sm:table-cell">Subtotal dos Itens</td>
+                                <td className="text-right py-2 px-2 md:py-3 md:px-4 text-sm">{formatCurrency(pricingSummary!.subtotalItems)}</td>
+                              </tr>
+                              {pricingSummary!.manualDiscount.amount > 0 && (
+                                <tr className="bg-red-50/60 dark:bg-red-950/20">
+                                  <td colSpan={3} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm font-medium text-red-600 sm:hidden">
+                                    Desconto manual{pricingSummary!.manualDiscount.percent ? ` (${pricingSummary!.manualDiscount.percent}%)` : ''}
+                                  </td>
+                                  <td colSpan={colSpanLabel} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm font-medium text-red-600 hidden sm:table-cell">
+                                    Desconto manual{pricingSummary!.manualDiscount.percent ? ` (${pricingSummary!.manualDiscount.percent}%)` : ''}
+                                  </td>
+                                  <td className="text-right py-2 px-2 md:py-3 md:px-4 text-sm font-medium text-red-600">
+                                    - {formatCurrency(pricingSummary!.manualDiscount.amount)}
+                                  </td>
+                                </tr>
+                              )}
+                              {pricingSummary!.manualDiscount.amount > 0 && pricingSummary!.dynamicAdjustment.amount !== 0 && (
+                                <tr className="bg-muted/20">
+                                  <td colSpan={3} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm text-muted-foreground sm:hidden">Base comercial</td>
+                                  <td colSpan={colSpanLabel} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm text-muted-foreground hidden sm:table-cell">Base comercial</td>
+                                  <td className="text-right py-2 px-2 md:py-3 md:px-4 text-sm">{formatCurrency(pricingSummary!.baseAmount)}</td>
+                                </tr>
+                              )}
+                              {pricingSummary!.dynamicAdjustment.amount !== 0 && (
+                                <tr className="bg-amber-50/60 dark:bg-amber-950/20">
+                                  <td colSpan={3} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm font-medium text-amber-700 dark:text-amber-300 sm:hidden">
+                                    Ajuste por antecedência ({pricingSummary!.dynamicAdjustment.percent >= 0 ? '+' : ''}{pricingSummary!.dynamicAdjustment.percent}%)
+                                  </td>
+                                  <td colSpan={colSpanLabel} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm font-medium text-amber-700 dark:text-amber-300 hidden sm:table-cell">
+                                    Ajuste por antecedência ({pricingSummary!.dynamicAdjustment.percent >= 0 ? '+' : ''}{pricingSummary!.dynamicAdjustment.percent}%)
+                                  </td>
+                                  <td className="text-right py-2 px-2 md:py-3 md:px-4 text-sm font-medium text-amber-700 dark:text-amber-300">
+                                    {pricingSummary!.dynamicAdjustment.amount >= 0 ? '+ ' : '- '}{formatCurrency(Math.abs(pricingSummary!.dynamicAdjustment.amount))}
+                                  </td>
+                                </tr>
+                              )}
+                              <tr className="bg-amber-50 dark:bg-amber-950/30 border-t-2 border-amber-300 dark:border-amber-700">
+                                <td colSpan={3} className="text-right py-3 px-2 md:py-4 md:px-4 font-bold text-sm md:text-base sm:hidden">Total Vigente Hoje</td>
+                                <td colSpan={colSpanLabel} className="text-right py-3 px-2 md:py-4 md:px-4 font-bold text-sm md:text-base hidden sm:table-cell">Total Vigente Hoje</td>
+                                <td className="text-right py-3 px-2 md:py-4 md:px-4 font-bold text-base md:text-lg text-amber-700 dark:text-amber-300">
+                                  {formatCurrency(ledgerOneTimeEffective)}
+                                </td>
+                              </tr>
+                            </>
+                          ) : showDpBreakdown ? (
                             <>
                               <tr className="bg-muted/30">
                                 <td colSpan={3} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm text-muted-foreground sm:hidden">Subtotal dos Itens</td>
@@ -1579,14 +1627,22 @@ export default function ProposalPublicView() {
                         </tfoot>
                       </table>
                     </div>
-                    {showDpBreakdown && (dpBreakdown.endsAt || dpBreakdown.nextAmount != null) && (
+                    {(showDpBreakdown || ledgerFooterActive) && (dpBreakdown.endsAt || dpBreakdown.nextAmount != null) && (
                       <p className="mt-3 text-xs text-muted-foreground leading-relaxed">
                         {dpBreakdown.endsAt && (
                           <>Condição vigente até <span className="font-medium text-foreground">{formatDpDateTime(dpBreakdown.endsAt)}</span>. </>
                         )}
-                        {dpBreakdown.nextAmount != null && dpBreakdown.nextStartsAt && (
-                          <>A partir de <span className="font-medium text-foreground">{formatDpDateTime(dpBreakdown.nextStartsAt)}</span>, novo valor: <span className="font-semibold text-amber-700 dark:text-amber-300">{formatCurrency(dpBreakdown.nextAmount)}</span>.</>
-                        )}
+                        {dpBreakdown.nextAmount != null && dpBreakdown.nextStartsAt && (() => {
+                          // Aplica o mesmo % de desconto manual ao "novo valor" para
+                          // manter consistência com o header/ledger quando o cliente
+                          // já tem desconto negociado.
+                          const nextDiscounted = ledgerManualDiscountPct > 0
+                            ? dpBreakdown.nextAmount * (1 - ledgerManualDiscountPct / 100)
+                            : dpBreakdown.nextAmount;
+                          return (
+                            <>A partir de <span className="font-medium text-foreground">{formatDpDateTime(dpBreakdown.nextStartsAt)}</span>, novo valor: <span className="font-semibold text-amber-700 dark:text-amber-300">{formatCurrency(nextDiscounted)}</span>.</>
+                          );
+                        })()}
                       </p>
                     )}
                   </CardContent>
