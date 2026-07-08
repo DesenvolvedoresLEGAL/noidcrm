@@ -1040,10 +1040,21 @@ export default function ProposalPublicView() {
   
   // CRITICAL: Use oneTimeTotal for installments, not totalAmount (which includes MRR items)
   // PRICE UX 1.0.3 — usar approved_amount quando proposta já foi aprovada (congela o split)
+  //
+  // PRICE CORE 2.0 — quando o ledger está disponível e a proposta ainda não
+  // foi aprovada, usamos `oneTimeNetFromLedger` (valor já líquido de desconto
+  // manual + ajuste dinâmico) como base do cronograma E como `approvedAmount`
+  // do options, para que `calculateInstallments` NÃO reaplique o
+  // `discount_percent` sobre uma base que já foi descontada. Sem isso o total
+  // do cronograma diverge do "Valor vigente" mostrado no header/ledger.
+  const ledgerOneTimeNet =
+    pricingSummary && oneTimeNetFromLedger != null
+      ? Number(Number(oneTimeNetFromLedger).toFixed(2))
+      : null;
   const baseForSchedule =
     proposal?.status === 'accepted' && proposal?.approved_amount != null
       ? Number(proposal.approved_amount)
-      : effectiveOneTimeBase;
+      : ledgerOneTimeNet ?? effectiveOneTimeBase;
   // FREEZE-ON-APPROVAL: quando a proposta está aprovada, o cronograma exibido
   // ao cliente DEVE vir do snapshot congelado em `approved_payment_schedule`.
   // Edições posteriores em `proposal_payment_terms` ou nos tiers dinâmicos
@@ -1054,7 +1065,10 @@ export default function ProposalPublicView() {
     : oneTimeTerm
       ? calculateInstallments(oneTimeTerm, baseForSchedule, {
           proposalExpiresAt: proposal?.expires_at ?? null,
-          approvedAmount: proposal?.status === 'accepted' ? Number(proposal?.approved_amount ?? effectiveOneTimeAmount) : null,
+          approvedAmount:
+            proposal?.status === 'accepted'
+              ? Number(proposal?.approved_amount ?? effectiveOneTimeAmount)
+              : ledgerOneTimeNet,
           dynamicPricingCurrentEndsAt: dynamicPricingEndForInstallments(
             proposal,
             oneTimeTerm,
@@ -1315,25 +1329,56 @@ export default function ProposalPublicView() {
                 Criada em {formatDateBR(proposal.created_at)}
               </p>
               <div className="pt-2 border-t space-y-1">
-                {(paymentDiscountAmount > 0) && (
-                  <>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">
-                        {dynamicAdjustment !== 0 ? 'Subtotal vigente:' : 'Subtotal:'}
-                      </span>
-                      <span>{formatCurrency(effectiveOneTimeBase + recurringContractTotal)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm text-red-600">
-                      <span>
-                        Desconto{pricingSummary?.manualDiscount.percent
-                          ? ` (${pricingSummary.manualDiscount.percent}%)`
-                          : paymentDiscountPercent > 0
-                          ? ` (${paymentDiscountPercent}%)`
-                          : ''}:
-                      </span>
-                      <span>- {formatCurrency(paymentDiscountAmount)}</span>
-                    </div>
-                  </>
+                {pricingSummary ? (
+                  (pricingSummary.manualDiscount.amount > 0 ||
+                    pricingSummary.dynamicAdjustment.amount !== 0) && (
+                    <>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Subtotal:</span>
+                        <span>{formatCurrency(pricingSummary.subtotalItems + recurringContractTotal)}</span>
+                      </div>
+                      {pricingSummary.manualDiscount.amount > 0 && (
+                        <div className="flex justify-between text-sm text-red-600">
+                          <span>
+                            Desconto{pricingSummary.manualDiscount.percent
+                              ? ` (${pricingSummary.manualDiscount.percent}%)`
+                              : ''}:
+                          </span>
+                          <span>- {formatCurrency(pricingSummary.manualDiscount.amount)}</span>
+                        </div>
+                      )}
+                      {pricingSummary.dynamicAdjustment.amount !== 0 && (
+                        <div className="flex justify-between text-sm text-amber-700 dark:text-amber-400">
+                          <span>
+                            Ajuste dinâmico{pricingSummary.dynamicAdjustment.percent
+                              ? ` (${pricingSummary.dynamicAdjustment.percent > 0 ? '+' : ''}${pricingSummary.dynamicAdjustment.percent}%)`
+                              : ''}:
+                          </span>
+                          <span>
+                            {pricingSummary.dynamicAdjustment.amount >= 0 ? '+ ' : '- '}
+                            {formatCurrency(Math.abs(pricingSummary.dynamicAdjustment.amount))}
+                          </span>
+                        </div>
+                      )}
+                    </>
+                  )
+                ) : (
+                  (paymentDiscountAmount > 0) && (
+                    <>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">
+                          {dynamicAdjustment !== 0 ? 'Subtotal vigente:' : 'Subtotal:'}
+                        </span>
+                        <span>{formatCurrency(effectiveOneTimeBase + recurringContractTotal)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm text-red-600">
+                        <span>
+                          Desconto{paymentDiscountPercent > 0 ? ` (${paymentDiscountPercent}%)` : ''}:
+                        </span>
+                        <span>- {formatCurrency(paymentDiscountAmount)}</span>
+                      </div>
+                    </>
+                  )
                 )}
                 <p className="text-2xl md:text-3xl font-bold text-primary">{formatCurrency(totalAmount)}</p>
               </div>
@@ -1376,6 +1421,19 @@ export default function ProposalPublicView() {
           const dpSnapItems: any = (proposal as any)?.dynamic_pricing_snapshot ?? null;
           const dpBreakdown = getDynamicPricingBreakdown(dpSnapItems, oneTimeTotal);
           const showDpBreakdown = dpBreakdown.active && dpBreakdown.hasAdjustment;
+          // PRICE CORE 2.0 — quando o ledger existe e há desconto manual ou
+          // ajuste dinâmico, o rodapé da tabela de itens deve exibir a mesma
+          // composição canônica do "Resumo Financeiro" (subtotal → desconto
+          // → base → ajuste → valor vigente) para não conflitar com o header.
+          const ledgerFooterActive = !!(
+            pricingSummary &&
+            (pricingSummary.manualDiscount.amount > 0 ||
+              pricingSummary.dynamicAdjustment.amount !== 0)
+          );
+          const ledgerManualDiscountPct = pricingSummary?.manualDiscount.percent ?? 0;
+          const ledgerOneTimeEffective = pricingSummary
+            ? pricingSummary.effectiveAmount - pricingSummary.recurringSubtotal
+            : 0;
           const colSpanLabel = hasItemDiscounts ? 5 : 4;
 
           return (
@@ -1485,7 +1543,55 @@ export default function ProposalPublicView() {
                               </tr>
                             </>
                           )}
-                          {showDpBreakdown ? (
+                          {ledgerFooterActive ? (
+                            <>
+                              <tr className="bg-muted/30">
+                                <td colSpan={3} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm text-muted-foreground sm:hidden">Subtotal dos Itens</td>
+                                <td colSpan={colSpanLabel} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm text-muted-foreground hidden sm:table-cell">Subtotal dos Itens</td>
+                                <td className="text-right py-2 px-2 md:py-3 md:px-4 text-sm">{formatCurrency(pricingSummary!.subtotalItems)}</td>
+                              </tr>
+                              {pricingSummary!.manualDiscount.amount > 0 && (
+                                <tr className="bg-red-50/60 dark:bg-red-950/20">
+                                  <td colSpan={3} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm font-medium text-red-600 sm:hidden">
+                                    Desconto manual{pricingSummary!.manualDiscount.percent ? ` (${pricingSummary!.manualDiscount.percent}%)` : ''}
+                                  </td>
+                                  <td colSpan={colSpanLabel} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm font-medium text-red-600 hidden sm:table-cell">
+                                    Desconto manual{pricingSummary!.manualDiscount.percent ? ` (${pricingSummary!.manualDiscount.percent}%)` : ''}
+                                  </td>
+                                  <td className="text-right py-2 px-2 md:py-3 md:px-4 text-sm font-medium text-red-600">
+                                    - {formatCurrency(pricingSummary!.manualDiscount.amount)}
+                                  </td>
+                                </tr>
+                              )}
+                              {pricingSummary!.manualDiscount.amount > 0 && pricingSummary!.dynamicAdjustment.amount !== 0 && (
+                                <tr className="bg-muted/20">
+                                  <td colSpan={3} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm text-muted-foreground sm:hidden">Base comercial</td>
+                                  <td colSpan={colSpanLabel} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm text-muted-foreground hidden sm:table-cell">Base comercial</td>
+                                  <td className="text-right py-2 px-2 md:py-3 md:px-4 text-sm">{formatCurrency(pricingSummary!.baseAmount)}</td>
+                                </tr>
+                              )}
+                              {pricingSummary!.dynamicAdjustment.amount !== 0 && (
+                                <tr className="bg-amber-50/60 dark:bg-amber-950/20">
+                                  <td colSpan={3} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm font-medium text-amber-700 dark:text-amber-300 sm:hidden">
+                                    Ajuste por antecedência ({pricingSummary!.dynamicAdjustment.percent >= 0 ? '+' : ''}{pricingSummary!.dynamicAdjustment.percent}%)
+                                  </td>
+                                  <td colSpan={colSpanLabel} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm font-medium text-amber-700 dark:text-amber-300 hidden sm:table-cell">
+                                    Ajuste por antecedência ({pricingSummary!.dynamicAdjustment.percent >= 0 ? '+' : ''}{pricingSummary!.dynamicAdjustment.percent}%)
+                                  </td>
+                                  <td className="text-right py-2 px-2 md:py-3 md:px-4 text-sm font-medium text-amber-700 dark:text-amber-300">
+                                    {pricingSummary!.dynamicAdjustment.amount >= 0 ? '+ ' : '- '}{formatCurrency(Math.abs(pricingSummary!.dynamicAdjustment.amount))}
+                                  </td>
+                                </tr>
+                              )}
+                              <tr className="bg-amber-50 dark:bg-amber-950/30 border-t-2 border-amber-300 dark:border-amber-700">
+                                <td colSpan={3} className="text-right py-3 px-2 md:py-4 md:px-4 font-bold text-sm md:text-base sm:hidden">Total Vigente Hoje</td>
+                                <td colSpan={colSpanLabel} className="text-right py-3 px-2 md:py-4 md:px-4 font-bold text-sm md:text-base hidden sm:table-cell">Total Vigente Hoje</td>
+                                <td className="text-right py-3 px-2 md:py-4 md:px-4 font-bold text-base md:text-lg text-amber-700 dark:text-amber-300">
+                                  {formatCurrency(ledgerOneTimeEffective)}
+                                </td>
+                              </tr>
+                            </>
+                          ) : showDpBreakdown ? (
                             <>
                               <tr className="bg-muted/30">
                                 <td colSpan={3} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm text-muted-foreground sm:hidden">Subtotal dos Itens</td>
@@ -1521,14 +1627,22 @@ export default function ProposalPublicView() {
                         </tfoot>
                       </table>
                     </div>
-                    {showDpBreakdown && (dpBreakdown.endsAt || dpBreakdown.nextAmount != null) && (
+                    {(showDpBreakdown || ledgerFooterActive) && (dpBreakdown.endsAt || dpBreakdown.nextAmount != null) && (
                       <p className="mt-3 text-xs text-muted-foreground leading-relaxed">
                         {dpBreakdown.endsAt && (
                           <>Condição vigente até <span className="font-medium text-foreground">{formatDpDateTime(dpBreakdown.endsAt)}</span>. </>
                         )}
-                        {dpBreakdown.nextAmount != null && dpBreakdown.nextStartsAt && (
-                          <>A partir de <span className="font-medium text-foreground">{formatDpDateTime(dpBreakdown.nextStartsAt)}</span>, novo valor: <span className="font-semibold text-amber-700 dark:text-amber-300">{formatCurrency(dpBreakdown.nextAmount)}</span>.</>
-                        )}
+                        {dpBreakdown.nextAmount != null && dpBreakdown.nextStartsAt && (() => {
+                          // Aplica o mesmo % de desconto manual ao "novo valor" para
+                          // manter consistência com o header/ledger quando o cliente
+                          // já tem desconto negociado.
+                          const nextDiscounted = ledgerManualDiscountPct > 0
+                            ? dpBreakdown.nextAmount * (1 - ledgerManualDiscountPct / 100)
+                            : dpBreakdown.nextAmount;
+                          return (
+                            <>A partir de <span className="font-medium text-foreground">{formatDpDateTime(dpBreakdown.nextStartsAt)}</span>, novo valor: <span className="font-semibold text-amber-700 dark:text-amber-300">{formatCurrency(nextDiscounted)}</span>.</>
+                          );
+                        })()}
                       </p>
                     )}
                   </CardContent>
@@ -1648,6 +1762,7 @@ export default function ProposalPublicView() {
             variant={isAccepted ? 'frozen' : 'public'}
             approvalSnapshot={isAccepted ? (proposal as any)?.approval_snapshot ?? null : null}
             acceptedAt={isAccepted ? (proposal as any)?.accepted_at ?? null : null}
+            manualDiscountPercent={pricingSummary?.manualDiscount.percent ?? 0}
           />
         )}
 

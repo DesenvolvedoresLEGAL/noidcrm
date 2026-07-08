@@ -16,6 +16,13 @@ interface Props {
   approvalSnapshot?: any | null;
   /** Data de aceite formatada (ISO) — usada apenas em variant='frozen'. */
   acceptedAt?: string | null;
+  /**
+   * PRICE CORE 2.0 — % de desconto manual aplicado à proposta. Quando > 0, os
+   * valores vigente / próxima virada / anterior mostrados neste banner são
+   * exibidos JÁ com o desconto aplicado, para não conflitar com o valor
+   * exibido no header e no "Resumo Financeiro".
+   */
+  manualDiscountPercent?: number;
 }
 
 const CLAUSE =
@@ -108,6 +115,7 @@ export function PublicProposalDynamicPricingBanner({
   variant = 'public',
   approvalSnapshot = null,
   acceptedAt = null,
+  manualDiscountPercent = 0,
 }: Props) {
   // FREEZE-ON-APPROVAL: após o aceite, renderizamos o snapshot congelado,
   // nunca o snapshot vivo (que pode ter mudado de tier).
@@ -130,6 +138,15 @@ export function PublicProposalDynamicPricingBanner({
   }
 
   if (!snapshot.current_amount) return null;
+
+  const discountFactor =
+    manualDiscountPercent > 0 ? 1 - manualDiscountPercent / 100 : 1;
+  const displayCurrent = Number(snapshot.current_amount) * discountFactor;
+  const displayNext =
+    snapshot.next_amount != null ? Number(snapshot.next_amount) * discountFactor : null;
+  const displayPrevious =
+    snapshot.previous_amount != null ? Number(snapshot.previous_amount) * discountFactor : null;
+  const hasDiscount = manualDiscountPercent > 0;
 
   return (
     <Card className="my-4 border-primary/40">
@@ -162,12 +179,13 @@ export function PublicProposalDynamicPricingBanner({
                 const base = (snapshot as any).base_amount;
                 const adjusted =
                   isAuto && base != null && Number(snapshot.current_amount) !== Number(base);
-                return adjusted
+                const label = adjusted
                   ? 'Valor vigente hoje, já com ajuste por antecedência'
                   : 'Valor vigente hoje';
+                return hasDiscount ? `${label} e desconto de ${manualDiscountPercent}%` : label;
               })()}
             </div>
-            <div className="text-2xl font-bold">{formatBRL(snapshot.current_amount)}</div>
+            <div className="text-2xl font-bold">{formatBRL(displayCurrent)}</div>
             {snapshot.current_ends_at && (
               <div className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
                 <Clock className="h-3 w-3" />
@@ -176,21 +194,21 @@ export function PublicProposalDynamicPricingBanner({
             )}
           </div>
 
-          {snapshot.next_amount != null && snapshot.next_starts_at && (
+          {displayNext != null && snapshot.next_starts_at && (
             <div>
               <div className="text-xs text-muted-foreground">Próxima atualização</div>
-              <div className="text-lg font-semibold">{formatBRL(snapshot.next_amount)}</div>
+              <div className="text-lg font-semibold">{formatBRL(displayNext)}</div>
               <div className="text-xs text-muted-foreground">
                 em {formatDateTime(snapshot.next_starts_at)}
               </div>
             </div>
           )}
 
-          {snapshot.previous_amount != null && (
+          {displayPrevious != null && (
             <div className="opacity-70">
               <div className="text-xs text-muted-foreground">Valor anterior expirado</div>
               <div className="text-sm font-medium line-through">
-                {formatBRL(snapshot.previous_amount)}
+                {formatBRL(displayPrevious)}
               </div>
               <div className="text-xs text-muted-foreground">
                 {snapshot.previous_label} —{' '}
