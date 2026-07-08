@@ -120,6 +120,7 @@ const WinLossReasons = lazy(() => import("./pages/settings/WinLossReasons"));
 const ProposalLayouts = lazy(() => import("./pages/settings/ProposalLayouts"));
 const ProposalSettings = lazy(() => import("./pages/settings/ProposalSettings"));
 const EventrixInventorySettings = lazy(() => import("./pages/settings/EventrixInventorySettings"));
+const NoidInventoryBackupPage = lazy(() => import("./pages/settings/NoidInventoryBackupPage"));
 const ProposalTemplateEditor = lazy(() => import("./pages/settings/ProposalTemplateEditor"));
 const ReleaseNotes = lazy(() => import("./pages/ReleaseNotes"));
 const NotificationsHistory = lazy(() => import("./pages/NotificationsHistory"));
@@ -917,6 +918,7 @@ const App = () => (
                 <Route path="/app/settings/proposal-layouts" element={<ProposalLayouts />} />
                 <Route path="/app/settings/proposal-settings" element={<ProposalSettings />} />
                 <Route path="/app/settings/eventrix-inventory" element={<EventrixInventorySettings />} />
+                <Route path="/app/settings/noid-inventory-backup" element={<NoidInventoryBackupPage />} />
                 <Route path="/app/settings/proposal-templates" element={<ProposalLayouts />} />
                 <Route path="/app/settings/proposal-templates/new" element={<ProposalTemplateEditor />} />
                 <Route path="/app/settings/proposal-templates/:id/edit" element={<ProposalTemplateEditor />} />
