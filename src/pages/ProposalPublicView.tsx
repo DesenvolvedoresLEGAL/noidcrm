@@ -1329,25 +1329,56 @@ export default function ProposalPublicView() {
                 Criada em {formatDateBR(proposal.created_at)}
               </p>
               <div className="pt-2 border-t space-y-1">
-                {(paymentDiscountAmount > 0) && (
-                  <>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">
-                        {dynamicAdjustment !== 0 ? 'Subtotal vigente:' : 'Subtotal:'}
-                      </span>
-                      <span>{formatCurrency(effectiveOneTimeBase + recurringContractTotal)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm text-red-600">
-                      <span>
-                        Desconto{pricingSummary?.manualDiscount.percent
-                          ? ` (${pricingSummary.manualDiscount.percent}%)`
-                          : paymentDiscountPercent > 0
-                          ? ` (${paymentDiscountPercent}%)`
-                          : ''}:
-                      </span>
-                      <span>- {formatCurrency(paymentDiscountAmount)}</span>
-                    </div>
-                  </>
+                {pricingSummary ? (
+                  (pricingSummary.manualDiscount.amount > 0 ||
+                    pricingSummary.dynamicAdjustment.amount !== 0) && (
+                    <>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Subtotal:</span>
+                        <span>{formatCurrency(pricingSummary.subtotalItems + recurringContractTotal)}</span>
+                      </div>
+                      {pricingSummary.manualDiscount.amount > 0 && (
+                        <div className="flex justify-between text-sm text-red-600">
+                          <span>
+                            Desconto{pricingSummary.manualDiscount.percent
+                              ? ` (${pricingSummary.manualDiscount.percent}%)`
+                              : ''}:
+                          </span>
+                          <span>- {formatCurrency(pricingSummary.manualDiscount.amount)}</span>
+                        </div>
+                      )}
+                      {pricingSummary.dynamicAdjustment.amount !== 0 && (
+                        <div className="flex justify-between text-sm text-amber-700 dark:text-amber-400">
+                          <span>
+                            Ajuste dinâmico{pricingSummary.dynamicAdjustment.percent
+                              ? ` (${pricingSummary.dynamicAdjustment.percent > 0 ? '+' : ''}${pricingSummary.dynamicAdjustment.percent}%)`
+                              : ''}:
+                          </span>
+                          <span>
+                            {pricingSummary.dynamicAdjustment.amount >= 0 ? '+ ' : '- '}
+                            {formatCurrency(Math.abs(pricingSummary.dynamicAdjustment.amount))}
+                          </span>
+                        </div>
+                      )}
+                    </>
+                  )
+                ) : (
+                  (paymentDiscountAmount > 0) && (
+                    <>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">
+                          {dynamicAdjustment !== 0 ? 'Subtotal vigente:' : 'Subtotal:'}
+                        </span>
+                        <span>{formatCurrency(effectiveOneTimeBase + recurringContractTotal)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm text-red-600">
+                        <span>
+                          Desconto{paymentDiscountPercent > 0 ? ` (${paymentDiscountPercent}%)` : ''}:
+                        </span>
+                        <span>- {formatCurrency(paymentDiscountAmount)}</span>
+                      </div>
+                    </>
+                  )
                 )}
                 <p className="text-2xl md:text-3xl font-bold text-primary">{formatCurrency(totalAmount)}</p>
               </div>
