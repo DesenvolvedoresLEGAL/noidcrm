@@ -1762,6 +1762,7 @@ export default function ProposalPublicView() {
             variant={isAccepted ? 'frozen' : 'public'}
             approvalSnapshot={isAccepted ? (proposal as any)?.approval_snapshot ?? null : null}
             acceptedAt={isAccepted ? (proposal as any)?.accepted_at ?? null : null}
+            manualDiscountPercent={pricingSummary?.manualDiscount.percent ?? 0}
           />
         )}
 
