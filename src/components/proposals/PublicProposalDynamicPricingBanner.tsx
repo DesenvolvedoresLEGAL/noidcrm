@@ -16,6 +16,13 @@ interface Props {
   approvalSnapshot?: any | null;
   /** Data de aceite formatada (ISO) — usada apenas em variant='frozen'. */
   acceptedAt?: string | null;
+  /**
+   * PRICE CORE 2.0 — % de desconto manual aplicado à proposta. Quando > 0, os
+   * valores vigente / próxima virada / anterior mostrados neste banner são
+   * exibidos JÁ com o desconto aplicado, para não conflitar com o valor
+   * exibido no header e no "Resumo Financeiro".
+   */
+  manualDiscountPercent?: number;
 }
 
 const CLAUSE =
