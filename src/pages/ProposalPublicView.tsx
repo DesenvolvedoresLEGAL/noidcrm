@@ -1421,6 +1421,19 @@ export default function ProposalPublicView() {
           const dpSnapItems: any = (proposal as any)?.dynamic_pricing_snapshot ?? null;
           const dpBreakdown = getDynamicPricingBreakdown(dpSnapItems, oneTimeTotal);
           const showDpBreakdown = dpBreakdown.active && dpBreakdown.hasAdjustment;
+          // PRICE CORE 2.0 — quando o ledger existe e há desconto manual ou
+          // ajuste dinâmico, o rodapé da tabela de itens deve exibir a mesma
+          // composição canônica do "Resumo Financeiro" (subtotal → desconto
+          // → base → ajuste → valor vigente) para não conflitar com o header.
+          const ledgerFooterActive = !!(
+            pricingSummary &&
+            (pricingSummary.manualDiscount.amount > 0 ||
+              pricingSummary.dynamicAdjustment.amount !== 0)
+          );
+          const ledgerManualDiscountPct = pricingSummary?.manualDiscount.percent ?? 0;
+          const ledgerOneTimeEffective = pricingSummary
+            ? pricingSummary.effectiveAmount - pricingSummary.recurringSubtotal
+            : 0;
           const colSpanLabel = hasItemDiscounts ? 5 : 4;
 
           return (
