@@ -1040,10 +1040,21 @@ export default function ProposalPublicView() {
   
   // CRITICAL: Use oneTimeTotal for installments, not totalAmount (which includes MRR items)
   // PRICE UX 1.0.3 — usar approved_amount quando proposta já foi aprovada (congela o split)
+  //
+  // PRICE CORE 2.0 — quando o ledger está disponível e a proposta ainda não
+  // foi aprovada, usamos `oneTimeNetFromLedger` (valor já líquido de desconto
+  // manual + ajuste dinâmico) como base do cronograma E como `approvedAmount`
+  // do options, para que `calculateInstallments` NÃO reaplique o
+  // `discount_percent` sobre uma base que já foi descontada. Sem isso o total
+  // do cronograma diverge do "Valor vigente" mostrado no header/ledger.
+  const ledgerOneTimeNet =
+    pricingSummary && oneTimeNetFromLedger != null
+      ? Number(Number(oneTimeNetFromLedger).toFixed(2))
+      : null;
   const baseForSchedule =
     proposal?.status === 'accepted' && proposal?.approved_amount != null
       ? Number(proposal.approved_amount)
-      : effectiveOneTimeBase;
+      : ledgerOneTimeNet ?? effectiveOneTimeBase;
   // FREEZE-ON-APPROVAL: quando a proposta está aprovada, o cronograma exibido
   // ao cliente DEVE vir do snapshot congelado em `approved_payment_schedule`.
   // Edições posteriores em `proposal_payment_terms` ou nos tiers dinâmicos
@@ -1054,7 +1065,10 @@ export default function ProposalPublicView() {
     : oneTimeTerm
       ? calculateInstallments(oneTimeTerm, baseForSchedule, {
           proposalExpiresAt: proposal?.expires_at ?? null,
-          approvedAmount: proposal?.status === 'accepted' ? Number(proposal?.approved_amount ?? effectiveOneTimeAmount) : null,
+          approvedAmount:
+            proposal?.status === 'accepted'
+              ? Number(proposal?.approved_amount ?? effectiveOneTimeAmount)
+              : ledgerOneTimeNet,
           dynamicPricingCurrentEndsAt: dynamicPricingEndForInstallments(
             proposal,
             oneTimeTerm,
