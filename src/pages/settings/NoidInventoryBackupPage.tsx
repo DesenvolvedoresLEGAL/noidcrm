@@ -83,12 +83,11 @@ function inferLastUpdatedAt(rows: Record<string, any>[]): string | null {
 
 function convertToCsv(rows: Record<string, any>[]): string {
   if (!rows.length) return '';
-  const headers = Array.from(
-    rows.reduce((set, row) => {
-      Object.keys(row).forEach((k) => set.add(k));
-      return set;
-    }, new Set<string>())
-  );
+  const headerSet = new Set<string>();
+  for (const row of rows) {
+    Object.keys(row).forEach((k) => headerSet.add(k));
+  }
+  const headers = Array.from(headerSet);
   const escape = (value: any) => {
     if (value === null || value === undefined) return '';
     const s = typeof value === 'object' ? JSON.stringify(value) : String(value);
