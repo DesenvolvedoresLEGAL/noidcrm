@@ -248,7 +248,8 @@ function NoidInventoryBackupInner() {
       return;
     }
     try {
-      downloadTextFile(`noid-${name}-${todayIso()}.csv`, convertToCsv(r.rows), 'text/csv;charset=utf-8');
+      const csvRows = flattenRowsForCsv(name, r.rows);
+      downloadTextFile(`noid-${name}-${todayIso()}.csv`, convertToCsv(csvRows), 'text/csv;charset=utf-8');
       toast.success('CSV exportado com sucesso.');
     } catch {
       toast.error('Não foi possível exportar esta tabela.');
