@@ -30,15 +30,68 @@ interface TableResult {
 }
 
 const TARGET_TABLES: TargetTable[] = [
-  { name: 'product_inventory_requirements', priority: 'essential', label: 'Requisitos operacionais por produto' },
-  { name: 'proposal_inventory_demand_snapshots', priority: 'essential', label: 'Snapshots de demanda operacional' },
-  { name: 'products', priority: 'essential', label: 'Produtos comerciais' },
-  { name: 'eventrix_inventory_integration_settings', priority: 'support', label: 'Configurações de integração Eventrix' },
-  { name: 'eventrix_inventory_sync_cache', priority: 'support', label: 'Cache de sincronização Eventrix' },
-  { name: 'proposals', priority: 'support', label: 'Propostas' },
-  { name: 'proposal_items', priority: 'support', label: 'Itens de proposta' },
-  { name: 'tenants', priority: 'context', label: 'Tenants' },
+  // Inventário físico de equipamentos
+  { name: 'inventory_items', priority: 'essential', label: 'Equipamentos (serial, IMEI, marca, modelo, status)' },
+  { name: 'inventory_families', priority: 'essential', label: 'Famílias de equipamento' },
+  { name: 'inventory_categories', priority: 'essential', label: 'Categorias de equipamento' },
+  { name: 'inventory_locations', priority: 'essential', label: 'Locais / depósitos' },
+  { name: 'inventory_movements', priority: 'essential', label: 'Movimentações de estoque' },
+  { name: 'inventory_status_history', priority: 'essential', label: 'Histórico de status por equipamento' },
+  // Operação / reservas
+  { name: 'inventory_reservations', priority: 'support', label: 'Reservas de equipamento' },
+  { name: 'inventory_reservation_items', priority: 'support', label: 'Itens de reserva' },
+  { name: 'inventory_reservation_allocations', priority: 'support', label: 'Alocações de reserva' },
+  { name: 'inventory_pre_reservations', priority: 'support', label: 'Pré-reservas' },
+  { name: 'inventory_pre_reservation_items', priority: 'support', label: 'Itens de pré-reserva' },
+  { name: 'inventory_pre_reservation_allocations', priority: 'support', label: 'Alocações de pré-reserva' },
+  { name: 'inventory_pricing_rules', priority: 'support', label: 'Regras de preço de inventário' },
+  { name: 'inventory_operation_events', priority: 'support', label: 'Eventos operacionais' },
+  // Comercial correlato
+  { name: 'product_inventory_requirements', priority: 'context', label: 'Requisitos operacionais por produto' },
+  { name: 'proposal_inventory_demand_snapshots', priority: 'context', label: 'Snapshots de demanda operacional' },
+  { name: 'products', priority: 'context', label: 'Produtos comerciais' },
+  { name: 'proposals', priority: 'context', label: 'Propostas' },
+  { name: 'proposal_items', priority: 'context', label: 'Itens de proposta' },
+  { name: 'eventrix_inventory_integration_settings', priority: 'context', label: 'Configurações de integração Eventrix' },
+  { name: 'eventrix_inventory_sync_cache', priority: 'context', label: 'Cache de sincronização Eventrix' },
 ];
+
+// Achatamento de campos JSONB relevantes para CSV (Excel abre em coluna própria).
+// A exportação JSON mantém o objeto original intacto.
+const CSV_FLATTEN_PATHS: Record<string, string[]> = {
+  inventory_items: [
+    'metadata.router.imei',
+    'metadata.router.iccid',
+    'metadata.router.ssid_factory',
+    'metadata.router.admin_user',
+    'metadata.router.admin_password',
+    'metadata.router.wifi_password_factory',
+    'metadata.sim.iccid',
+    'metadata.sim.imsi',
+    'metadata.sim.operator',
+  ],
+};
+
+function getPath(obj: any, path: string): any {
+  return path.split('.').reduce((acc, key) => (acc == null ? undefined : acc[key]), obj);
+}
+
+function flattenRowsForCsv(tableName: string, rows: Record<string, any>[]): Record<string, any>[] {
+  const paths = CSV_FLATTEN_PATHS[tableName];
+  if (!paths || !paths.length) return rows;
+  return rows.map((row) => {
+    const extras: Record<string, any> = {};
+    for (const p of paths) {
+      const val = getPath(row, p);
+      if (val !== undefined && val !== null) {
+        extras[p.replace(/\./g, '_')] = val;
+      } else {
+        extras[p.replace(/\./g, '_')] = '';
+      }
+    }
+    return { ...row, ...extras };
+  });
+}
 
 const PAGE_SIZE = 1000;
 const MAX_ROWS = 20000;
@@ -195,7 +248,8 @@ function NoidInventoryBackupInner() {
       return;
     }
     try {
-      downloadTextFile(`noid-${name}-${todayIso()}.csv`, convertToCsv(r.rows), 'text/csv;charset=utf-8');
+      const csvRows = flattenRowsForCsv(name, r.rows);
+      downloadTextFile(`noid-${name}-${todayIso()}.csv`, convertToCsv(csvRows), 'text/csv;charset=utf-8');
       toast.success('CSV exportado com sucesso.');
     } catch {
       toast.error('Não foi possível exportar esta tabela.');
@@ -264,28 +318,35 @@ function NoidInventoryBackupInner() {
   };
 
   const migrationSummary = useMemo(() => {
-    const reqs = results['product_inventory_requirements']?.rows ?? [];
-    const products = results['products']?.rows ?? [];
-    const snapshots = results['proposal_inventory_demand_snapshots']?.rows ?? [];
+    const items = results['inventory_items']?.rows ?? [];
+    const familiesTbl = results['inventory_families']?.rows ?? [];
+    const categoriesTbl = results['inventory_categories']?.rows ?? [];
+    const locations = results['inventory_locations']?.rows ?? [];
+    const movements = results['inventory_movements']?.rows ?? [];
+    const reservations = results['inventory_reservations']?.rows ?? [];
 
-    const productIdsWithReqs = new Set(reqs.map((r) => r.product_id).filter(Boolean));
-    const productsWithoutReqs = products.filter((p) => !productIdsWithReqs.has(p.id)).length;
-
-    const productIdsAll = new Set(products.map((p) => p.id));
-    const reqsWithoutProduct = reqs.filter((r) => r.product_id && !productIdsAll.has(r.product_id)).length;
-
-    const categories = new Set(reqs.map((r) => r.eventrix_category_id).filter(Boolean));
-    const families = new Set(reqs.map((r) => r.eventrix_family_id).filter(Boolean));
-    const kinds = new Set(reqs.map((r) => r.eventrix_item_kind).filter(Boolean));
+    const byStatus: Record<string, number> = {};
+    for (const it of items) {
+      const s = String(it.status ?? 'unknown');
+      byStatus[s] = (byStatus[s] ?? 0) + 1;
+    }
+    const familiesInUse = new Set(items.map((i) => i.family_id).filter(Boolean));
+    const categoriesInUse = new Set(items.map((i) => i.category_id).filter(Boolean));
+    const withSerial = items.filter((i) => i.serial_number).length;
+    const withImei = items.filter((i) => i.metadata?.router?.imei || i.metadata?.sim?.iccid).length;
 
     return {
-      productsWithReqs: productIdsWithReqs.size,
-      productsWithoutReqs,
-      reqsWithoutProduct,
-      categories: categories.size,
-      families: families.size,
-      kinds: kinds.size,
-      snapshots: snapshots.length,
+      totalItems: items.length,
+      withSerial,
+      withImei,
+      byStatus,
+      familiesTotal: familiesTbl.length,
+      categoriesTotal: categoriesTbl.length,
+      locations: locations.length,
+      familiesInUse: familiesInUse.size,
+      categoriesInUse: categoriesInUse.size,
+      movements: movements.length,
+      reservations: reservations.length,
     };
   }, [results]);
 
@@ -296,8 +357,9 @@ function NoidInventoryBackupInner() {
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Backup Inventário NOID</h1>
             <p className="text-muted-foreground max-w-3xl">
-              Exporte os dados de requisitos operacionais, snapshots e configurações de inventário do NOID
-              para análise e futura migração assistida ao Eventrix.
+              Exporte o inventário físico de equipamentos do NOID (serial, IMEI, ICCID, marca, modelo,
+              família, categoria, status) e os dados comerciais correlatos para backup, auditoria e
+              conferência com outros sistemas.
             </p>
           </div>
           <div className="flex gap-2 flex-wrap">
@@ -390,19 +452,36 @@ function NoidInventoryBackupInner() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Resumo para futura migração Eventrix</CardTitle>
+          <CardTitle>Resumo do inventário físico</CardTitle>
           <CardDescription>
-            Indicadores agregados a partir dos dados exportáveis do NOID.
+            Indicadores agregados de equipamentos cadastrados no NOID.
           </CardDescription>
         </CardHeader>
-        <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-          <div><div className="text-muted-foreground">Produtos com requisitos</div><div className="text-2xl font-semibold">{migrationSummary.productsWithReqs}</div></div>
-          <div><div className="text-muted-foreground">Produtos sem requisitos</div><div className="text-2xl font-semibold">{migrationSummary.productsWithoutReqs}</div></div>
-          <div><div className="text-muted-foreground">Categorias referenciadas</div><div className="text-2xl font-semibold">{migrationSummary.categories}</div></div>
-          <div><div className="text-muted-foreground">Famílias referenciadas</div><div className="text-2xl font-semibold">{migrationSummary.families}</div></div>
-          <div><div className="text-muted-foreground">Tipos de item</div><div className="text-2xl font-semibold">{migrationSummary.kinds}</div></div>
-          <div><div className="text-muted-foreground">Snapshots de demanda</div><div className="text-2xl font-semibold">{migrationSummary.snapshots}</div></div>
-          <div><div className="text-muted-foreground">Requisitos sem produto</div><div className="text-2xl font-semibold">{migrationSummary.reqsWithoutProduct}</div></div>
+        <CardContent className="space-y-4 text-sm">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div><div className="text-muted-foreground">Equipamentos</div><div className="text-2xl font-semibold">{migrationSummary.totalItems}</div></div>
+            <div><div className="text-muted-foreground">Com serial number</div><div className="text-2xl font-semibold">{migrationSummary.withSerial}</div></div>
+            <div><div className="text-muted-foreground">Com IMEI / ICCID</div><div className="text-2xl font-semibold">{migrationSummary.withImei}</div></div>
+            <div><div className="text-muted-foreground">Locais cadastrados</div><div className="text-2xl font-semibold">{migrationSummary.locations}</div></div>
+            <div><div className="text-muted-foreground">Famílias (total)</div><div className="text-2xl font-semibold">{migrationSummary.familiesTotal}</div></div>
+            <div><div className="text-muted-foreground">Famílias em uso</div><div className="text-2xl font-semibold">{migrationSummary.familiesInUse}</div></div>
+            <div><div className="text-muted-foreground">Categorias (total)</div><div className="text-2xl font-semibold">{migrationSummary.categoriesTotal}</div></div>
+            <div><div className="text-muted-foreground">Categorias em uso</div><div className="text-2xl font-semibold">{migrationSummary.categoriesInUse}</div></div>
+            <div><div className="text-muted-foreground">Movimentações</div><div className="text-2xl font-semibold">{migrationSummary.movements}</div></div>
+            <div><div className="text-muted-foreground">Reservas</div><div className="text-2xl font-semibold">{migrationSummary.reservations}</div></div>
+          </div>
+          {Object.keys(migrationSummary.byStatus).length > 0 && (
+            <div>
+              <div className="text-muted-foreground mb-2">Equipamentos por status</div>
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(migrationSummary.byStatus).map(([status, count]) => (
+                  <Badge key={status} variant="outline" className="font-mono">
+                    {status}: {count}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -411,14 +490,16 @@ function NoidInventoryBackupInner() {
         <AlertTitle>Atenção — interpretação dos dados</AlertTitle>
         <AlertDescription className="space-y-2">
           <p>
-            Os dados do NOID representam requisitos comerciais/operacionais e snapshots de demanda.
-            Eles não devem ser importados diretamente como itens físicos no Eventrix.
+            As tabelas <code className="font-mono text-xs">inventory_*</code> contêm o inventário físico
+            real (equipamentos com serial number, IMEI, marca, modelo, status). Já
+            <code className="font-mono text-xs"> product_inventory_requirements</code> e
+            <code className="font-mono text-xs"> proposal_inventory_demand_snapshots</code> são
+            requisitos comerciais / demanda estimada, não itens físicos.
           </p>
           <p>
-            O mapeamento correto é:{' '}
-            <code className="font-mono text-xs">NOID product_inventory_requirements</code> → Eventrix
-            Kits / Famílias / Regras de composição. Não importar como <code className="font-mono text-xs">inventory_items</code>{' '}
-            físicos sem validação.
+            Para bater dado-a-dado com o Eventrix: use o CSV de <code className="font-mono text-xs">inventory_items</code>{' '}
+            (colunas <code className="font-mono text-xs">serial_number</code>, <code className="font-mono text-xs">metadata_router_imei</code>,
+            <code className="font-mono text-xs"> metadata_router_iccid</code>, <code className="font-mono text-xs">metadata_sim_iccid</code>).
           </p>
         </AlertDescription>
       </Alert>
