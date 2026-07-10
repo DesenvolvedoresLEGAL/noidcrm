@@ -357,8 +357,9 @@ function NoidInventoryBackupInner() {
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Backup Inventário NOID</h1>
             <p className="text-muted-foreground max-w-3xl">
-              Exporte os dados de requisitos operacionais, snapshots e configurações de inventário do NOID
-              para análise e futura migração assistida ao Eventrix.
+              Exporte o inventário físico de equipamentos do NOID (serial, IMEI, ICCID, marca, modelo,
+              família, categoria, status) e os dados comerciais correlatos para backup, auditoria e
+              conferência com outros sistemas.
             </p>
           </div>
           <div className="flex gap-2 flex-wrap">
