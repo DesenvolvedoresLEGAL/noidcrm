@@ -318,28 +318,35 @@ function NoidInventoryBackupInner() {
   };
 
   const migrationSummary = useMemo(() => {
-    const reqs = results['product_inventory_requirements']?.rows ?? [];
-    const products = results['products']?.rows ?? [];
-    const snapshots = results['proposal_inventory_demand_snapshots']?.rows ?? [];
+    const items = results['inventory_items']?.rows ?? [];
+    const familiesTbl = results['inventory_families']?.rows ?? [];
+    const categoriesTbl = results['inventory_categories']?.rows ?? [];
+    const locations = results['inventory_locations']?.rows ?? [];
+    const movements = results['inventory_movements']?.rows ?? [];
+    const reservations = results['inventory_reservations']?.rows ?? [];
 
-    const productIdsWithReqs = new Set(reqs.map((r) => r.product_id).filter(Boolean));
-    const productsWithoutReqs = products.filter((p) => !productIdsWithReqs.has(p.id)).length;
-
-    const productIdsAll = new Set(products.map((p) => p.id));
-    const reqsWithoutProduct = reqs.filter((r) => r.product_id && !productIdsAll.has(r.product_id)).length;
-
-    const categories = new Set(reqs.map((r) => r.eventrix_category_id).filter(Boolean));
-    const families = new Set(reqs.map((r) => r.eventrix_family_id).filter(Boolean));
-    const kinds = new Set(reqs.map((r) => r.eventrix_item_kind).filter(Boolean));
+    const byStatus: Record<string, number> = {};
+    for (const it of items) {
+      const s = String(it.status ?? 'unknown');
+      byStatus[s] = (byStatus[s] ?? 0) + 1;
+    }
+    const familiesInUse = new Set(items.map((i) => i.family_id).filter(Boolean));
+    const categoriesInUse = new Set(items.map((i) => i.category_id).filter(Boolean));
+    const withSerial = items.filter((i) => i.serial_number).length;
+    const withImei = items.filter((i) => i.metadata?.router?.imei || i.metadata?.sim?.iccid).length;
 
     return {
-      productsWithReqs: productIdsWithReqs.size,
-      productsWithoutReqs,
-      reqsWithoutProduct,
-      categories: categories.size,
-      families: families.size,
-      kinds: kinds.size,
-      snapshots: snapshots.length,
+      totalItems: items.length,
+      withSerial,
+      withImei,
+      byStatus,
+      familiesTotal: familiesTbl.length,
+      categoriesTotal: categoriesTbl.length,
+      locations: locations.length,
+      familiesInUse: familiesInUse.size,
+      categoriesInUse: categoriesInUse.size,
+      movements: movements.length,
+      reservations: reservations.length,
     };
   }, [results]);
 
