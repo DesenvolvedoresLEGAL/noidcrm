@@ -451,19 +451,36 @@ function NoidInventoryBackupInner() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Resumo para futura migração Eventrix</CardTitle>
+          <CardTitle>Resumo do inventário físico</CardTitle>
           <CardDescription>
-            Indicadores agregados a partir dos dados exportáveis do NOID.
+            Indicadores agregados de equipamentos cadastrados no NOID.
           </CardDescription>
         </CardHeader>
-        <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-          <div><div className="text-muted-foreground">Produtos com requisitos</div><div className="text-2xl font-semibold">{migrationSummary.productsWithReqs}</div></div>
-          <div><div className="text-muted-foreground">Produtos sem requisitos</div><div className="text-2xl font-semibold">{migrationSummary.productsWithoutReqs}</div></div>
-          <div><div className="text-muted-foreground">Categorias referenciadas</div><div className="text-2xl font-semibold">{migrationSummary.categories}</div></div>
-          <div><div className="text-muted-foreground">Famílias referenciadas</div><div className="text-2xl font-semibold">{migrationSummary.families}</div></div>
-          <div><div className="text-muted-foreground">Tipos de item</div><div className="text-2xl font-semibold">{migrationSummary.kinds}</div></div>
-          <div><div className="text-muted-foreground">Snapshots de demanda</div><div className="text-2xl font-semibold">{migrationSummary.snapshots}</div></div>
-          <div><div className="text-muted-foreground">Requisitos sem produto</div><div className="text-2xl font-semibold">{migrationSummary.reqsWithoutProduct}</div></div>
+        <CardContent className="space-y-4 text-sm">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div><div className="text-muted-foreground">Equipamentos</div><div className="text-2xl font-semibold">{migrationSummary.totalItems}</div></div>
+            <div><div className="text-muted-foreground">Com serial number</div><div className="text-2xl font-semibold">{migrationSummary.withSerial}</div></div>
+            <div><div className="text-muted-foreground">Com IMEI / ICCID</div><div className="text-2xl font-semibold">{migrationSummary.withImei}</div></div>
+            <div><div className="text-muted-foreground">Locais cadastrados</div><div className="text-2xl font-semibold">{migrationSummary.locations}</div></div>
+            <div><div className="text-muted-foreground">Famílias (total)</div><div className="text-2xl font-semibold">{migrationSummary.familiesTotal}</div></div>
+            <div><div className="text-muted-foreground">Famílias em uso</div><div className="text-2xl font-semibold">{migrationSummary.familiesInUse}</div></div>
+            <div><div className="text-muted-foreground">Categorias (total)</div><div className="text-2xl font-semibold">{migrationSummary.categoriesTotal}</div></div>
+            <div><div className="text-muted-foreground">Categorias em uso</div><div className="text-2xl font-semibold">{migrationSummary.categoriesInUse}</div></div>
+            <div><div className="text-muted-foreground">Movimentações</div><div className="text-2xl font-semibold">{migrationSummary.movements}</div></div>
+            <div><div className="text-muted-foreground">Reservas</div><div className="text-2xl font-semibold">{migrationSummary.reservations}</div></div>
+          </div>
+          {Object.keys(migrationSummary.byStatus).length > 0 && (
+            <div>
+              <div className="text-muted-foreground mb-2">Equipamentos por status</div>
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(migrationSummary.byStatus).map(([status, count]) => (
+                  <Badge key={status} variant="outline" className="font-mono">
+                    {status}: {count}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -472,14 +489,16 @@ function NoidInventoryBackupInner() {
         <AlertTitle>Atenção — interpretação dos dados</AlertTitle>
         <AlertDescription className="space-y-2">
           <p>
-            Os dados do NOID representam requisitos comerciais/operacionais e snapshots de demanda.
-            Eles não devem ser importados diretamente como itens físicos no Eventrix.
+            As tabelas <code className="font-mono text-xs">inventory_*</code> contêm o inventário físico
+            real (equipamentos com serial number, IMEI, marca, modelo, status). Já
+            <code className="font-mono text-xs"> product_inventory_requirements</code> e
+            <code className="font-mono text-xs"> proposal_inventory_demand_snapshots</code> são
+            requisitos comerciais / demanda estimada, não itens físicos.
           </p>
           <p>
-            O mapeamento correto é:{' '}
-            <code className="font-mono text-xs">NOID product_inventory_requirements</code> → Eventrix
-            Kits / Famílias / Regras de composição. Não importar como <code className="font-mono text-xs">inventory_items</code>{' '}
-            físicos sem validação.
+            Para bater dado-a-dado com o Eventrix: use o CSV de <code className="font-mono text-xs">inventory_items</code>{' '}
+            (colunas <code className="font-mono text-xs">serial_number</code>, <code className="font-mono text-xs">metadata_router_imei</code>,
+            <code className="font-mono text-xs"> metadata_router_iccid</code>, <code className="font-mono text-xs">metadata_sim_iccid</code>).
           </p>
         </AlertDescription>
       </Alert>
