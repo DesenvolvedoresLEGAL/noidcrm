@@ -30,15 +30,68 @@ interface TableResult {
 }
 
 const TARGET_TABLES: TargetTable[] = [
-  { name: 'product_inventory_requirements', priority: 'essential', label: 'Requisitos operacionais por produto' },
-  { name: 'proposal_inventory_demand_snapshots', priority: 'essential', label: 'Snapshots de demanda operacional' },
-  { name: 'products', priority: 'essential', label: 'Produtos comerciais' },
-  { name: 'eventrix_inventory_integration_settings', priority: 'support', label: 'Configurações de integração Eventrix' },
-  { name: 'eventrix_inventory_sync_cache', priority: 'support', label: 'Cache de sincronização Eventrix' },
-  { name: 'proposals', priority: 'support', label: 'Propostas' },
-  { name: 'proposal_items', priority: 'support', label: 'Itens de proposta' },
-  { name: 'tenants', priority: 'context', label: 'Tenants' },
+  // Inventário físico de equipamentos
+  { name: 'inventory_items', priority: 'essential', label: 'Equipamentos (serial, IMEI, marca, modelo, status)' },
+  { name: 'inventory_families', priority: 'essential', label: 'Famílias de equipamento' },
+  { name: 'inventory_categories', priority: 'essential', label: 'Categorias de equipamento' },
+  { name: 'inventory_locations', priority: 'essential', label: 'Locais / depósitos' },
+  { name: 'inventory_movements', priority: 'essential', label: 'Movimentações de estoque' },
+  { name: 'inventory_status_history', priority: 'essential', label: 'Histórico de status por equipamento' },
+  // Operação / reservas
+  { name: 'inventory_reservations', priority: 'support', label: 'Reservas de equipamento' },
+  { name: 'inventory_reservation_items', priority: 'support', label: 'Itens de reserva' },
+  { name: 'inventory_reservation_allocations', priority: 'support', label: 'Alocações de reserva' },
+  { name: 'inventory_pre_reservations', priority: 'support', label: 'Pré-reservas' },
+  { name: 'inventory_pre_reservation_items', priority: 'support', label: 'Itens de pré-reserva' },
+  { name: 'inventory_pre_reservation_allocations', priority: 'support', label: 'Alocações de pré-reserva' },
+  { name: 'inventory_pricing_rules', priority: 'support', label: 'Regras de preço de inventário' },
+  { name: 'inventory_operation_events', priority: 'support', label: 'Eventos operacionais' },
+  // Comercial correlato
+  { name: 'product_inventory_requirements', priority: 'context', label: 'Requisitos operacionais por produto' },
+  { name: 'proposal_inventory_demand_snapshots', priority: 'context', label: 'Snapshots de demanda operacional' },
+  { name: 'products', priority: 'context', label: 'Produtos comerciais' },
+  { name: 'proposals', priority: 'context', label: 'Propostas' },
+  { name: 'proposal_items', priority: 'context', label: 'Itens de proposta' },
+  { name: 'eventrix_inventory_integration_settings', priority: 'context', label: 'Configurações de integração Eventrix' },
+  { name: 'eventrix_inventory_sync_cache', priority: 'context', label: 'Cache de sincronização Eventrix' },
 ];
+
+// Achatamento de campos JSONB relevantes para CSV (Excel abre em coluna própria).
+// A exportação JSON mantém o objeto original intacto.
+const CSV_FLATTEN_PATHS: Record<string, string[]> = {
+  inventory_items: [
+    'metadata.router.imei',
+    'metadata.router.iccid',
+    'metadata.router.ssid_factory',
+    'metadata.router.admin_user',
+    'metadata.router.admin_password',
+    'metadata.router.wifi_password_factory',
+    'metadata.sim.iccid',
+    'metadata.sim.imsi',
+    'metadata.sim.operator',
+  ],
+};
+
+function getPath(obj: any, path: string): any {
+  return path.split('.').reduce((acc, key) => (acc == null ? undefined : acc[key]), obj);
+}
+
+function flattenRowsForCsv(tableName: string, rows: Record<string, any>[]): Record<string, any>[] {
+  const paths = CSV_FLATTEN_PATHS[tableName];
+  if (!paths || !paths.length) return rows;
+  return rows.map((row) => {
+    const extras: Record<string, any> = {};
+    for (const p of paths) {
+      const val = getPath(row, p);
+      if (val !== undefined && val !== null) {
+        extras[p.replace(/\./g, '_')] = val;
+      } else {
+        extras[p.replace(/\./g, '_')] = '';
+      }
+    }
+    return { ...row, ...extras };
+  });
+}
 
 const PAGE_SIZE = 1000;
 const MAX_ROWS = 20000;
