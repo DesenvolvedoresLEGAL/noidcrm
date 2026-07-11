@@ -1,0 +1,35 @@
+name: Tenant Isolation Suite
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * *' # 06:00 UTC diariamente
+
+jobs:
+  tenant-isolation:
+    runs-on: ubuntu-latest
+    # Só roda se o repositório tiver os segredos configurados apontando para STAGING.
+    if: ${{ vars.TENANT_ISOLATION_ENABLED == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v1
+      - run: bun install --frozen-lockfile
+      - name: Guard against production
+        env:
+          TEST_SUPABASE_URL: ${{ secrets.TEST_SUPABASE_URL }}
+          PROD_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+        run: |
+          if [ -z "$TEST_SUPABASE_URL" ]; then
+            echo "TEST_SUPABASE_URL is empty; refusing to run." && exit 1
+          fi
+          test_host=$(echo "$TEST_SUPABASE_URL" | awk -F/ '{print $3}')
+          prod_host=$(echo "$PROD_SUPABASE_URL" | awk -F/ '{print $3}')
+          if [ "$test_host" = "$prod_host" ]; then
+            echo "TEST_SUPABASE_URL matches production host; aborting." && exit 1
+          fi
+      - name: Run tenant-isolation suite
+        env:
+          TEST_SUPABASE_URL: ${{ secrets.TEST_SUPABASE_URL }}
+          TEST_SUPABASE_ANON_KEY: ${{ secrets.TEST_SUPABASE_ANON_KEY }}
+          TEST_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.TEST_SUPABASE_SERVICE_ROLE_KEY }}
+        run: bunx vitest run src/test/security/tenant-isolation --reporter=verbose
