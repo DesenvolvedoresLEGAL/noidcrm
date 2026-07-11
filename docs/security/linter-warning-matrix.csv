@@ -1,0 +1,377 @@
+rule,object,detail,severity,notes
+0011_function_search_path_mutable,array_to_halfvec,"double precision[], integer, boolean",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,array_to_halfvec,"numeric[], integer, boolean",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,array_to_halfvec,"integer[], integer, boolean",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,array_to_halfvec,"real[], integer, boolean",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,array_to_sparsevec,"integer[], integer, boolean",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,array_to_sparsevec,"double precision[], integer, boolean",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,array_to_sparsevec,"real[], integer, boolean",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,array_to_sparsevec,"numeric[], integer, boolean",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,array_to_vector,"real[], integer, boolean",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,array_to_vector,"integer[], integer, boolean",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,array_to_vector,"double precision[], integer, boolean",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,array_to_vector,"numeric[], integer, boolean",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,avg,vector,false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,avg,halfvec,false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,binary_quantize,halfvec,false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,binary_quantize,vector,false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,cosine_distance,"sparsevec, sparsevec",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,cosine_distance,"halfvec, halfvec",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,cosine_distance,"vector, vector",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,halfvec,"halfvec, integer, boolean",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,halfvec_accum,"double precision[], halfvec",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,halfvec_add,"halfvec, halfvec",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,halfvec_avg,double precision[],false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,halfvec_cmp,"halfvec, halfvec",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,halfvec_combine,"double precision[], double precision[]",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,halfvec_concat,"halfvec, halfvec",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,halfvec_eq,"halfvec, halfvec",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,halfvec_ge,"halfvec, halfvec",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,halfvec_gt,"halfvec, halfvec",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,halfvec_in,"cstring, oid, integer",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,halfvec_l2_squared_distance,"halfvec, halfvec",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,halfvec_le,"halfvec, halfvec",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,halfvec_lt,"halfvec, halfvec",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,halfvec_mul,"halfvec, halfvec",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,halfvec_ne,"halfvec, halfvec",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,halfvec_negative_inner_product,"halfvec, halfvec",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,halfvec_out,halfvec,false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,halfvec_recv,"internal, oid, integer",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,halfvec_send,halfvec,false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,halfvec_spherical_distance,"halfvec, halfvec",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,halfvec_sub,"halfvec, halfvec",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,halfvec_to_float4,"halfvec, integer, boolean",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,halfvec_to_sparsevec,"halfvec, integer, boolean",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,halfvec_to_vector,"halfvec, integer, boolean",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,halfvec_typmod_in,cstring[],false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,hamming_distance,"bit, bit",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,hnsw_bit_support,internal,false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,hnsw_halfvec_support,internal,false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,hnsw_sparsevec_support,internal,false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,hnswhandler,internal,false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,inner_product,"sparsevec, sparsevec",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,inner_product,"vector, vector",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,inner_product,"halfvec, halfvec",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,ivfflat_bit_support,internal,false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,ivfflat_halfvec_support,internal,false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,ivfflathandler,internal,false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,jaccard_distance,"bit, bit",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,l1_distance,"sparsevec, sparsevec",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,l1_distance,"vector, vector",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,l1_distance,"halfvec, halfvec",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,l2_distance,"sparsevec, sparsevec",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,l2_distance,"vector, vector",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,l2_distance,"halfvec, halfvec",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,l2_norm,halfvec,false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,l2_norm,sparsevec,false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,l2_normalize,halfvec,false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,l2_normalize,vector,false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,l2_normalize,sparsevec,false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,sparsevec,"sparsevec, integer, boolean",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,sparsevec_cmp,"sparsevec, sparsevec",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,sparsevec_eq,"sparsevec, sparsevec",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,sparsevec_ge,"sparsevec, sparsevec",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,sparsevec_gt,"sparsevec, sparsevec",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,sparsevec_in,"cstring, oid, integer",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,sparsevec_l2_squared_distance,"sparsevec, sparsevec",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,sparsevec_le,"sparsevec, sparsevec",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,sparsevec_lt,"sparsevec, sparsevec",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,sparsevec_ne,"sparsevec, sparsevec",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,sparsevec_negative_inner_product,"sparsevec, sparsevec",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,sparsevec_out,sparsevec,false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,sparsevec_recv,"internal, oid, integer",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,sparsevec_send,sparsevec,false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,sparsevec_to_halfvec,"sparsevec, integer, boolean",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,sparsevec_to_vector,"sparsevec, integer, boolean",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,sparsevec_typmod_in,cstring[],false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,subvector,"halfvec, integer, integer",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,subvector,"vector, integer, integer",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,sum,vector,false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,sum,halfvec,false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,unaccent,text,false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,unaccent,"regdictionary, text",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,unaccent_init,internal,false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,unaccent_lexize,"internal, internal, internal, internal",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,vector,"vector, integer, boolean",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,vector_accum,"double precision[], vector",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,vector_add,"vector, vector",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,vector_avg,double precision[],false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,vector_cmp,"vector, vector",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,vector_combine,"double precision[], double precision[]",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,vector_concat,"vector, vector",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,vector_dims,halfvec,false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,vector_dims,vector,false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,vector_eq,"vector, vector",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,vector_ge,"vector, vector",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,vector_gt,"vector, vector",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,vector_in,"cstring, oid, integer",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,vector_l2_squared_distance,"vector, vector",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,vector_le,"vector, vector",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,vector_lt,"vector, vector",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,vector_mul,"vector, vector",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,vector_ne,"vector, vector",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,vector_negative_inner_product,"vector, vector",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,vector_norm,vector,false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,vector_out,vector,false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,vector_recv,"internal, oid, integer",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,vector_send,vector,false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,vector_spherical_distance,"vector, vector",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,vector_sub,"vector, vector",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,vector_to_float4,"vector, integer, boolean",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,vector_to_halfvec,"vector, integer, boolean",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,vector_to_sparsevec,"vector, integer, boolean",false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,vector_typmod_in,cstring[],false-positive,Extension-owned function (pgvector/unaccent); no user-facing risk
+0011_function_search_path_mutable,calculate_weighted_xp,"p_base_xp integer, p_activity_weight numeric, p_is_gap_correction boolean",low,Non-definer function; low risk but recommend pinning
+0011_function_search_path_mutable,tg_touch_updated_at,"",low,Non-definer function; low risk but recommend pinning
+0014_extension_in_public,unaccent,schema=public,low,Moving requires drop/recreate with rewire; accepted risk - no direct data exposure
+0014_extension_in_public,vector,schema=public,low,Moving requires drop/recreate with rewire; accepted risk - no direct data exposure
+0028_anon_security_definer_function_executable,get_invitation_by_token,p_token text,accepted,Public-token flow (proposal/invitation). Function revalidates by token.
+0028_anon_security_definer_function_executable,get_proposal_by_public_token,p_token text,accepted,Public-token flow (proposal/invitation). Function revalidates by token.
+0029_authenticated_security_definer_function_executable,_mcp_apply_object_security,"p_tool_id uuid, p_resource_id uuid, p_prompt_id uuid, p_can_read boolean, p_can_suggest boolean, p_can_execute boolean, p_requires_approval boolean",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,activate_forecast_v2_engine,"p_organization_id uuid, p_enabled boolean",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,admin_delete_organization,org_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,apply_dynamic_price_to_proposal,"p_proposal_id uuid, p_reference_at timestamp with time zone",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,apply_loss_win_reasons_scope_matrix,p_org_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,apply_proposal_financial_audit_item,"p_audit_item_id uuid, p_apply_mode text",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,apply_qualification_template_legal,"",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,approve_hypothesis,_hypothesis_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,audit_approved_amount_vs_approval_snapshot,"p_organization_id uuid, p_start timestamp with time zone, p_end timestamp with time zone",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,block_expired_trial,org_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,build_knowledge_graph,"p_organization_id uuid, p_build_type text",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,bulk_update_prospect_priority,p_updates jsonb,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,calculate_edge_weight,p_edge_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,calculate_forecast_accuracy_v2,"p_organization_id uuid, p_pipeline_id uuid, p_period_start date, p_period_end date, p_seller_id uuid",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,calculate_forecast_audit_v2,"p_organization_id uuid, p_pipeline_id uuid, p_period_start date, p_period_end date, p_seller_id uuid",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,calculate_fraud_score,"p_email_domain text, p_browser_hash text, p_ip_address inet, p_cpf_hash text, p_cnpj_hash text",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,calculate_inventory_pricing_factor,"p_start_date date, p_end_date date, p_category_id uuid, p_family_id uuid, p_requested_quantity numeric, p_base_amount numeric",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,calculate_proposal_dynamic_price,"p_proposal_id uuid, p_reference_at timestamp with time zone",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,can_access_org_record,record_org_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,can_auto_generate_dynamic_pricing,p_proposal_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,can_read_delivery_log,_log_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,can_view_all,"_user_id uuid, _org_id uuid",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,can_view_all,_user_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,can_view_by_team,"_user_id uuid, _owner_user_id uuid",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,can_view_opportunity,"_user_id uuid, _opportunity_id uuid",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,can_view_user_data,"_viewer_id uuid, _owner_id uuid",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,check_dynamic_mission_completion,p_seller_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,check_index_health,"",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,check_inventory_availability_for_period,"p_organization_id uuid, p_inventory_item_type text, p_serialized_item_id uuid, p_quantity_item_id uuid, p_requested_quantity numeric, p_start_date date, p_end_date date, p_ignore_pre_reservation_id uuid",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,check_inventory_reservation_conflict,"p_organization_id uuid, p_allocation_item_type text, p_serialized_item_id uuid, p_quantity_item_id uuid, p_requested_quantity numeric, p_start_date date, p_end_date date, p_ignore_reservation_id uuid",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,check_mcp_permission,"p_organization_id uuid, p_action text, p_agent_id uuid, p_user_id uuid, p_role_name text, p_tool_id uuid, p_resource_id uuid, p_prompt_id uuid",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,claim_next_owner_round_robin,"_organization_id uuid, _role_filter text",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,claim_next_owner_v2,"_organization_id uuid, _pipeline_id text, _account_uf text",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,cleanup_apollo_query_logs,"",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,cleanup_expired_dedup_keys,"",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,cleanup_expired_oauth_nonces,"",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,cleanup_expired_snapshots,"",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,cleanup_orphaned_playbook_runs,"",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,cleanup_stale_phone_reveal_requests,"",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,complete_action_execution,"p_execution_id uuid, p_status text, p_output jsonb, p_after_state jsonb, p_error text, p_duration_ms integer",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,consume_volts,"p_org_id uuid, p_amount integer, p_action_type text",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,convert_account_type,"p_account_id uuid, p_new_type tipo_pessoa_type",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,convert_pre_reservation_to_reservation,"p_pre_reservation_id uuid, p_confirmation_trigger text",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,count_leads_by_grade,"",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,count_opportunities_by_score_range,"",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,create_complementary_payment_intent,p_original_payment_intent_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,create_forecast_daily_snapshot_v2,"p_organization_id uuid, p_pipeline_id uuid, p_period_start date, p_period_end date, p_seller_id uuid, p_snapshot_date date",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,create_organization_backup,"p_organization_id uuid, p_backup_type text",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,create_proposal_payment_intent,"p_proposal_id uuid, p_source text",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,create_proposal_version,p_proposal_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,create_system_notification,"p_user_id uuid, p_org_id uuid, p_type text, p_title text, p_message text, p_metadata jsonb",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,crm_check_qualification_gate,_opportunity_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,crm_disable_all_closer_dashboard_pilots,"p_tenant_id uuid, p_reason text",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,crm_disable_closer_dashboard_pilot,"p_tenant_id uuid, p_target_user_id uuid, p_reason text",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,crm_disable_tenant_dynamic_dashboards,"p_tenant_id uuid, p_reason text",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,crm_enable_closer_dashboard_pilot,"p_tenant_id uuid, p_target_user_id uuid, p_reason text",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,crm_get_closer_dashboard_data,"p_tenant_id uuid, p_user_id uuid, p_period text, p_start_date date, p_end_date date",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,crm_get_closer_pace_data,"p_tenant_id uuid, p_user_id uuid",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,crm_log_closer_dashboard_view,"p_tenant_id uuid, p_target_user_id uuid, p_source text, p_period text, p_metadata jsonb",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,crm_log_dynamic_dashboard_runtime_event,"p_tenant_id uuid, p_user_id uuid, p_profile_key text, p_event_type text, p_guard_allowed boolean, p_fallback_used boolean, p_fallback_reason text, p_load_ms integer, p_error_message text, p_metadata jsonb",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,crm_resolve_dashboard_profile,"p_tenant_id uuid, p_user_id uuid, p_preview boolean",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,crm_run_user_context_backfill,"",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,crm_save_user_context,payload jsonb,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,crm_seed_default_dashboard_profiles,p_tenant_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,crm_set_user_dynamic_dashboard,"p_tenant_id uuid, p_user_id uuid, p_enabled boolean",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,crm_submit_dynamic_dashboard_feedback,"p_tenant_id uuid, p_dashboard_type text, p_rating integer, p_is_useful boolean, p_is_confusing boolean, p_is_slow boolean, p_missing_info text, p_comment text, p_metadata jsonb",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,decide_approval,"p_approval_id uuid, p_decision text, p_reason text",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,dedupe_prospect_contacts,p_prospect_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,delete_contract,contract_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,delete_email,"queue_name text, message_id bigint",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,deploy_playbook_version,"p_playbook_id uuid, p_version_label text, p_deployed_by uuid",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,detect_proposal_forward,"p_proposal_id uuid, p_viewer_ip text",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,dismiss_optimization_recommendation,_rec_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,dry_run_detect_operational_proposal_clones,"p_period_start date, p_period_end date",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,dry_run_sync_won_opportunity_values_from_approved_proposals,"p_organization_id uuid, p_start timestamp with time zone, p_end timestamp with time zone",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,email_queue_dispatch,"",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,enqueue_email,"queue_name text, payload jsonb",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,enqueue_nrhs_recalc_for_filters,"p_org_id uuid, p_owner_id uuid",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,enqueue_opportunity_indicators_recalc,"_opportunity_id uuid, _organization_id uuid, _account_id uuid, _trigger_source text, _trigger_action text",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,ensure_proposal_dynamic_pricing_current,p_proposal_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,ensure_proposal_pricing_ready,p_proposal_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,ensure_public_proposal_dynamic_pricing_current,p_token text,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,expire_old_payment_intents,"",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,find_inventory_allocation_candidates,p_pre_reservation_item_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,find_similar_accounts,"p_name text, p_org_id uuid, p_threshold double precision",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,find_similar_accounts,"p_name text, p_org_id uuid, p_threshold numeric, p_tipo_pessoa tipo_pessoa_type, p_parent_account_id uuid",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,finish_headless_humanoid_test_run,p_run_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,fn_apollo_credits_used_today,p_org uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,fn_apollo_should_run,"p_prospect_id uuid, p_org uuid",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,fn_kairos_compute_gtm_performance,p_organization_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,fn_kairos_sync_attribution,p_opportunity_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,fn_list_accounts_for_segmento_backfill,p_limit integer,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,freeze_proposal_approval,"p_proposal_id uuid, p_acceptor_name text, p_acceptor_document text",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,generate_acceptance_hash,"p_proposal_id uuid, p_acceptor_document text, p_timestamp timestamp with time zone",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,generate_dynamic_missions,p_seller_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,generate_event_antecedence_pricing_for_proposal,"p_proposal_id uuid, p_force_regenerate boolean",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,generate_graph_insights,"p_organization_id uuid, p_build_id uuid",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,generate_inventory_pre_reservation_code,org_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,generate_inventory_reservation_code,org_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,generate_proposal_number,"p_org_id uuid, p_prefix text",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,generate_proposal_public_token,"",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,generate_public_form_token,"",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,get_account_rfm_intelligence,"p_organization_id uuid, p_period_start date, p_period_end date, p_owner_id uuid, p_segment text, p_search text",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,get_accounts_porte_summary,_organization_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,get_active_opportunities_count,"p_organization_id uuid, p_pipeline_id text, p_pipeline_type text",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,get_daily_digest_cron_status,"",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,get_database_performance_summary,"",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,get_entity_graph,"p_organization_id uuid, p_entity_type text, p_entity_id uuid, p_depth integer",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,get_forecast_actual_closed_amount_v2,"p_organization_id uuid, p_pipeline_id uuid, p_period_start date, p_period_end date, p_seller_id uuid",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,get_forecast_intelligence_v2,"p_organization_id uuid, p_pipeline_id uuid, p_period_start date, p_period_end date, p_seller_id uuid",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,get_forecast_risk_center_v2,"p_organization_id uuid, p_period_start date, p_period_end date, p_pipeline_id uuid, p_seller_id uuid",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,get_forecast_sales_pipeline_v2,p_organization_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,get_forecast_seller_accuracy_v2,"p_organization_id uuid, p_pipeline_id uuid, p_period_start date, p_period_end date",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,get_forecast_seller_performance_v2,"p_organization_id uuid, p_pipeline_id uuid, p_period_start date, p_period_end date",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,get_forecast_v2_health_check,"p_organization_id uuid, p_period_start date, p_period_end date, p_pipeline_id uuid",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,get_global_seat_metrics,"",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,get_headless_humanoid_health,p_org_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,get_index_usage_stats,"",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,get_inventory_availability_snapshot,"p_start_date date, p_end_date date, p_category_id uuid, p_family_id uuid, p_requested_quantity numeric",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,get_inventory_capacity_by_period,"p_start_date date, p_end_date date, p_category_id uuid, p_family_id uuid",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,get_inventory_category_overview,p_org_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,get_inventory_item_pre_reservation_summary,"p_inventory_item_type text, p_serialized_item_id uuid, p_quantity_item_id uuid",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,get_inventory_occupancy_calendar,"p_start_date date, p_end_date date, p_category_id uuid, p_family_id uuid, p_status text, p_view_mode text",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,get_inventory_pre_reservations_overview,"",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,get_inventory_pricing_pressure,p_window_days integer,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,get_inventory_reservations_overview,"",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,get_invitation_by_token,p_token text,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,get_notification_admin_metrics,"p_organization_id uuid, p_from date, p_to date",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,get_nrhs_analytics,"p_org_id uuid, p_owner_id uuid, p_only_privileged boolean, p_caller_user_id uuid",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,get_opportunity_pending_approvals,p_opportunity_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,get_optimization_impact_summary,_org_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,get_or_create_agent_guardrails,_org_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,get_org_seat_metrics,org_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,get_platform_admin_role,_user_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,get_profile_sensitive_fields,_target_user_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,get_proposal_acceptor_sensitive,_proposal_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,get_proposal_ai_insights_cache,p_proposal_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,get_proposal_analytics_signature,p_proposal_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,get_proposal_by_public_token,p_token text,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,get_relevant_memories,"p_organization_id uuid, p_context text, p_memory_types memory_type[], p_industry text, p_stage text, p_pipeline_id text, p_keywords text[], p_limit integer",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,get_revenue_context,p_opportunity_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,get_scoring_summary,"",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,get_seller_monthly_goal_v2,"p_organization_id uuid, p_seller_id uuid, p_period_start date, p_period_end date",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,get_tables_needing_indexes,"",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,get_team_member_ids,_manager_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,get_user_organization_id,"",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,get_user_permissions,_user_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,get_user_settings_access_level,_user_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,get_user_team_ids,_user_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,get_visible_user_ids,_user_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,hard_delete_old_opportunities,"",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,has_role,"_user_id uuid, _role app_role",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,ignore_proposal_financial_audit_item,"p_audit_item_id uuid, p_note text",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,import_prospect_to_pipeline,"p_prospect_id uuid, p_target_pipeline_type text",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,increment_email_kb_usage,p_kb_ids uuid[],accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,increment_email_knowledge_usage,knowledge_ids uuid[],accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,increment_outreach_metric,"p_organization_id uuid, p_channel text, p_template_type text, p_variant text, p_metric text, p_amount integer",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,increment_usage,"p_org_id uuid, p_metric text, p_period text, p_inc integer",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,initialize_agent_environments,p_organization_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,is_active_org_member,"_org_id uuid, _user_id uuid",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,is_admin_or_owner,"_user_id uuid, _org_id uuid",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,is_admin_or_owner,_user_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,is_feature_enabled,_flag_key text,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,is_org_admin,"_org_id uuid, _user_id uuid",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,is_platform_admin,_user_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,is_platform_admin_for_rls,user_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,is_platform_super_admin,_user_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,is_team_manager,_user_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,is_tenant_admin_or_owner,_tenant_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,is_trial_expired,org_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,kairos_janitor_stale_runs,"",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,list_pre_reservation_item_allocations,p_pre_reservation_item_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,load_noid_performance_gates,p_organization_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,load_noid_performance_preset,p_organization_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,log_proposal_view,"p_proposal_id uuid, p_ip_address text, p_user_agent text, p_referer text",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,log_system_event,"p_trace_id uuid, p_org_id uuid, p_actor_type text, p_actor_id uuid, p_event_type text, p_event_category text, p_action text, p_entity_type text, p_entity_id uuid, p_payload jsonb",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,mark_contact_phone_invalid,"p_contact_id uuid, p_reason text",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,mark_operational_proposal_clone,"p_clone_proposal_id uuid, p_original_proposal_id uuid",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,mark_proposal_financial_audit_item_review,"p_audit_item_id uuid, p_note text",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,mark_proposal_pricing_dirty,p_proposal_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,mark_recommendation_rolled_back,"_rec_id uuid, _user_id uuid, _payload jsonb",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,mark_stale_playbook_runs_failed,"",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,match_email_knowledge,"query_embedding vector, p_organization_id uuid, match_threshold double precision, match_count integer, filter_pipeline_stage text, filter_outcome text, min_quality double precision",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,match_email_knowledge,"p_organization_id uuid, p_query_embedding vector, p_pipeline_stage text, p_min_quality numeric, p_match_count integer",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,mcp_create_permission,"p_organization_id uuid, p_agent_id uuid, p_user_id uuid, p_role_name text, p_tool_id uuid, p_resource_id uuid, p_prompt_id uuid, p_can_read boolean, p_can_suggest boolean, p_can_execute boolean, p_requires_approval boolean, p_max_calls_per_day integer, p_allowed_scopes jsonb, p_status text, p_metadata jsonb",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,mcp_log_audit,"p_entity_type text, p_action text, p_organization_id uuid, p_user_id uuid, p_agent_id uuid, p_entity_id uuid, p_before_json jsonb, p_after_json jsonb, p_metadata jsonb",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,mcp_record_invocation,"p_organization_id uuid, p_tool_id uuid, p_agent_id uuid, p_user_id uuid, p_input_json jsonb",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,mcp_set_permission_status,"p_permission_id uuid, p_status text",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,mcp_update_permission,"p_permission_id uuid, p_can_read boolean, p_can_suggest boolean, p_can_execute boolean, p_requires_approval boolean, p_max_calls_per_day integer, p_allowed_scopes jsonb, p_status text, p_metadata jsonb",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,move_to_dlq,"source_queue text, dlq_name text, message_id bigint, payload jsonb",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,orchestrate_proposal_financials,"p_proposal_id uuid, p_reason text",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,perf_apply_retention_policies,"",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,preview_next_proposal_number,"p_org_id uuid, p_prefix text",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,read_email_batch,"queue_name text, batch_size integer, vt integer",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,recalculate_account_rfm,"p_organization_id uuid, p_period_start date, p_period_end date",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,recalculate_email_kb_quality,p_opportunity_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,recalculate_inventory_pre_reservation_status,p_pre_reservation_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,recalculate_org_mrr,org_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,recalculate_pre_reservation_item_allocation,p_pre_reservation_item_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,recalculate_proposal_pricing_ledger,p_proposal_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,recompute_primary_contact,p_prospect_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,record_memory_read,"p_organization_id uuid, p_memory_id uuid, p_context text, p_entity_type text, p_entity_id uuid, p_triggered_by text, p_user_id uuid, p_ai_function text",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,register_action_execution,"p_action_key text, p_input jsonb, p_entity_type text, p_entity_id uuid, p_surface action_surface",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,reject_hypothesis,"_hypothesis_id uuid, _reason text",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,report_products_cross,"p_start date, p_end date, p_pipelines text[], p_users uuid[]",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,report_products_monthly,"p_start date, p_end date, p_pipelines text[], p_users uuid[], p_top_n integer",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,report_products_sold,"p_start date, p_end date, p_pipelines text[], p_users uuid[]",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,request_approval,"p_action_key text, p_payload jsonb, p_entity_type text, p_entity_id uuid, p_execution_id uuid, p_expires_in_hours integer",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,reset_monthly_volts,"",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,reset_proposal_approval_state,p_proposal_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,resolve_approved_commercial_amount,p_opportunity_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,resolve_approved_commercial_amount_by_proposal,p_proposal_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,resolve_dynamic_pricing_reference_date,p_proposal_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,resolve_historical_qualifier,p_opportunity_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,resolve_historical_seller_at,"p_opportunity_id uuid, p_at timestamp with time zone",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,resolve_manual_discount,"p_proposal_id uuid, p_subtotal_one_time numeric",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,resolve_primary_contact,p_prospect_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,resolve_primary_contact_manual,"p_prospect_id uuid, p_contact_id uuid",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,resolve_proposal_commercial_amount,p_proposal_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,restore_from_snapshot,"p_snapshot_id uuid, p_user_id uuid",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,restore_opportunity,opportunity_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,rollback_playbook_version,"p_playbook_id uuid, p_target_version_id uuid, p_reason text",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,run_headless_humanoid_test,"p_run_id uuid, p_test_key text",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,run_proposal_financial_audit,"p_period_start date, p_period_end date, p_dry_run boolean",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,seed_default_decision_rules,_org_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,seed_default_pricing_factor_rules,p_org_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,seed_inventory_pricing_rules,p_org uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,seed_pre_sales_disqualification_reasons,"p_org_id uuid, p_pipeline_id text",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,seed_recommended_proposal_templates,p_org_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,set_inventory_return_condition,"p_reservation_allocation_id uuid, p_return_condition text, p_return_notes text",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,set_optimization_auto_mode,"_org_id uuid, _enabled boolean",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,start_headless_humanoid_test_run,"",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,sync_enriched_contacts_to_account,"p_prospect_id uuid, p_account_id uuid, p_contact_ids uuid[]",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,sync_won_opportunity_value_from_approved_proposal,p_opportunity_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,try_acquire_dedup_lock,"p_organization_id uuid, p_dedup_key text, p_event_type text, p_window_seconds integer",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,unblock_trial,"org_id uuid, by_user_id uuid, reason text",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,update_inventory_reservation_operational_status,"p_reservation_id uuid, p_new_status text, p_notes text",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,upsert_proposal_ai_insights_cache,"p_organization_id uuid, p_opportunity_id uuid, p_proposal_id uuid, p_analytics_signature text, p_insights_payload jsonb, p_engagement_score numeric, p_engagement_level text, p_close_probability numeric, p_risk_level text, p_recommended_actions jsonb, p_smart_alerts jsonb, p_generated_summary text, p_model_used text, p_tokens_input integer, p_tokens_output integer, p_total_tokens integer",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,user_belongs_to_tenant,_tenant_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,user_can_access_inventory,p_org_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,user_can_access_proposal,"_organization_id uuid, _opportunity_id uuid",accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,user_can_read_eventrix_inventory,p_org_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,user_is_cs,_org_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,user_is_org_admin,_org_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,user_is_org_admin_manager_or_cs,_org_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,user_is_org_admin_or_manager,_org_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,user_is_org_member,_org_id uuid,accepted,Intentional RPC callable by authenticated org members
+0029_authenticated_security_definer_function_executable,validate_proposal_payment_amount,"p_payment_intent_id uuid, p_paid_amount numeric, p_paid_at timestamp with time zone, p_payment_reference text",accepted,Intentional RPC callable by authenticated org members
