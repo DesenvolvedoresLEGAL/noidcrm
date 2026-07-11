@@ -26,12 +26,14 @@ Concluído nesta iteração (Opção B do último ciclo):
 
 | Bucket             | Estado hoje | Classificação alvo   | Ação pendente                                             |
 | ------------------ | :---------: | -------------------- | --------------------------------------------------------- |
-| avatars            |   public    | PUBLIC_APPROVED      | manter — adicionar mime/size limits em migration futura   |
-| organization-logos |   public    | PUBLIC_APPROVED      | manter — idem                                             |
-| product-images     |   public    | PUBLIC_APPROVED      | manter — idem                                             |
-| proposal-layouts   |   public    | PRIVATE_ORG_SCOPED   | **privatizar + policies + backfill de storage_path**      |
-| opportunity-files  |   private   | PRIVATE_ORG_SCOPED   | endurecer policies (uuid cast + membership)                |
-| proposal-pdfs      |   private   | PRIVATE_ORG_SCOPED   | corrigir P-01 (parar de persistir signed URL)              |
+| avatars            |   public    | PUBLIC_APPROVED      | manter — mime/size limits em migration futura              |
+| organization-logos |   public    | PRIVATE_ORG_SCOPED   | **reclassificado 2026-07-11** — privatizar por default; flag público via fluxo deliberado (fase futura) |
+| product-images     |   public    | PUBLIC_APPROVED      | manter — content policy (só imagens genéricas de catálogo, sem PII/preços/propostas) + mime/size limits |
+| proposal-layouts   |   public    | PRIVATE_ORG_SCOPED   | **privatizar + policies + backfill storage_path + signed URL 5–15min** |
+| opportunity-files  |   private   | PRIVATE_ORG_SCOPED   | endurecer policies + renomeação gradual via `storage_path_migration` |
+| proposal-pdfs      |   private   | PRIVATE_ORG_SCOPED   | rollout em 2 etapas (`07a` audit → `07b` enforcement)      |
+
+> Decisões aprovadas em `docs/security/phase2-approval-decisions.md` (2026-07-11).
 
 ## Findings principais
 
