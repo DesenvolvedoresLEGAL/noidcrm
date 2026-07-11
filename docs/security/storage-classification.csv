@@ -1,7 +1,7 @@
 bucket,path_pattern,current_public,proposed_class,rationale,contains_pii,contains_client_data,action_required
 avatars,avatars/<uuid>-<slug>.png,true,PUBLIC_APPROVED,Avatar do próprio usuário exibido em UI compartilhada; sem PII no path,no,no,keep_public_add_mime_size_limits
-organization-logos,<organization_id>/<file>,true,PUBLIC_APPROVED,Logo institucional exibido em propostas públicas e emails; sem PII,no,no,keep_public_add_mime_size_limits
-product-images,<organization_id>/<file>,true,PUBLIC_APPROVED,Imagem comercial exibida em catálogos/propostas públicas; conteúdo aprovado como público pelo dono,no,no,keep_public_add_mime_size_limits
-proposal-layouts,<organization_id>/<layout_id>/<file>,true,PRIVATE_ORG_SCOPED,PDF de termos de contrato/layout preenchido pode incluir dados comerciais e cláusulas específicas por cliente,possible,yes,privatize_migrate_backfill_signed_url
-opportunity-files,<organization_id>/<opportunity_id>/<file>,false,PRIVATE_ORG_SCOPED,Contratos assinados anexos comerciais e documentos financeiros por oportunidade,yes,yes,harden_policies_add_limits
-proposal-pdfs,<organization_id>/<proposal_id>.html,false,PRIVATE_ORG_SCOPED,HTML renderizado da proposta com dados de conta contato e valores,yes,yes,stop_persisting_signed_url_fix_p01
+organization-logos,<organization_id>/<file>,true,PRIVATE_ORG_SCOPED,Reclassificado 2026-07-11: logo institucional só é público quando o cliente ativar deliberadamente publicação externa; default é privado org-scoped,no,possible,privatize_default_add_public_flag_flow
+product-images,<organization_id>/<file>,true,PUBLIC_APPROVED,Imagem genérica de catálogo somente; proibido PII/preços personalizados/propostas/documentos/materiais específicos de cliente,no,no,keep_public_enforce_content_policy_add_mime_size_limits
+proposal-layouts,<organization_id>/<layout_id>/<file>,true,PRIVATE_ORG_SCOPED,PDF de termos de contrato/layout preenchido pode incluir dados comerciais e cláusulas específicas por cliente,possible,yes,privatize_migrate_backfill_signed_url_5_15min_ttl
+opportunity-files,<organization_id>/<resource_type>/<resource_id>/<uuid>.<ext>,false,PRIVATE_ORG_SCOPED,Contratos assinados anexos comerciais e documentos financeiros por oportunidade; rename gradual para remover PII de filenames,yes,yes,harden_policies_gradual_rename_via_storage_path_migration_table
+proposal-pdfs,<organization_id>/<proposal_id>.html,false,PRIVATE_ORG_SCOPED,HTML renderizado da proposta com dados de conta contato e valores,yes,yes,two_stage_pdf_url_deprecation_signed_url_on_demand
