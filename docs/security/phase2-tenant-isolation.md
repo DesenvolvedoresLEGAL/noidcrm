@@ -1,46 +1,60 @@
-# Fase 2 — Suíte de Isolamento Multi-Tenant
+# Fase 2 — Tenant Isolation Suite (Status atualizado)
 
-**Localização:** `src/test/security/tenant-isolation/`
-**Execução manual:** `bunx vitest run src/test/security/tenant-isolation`
-**Execução em CI:** `.github/workflows/tenant-isolation.yml` (opt-in via secret + var de repo)
+Data: 2026-07-11
 
-## Arquitetura da suíte
+## Estado atual
 
-- Fixture cria e destrói 2 orgs + 12 usuários por run em **staging isolado**.
-- Suíte pula tudo por padrão se `TEST_SUPABASE_URL`, `TEST_SUPABASE_ANON_KEY` e
-  `TEST_SUPABASE_SERVICE_ROLE_KEY` não estiverem definidas.
-- Guarda anti-produção: se `TEST_SUPABASE_URL` for o mesmo host do
-  `VITE_SUPABASE_URL`, a suíte aborta antes de criar qualquer fixture.
-- Fixtures usam prefixo `iso-<runId>-*` e são destruídas em `afterAll`.
-- Nenhuma migration de fixture é aplicada em produção.
+- Suíte automatizada criada em `src/test/security/tenant-isolation/`.
+- Workflow `.github/workflows/tenant-isolation.yml` configurado.
+- **Bloqueio**: sem projeto Supabase de staging provisionado, a suíte ainda não foi executada end-to-end. Fixture aborta se `TEST_SUPABASE_URL === VITE_SUPABASE_URL`.
 
-## Escopo (7 arquivos de teste)
+## Progresso — Storage (paralelo ao provisionamento do staging)
 
-| Arquivo | O que valida |
-|---|---|
-| `data-api.test.ts` | Tabelas críticas: usuário de ORG_A nunca lê linhas de ORG_B via Data API |
-| `roles.test.ts` | Matriz de papéis (owner/admin/manager/sales/viewer/cs) segue ADR-002; bloqueio de escalação |
-| `rpcs.test.ts` | RPCs com `p_organization_id` rejeitam ID forjado; anon não pode chamar RPC autenticada |
-| `views.test.ts` | As 10 views corrigidas na Fase 1 não expõem dados cross-org |
-| `storage.test.ts` | Buckets multi-tenant (`opportunity-files`, `proposal-pdfs`) isolados |
-| `realtime.test.ts` | Assinaturas realtime não recebem mudanças cross-org |
-| `invite-switch.test.ts` | Membro em 2 orgs enxerga apenas dados do org ativo |
+Concluído nesta iteração (Opção B do último ciclo):
 
-## Habilitação em CI
+- Inventário completo: `docs/security/storage-inventory.md`.
+- Classificação: `docs/security/storage-classification.csv`.
+- Análise de impacto: `docs/security/storage-impact-analysis.md`.
+- Plano de migração: `docs/security/storage-migration-plan.md`.
+- Migrations preparadas em `supabase/migrations-staged/storage/` (NÃO aplicadas).
+- Testes ampliados em `src/test/security/tenant-isolation/storage.test.ts` cobrindo S1–S12.
+- Script de staging: `scripts/apply-migrations-staging.sh`.
+- Checklist manual: `docs/security/storage-post-migration-checklist.md`.
+- Rollback: `docs/security/storage-rollback-plan.md`.
 
-1. Criar projeto Supabase **exclusivo para testes**.
-2. No repositório, adicionar:
-   - Secret `TEST_SUPABASE_URL`
-   - Secret `TEST_SUPABASE_ANON_KEY`
-   - Secret `TEST_SUPABASE_SERVICE_ROLE_KEY`
-   - Variable `TENANT_ISOLATION_ENABLED = "true"`
-3. Aplicar as mesmas migrations de produção no projeto de teste.
-4. Rodar o workflow manualmente e conferir 100% verde antes de habilitar o cron diário.
+## Buckets
 
-## Restrições respeitadas
+| Bucket             | Estado hoje | Classificação alvo   | Ação pendente                                             |
+| ------------------ | :---------: | -------------------- | --------------------------------------------------------- |
+| avatars            |   public    | PUBLIC_APPROVED      | manter — adicionar mime/size limits em migration futura   |
+| organization-logos |   public    | PUBLIC_APPROVED      | manter — idem                                             |
+| product-images     |   public    | PUBLIC_APPROVED      | manter — idem                                             |
+| proposal-layouts   |   public    | PRIVATE_ORG_SCOPED   | **privatizar + policies + backfill de storage_path**      |
+| opportunity-files  |   private   | PRIVATE_ORG_SCOPED   | endurecer policies (uuid cast + membership)                |
+| proposal-pdfs      |   private   | PRIVATE_ORG_SCOPED   | corrigir P-01 (parar de persistir signed URL)              |
 
-- ✅ Nenhuma fixture persistente em produção
-- ✅ Usuários de teste criados apenas via `auth.admin` em staging
-- ✅ Teardown obrigatório em `afterAll`
-- ✅ Guarda anti-produção dupla (env vazio + comparação de host)
-- ✅ Zero dado ou usuário de teste em produção
+## Findings principais
+
+- **P-01** — `proposals.pdf_url` armazena signed URL de 7 dias. Correção: RPC `resolve_proposal_pdf_path` + trigger que bloqueia persistência.
+- **P-02** — Privatização de `proposal-layouts` quebra `terms_pdf_url`. Correção: coluna `storage_path` + signed URL sob demanda.
+- **P-03/04** — Policies de storage podem ser mais estritas em cast `uuid` e checagem de `organization_members.status='active'`.
+- **P-05** — Nenhum bucket tem `file_size_limit`/`allowed_mime_types` definidos.
+- **P-06** — Falta função utilitária única `getSignedUrl()`.
+
+## Decisões pendentes de aprovação humana
+
+Ver `storage-impact-analysis.md §6`. Nenhuma migração destrutiva será aplicada sem sinal explícito após:
+
+1. Provisionamento do staging + secrets no CI.
+2. Execução end-to-end da suíte (Fase 2 completa).
+3. Aprovação das decisões listadas.
+
+## Bloqueio para Fases 3, 4, 5
+
+Mantido. Fases 3 (segredos no bundle), 4 (backup/restore) e 5 (relatório final) começam **somente** após:
+
+- Fixture rodar 100% no staging com 0 falhas / 0 skips não justificados.
+- Teardown validado (12 usuários + 2 orgs).
+- Evidências salvas em `docs/security/evidence/phase2/`.
+- Inventário/classificação de buckets aceito.
+- Nenhum arquivo sensível permanecendo em bucket público.
