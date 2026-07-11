@@ -10,15 +10,16 @@ Localização das migrations: `supabase/migrations-staged/storage/` — pasta fo
 
 ## Ordem de aplicação
 
-| # | Arquivo                                                          | Descrição                                                                                                    | Idempotente | Rollback                                     |
-| - | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | :---------: | -------------------------------------------- |
-| 1 | `01_add_storage_path_columns.sql`                                | Adiciona `proposal_layouts.storage_path`, `proposal_layout_pages.storage_path`, `proposals.pdf_storage_path` |      ✔      | `ALTER TABLE ... DROP COLUMN`                |
-| 2 | `02_backfill_storage_paths.sql`                                  | Backfill a partir de URLs públicas atuais                                                                    |      ✔      | Colunas nullable — reversível deixando NULL  |
-| 3 | `03_harden_opportunity_files_policies.sql`                       | Substitui policies INSERT/UPDATE por validação estrita via `storage.foldername(name)[1]::uuid`                |      ✔      | `DROP POLICY` + `CREATE POLICY` legada       |
-| 4 | `04_harden_proposal_pdfs_policies.sql`                           | Mesmo padrão em `proposal-pdfs`                                                                               |      ✔      | idem                                         |
-| 5 | `05_privatize_proposal_layouts.sql`                              | Via `supabase--storage_update_bucket` — não SQL; policies novas em `storage.objects`                          |      ✔      | `supabase--storage_update_bucket public=true` |
-| 6 | `06_create_signed_url_rpcs.sql`                                  | `get_proposal_pdf_signed_url`, `get_proposal_layout_signed_url` (SECURITY DEFINER, search_path=public)         |      ✔      | `DROP FUNCTION`                              |
-| 7 | `07_deprecate_pdf_url_persistence.sql`                           | Trigger que impede novos `UPDATE proposals SET pdf_url = <valor não NULL>` fora de service_role                |      ✔      | `DROP TRIGGER`                                |
+| #   | Arquivo                                    | Descrição                                                                                              | Idempotente | Rollback                                      |
+| --- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------ | :---------: | --------------------------------------------- |
+| 1   | `01_add_storage_path_columns.sql`          | Adiciona `storage_path` em `proposal_layouts`, `proposal_layout_pages`, `proposals.pdf_storage_path`   |      ✔      | `ALTER TABLE ... DROP COLUMN`                 |
+| 2   | `02_backfill_storage_paths.sql`            | Backfill a partir de URLs públicas atuais                                                              |      ✔      | Colunas nullable — reversível deixando NULL   |
+| 3   | `03_harden_opportunity_files_policies.sql` | Policies estritas via `storage.foldername(name)[1]::uuid`                                              |      ✔      | `DROP POLICY` + recriar legadas               |
+| 4   | `04_harden_proposal_pdfs_policies.sql`     | Mesmo padrão em `proposal-pdfs`                                                                        |      ✔      | idem                                          |
+| 5a  | `05b_proposal_layouts_policies.sql`        | Policies do bucket privatizado (bucket flip via `supabase--storage_update_bucket`)                     |      ✔      | `supabase--storage_update_bucket public=true` |
+| 6   | `06_create_signed_url_rpcs.sql`            | `resolve_proposal_pdf_path`, `resolve_proposal_layout_path` (SECURITY DEFINER, search_path=public)     |      ✔      | `DROP FUNCTION`                               |
+| 7a  | `07a_pdf_url_write_audit.sql`              | **Etapa 1 — observabilidade**: audita writes em `proposals.pdf_url` sem bloquear                       |      ✔      | `DROP TRIGGER trg_audit_pdf_url_writes`       |
+| 7b  | `07b_pdf_url_enforcement.sql`              | **Etapa 2 — enforcement**: bloqueia writes fora de service_role. Aplicar SÓ após 7a validar cobertura |      ✔      | `DROP TRIGGER trg_block_pdf_url_persistence`  |
 
 **Após deploy do código consumidor** (nova camada de signed URL): remover coluna `proposals.pdf_url` em migration futura, não incluída neste plano.
 
