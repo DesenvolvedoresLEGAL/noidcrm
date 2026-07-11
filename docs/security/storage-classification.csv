@@ -1,0 +1,7 @@
+bucket,path_pattern,current_public,proposed_class,rationale,contains_pii,contains_client_data,action_required
+avatars,avatars/<uuid>-<slug>.png,true,PUBLIC_APPROVED,Avatar do próprio usuário exibido em UI compartilhada; sem PII no path,no,no,keep_public_add_mime_size_limits
+organization-logos,<organization_id>/<file>,true,PUBLIC_APPROVED,Logo institucional exibido em propostas públicas e emails; sem PII,no,no,keep_public_add_mime_size_limits
+product-images,<organization_id>/<file>,true,PUBLIC_APPROVED,Imagem comercial exibida em catálogos/propostas públicas; conteúdo aprovado como público pelo dono,no,no,keep_public_add_mime_size_limits
+proposal-layouts,<organization_id>/<layout_id>/<file>,true,PRIVATE_ORG_SCOPED,PDF de termos de contrato/layout preenchido pode incluir dados comerciais e cláusulas específicas por cliente,possible,yes,privatize_migrate_backfill_signed_url
+opportunity-files,<organization_id>/<opportunity_id>/<file>,false,PRIVATE_ORG_SCOPED,Contratos assinados anexos comerciais e documentos financeiros por oportunidade,yes,yes,harden_policies_add_limits
+proposal-pdfs,<organization_id>/<proposal_id>.html,false,PRIVATE_ORG_SCOPED,HTML renderizado da proposta com dados de conta contato e valores,yes,yes,stop_persisting_signed_url_fix_p01
