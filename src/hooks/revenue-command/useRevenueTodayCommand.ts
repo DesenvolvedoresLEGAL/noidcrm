@@ -126,9 +126,10 @@ export function useRevenueTodayCommand() {
   });
 
   // 5) Receita adicionada nos últimos 7 dias — leitura paralela do SSoT
+  //    (mesmo escopo de pipeline para consistência com Forecast/OTE/Dashboard)
   const last7Start = useMemo(() => subDays(now, 7).toISOString(), [now]);
   const last7Summary = useQuery({
-    queryKey: ['revenue-command:last7', orgId, last7Start, end],
+    queryKey: ['revenue-command:last7', orgId, last7Start, end, salesPipelineFilter?.[0] ?? null],
     enabled: !!orgId,
     staleTime: 30_000,
     queryFn: () =>
@@ -136,6 +137,7 @@ export function useRevenueTodayCommand() {
         organizationId: orgId!,
         start: last7Start,
         end,
+        pipelineIds: salesPipelineFilter ?? null,
       }),
   });
 
