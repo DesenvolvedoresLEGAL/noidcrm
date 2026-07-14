@@ -85,27 +85,31 @@ export function useRevenueTodayCommand() {
   const start = periodStart.toISOString();
   const end = periodEnd.toISOString();
 
-  // 1) Receita válida do mês — fonte oficial (Resultados/Auditoria)
-  const closedSummary = useClosedRevenueSummary({
-    surface: 'revenue-command:today',
-    organizationId: orgId ?? undefined,
-    start,
-    end,
-  });
-
-  // 2) Concentração de receita por vendedor
-  const bySeller = useRevenueBySeller({
-    surface: 'revenue-command:today',
-    organizationId: orgId ?? undefined,
-    start,
-    end,
-  });
-
   // 3) Forecast oficial — exige sales pipeline resolvido
   const { salesPipelineId, salesPipelineStatus } = useForecastSalesPipeline({
     organizationId: orgId,
   });
   const pipelineResolved = salesPipelineStatus === 'resolved' && !!salesPipelineId;
+  const salesPipelineFilter = pipelineResolved && salesPipelineId ? [salesPipelineId] : undefined;
+
+  // 1) Receita válida do mês — fonte oficial (Resultados/Auditoria)
+  //    Restrita ao pipeline de vendas (mesma janela que Forecast/OTE/Dashboard).
+  const closedSummary = useClosedRevenueSummary({
+    surface: 'revenue-command:today',
+    organizationId: orgId ?? undefined,
+    start,
+    end,
+    pipelineIds: salesPipelineFilter,
+  });
+
+  // 2) Concentração de receita por vendedor (mesmo escopo de pipeline)
+  const bySeller = useRevenueBySeller({
+    surface: 'revenue-command:today',
+    organizationId: orgId ?? undefined,
+    start,
+    end,
+    pipelineIds: salesPipelineFilter,
+  });
 
   const forecast = useForecastData({
     periodType: 'monthly',
