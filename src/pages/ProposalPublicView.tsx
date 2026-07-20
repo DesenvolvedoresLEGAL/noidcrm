@@ -325,6 +325,9 @@ export default function ProposalPublicView() {
                 ((proposal as any)?.status === 'accepted' || oneTimeTerm?.discount_percent)
                   ? Number((proposal as any)?.approved_amount ?? oneTimeAmountForPdf)
                   : null,
+              frozenSchedule:
+                (proposal as any)?.status === 'accepted' &&
+                !!(proposal as any)?.approved_payment_schedule,
               dynamicPricingCurrentEndsAt: dynamicPricingEndForInstallments(
                 proposal,
                 oneTimeTerm,
