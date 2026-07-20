@@ -21,7 +21,20 @@ com rollback interno + JWT real por HTTPS (`apikey` publishable, nunca `service_
 | DELETE | não executado | — | fora do escopo autorizado |
 | RPC temporária de probe | REMOVIDA | NSEC-1.2-CHG-004 (cleanup) | `DROP FUNCTION nsec12_probe_insert_account` — §9.8 |
 
-### Demais tabelas (`contacts`, `opportunities`, `activities`, `proposals`, …)
+### `public.contacts`
+
+| Operação | Estado | Autorização | Evidência |
+|---|---|---|---|
+| SELECT | PASS (implícito na Fase 4 SELECT) | NSEC-1.2-CHG (Fase 4) | `phase4-select-report-v1.md` |
+| INSERT canary (owner same-org × 2) | PASS | NSEC-1.2-CHG-005 | 2/2 `ALLOWED_ROLLED_BACK` — `phase4-insert-contacts-jwt-report-v1.md` |
+| INSERT canary cross-org (owner × 2) | PASS — bloqueado | NSEC-1.2-CHG-005 | 2/2 `BLOCKED_RLS` |
+| INSERT canary viewer (same-org × 2) | **FAIL — role escalation** | NSEC-1.2-CHG-005 | 2/2 `ALLOWED_ROLLED_BACK` → `SEC-012` HIGH OPEN |
+| `account_id` FK | não testado | — | fora do escopo do canary |
+| Matriz completa (admin/manager/sales/cs, org_id NULL) | não executada | — | aguardando autorização |
+| UPDATE / DELETE | não executados | — | fora do escopo autorizado |
+| RPC temporária de probe | **MANTIDA** (por mandato) | NSEC-1.2-CHG-005 | `public.nsec12_probe_insert_contact` — rollback `DROP FUNCTION IF EXISTS public.nsec12_probe_insert_contact(uuid, text);` |
+
+### Demais tabelas (`opportunities`, `activities`, `proposals`, …)
 
 Não homologadas para escrita. Aguardando autorização explícita.
 
