@@ -71,12 +71,26 @@
 - [ ] SECURITY GO CONDICIONAL
 - [x] **SECURITY NO-GO**
 
-**Motivo:** P0-01, P0-03, P0-05 e P0-11 permanecem abertos até que o
-ambiente Supabase de staging seja provisionado, a suíte multi-tenant seja
-executada 100% verde e o repositório seja tornado privado (ou decisão
-executiva formal alternativa seja registrada).
+**Motivo:** P0-01, P0-03, P0-05 e P0-11 permanecem abertos.
+A sprint NOID-SECURITY 1.1 foi **interrompida na Fase 0** porque nenhum
+secret de staging (`TEST_SUPABASE_*` / `SUPABASE_STAGING_*`) estava
+disponível no ambiente de execução. Conforme a regra absoluta da 1.1,
+produção **não** foi usada como fallback, nada foi simulado e nenhum
+teste foi marcado como aprovado. Evidência completa em
+`docs/security/staging-environment-evidence-v1.md`.
+
+## Ressalva sobre `.gitignore` (correção herdada da 1.0)
+
+No sandbox Lovable os arquivos `.env` e `.gitignore` são somente-leitura.
+O agente **não** corrigiu o `.gitignore` tracked no repositório na 1.0;
+qualquer frase anterior nesse sentido deve ser lida como "diff proposto,
+não aplicado". A correção depende de commit humano local
+(`git rm --cached .env` + edição do `.gitignore`).
 
 ## Próxima sprint autorizada
 
-**Continuação NOID-SECURITY** — provisionar staging, aplicar staged/storage/*
-em staging, rodar suíte, atualizar este gate.
+**Continuação NOID-SECURITY 1.1** — provisionar staging fora do sandbox,
+cadastrar secrets `TEST_SUPABASE_*` no GitHub Environment `staging`,
+habilitar `TENANT_ISOLATION_ENABLED=true`, tornar repositório privado
+e remover `.env` do tracking; em seguida reexecutar Fase 0 e prosseguir
+com as fases dinâmicas (schema, smoke, multi-tenant, storage, convites).
