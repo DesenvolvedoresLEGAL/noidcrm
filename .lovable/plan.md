@@ -1,82 +1,72 @@
-# Sprint NOID-VERTICAL 0.1 — Product Blueprint v1
+# SPRINT NOID-VERTICAL 0.1.1 — Correção Documental do Blueprint
 
-## Objetivo
+## Escopo
+Edições **exclusivamente** em `docs/product/noid-revenueos-for-events-product-blueprint-v1.md`. Nenhuma outra alteração (código, migration, RLS, RPC, Edge Function, secret, config, dados, memória, plano).
 
-Criar **um único artefato**: `docs/product/noid-revenueos-for-events-product-blueprint-v1.md`, seguindo integralmente o briefing aprovado e as correções obrigatórias (hierarquia de evidência, validação prévia de paths, apêndice de evidências, respeito ao freeze).
+## Passos
 
-## O que NÃO será feito (freeze)
+### 1. Pré-verificação (read-only)
+- `git status --short` → confirmar árvore limpa antes.
+- `code--view` do blueprint atual para localizar Seções 12, 18, 19, 21, 22 e a descrição de fronteira NOID×Eventrix.
+- Confirmar presença das 23 seções + Apêndice A antes da edição.
 
-- Nenhum arquivo funcional será criado, editado ou removido.
-- Nenhuma migration, RPC, RLS, edge function, secret, seed ou dado será tocado.
-- Nenhuma memória (`mem://*`) será criada, editada ou removida.
-- Nenhuma configuração de plataforma será alterada.
-- Nenhum tenant/template/organização será criado.
-- Verificação: `git status --short` continuará mostrando **apenas** o novo arquivo em `docs/product/`.
+### 2. Edições no blueprint (via `code--line_replace`, cirúrgicas)
 
-## Auditoria read-only já realizada nesta sprint (evidências para o Apêndice A)
+**Seção 19 — Governança do Freeze**
+- Reescrever para deixar explícito: freeze 19/07/2026 → 18/08/2026 proíbe expansão funcional mas **permite productização**.
+- Listar as 13 atividades permitidas (Product Fit Audit read-only, NOID Events Template, ocultação de módulos, feature flags/entitlements, remoção de provas sociais não comprovadas, correções na landing, preços/contratos/SLA, correções P0 do Revenue Core, segurança/isolamento multi-tenant, onboarding repetível, ambiente demo, correções para clientes fundadores, correções para operação interna LEGAL/KAIRÓS).
+- Listar as 9 atividades proibidas (novos módulos, agentes, dashboards fora do Core, integrações não-GO-LIVE, funcionalidades experimentais, expansão de escopo, dev exclusivo por cliente, redesign cosmético, automações fora do Revenue Core).
 
-Nível de confiança conforme briefing: schema em produção > migrations > tipos > código funcional > rota/componente/hook > testes > docs > dumps.
+**Seção 12 — Escopo do Revenue Core**
+- Substituir título "Core obrigatório — vendável no primeiro ciclo" por "Escopo-alvo do primeiro ciclo comercial — sujeito à classificação e homologação no Product Fit Audit".
+- Adicionar nota: nada é vendável antes da classificação `PRONTO / CONFIGURAR / CORRIGIR / ADAPTAR / OCULTAR / FUTURO`.
 
-- **Rotas** — `src/App.tsx` mapeado (≈180+ rotas): `/app/*`, `/app/settings/*`, `/app/intelligence/*`, `/app/gtm/*`, `/admin/*`, públicas `/p/:token`, `/f/:token`, `/agendar-demo`, `/docs`.
-- **Páginas** — `src/pages/` (Opportunities, Forecast, RevenueCommandPage, Proposals, ProposalEditor, ProposalPublicView, Products, Accounts, Contacts, Leads, Activities, Reports, OTEReport, Insights, Automation, Onboarding, AcceptInvitation, Login, Signup, Support, Community, Trash, Roleplay, DynamicDashboardPage, NotificationsHistory, MigrationAuditPage, etc.).
-- **Settings** — `NoidInventoryBackupPage`, `EventrixInventorySettings`, `QualificationFrameworkPage`, `PipelineSettings`, `SalesConfigPage`, `PermissionSettings`, `NotificationPreferences`, `CustomFields`, `CustomForms`, `ProposalLayouts`, `ProposalTemplateEditor`, `LossReasons`, `Integrations`, `Origins`, `Industries`, `BusinessUnits`, `DataManagement`, `Account`, `ApiKeysSettings`, `ProductSettings`, `ProductCategories`.
-- **NOID Intelligence (interno)** — `noid-intelligence/*` (Hub, Agents, Builder, Simulator, Outcomes, Approvals, Runs, Metrics, Environments, Permissions, McpRegistry, DecisionRules, LearningPerformance, HeadlessHumanoidLab) + placeholders (Orquestrações/Logs/Ferramentas/Memórias).
-- **Kairós** — `src/pages/intelligence/KairosHub.tsx`, serviços `src/services/intelligence/{autopilot,qualifiedQueue,revenueAttribution,sdrCopilot,coverage}.ts`, edge functions `kairos-*`.
-- **Apollo** — `src/services/enrichment/apolloService.ts`, `apolloPreview.ts`, `src/services/intelligence/apollo{EndpointMatrix,BrowserParity,Invisible}.ts`, `src/pages/intelligence/ApolloRoi.tsx`, edge functions `apollo-*`.
-- **Experimentais** — `Vibe`, `Optimization`, `Experiments`, `Playbooks`, `WinLossHub`, `Graph`, `Memories`, Skills Library.
-- **Qualificação** — `src/lib/qualification/{qualificationScore,qualificationRecommendation,disqualifyReasons}.ts` + testes.
-- **Admin HUMANOID** — `/admin/*` (organizations, users, forensic, revenue, analytics, logs, audit, trash, backup, ai, infrastructure, control-room, trace, plans, revenue-integrity).
-- **Contagens referenciais** — `supabase/migrations/` ≈ **688 arquivos**; `supabase/functions/` ≈ **272 diretórios**. Tratadas como referência, **não** como fato de "todas em uso".
-- **Documentos de segurança** — `docs/security/phase1-rls-audit.md`, `phase2-tenant-isolation.md`, `storage-classification.csv`, `.github/workflows/tenant-isolation.yml`, `supabase/migrations-staged/storage/*`. Tratados como **evidência documental**, não como prova de proteção ativa em produção.
-- **Dump** `database/dumps/00_table_list.sql`: **baixa confiança** (snapshot possivelmente desatualizado). Não usado como fonte primária.
+**Evidências operacionais (Seções relevantes de dashboards/métricas)**
+- Rebaixar status de reconciliação/integração para `EXISTENTE ESTRUTURALMENTE — NECESSITA AUDITORIA OPERACIONAL` em: Dashboard do Closer, Forecast, Revenue Command, Win/Loss, Relatórios, Fonte Única de Receita, integração de indicadores entre módulos.
+- Remover qualquer afirmação de reconciliação operacional definitiva.
 
-## Estrutura do blueprint (23 seções + Apêndice A)
+**Seção 18 — Escopo da Sprint 0.2**
+- Reescrever: inventário macro de todas rotas/Edge Functions/RPCs/tabelas/migrations, com aprofundamento **apenas** em: rotas expostas a clientes, módulos do Revenue Core, módulos a ocultar, tabelas do Revenue Core, RPCs de fluxos ativos, Edge Functions chamadas pelo frontend/automações ativas, migrations relevantes (Revenue Core, onboarding, billing, permissões, RLS, Storage, isolamento multi-tenant), dependências dos Clientes Fundadores.
+- Explicitar: não exige auditoria linha a linha do histórico completo de migrations.
 
-1. Resumo Executivo — definição oficial, fronteira NOID x Eventrix, versão Fundadores.
-2. ICP primário + secundário, comprador, usuário, qualificação, desqualificação, anti-ICP.
-3. Segmentos P1 e P2 com ficha (processo, dores, campos, riscos, indicadores, aderência).
-4. Taxonomia de 22 dores (sintoma, impacto, momento, persona, tratamento, métrica, status).
-5. Proposta de valor: promessa agressiva + institucional, por persona, por segmento, diferenciais.
-6. Fluxos canônicos — pipelines de pré-vendas e vendas (PROPOSTO), ficha por etapa, fluxos transversais.
-7. Campos verticais de eventos (identificação, datas, localização, escopo, comercial, relacionamento).
-8. Framework de qualificação vertical (18 itens + pesos + cortes + comparação com produto atual).
-9. Automações verticais (14 automações, com gatilho, condições, ação, aprovação, status).
-10. Dashboards por persona (SDR, Closer, Gestor, Owner) — com status EXISTENTE/PROPOSTO/NECESSITA AUDITORIA.
-11. Métricas oficiais (pré-vendas, vendas, verticais, gestão) + fontes já comprovadas.
-12. Escopo do Revenue Core (core obrigatório, configurável, add-ons futuros, internos, experimentais).
-13. Itens candidatos a ocultação no 1º ciclo — sem ocultar nada agora; documenta caminho.
-14. Fora do escopo — nunca entra no Revenue Core; fronteiras Eventrix / HumanERP.
-15. NOID Events Template (PROPOSTO) — estrutura, critérios de qualidade, uso.
-16. Critérios de implantação — 12 fases, informações obrigatórias, limites, saneamento.
-17. Critérios de sucesso dos Clientes Fundadores — implantação binária, adoção com baseline, resultado após baseline; regras do programa (sem promessa percentual).
-18. Product Fit Audit — critérios da Sprint 0.2 (PRONTO/CONFIGURAR/CORRIGIR/ADAPTAR/OCULTAR/FUTURO), sem executar aqui.
-19. Governança do freeze — permitido/proibido + árvore de decisão.
-20. Brief comercial de 20/07/2026 — o que vender/não vender, oferta, CTA, papéis.
-21. Riscos e dependências — matriz com mitigação, owner e gate.
-22. Decisões em aberto — opções + recomendação inicial + momento de decisão.
-23. Roadmap imediato — 10 fases até o GO LIVE público.
-- **Apêndice A** — matriz preliminar de evidências (domínio, evidência localizada, tipo, status, confiança, aprofundar em 0.2). Documentos de segurança marcados como *evidência documental* e não como prova operacional. Contagens de migrations/functions declaradas como referenciais.
+**Seção 21 — Novos Bloqueadores P0**
 
-## Regras aplicadas ao texto
+*Bloqueador: Provas sociais não comprovadas na landing*
+- Risco, Probabilidade (Alta), Impacto (Crítico reputacional/jurídico/comercial), Mitigação (remover ou substituir por cases reais com autorização), Owner (Marketing + Produto + Fundador), Gate (antes de qualquer prospect na landing e antes da primeira demo externa).
+- Registrar que a correção é permitida durante o freeze.
 
-- Cada afirmação sobre o produto atual usa: **EXISTENTE / PROPOSTO / NECESSITA AUDITORIA / BLOQUEADOR / RISCO / FUTURO / FORA DO ESCOPO**.
-- Nenhuma feature é dada como "pronta" apenas por existir rota, componente ou nome no código.
-- Nenhuma capacidade é afirmada com base em memórias (`mem://*`); memórias serviram só de contexto.
-- Documentos de segurança são citados como evidência documental — sua efetividade depende de execução da suíte contra staging (item mapeado em Riscos e no Apêndice).
-- Nenhuma promessa percentual, ROI numérico ou case comercial é feita.
+*Bloqueador: Repositório público sem confirmação executiva*
+- Risco, Probabilidade (confirmada no metadata atual do GitHub, sujeita a nova verificação), Impacto (Alto para PI, potencialmente crítico se houver histórico sensível), Mitigação (confirmar intencionalidade, revisar histórico de secrets, tornar privado se não deliberado), Owner (Fundador + Engenharia + Segurança), Gate (imediato, antes do primeiro cliente externo).
+- Deixar explícito: visibilidade do repositório **não** é alterada nesta sprint documental.
 
-## Entregável final
+**Seção 22 — Preços dos Clientes Fundadores**
+- Planos comerciais públicos definitivos: decisão após os 3 primeiros clientes.
+- Condição comercial do Programa Clientes Fundadores: decisão antes da primeira proposta.
+- Preço de implantação assistida: decisão antes da primeira proposta.
+- Mensalidade fundadora: decisão antes da primeira proposta.
+- Comissão provisória da pré-vendas: decisão executiva imediata (outbound inicia 20/07/2026).
+- Comissão definitiva: revisável após baseline comercial.
 
-Um único novo arquivo:
+**Fronteira NOID × Eventrix**
+- Revenue Core inicial do NOID = pré-vendas, vendas, forecast, handoff comercial.
+- Eventrix = execução operacional do evento.
+- CS, renovação, expansão e pós-venda comercial podem permanecer no NOID em fases futuras.
+- Integração NOID → Eventrix classificada como `PROPOSTA` ou `NECESSITA AUDITORIA` até homologação.
+- Remover qualquer afirmação de que a integração já funciona baseada apenas em componentes/snapshots/configs.
 
-```text
-docs/product/noid-revenueos-for-events-product-blueprint-v1.md
-```
+### 3. Validação final
+- `code--view` do blueprint pós-edição: confirmar 23 seções + Apêndice A intactos.
+- `git status --short` e `git diff --stat`: confirmar que **apenas** `docs/product/noid-revenueos-for-events-product-blueprint-v1.md` foi modificado.
+- Nenhum arquivo funcional, migration, RLS, RPC, Edge Function, secret, config ou memória alterado.
 
-## Verificação de freeze pós-escrita
+## Resposta ao usuário
+1. Arquivo corrigido (caminho).
+2. Lista de seções alteradas (12, 18, 19, 21, 22, fronteira NOID×Eventrix, evidências de dashboards).
+3. Contradições resolvidas (freeze vs. productização; "vendável" vs. classificação pendente; evidência estrutural vs. operacional).
+4. Novos bloqueadores registrados (provas sociais na landing; repositório público).
+5. Confirmação: somente o blueprint foi alterado (via `git diff --stat`).
+6. Próxima sprint: NOID-VERTICAL 0.2 — Product Fit Audit.
 
-- `git status --short` deve listar **exclusivamente** esse arquivo (Untracked).
-- `git diff --stat` deve retornar vazio.
-- Nada em `src/`, `supabase/`, `.github/`, `scripts/`, `mem://`, `docs/security/`, `database/`, `public/`, `package.json`, `bun.lockb`, `vite.config.ts`, `tailwind.config.ts`, `tsconfig*.json`.
-
-Aprove para eu escrever o arquivo em build mode.
+## Riscos
+- Baixo — edição puramente documental, sem impacto em runtime, RLS ou dados.
+- Único risco operacional: divergência de linhas ao aplicar `line_replace`; mitigado por `code--view` prévio e edições cirúrgicas.
