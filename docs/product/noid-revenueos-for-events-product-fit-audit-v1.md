@@ -1,26 +1,30 @@
-# NOID RevenueOS for Events — Product Fit Audit v1
+# NOID RevenueOS for Events — Product Fit Audit v1 (normalizado v1.1)
 
 | Campo | Valor |
 |---|---|
-| Status | APROVADO PARA REVISÃO EXECUTIVA |
-| Versão | v1.0 |
-| Data | 2026-07-20 |
+| Status | APROVADO PARA REVISÃO EXECUTIVA — normalização documental 0.2.1 aplicada |
+| Versão | v1.1 (normalização 2026-07-20) |
+| Data original | 2026-07-20 |
 | Owner | Produto + Engenharia + Segurança |
-| Commit auditado | `4115734591d0d19c078f39f2b2542a77e7a5e936` |
-| Branch | `edit/edt-331a1e34-6530-41a2-9ee3-f76e50a6315f` |
+| Commit-base auditado | `4115734591d0d19c078f39f2b2542a77e7a5e936` |
+| Branch de execução original | `edit/edt-331a1e34-6530-41a2-9ee3-f76e50a6315f` (temporária; artefatos disponíveis também no branch atual) |
+| Branch atual dos artefatos | Branch de trabalho ativo da sprint 0.2.1 |
 | Ambiente | Produção Lovable Cloud (ref `urihdqturaebhiefwjnw`) — leitura de metadados apenas |
-| Natureza | Read-only. Nenhum código funcional, migration, RLS, RPC, Edge Function, secret ou dado alterado. |
+| Natureza | Read-only. Nenhum código funcional, migration, RLS, RPC, Edge Function, secret ou dado alterado nesta sprint 0.2.1. |
 | Fonte executiva | `docs/product/noid-revenueos-for-events-product-blueprint-v1.md` |
+| Fonte de contagem oficial | `docs/product/noid-revenueos-for-events-capability-matrix-v1.csv` (parser CSV) |
 | Freeze | 19/07/2026 → 18/08/2026 respeitado |
+
+> **Sprint 0.2.1 — Normalização documental.** As contagens desta seção são derivadas programaticamente da matriz CSV e não de listas narrativas. Foram removidas referências a memórias como evidência técnica, corrigidas divergências de contagem, reclassificados itens `NECESSITA AUDITORIA` (agora marcador em `notes`/`current_status`, nunca classificação principal), corrigida a responsabilidade institucional (HUMANOID conduz implantação externa; LEGAL é operação interna e cliente-base), redistribuído PROP-004 como subcapacidade bloqueadora agregada em P0-03, ajustada a redação sobre migrations versionadas e registrado o estado confirmado do repositório público.
 
 ---
 
 ## 1. Resumo executivo
 
-O NOID RevenueOS possui **estrutura ampla e madura** (413 tabelas RLS-enabled, 1049 policies, 379 funções `SECURITY DEFINER`, 66 views, 272 diretórios de Edge Functions, 688 migrations, 190 páginas React, 302 hooks, 188 services e 98 padrões de rota únicos declarados em `src/App.tsx`). No entanto, **maturidade estrutural não equivale a prontidão comercial**. A auditoria identifica um núcleo de Revenue Core operável, cercado por módulos internos (LEGAL/HUMANOID) e experimentais que não podem ser expostos ao primeiro cliente externo, além de bloqueadores concretos em **onboarding, isolamento comprovado em staging, storage público, landing e visibilidade do repositório**.
+O NOID RevenueOS possui **estrutura ampla e madura** (413 tabelas RLS-enabled, 1.049 policies, 379 funções `SECURITY DEFINER`, 66 views, 272 diretórios de Edge Functions, **688 arquivos de migration versionados em `supabase/migrations/`** — sem confirmação individual de aplicação por objeto no banco —, 190 páginas React, 302 hooks, 188 services e 98 padrões de rota únicos declarados em `src/App.tsx`). No entanto, **maturidade estrutural não equivale a prontidão comercial**. A auditoria identifica um núcleo de Revenue Core operável, cercado por módulos internos (usados pela HUMANOID e pela LEGAL como cliente-base interno) e experimentais que não podem ser expostos ao primeiro cliente externo, além de bloqueadores concretos em **onboarding assistido, isolamento comprovado em staging, storage público, landing, oferta legal e visibilidade do repositório**.
 
 **Recomendação final: GO CONDICIONAL.**
-O NOID pode receber o primeiro Cliente Fundador **após** resolver os P0 listados na Seção 14 e executar as sprints NOID-SECURITY (isolamento em staging), 0.3 (Events Template + ocultação) e NOID-GTM (landing/oferta).
+O NOID pode receber o primeiro Cliente Fundador **após** resolver os 11 bloqueadores P0 consolidados na Seção 13 e executar as sprints NOID-SECURITY (isolamento em staging), NOID-VERTICAL 0.3A (correções P0 do Revenue Core), NOID-VERTICAL 0.3 (Events Template + ocultação) e NOID-GTM (landing e oferta). A implantação, onboarding assistido, configuração de tenant e suporte de clientes externos serão conduzidos pela **HUMANOID PLATFORMS LTDA.** — a LEGAL permanece exclusivamente como operação interna, cliente-base, ambiente de validação e potencial case (se autorizado).
 
 ---
 
@@ -61,7 +65,7 @@ Contagens obtidas via introspecção do repositório e do banco no commit audita
 | Hooks | 302 | `find src/hooks` |
 | Services | 188 | `find src/services` |
 | Diretórios de Edge Functions | 272 | `ls supabase/functions` |
-| Migrations | 688 | `ls supabase/migrations` |
+| Arquivos de migration versionados (não implica aplicação individual verificada) | 688 | `ls supabase/migrations` |
 | Migrations staged (não aplicadas) | 8 | `supabase/migrations-staged/` |
 | Tabelas no schema `public` | 413 | `information_schema.tables` |
 | Tabelas com `organization_id` | 408 | `information_schema.columns` |
@@ -89,7 +93,7 @@ Classificação dos 98 padrões de rota únicos declarados em `src/App.tsx` (lin
 | PUBLIC | 15 | `/`, `/login`, `/signup`, `/forgot-password`, `/reset-password`, `/onboarding`, `/accept-invitation/:token`, `/public/proposal/:token`, `/p/:token`, `/f/:token`, `/terms`, `/privacy`, `/agendar-demo`, `/docs`, `/docs/:category/:slug`, `/status/auth` |
 | CLIENT | ~40 | `/app/dashboard`, `/app/accounts`, `/app/contacts`, `/app/opportunities`, `/app/proposals`, `/app/reports`, `/app/forecast`, `/app/revenue-command`, `/app/activities`, `/app/leads` |
 | OWNER_ADMIN | ~30 | Todo `/app/settings/*` (58 rotas segundo prefix scan) |
-| INTERNAL_LEGAL / EXPERIMENTAL | ~13 | `/app/settings/noid-intelligence/*` (15 subrrotas), `/app/intelligence/kairos`, `/app/intelligence/apollo-roi`, `/app/intelligence/experiments`, `/app/intelligence/skills*`, `/app/intelligence/optimization`, `/app/intelligence/knowledge-graph`, `/app/roleplay/*`, `/app/vibe-selling`, `/app/community`, `/app/ai-operations` |
+| INTERNAL_HUMANOID / EXPERIMENTAL | ~13 | `/app/settings/noid-intelligence/*` (15 subrrotas), `/app/intelligence/kairos`, `/app/intelligence/apollo-roi`, `/app/intelligence/experiments`, `/app/intelligence/skills*`, `/app/intelligence/optimization`, `/app/intelligence/knowledge-graph`, `/app/roleplay/*`, `/app/vibe-selling`, `/app/community`, `/app/ai-operations` |
 | PLATFORM_ADMIN | ~18 | `/admin/*` (organizations, users, forensic, revenue, analytics, logs, audit, trash, backup, ai, infrastructure, settings, control-room, trace/:traceId, plans, plg-score, revenue-integrity) |
 | PLACEHOLDER | 5 | `/app/settings/noid-intelligence/{orchestrations,logs,tools,memories}` |
 
@@ -99,93 +103,126 @@ Inventário completo dos 98 padrões: `rg -n '<Route\s+path=' src/App.tsx` no co
 
 ---
 
-## 6. Resumo do Revenue Core
+## 6. Resumo do Revenue Core e distribuição das classificações
 
-O Revenue Core (Blueprint Seção 12.1) foi mapeado capacidade a capacidade em `noid-revenueos-for-events-capability-matrix-v1.csv`. Distribuição das classificações finais:
+As contagens desta seção são derivadas programaticamente da matriz CSV (`noid-revenueos-for-events-capability-matrix-v1.csv`) e não de listas narrativas. `NECESSITA AUDITORIA` deixou de ser classificação principal e passa a existir apenas como marcador complementar em `notes` e `current_status`. `EXISTENTE ESTRUTURALMENTE` também é apenas `current_status`, nunca classificação. `ATIVO` é `current_status`, não classificação.
 
 | Classificação | Quantidade |
 |---|---:|
 | PRONTO | 4 |
-| CONFIGURAR | 3 |
-| CORRIGIR | 5 |
-| ADAPTAR | 11 |
-| OCULTAR | 8 |
-| NECESSITA AUDITORIA (marcador) | 13 |
+| CONFIGURAR | 2 |
+| CORRIGIR | 18 |
+| ADAPTAR | 16 |
+| OCULTAR | 10 |
+| **Total** | **50** |
 
-Total de capacidades auditadas nesta sprint: **48** (não exaustivo; cobre os 23 domínios obrigatórios do Blueprint).
+Escopo das contagens: **todas as 50 capacidades auditadas nesta sprint**, incluindo capacidades de segurança/governança e módulos internos a ocultar (não apenas o Revenue Core comercial). Recorte "apenas Revenue Core comercial" pode ser derivado do CSV filtrando `owner_suggested` e `domain` — não misturado aqui.
+
+Marcadores complementares (não somam com as classificações principais):
+
+| Marcador | Quantidade | Onde |
+|---|---:|---|
+| Linhas com "NECESSITA AUDITORIA" registrado | 18 | `notes` ou `current_status` |
+| Linhas com `current_status = EXISTENTE ESTRUTURALMENTE` | 15 | `current_status` |
+
+Distribuição por prioridade (extraída do CSV):
+
+| Prioridade | Quantidade |
+|---|---:|
+| P0 | 18 |
+| P1 | 28 |
+| P2 | 4 |
+| **Total** | **50** |
+
+Bloqueadores (`blocker=sim`): **18 capacidades**, agregadas em **11 blocos P0 operacionais** no backlog (várias capacidades OCULTAR compartilham o mesmo bloco P0-02; PROP-004 é subcapacidade agregada em P0-03).
 
 ---
 
 ## 7. Capacidades PRONTAS
 
-- **AUTH-001** Login email+senha.
-- **ORG-002** Memberships e papéis (owner/admin/manager/sales/viewer/cs) + `has_role` DEFINER com `search_path=public`.
-- **PROP-002** Link público de proposta com token (RPC `get_proposal_by_public_token`).
-- **PROP-003** Aceite/recusa/expiração (state machine + trigger para outbox).
-- **DEFINER-001** Hardening `SECURITY DEFINER`: 379 funções revogadas de `PUBLIC EXECUTE` (Fase 1.5).
+Somente capacidades que possuem evidência técnica versionada, autorização server-side aplicável, isolamento correspondente ao contexto e ausência de dependência de memória:
 
-Nenhum item PRONTO isenta a Sprint 0.3 de validar em ambiente limpo de Fundador antes da primeira demo.
+- **AUTH-001** Login email+senha — evidência: `src/pages/Login.tsx`, `docs/auth-login-checklist.md`, `src/lib/authDiagnostics.ts`.
+- **ORG-002** Memberships e papéis + RPC `has_role` com `search_path=public` — evidência: `src/hooks/usePermissions.ts`, `user_roles`, `has_role`, `src/test/hooks/usePermissions.test.tsx`.
+- **CRM-002** Contatos — evidência: `src/services/crm/`, tabela `contacts` com `organization_id`.
+- **DEFINER-001** Hardening estrutural `SECURITY DEFINER` (revogação de `PUBLIC EXECUTE`, `search_path=public`) — evidência: `docs/security/phase1-5-linter-triage.md`, `docs/security/linter-warning-matrix.csv`. **Controle de segurança estrutural**, não é capacidade funcional do Revenue Core.
+
+**PROP-002 e PROP-003 foram rebaixadas** de PRONTO para ADAPTAR + `current_status=EXISTENTE ESTRUTURALMENTE`, pois a evidência original vinha de memórias, e os fluxos público (`get_proposal_by_public_token`) e state-machine (aceite/recusa/expiração) não foram reproduzidos end-to-end nesta sprint.
+
+Nenhum item PRONTO isenta a Sprint 0.3 de validar em ambiente limpo de Cliente Fundador antes da primeira demo. PRONTO **não significa homologado em produção externa**.
+
 
 ---
 
-## 8. Capacidades a CONFIGURAR
+## 8. Capacidades a CONFIGURAR (2)
 
-Não exigem código, apenas conteúdo/configuração no NOID Events Template:
+Não exigem código, apenas conteúdo/configuração no NOID Events Template — conforme matriz:
 
 - **CRM-005** Pipelines padrão Eventos (Pré-vendas, Vendas, Onboarding/CS).
-- **QUAL-001** Framework de qualificação vertical (decisor, data limite de contratação, fornecedor oficial).
-- **WINLOSS-001** Motivos de perda verticais (prazo, fornecedor oficial, orçamento cliente, cancelamento do evento).
-- **IMPEXP-002** Backup Inventário NOID: manter para operação interna; ocultar do cliente.
-- **AUTOM-001** Regras de workflow homologadas (não duplicar atividades).
+- **IMPEXP-002** Backup Inventário NOID: manter para operação interna Eventrix; ocultar do menu cliente.
+
+QUAL-001, WINLOSS-001 e AUTOM-001 foram reclassificados como **ADAPTAR** por exigirem framework/motivos/regras verticais formais no Template (Sprint 0.3), não apenas configuração pontual.
 
 ---
 
-## 9. Capacidades a CORRIGIR
+## 9. Capacidades a CORRIGIR (18)
 
-- **PROP-004** Bucket `proposal-pdfs` — aplicar migrations `07a` (audit) e `07b` (enforcement) staged.
-- **STORAGE-001** Buckets públicos (`proposal-layouts`, `organization-logos`, `product-images`, `avatars`) — privatizar `proposal-layouts` e `organization-logos` conforme decisão executiva aprovada; rename gradual `opportunity-files`.
-- **ONBOARD-001** Onboarding: hoje mistura self-service com dependência operacional; para Fundador, LEGAL executa manualmente.
+Lista completa derivada do CSV (`recommended_classification=CORRIGIR`):
+
+AUTH-003, AUTH-004, TENANT-001, TENANT-002, PROP-004, FORECAST-001, REVCMD-001, DASH-001, DASH-002, DASH-003, REPORTS-001, IMPEXP-001, ONBOARD-001, NOTIF-001, STORAGE-001, LANDING-001, REPO-001, LEGAL-001.
+
+Destaques:
+
+- **PROP-004** Bucket `proposal-pdfs` — subcapacidade bloqueadora agregada no **P0-03 (Storage)**. Não aparece duplicada em P1. Aplicar `07a_pdf_url_write_audit.sql` seguido de `07b_pdf_url_enforcement.sql` em staging.
+- **STORAGE-001** Buckets públicos (`proposal-layouts`, `organization-logos`, `product-images`, `avatars`) — privatizar `proposal-layouts` e `organization-logos` conforme decisão executiva; rename gradual `opportunity-files`.
+- **ONBOARD-001** Onboarding: para o Cliente Fundador, a **HUMANOID conduz a implantação assistida**; não é fluxo self-service.
 - **LANDING-001** Provas sociais/claims não comprovados na landing (Blueprint Seção 21 P0).
-- **LEGAL-001** Termos, Privacidade, DPA e SLA — revisar/completar para Fundadores.
+- **LEGAL-001** Termos, Privacidade, DPA e SLA — revisar/completar para Clientes Fundadores.
+- **REPO-001** Repositório `DesenvolvedoresLEGAL/noidcrm` está configurado como **público** no metadata atual do GitHub — estado **CONFIRMADO**; decisão executiva pendente (Seção 31).
 
 ---
 
-## 10. Capacidades a ADAPTAR
+## 10. Capacidades a ADAPTAR (16)
 
-- **CRM-001** Empresas → campos verticais (organizador, local, pavilhão, estande) via `custom_fields`.
-- **CRM-003** Central SDR → PACE multi-métrica, remover dependência de Kairós.
-- **CRM-004** Oportunidades → relógio do evento, `data_evento`, `data_montagem`, `data_desmontagem`, `data_limite_contratacao` (via `custom_fields` no template).
-- **PROP-001** Propostas → layout PDF vertical Eventos.
-- **AUTH-002** Signup → fechar signup público durante o ciclo Fundadores; entrada apenas por convite.
-- **ORG-001** Criação de organização → operação assistida pela LEGAL para Fundadores.
-- **BILLING-001** Planos e entitlements → configurar plano Fundador manualmente; sem checkout público ativo.
-- **BILLING-002** Trial → nunca aplicar a Fundadores.
-- **AUTOM-001** Automações → regras template idempotentes.
-- **DOCS-001** Docs públicas → curar conteúdo Eventos; remover referências a Kairós/Apollo/Autonomous.
-- **REPO-001** Repositório → decisão executiva de visibilidade + `.gitignore` cobrindo `.env` mesmo em Lovable.
+Lista completa derivada do CSV:
+
+AUTH-002, ORG-001, CRM-001, CRM-003, CRM-004, CRM-006, QUAL-001, PROP-001, PROP-002, PROP-003, WINLOSS-001, BILLING-001, BILLING-002, AUTOM-001, DOCS-001, SUPPORT-001.
+
+Destaques:
+
+- **CRM-001 / CRM-004** — campos verticais Eventos via `custom_fields`.
+- **CRM-003** — Central SDR sem dependência de Kairós; PACE multi-métrica.
+- **PROP-001** — layout PDF vertical Eventos; SSoT valor líquido validada por reprodução.
+- **PROP-002 / PROP-003** — reproduzir fluxo público e state machine end-to-end antes de reclassificar.
+- **AUTH-002** — signup público fechado durante o ciclo Clientes Fundadores; entrada apenas por convite.
+- **ORG-001** — criação de organização assistida pela **HUMANOID** para Clientes Fundadores.
+- **BILLING-001 / BILLING-002** — plano Cliente Fundador interno configurado manualmente pela HUMANOID; sem checkout público; trial nunca aplicado.
+- **DOCS-001** — remover referências a Kairós/Apollo/Autonomous.
 
 ---
 
-## 11. Capacidades a OCULTAR
+## 11. Capacidades a OCULTAR (10)
 
-Módulos internos ou experimentais que **não devem** aparecer para clientes externos no primeiro ciclo. Todos exigem guard de rota (não apenas ocultação de menu):
+Módulos internos ou experimentais que **não devem** aparecer para clientes externos no primeiro ciclo. Todos exigem guard de rota (não apenas ocultação de menu). Uso interno é da **HUMANOID** (operação, implantação, suporte); a **LEGAL** aparece apenas como cliente-base interno e ambiente de validação:
 
-- **INTERNAL-001** Kairós Hub (`/app/intelligence/kairos`) e subseções (Apollo, Coverage, Autopilot, Revenue Attribution, SDR Copilot).
+- **AUDIT-001** `/admin/*` (18 rotas) — permanece platform_admin apenas.
+- **INTERNAL-001** Kairós Hub (`/app/intelligence/kairos`) e subseções — uso interno pela HUMANOID e pela LEGAL como cliente-base.
 - **INTERNAL-002** Apollo ROI (`/app/intelligence/apollo-roi`).
-- **INTERNAL-003** NOID Intelligence Hub inteiro (`/app/settings/noid-intelligence/*` — 15 rotas incluindo Agents, Builder, Simulator, Approvals, Runs, Metrics, Environments, Permissions, MCP Registry, Decision Rules, Learning, HH Lab).
+- **INTERNAL-003** NOID Intelligence Hub inteiro (`/app/settings/noid-intelligence/*` — 15+ rotas: Agents, Builder, Simulator, Approvals, Runs, Metrics, Environments, Permissions, MCP Registry, Decision Rules, Learning, HH Lab).
 - **INTERNAL-004** Optimization Hub, Experiments Hub, Skills Library/Playground, Knowledge Graph.
 - **INTERNAL-005** Roleplay e Video Library.
 - **INTERNAL-006** Vibe Selling.
 - **INTERNAL-007** Community.
 - **INTERNAL-008** AI Operations.
-- **PLACEHOLDER-001** 5 rotas `NoidPlaceholder` (orchestrations, logs, tools, memories, learning).
-- **AUDIT-001** `/admin/*` (18 rotas) — manter oculto para clientes, migrar telas equivalentes cliente-visible para `timeline_events`/audit próprio.
+- **PLACEHOLDER-001** 5 rotas `NoidPlaceholder` (orchestrations, logs, tools, memories).
+
+Total: 10 capacidades OCULTAR na matriz.
 
 ---
 
 ## 12. Capacidades FUTURAS
 
-Fora do primeiro ciclo comercial:
+Fora do primeiro ciclo comercial (não classificadas na matriz, tratadas como escopo futuro):
 
 - Integração operacional NOID → Eventrix homologada (existe estruturalmente; NÃO comprovada).
 - Renovação/expansão/CS avançado (Blueprint 12.1 permite futuro).
@@ -196,31 +233,33 @@ Fora do primeiro ciclo comercial:
 
 ---
 
-## 13. Bloqueadores P0 (ordem de prioridade)
+## 13. Bloqueadores P0 (11 blocos operacionais consolidados)
 
-Lista consolidada — detalhe em `noid-revenueos-for-events-go-live-backlog-v1.md`.
+O CSV registra **18 capacidades com `blocker=sim` e `priority=P0`**. No backlog operacional, essas 18 capacidades foram consolidadas em **11 blocos P0** (várias OCULTAR internas compartilham o mesmo bloco P0-02; PROP-004 é subcapacidade agregada em P0-03). Detalhe individual em `noid-revenueos-for-events-go-live-backlog-v1.md`.
 
-1. **TENANT-001** Isolamento multi-tenant não comprovado em staging (suíte staged, não executada).
-2. **INTERNAL-001..008 + PLACEHOLDER-001 + INTERNAL-003** Módulos internos acessíveis por URL direta.
-3. **STORAGE-001 / PROP-004** Buckets públicos e ausência de enforcement de signed URL para `proposal-pdfs`.
-4. **AUTH-002** Signup público ativo — deve ser desabilitado para o ciclo Fundadores.
-5. **AUTH-004** Aceite de convite não validado end-to-end (token TTL, single-use, isolamento).
-6. **ONBOARD-001** Onboarding para Fundador não é repetível sem operação manual.
-7. **BILLING-001** Fluxo de plano Fundador não separado do fluxo self-service.
-8. **IMPEXP-001** Importação não reproduzida com dedupe/rollback/isolamento.
-9. **LANDING-001** Provas sociais e claims não comprovados.
-10. **LEGAL-001** Termos/Privacidade/DPA/SLA insuficientes.
-11. **REPO-001** Visibilidade do repositório e `.env` versionado (contém apenas publishable/anon; ainda assim `.gitignore` não protege `.env`).
+1. **P0-01 · TENANT-001** — Isolamento multi-tenant não comprovado em staging (suíte staged, não executada).
+2. **P0-02 · INTERNAL-001..004 + INTERNAL-008 + PLACEHOLDER-001** — Módulos internos acessíveis por URL direta.
+3. **P0-03 · STORAGE-001 + PROP-004** — Buckets públicos e ausência de enforcement de signed URL para `proposal-pdfs`.
+4. **P0-04 · AUTH-002** — Signup público ativo; deve ser desabilitado para o ciclo Clientes Fundadores.
+5. **P0-05 · AUTH-004** — Aceite de convite não validado end-to-end (token TTL, single-use, isolamento).
+6. **P0-06 · ONBOARD-001** — Onboarding assistido pela HUMANOID não é repetível como runbook validado.
+7. **P0-07 · BILLING-001** — Plano Cliente Fundador não separado do fluxo self-service.
+8. **P0-08 · IMPEXP-001** — Importação não reproduzida com dedupe/rollback/isolamento.
+9. **P0-09 · LANDING-001** — Provas sociais e claims não comprovados.
+10. **P0-10 · LEGAL-001** — Termos/Privacidade/DPA/SLA insuficientes.
+11. **P0-11 · REPO-001** — Repositório público **CONFIRMADO** no metadata atual do GitHub e `.env` versionado (contém apenas publishable/anon; ainda assim `.gitignore` não protege `.env`). Decisão pendente: tornar privado; ou manter público mediante decisão executiva deliberada, auditoria forense do histórico e aceite formal do risco.
 
 ---
 
 ## 14. Itens P1, P2 e P3
 
-Detalhe completo no backlog. Resumo:
+Contagens derivadas do CSV:
 
-- **P1 (13):** reset de senha end-to-end, memberships/troca org, Central SDR, Oportunidades verticais, atividades, framework qualificação, propostas edição, PDF layouts, Forecast reconciliação, Revenue Command reconciliação, Dashboards em org limpa, Win/Loss motivos verticais, Reports v2 rastreio de fontes, PROP-004 (também classificado abaixo de STORAGE-001), automações.
-- **P2 (3):** contatos (mantidos como estão), backup inventário (configurar), suporte/tickets.
-- **P3 (6):** integração operacional Eventrix, renovação/expansão/CS avançado, OTE avançado, Marketplace skills/MCP, Autonomous produtivo, Community pública.
+- **P1: 28 capacidades** — cobrindo AUTH-001 (validar em staging), TENANT-002, ORG-002, CRM-001..006, QUAL-001, PROP-001..003, FORECAST-001, REVCMD-001, DASH-001..003, WINLOSS-001, REPORTS-001, BILLING-002, AUTOM-001, NOTIF-001, AUDIT-001, INTERNAL-005/006, DEFINER-001, DOCS-001. Detalhe individual no backlog (P1-01..P1-15 sintéticos + demais).
+- **P2: 4 capacidades** — CRM-002 (contatos), IMPEXP-002 (backup inventário), INTERNAL-007 (community oculto), SUPPORT-001 (suporte/tickets).
+- **P3 / FUTURO:** Integração operacional Eventrix, renovação/expansão/CS avançado, OTE avançado, Marketplace skills/MCP, Autonomous produtivo, Community pública. Não representados na matriz de 50 capacidades.
+
+
 
 ---
 
@@ -239,10 +278,10 @@ Tabela de superfícies de risco (não-exaustiva):
 
 | Superfície | Risco | Evidência | Severidade | Exploração provável | Mitigação | Gate |
 |---|---|---|---|---|---|---|
-| Rotas `/app/intelligence/*` e `/app/settings/noid-intelligence/*` acessíveis por URL | Cliente comum vê ferramentas internas | `src/App.tsx` 934–959 sem entitlement específico | ALTA | Baixa em produção controlada; média se URL vazar | Guard de entitlement/plataforma no `ProtectedRoute` | Antes do 1º Fundador |
+| Rotas `/app/intelligence/*` e `/app/settings/noid-intelligence/*` acessíveis por URL | Cliente comum vê ferramentas internas | `src/App.tsx` 934–959 sem entitlement específico | ALTA | Baixa em produção controlada; média se URL vazar | Guard de entitlement/plataforma no `ProtectedRoute` | Antes do 1º Cliente Fundador |
 | `proposal-layouts` bucket público | Layouts com PII/preços expostos | `storage.buckets` `public=true` | ALTA | Requer conhecer o path | Migration `05b` staged | NOID-SECURITY |
 | `pdf_url` gravado por cliente sem enforcement | Bypass signed URL | migrations staged `07a/07b` | MÉDIA | Depende de coluna e do fluxo | Trigger audit primeiro, depois enforcement | NOID-SECURITY |
-| Signup público aberto | Enumeração/pollution de tenants | `/signup` público | MÉDIA | Média | Fechar signup no ciclo Fundadores | Antes do 1º Fundador |
+| Signup público aberto | Enumeração/pollution de tenants | `/signup` público | MÉDIA | Média | Fechar signup no ciclo Clientes Fundadores | Antes do 1º Cliente Fundador |
 | `.env` versionado (publishable apenas) | Exposição de project ref | `git ls-files .env` retorna arquivo | BAIXA (conteúdo é publishable) | Baixa | Adicionar ao `.gitignore` + decisão sobre repo público | NOID-SECURITY |
 | 27 policies `USING (true)` | Falsos positivos + potencial real | listagem já feita | BAIXA a MÉDIA | Depende do caso | Revisão caso-a-caso | Sprint 0.3A |
 
@@ -254,13 +293,13 @@ Ver capacidades AUTH-001..004 e ORG-002. Fluxos base presentes; hardening de con
 
 ## 17. Onboarding
 
-**Não repetível para cliente externo sem operação manual.** Blueprint 12.1 exige capacidade de implantar Fundador sem alteração de código; hoje isso depende de scripts operacionais e ajustes no tenant. Ver ONBOARD-001.
+**Não repetível para cliente externo sem operação manual.** Blueprint 12.1 exige capacidade de implantar o Cliente Fundador sem alteração de código; a HUMANOID conduz a implantação assistida; hoje isso depende de scripts operacionais e ajustes no tenant. Ver ONBOARD-001.
 
 ## 18. Dados e integridade
 
 - `opportunities` tem 113 colunas e `proposals` tem 102 — schema amplo, requer inspeção de campos legados durante a criação do Template (Sprint 0.3).
 - 408/413 tabelas com `organization_id`; as 5 sem incluem catálogos globais (`plans`, `plan_entitlements`, `disposable_email_domains`, `holidays`, `industries`).
-- Triggers documentados na memória (título uppercase, valid_revenue_amount, closed_at imutável) — não reverificados nesta sprint.
+- Triggers referenciados no Blueprint (título uppercase, valid_revenue_amount, closed_at imutável) — não reverificados nesta sprint em ambiente reproduzível.
 
 ## 19. Importação e exportação
 
@@ -268,7 +307,7 @@ Import CSV existe (`/app/settings/data-management`, tabela `import_logs`), mas n
 
 ## 20. Propostas
 
-Fluxo completo mapeado (criação, edição, PDF, layout, token público, aceite, decline, expiração). SSoT de valor líquido em memória. PROP-004 depende das migrations staged.
+Fluxo completo mapeado (criação, edição, PDF, layout, token público, aceite, decline, expiração). SSoT de valor líquido descrita no Blueprint e implementada em `src/lib/proposals/proposalPayments.ts` — não reproduzida end-to-end nesta sprint. PROP-004 depende das migrations staged.
 
 ## 21. Forecast e reconciliação de receita
 
@@ -284,11 +323,11 @@ Closer, CEO e Central SDR foram inventariados. **Nenhum foi validado em org limp
 
 ## 24. Billing e trial
 
-Estrutura de planos, entitlements, subscriptions, trial_blocks e organization_billing_status presente. **Fundador precisa de plano interno separado do checkout self-service** (BILLING-001 P0).
+Estrutura de planos, entitlements, subscriptions, trial_blocks e organization_billing_status presente. **Cliente Fundador precisa de plano interno (configurado pela HUMANOID) separado do checkout self-service** (BILLING-001 P0).
 
 ## 25. Automações
 
-Estrutura presente. **Nenhuma automação deve ser considerada PRONTA para Fundador sem evidência de idempotência, isolamento e logs.**
+Estrutura presente. **Nenhuma automação deve ser considerada PRONTA para o Cliente Fundador sem evidência de idempotência, isolamento e logs.**
 
 ## 26. Observabilidade e suporte
 
@@ -327,22 +366,30 @@ Bloqueador P0 registrado no Blueprint 21. Auditoria detalhada deferida para NOID
 
 ## 31. Risco do repositório público
 
-Evidência coletada em modo read-only:
+Estado registrado nesta sprint (fato atual, não decisão):
 
+- **O repositório `DesenvolvedoresLEGAL/noidcrm` está configurado como público no metadata atual do GitHub.** Status: **CONFIRMADO**.
 - `.env` está **versionado** (`git ls-files .env` retorna o arquivo).
 - Conteúdo do `.env`: apenas variáveis `VITE_*` publishable (Firebase config e Supabase URL/anon key). Nenhum `service_role` ou secret privado localizado.
-- `.gitignore` **não** contém regra para `.env` — regra recomendada mesmo em ambiente Lovable.
+- `.gitignore` **não** contém regra para `.env` — recomendação de higiene independente da decisão sobre visibilidade.
 - Nenhum `service_role` hardcoded em `src/`; único match legítimo em `src/integrations/supabase/client.ts` é uma checagem defensiva.
 - Nenhum dump de dados versionado localizado em `database/dumps/` (apenas DDL estrutural).
-- Visibilidade real do repositório GitHub **não** foi verificada nesta sprint — exige decisão executiva.
 
-**Recomendação:** decisão executiva sobre visibilidade + regra em `.gitignore` + auditoria forense do histórico Git (Sprint NOID-SECURITY). Não expor secrets encontrados neste documento.
+**Decisão pendente (não executada nesta sprint documental):**
+
+1. Tornar o repositório **privado**; ou
+2. Manter público **mediante decisão executiva deliberada**, auditoria forense do histórico Git e aceite formal do risco reputacional/PI.
+
+**Critério de aceite preferencial:** repositório privado, `.env` removido do tracking (após rotação preventiva das chaves publishable se decidido) e histórico auditado. Ver REPO-001 (P0, gate imediato) e P0-11 no backlog.
+
+Não expor secrets encontrados neste documento. **Nesta sprint 0.2.1 nenhuma ação foi executada sobre visibilidade, `.env` ou `.gitignore`.**
+
 
 ## 32. Dependências externas
 
-Firebase (opcional/mock), Supabase (Lovable Cloud), OpenAI (memórias core), Slack (aprovações), Apollo/Firecrawl/ExpoFP (uso interno LEGAL — deve ficar oculto para Fundador), Google Places, Umma ERP, Human ERP.
+Firebase (opcional/mock), Lovable Cloud (backend), OpenAI (integração de IA declarada no Blueprint), Slack (aprovações), Apollo/Firecrawl/ExpoFP (uso interno pela HUMANOID — deve ficar oculto para Clientes Fundadores), Google Places, Umma ERP, Human ERP.
 
-## 33. Critérios para o primeiro cliente fundador
+## 33. Critérios para o primeiro Cliente Fundador
 
 Ver Seção 14 do backlog para o checklist objetivo (Sim / Sim com configuração / Sim após P0 / Não / Não comprovado).
 
@@ -361,7 +408,7 @@ O template pode ser materializado **após** resolver os P0 e conter:
 - Módulos internos ocultos por default.
 - Dados sintéticos mínimos para demo (opcional).
 
-O template **não** deve incorporar: itens CORRIGIR P0, itens FUTURO, itens OCULTAR, internos LEGAL, experimentais, ou capacidades `NECESSITA AUDITORIA` com risco alto.
+O template **não** deve incorporar: itens CORRIGIR P0, itens FUTURO, itens OCULTAR, internos da HUMANOID (uso pela LEGAL como cliente-base), experimentais, ou capacidades `NECESSITA AUDITORIA` com risco alto.
 
 ## 35. Recomendação final
 
@@ -372,9 +419,9 @@ Justificativa: o NOID tem infraestrutura suficiente (RLS 100%, hardening DEFINER
 ## 36. Próximas fases
 
 1. **NOID-SECURITY** — provisionar Supabase de staging, executar suíte de isolamento, aplicar migrations staged de storage, decidir visibilidade do repositório, rotacionar se necessário.
-2. **NOID-VERTICAL 0.3A** — Correções P0 do Revenue Core (signup gate, aceite de convite, onboarding assistido, billing Fundador, importação reproduzida).
+2. **NOID-VERTICAL 0.3A** — Correções P0 do Revenue Core (signup gate, aceite de convite, onboarding assistido, billing Cliente Fundador, importação reproduzida).
 3. **NOID-VERTICAL 0.3 — Events Template** — pipelines, framework, campos, motivos, automações, ocultação de módulos internos, guard de entitlement.
-4. **NOID-GTM** — landing sem claims não comprovados, oferta Fundadores, termos/privacidade/DPA/SLA.
+4. **NOID-GTM** — landing sem claims não comprovados, oferta Clientes Fundadores, termos/privacidade/DPA/SLA.
 
 ## 37. Apêndice de evidências
 
@@ -387,3 +434,35 @@ Justificativa: o NOID tem infraestrutura suficiente (RLS 100%, hardening DEFINER
 - `src/App.tsx` (rotas), `src/test/security/tenant-isolation/**` (suíte).
 - Supabase catalog: 413 tabelas, 1049 policies, 379 funções DEFINER, 66 views, 6 buckets, 27 policies `USING(true)`.
 - Commit auditado `4115734591d0d19c078f39f2b2542a77e7a5e936`.
+
+---
+
+## 38. Proveniência da sprint 0.2.1 (normalização documental)
+
+| Campo | Valor |
+|---|---|
+| Sprint | NOID-VERTICAL 0.2.1 — Normalização dos Artefatos do Product Fit Audit |
+| Commit-base auditado | `4115734591d0d19c078f39f2b2542a77e7a5e936` |
+| Branch de execução original da sprint 0.2 | `edit/edt-331a1e34-6530-41a2-9ee3-f76e50a6315f` (temporária) |
+| Branch em que os artefatos estão disponíveis | Branch ativo de trabalho da sprint 0.2.1 (a branch original pode não estar mais resolvível no GitHub; os artefatos encontram-se disponíveis no branch atual) |
+| Data e horário da normalização | 2026-07-20 (America/Sao_Paulo) |
+| SHA atual dos três documentos | Registrado pelo controle de versão no momento da revisão (não fixado aqui para evitar divergência com o commit da normalização) |
+| Escopo permitido | Editar exclusivamente `noid-revenueos-for-events-product-fit-audit-v1.md`, `noid-revenueos-for-events-capability-matrix-v1.csv`, `noid-revenueos-for-events-go-live-backlog-v1.md` |
+| Alterações fora do escopo | Nenhuma. Nenhum código funcional, migration, banco, RLS, RPC, Edge Function, Storage, secret, `.env`, `.gitignore`, landing, signup, rota, tenant, template, billing, deploy, publish ou visibilidade de repositório foi alterado. |
+
+Contagens autoritativas (parser CSV, `docs/product/noid-revenueos-for-events-capability-matrix-v1.csv`):
+
+| Métrica | Valor |
+|---|---:|
+| Total de capacidades | 50 |
+| PRONTO | 4 |
+| CONFIGURAR | 2 |
+| CORRIGIR | 18 |
+| ADAPTAR | 16 |
+| OCULTAR | 10 |
+| P0 | 18 |
+| P1 | 28 |
+| P2 | 4 |
+| Bloqueadores (`blocker=sim`) | 18 |
+| Blocos P0 operacionais consolidados no backlog | 11 |
+| Ocorrências de `mem:`, `mem://`, `memory`, `memória`, `memórias` em campo de evidência do CSV | 0 |
