@@ -365,16 +365,16 @@ Conjunto vertical recomendado. Nenhuma será implementada aqui.
 | Dashboard | Persona | Pergunta que responde | Fonte principal (a validar) | Status no produto |
 |---|---|---|---|---|
 | Central SDR | SDR | "Quais leads devo trabalhar agora?" | Pipelines de pré-vendas + fila priorizada | NECESSITA AUDITORIA |
-| Dashboard do Closer | Closer | "Onde perco receita hoje?" | `useCloserDashboardData` (`src/hooks/dashboard/`) | EXISTENTE (rota + hook) — completude do vertical NECESSITA AUDITORIA |
+| Dashboard do Closer | Closer | "Onde perco receita hoje?" | `useCloserDashboardData` (`src/hooks/dashboard/`) | EXISTENTE ESTRUTURALMENTE — NECESSITA AUDITORIA OPERACIONAL |
 | Dashboard do Gestor | Gestor | "Meu time bate a meta?" | Agregação por dono | NECESSITA AUDITORIA |
-| Forecast | Gestor / Owner | "Onde estou vs. meta, com qual confiança?" | Forecast unificado (regra registrada: `calculateForecastScenarios`) | EXISTENTE (rota `/app/forecast`) — completude vertical NECESSITA AUDITORIA |
-| Revenue Command | Owner | "Realizado, gap, concentração, run rate" | `commercial_won_revenue_view` restrita ao pipeline sales primário | EXISTENTE (rota `/app/revenue-command`) — SSoT recentemente alinhada com Forecast |
-| Win/Loss | Gestor / Owner | "Por que ganho/perco?" | `WinLossHub` (`src/pages/intelligence/`) | EXISTENTE — aderência vertical NECESSITA AUDITORIA |
-| Relatórios comerciais | Gestor / RevOps | "Cortes por vendedor/segmento/período" | Relatórios v2 | NECESSITA AUDITORIA |
+| Forecast | Gestor / Owner | "Onde estou vs. meta, com qual confiança?" | Forecast unificado (regra registrada: `calculateForecastScenarios`) | EXISTENTE ESTRUTURALMENTE — NECESSITA AUDITORIA OPERACIONAL |
+| Revenue Command | Owner | "Realizado, gap, concentração, run rate" | `commercial_won_revenue_view` restrita ao pipeline sales primário | EXISTENTE ESTRUTURALMENTE — NECESSITA AUDITORIA OPERACIONAL (SSoT recentemente alinhada com Forecast por correção pontual; **reconciliação operacional definitiva será provada na Sprint 0.2**) |
+| Win/Loss | Gestor / Owner | "Por que ganho/perco?" | `WinLossHub` (`src/pages/intelligence/`) | EXISTENTE ESTRUTURALMENTE — NECESSITA AUDITORIA OPERACIONAL |
+| Relatórios comerciais | Gestor / RevOps | "Cortes por vendedor/segmento/período" | Relatórios v2 | EXISTENTE ESTRUTURALMENTE — NECESSITA AUDITORIA OPERACIONAL |
 | Propostas em risco | Closer / Gestor | "Que propostas vão morrer?" | Combinação de proposals + views + atividades | PROPOSTO (parcialmente coberto por Dashboard Closer) |
 | Eventos próximos sem definição | Gestor | "O que fecha esta semana?" | Corte por data do evento | PROPOSTO |
 
-**Nenhum dashboard será criado ou redesenhado nesta sprint.**
+**Nenhum dashboard será criado ou redesenhado nesta sprint.** A **reconciliação operacional entre módulos** (Dashboard do Closer, Forecast, Revenue Command, Win/Loss, Relatórios e Fonte Única de Receita) **não pode ser afirmada como definitiva** com base apenas em rota + componente + hook — precisa de teste e rastreamento da fonte de dados na Sprint 0.2.
 
 ---
 
