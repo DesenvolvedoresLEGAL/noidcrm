@@ -10,6 +10,8 @@
 | Matriz | `noid-revenueos-for-events-capability-matrix-v1.csv` |
 | Freeze | 19/07/2026 → 18/08/2026 respeitado |
 
+> **Sprint 0.2.1 — normalização documental.** Responsabilidade institucional: a **HUMANOID PLATFORMS LTDA.** é a fornecedora, conduz onboarding, implantação assistida, suporte e configuração de tenant para clientes externos. A **LEGAL** é operação interna, cliente-base, ambiente de origem/validação e usuária de ferramentas internas (KAIRÓS, Apollo). Contagens deste backlog são derivadas programaticamente do CSV `noid-revenueos-for-events-capability-matrix-v1.csv`: 50 capacidades totais (4 PRONTO, 2 CONFIGURAR, 18 CORRIGIR, 16 ADAPTAR, 10 OCULTAR); 18 capacidades P0 consolidadas em 11 blocos operacionais; 28 P1; 4 P2. PROP-004 é subcapacidade bloqueadora agregada em P0-03 (Storage) — não duplicada em P1.
+
 Este backlog **NÃO** implementa nada. É a lista priorizada e verificável do que precisa acontecer antes/depois de receber o primeiro Cliente Fundador.
 
 ---
@@ -61,7 +63,7 @@ Este backlog **NÃO** implementa nada. É a lista priorizada e verificável do q
 - **Executável durante o freeze?** SIM.
 - **Sprint sugerida:** NOID-SECURITY.
 
-### P0-04 · Signup público fechado durante ciclo Fundadores
+### P0-04 · Signup público fechado durante ciclo Clientes Fundadores
 - **Domínio:** Auth.
 - **Problema:** `/signup` aberto ao público. Blueprint 12.1 exige entrada exclusiva por convite.
 - **Evidência:** `src/App.tsx:386`.
@@ -93,22 +95,22 @@ Este backlog **NÃO** implementa nada. É a lista priorizada e verificável do q
 - **Evidência:** `src/pages/Onboarding.tsx`; `onboarding_status`.
 - **Impacto:** Fundador chega em produto vazio ou inconsistente.
 - **Risco:** ALTO comercial.
-- **Correção:** Definir runbook operacional LEGAL + Events Template semear organização.
+- **Correção:** Definir runbook operacional HUMANOID + Events Template semear organização.
 - **Dependências:** P0-02 (ocultação), Sprint 0.3 (Template).
 - **Owner:** Produto + Engenharia.
-- **Critério de aceite:** Um Fundador criado zero-a-utilizável em ≤ 60 minutos, sem alteração de código.
+- **Critério de aceite:** Um Cliente Fundador criado zero-a-utilizável em ≤ 60 minutos, sem alteração de código.
 - **Executável durante o freeze?** SIM.
 - **Sprint sugerida:** 0.3.
 
-### P0-07 · Plano Fundador separado do fluxo self-service
+### P0-07 · Plano Cliente Fundador separado do fluxo self-service
 - **Domínio:** Billing.
 - **Problema:** Não há isolamento entre plano interno (Fundador) e planos public-facing. Trial pode bloquear Fundador.
 - **Evidência:** `plans`, `plan_entitlements`, `billing_subscriptions`, `trial_blocks`.
-- **Impacto:** Fundador bloqueado por trial ou faturado indevidamente.
+- **Impacto:** Fundador bloqueado por trial ou faturado indevidamente pela HUMANOID.
 - **Risco:** ALTO comercial.
 - **Correção:** Definir plano interno "Founder" com entitlements adequados; configurar tenants manualmente; nenhum checkout público ativo.
 - **Owner:** Produto + Engenharia.
-- **Critério de aceite:** Fundador nunca é bloqueado por trial; nenhum caminho de checkout public-facing ativo antes de NOID-GTM.
+- **Critério de aceite:** Cliente Fundador nunca é bloqueado por trial; nenhum caminho de checkout public-facing ativo antes de NOID-GTM.
 - **Executável durante o freeze?** SIM (configuração + productização).
 - **Sprint sugerida:** 0.3A.
 
@@ -144,17 +146,17 @@ Este backlog **NÃO** implementa nada. É a lista priorizada e verificável do q
 
 ### P0-11 · Decisão sobre visibilidade do repositório e higiene do `.env`
 - **Domínio:** Segurança / PI.
-- **Problema:** `.env` está versionado (contém apenas publishable/anon Supabase e Firebase), `.gitignore` não protege `.env`. Visibilidade do repositório GitHub não confirmada nesta sprint.
-- **Evidência:** `git ls-files .env` retorna o arquivo; `.gitignore` inspecionado.
-- **Correção:** Decisão executiva sobre visibilidade + adicionar `.env` ao `.gitignore` + auditoria forense do histórico se público + rotação preventiva se necessária.
+- **Estado atual (CONFIRMADO):** o repositório `DesenvolvedoresLEGAL/noidcrm` está configurado como **público** no metadata atual do GitHub. `.env` está versionado (contém apenas publishable/anon Supabase e Firebase); `.gitignore` não protege `.env`.
+- **Evidência:** metadata atual do repositório GitHub; `git ls-files .env` retorna o arquivo; `.gitignore` inspecionado. Prioridade: **P0**, gate: **imediato**.
+- **Correção:** Decisão executiva sobre visibilidade (privado ou público com aceite formal) + adicionar `.env` ao `.gitignore` + auditoria forense do histórico + rotação preventiva se necessária. Nenhuma ação executada nesta sprint documental.
 - **Owner:** Fundador + Engenharia + Segurança.
-- **Critério de aceite:** Repositório privado OU auditoria forense assinada + rotação completa; `.gitignore` cobre `.env`, `.env.local`, `.env.*.local`.
+- **Critério de aceite:** Critério preferencial: repositório **privado**, `.env` removido do tracking e histórico auditado. Alternativa: mantém público mediante decisão executiva deliberada + auditoria forense do histórico + aceite formal do risco. Em qualquer cenário, `.gitignore` cobre `.env`, `.env.local`, `.env.*.local`.
 - **Executável durante o freeze?** SIM.
 - **Sprint sugerida:** NOID-SECURITY.
 
 ---
 
-## P1 — Necessário para o primeiro ciclo
+## P1 — Necessário para o primeiro ciclo (28 capacidades no total, ver matriz CSV)
 
 Formato resumido; detalhe em `noid-revenueos-for-events-capability-matrix-v1.csv`.
 
@@ -176,7 +178,7 @@ Formato resumido; detalhe em `noid-revenueos-for-events-capability-matrix-v1.csv
 
 ---
 
-## P2 — Productização posterior ao primeiro cliente
+## P2 — Productização posterior ao primeiro cliente (4 capacidades: CRM-002, IMPEXP-002, INTERNAL-007, SUPPORT-001)
 
 - **P2-01 Contatos** (CRM-002) — manter atual; melhorias posteriores.
 - **P2-02 Backup Inventário NOID** (IMPEXP-002) — configurável, ocultável.
@@ -254,7 +256,7 @@ Exigem pequenos ajustes verticais:
 
 ---
 
-## Itens FUTURO (não trabalhar no ciclo Fundadores)
+## Itens FUTURO (não trabalhar no ciclo Clientes Fundadores)
 
 - Integração NOID → Eventrix operacional homologada.
 - Marketplace de Skills / MCP público.
