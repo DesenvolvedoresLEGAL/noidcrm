@@ -286,3 +286,166 @@ Não executado nesta rodada: os 108 probes; expansão para `contacts`,
 `opportunities`, `activities`; UPDATE/DELETE; Storage; cleanup da RPC
 temporária. Nenhuma dessas etapas será iniciada sem autorização
 específica.
+
+## 9. NSEC-1.2-CHG-004 — Matriz completa de INSERT em `accounts` + remoção da RPC
+
+**Autorização:** `NSEC-1.2-CHG-004` (usuário, mensagem desta sessão).
+**Data (UTC):** 2026-07-20.
+**Escopo:** exclusivamente `public.accounts`. Nenhuma outra tabela, nenhum
+UPDATE/DELETE, nenhuma nova migration de policy.
+
+### 9.1 Baseline pré
+
+| Métrica | Valor |
+|---|---|
+| `accounts` sintéticas ativas (`deleted_at IS NULL`) | 0 |
+| `accounts` sintéticas totais (tombstone incluído) | 1 |
+| `accounts` reais ativas | 4781 |
+| `lead_score_recalc_queue` sintéticas | 0 |
+| `notifications` sintéticas | 0 |
+| `interactions` sintéticas | 0 |
+| `revenue_events` sintéticos | 0 |
+| `system_events` sintéticos | 0 |
+| `entity_snapshots` sintéticos (não tombstone) | 0 |
+| `audit_log` sintéticos (tombstone anterior) | 1 |
+
+### 9.2 Validação de `org_role`
+
+| Org | user_id (mascarado) | `role` (legacy) | `org_role` |
+|---|---|---|---|
+| A | `58c9eb37…` | owner | owner |
+| A | `2fc41788…` | admin | admin |
+| A | `70f0f9de…` | member | manager |
+| A | `ec646ad0…` | member | sales |
+| A | `84cfb07e…` | member | viewer |
+| A | `6da9ebee…` | member | cs |
+| B | `4ac56488…` | owner | owner |
+| B | `e29eef51…` | admin | admin |
+| B | `13668a50…` | member | manager |
+| B | `56eed1b0…` | member | sales |
+| B | `ea6ca3ef…` | member | viewer |
+| B | `c8a897f4…` | member | cs |
+
+Confirmado: `manager`, `sales`, `cs` gravam com `role='member'` +
+`org_role` funcional; `viewer` idem. A policy RESTRICTIVE usa `org_role`
+primeiro e cai para `role` legado apenas quando `org_role IS NULL`.
+
+### 9.3 Bloco 1 — SAME-ORG (12 probes via RPC)
+
+`test_run_id = chg004_<ts>`. Prefixo `SECURITY_TEST_WRITE_`. JWT sintético
+real + `apikey` publishable. Nenhum service_role no header.
+
+| # | Ator | Alvo | Esperado | Observado | Veredicto |
+|---|---|---|---|---|---|
+| 1 | Owner A | Org A | `ALLOWED_ROLLED_BACK` | `ALLOWED_ROLLED_BACK` | ✅ |
+| 2 | Admin A | Org A | `ALLOWED_ROLLED_BACK` | `ALLOWED_ROLLED_BACK` | ✅ |
+| 3 | Manager A | Org A | `ALLOWED_ROLLED_BACK` | `ALLOWED_ROLLED_BACK` | ✅ |
+| 4 | Sales A | Org A | `ALLOWED_ROLLED_BACK` | `ALLOWED_ROLLED_BACK` | ✅ |
+| 5 | Viewer A | Org A | `BLOCKED_RLS` | `BLOCKED_RLS` | ✅ |
+| 6 | CS A | Org A | `ALLOWED_ROLLED_BACK` | `ALLOWED_ROLLED_BACK` | ✅ |
+| 7 | Owner B | Org B | `ALLOWED_ROLLED_BACK` | `ALLOWED_ROLLED_BACK` | ✅ |
+| 8 | Admin B | Org B | `ALLOWED_ROLLED_BACK` | `ALLOWED_ROLLED_BACK` | ✅ |
+| 9 | Manager B | Org B | `ALLOWED_ROLLED_BACK` | `ALLOWED_ROLLED_BACK` | ✅ |
+| 10 | Sales B | Org B | `ALLOWED_ROLLED_BACK` | `ALLOWED_ROLLED_BACK` | ✅ |
+| 11 | Viewer B | Org B | `BLOCKED_RLS` | `BLOCKED_RLS` | ✅ |
+| 12 | CS B | Org B | `ALLOWED_ROLLED_BACK` | `ALLOWED_ROLLED_BACK` | ✅ |
+
+10 `ALLOWED_ROLLED_BACK` + 2 `BLOCKED_RLS` (viewers) exatamente como esperado.
+
+### 9.4 Bloco 2 — CROSS-ORG (12 probes via RPC)
+
+Todos os 12 papéis apontando para a organização oposta. Todos retornaram
+`BLOCKED_RLS`. Nenhuma exceção.
+
+| Ator | Alvo | Resultado |
+|---|---|---|
+| Owner/Admin/Manager/Sales/Viewer/CS A | Org B | `BLOCKED_RLS` (6/6) ✅ |
+| Owner/Admin/Manager/Sales/Viewer/CS B | Org A | `BLOCKED_RLS` (6/6) ✅ |
+
+### 9.5 Bloco 3 — `organization_id` nulo (2 probes diretos)
+
+RPC não alterada. INSERT direto via PostgREST em `/rest/v1/accounts` com
+JWT do owner sintético, `apikey` publishable, sem service_role.
+
+| # | Ator | Payload | HTTP | Resultado |
+|---|---|---|---|---|
+| 1 | Owner A | `{organization_id: null, razao_social: "SECURITY_TEST_WRITE_…_a_owner_null"}` | 403 | RLS bloqueou (`code 42501`, "new row violates row-level security policy") ✅ |
+| 2 | Owner B | idem Org B | 403 | RLS bloqueou (`code 42501`) ✅ |
+
+RLS já barra antes do NOT NULL — cobertura estrutural suficiente.
+
+### 9.6 Totais
+
+| Métrica | Valor |
+|---|---|
+| Probes obrigatórios previstos | 24 |
+| Probes de `organization_id` nulo | 2 |
+| Total executado | 26 |
+| Aprovados | 26 |
+| Reprovados | 0 |
+
+### 9.7 Baseline pós + smoke test
+
+| Métrica | Pré | Pós |
+|---|---|---|
+| `accounts` sintéticas ativas | 0 | 0 |
+| `accounts` sintéticas totais | 1 | 1 |
+| `accounts` reais ativas | 4781 | 4781 |
+| `lead_score_recalc_queue` sintéticas | 0 | 0 |
+| `notifications` sintéticas | 0 | 0 |
+| `interactions` sintéticas | 0 | 0 |
+| `revenue_events` sintéticos | 0 | 0 |
+| `system_events` sintéticos | 0 | 0 |
+| `entity_snapshots` sintéticos | 0 | 0 |
+| `audit_log` sintéticos | 1 | 1 |
+
+Rollback interno da RPC + policy RESTRICTIVE nos viewers impediram
+qualquer efeito derivado. Tombstone anterior inalterado.
+
+Smoke read-only:
+- `SELECT count(*) WHERE deleted_at IS NULL` = 4781 (idêntico).
+- Tela `/app/companies` continua carregando (React Query realtime).
+- Nenhum erro novo relacionado a RLS de `accounts` no console.
+- Nenhuma organização real perdeu leitura.
+
+### 9.8 Remoção da RPC temporária
+
+Migration de cleanup aplicada (após 26/26 probes verdes):
+
+```sql
+REVOKE ALL ON FUNCTION public.nsec12_probe_insert_account(uuid, text)
+  FROM PUBLIC, authenticated, anon, service_role;
+DROP FUNCTION IF EXISTS public.nsec12_probe_insert_account(uuid, text);
+```
+
+Verificações pós-remoção:
+
+| Verificação | Estado |
+|---|---|
+| `pg_proc.proname = 'nsec12_probe_insert_account'` | ✅ 0 linhas |
+| Grants residuais | ✅ nenhum (função inexistente) |
+| Referências no frontend (`src/`) | ✅ nenhuma funcional (apenas types.ts autogerado, regenera após próximo pull) |
+| Referências em Edge Functions | ✅ nenhuma |
+| Policy `nsec12_accounts_insert_block_viewer` | ✅ ativa |
+| Policies permissivas prévias | ✅ preservadas (`Org members can insert accounts`, `Users insert accounts in own org`, `Users view org accounts`, `Users update accounts in own org`, `Admins delete accounts in own org`) |
+| `accounts` reais ativas | ✅ 4781 (idêntico) |
+
+### 9.9 Decisão final
+
+**`ACCOUNTS INSERT HOMOLOGADO` — NSEC-1.2-CHG-004 VALIDATED.**
+
+- 12/12 same-org conforme matriz (10 permitidos, 2 viewers bloqueados).
+- 12/12 cross-org bloqueados.
+- 2/2 `organization_id` nulo bloqueados por RLS.
+- `org_role` respeitado para manager/sales/cs (permitidos) e viewer (bloqueado).
+- Baseline pré/pós idêntico. Zero persistência. Zero efeito derivado.
+- RPC temporária removida. Policy `nsec12_accounts_insert_block_viewer` ativa.
+- Rollback disponível em um único `DROP POLICY`.
+- Dados reais intocados.
+
+### 9.10 PARADO
+
+Não iniciar: contacts, opportunities, activities, proposals, UPDATE,
+DELETE, RPCs do produto, Views, Edge Functions, Importação,
+Notificações, Storage, Signup, Convites, novas correções de policy,
+publish. Aguardando nova autorização explícita.
