@@ -406,9 +406,11 @@ Cobertura de pipeline · Forecast · Commit · Best case · Gap para meta · Pip
 
 ## 12. Escopo do NOID Revenue Core
 
-### 12.1 Core obrigatório (APROVADO — vendável no primeiro ciclo)
+### 12.1 Escopo-alvo do primeiro ciclo comercial — sujeito à classificação e homologação no Product Fit Audit
 
 Empresas · Contatos · Leads · Oportunidades · Pipelines · Atividades · Próximos passos · Pré-vendas · Qualificação · Handoff · Vendas · Produtos e serviços · Propostas · Motivos de perda · Motivos de desqualificação · Forecast · Revenue Command · Win/Loss · Dashboards por função · Relatórios · Importação · Exportação · Usuários · Equipes · Papéis · Permissões · Auditoria básica · Notificações · Automações homologadas · Implantação assistida · Treinamento · Suporte inicial.
+
+**Nenhum módulo desta lista é considerado definitivamente vendável antes de ser classificado, na Sprint 0.2, em uma das categorias:** `PRONTO / CONFIGURAR / CORRIGIR / ADAPTAR / OCULTAR / FUTURO`. A lista acima define o **alvo** do primeiro ciclo, não uma garantia de prontidão comercial de cada capacidade.
 
 ### 12.2 Core configurável (APROVADO)
 
