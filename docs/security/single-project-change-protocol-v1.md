@@ -111,10 +111,7 @@ Toda mudança AMARELA aplicada deve aparecer em:
 
 ## 9. Log de mudanças desta sprint
 
-Nenhuma mudança AMARELA aplicada até o momento — sprint pausada para
-aprovação humana da janela operacional e das fixtures sintéticas antes
-da Fase 3.
-
-| ID | Data/hora | Superfície | Descrição | Status |
+| ID | Data/hora (UTC) | Superfície | Descrição | Status |
 | --- | --- | --- | --- | --- |
-| — | — | — | — | — |
+| NSEC-1.2-CHG-001 | 2026-07-20T20:54Z | Edge Function + Auth + DB (aditivo) | Deploy de `nsec12-provision-fixtures` (guarded por `NSEC12_TOKEN2`) e criação de 2 orgs sintéticas + 12 usuários `@example.com` + 12 memberships + user_roles. Prefixo `NOID_SECURITY_ORG_*` / `sec-test-*`. Zero erros após correção do CHECK legado em `organization_members.role` (usa `role='member'` para papéis não-owner/admin, mantendo `org_role` real). | APLICADA — aditiva, reversível via cleanup runbook |
+
