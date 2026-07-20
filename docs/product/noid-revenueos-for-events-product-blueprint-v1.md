@@ -38,7 +38,7 @@ O NOID RevenueOS for Events resolve esse gap com um processo comercial pré-conf
 
 **A primeira versão comercial** entrega o **NOID Revenue Core** em modalidade de **implantação assistida**, dentro do **Programa Clientes Fundadores** (até cinco empresas). Não haverá self-service, trial irrestrito, nem promessa de agentes autônomos operando em nome do cliente no primeiro ciclo.
 
-**Fronteira NOID x Eventrix.** O NOID cuida do **antes da venda**: prospecção, qualificação, oportunidade, proposta, negociação, fechamento e forecast. O **Eventrix** cuida do **depois da venda**: inventário físico de equipamentos, alocação, operação, montagem, romaneio, controle de ativos. Onde os dois se tocam — catálogo comercial de produtos que consomem inventário — a integração é feita por sincronização de categorias/famílias e por snapshot de demanda operacional na proposta, não por fusão de módulos.
+**Fronteira NOID x Eventrix.** O **Revenue Core inicial do NOID** cobre **pré-vendas, vendas, forecast e handoff comercial**. O **Eventrix** cobre a **execução operacional do evento** (inventário físico, alocação, romaneio, montagem, controle de ativos). **CS, renovação, expansão e pós-venda comercial poderão permanecer no NOID em fases futuras** — não são compromisso do primeiro ciclo. Onde os dois se tocam — catálogo comercial de produtos que consomem inventário — existem componentes, schemas e snapshots no repositório (ver Apêndice A); isso **não** comprova integração funcional. **Qualquer integração NOID → Eventrix é classificada como PROPOSTO ou NECESSITA AUDITORIA** até ser homologada operacionalmente na Sprint 0.2. Não é possível afirmar que a integração já funciona apenas porque há componentes, snapshots ou configurações no código.
 
 ---
 
