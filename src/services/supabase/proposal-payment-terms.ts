@@ -166,6 +166,14 @@ export function calculateInstallments(
      * data manual "Início" do termo.
      */
     dynamicPricingCurrentEndsAt?: string | null;
+    /**
+     * PRICE UX 1.0.6 — sinal explícito de "cronograma congelado por aceite".
+     * Deve ser passado `true` APENAS quando a proposta já foi aceita e o
+     * cronograma foi persistido em `approved_payment_schedule`.
+     * Não confundir com `approvedAmount`, que serve apenas para não
+     * reaplicar `discount_percent` sobre uma base já líquida (ledger).
+     */
+    frozenSchedule?: boolean;
   },
 ): Installment[] {
   if (term.payment_type !== 'one_time') {
