@@ -1072,6 +1072,9 @@ export default function ProposalPublicView() {
             proposal?.status === 'accepted'
               ? Number(proposal?.approved_amount ?? effectiveOneTimeAmount)
               : ledgerOneTimeNet,
+          frozenSchedule:
+            proposal?.status === 'accepted' &&
+            !!(proposal as any)?.approved_payment_schedule,
           dynamicPricingCurrentEndsAt: dynamicPricingEndForInstallments(
             proposal,
             oneTimeTerm,
