@@ -612,13 +612,29 @@ Redução de opps sem próximo passo · Redução de propostas abandonadas · Au
 
 Módulo · Rota · Componente · Hook · Tabela · RPC · Edge Function · Público · Status · Risco · Dependência · Evidência · Recomendação · Prioridade · Critério de aceite.
 
-### 18.3 Escopo mínimo esperado da Sprint 0.2
+### 18.3 Escopo da Sprint 0.2 — inventário macro + aprofundamento seletivo
 
-- Classificar todas as rotas sob `/app/*` e `/app/settings/*`.
-- Classificar todas as edge functions em `supabase/functions/` (inventário macro identificou **~272 diretórios** — número referencial, não fato de "todas em uso").
-- Classificar todas as migrations em `supabase/migrations/` (inventário macro identificou **~688 arquivos** — número referencial; nem toda migration cria capacidade nova).
-- Classificar tabelas com base no schema em produção via introspecção read-only (o dump `database/dumps/00_table_list.sql` **não** é usado como fato definitivo).
-- Marcar candidatos a **CORRIGIR** com prioridade explícita.
+A Sprint 0.2 deverá **inventariar de forma macro** todas as rotas, edge functions, RPCs, tabelas e migrations do repositório — mas **aprofundará apenas** os itens listados abaixo. **Não é exigida auditoria linha a linha do histórico completo de migrations.**
+
+**Inventário macro (obrigatório, sem aprofundamento):**
+
+- Todas as rotas sob `/app/*`, `/app/settings/*`, `/admin/*` e rotas públicas.
+- Todas as edge functions em `supabase/functions/` (inventário macro identificou **~272 diretórios** — número referencial).
+- Todas as migrations em `supabase/migrations/` (inventário macro identificou **~688 arquivos** — número referencial; nem toda migration cria capacidade nova).
+- Todas as tabelas com base no schema em produção via introspecção read-only (o dump `database/dumps/00_table_list.sql` **não** é usado como fato definitivo).
+- Todas as RPCs declaradas no schema `public`.
+
+**Aprofundamento obrigatório (auditoria detalhada + classificação `PRONTO / CONFIGURAR / CORRIGIR / ADAPTAR / OCULTAR / FUTURO`):**
+
+- **Rotas expostas a clientes** (fora de `/admin/*` e de módulos internos LEGAL).
+- **Módulos do Revenue Core** (Seção 12).
+- **Módulos internos que precisam ser ocultados** no primeiro ciclo (Seção 13).
+- **Tabelas consumidas por capacidades do Revenue Core.**
+- **RPCs referenciadas por fluxos ativos** (frontend, edge functions em uso, jobs cron ativos).
+- **Edge Functions chamadas pelo frontend ou por automações ativas.**
+- **Migrations relevantes para** Revenue Core, onboarding, billing, permissões, RLS, Storage e isolamento multi-tenant.
+- **Dependências necessárias para implantação dos Clientes Fundadores.**
+- Marcar candidatos a **CORRIGIR** com prioridade explícita (P0/P1/P2).
 
 ---
 
