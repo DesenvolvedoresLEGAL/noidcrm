@@ -25,7 +25,7 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   const token = req.headers.get('x-nsec12-token');
-  const expected = Deno.env.get('NSEC12_PROVISION_TOKEN');
+  const expected = Deno.env.get('NSEC12_TOKEN2');
   if (!expected || token !== expected) return json({ error: 'forbidden' }, 403);
 
   const url = Deno.env.get('SUPABASE_URL')!;
