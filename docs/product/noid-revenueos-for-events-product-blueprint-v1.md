@@ -736,22 +736,33 @@ O freeze **inicia em 19/07/2026** e **encerra em 18/08/2026** (30 dias). O freez
 
 ## 22. Decisões em aberto
 
-Cada decisão registra opções, impactos, recomendação inicial e momento sugerido de decisão. **Nenhum valor final é fixado.**
+Cada decisão registra opções, impactos, recomendação inicial e momento sugerido de decisão. **Nenhum valor final é fixado neste documento.**
+
+### 22.1 Preços e condições comerciais dos Clientes Fundadores
+
+| Decisão | Momento de decisão |
+|---|---|
+| **Planos comerciais públicos definitivos** (Starter / Pro / Enterprise ou equivalente) | **Após os 3 primeiros clientes implantados** |
+| **Condição comercial do Programa Clientes Fundadores** (desconto, contrapartidas, duração da tarifa fundadora) | **Antes da primeira proposta** |
+| **Preço de implantação assistida** (setup fee) | **Antes da primeira proposta** |
+| **Mensalidade fundadora** | **Antes da primeira proposta** |
+| **Comissão provisória da pré-vendas** (SDR interno da HUMANOID) | **Decisão executiva imediata** — o outbound começa em 20/07/2026 |
+| **Comissão comercial definitiva** (SDR + closer + gestor) | Poderá ser revisada após baseline comercial dos 3 primeiros clientes |
+
+### 22.2 Demais decisões em aberto
 
 | Decisão | Opções | Impactos | Recomendação inicial | Momento |
 |---|---|---|---|---|
-| Preços por plano | (a) Preço fixo por org; (b) Preço por usuário; (c) Híbrido | Previsibilidade x escala | (c) Híbrido: base + por usuário | Após 3 fundadores |
+| Preços por plano público | (a) Preço fixo por org; (b) Preço por usuário; (c) Híbrido | Previsibilidade x escala | (c) Híbrido: base + por usuário | Após 3 fundadores |
 | Limites de usuários por plano | (a) 10/30/ilimitado; (b) tudo por usuário | Simplicidade x ARR | (a) para começar | Antes de plano comercial oficial |
 | Limites de armazenamento / propostas / IA | Limites nominais x limites soft | UX x custo | Limites soft com alerta | Após 3 fundadores |
 | SLA definitivo | 8x5 vs 24x7 vs híbrido | Custo operacional | 8x5 no primeiro ciclo | Antes do 1º contrato |
-| Planos comerciais definitivos | Starter / Pro / Enterprise | Posicionamento | Aguardar baseline | Após 3 fundadores |
 | Integrações incluídas | Nenhuma; Eventrix incluso; HumanERP incluso | Ticket x complexidade | Nenhuma incluída; add-on | Antes de plano comercial |
 | Política de customização paga | Não fazer; horas técnicas cobradas | Escalabilidade | Não fazer no Revenue Core | Constante |
 | Estratégia de WhatsApp | Provedor oficial x sem WhatsApp x add-on | Compliance | Sem WhatsApp no primeiro ciclo | FUTURO |
 | Política de trial futuro | Sem trial; trial guiado; trial self-service | Aquisição x qualidade | Sem trial no primeiro ciclo | Após 3 fundadores |
 | Estrutura de suporte | Só e-mail; e-mail + call; Slack Connect | Custo | E-mail + call para fundadores | 1º contrato |
 | Meta de MRR | — | Direciona time | Definir após baseline | Após 3 fundadores |
-| Comissão comercial interna | Fixo; % MRR; misto | Motivação x custo | Misto | Antes do outbound |
 | Critérios jurídicos definitivos | Contrato padrão x adendos | Risco jurídico | Contrato padrão simples + adendo de LGPD | Antes do 1º contrato |
 
 ---
