@@ -638,15 +638,37 @@ A Sprint 0.2 deverá **inventariar de forma macro** todas as rotas, edge functio
 
 ---
 
-## 19. Governança do freeze (19/07/2026 → 30 dias)
+## 19. Governança do freeze (19/07/2026 → 18/08/2026)
 
-### 19.1 Permitido durante o freeze
+O freeze **inicia em 19/07/2026** e **encerra em 18/08/2026** (30 dias). O freeze **proíbe expansão funcional**, mas **permite productização** — ou seja, atividades necessárias para transformar o produto atual em algo vendável e operável para os primeiros clientes externos, sem introduzir novas capacidades.
 
-Correção de: bug · segurança · isolamento multi-tenant · integridade de dados · autenticação · billing · performance crítica · onboarding · importação · exportação · homologação comercial · ferramenta interna necessária à operação da LEGAL (ex.: Kairós). Correções necessárias para clientes fundadores.
+### 19.1 Permitido durante o freeze (productização)
+
+- **Product Fit Audit read-only** (Sprint 0.2).
+- **Criação e configuração do NOID Events Template** (organização fictícia + dados sintéticos + processo de clonagem).
+- **Ocultação de módulos internos ou experimentais** (via feature flag / entitlement).
+- **Criação ou ajuste de feature flags e entitlements** necessários para isolamento comercial entre planos, clientes e uso interno LEGAL.
+- **Remoção de provas sociais e promessas não comprovadas** (landing, materiais comerciais, decks).
+- **Correções na landing page** para adequação ao posicionamento aprovado neste blueprint.
+- **Definição de preços, condições comerciais, contratos e SLA** (Programa Clientes Fundadores).
+- **Correções P0 do Revenue Core** (apenas as classificadas como CORRIGIR na Sprint 0.2 com prioridade P0).
+- **Segurança e isolamento multi-tenant** (RLS, Storage, tenant isolation suite, staging).
+- **Onboarding e implantação repetível** (playbook, checklist, ambiente de implantação).
+- **Ambiente demonstrativo** (base do template ligada ao pitch comercial).
+- **Correções necessárias para os Clientes Fundadores** (bug, integridade de dados, autenticação, billing, importação, exportação, homologação comercial).
+- **Correções necessárias para a operação interna da LEGAL**, incluindo Kairós e demais ferramentas internas necessárias ao dia a dia da HUMANOID.
 
 ### 19.2 Proibido durante o freeze
 
-Novo módulo · novo agente · novo dashboard · nova integração · nova automação fora do Core · redesign cosmético · feature sem caso validado · personalização exclusiva de cliente · expansão de escopo · feature experimental · mudança de plano ou preço · alteração da landing page · ocultação de módulos (não faz parte desta sprint) · criação do tenant template · Product Fit Audit completo · qualquer mudança funcional no produto.
+- **Novos módulos.**
+- **Novos agentes.**
+- **Novos dashboards não pertencentes ao Core.**
+- **Novas integrações não necessárias ao GO LIVE.**
+- **Novas funcionalidades experimentais.**
+- **Expansão de escopo.**
+- **Desenvolvimento exclusivo por cliente.**
+- **Redesign cosmético sem impacto de GO LIVE.**
+- **Automações fora do Revenue Core.**
 
 ### 19.3 Árvore de decisão do freeze
 
@@ -654,9 +676,9 @@ Novo módulo · novo agente · novo dashboard · nova integração · nova autom
 2. **Está quebrado?** Se sim, prossegue.
 3. **Representa risco de segurança, dados, receita ou implantação?** Se sim, alta prioridade.
 4. **É necessário para o Revenue Core?** Se sim, prossegue.
-5. **É necessário para cliente fundador?** Se sim, prossegue.
+5. **É necessário para cliente fundador ou para a operação interna da LEGAL?** Se sim, prossegue.
 6. **É configuração ou desenvolvimento?** Se configuração, execute sem código.
-7. **A alteração aumenta o escopo?** Se sim, backlog pós-freeze.
+7. **A alteração aumenta o escopo funcional?** Se sim, backlog pós-freeze — **productização, ocultação, feature flag e correção não são expansão de escopo**.
 
 ---
 
