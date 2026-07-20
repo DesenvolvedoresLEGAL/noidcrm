@@ -1,156 +1,82 @@
+# Sprint NOID-VERTICAL 0.1 — Product Blueprint v1
 
-# Plano — Auditoria de Isolamento Multiempresa NOID RevenueOS
+## Objetivo
 
-Objetivo: comprovar, com evidência técnica reproduzível, que nenhum dado (linhas, arquivos, métricas, logs, propostas) de uma organização vaza para outra, em nenhum caminho de acesso (Data API, RPC, Edge Function, Storage, Realtime, Views/Reports).
+Criar **um único artefato**: `docs/product/noid-revenueos-for-events-product-blueprint-v1.md`, seguindo integralmente o briefing aprovado e as correções obrigatórias (hierarquia de evidência, validação prévia de paths, apêndice de evidências, respeito ao freeze).
 
-Entregável final: relatório assinado `docs/security/multitenant-isolation-report-v1.md` com resultados de cada teste + suíte automatizada que roda em CI.
+## O que NÃO será feito (freeze)
 
----
+- Nenhum arquivo funcional será criado, editado ou removido.
+- Nenhuma migration, RPC, RLS, edge function, secret, seed ou dado será tocado.
+- Nenhuma memória (`mem://*`) será criada, editada ou removida.
+- Nenhuma configuração de plataforma será alterada.
+- Nenhum tenant/template/organização será criado.
+- Verificação: `git status --short` continuará mostrando **apenas** o novo arquivo em `docs/product/`.
 
-## Fase 1 — Auditoria estática de RLS (read-only)
+## Auditoria read-only já realizada nesta sprint (evidências para o Apêndice A)
 
-**1.1. Inventário de tabelas**
-- Consultar `pg_tables` em `public` e cruzar com `pg_class.relrowsecurity`.
-- Produzir tabela: `tabela | tem_organization_id | rls_enabled | force_rls | nº_policies | policies_por_comando`.
-- Sinalizar toda tabela em `public` sem RLS habilitado (bloqueador).
-- Sinalizar toda tabela com `organization_id` cuja policy não referencia `organization_id` nem `user_id` (bloqueador).
+Nível de confiança conforme briefing: schema em produção > migrations > tipos > código funcional > rota/componente/hook > testes > docs > dumps.
 
-**1.2. Auditoria de policies**
-- Extrair `pg_policies` completo e classificar cada policy por padrão:
-  - `org_isolation` (usa `get_user_organization_id()` ou `user_is_org_member()`)
-  - `owner_scoped` (usa `auth.uid()`)
-  - `role_gated` (usa `has_role` / `can_view_all`)
-  - `public_read` (`USING (true)` — precisa justificativa)
-  - `service_only` (`USING (false)` — ok)
-- Bloqueadores: policies com `USING (true)` em tabelas que contêm dados de tenant; policies `FOR ALL` sem `WITH CHECK`; policies que referenciam a própria tabela (risco de recursão).
+- **Rotas** — `src/App.tsx` mapeado (≈180+ rotas): `/app/*`, `/app/settings/*`, `/app/intelligence/*`, `/app/gtm/*`, `/admin/*`, públicas `/p/:token`, `/f/:token`, `/agendar-demo`, `/docs`.
+- **Páginas** — `src/pages/` (Opportunities, Forecast, RevenueCommandPage, Proposals, ProposalEditor, ProposalPublicView, Products, Accounts, Contacts, Leads, Activities, Reports, OTEReport, Insights, Automation, Onboarding, AcceptInvitation, Login, Signup, Support, Community, Trash, Roleplay, DynamicDashboardPage, NotificationsHistory, MigrationAuditPage, etc.).
+- **Settings** — `NoidInventoryBackupPage`, `EventrixInventorySettings`, `QualificationFrameworkPage`, `PipelineSettings`, `SalesConfigPage`, `PermissionSettings`, `NotificationPreferences`, `CustomFields`, `CustomForms`, `ProposalLayouts`, `ProposalTemplateEditor`, `LossReasons`, `Integrations`, `Origins`, `Industries`, `BusinessUnits`, `DataManagement`, `Account`, `ApiKeysSettings`, `ProductSettings`, `ProductCategories`.
+- **NOID Intelligence (interno)** — `noid-intelligence/*` (Hub, Agents, Builder, Simulator, Outcomes, Approvals, Runs, Metrics, Environments, Permissions, McpRegistry, DecisionRules, LearningPerformance, HeadlessHumanoidLab) + placeholders (Orquestrações/Logs/Ferramentas/Memórias).
+- **Kairós** — `src/pages/intelligence/KairosHub.tsx`, serviços `src/services/intelligence/{autopilot,qualifiedQueue,revenueAttribution,sdrCopilot,coverage}.ts`, edge functions `kairos-*`.
+- **Apollo** — `src/services/enrichment/apolloService.ts`, `apolloPreview.ts`, `src/services/intelligence/apollo{EndpointMatrix,BrowserParity,Invisible}.ts`, `src/pages/intelligence/ApolloRoi.tsx`, edge functions `apollo-*`.
+- **Experimentais** — `Vibe`, `Optimization`, `Experiments`, `Playbooks`, `WinLossHub`, `Graph`, `Memories`, Skills Library.
+- **Qualificação** — `src/lib/qualification/{qualificationScore,qualificationRecommendation,disqualifyReasons}.ts` + testes.
+- **Admin HUMANOID** — `/admin/*` (organizations, users, forensic, revenue, analytics, logs, audit, trash, backup, ai, infrastructure, control-room, trace, plans, revenue-integrity).
+- **Contagens referenciais** — `supabase/migrations/` ≈ **688 arquivos**; `supabase/functions/` ≈ **272 diretórios**. Tratadas como referência, **não** como fato de "todas em uso".
+- **Documentos de segurança** — `docs/security/phase1-rls-audit.md`, `phase2-tenant-isolation.md`, `storage-classification.csv`, `.github/workflows/tenant-isolation.yml`, `supabase/migrations-staged/storage/*`. Tratados como **evidência documental**, não como prova de proteção ativa em produção.
+- **Dump** `database/dumps/00_table_list.sql`: **baixa confiança** (snapshot possivelmente desatualizado). Não usado como fonte primária.
 
-**1.3. Auditoria de GRANTs**
-- Cruzar `information_schema.role_table_grants` × RLS: nenhuma tabela com `organization_id` pode ter `SELECT` para `anon` a menos que policy explícita permita.
-- Bloqueador: `anon` com privilégio em tabela de tenant.
+## Estrutura do blueprint (23 seções + Apêndice A)
 
-**1.4. Funções SECURITY DEFINER**
-- Listar todas com `prosecdef = true` em `public`.
-- Verificar `search_path` fixo (`SET search_path = public`) em cada uma — sem isso é vetor de escalação.
-- Verificar que nenhuma função definer retorna dados cross-org sem filtro por `get_user_organization_id()` (exceto helpers de auth reconhecidos).
+1. Resumo Executivo — definição oficial, fronteira NOID x Eventrix, versão Fundadores.
+2. ICP primário + secundário, comprador, usuário, qualificação, desqualificação, anti-ICP.
+3. Segmentos P1 e P2 com ficha (processo, dores, campos, riscos, indicadores, aderência).
+4. Taxonomia de 22 dores (sintoma, impacto, momento, persona, tratamento, métrica, status).
+5. Proposta de valor: promessa agressiva + institucional, por persona, por segmento, diferenciais.
+6. Fluxos canônicos — pipelines de pré-vendas e vendas (PROPOSTO), ficha por etapa, fluxos transversais.
+7. Campos verticais de eventos (identificação, datas, localização, escopo, comercial, relacionamento).
+8. Framework de qualificação vertical (18 itens + pesos + cortes + comparação com produto atual).
+9. Automações verticais (14 automações, com gatilho, condições, ação, aprovação, status).
+10. Dashboards por persona (SDR, Closer, Gestor, Owner) — com status EXISTENTE/PROPOSTO/NECESSITA AUDITORIA.
+11. Métricas oficiais (pré-vendas, vendas, verticais, gestão) + fontes já comprovadas.
+12. Escopo do Revenue Core (core obrigatório, configurável, add-ons futuros, internos, experimentais).
+13. Itens candidatos a ocultação no 1º ciclo — sem ocultar nada agora; documenta caminho.
+14. Fora do escopo — nunca entra no Revenue Core; fronteiras Eventrix / HumanERP.
+15. NOID Events Template (PROPOSTO) — estrutura, critérios de qualidade, uso.
+16. Critérios de implantação — 12 fases, informações obrigatórias, limites, saneamento.
+17. Critérios de sucesso dos Clientes Fundadores — implantação binária, adoção com baseline, resultado após baseline; regras do programa (sem promessa percentual).
+18. Product Fit Audit — critérios da Sprint 0.2 (PRONTO/CONFIGURAR/CORRIGIR/ADAPTAR/OCULTAR/FUTURO), sem executar aqui.
+19. Governança do freeze — permitido/proibido + árvore de decisão.
+20. Brief comercial de 20/07/2026 — o que vender/não vender, oferta, CTA, papéis.
+21. Riscos e dependências — matriz com mitigação, owner e gate.
+22. Decisões em aberto — opções + recomendação inicial + momento de decisão.
+23. Roadmap imediato — 10 fases até o GO LIVE público.
+- **Apêndice A** — matriz preliminar de evidências (domínio, evidência localizada, tipo, status, confiança, aprofundar em 0.2). Documentos de segurança marcados como *evidência documental* e não como prova operacional. Contagens de migrations/functions declaradas como referenciais.
 
-**1.5. Views e Reports**
-- Listar todas as views `v_*` (Reports V2, dashboards, KPIs).
-- Para cada view: confirmar `security_invoker = on` OU que a definição já filtra por `organization_id`.
-- Bloqueador: view `security_definer` sem filtro de org acessível ao `authenticated`.
+## Regras aplicadas ao texto
 
-**Saída da Fase 1:** `docs/security/rls-audit-matrix.csv` + lista de bloqueadores.
+- Cada afirmação sobre o produto atual usa: **EXISTENTE / PROPOSTO / NECESSITA AUDITORIA / BLOQUEADOR / RISCO / FUTURO / FORA DO ESCOPO**.
+- Nenhuma feature é dada como "pronta" apenas por existir rota, componente ou nome no código.
+- Nenhuma capacidade é afirmada com base em memórias (`mem://*`); memórias serviram só de contexto.
+- Documentos de segurança são citados como evidência documental — sua efetividade depende de execução da suíte contra staging (item mapeado em Riscos e no Apêndice).
+- Nenhuma promessa percentual, ROI numérico ou case comercial é feita.
 
----
+## Entregável final
 
-## Fase 2 — Testes automatizados de isolamento (Vitest + service_role fixture)
+Um único novo arquivo:
 
-Suíte nova em `src/test/security/tenant-isolation/`, roda em CI, usa duas organizações-fixture (`ORG_A`, `ORG_B`) e 8 usuários (owner/admin/manager/sales/viewer/cs × 2 orgs).
+```text
+docs/product/noid-revenueos-for-events-product-blueprint-v1.md
+```
 
-**2.1. Isolamento por Data API (`supabase-js` como cada usuário)**
-- Para cada tabela com `organization_id` do inventário:
-  - Seed 1 linha em ORG_A e 1 em ORG_B.
-  - Autenticar como usuário de ORG_A → `SELECT *` NUNCA pode retornar linha de ORG_B.
-  - `UPDATE`/`DELETE` de linha de ORG_B autenticado como ORG_A → deve falhar (0 rows).
-  - `INSERT` com `organization_id = ORG_B` autenticado como ORG_A → deve falhar por policy `WITH CHECK`.
-- Falha em qualquer tabela = bloqueador.
+## Verificação de freeze pós-escrita
 
-**2.2. Matriz de roles (dentro da mesma org)**
-- Para cada role (`owner`, `admin`, `manager`, `sales`, `viewer`, `cs`):
-  - Confirmar visibilidade esperada (matriz do ADR-002): sales só vê próprios; manager vê equipe; admin/owner vê org.
-  - Confirmar bloqueio de escrita em tabelas administrativas (`organization_members`, `user_roles`, `platform_admins`) para roles não-admin.
+- `git status --short` deve listar **exclusivamente** esse arquivo (Untracked).
+- `git diff --stat` deve retornar vazio.
+- Nada em `src/`, `supabase/`, `.github/`, `scripts/`, `mem://`, `docs/security/`, `database/`, `public/`, `package.json`, `bun.lockb`, `vite.config.ts`, `tailwind.config.ts`, `tsconfig*.json`.
 
-**2.3. RPCs e Edge Functions**
-- Inventariar todas as edge functions em `supabase/functions/`.
-- Para cada função que aceita `organization_id`/`opportunity_id`/`proposal_id` no body:
-  - Chamar autenticado como ORG_A passando ID de ORG_B → deve retornar 403/404, nunca dado.
-  - Chamar sem JWT em função que exige auth → 401.
-- Auditar toda função que usa `SUPABASE_SERVICE_ROLE_KEY`: precisa validar `auth.getClaims()` + resolver `organization_id` do JWT, **nunca** confiar em `organization_id` do body.
-- Bloqueador: qualquer função que aceite `organization_id` do body sem revalidar contra o JWT do chamador.
-
-**2.4. Storage**
-- Inventariar buckets (`opportunity_files`, avatares, exports, propostas PDF, etc.).
-- Confirmar policies por bucket com prefixo `organization_id/...`.
-- Teste: user de ORG_A tentando `download`/`list` de objeto em prefixo ORG_B → negado.
-
-**2.5. Realtime**
-- Subscrever `postgres_changes` em tabelas críticas (`opportunities`, `proposals`, `notifications_v2`) como user de ORG_A.
-- Executar mutation em ORG_B via service_role → subscriber de ORG_A **não pode** receber o evento.
-
-**2.6. Reports V2 e views**
-- Rodar cada endpoint de relatório (`v_report_forecast_v2`, `commercial_won_revenue_view`, `unified_audit_view`, `unified_approval_queue_view`, etc.) autenticado em ORG_A e conferir que nenhum agregado inclui linhas de ORG_B.
-- Guardrail: adicionar assertivas em `src/lib/reports/canonicalFilters.ts` audit hook rodando no CI.
-
-**2.7. Convite e troca de organização**
-- Convidar user existente para segunda org.
-- Confirmar que switch de org limpa cache React Query + refaz `get-current-user`.
-- Após switch para ORG_B, nenhum dado de ORG_A pode aparecer em query alguma (verificar por network snapshot).
-
----
-
-## Fase 3 — Segredos e superfícies de risco
-
-**3.1. Varredura de segredos no bundle**
-- `rg` no `dist/` após build: `SERVICE_ROLE`, `service_role`, chaves JWT longas, `OPENAI_API_KEY`, `SLACK_`, etc.
-- Bloqueador: qualquer secret server-only encontrado no bundle client.
-
-**3.2. Uso de `service_role`**
-- Grep em `src/` — não pode aparecer. Só em `supabase/functions/`.
-- Em cada edge function que usa service_role, documentar por que precisa e qual validação de tenant faz antes.
-
-**3.3. `.env` client**
-- Confirmar que só `VITE_SUPABASE_URL` e `VITE_SUPABASE_PUBLISHABLE_KEY` (anon) estão expostos.
-
----
-
-## Fase 4 — Backup e restauração
-
-- Executar export via Cloud → Advanced settings → Export data para snapshot atual.
-- Documentar procedimento de restore (test-restore em ambiente isolado — não em prod).
-- Registrar RPO/RTO alvo e responsáveis.
-- Teste: após restore em ambiente sombra, rodar suíte da Fase 2 → todos os isolamentos preservados.
-
----
-
-## Fase 5 — Registro formal
-
-Arquivo `docs/security/multitenant-isolation-report-v1.md` contendo:
-1. Escopo, data, versão do schema (hash da última migration).
-2. Matriz RLS (Fase 1) resumida + link para CSV.
-3. Resultado por suíte da Fase 2 (verde/vermelho, contagem de asserts).
-4. Lista de edge functions auditadas + validações confirmadas.
-5. Evidência de storage e realtime.
-6. Bloqueadores encontrados + fix aplicado + re-teste.
-7. Procedimento de backup/restore testado.
-8. Assinatura (responsável técnico + data).
-
-CI: workflow `.github/workflows/tenant-isolation.yml` roda Fase 2 em cada PR; falha bloqueia merge.
-
----
-
-## Detalhes técnicos
-
-- Suíte usa `@supabase/supabase-js` com dois JWTs reais gerados via `auth.admin.generateLink` no setup, não service_role client-side.
-- Fixture cria e destrói `ORG_A`/`ORG_B` por run (idempotente), namespace `iso-test-*`.
-- Cada teste tem timeout de 30s e roda em paralelo por tabela via `it.concurrent`.
-- Inventário de tabelas é gerado dinamicamente (query em `information_schema`) — não hardcoded — para que novas tabelas sejam automaticamente cobertas.
-- Bloqueadores impedem release; warnings entram em backlog rastreado.
-
----
-
-## Fora de escopo desta sprint
-- Pentest externo (recomendado após v1 estar verde).
-- Criptografia at-rest de campos sensíveis (tema separado).
-- SIEM/alertas de acesso anômalo (tema separado — já existe `security_audit_log`).
-
----
-
-## Riscos
-- Inventário revelar tabelas legadas sem `organization_id` → decidir caso a caso (drop, adicionar coluna+backfill, ou marcar como global).
-- Edge functions que aceitam `organization_id` do body são o vetor mais provável de vazamento — priorizar Fase 2.3.
-- Views `SECURITY DEFINER` sem filtro explícito são o segundo maior risco — Fase 1.5.
-
-## Próximos passos após aprovação
-1. Rodar Fase 1 (read-only, sem migrations) e apresentar matriz + bloqueadores.
-2. Corrigir bloqueadores via migrations dedicadas.
-3. Implementar suíte da Fase 2 e rodar até ficar verde.
-4. Gerar relatório final da Fase 5.
+Aprove para eu escrever o arquivo em build mode.
