@@ -38,7 +38,7 @@ O NOID RevenueOS for Events resolve esse gap com um processo comercial pré-conf
 
 **A primeira versão comercial** entrega o **NOID Revenue Core** em modalidade de **implantação assistida**, dentro do **Programa Clientes Fundadores** (até cinco empresas). Não haverá self-service, trial irrestrito, nem promessa de agentes autônomos operando em nome do cliente no primeiro ciclo.
 
-**Fronteira NOID x Eventrix.** O NOID cuida do **antes da venda**: prospecção, qualificação, oportunidade, proposta, negociação, fechamento e forecast. O **Eventrix** cuida do **depois da venda**: inventário físico de equipamentos, alocação, operação, montagem, romaneio, controle de ativos. Onde os dois se tocam — catálogo comercial de produtos que consomem inventário — a integração é feita por sincronização de categorias/famílias e por snapshot de demanda operacional na proposta, não por fusão de módulos.
+**Fronteira NOID x Eventrix.** O **Revenue Core inicial do NOID** cobre **pré-vendas, vendas, forecast e handoff comercial**. O **Eventrix** cobre a **execução operacional do evento** (inventário físico, alocação, romaneio, montagem, controle de ativos). **CS, renovação, expansão e pós-venda comercial poderão permanecer no NOID em fases futuras** — não são compromisso do primeiro ciclo. Onde os dois se tocam — catálogo comercial de produtos que consomem inventário — existem componentes, schemas e snapshots no repositório (ver Apêndice A); isso **não** comprova integração funcional. **Qualquer integração NOID → Eventrix é classificada como PROPOSTO ou NECESSITA AUDITORIA** até ser homologada operacionalmente na Sprint 0.2. Não é possível afirmar que a integração já funciona apenas porque há componentes, snapshots ou configurações no código.
 
 ---
 
@@ -365,16 +365,16 @@ Conjunto vertical recomendado. Nenhuma será implementada aqui.
 | Dashboard | Persona | Pergunta que responde | Fonte principal (a validar) | Status no produto |
 |---|---|---|---|---|
 | Central SDR | SDR | "Quais leads devo trabalhar agora?" | Pipelines de pré-vendas + fila priorizada | NECESSITA AUDITORIA |
-| Dashboard do Closer | Closer | "Onde perco receita hoje?" | `useCloserDashboardData` (`src/hooks/dashboard/`) | EXISTENTE (rota + hook) — completude do vertical NECESSITA AUDITORIA |
+| Dashboard do Closer | Closer | "Onde perco receita hoje?" | `useCloserDashboardData` (`src/hooks/dashboard/`) | EXISTENTE ESTRUTURALMENTE — NECESSITA AUDITORIA OPERACIONAL |
 | Dashboard do Gestor | Gestor | "Meu time bate a meta?" | Agregação por dono | NECESSITA AUDITORIA |
-| Forecast | Gestor / Owner | "Onde estou vs. meta, com qual confiança?" | Forecast unificado (regra registrada: `calculateForecastScenarios`) | EXISTENTE (rota `/app/forecast`) — completude vertical NECESSITA AUDITORIA |
-| Revenue Command | Owner | "Realizado, gap, concentração, run rate" | `commercial_won_revenue_view` restrita ao pipeline sales primário | EXISTENTE (rota `/app/revenue-command`) — SSoT recentemente alinhada com Forecast |
-| Win/Loss | Gestor / Owner | "Por que ganho/perco?" | `WinLossHub` (`src/pages/intelligence/`) | EXISTENTE — aderência vertical NECESSITA AUDITORIA |
-| Relatórios comerciais | Gestor / RevOps | "Cortes por vendedor/segmento/período" | Relatórios v2 | NECESSITA AUDITORIA |
+| Forecast | Gestor / Owner | "Onde estou vs. meta, com qual confiança?" | Forecast unificado (regra registrada: `calculateForecastScenarios`) | EXISTENTE ESTRUTURALMENTE — NECESSITA AUDITORIA OPERACIONAL |
+| Revenue Command | Owner | "Realizado, gap, concentração, run rate" | `commercial_won_revenue_view` restrita ao pipeline sales primário | EXISTENTE ESTRUTURALMENTE — NECESSITA AUDITORIA OPERACIONAL (SSoT recentemente alinhada com Forecast por correção pontual; **reconciliação operacional definitiva será provada na Sprint 0.2**) |
+| Win/Loss | Gestor / Owner | "Por que ganho/perco?" | `WinLossHub` (`src/pages/intelligence/`) | EXISTENTE ESTRUTURALMENTE — NECESSITA AUDITORIA OPERACIONAL |
+| Relatórios comerciais | Gestor / RevOps | "Cortes por vendedor/segmento/período" | Relatórios v2 | EXISTENTE ESTRUTURALMENTE — NECESSITA AUDITORIA OPERACIONAL |
 | Propostas em risco | Closer / Gestor | "Que propostas vão morrer?" | Combinação de proposals + views + atividades | PROPOSTO (parcialmente coberto por Dashboard Closer) |
 | Eventos próximos sem definição | Gestor | "O que fecha esta semana?" | Corte por data do evento | PROPOSTO |
 
-**Nenhum dashboard será criado ou redesenhado nesta sprint.**
+**Nenhum dashboard será criado ou redesenhado nesta sprint.** A **reconciliação operacional entre módulos** (Dashboard do Closer, Forecast, Revenue Command, Win/Loss, Relatórios e Fonte Única de Receita) **não pode ser afirmada como definitiva** com base apenas em rota + componente + hook — precisa de teste e rastreamento da fonte de dados na Sprint 0.2.
 
 ---
 
@@ -396,7 +396,8 @@ Cobertura de pipeline · Forecast · Commit · Best case · Gap para meta · Pip
 
 ### 11.5 Fontes já comprovadas
 
-- **Receita realizada:** fonte única `commercial_won_revenue_view` já reconciliada entre Forecast, Dashboard, Revenue Command, OTE e Relatórios (correção recente unificando o escopo ao pipeline sales primário). **Status: EXISTENTE.**
+- **Receita realizada:** existe fonte técnica única `commercial_won_revenue_view` referenciada pelo Forecast, Dashboard, Revenue Command, OTE e Relatórios (correção recente unificou o escopo ao pipeline sales primário). **Status: EXISTENTE ESTRUTURALMENTE — NECESSITA AUDITORIA OPERACIONAL.** A reconciliação numérica definitiva entre todas as telas será rastreada e comprovada na Sprint 0.2; a correção recente é evidência estrutural, não substitui teste operacional.
+- **Integração dos indicadores entre módulos:** **EXISTENTE ESTRUTURALMENTE — NECESSITA AUDITORIA OPERACIONAL**.
 - **Demais métricas verticais:** **NECESSITA AUDITORIA** — várias dependem de campos verticais (Seção 7) ainda não formalizados.
 
 **Regra:** nenhuma RPC ou função de cálculo será criada nesta sprint.
@@ -405,9 +406,11 @@ Cobertura de pipeline · Forecast · Commit · Best case · Gap para meta · Pip
 
 ## 12. Escopo do NOID Revenue Core
 
-### 12.1 Core obrigatório (APROVADO — vendável no primeiro ciclo)
+### 12.1 Escopo-alvo do primeiro ciclo comercial — sujeito à classificação e homologação no Product Fit Audit
 
 Empresas · Contatos · Leads · Oportunidades · Pipelines · Atividades · Próximos passos · Pré-vendas · Qualificação · Handoff · Vendas · Produtos e serviços · Propostas · Motivos de perda · Motivos de desqualificação · Forecast · Revenue Command · Win/Loss · Dashboards por função · Relatórios · Importação · Exportação · Usuários · Equipes · Papéis · Permissões · Auditoria básica · Notificações · Automações homologadas · Implantação assistida · Treinamento · Suporte inicial.
+
+**Nenhum módulo desta lista é considerado definitivamente vendável antes de ser classificado, na Sprint 0.2, em uma das categorias:** `PRONTO / CONFIGURAR / CORRIGIR / ADAPTAR / OCULTAR / FUTURO`. A lista acima define o **alvo** do primeiro ciclo, não uma garantia de prontidão comercial de cada capacidade.
 
 ### 12.2 Core configurável (APROVADO)
 
@@ -609,25 +612,63 @@ Redução de opps sem próximo passo · Redução de propostas abandonadas · Au
 
 Módulo · Rota · Componente · Hook · Tabela · RPC · Edge Function · Público · Status · Risco · Dependência · Evidência · Recomendação · Prioridade · Critério de aceite.
 
-### 18.3 Escopo mínimo esperado da Sprint 0.2
+### 18.3 Escopo da Sprint 0.2 — inventário macro + aprofundamento seletivo
 
-- Classificar todas as rotas sob `/app/*` e `/app/settings/*`.
-- Classificar todas as edge functions em `supabase/functions/` (inventário macro identificou **~272 diretórios** — número referencial, não fato de "todas em uso").
-- Classificar todas as migrations em `supabase/migrations/` (inventário macro identificou **~688 arquivos** — número referencial; nem toda migration cria capacidade nova).
-- Classificar tabelas com base no schema em produção via introspecção read-only (o dump `database/dumps/00_table_list.sql` **não** é usado como fato definitivo).
-- Marcar candidatos a **CORRIGIR** com prioridade explícita.
+A Sprint 0.2 deverá **inventariar de forma macro** todas as rotas, edge functions, RPCs, tabelas e migrations do repositório — mas **aprofundará apenas** os itens listados abaixo. **Não é exigida auditoria linha a linha do histórico completo de migrations.**
+
+**Inventário macro (obrigatório, sem aprofundamento):**
+
+- Todas as rotas sob `/app/*`, `/app/settings/*`, `/admin/*` e rotas públicas.
+- Todas as edge functions em `supabase/functions/` (inventário macro identificou **~272 diretórios** — número referencial).
+- Todas as migrations em `supabase/migrations/` (inventário macro identificou **~688 arquivos** — número referencial; nem toda migration cria capacidade nova).
+- Todas as tabelas com base no schema em produção via introspecção read-only (o dump `database/dumps/00_table_list.sql` **não** é usado como fato definitivo).
+- Todas as RPCs declaradas no schema `public`.
+
+**Aprofundamento obrigatório (auditoria detalhada + classificação `PRONTO / CONFIGURAR / CORRIGIR / ADAPTAR / OCULTAR / FUTURO`):**
+
+- **Rotas expostas a clientes** (fora de `/admin/*` e de módulos internos LEGAL).
+- **Módulos do Revenue Core** (Seção 12).
+- **Módulos internos que precisam ser ocultados** no primeiro ciclo (Seção 13).
+- **Tabelas consumidas por capacidades do Revenue Core.**
+- **RPCs referenciadas por fluxos ativos** (frontend, edge functions em uso, jobs cron ativos).
+- **Edge Functions chamadas pelo frontend ou por automações ativas.**
+- **Migrations relevantes para** Revenue Core, onboarding, billing, permissões, RLS, Storage e isolamento multi-tenant.
+- **Dependências necessárias para implantação dos Clientes Fundadores.**
+- Marcar candidatos a **CORRIGIR** com prioridade explícita (P0/P1/P2).
 
 ---
 
-## 19. Governança do freeze (19/07/2026 → 30 dias)
+## 19. Governança do freeze (19/07/2026 → 18/08/2026)
 
-### 19.1 Permitido durante o freeze
+O freeze **inicia em 19/07/2026** e **encerra em 18/08/2026** (30 dias). O freeze **proíbe expansão funcional**, mas **permite productização** — ou seja, atividades necessárias para transformar o produto atual em algo vendável e operável para os primeiros clientes externos, sem introduzir novas capacidades.
 
-Correção de: bug · segurança · isolamento multi-tenant · integridade de dados · autenticação · billing · performance crítica · onboarding · importação · exportação · homologação comercial · ferramenta interna necessária à operação da LEGAL (ex.: Kairós). Correções necessárias para clientes fundadores.
+### 19.1 Permitido durante o freeze (productização)
+
+- **Product Fit Audit read-only** (Sprint 0.2).
+- **Criação e configuração do NOID Events Template** (organização fictícia + dados sintéticos + processo de clonagem).
+- **Ocultação de módulos internos ou experimentais** (via feature flag / entitlement).
+- **Criação ou ajuste de feature flags e entitlements** necessários para isolamento comercial entre planos, clientes e uso interno LEGAL.
+- **Remoção de provas sociais e promessas não comprovadas** (landing, materiais comerciais, decks).
+- **Correções na landing page** para adequação ao posicionamento aprovado neste blueprint.
+- **Definição de preços, condições comerciais, contratos e SLA** (Programa Clientes Fundadores).
+- **Correções P0 do Revenue Core** (apenas as classificadas como CORRIGIR na Sprint 0.2 com prioridade P0).
+- **Segurança e isolamento multi-tenant** (RLS, Storage, tenant isolation suite, staging).
+- **Onboarding e implantação repetível** (playbook, checklist, ambiente de implantação).
+- **Ambiente demonstrativo** (base do template ligada ao pitch comercial).
+- **Correções necessárias para os Clientes Fundadores** (bug, integridade de dados, autenticação, billing, importação, exportação, homologação comercial).
+- **Correções necessárias para a operação interna da LEGAL**, incluindo Kairós e demais ferramentas internas necessárias ao dia a dia da HUMANOID.
 
 ### 19.2 Proibido durante o freeze
 
-Novo módulo · novo agente · novo dashboard · nova integração · nova automação fora do Core · redesign cosmético · feature sem caso validado · personalização exclusiva de cliente · expansão de escopo · feature experimental · mudança de plano ou preço · alteração da landing page · ocultação de módulos (não faz parte desta sprint) · criação do tenant template · Product Fit Audit completo · qualquer mudança funcional no produto.
+- **Novos módulos.**
+- **Novos agentes.**
+- **Novos dashboards não pertencentes ao Core.**
+- **Novas integrações não necessárias ao GO LIVE.**
+- **Novas funcionalidades experimentais.**
+- **Expansão de escopo.**
+- **Desenvolvimento exclusivo por cliente.**
+- **Redesign cosmético sem impacto de GO LIVE.**
+- **Automações fora do Revenue Core.**
 
 ### 19.3 Árvore de decisão do freeze
 
@@ -635,9 +676,9 @@ Novo módulo · novo agente · novo dashboard · nova integração · nova autom
 2. **Está quebrado?** Se sim, prossegue.
 3. **Representa risco de segurança, dados, receita ou implantação?** Se sim, alta prioridade.
 4. **É necessário para o Revenue Core?** Se sim, prossegue.
-5. **É necessário para cliente fundador?** Se sim, prossegue.
+5. **É necessário para cliente fundador ou para a operação interna da LEGAL?** Se sim, prossegue.
 6. **É configuração ou desenvolvimento?** Se configuração, execute sem código.
-7. **A alteração aumenta o escopo?** Se sim, backlog pós-freeze.
+7. **A alteração aumenta o escopo funcional?** Se sim, backlog pós-freeze — **productização, ocultação, feature flag e correção não são expansão de escopo**.
 
 ---
 
@@ -679,7 +720,7 @@ Novo módulo · novo agente · novo dashboard · nova integração · nova autom
 | Herança de configurações específicas da LEGAL | Alta | Alto | Sprint 0.3 (Tenant Template) sem clonar tenant LEGAL | Produto | Antes de qualquer demo externa |
 | Funcionalidades experimentais expostas | Alta | Alto | Ocultação por entitlement/feature flag na Sprint 0.2 | Engenharia | Antes do primeiro fundador |
 | Falta de isolamento multi-tenant comprovado | Média | Crítico | Fase 2 (Tenant Isolation) executada em staging | Segurança | Antes do 1º cliente externo |
-| Métricas inconsistentes | Média | Alto | SSoT de receita já unificada; auditar demais métricas na Sprint 0.2 | RevOps | Antes do GO LIVE |
+| Métricas inconsistentes | Média | Alto | SSoT de receita existente estruturalmente; **reconciliação operacional a comprovar na Sprint 0.2** | RevOps | Antes do GO LIVE |
 | Módulos incompletos | Alta | Médio | Classificar em CORRIGIR / OCULTAR na Sprint 0.2 | Produto | Sprint 0.2 |
 | Promessas de IA autônoma não homologadas | Média | Alto | Não vender Autonomous no primeiro ciclo | Comercial | Constante |
 | Customização excessiva por cliente | Média | Alto | Regra "produto vs configuração vs fora do escopo" | Comercial + Produto | Contrato |
@@ -688,27 +729,40 @@ Novo módulo · novo agente · novo dashboard · nova integração · nova autom
 | Dependência do fundador | Alta | Alto | Documentar diagnóstico e demo | Fundador | Após 3º cliente |
 | Dependência de integrações externas | Média | Médio | Sinalizar integrações como add-on | Produto | Contrato |
 | Falta de critérios claros de aceite | Média | Alto | Fase 7 e 10 da implantação com aceite explícito | Ops | Cada fase |
+| **Métricas, resultados, clientes ou depoimentos não comprovados na landing** (**BLOQUEADOR P0**) | Alta | Crítico reputacional, jurídico e comercial | Remover ou substituir por dados e cases reais, com autorização e evidência formal. Correção permitida durante o freeze. | Marketing + Produto + Fundador | **Antes de enviar qualquer prospect para a landing e antes da primeira demo externa** |
+| **Repositório principal do NOID configurado como público sem confirmação de decisão executiva** (**BLOQUEADOR P0**) | Confirmada no metadata atual do GitHub, sujeita a nova verificação na execução | Alto para propriedade intelectual; potencialmente crítico caso exista histórico sensível (secrets, PII, dados de clientes) | Confirmar se a exposição é intencional; revisar histórico de commits em busca de secrets; tornar o repositório privado caso não seja decisão deliberada. **A visibilidade do repositório NÃO é alterada nesta sprint documental.** | Fundador + Engenharia + Segurança | **Imediato, antes do primeiro cliente externo** |
 
 ---
 
 ## 22. Decisões em aberto
 
-Cada decisão registra opções, impactos, recomendação inicial e momento sugerido de decisão. **Nenhum valor final é fixado.**
+Cada decisão registra opções, impactos, recomendação inicial e momento sugerido de decisão. **Nenhum valor final é fixado neste documento.**
+
+### 22.1 Preços e condições comerciais dos Clientes Fundadores
+
+| Decisão | Momento de decisão |
+|---|---|
+| **Planos comerciais públicos definitivos** (Starter / Pro / Enterprise ou equivalente) | **Após os 3 primeiros clientes implantados** |
+| **Condição comercial do Programa Clientes Fundadores** (desconto, contrapartidas, duração da tarifa fundadora) | **Antes da primeira proposta** |
+| **Preço de implantação assistida** (setup fee) | **Antes da primeira proposta** |
+| **Mensalidade fundadora** | **Antes da primeira proposta** |
+| **Comissão provisória da pré-vendas** (SDR interno da HUMANOID) | **Decisão executiva imediata** — o outbound começa em 20/07/2026 |
+| **Comissão comercial definitiva** (SDR + closer + gestor) | Poderá ser revisada após baseline comercial dos 3 primeiros clientes |
+
+### 22.2 Demais decisões em aberto
 
 | Decisão | Opções | Impactos | Recomendação inicial | Momento |
 |---|---|---|---|---|
-| Preços por plano | (a) Preço fixo por org; (b) Preço por usuário; (c) Híbrido | Previsibilidade x escala | (c) Híbrido: base + por usuário | Após 3 fundadores |
+| Preços por plano público | (a) Preço fixo por org; (b) Preço por usuário; (c) Híbrido | Previsibilidade x escala | (c) Híbrido: base + por usuário | Após 3 fundadores |
 | Limites de usuários por plano | (a) 10/30/ilimitado; (b) tudo por usuário | Simplicidade x ARR | (a) para começar | Antes de plano comercial oficial |
 | Limites de armazenamento / propostas / IA | Limites nominais x limites soft | UX x custo | Limites soft com alerta | Após 3 fundadores |
 | SLA definitivo | 8x5 vs 24x7 vs híbrido | Custo operacional | 8x5 no primeiro ciclo | Antes do 1º contrato |
-| Planos comerciais definitivos | Starter / Pro / Enterprise | Posicionamento | Aguardar baseline | Após 3 fundadores |
 | Integrações incluídas | Nenhuma; Eventrix incluso; HumanERP incluso | Ticket x complexidade | Nenhuma incluída; add-on | Antes de plano comercial |
 | Política de customização paga | Não fazer; horas técnicas cobradas | Escalabilidade | Não fazer no Revenue Core | Constante |
 | Estratégia de WhatsApp | Provedor oficial x sem WhatsApp x add-on | Compliance | Sem WhatsApp no primeiro ciclo | FUTURO |
 | Política de trial futuro | Sem trial; trial guiado; trial self-service | Aquisição x qualidade | Sem trial no primeiro ciclo | Após 3 fundadores |
 | Estrutura de suporte | Só e-mail; e-mail + call; Slack Connect | Custo | E-mail + call para fundadores | 1º contrato |
 | Meta de MRR | — | Direciona time | Definir após baseline | Após 3 fundadores |
-| Comissão comercial interna | Fixo; % MRR; misto | Motivação x custo | Misto | Antes do outbound |
 | Critérios jurídicos definitivos | Contrato padrão x adendos | Risco jurídico | Contrato padrão simples + adendo de LGPD | Antes do 1º contrato |
 
 ---
