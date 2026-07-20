@@ -720,7 +720,7 @@ O freeze **inicia em 19/07/2026** e **encerra em 18/08/2026** (30 dias). O freez
 | Herança de configurações específicas da LEGAL | Alta | Alto | Sprint 0.3 (Tenant Template) sem clonar tenant LEGAL | Produto | Antes de qualquer demo externa |
 | Funcionalidades experimentais expostas | Alta | Alto | Ocultação por entitlement/feature flag na Sprint 0.2 | Engenharia | Antes do primeiro fundador |
 | Falta de isolamento multi-tenant comprovado | Média | Crítico | Fase 2 (Tenant Isolation) executada em staging | Segurança | Antes do 1º cliente externo |
-| Métricas inconsistentes | Média | Alto | SSoT de receita já unificada; auditar demais métricas na Sprint 0.2 | RevOps | Antes do GO LIVE |
+| Métricas inconsistentes | Média | Alto | SSoT de receita existente estruturalmente; **reconciliação operacional a comprovar na Sprint 0.2** | RevOps | Antes do GO LIVE |
 | Módulos incompletos | Alta | Médio | Classificar em CORRIGIR / OCULTAR na Sprint 0.2 | Produto | Sprint 0.2 |
 | Promessas de IA autônoma não homologadas | Média | Alto | Não vender Autonomous no primeiro ciclo | Comercial | Constante |
 | Customização excessiva por cliente | Média | Alto | Regra "produto vs configuração vs fora do escopo" | Comercial + Produto | Contrato |
@@ -729,6 +729,8 @@ O freeze **inicia em 19/07/2026** e **encerra em 18/08/2026** (30 dias). O freez
 | Dependência do fundador | Alta | Alto | Documentar diagnóstico e demo | Fundador | Após 3º cliente |
 | Dependência de integrações externas | Média | Médio | Sinalizar integrações como add-on | Produto | Contrato |
 | Falta de critérios claros de aceite | Média | Alto | Fase 7 e 10 da implantação com aceite explícito | Ops | Cada fase |
+| **Métricas, resultados, clientes ou depoimentos não comprovados na landing** (**BLOQUEADOR P0**) | Alta | Crítico reputacional, jurídico e comercial | Remover ou substituir por dados e cases reais, com autorização e evidência formal. Correção permitida durante o freeze. | Marketing + Produto + Fundador | **Antes de enviar qualquer prospect para a landing e antes da primeira demo externa** |
+| **Repositório principal do NOID configurado como público sem confirmação de decisão executiva** (**BLOQUEADOR P0**) | Confirmada no metadata atual do GitHub, sujeita a nova verificação na execução | Alto para propriedade intelectual; potencialmente crítico caso exista histórico sensível (secrets, PII, dados de clientes) | Confirmar se a exposição é intencional; revisar histórico de commits em busca de secrets; tornar o repositório privado caso não seja decisão deliberada. **A visibilidade do repositório NÃO é alterada nesta sprint documental.** | Fundador + Engenharia + Segurança | **Imediato, antes do primeiro cliente externo** |
 
 ---
 
