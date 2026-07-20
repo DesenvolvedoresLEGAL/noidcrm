@@ -202,21 +202,87 @@ triggers foram revertidos pelo sub-bloco.
 | Secret ou JWT em log | ✅ Não |
 | Dados reais alterados | ✅ Não |
 
-## 7. Estado atual e próximas etapas (aguardando aprovação explícita)
+## 7. NSEC-1.2-CHG-003 — Restrição de INSERT para `viewer`
 
-Metodologia validada nos 4 cenários iniciais. Nenhuma expansão foi
-iniciada. Para prosseguir será necessária **nova aprovação explícita**
-para cada um dos itens abaixo, tratados separadamente:
+### 7.1 Policies anteriores (preservadas, inalteradas)
 
-1. Rodar os 108 probes em `public.accounts` (12 usuários × 3 cenários +
-   variações), reutilizando a RPC `nsec12_probe_insert_account`.
-2. Discussão isolada da policy de `viewer` (proposta + rollback).
-3. Extensão da metodologia (nova RPC análoga, mesmo padrão SECURITY
-   INVOKER + sub-bloco com rollback) para `contacts`, `opportunities`,
-   `activities`, uma tabela por vez.
-4. Cleanup final da sprint: `DROP FUNCTION
-   public.nsec12_probe_insert_account(uuid, text);` e demais itens do
-   `single-project-cleanup-runbook-v1.md`.
+- `Org members can insert accounts` (permissive, `authenticated`, WITH CHECK: membership ativo na org do registro).
+- `Users insert accounts in own org` (permissive, roles padrão, WITH CHECK: `organization_id = get_user_organization_id()`).
 
-**PARADO.** Nenhuma dessas etapas será iniciada sem autorização
+Nenhuma das duas foi removida ou recriada. Verificado via `pg_policy` após a migration.
+
+### 7.2 Policy nova (aditiva, RESTRICTIVE)
+
+Nome: `nsec12_accounts_insert_block_viewer`
+Tabela: `public.accounts` — Comando: `INSERT` — Roles: `authenticated`
+Modo: `AS RESTRICTIVE` (`polpermissive = false` confirmado). Somente `WITH CHECK`.
+
+```sql
+NOT EXISTS (
+  SELECT 1 FROM public.organization_members om
+  WHERE om.user_id = auth.uid()
+    AND om.organization_id = accounts.organization_id
+    AND om.status = 'active'
+    AND (om.org_role = 'viewer'
+         OR (om.org_role IS NULL AND om.role = 'viewer'))
+)
+```
+
+Papel efetivo prioriza `org_role`; `role` legado só é consultado quando
+`org_role` é NULL. Sem recursão: a policy de leitura de
+`organization_members` usa o helper SECURITY DEFINER `user_is_org_member`,
+que não referencia `accounts`. Nenhuma função nova, nenhum trigger, RPC,
+tabela ou bucket alterado.
+
+### 7.3 Rollback registrado
+
+```sql
+DROP POLICY IF EXISTS nsec12_accounts_insert_block_viewer ON public.accounts;
+```
+
+### 7.4 Baseline
+
+| Métrica | Pré | Pós |
+|---|---|---|
+| Accounts sintéticas ativas (orgs A/B) | 0 | 0 |
+| Accounts sintéticas totais (tombstone) | 1 | 1 |
+| Accounts reais totais ativas | 4781 | 4781 |
+| `lead_score_recalc_queue` sintéticas | 0 | 0 |
+
+Baseline idêntico. Tombstone preservado.
+
+### 7.5 Seis reprobes (RPC `nsec12_probe_insert_account`, JWT real, apikey publishable)
+
+| # | Ator | Alvo | Esperado | Observado |
+|---|---|---|---|---|
+| 1 | Owner A (`58c9eb37…`) | Org A | `ALLOWED_ROLLED_BACK` | `ALLOWED_ROLLED_BACK` ✅ |
+| 2 | Owner B (`4ac56488…`) | Org B | `ALLOWED_ROLLED_BACK` | `ALLOWED_ROLLED_BACK` ✅ |
+| 3 | Owner A | Org B | `BLOCKED_RLS` | `BLOCKED_RLS` ✅ |
+| 4 | Owner B | Org A | `BLOCKED_RLS` | `BLOCKED_RLS` ✅ |
+| 5 | Viewer A (`84cfb07e…`) | Org A | `BLOCKED_RLS` | `BLOCKED_RLS` ✅ |
+| 6 | Viewer B (`ea6ca3ef…`) | Org B | `BLOCKED_RLS` | `BLOCKED_RLS` ✅ |
+
+Owner na própria org preservado; cross-org bloqueado pela policy
+permissiva existente (RESTRICTIVE nova não afrouxa nada); viewer na
+própria org corrigido — de `ALLOWED_ROLLED_BACK` (Fase 4b-2) para
+`BLOCKED_RLS`. Nenhum probe persistiu: rollback interno da RPC reverteu
+todos os efeitos de trigger.
+
+### 7.6 Smoke não destrutivo
+
+- `SELECT` sobre `accounts` continua retornando as 4781 contas ativas.
+- Nenhuma alteração de código de frontend; policy afeta apenas INSERT
+  de `viewer` em `accounts`.
+- Nenhum registro real foi criado, alterado ou removido.
+
+### 7.7 Decisão
+
+`NSEC-1.2-CHG-003`: **VALIDATED** — policy ativa; rollback disponível
+em um único `DROP POLICY`.
+
+## 8. PARADO — aguardando nova aprovação explícita
+
+Não executado nesta rodada: os 108 probes; expansão para `contacts`,
+`opportunities`, `activities`; UPDATE/DELETE; Storage; cleanup da RPC
+temporária. Nenhuma dessas etapas será iniciada sem autorização
 específica.
