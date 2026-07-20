@@ -14,13 +14,15 @@ Nesta sprint foi executado apenas o que é possível **sem tocar produção e se
 um projeto Supabase de staging exclusivo**. Isso significa:
 
 - **Ações aplicadas** (código/documentação, sem impacto em banco):
-  - `.gitignore` protege padrões `.env*` (novo).
   - `.env.example` e `.env.staging.example` sanitizados (novos).
   - 6 relatórios de segurança versionados (este + demais artefatos da sprint).
   - Guardas existentes contra o ref de produção `urihdqturaebhiefwjnw`
     revisadas em `scripts/apply-migrations-staging.sh`,
     `scripts/staging-smoke-tests.sh`, `src/test/security/tenant-isolation/**`
     e `.github/workflows/tenant-isolation.yml`.
+  - **Bloqueado**: edição do `.gitignore` — o arquivo é read-only no sandbox
+    Lovable. Instrução humana registrada em
+    `repository-protection-report-v1.md`.
 
 - **Ações bloqueadas** (dependem de staging humano):
   - Execução da suíte multi-tenant em Supabase real.

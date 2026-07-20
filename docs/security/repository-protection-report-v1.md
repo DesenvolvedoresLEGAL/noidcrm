@@ -46,12 +46,29 @@ assim inadequados para versionamento).
 
 | Ação | Estado |
 | --- | --- |
-| `.gitignore` protege `.env`, `.env.local`, `.env.*.local`, `.env.staging`, `.env.production`, etc. | **APLICADO** |
+| `.gitignore` atualizado para proteger `.env*` | **BLOQUEADO pelo Lovable** — o arquivo é read-only no sandbox e não pode ser editado pelo agente; edição precisa ser feita via checkout local ou GitHub UI |
 | `.env.example` sanitizado criado | **APLICADO** |
 | `.env.staging.example` sanitizado criado | **APLICADO** |
 | Remoção de `.env` do tracking (`git rm --cached .env`) | **PENDENTE — exige ação humana**: o agente Lovable não pode executar comandos Git de escrita (`git add/rm/commit`). |
 
-**Instrução humana obrigatória:**
+**Instruções humanas obrigatórias:**
+
+1. Em checkout local, adicionar ao `.gitignore` (read-only para o agente
+   Lovable, mas editável por humanos via Git):
+   ```
+   .env
+   .env.local
+   .env.*.local
+   .env.development
+   .env.development.local
+   .env.test
+   .env.test.local
+   .env.production
+   .env.production.local
+   .env.staging
+   .env.staging.local
+   ```
+2. Depois:
 ```bash
 git rm --cached .env
 git commit -m "chore(security): stop tracking .env"

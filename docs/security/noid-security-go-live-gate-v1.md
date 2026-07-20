@@ -8,7 +8,7 @@
 
 - [ ] Repositório privado **ou** decisão formal alternativa registrada — **não** (P0-11 aberto)
 - [ ] `.env` fora do tracking — **não** (agente aplicou `.gitignore`; `git rm --cached .env` humano pendente)
-- [ ] `.gitignore` corrigido — **sim**
+- [ ] `.gitignore` corrigido — **não** (arquivo read-only no sandbox Lovable; pendente de edição humana)
 - [x] Árvore atual sem secret privado conhecido — **sim**
 - [ ] Histórico Git revisado exaustivamente — **não** (só preliminar; gitleaks pendente)
 - [ ] Secrets privados rotacionados quando aplicável — **n/a** (nenhum privado detectado)
