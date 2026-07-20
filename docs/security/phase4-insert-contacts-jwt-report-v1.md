@@ -67,11 +67,98 @@ Nenhum registro sintético persistiu. Nenhum contato real alterado. Nenhum efeit
 - Nenhuma policy, trigger, coluna ou constraint foi alterada.
 - Frontend não impactado (nenhum deploy).
 
-## Decisão
+## Decisão (canary — NSEC-1.2-CHG-005)
 
-**CONTACTS INSERT CANARY VALIDATED** — metodologia comprovada; isolamento cross-org OK; role escalation de `viewer` confirmada (HIGH, OPEN) e registrada. Matriz completa, correção do viewer e testes de `account_id`/UPDATE/DELETE **não executados** — aguardando nova autorização explícita.
+**CONTACTS INSERT CANARY — METODOLOGIA VALIDATED / ROLE ENFORCEMENT FAILED.** Isolamento cross-org OK; role escalation de `viewer` confirmada (HIGH). Registrada como `SEC-012` (OPEN à época).
 
-## Pendências
+---
 
-- RPC `nsec12_probe_insert_contact` **mantida** (por mandato) até aprovação da próxima rodada.
-- `SEC-012` (viewer role escalation em `contacts`) permanece OPEN.
+## NSEC-1.2-CHG-006 — Correção do viewer (RESTRICTIVE aditiva)
+
+**Objetivo:** bloquear INSERT em `public.contacts` para papel efetivo `viewer`, sem alterar policies existentes, triggers, RPC temporária ou frontend.
+
+### Pre-flight
+
+- Policy INSERT anterior preservada: `Users insert contacts in own org` (PERMISSIVE, `authenticated`, WITH CHECK exige `organization_id = get_user_organization_id()` e — se `account_id` presente — mesma org do account; não filtra `org_role`).
+- `public.contacts.organization_id` é `NOT NULL uuid`.
+- Helper `organization_members` acessível de RLS sem recursão (padrão CHG-003 para accounts já validado).
+- Modelo de papel efetivo confirmado: `org_role` prioritário; fallback para `role` quando `org_role IS NULL`; filtro `status = 'active'`.
+- Rollback registrado antes da aplicação: `DROP POLICY IF EXISTS nsec12_contacts_insert_block_viewer ON public.contacts;`
+- Nenhuma alteração feita no pre-flight.
+
+### Policy aplicada
+
+```sql
+CREATE POLICY nsec12_contacts_insert_block_viewer
+ON public.contacts
+AS RESTRICTIVE
+FOR INSERT
+TO authenticated
+WITH CHECK (
+  NOT EXISTS (
+    SELECT 1
+    FROM public.organization_members om
+    WHERE om.user_id = auth.uid()
+      AND om.organization_id = contacts.organization_id
+      AND om.status = 'active'
+      AND (
+        om.org_role = 'viewer'::org_role
+        OR (om.org_role IS NULL AND om.role = 'viewer')
+      )
+  )
+);
+```
+
+- `polpermissive = false` (RESTRICTIVE), comando `INSERT`, roles `{authenticated}`.
+- Apenas `WITH CHECK`, sem `USING`.
+- Policies preservadas em `public.contacts` (6 total): `Admins delete contacts`, `Users can update org contacts`, `Users insert contacts in own org`, `Users update contacts in own org`, `Users view contacts in own org`, `nsec12_contacts_insert_block_viewer` (nova).
+
+### Rollback
+
+```sql
+DROP POLICY IF EXISTS nsec12_contacts_insert_block_viewer ON public.contacts;
+```
+
+### Reprobes (RPC `nsec12_probe_insert_contact` + JWT sintético via PostgREST)
+
+| # | Papel | Origem → Destino | Esperado | Observado |
+|---|---|---|---|---|
+| 1 | OWNER A | ORG A → ORG A | `ALLOWED_ROLLED_BACK` | `ALLOWED_ROLLED_BACK` ✅ |
+| 2 | OWNER B | ORG B → ORG B | `ALLOWED_ROLLED_BACK` | `ALLOWED_ROLLED_BACK` ✅ |
+| 3 | OWNER A | ORG A → ORG B | `BLOCKED_RLS` | `BLOCKED_RLS` ✅ |
+| 4 | OWNER B | ORG B → ORG A | `BLOCKED_RLS` | `BLOCKED_RLS` ✅ |
+| 5 | VIEWER A | ORG A → ORG A | `BLOCKED_RLS` | `BLOCKED_RLS` ✅ |
+| 6 | VIEWER B | ORG B → ORG B | `BLOCKED_RLS` | `BLOCKED_RLS` ✅ |
+
+Nenhum probe usou `service_role`. Todos com `Authorization: Bearer <JWT sintético>` + `apikey: <anon publishable>`.
+
+### Baseline pré/pós (CHG-006)
+
+| Métrica | Pré | Pós |
+|---|---|---|
+| Contatos reais ativos (excluindo orgs sintéticas) | 1681 | 1681 |
+| Contatos sintéticos ativos ou em orgs sintéticas | 0 | 0 |
+
+Nenhum registro sintético persistiu. Nenhum contato real alterado. Nenhum efeito derivado.
+
+### Smoke read-only
+
+- `SELECT` em `public.contacts` continua funcional para papéis autorizados (policies SELECT intactas).
+- Nenhuma organização real perdeu leitura.
+- Nenhuma policy anterior removida ou alterada.
+- RPC `nsec12_probe_insert_contact` continua **SECURITY INVOKER** (`prosecdef = false`).
+
+### Estado da RPC temporária
+
+Mantida por mandato. Não removida nesta rodada.
+
+### Decisão
+
+**NSEC-1.2-CHG-006 → VALIDATED.** SEC-012 marcado como RESOLVED com correção `nsec12_contacts_insert_block_viewer`.
+
+### Pendências
+
+- Matriz completa de INSERT em `contacts` (admin/manager/sales/cs/`account_id`) não executada.
+- UPDATE/DELETE em `contacts` não executados.
+- RPC temporária permanece por mandato.
+

@@ -28,7 +28,7 @@ com rollback interno + JWT real por HTTPS (`apikey` publishable, nunca `service_
 | SELECT | PASS (implícito na Fase 4 SELECT) | NSEC-1.2-CHG (Fase 4) | `phase4-select-report-v1.md` |
 | INSERT canary (owner same-org × 2) | PASS | NSEC-1.2-CHG-005 | 2/2 `ALLOWED_ROLLED_BACK` — `phase4-insert-contacts-jwt-report-v1.md` |
 | INSERT canary cross-org (owner × 2) | PASS — bloqueado | NSEC-1.2-CHG-005 | 2/2 `BLOCKED_RLS` |
-| INSERT canary viewer (same-org × 2) | **FAIL — role escalation** | NSEC-1.2-CHG-005 | 2/2 `ALLOWED_ROLLED_BACK` → `SEC-012` HIGH OPEN |
+| INSERT canary viewer (same-org × 2) | **FIXED** | NSEC-1.2-CHG-005 → CHG-006 | Canary 2/2 `ALLOWED_ROLLED_BACK` → `SEC-012` HIGH; correção `nsec12_contacts_insert_block_viewer` (RESTRICTIVE); reprobe 2/2 `BLOCKED_RLS`; SEC-012 **RESOLVED** |
 | `account_id` FK | não testado | — | fora do escopo do canary |
 | Matriz completa (admin/manager/sales/cs, org_id NULL) | não executada | — | aguardando autorização |
 | UPDATE / DELETE | não executados | — | fora do escopo autorizado |
