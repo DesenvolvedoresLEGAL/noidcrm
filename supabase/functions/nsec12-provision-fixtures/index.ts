@@ -33,12 +33,45 @@ Deno.serve(async (req) => {
   const admin = createClient(url, key, { auth: { persistSession: false } });
 
   const body = await req.json().catch(() => ({}));
+  const action = typeof body?.action === 'string' ? body.action : 'provision';
   const dryRun = body?.dryRun === true;
   const orgsWanted: string[] = Array.isArray(body?.orgs) && body.orgs.length
     ? body.orgs.filter((o: string) => ORG_ALLOW.includes(o))
     : ORG_ALLOW;
 
+  // ---- Test-token issuer (Phase 4 read-only impersonation) ----
+  // Signs in as a synthetic user, strictly enforced by email prefix/domain.
+  // Returns access_token + user_id. Never touches real users.
+  if (action === 'issueToken') {
+    const email: string = typeof body?.email === 'string' ? body.email : '';
+    if (!email.startsWith(`${EMAIL_PREFIX}-`) || !email.endsWith(`@${EMAIL_DOMAIN}`)) {
+      return json({ error: 'email not allowed (must be sec-test-*@example.com)' }, 400);
+    }
+    // find user + reset password to a known one for this call
+    const { data: list } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 });
+    const found = list?.users?.find((u) => u.email === email);
+    if (!found) return json({ error: 'user not found' }, 404);
+    const password = 'SEC_TEST_' + crypto.randomUUID();
+    const { error: updErr } = await admin.auth.admin.updateUserById(found.id, { password });
+    if (updErr) return json({ error: 'password reset failed', detail: updErr.message }, 500);
+    // sign in via anon endpoint
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const resp = await fetch(`${url}/auth/v1/token?grant_type=password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: anonKey },
+      body: JSON.stringify({ email, password }),
+    });
+    const tok = await resp.json();
+    if (!resp.ok) return json({ error: 'signin failed', detail: tok }, 500);
+    return json({
+      email, user_id: found.id,
+      access_token: tok.access_token,
+      expires_in: tok.expires_in,
+    });
+  }
+
   const result: any = { dryRun, orgs: [], users: [], errors: [] };
+
 
   for (const orgName of orgsWanted) {
     const slug = orgName.toLowerCase().replace(/_/g, '-');
