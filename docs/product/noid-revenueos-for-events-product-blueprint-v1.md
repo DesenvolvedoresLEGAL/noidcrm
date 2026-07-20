@@ -396,7 +396,8 @@ Cobertura de pipeline · Forecast · Commit · Best case · Gap para meta · Pip
 
 ### 11.5 Fontes já comprovadas
 
-- **Receita realizada:** fonte única `commercial_won_revenue_view` já reconciliada entre Forecast, Dashboard, Revenue Command, OTE e Relatórios (correção recente unificando o escopo ao pipeline sales primário). **Status: EXISTENTE.**
+- **Receita realizada:** existe fonte técnica única `commercial_won_revenue_view` referenciada pelo Forecast, Dashboard, Revenue Command, OTE e Relatórios (correção recente unificou o escopo ao pipeline sales primário). **Status: EXISTENTE ESTRUTURALMENTE — NECESSITA AUDITORIA OPERACIONAL.** A reconciliação numérica definitiva entre todas as telas será rastreada e comprovada na Sprint 0.2; a correção recente é evidência estrutural, não substitui teste operacional.
+- **Integração dos indicadores entre módulos:** **EXISTENTE ESTRUTURALMENTE — NECESSITA AUDITORIA OPERACIONAL**.
 - **Demais métricas verticais:** **NECESSITA AUDITORIA** — várias dependem de campos verticais (Seção 7) ainda não formalizados.
 
 **Regra:** nenhuma RPC ou função de cálculo será criada nesta sprint.
