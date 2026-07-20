@@ -93,15 +93,17 @@ Deno.serve(async (req) => {
           organization_id: orgId,
         } as any, { onConflict: 'id' });
 
-        // membership
-        await admin.from('organization_members').upsert({
+        // membership — role column has CHECK (owner|admin|member); org_role enum holds the real role
+        const legacyRole = (role === 'owner' || role === 'admin') ? role : 'member';
+        const { error: memErr } = await admin.from('organization_members').upsert({
           organization_id: orgId,
           user_id: userId,
-          role: role,
+          role: legacyRole,
           org_role: role,
           status: 'active',
           joined_at: new Date().toISOString(),
         } as any, { onConflict: 'organization_id,user_id' });
+        if (memErr) result.errors.push({ email, step: 'member', error: memErr.message });
 
         // user_roles (app_role) — map viewer->sales for enum, owner ok
         const appRole = ['admin','manager','sales','cs','owner'].includes(role) ? role : 'sales';
