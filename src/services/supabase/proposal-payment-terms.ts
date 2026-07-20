@@ -210,7 +210,7 @@ export function calculateInstallments(
     // âncora de precificação, esta data passa a ser também o vencimento do
     // à vista (refletindo no Cronograma e na proposta pública).
     const dynEnd = options?.dynamicPricingCurrentEndsAt;
-    const isFrozen = options?.approvedAmount != null;
+    const isFrozen = options?.frozenSchedule === true;
     const refType = (term as any).dynamic_pricing_reference_type;
     const refDate = (term as any).dynamic_pricing_reference_date;
     const customAnchor =
