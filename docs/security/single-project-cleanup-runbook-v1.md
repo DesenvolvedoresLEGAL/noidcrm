@@ -383,3 +383,74 @@ dependentes → Contact A → Contact B → contato órfão (§6) → stages sin
 organizações sintéticas (ordem final respeita FKs no momento do cleanup).
 
 **Nenhum cleanup executado nesta mudança.**
+
+## §8 — Fixtures alternativas (CHG-022)
+
+### Account A Alternativa (OFICIAL)
+| Campo | Valor |
+|---|---|
+| `id` | `14127c66-7d33-43e5-8da4-f960469261af` |
+| `razao_social` | `SECURITY_TEST_ACCOUNT_ORG_A_ALT` |
+| `nome_fantasia` | `SECURITY_TEST_ACCOUNT_ORG_A_ALT` |
+| `organization_id` | `e1c4881f-0cd4-45fb-bc50-48314ce7bca0` (NOID_SECURITY_ORG_A) |
+| `created_by` | `58c9eb37-4ae3-4612-bbfd-e873f49b329b` (sec-test-a-owner@example.com) |
+| `deleted_at` | `NULL` |
+| Criada em | 2026-07-21 18:07:35 UTC |
+| Estado | ATIVA — fixture oficial |
+| Efeitos derivados | Não executados nesta CHG (não autorizado) |
+| Finalidade | FIXTURE PARA TESTE DE COMPATIBILIDADE ACCOUNT↔CONTACT SAME-TENANT |
+| Dependências | Nenhuma (pipeline/stage não vinculam accounts) |
+| Ordem de cleanup | Após contacts alternativos e antes das accounts-base |
+
+### Account B Alternativa (OFICIAL)
+| Campo | Valor |
+|---|---|
+| `id` | `95585017-2d71-4cb2-a145-5ce5f08ada5e` |
+| `razao_social` | `SECURITY_TEST_ACCOUNT_ORG_B_ALT` |
+| `nome_fantasia` | `SECURITY_TEST_ACCOUNT_ORG_B_ALT` |
+| `organization_id` | `bea090a6-4c6c-45b1-92e0-83678c687578` (NOID_SECURITY_ORG_B) |
+| `created_by` | `4ac56488-9128-4ff4-b236-56e1e06e9526` (sec-test-b-owner@example.com) |
+| `deleted_at` | `NULL` |
+| Criada em | 2026-07-21 18:07:44 UTC |
+| Estado | ATIVA — fixture oficial |
+| Finalidade | FIXTURE PARA TESTE DE COMPATIBILIDADE ACCOUNT↔CONTACT SAME-TENANT |
+
+### Contact A Alternativo (OFICIAL)
+| Campo | Valor |
+|---|---|
+| `id` | `b1ab7611-d0eb-4cc1-ae9c-2b00adb3d089` |
+| `nome` | `SECURITY_TEST_CONTACT_ORG_A_ALT` |
+| `primeiro_nome` | `SECURITY_TEST_CONTACT_ORG_A_ALT` |
+| `ultimo_nome` | `NULL` |
+| `organization_id` | `e1c4881f-0cd4-45fb-bc50-48314ce7bca0` (Org A) |
+| `account_id` | `14127c66-7d33-43e5-8da4-f960469261af` (Account A ALT oficial) |
+| Persona/JWT | Owner A (sec-test-a-owner@example.com) |
+| Criado em | 2026-07-21 18:08 UTC |
+| Estado | ATIVO — fixture oficial |
+| Finalidade | FIXTURE PARA TESTE DE COMPATIBILIDADE ACCOUNT↔CONTACT SAME-TENANT |
+| Proibição | Não remover antes da canary futura |
+| Ordem de cleanup | Antes das accounts alternativas |
+
+### Contact B Alternativo (OFICIAL)
+| Campo | Valor |
+|---|---|
+| `id` | `edfd34a3-2188-4767-80de-de3991c3e0e3` |
+| `nome` | `SECURITY_TEST_CONTACT_ORG_B_ALT` |
+| `primeiro_nome` | `SECURITY_TEST_CONTACT_ORG_B_ALT` |
+| `ultimo_nome` | `NULL` |
+| `organization_id` | `bea090a6-4c6c-45b1-92e0-83678c687578` (Org B) |
+| `account_id` | `95585017-2d71-4cb2-a145-5ce5f08ada5e` (Account B ALT oficial) |
+| Persona/JWT | Owner B |
+
+## §8bis — Orphan account (CHG-022 retry duplicate)
+| Campo | Valor |
+|---|---|
+| `id` | `73dbf1e3-790e-4ad5-a389-22a400d37f77` |
+| `razao_social` | `SECURITY_TEST_ACCOUNT_ORG_A_ALT` |
+| `organization_id` | `e1c4881f-0cd4-45fb-bc50-48314ce7bca0` (Org A) |
+| `created_by` | `58c9eb37-4ae3-4612-bbfd-e873f49b329b` |
+| Criada em | 2026-07-21 18:07:29 UTC (6s antes da oficial) |
+| Estado | ORPHAN DUP — **NON-FIXTURE / DO NOT USE / CLEANUP REQUIRED** |
+| Motivo | Retry indevido após parse `jq` falho da resposta HTTP 201 inicial |
+| Referências downstream | 0 (opportunities/contacts) |
+| Ordem de cleanup | Antes das accounts-base; independente das fixtures ALT oficiais |
