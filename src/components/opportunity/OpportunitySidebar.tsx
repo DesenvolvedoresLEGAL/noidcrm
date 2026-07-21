@@ -51,6 +51,7 @@ export function OpportunitySidebar({
   onLost,
   onEdit,
   onDelete,
+  onDuplicate,
   onReopen,
   userRole,
   onNavigateToIntelligence,
