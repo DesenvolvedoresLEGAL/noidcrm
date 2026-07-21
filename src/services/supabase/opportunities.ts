@@ -526,7 +526,8 @@ export async function duplicateOpportunity(sourceId: string): Promise<Opportunit
 
   insertPayload.title = `CÓPIA - ${source.title || 'Oportunidade'}`;
   insertPayload.status = 'new';
-  insertPayload.source_opportunity_id = source.id;
+  // Não vinculamos source_opportunity_id para não colidir com o unique index
+  // `opportunities_no_duplicate_handoff_uidx` (reservado para handoffs de workflow).
   insertPayload.created_by = user.id;
   insertPayload.owner_user_id = source.owner_user_id || user.id;
 
