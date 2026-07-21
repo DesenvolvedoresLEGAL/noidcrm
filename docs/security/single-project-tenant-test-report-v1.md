@@ -60,3 +60,14 @@ Não homologadas para escrita. Aguardando autorização explícita.
 
 `ACCOUNTS INSERT HOMOLOGADO`. Sprint parada conforme mandato até próxima
 autorização explícita.
+
+## NSEC-1.2-CHG-008 — Fixtures base de accounts
+
+- Org A: **criada** (`36085a30-…-d92b`)
+- Org B: **criada** (`b777baac-…-9f41`)
+- Isolamento SELECT (Owner A/B, Viewer A/B contra ambas as fixtures): **PASS**
+- Testes de relacionamento (`account_id` em contacts/opportunities/activities): **ainda não iniciados**
+
+Baseline: accounts reais ativas 4781 → 4781 (delta 0); sintéticas ativas 0 → 2; tombstone 1 → 1.
+
+Estado: `ACCOUNT RELATIONSHIP FIXTURES READY`.
