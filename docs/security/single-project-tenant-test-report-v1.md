@@ -44,9 +44,10 @@ com rollback interno + JWT real por HTTPS (`apikey` publishable, nunca `service_
 | Operação | Estado | Autorização | Evidência |
 |---|---|---|---|
 | Pre-flight (schema, FKs, policies, triggers, egress, código, fixtures) | **EXECUTADO** | NSEC-1.2-CHG-011 | `docs/security/phase4-opportunities-insert-preflight-v1.md` |
-| INSERT (probes dinâmicos) | **NÃO EXECUTADOS** | — | aguarda fixtures + autorização |
+| Pipeline/Stage fixtures A e B | **CRIADAS** — `OPPORTUNITY PIPELINE FIXTURES READY` | NSEC-1.2-CHG-012 | `docs/security/phase4-opportunity-relationship-fixtures-report-v1.md` |
+| INSERT (probes dinâmicos) | **NÃO EXECUTADO** | — | aguarda contacts-base + autorização |
 | UPDATE / DELETE | **NÃO EXECUTADOS** | — | fora do escopo |
-| Readiness | `READY AFTER SYNTHETIC FIXTURES` | NSEC-1.2-CHG-011 | pipelines/stages sintéticos ausentes; contacts-base permanentes ausentes |
+| Readiness | `READY AFTER SYNTHETIC FIXTURES` — pipelines/stages OK; contacts-base pendentes | NSEC-1.2-CHG-012 | idem |
 | Achados abertos | SEC-013 candidato (viewer insere), Achado A (FK cross-tenant sem tenant-check em account/contact/pipeline/stage) | NSEC-1.2-CHG-011 | §6.1 e §3 do pre-flight |
 
 ### Demais tabelas (`activities`, `proposals`, …)
