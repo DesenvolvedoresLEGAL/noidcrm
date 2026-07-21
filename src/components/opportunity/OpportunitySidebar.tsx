@@ -197,7 +197,7 @@ export function OpportunitySidebar({
                 <Edit className="h-4 w-4 mr-2" />
                 Editar
               </DropdownMenuItem>
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={onDuplicate} disabled={!onDuplicate}>
                 <Copy className="h-4 w-4 mr-2" />
                 Duplicar
               </DropdownMenuItem>
