@@ -114,4 +114,5 @@ Toda mudança AMARELA aplicada deve aparecer em:
 | ID | Data/hora (UTC) | Superfície | Descrição | Status |
 | --- | --- | --- | --- | --- |
 | NSEC-1.2-CHG-001 | 2026-07-20T20:54Z | Edge Function + Auth + DB (aditivo) | Deploy de `nsec12-provision-fixtures` (guarded por `NSEC12_TOKEN2`) e criação de 2 orgs sintéticas + 12 usuários `@example.com` + 12 memberships + user_roles. Prefixo `NOID_SECURITY_ORG_*` / `sec-test-*`. Zero erros após correção do CHECK legado em `organization_members.role` (usa `role='member'` para papéis não-owner/admin, mantendo `org_role` real). | APLICADA — aditiva, reversível via cleanup runbook |
+| NSEC-1.2-CHG-007 | 2026-07-21T10:22Z | DB (cleanup) | Matriz completa de INSERT em `public.contacts` sem `account_id` (26/26 probes conforme esperado) e remoção da RPC temporária `nsec12_probe_insert_contact(uuid,text)`. Policies preservadas; baseline pré/pós idêntico (1684/1733/0). Decisão: **CONTACTS INSERT BÁSICO HOMOLOGADO**. | APLICADA — cleanup, sem rollback necessário |
 
