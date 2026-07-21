@@ -31,10 +31,13 @@ com rollback interno + JWT real por HTTPS (`apikey` publishable, nunca `service_
 | INSERT cross-org sem `account_id` (todos os papéis) | PASS — bloqueado | NSEC-1.2-CHG-007 | 12/12 `BLOCKED_RLS` |
 | INSERT `organization_id = NULL` (owners A/B) | PASS — bloqueado | NSEC-1.2-CHG-007 | 2/2 HTTP 403 RLS |
 | Role enforcement (`org_role`) | PASS | NSEC-1.2-CHG-006 + CHG-007 | manager/sales/cs preservados; viewer bloqueado |
-| INSERT com `account_id` FK | **NÃO EXECUTADO** | — | fora do escopo autorizado (CHG-007 pára aqui) |
+| INSERT com `account_id` FK — canary 8 probes | PASS | NSEC-1.2-CHG-009 | `phase4-contact-account-relationship-report-v1.md` (canary) |
+| INSERT com `account_id` FK — matriz 36 probes | PASS | NSEC-1.2-CHG-010 | `phase4-contact-account-relationship-report-v1.md` §4 — 12/12 same-org (10 allowed, 2 viewers blocked), 12/12 account cross-org bloqueados, 12/12 org cross-org bloqueados |
+| Role enforcement com `account_id` (owner/admin/manager/sales/cs allowed; viewer blocked) | PASS | NSEC-1.2-CHG-010 | Matriz por papel §5 |
 | UPDATE | não executado | — | fora do escopo autorizado |
 | DELETE | não executado | — | fora do escopo autorizado |
-| RPC temporária de probe | **REMOVIDA** | NSEC-1.2-CHG-007 (cleanup) | `DROP FUNCTION nsec12_probe_insert_contact` — `pg_proc` 0 linhas |
+| RPC temporária `nsec12_probe_insert_contact` | **REMOVIDA** | NSEC-1.2-CHG-007 | `pg_proc` 0 linhas |
+| RPC temporária `nsec12_probe_insert_contact_with_account` | **REMOVIDA** | NSEC-1.2-CHG-010 | `pg_proc` 0 linhas |
 
 ### Demais tabelas (`opportunities`, `activities`, `proposals`, …)
 
