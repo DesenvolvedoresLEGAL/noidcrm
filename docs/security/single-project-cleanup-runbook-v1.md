@@ -175,3 +175,54 @@ SELECT count(*) FROM public.organization_members WHERE user_id IN (<lista>);    
 | — | — | — | — | — |
 
 Preencher em ordem cronológica antes do encerramento da sprint.
+
+## 7. Fixtures ativas de RELACIONAMENTO (NSEC-1.2-CHG-008)
+
+Duas accounts sintéticas base foram provisionadas via PostgREST com JWT real
+dos owners sintéticos. Devem permanecer ativas até o encerramento das etapas
+de relacionamento (`contacts.account_id`, `opportunities.account_id`,
+`activities.account_id`). **Proibido remover enquanto houver testes
+dependentes.**
+
+### Account A
+| Campo | Valor |
+| --- | --- |
+| UUID | `36085a30-06a1-491a-a079-a24fb42dd92b` |
+| `razao_social` | `SECURITY_TEST_ACCOUNT_ORG_A_BASE` |
+| `nome_fantasia` | `SECURITY_TEST_ACCOUNT_ORG_A_BASE` |
+| `organization_id` | `e1c4881f-0cd4-45fb-bc50-48314ce7bca0` (NOID_SECURITY_ORG_A) |
+| `created_by` | `58c9eb37-4ae3-4612-bbfd-e873f49b329b` (sec-test-a-owner@example.com) |
+| Criada em (UTC) | 2026-07-21 |
+| Estado | ativo (`deleted_at IS NULL`) |
+| Finalidade | FIXTURE BASE PARA TESTES DE RELACIONAMENTO |
+| Efeitos derivados | 1 linha em `lead_score_recalc_queue` (account_id = UUID) |
+
+### Account B
+| Campo | Valor |
+| --- | --- |
+| UUID | `b777baac-072a-4c1a-b481-306d0c899f41` |
+| `razao_social` | `SECURITY_TEST_ACCOUNT_ORG_B_BASE` |
+| `nome_fantasia` | `SECURITY_TEST_ACCOUNT_ORG_B_BASE` |
+| `organization_id` | `bea090a6-4c6c-45b1-92e0-83678c687578` (NOID_SECURITY_ORG_B) |
+| `created_by` | `4ac56488-9128-4ff4-b236-56e1e06e9526` (sec-test-b-owner@example.com) |
+| Criada em (UTC) | 2026-07-21 |
+| Estado | ativo (`deleted_at IS NULL`) |
+| Finalidade | FIXTURE BASE PARA TESTES DE RELACIONAMENTO |
+| Efeitos derivados | 1 linha em `lead_score_recalc_queue` (account_id = UUID) |
+
+### Dependências futuras esperadas
+- `contacts.account_id` apontando para uma dessas fixtures.
+- `opportunities.account_id` apontando para uma dessas fixtures.
+- `activities.account_id` apontando para uma dessas fixtures.
+- Registros em `lead_score_recalc_queue`, `entity_snapshots`, `audit_log`,
+  `system_events`, `notifications`, `interactions`, `revenue_events`,
+  `workflow_executions` vinculados a essas UUIDs.
+
+### Ordem de cleanup futura
+1. Soft-delete de filhos vinculados (activities → opportunities → contacts).
+2. Limpeza de filas/eventos por UUID exato da account.
+3. Soft-delete das accounts (via `UPDATE ... SET deleted_at = now()` — nunca
+   `DELETE` físico, para respeitar o trigger de auditoria).
+4. Registro em tombstone e atualização deste runbook.
+
+**Nenhum cleanup executado nesta mudança.**
