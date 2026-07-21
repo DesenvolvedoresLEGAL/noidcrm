@@ -273,3 +273,46 @@ JWT real dos 4 atores sintéticos via `nsec12-provision-fixtures issueToken`; pu
 ### 12.10 Decisão final
 
 **`NSEC-1.2-CHG-014 VALIDATED`**
+
+## NSEC-1.2-CHG-015 — Integridade tenant de pipeline e stage
+
+- **Pré-flight:** RPC `nsec12_probe_insert_opportunity` intacta (SECURITY INVOKER, `prosecdef=false`). Policies em `opportunities`: 7 (6 permissivas + `nsec12_opportunities_insert_block_viewer` restrictiva). Tipos de `pipeline_id`/`stage_id`/`pipelines.id`/`stages.id`/`stages.pipeline_id`: todos `text`, compatíveis. Fixtures Pipeline A/B e Stage A/B confirmadas, `is_primary=false`, vínculos ao pipeline correto.
+- **Baseline pré:** total=2621, active=2218, synthetic=0.
+- **Policy criada:** `nsec12_opportunities_insert_tenant_relations_guard` · `AS RESTRICTIVE FOR INSERT TO authenticated` · somente WITH CHECK · sem USING.
+- **Expressão final:**
+  ```sql
+  (opportunities.pipeline_id IS NULL
+   OR EXISTS (SELECT 1 FROM public.pipelines p
+              WHERE p.id = opportunities.pipeline_id
+                AND p.organization_id = opportunities.organization_id))
+  AND
+  (opportunities.stage_id IS NULL
+   OR EXISTS (SELECT 1 FROM public.stages s
+              WHERE s.id = opportunities.stage_id
+                AND s.organization_id = opportunities.organization_id
+                AND (opportunities.pipeline_id IS NULL
+                     OR s.pipeline_id = opportunities.pipeline_id)))
+  ```
+- **Confirmação RESTRICTIVE:** `polpermissive=false`, `polcmd='a'` (INSERT), 8 policies totais em opportunities.
+- **Rollback:** `DROP POLICY IF EXISTS nsec12_opportunities_insert_tenant_relations_guard ON public.opportunities;`
+- **Resultado dos 12 reprobes:**
+  | Probe | Papel | Org | Pipe | Stage | Esperado | Obtido |
+  |---|---|---|---|---|---|---|
+  | P1 | Owner A | A | A | A | ALLOWED_ROLLED_BACK | ✅ ALLOWED_ROLLED_BACK |
+  | P2 | Owner B | B | B | B | ALLOWED_ROLLED_BACK | ✅ ALLOWED_ROLLED_BACK |
+  | P3 | Owner A | B | A | A | BLOCKED | ✅ BLOCKED_RLS |
+  | P4 | Owner B | A | B | B | BLOCKED | ✅ BLOCKED_RLS |
+  | P5 | Viewer A | A | A | A | BLOCKED | ✅ BLOCKED_RLS |
+  | P6 | Viewer B | B | B | B | BLOCKED | ✅ BLOCKED_RLS |
+  | P7 | Owner A | A | B | NULL | BLOCKED | ✅ BLOCKED_RLS |
+  | P8 | Owner B | B | A | NULL | BLOCKED | ✅ BLOCKED_RLS |
+  | P9 | Owner A | A | NULL | B | BLOCKED | ✅ BLOCKED_RLS |
+  | P10 | Owner B | B | NULL | A | BLOCKED | ✅ BLOCKED_RLS |
+  | P11 | Owner A | A | A | B | BLOCKED | ✅ BLOCKED_CHECK |
+  | P12 | Owner B | B | B | A | BLOCKED | ✅ BLOCKED_CHECK |
+- **Baseline pós:** total=2621, active=2218, synthetic=0 — idêntico ao pré. Zero persistência.
+- **Smoke read-only:** dados reais intocados; policies anteriores preservadas; nenhuma linha escrita pela migration; nenhum trigger alterado; nenhum egress externo.
+- **Estado da RPC:** `nsec12_probe_insert_opportunity` mantida (SECURITY INVOKER), preservada para próxima matriz.
+- **SEC-014:** RESOLVED (P7/P8 bloqueados).
+- **SEC-015:** RESOLVED (P9/P10/P11/P12 bloqueados).
+- **Decisão final:** `NSEC-1.2-CHG-015 VALIDATED`.
