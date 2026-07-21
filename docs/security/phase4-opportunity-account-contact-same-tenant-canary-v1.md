@@ -158,3 +158,83 @@ Nenhuma organização, pipeline, stage, account, contact, opportunity, activity,
 Motivo exclusivo: P5–P8 retornaram `ALLOWED_ROLLED_BACK`, evidenciando ausência de regra que force `contacts.account_id = opportunities.account_id` no INSERT. Todos os demais eixos (viewer, account cross-tenant, contact cross-tenant, integridade das fixtures, zero persistência, zero egress) atenderam ao critério.
 
 Correção **não executada** conforme escopo. Nenhuma matriz completa, nenhum UPDATE/DELETE, nenhum cleanup executado.
+
+---
+
+## NSEC-1.2-CHG-024 — Correção e reprobe final
+
+### 1. Pre-flight
+- 9 policies em `public.opportunities` confirmadas (3 RESTRICTIVE + 6 PERMISSIVE) — inalteradas desde CHG-023.
+- Restritivas ativas: `nsec12_opportunities_insert_block_viewer`, `nsec12_opportunities_insert_tenant_relations_guard`, `nsec12_opportunities_insert_account_contact_tenant_guard` (todas `polpermissive=false`, `polcmd=a`, role `authenticated`, apenas `WITH CHECK`).
+- RPC `nsec12_probe_insert_opportunity_account_contact_match` presente, `SECURITY INVOKER`, whitelist intacta, rollback interno ativo.
+- Edge Function `nsec12-canary-023` restrita à whitelist de 4 personas sintéticas.
+- Fixtures oficiais (4 accounts + 4 contacts) e órfãos intactos.
+- Tipos confirmados: `opportunities.account_id`, `opportunities.contact_id`, `contacts.id`, `contacts.account_id` = `uuid`.
+
+### 2. Policy criada
+```sql
+CREATE POLICY nsec12_opportunities_insert_account_contact_match_guard
+ON public.opportunities
+AS RESTRICTIVE
+FOR INSERT
+TO authenticated
+WITH CHECK (
+  account_id IS NULL
+  OR contact_id IS NULL
+  OR EXISTS (
+    SELECT 1 FROM public.contacts c
+    WHERE c.id = opportunities.contact_id
+      AND c.account_id = opportunities.account_id
+  )
+);
+```
+- `polpermissive=false`, INSERT, `authenticated`, apenas `WITH CHECK`.
+- Total policies: **10** (6 PERMISSIVE + 4 RESTRICTIVE).
+
+### 3. Rollback
+```sql
+DROP POLICY IF EXISTS nsec12_opportunities_insert_account_contact_match_guard
+  ON public.opportunities;
+```
+
+### 4. Resultado dos 14 reprobes
+
+| Probe | Contexto | Esperado | Obtido |
+|---|---|---|---|
+| P1 | Owner A, Account A Base + Contact A Base | ALLOWED_ROLLED_BACK | ✅ ALLOWED_ROLLED_BACK |
+| P2 | Owner A, Account A Alt + Contact A Alt | ALLOWED_ROLLED_BACK | ✅ ALLOWED_ROLLED_BACK |
+| P3 | Owner B, Account B Base + Contact B Base | ALLOWED_ROLLED_BACK | ✅ ALLOWED_ROLLED_BACK |
+| P4 | Owner B, Account B Alt + Contact B Alt | ALLOWED_ROLLED_BACK | ✅ ALLOWED_ROLLED_BACK |
+| P5 | Owner A, Account A Base + Contact A Alt | BLOCKED_* | ✅ BLOCKED_RLS |
+| P6 | Owner A, Account A Alt + Contact A Base | BLOCKED_* | ✅ BLOCKED_RLS |
+| P7 | Owner B, Account B Base + Contact B Alt | BLOCKED_* | ✅ BLOCKED_RLS |
+| P8 | Owner B, Account B Alt + Contact B Base | BLOCKED_* | ✅ BLOCKED_RLS |
+| P9 | Viewer A, par correto Base | BLOCKED_RLS | ✅ BLOCKED_RLS |
+| P10 | Viewer B, par correto Base | BLOCKED_RLS | ✅ BLOCKED_RLS |
+| P11 | Owner A, Account B Base | BLOCKED_* | ✅ BLOCKED_RLS |
+| P12 | Owner B, Account A Base | BLOCKED_* | ✅ BLOCKED_RLS |
+| P13 | Owner A, Contact B Base | BLOCKED_* | ✅ BLOCKED_RLS |
+| P14 | Owner B, Contact A Base | BLOCKED_* | ✅ BLOCKED_RLS |
+
+**14/14 conforme esperado.**
+
+### 5. Baseline pré/pós
+- Opportunities totais/ativas: idêntico pré/pós (2 627 / 2 224).
+- Títulos `SECURITY_TEST_OPPORTUNITY_MATCH_CANARY_%` no banco: **0**.
+- Fixtures oficiais (4 accounts + 4 contacts): intactas.
+- Órfãos (account dup + contact vazio): intactos.
+- Triggers de `opportunities`: intactos.
+- Zero dado real alterado. Zero egress externo.
+
+### 6. Cleanup executado
+- `REVOKE ALL` + `DROP FUNCTION public.nsec12_probe_insert_opportunity_account_contact_match(uuid, text, text, uuid, uuid, text)` — `pg_proc = 0` confirmado.
+- Edge Function `nsec12-canary-023` removida (delete_edge_functions) + código-fonte local removido (`supabase/functions/nsec12-canary-023/`).
+- `nsec12-provision-fixtures` preservada (necessária para próximas fases).
+
+### 7. Findings
+- **SEC-018 → RESOLVED.** Evidência: P5–P8 BLOCKED_RLS.
+- SEC-013 / SEC-014 / SEC-015 / SEC-016 / SEC-017 permanecem **RESOLVED**.
+- Nenhum finding novo.
+
+### 8. Decisão final
+`NSEC-1.2-CHG-024 VALIDATED — OPPORTUNITIES INSERT COMPLETO HOMOLOGADO`

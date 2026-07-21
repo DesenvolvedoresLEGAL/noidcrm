@@ -1,0 +1,2 @@
+REVOKE ALL ON FUNCTION public.nsec12_probe_insert_opportunity_account_contact_match(uuid, text, text, uuid, uuid, text) FROM PUBLIC, authenticated, anon, service_role;
+DROP FUNCTION IF EXISTS public.nsec12_probe_insert_opportunity_account_contact_match(uuid, text, text, uuid, uuid, text);

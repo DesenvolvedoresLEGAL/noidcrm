@@ -369,3 +369,44 @@ Guardrails #10 (>2 accounts) e #12 (retry duplicidade) acionados por parse local
 - Account órfã duplicada e contact órfão intactos.
 - 9 policies em `public.opportunities` inalteradas.
 - Zero dado real alterado. Zero egress externo.
+
+## NSEC-1.2-CHG-024 — Correção account/contact same-tenant e encerramento do INSERT (VALIDATED)
+
+- **Data:** 2026-07-21
+- **Classificação:** AMARELA controlada
+- **Decisão:** `NSEC-1.2-CHG-024 VALIDATED — OPPORTUNITIES INSERT COMPLETO HOMOLOGADO`
+- **Detalhe:** `docs/security/phase4-opportunity-account-contact-same-tenant-canary-v1.md` (seção CHG-024)
+
+### Migration aplicada
+Policy única `nsec12_opportunities_insert_account_contact_match_guard`:
+- `AS RESTRICTIVE FOR INSERT TO authenticated`, somente `WITH CHECK`, sem `USING`.
+- Expressão: `account_id IS NULL OR contact_id IS NULL OR EXISTS (SELECT 1 FROM public.contacts c WHERE c.id = opportunities.contact_id AND c.account_id = opportunities.account_id)`.
+- Rollback: `DROP POLICY IF EXISTS nsec12_opportunities_insert_account_contact_match_guard ON public.opportunities;`
+
+### 14 reprobes (mesma bateria da CHG-023)
+- P1–P4 (pares corretos same-tenant): **ALLOWED_ROLLED_BACK** ✅
+- P5–P8 (pares incompatíveis same-tenant): **BLOCKED_RLS** ✅ (SEC-018 resolvido)
+- P9–P10 (viewer): **BLOCKED_RLS** ✅
+- P11–P12 (account cross-tenant): **BLOCKED_RLS** ✅
+- P13–P14 (contact cross-tenant): **BLOCKED_RLS** ✅
+
+### Consolidated status (atualizado)
+- Opportunities INSERT básico: **PASS**
+- Pipeline/stage tenant: **PASS**
+- Account/contact tenant: **PASS**
+- Account/contact tenant matrix: **PASS**
+- Account/contact compatibility same-tenant: **PASS** (CHG-024)
+- RPC temporária `nsec12_probe_insert_opportunity_account_contact_match`: **REMOVIDA**
+- Edge Function `nsec12-canary-023`: **REMOVIDA**
+- UPDATE: **NÃO EXECUTADO**
+- DELETE: **NÃO EXECUTADO**
+
+### Findings
+- **SEC-018:** RESOLVED (P5–P8 BLOCKED_RLS via nova policy).
+- SEC-013 / SEC-014 / SEC-015 / SEC-016 / SEC-017: **RESOLVED** preservado (P9–P14 continuam bloqueados).
+
+### Baseline pré/pós
+- Total policies `public.opportunities`: 9 → **10** (apenas a nova policy adicionada; 6 permissivas + 4 restritivas).
+- 2 627 opportunities totais, 0 títulos `SECURITY_TEST_OPPORTUNITY_MATCH_CANARY_%` (idêntico pré/pós).
+- 4 accounts oficiais + 4 contacts oficiais intactos; account órfã duplicada e contact órfão intactos.
+- Triggers intactos. Zero dado real alterado. Zero egress externo.
