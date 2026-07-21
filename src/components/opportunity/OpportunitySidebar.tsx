@@ -37,6 +37,7 @@ interface OpportunitySidebarProps {
   onLost: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onDuplicate?: () => void;
   onReopen?: () => void;
   userRole?: string;
   onNavigateToIntelligence?: () => void;
