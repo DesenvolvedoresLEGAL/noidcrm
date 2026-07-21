@@ -37,6 +37,7 @@ interface OpportunitySidebarProps {
   onLost: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onDuplicate?: () => void;
   onReopen?: () => void;
   userRole?: string;
   onNavigateToIntelligence?: () => void;
@@ -50,6 +51,7 @@ export function OpportunitySidebar({
   onLost,
   onEdit,
   onDelete,
+  onDuplicate,
   onReopen,
   userRole,
   onNavigateToIntelligence,
@@ -195,7 +197,7 @@ export function OpportunitySidebar({
                 <Edit className="h-4 w-4 mr-2" />
                 Editar
               </DropdownMenuItem>
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={onDuplicate} disabled={!onDuplicate}>
                 <Copy className="h-4 w-4 mr-2" />
                 Duplicar
               </DropdownMenuItem>

@@ -481,6 +481,133 @@ export async function createOpportunity(dto: unknown): Promise<Opportunity> {
   return data as Opportunity;
 }
 
+/**
+ * Duplica uma oportunidade existente com deep clone dos relacionamentos
+ * essenciais (tags, participantes, custom fields). Reseta status para 'new'
+ * e vincula ao source via source_opportunity_id.
+ */
+export async function duplicateOpportunity(sourceId: string): Promise<Opportunity> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Usuário não autenticado');
+
+  // 1) Buscar oportunidade original
+  const { data: source, error: fetchError } = await supabase
+    .from('opportunities')
+    .select('*')
+    .eq('id', sourceId)
+    .is('deleted_at', null)
+    .maybeSingle();
+
+  if (fetchError) {
+    console.error('[duplicateOpportunity] fetch source failed', fetchError);
+    throw fetchError;
+  }
+  if (!source) throw new Error('Oportunidade original não encontrada');
+
+  // 2) Montar payload limpo (remover chaves únicas/derivadas)
+  const excluded = new Set([
+    'id', 'created_at', 'updated_at', 'deleted_at', 'closed_at',
+    'won_at', 'lost_at', 'accepted_proposal_id', 'accepted_at',
+    'public_token', 'public_token_created_at', 'signature_hash',
+    'client_ip', 'user_agent', 'search_vector',
+    'score', 'grade', 'health_status', 'score_calculated_at',
+    'requires_seller_classification', 'reopened_at', 'reopened_by',
+    'reopen_reason', 'source_opportunity_id', 'qualified_by_user_id',
+    'qualified_at', 'is_cancelled_sale', 'cancelled_at', 'cancelled_by',
+    'cancellation_reason',
+  ]);
+
+  const insertPayload: Record<string, any> = {};
+  for (const [key, value] of Object.entries(source as Record<string, any>)) {
+    if (!excluded.has(key) && value !== undefined) {
+      insertPayload[key] = value;
+    }
+  }
+
+  insertPayload.title = `CÓPIA - ${source.title || 'Oportunidade'}`;
+  insertPayload.status = 'new';
+  // Não vinculamos source_opportunity_id para não colidir com o unique index
+  // `opportunities_no_duplicate_handoff_uidx` (reservado para handoffs de workflow).
+  insertPayload.created_by = user.id;
+  insertPayload.owner_user_id = source.owner_user_id || user.id;
+
+  const orgId = (source as any).organization_id;
+
+  const { data: created, error: insertError } = await supabase
+    .from('opportunities')
+    .insert(insertPayload as any)
+    .select()
+    .single();
+
+  if (insertError) {
+    console.error('[duplicateOpportunity] insert failed', insertError);
+    throw insertError;
+  }
+
+  const newId = (created as any).id as string;
+
+  // 3) Deep clone: tags
+  try {
+    const { data: tags } = await supabase
+      .from('opportunity_tags')
+      .select('tag_id')
+      .eq('opportunity_id', sourceId);
+    if (tags && tags.length > 0) {
+      const tagRows = tags.map((t: any) => ({
+        opportunity_id: newId,
+        tag_id: t.tag_id,
+        organization_id: orgId,
+      }));
+      await supabase.from('opportunity_tags').insert(tagRows as any);
+    }
+  } catch (e) {
+    console.warn('[duplicateOpportunity] copy tags failed', e);
+  }
+
+  // 4) Deep clone: participantes do deal
+  try {
+    const { data: participants } = await supabase
+      .from('deal_participants')
+      .select('user_id, role, share_percentage')
+      .eq('opportunity_id', sourceId);
+    if (participants && participants.length > 0) {
+      const rows = participants.map((p: any) => ({
+        opportunity_id: newId,
+        user_id: p.user_id,
+        role: p.role,
+        share_percentage: p.share_percentage,
+        organization_id: orgId,
+      }));
+      await supabase.from('deal_participants').insert(rows as any);
+    }
+  } catch (e) {
+    console.warn('[duplicateOpportunity] copy participants failed', e);
+  }
+
+  // 5) Deep clone: custom fields
+  try {
+    const { data: cfvs } = await supabase
+      .from('custom_field_values')
+      .select('custom_field_id, value')
+      .eq('entity_id', sourceId)
+      .eq('entity_type', 'opportunity');
+    if (cfvs && cfvs.length > 0) {
+      const rows = cfvs.map((v: any) => ({
+        entity_id: newId,
+        entity_type: 'opportunity',
+        custom_field_id: v.custom_field_id,
+        value: v.value,
+        organization_id: orgId,
+      }));
+      await supabase.from('custom_field_values').insert(rows as any);
+    }
+  } catch (e) {
+    console.warn('[duplicateOpportunity] copy custom fields failed', e);
+  }
+
+  return created as Opportunity;
+}
+
 export async function advanceOpportunity(id: string, targetStageId: string): Promise<Opportunity> {
   const { data, error } = await supabase
     .from('opportunities')

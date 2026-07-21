@@ -33,7 +33,7 @@ import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { extractEmail, extractPhone } from '@/lib/contactFormat';
-import { updateOpportunity, updateOpportunityStatus, markOpportunityAsLost, markOpportunityAsWon, deleteOpportunity, reopenOpportunity } from '@/services/crm/opportunities';
+import { updateOpportunity, updateOpportunityStatus, markOpportunityAsLost, markOpportunityAsWon, deleteOpportunity, reopenOpportunity, duplicateOpportunity } from '@/services/crm/opportunities';
 import { processPendingWorkflows } from '@/services/crm/workflow-rules';
 import { invalidateOpportunity } from '@/lib/cache-invalidation';
 import { opportunityKeys } from '@/lib/query-keys';
@@ -194,6 +194,22 @@ export default function OpportunityDetail() {
       toast({
         variant: 'destructive',
         title: 'Erro ao excluir',
+        description: error.message,
+      });
+    },
+  });
+
+  const duplicateMutation = useMutation({
+    mutationFn: () => duplicateOpportunity(id!),
+    onSuccess: (created: any) => {
+      queryClient.invalidateQueries({ queryKey: opportunityKeys.all });
+      toast({ title: 'Oportunidade duplicada com sucesso' });
+      if (created?.id) navigate(`/app/opportunities/${created.id}`);
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao duplicar oportunidade',
         description: error.message,
       });
     },
@@ -380,6 +396,7 @@ export default function OpportunityDetail() {
                 onLost={handleLost}
                 onEdit={() => setEditModalOpen(true)}
                 onDelete={() => setDeleteDialogOpen(true)}
+                onDuplicate={() => duplicateMutation.mutate()}
                 onReopen={handleReopen}
                 userRole={membership?.org_role || undefined}
                 onNavigateToIntelligence={() => setActiveTab('intelligence')}
