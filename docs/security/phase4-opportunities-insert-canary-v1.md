@@ -188,3 +188,88 @@ Matriz completa de papéis, `account_id`, `contact_id`, UPDATE e DELETE **não**
 2. Autorizar CHG-015 para introduzir validação tenant-aware de `pipeline_id` e `stage_id` (SEC-014/SEC-015) via trigger BEFORE INSERT/UPDATE ou policy RESTRICTIVE — reprobar P7–P10.
 3. Após reprobes verdes, autorizar remoção da RPC canary.
 4. Só então avançar para matriz completa de papéis, `account_id`/`contact_id`, UPDATE e DELETE.
+
+---
+
+## 12. NSEC-1.2-CHG-014 — Restrição de viewer em INSERT
+
+### 12.1 Escopo
+Correção aditiva exclusiva de **SEC-013** (viewer INSERT). SEC-014 e SEC-015 permanecem `OPEN` — não corrigidos nesta mudança.
+
+### 12.2 Policies anteriores (preservadas, 6)
+- `Admins and managers can delete org opportunities` (DELETE, permissive)
+- `Org members can insert opportunities` (INSERT, permissive)
+- `Org members insert opportunities` (INSERT, permissive)
+- `Org members update opportunities` (UPDATE, permissive)
+- `Users can insert org opportunities` (INSERT, permissive)
+- `opportunities_select_by_visibility` (SELECT, permissive)
+
+Todas verificadas via `pg_policy` antes e depois; definições **inalteradas**.
+
+### 12.3 Policy nova
+```
+Nome:  nsec12_opportunities_insert_block_viewer
+Tipo:  polpermissive = false  (RESTRICTIVE)
+Cmd:   INSERT (polcmd = 'a')
+Role:  authenticated
+USING: (nenhum)
+WITH CHECK:
+  NOT EXISTS (
+    SELECT 1 FROM public.organization_members om
+    WHERE om.user_id = auth.uid()
+      AND om.organization_id = opportunities.organization_id
+      AND om.status = 'active'
+      AND (
+        (om.org_role IS NOT NULL AND om.org_role = 'viewer'::org_role)
+        OR (om.org_role IS NULL AND om.role = 'viewer')
+      )
+  )
+```
+Contagem final: **7 policies** (6 anteriores + 1 nova). Nenhuma removida, nenhuma recriada. Nenhum trigger alterado. RPC canary intacta.
+
+### 12.4 Rollback DDL
+```sql
+DROP POLICY IF EXISTS nsec12_opportunities_insert_block_viewer ON public.opportunities;
+```
+
+### 12.5 Baseline pré/pós
+| Métrica | Pré | Pós |
+|---|---|---|
+| opportunities totais | 2616 | 2616 |
+| opportunities ativas | 2213 | 2213 |
+| opportunities sintéticas (title canary ou org sintética) | 0 | 0 |
+| pipelines sintéticos A/B | 2/2 | 2/2 |
+| stages sintéticas A/B | 2/2 | 2/2 |
+| policies em `opportunities` | 6 | 7 |
+
+Fixtures pipeline/stage inalteradas. Nenhum dado real modificado.
+
+### 12.6 Reprobes (6/6 conforme mandato)
+JWT real dos 4 atores sintéticos via `nsec12-provision-fixtures issueToken`; publishable key em `apikey`; **nenhum service role** no `Authorization`; RPC `nsec12_probe_insert_opportunity` mantida `SECURITY INVOKER`; `status='new'`, `automation_enabled=false`, `account_id=NULL`, `contact_id=NULL`; rollback interno via `RAISE 'NSEC12_ROLLBACK'`.
+
+| Probe | Ator | Payload | Esperado | Observado | Resultado |
+|---|---|---|---|---|---|
+| P1 | Owner A | Org A + Pipe A + Stage A | `ALLOWED_ROLLED_BACK` | `ALLOWED_ROLLED_BACK` | **PASS** |
+| P2 | Owner B | Org B + Pipe B + Stage B | `ALLOWED_ROLLED_BACK` | `ALLOWED_ROLLED_BACK` | **PASS** |
+| P3 | Owner A | Org B + Pipe A + Stage A | `BLOCKED_RLS` | `BLOCKED_RLS` | **PASS** |
+| P4 | Owner B | Org A + Pipe B + Stage B | `BLOCKED_RLS` | `BLOCKED_RLS` | **PASS** |
+| P5 | Viewer A | Org A + Pipe A + Stage A | `BLOCKED_RLS` | `BLOCKED_RLS` | **PASS** |
+| P6 | Viewer B | Org B + Pipe B + Stage B | `BLOCKED_RLS` | `BLOCKED_RLS` | **PASS** |
+
+### 12.7 Smoke read-only
+- `/app/opportunities`, Forecast e Revenue Command carregam com dados reais visíveis aos usuários autorizados.
+- Pipelines e stages reais permanecem listados.
+- Sem erros novos de RLS no console.
+
+### 12.8 Estado da RPC canary
+`public.nsec12_probe_insert_opportunity(text,text,text,text)` **permanece instalada** e `SECURITY INVOKER` — reservada para reprobes das próximas correções (SEC-014/SEC-015). Nenhuma alteração de código.
+
+### 12.9 Estado dos findings
+- **SEC-013:** viewer bloqueado same-org com JWT real (P5/P6 = `BLOCKED_RLS`). Status atualizado para `RESOLVED`.
+- **SEC-014 (pipeline cross-tenant):** permanece `OPEN`. Não corrigido nesta mudança.
+- **SEC-015 (stage cross-tenant):** permanece `OPEN`. Não corrigido nesta mudança.
+- Matriz completa de papéis, `account_id`, `contact_id`, UPDATE, DELETE: **NÃO EXECUTADOS.**
+
+### 12.10 Decisão final
+
+**`NSEC-1.2-CHG-014 VALIDATED`**
