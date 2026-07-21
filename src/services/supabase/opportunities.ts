@@ -530,9 +530,11 @@ export async function duplicateOpportunity(sourceId: string): Promise<Opportunit
   insertPayload.created_by = user.id;
   insertPayload.owner_user_id = source.owner_user_id || user.id;
 
+  const orgId = (source as any).organization_id;
+
   const { data: created, error: insertError } = await supabase
     .from('opportunities')
-    .insert(insertPayload)
+    .insert(insertPayload as any)
     .select()
     .single();
 
@@ -553,8 +555,9 @@ export async function duplicateOpportunity(sourceId: string): Promise<Opportunit
       const tagRows = tags.map((t: any) => ({
         opportunity_id: newId,
         tag_id: t.tag_id,
+        organization_id: orgId,
       }));
-      await supabase.from('opportunity_tags').insert(tagRows);
+      await supabase.from('opportunity_tags').insert(tagRows as any);
     }
   } catch (e) {
     console.warn('[duplicateOpportunity] copy tags failed', e);
@@ -564,16 +567,17 @@ export async function duplicateOpportunity(sourceId: string): Promise<Opportunit
   try {
     const { data: participants } = await supabase
       .from('deal_participants')
-      .select('user_id, role, allocation_percent')
+      .select('user_id, role, share_percentage')
       .eq('opportunity_id', sourceId);
     if (participants && participants.length > 0) {
       const rows = participants.map((p: any) => ({
         opportunity_id: newId,
         user_id: p.user_id,
         role: p.role,
-        allocation_percent: p.allocation_percent,
+        share_percentage: p.share_percentage,
+        organization_id: orgId,
       }));
-      await supabase.from('deal_participants').insert(rows);
+      await supabase.from('deal_participants').insert(rows as any);
     }
   } catch (e) {
     console.warn('[duplicateOpportunity] copy participants failed', e);
@@ -583,17 +587,18 @@ export async function duplicateOpportunity(sourceId: string): Promise<Opportunit
   try {
     const { data: cfvs } = await supabase
       .from('custom_field_values')
-      .select('field_id, value')
+      .select('custom_field_id, value')
       .eq('entity_id', sourceId)
       .eq('entity_type', 'opportunity');
     if (cfvs && cfvs.length > 0) {
       const rows = cfvs.map((v: any) => ({
         entity_id: newId,
         entity_type: 'opportunity',
-        field_id: v.field_id,
+        custom_field_id: v.custom_field_id,
         value: v.value,
+        organization_id: orgId,
       }));
-      await supabase.from('custom_field_values').insert(rows);
+      await supabase.from('custom_field_values').insert(rows as any);
     }
   } catch (e) {
     console.warn('[duplicateOpportunity] copy custom fields failed', e);
