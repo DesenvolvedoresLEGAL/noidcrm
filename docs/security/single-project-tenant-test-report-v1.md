@@ -148,3 +148,19 @@ Estado: `CONTACTS.ACCOUNT_ID HOMOLOGADO`. Sprint parada conforme mandato.
 - Matriz completa de papéis, `account_id`, `contact_id`, UPDATE, DELETE: **NÃO EXECUTADOS.**
 
 Estado: `OPPORTUNITIES INSERT CANARY FAILED` (metodologia OK; 3 findings lógicos abertos).
+
+## NSEC-1.2-CHG-014 — Opportunities viewer INSERT block
+
+- Migration aditiva: policy `nsec12_opportunities_insert_block_viewer` (`AS RESTRICTIVE FOR INSERT TO authenticated WITH CHECK`) barrando papel efetivo `viewer` (prioriza `org_role`, fallback `role`).
+- 6 policies anteriores preservadas sem edição; nenhum trigger tocado; RPC canary permanece `SECURITY INVOKER`.
+- Reprobes com JWT real (owner_a/b + viewer_a/b), publishable key, sem service role:
+  - P1/P2 same-org owner: **PASS** (`ALLOWED_ROLLED_BACK`).
+  - P3/P4 organization cross-org: **PASS** (`BLOCKED_RLS`).
+  - P5/P6 viewer same-org: **PASS** (`BLOCKED_RLS`) → SEC-013 resolvido.
+- Baseline pré/pós idêntico: 2616 totais / 2213 ativas / 0 sintéticas; fixtures pipeline/stage intactas; contagem de policies 6→7.
+- Smoke: `/app/opportunities`, Forecast e Revenue Command carregam sem regressão.
+- Estado dos findings: SEC-013 `RESOLVED`; SEC-014 e SEC-015 permanecem `OPEN`.
+- Matriz completa de papéis, `account_id`, `contact_id`, UPDATE, DELETE: **NÃO EXECUTADOS.**
+- Rollback: `DROP POLICY IF EXISTS nsec12_opportunities_insert_block_viewer ON public.opportunities;`.
+
+Estado: `NSEC-1.2-CHG-014 VALIDATED`.
