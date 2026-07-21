@@ -303,3 +303,35 @@ usado. Nenhum pipeline/stage real alterado. Nenhum default modificado
 **PROIBIDO** remover essas fixtures durante os testes de INSERT em opportunities.
 
 **Nenhum cleanup executado nesta mudança.**
+
+## 6. Fixture órfã de contatos (NSEC-1.2-CHG-017 — BLOCKED)
+
+CHG-017 tentou provisionar 2 contatos sintéticos usando o campo `nome`
+diretamente. O trigger `trg_contact_nome` sobrescreveu `nome` a partir de
+`primeiro_nome`/`ultimo_nome` (ambos vazios), produzindo um row com nome
+em branco. Guardrail acionado → STOP antes de Contact B.
+
+### Contact órfão (Org A)
+
+| Campo | Valor |
+|---|---|
+| Tabela | `public.contacts` |
+| `id` | `b53de59c-c80d-451c-9a2b-d9423d50fcb3` |
+| `organization_id` | `e1c4881f-0cd4-45fb-bc50-48314ce7bca0` (NOID_SECURITY_ORG_A) |
+| `account_id` | `36085a30-06a1-491a-a079-a24fb42dd92b` (SECURITY_TEST_ACCOUNT_ORG_A_BASE) |
+| `nome` | `""` (vazio, produzido pelo trigger) |
+| `primeiro_nome` | `""` |
+| `ultimo_nome` | `""` |
+| Criador (JWT) | `sec-test-a-owner@example.com` (`58c9eb37-…-329b`) |
+| Criada em (UTC) | 2026-07-21 16:33:57 |
+| Finalidade | Row órfão de CHG-017 BLOCKED — aguardando cleanup pós-sprint. |
+| Efeitos derivados | Enfileiramentos locais em `lead_score_recalc_queue`, `nrhs_recalc_queue`, `opportunity_score_recalc_queue` (transacionais, sem egress). |
+| Estado | ativo (`deleted_at IS NULL`). Não usar como fixture. |
+
+**PROIBIDO** promover esse row a fixture oficial. **PROIBIDO** removê-lo
+sem autorização humana. Contact A/B oficiais serão criados em CHG-018 com
+`primeiro_nome` populado.
+
+Contact B não foi criado.
+
+**Nenhum cleanup executado nesta mudança.**
