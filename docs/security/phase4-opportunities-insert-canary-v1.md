@@ -316,3 +316,20 @@ JWT real dos 4 atores sintéticos via `nsec12-provision-fixtures issueToken`; pu
 - **SEC-014:** RESOLVED (P7/P8 bloqueados).
 - **SEC-015:** RESOLVED (P9/P10/P11/P12 bloqueados).
 - **Decisão final:** `NSEC-1.2-CHG-015 VALIDATED`.
+
+## NSEC-1.2-CHG-016 — Matriz completa de papéis + cleanup da RPC
+
+- **Escopo:** INSERT básico em `public.opportunities` (sem `account_id`, sem `contact_id`, sem propostas, sem fechamento).
+- **Total de probes:** 32 (30 via RPC + 2 diretos para `organization_id NULL`).
+- **Resultados:**
+  - Bloco 1 (same-org, 12): 10 `ALLOWED_ROLLED_BACK` (owner/admin/manager/sales/cs) + 2 viewers `BLOCKED_RLS` — ✅
+  - Bloco 2 (organization cross-org, 12): 12/12 `BLOCKED_RLS` — ✅
+  - Bloco 3 (pipeline/stage opcionais, 6 owners): 6/6 `ALLOWED_ROLLED_BACK` — ✅
+  - Bloco 4 (organization_id NULL, 2 INSERT diretos): 2/2 HTTP 403 `BLOCKED_RLS` — ✅
+- **Baseline pré/pós idêntico:** 2621 totais / 2218 ativas / 0 sintéticas.
+- **8 policies** em `opportunities` intactas; triggers intactos.
+- **SEC-013 / SEC-014 / SEC-015:** todos permanecem `RESOLVED` (SEC-013 revalidado em 4 dimensões).
+- **Cleanup da RPC:** migration separada aplicada — `REVOKE ALL` + `DROP FUNCTION IF EXISTS public.nsec12_probe_insert_opportunity(text,text,text,text)`. `pg_proc` retorna zero. Sem referências no código.
+- **Fixtures preservadas:** ORG_A/B, Pipeline A/B, Stage A/B, 12 usuários sintéticos.
+- **Relatório completo:** `docs/security/phase4-opportunities-insert-matrix-v1.md`.
+- **Decisão final:** `OPPORTUNITIES INSERT BÁSICO HOMOLOGADO`.

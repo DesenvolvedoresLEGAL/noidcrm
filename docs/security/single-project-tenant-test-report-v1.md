@@ -185,3 +185,21 @@ Estado: `NSEC-1.2-CHG-014 VALIDATED`.
 - **RPC canary:** mantida (SECURITY INVOKER) para próximas rodadas.
 - **Rollback:** `DROP POLICY IF EXISTS nsec12_opportunities_insert_tenant_relations_guard ON public.opportunities;`
 - **Decisão final:** `NSEC-1.2-CHG-015 VALIDATED`.
+
+## NSEC-1.2-CHG-016 — Matriz completa de papéis + cleanup da RPC
+
+- **Opportunities INSERT básico — matriz de papéis:** 32/32 probes conforme esperado.
+  - Same-org (12): 10 permitidos + 2 viewers bloqueados. **PASS**
+  - Organization cross-org (12): 12/12 bloqueados. **PASS**
+  - Pipeline/stage opcionais (6): 6/6 permitidos. **PASS**
+  - `organization_id NULL` (2 INSERT diretos): 2/2 bloqueados (HTTP 403). **PASS**
+- **Pipeline/stage tenant relations:** PASS (regressão preservada de CHG-015).
+- **Viewer enforcement:** PASS (SEC-013 revalidado em 4 dimensões).
+- **account_id:** NÃO EXECUTADO.
+- **contact_id:** NÃO EXECUTADO.
+- **UPDATE / DELETE:** NÃO EXECUTADOS.
+- **RPC temporária `nsec12_probe_insert_opportunity`:** REMOVIDA via migration de cleanup após homologação total.
+- **Baseline pré/pós:** 2621 / 2218 / 0 — idêntico.
+- **Fixtures preservadas.** Dados reais intocados.
+- **Relatório completo:** `docs/security/phase4-opportunities-insert-matrix-v1.md`.
+- **Decisão final:** `OPPORTUNITIES INSERT BÁSICO HOMOLOGADO`.
