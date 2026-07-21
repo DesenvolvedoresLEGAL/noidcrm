@@ -307,3 +307,34 @@ Estado: `NSEC-1.2-CHG-014 VALIDATED`.
 - **Relatório completo:** `docs/security/phase4-opportunity-account-contact-matrix-v1.md`.
 - **Rollback (informativo — RPC removida):** RPC pode ser reprovisionada por migration reversível caso testes futuros exijam.
 - **Decisão final:** `OPPORTUNITIES ACCOUNT/CONTACT TENANT MATRIX HOMOLOGADA`.
+
+## NSEC-1.2-CHG-022 — Same-tenant mismatch fixtures (PARTIAL)
+
+- **Data:** 2026-07-21
+- **Classificação:** AMARELA controlada
+- **Decisão:** `OPPORTUNITY SAME-TENANT MISMATCH FIXTURES PARTIAL`
+
+### Fixtures oficiais criadas
+| Kind | UUID (mascarado) | Tenant | Vínculo |
+|---|---|---|---|
+| Account A ALT | `1412****61af` | Org A | — |
+| Account B ALT | `9558****da5e` | Org B | — |
+| Contact A ALT | `b1ab****d089` | Org A | account_id = Account A ALT |
+| Contact B ALT | `edfd****e0e3` | Org B | account_id = Account B ALT |
+
+### Consolidated status
+- Opportunities INSERT básico: **PASS**
+- Pipeline/stage tenant: **PASS**
+- Account/contact tenant (guard): **PASS**
+- Account/contact tenant matrix (36 probes): **PASS**
+- Fixtures same-tenant mismatch (CHG-022): **PARTIAL** (4 fixtures oficiais prontas + 1 orphan account documentado)
+- Compatibility account↔contact same-tenant: **NÃO EXECUTADA**
+- UPDATE / DELETE: **NÃO EXECUTADOS**
+- RPC ativa para opportunities: **nenhuma**
+
+### Findings
+- SEC-013 / SEC-014 / SEC-015 / SEC-016 / SEC-017 permanecem **RESOLVED** (não reavaliados nesta CHG; nenhum vazamento cross-org observado).
+- Nenhum finding HIGH novo: cross-org visibility confirmada `[]` por ID em todos os probes.
+
+### Observação operacional
+Guardrails #10 (>2 accounts) e #12 (retry duplicidade) acionados por parse local incorreto de `jq` durante Fase C, gerando 1 orphan account (`73db****7f77`) em Org A sem referências downstream. Registrado em `single-project-cleanup-runbook-v1.md §8bis`. Nenhum DELETE executado (não autorizado nesta CHG).
