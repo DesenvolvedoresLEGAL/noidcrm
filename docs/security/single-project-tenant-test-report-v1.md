@@ -31,10 +31,13 @@ com rollback interno + JWT real por HTTPS (`apikey` publishable, nunca `service_
 | INSERT cross-org sem `account_id` (todos os papéis) | PASS — bloqueado | NSEC-1.2-CHG-007 | 12/12 `BLOCKED_RLS` |
 | INSERT `organization_id = NULL` (owners A/B) | PASS — bloqueado | NSEC-1.2-CHG-007 | 2/2 HTTP 403 RLS |
 | Role enforcement (`org_role`) | PASS | NSEC-1.2-CHG-006 + CHG-007 | manager/sales/cs preservados; viewer bloqueado |
-| INSERT com `account_id` FK | **NÃO EXECUTADO** | — | fora do escopo autorizado (CHG-007 pára aqui) |
+| INSERT com `account_id` FK — canary 8 probes | PASS | NSEC-1.2-CHG-009 | `phase4-contact-account-relationship-report-v1.md` (canary) |
+| INSERT com `account_id` FK — matriz 36 probes | PASS | NSEC-1.2-CHG-010 | `phase4-contact-account-relationship-report-v1.md` §4 — 12/12 same-org (10 allowed, 2 viewers blocked), 12/12 account cross-org bloqueados, 12/12 org cross-org bloqueados |
+| Role enforcement com `account_id` (owner/admin/manager/sales/cs allowed; viewer blocked) | PASS | NSEC-1.2-CHG-010 | Matriz por papel §5 |
 | UPDATE | não executado | — | fora do escopo autorizado |
 | DELETE | não executado | — | fora do escopo autorizado |
-| RPC temporária de probe | **REMOVIDA** | NSEC-1.2-CHG-007 (cleanup) | `DROP FUNCTION nsec12_probe_insert_contact` — `pg_proc` 0 linhas |
+| RPC temporária `nsec12_probe_insert_contact` | **REMOVIDA** | NSEC-1.2-CHG-007 | `pg_proc` 0 linhas |
+| RPC temporária `nsec12_probe_insert_contact_with_account` | **REMOVIDA** | NSEC-1.2-CHG-010 | `pg_proc` 0 linhas |
 
 ### Demais tabelas (`opportunities`, `activities`, `proposals`, …)
 
@@ -83,7 +86,23 @@ Estado: `ACCOUNT RELATIONSHIP FIXTURES READY`.
 - Baseline contacts inalterado: 1.684 ativos, 1.733 totais, 0 sintéticos persistidos.
 - Accounts-base intactas.
 - RPC temporária removida (`pg_proc` = 0).
-- Matriz completa com `account_id`: **NÃO EXECUTADA.**
+- Matriz completa com `account_id`: **EXECUTADA (CHG-010).**
 - `UPDATE`/`DELETE`: **NÃO EXECUTADOS.**
 
 Estado: `CONTACTS.ACCOUNT_ID CANARY VALIDATED`. Sprint parada conforme mandato.
+
+## NSEC-1.2-CHG-010 — Contacts × account_id matriz completa
+
+- 36/36 probes aprovados via RPC `SECURITY INVOKER` + JWT real sintético (Edge Function `issueToken`, publishable anon em `apikey`, sem service role).
+- Bloco 1 — vínculo correto same-org: **12/12 PASS** (10 `ALLOWED_ROLLED_BACK` para owner/admin/manager/sales/cs; 2 `BLOCKED_RLS` para viewers).
+- Bloco 2 — account cross-org (Org A→Acc B / Org B→Acc A, todos os papéis): **12/12 PASS** (`BLOCKED_RLS`).
+- Bloco 3 — organization cross-org com account própria: **12/12 PASS** (`BLOCKED_RLS`).
+- Role enforcement (owner/admin/manager/sales/cs vs viewer) preservado em todos os cenários.
+- Baseline pré/pós idêntico: 1.684 contatos ativos, 1.733 totais, 0 sintéticos MATRIX persistidos; accounts-base ativas; 2 linhas de baseline em `lead_score_recalc_queue` intactas.
+- Zero efeitos derivados novos. Zero dado real alterado. Zero JWT/secret logado.
+- RPC temporária `nsec12_probe_insert_contact_with_account` removida (`pg_proc` = 0). Nenhum grant residual.
+- Smoke read-only: `/app/contacts` e `/app/companies` carregam; isolamento das accounts-base preservado.
+- Findings novos: **nenhum**.
+- `UPDATE`/`DELETE`, opportunities, activities, proposals, Storage: **NÃO EXECUTADOS.**
+
+Estado: `CONTACTS.ACCOUNT_ID HOMOLOGADO`. Sprint parada conforme mandato.
