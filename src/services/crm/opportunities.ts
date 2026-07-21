@@ -13,5 +13,6 @@ export {
   listDeletedOpportunities,
   restoreOpportunity,
   reopenOpportunity,
+  duplicateOpportunity,
   type ReopenOpportunityInput,
 } from '../supabase/opportunities';
