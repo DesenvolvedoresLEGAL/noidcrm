@@ -203,3 +203,20 @@ Estado: `NSEC-1.2-CHG-014 VALIDATED`.
 - **Fixtures preservadas.** Dados reais intocados.
 - **Relatório completo:** `docs/security/phase4-opportunities-insert-matrix-v1.md`.
 - **Decisão final:** `OPPORTUNITIES INSERT BÁSICO HOMOLOGADO`.
+
+## NSEC-1.2-CHG-017 — Contacts-base para testes relacionais de opportunities
+
+- **Objetivo:** provisionar 2 contatos sintéticos (`SECURITY_TEST_CONTACT_ORG_A_BASE`, `SECURITY_TEST_CONTACT_ORG_B_BASE`) vinculados às accounts-base.
+- **Opportunities INSERT básico:** PASS (herdado de CHG-016, sem regressão).
+- **Fixtures de account:** READY.
+- **Fixtures de pipeline/stage:** READY.
+- **Fixtures de contact:** **BLOCKED**.
+- **Motivo:** trigger `trg_contact_nome` sobrescreve `nome` a partir de `primeiro_nome`/`ultimo_nome`. Payload autorizado (com `nome` direto) resultou em row com nome vazio → guardrail STOP acionado antes de Contact B.
+- **Row órfão:** `b53de59c-…-fcb3` (Org A, Account A, `nome=""`) registrado no cleanup runbook §6. **Não usar como fixture.**
+- **Contact B:** NÃO criado.
+- **opportunities.account_id / opportunities.contact_id:** NÃO EXECUTADOS.
+- **UPDATE / DELETE:** NÃO EXECUTADOS.
+- **SEC-013/014/015:** permanecem RESOLVED (sem regressão).
+- **Dados reais intocados.** Zero egress externo.
+- **Relatório completo:** `docs/security/phase4-opportunity-contact-fixtures-report-v1.md`.
+- **Decisão final:** `OPPORTUNITY CONTACT FIXTURES BLOCKED`. Remediação proposta em CHG-018 (usar `primeiro_nome`), aguardando autorização humana.
