@@ -232,3 +232,25 @@ Estado: `NSEC-1.2-CHG-014 VALIDATED`.
 - **Estados:** Opportunities INSERT básico = PASS · Account fixtures = READY · Pipeline/stage fixtures = READY · **Contact fixtures = READY** · Órfão = registrado e excluído de probes · Opportunities.account_id = NÃO EXECUTADO · Opportunities.contact_id = NÃO EXECUTADO · UPDATE/DELETE = NÃO EXECUTADOS.
 - **SEC-013, SEC-014, SEC-015:** RESOLVED (sem regressão).
 - **Decisão final:** `OPPORTUNITY CONTACT FIXTURES READY`.
+
+## NSEC-1.2-CHG-019 — Canary tenant de account_id / contact_id em opportunities (FAILED)
+
+- **Objetivo:** validar isolamento multi-tenant dos campos relacionais `account_id` e `contact_id` no INSERT de `public.opportunities` via RPC temporária com rollback interno.
+- **RPC criada:** `public.nsec12_probe_insert_opportunity_with_relations` — SECURITY INVOKER, `EXECUTE` restrito a `authenticated`, whitelist rígida (12 usuários, 2 orgs, 2 pipelines, 2 stages, 2 accounts, 2 contacts oficiais), órfão CHG-017 rejeitado, título obrigatório com prefixo `SECURITY_TEST_OPPORTUNITY_REL_CANARY_`, INSERT + `RAISE 'NSEC12_ROLLBACK'` em sub-bloco, códigos sanitizados.
+- **Baseline pré/pós opportunities:** 2622 / 2622 — idêntico. Zero linhas com prefixo canary. Zero dados reais alterados. Zero egress externo.
+- **Matriz de 16 probes (Owner A/B, Viewer A/B via Edge Function `nsec12-provision-fixtures/issueToken`):**
+  - Relação completa same-org (P1/P2): `ALLOWED_ROLLED_BACK` ✅
+  - Viewer regression (P3/P4): `BLOCKED_RLS` ✅ (SEC-013 confirmado RESOLVED)
+  - Organization cross-org (P5/P6): `BLOCKED_RLS` ✅
+  - Account isolada same-org (P7/P8): `ALLOWED_ROLLED_BACK` ✅
+  - Contact isolado same-org (P9/P10): `ALLOWED_ROLLED_BACK` ✅
+  - **Account cross-tenant isolada (P11/P12): `ALLOWED_ROLLED_BACK` ❌ → SEC-016**
+  - **Contact cross-tenant isolado (P13/P14): `ALLOWED_ROLLED_BACK` ❌ → SEC-017**
+  - **Account + Contact cross-tenant conjuntos (P15/P16): `ALLOWED_ROLLED_BACK` ❌ (evidência associada)**
+- **SEC-013 / SEC-014 / SEC-015:** permanecem RESOLVED (P3–P6 confirmaram).
+- **SEC-016 (HIGH, OPEN):** `account_id` de outro tenant aceito em INSERT — nenhuma policy/CHECK/trigger valida `accounts.organization_id = opportunities.organization_id`.
+- **SEC-017 (HIGH, OPEN):** `contact_id` de outro tenant aceito em INSERT — nenhuma policy/CHECK/trigger valida `contacts.organization_id = opportunities.organization_id`. Risco secundário de vazamento indireto de PII em relatórios cruzados.
+- **Cenário mesmo-tenant com `account_id ≠ contact.account_id`:** NÃO TESTADO (fixture única por tenant); documentado para CHG futura.
+- **RPC canary:** MANTIDA para reprobes após remediação. Rollback DDL: `DROP FUNCTION IF EXISTS public.nsec12_probe_insert_opportunity_with_relations(uuid,text,text,uuid,uuid,text);`
+- **Relatório completo:** `docs/security/phase4-opportunity-account-contact-canary-v1.md`.
+- **Decisão final:** `OPPORTUNITIES ACCOUNT/CONTACT CANARY FAILED`. Correção fora de escopo desta mudança — aguardando autorização humana explícita para CHG de remediação (proposta: policy RESTRICTIVE tenant-aware para `account_id` e `contact_id`, análoga à `nsec12_opportunities_insert_tenant_relations_guard`).
