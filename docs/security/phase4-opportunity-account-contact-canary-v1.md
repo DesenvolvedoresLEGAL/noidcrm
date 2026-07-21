@@ -121,3 +121,90 @@ Cada organização sintética possui **apenas** uma account oficial e um contato
 - `account_id` e `contact_id` cross-tenant são aceitos em INSERT — dois vetores de contaminação multi-tenant confirmados.
 - Correção **não executada** nesta mudança (fora de escopo AMARELO).
 - Aguardando autorização humana explícita para próxima CHG (proposta: policy RESTRICTIVE tenant-aware para `account_id` e `contact_id`, análoga à `nsec12_opportunities_insert_tenant_relations_guard`).
+
+---
+
+## NSEC-1.2-CHG-020 — Integridade tenant de account_id e contact_id
+
+**Data (UTC):** 2026-07-21
+**Classificação:** AMARELA — aditiva, reversível por único DROP POLICY.
+**Superfície:** RLS INSERT em `public.opportunities`.
+
+### Pre-flight
+- 8 policies em `opportunities` (6 permissivas + `nsec12_opportunities_insert_block_viewer` + `nsec12_opportunities_insert_tenant_relations_guard`). Nenhuma valida `accounts.organization_id` ou `contacts.organization_id` versus `opportunities.organization_id`.
+- RPC `public.nsec12_probe_insert_opportunity_with_relations(uuid,text,text,uuid,uuid,text)` presente, `prosecdef=false`, `search_path=public`, whitelist intacta.
+- Fixtures ativas: Org A/B, Account A/B, Contact A/B oficiais, Pipeline A/B, Stage A/B. Órfão `b53de59c-…-fcb3` intocado.
+- Tipos confirmados uuid em todos os campos relacionais; `account_id` e `contact_id` permanecem nullable.
+- Baseline pré: `opportunities.total=2623`, sintéticas `SECURITY_TEST_OPPORTUNITY_REL_CANARY_%`=0.
+
+### Migration aplicada
+```sql
+CREATE POLICY nsec12_opportunities_insert_account_contact_tenant_guard
+ON public.opportunities AS RESTRICTIVE FOR INSERT TO authenticated
+WITH CHECK (
+  (account_id IS NULL OR EXISTS (
+    SELECT 1 FROM public.accounts a
+    WHERE a.id = opportunities.account_id
+      AND a.organization_id = opportunities.organization_id))
+  AND
+  (contact_id IS NULL OR EXISTS (
+    SELECT 1 FROM public.contacts c
+    WHERE c.id = opportunities.contact_id
+      AND c.organization_id = opportunities.organization_id))
+);
+```
+
+- `polpermissive=false`, `polcmd=a`, `polroles={authenticated}`, sem USING, sem função auxiliar, sem trigger.
+- Não valida compatibilidade `account_id`↔`contact_id` dentro do mesmo tenant (fora do escopo).
+- Total pós-migration: **9 policies** em `opportunities`. Demais policies intactas.
+
+### Rollback
+```sql
+DROP POLICY IF EXISTS nsec12_opportunities_insert_account_contact_tenant_guard ON public.opportunities;
+```
+
+### Reprobes — 16/16 conforme esperado
+
+| Probe | Cenário | Esperado | Observado |
+| --- | --- | --- | --- |
+| P1  | Owner A · relação completa same-org A | ALLOWED_ROLLED_BACK | ALLOWED_ROLLED_BACK |
+| P2  | Owner B · relação completa same-org B | ALLOWED_ROLLED_BACK | ALLOWED_ROLLED_BACK |
+| P3  | Viewer A                              | BLOCKED             | BLOCKED_RLS |
+| P4  | Viewer B                              | BLOCKED             | BLOCKED_RLS |
+| P5  | Owner A · organization_id=Org B       | BLOCKED             | BLOCKED_RLS |
+| P6  | Owner B · organization_id=Org A       | BLOCKED             | BLOCKED_RLS |
+| P7  | Owner A · Account A · contact NULL    | ALLOWED_ROLLED_BACK | ALLOWED_ROLLED_BACK |
+| P8  | Owner B · Account B · contact NULL    | ALLOWED_ROLLED_BACK | ALLOWED_ROLLED_BACK |
+| P9  | Owner A · account NULL · Contact A    | ALLOWED_ROLLED_BACK | ALLOWED_ROLLED_BACK |
+| P10 | Owner B · account NULL · Contact B    | ALLOWED_ROLLED_BACK | ALLOWED_ROLLED_BACK |
+| P11 | Owner A · Account B cross-tenant      | BLOCKED             | BLOCKED_RLS |
+| P12 | Owner B · Account A cross-tenant      | BLOCKED             | BLOCKED_RLS |
+| P13 | Owner A · Contact B cross-tenant      | BLOCKED             | BLOCKED_RLS |
+| P14 | Owner B · Contact A cross-tenant      | BLOCKED             | BLOCKED_RLS |
+| P15 | Owner A · Account B + Contact B       | BLOCKED             | BLOCKED_RLS |
+| P16 | Owner B · Account A + Contact A       | BLOCKED             | BLOCKED_RLS |
+
+Todos os probes retornaram HTTP 200 com JWT real dos usuários sintéticos + publishable key; nenhuma service role no `Authorization`.
+
+### Baseline pós
+- `opportunities.total = 2623` (idêntico).
+- Sintéticas `SECURITY_TEST_OPPORTUNITY_REL_CANARY_%` = 0.
+- Accounts A/B com `organization_id` correto; Contacts A/B oficiais com `organization_id` e `account_id` intactos; órfão inalterado.
+- Zero efeito derivado sintético persistido; zero dado real alterado; zero egress externo.
+
+### Smoke read-only
+- Preview autenticado carregando telas de oportunidades, empresas, contatos, forecast e Revenue Command sem novos erros de RLS.
+
+### Estado da RPC
+- `nsec12_probe_insert_opportunity_with_relations` **mantida** instalada (SECURITY INVOKER, sem alteração). Matriz completa relacional e compatibilidade same-tenant ficam para mudança separada.
+
+### Findings
+- **SEC-016 — RESOLVED.** Corrigido por `nsec12_opportunities_insert_account_contact_tenant_guard`. Evidências: P11, P12, P15, P16 → BLOCKED_RLS. Risco residual: UPDATE e compatibilidade account↔contact same-tenant não homologados.
+- **SEC-017 — RESOLVED.** Corrigido pela mesma policy. Evidências: P13, P14, P15, P16 → BLOCKED_RLS. Mesmo risco residual.
+- SEC-013 / SEC-014 / SEC-015: permanecem RESOLVED; sem regressão detectada nos reprobes.
+
+### Compatibilidade same-tenant
+Não implementada nesta mudança. A policy valida exclusivamente `organization_id` das entidades relacionadas.
+
+### Decisão
+**NSEC-1.2-CHG-020 VALIDATED.**
