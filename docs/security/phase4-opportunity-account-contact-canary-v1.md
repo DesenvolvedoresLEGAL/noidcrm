@@ -208,3 +208,21 @@ Não implementada nesta mudança. A policy valida exclusivamente `organization_i
 
 ### Decisão
 **NSEC-1.2-CHG-020 VALIDATED.**
+
+## NSEC-1.2-CHG-021 — Matriz completa por papel + cleanup da RPC (HOMOLOGADA)
+
+Executados 36 probes com JWT real de cada persona (owner/admin/manager/sales/viewer/cs × Org A/Org B), publishable key em `apikey`, zero service role.
+
+- **Bloco 1 (same-org, 12):** 10 `ALLOWED_ROLLED_BACK` (owner/admin/manager/sales/cs de ambas orgs) + 2 `BLOCKED_RLS` (viewers). ✅
+- **Bloco 2 (account cross-tenant, 12):** 12/12 `BLOCKED_RLS`. ✅ → SEC-016 revalidado por papel.
+- **Bloco 3 (contact cross-tenant, 12):** 12/12 `BLOCKED_RLS`. ✅ → SEC-017 revalidado por papel.
+
+**Baseline pré/pós:** `opportunities.total = 2624 / 2624`; zero linhas com `SECURITY_TEST_OPPORTUNITY_REL_CANARY_MATRIX_CHG021%`; 9 policies intactas; fixtures intactas; órfão inalterado.
+
+**Cleanup da RPC:** migration aplicada — `REVOKE ALL ... FROM PUBLIC, authenticated, anon, service_role;` seguido de `DROP FUNCTION IF EXISTS public.nsec12_probe_insert_opportunity_with_relations(uuid,text,text,uuid,uuid,text);`. `pg_proc` retorna 0. Sem referências de produto em `src/` ou `supabase/functions/`.
+
+**Risco residual não coberto:** compatibilidade account↔contact same-tenant (sem fixture), UPDATE, DELETE.
+
+**Relatório completo:** `docs/security/phase4-opportunity-account-contact-matrix-v1.md`.
+
+**Decisão:** `OPPORTUNITIES ACCOUNT/CONTACT TENANT MATRIX HOMOLOGADA`.
