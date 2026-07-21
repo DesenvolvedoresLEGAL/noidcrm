@@ -283,3 +283,27 @@ Estado: `NSEC-1.2-CHG-014 VALIDATED`.
 - **SEC-013 / SEC-014 / SEC-015:** permanecem RESOLVED (sem regressão em P3–P6).
 - **Relatório completo:** `docs/security/phase4-opportunity-account-contact-canary-v1.md` (seção CHG-020).
 - **Decisão final:** `NSEC-1.2-CHG-020 VALIDATED`.
+
+## NSEC-1.2-CHG-021 — Matriz completa por papel de account_id/contact_id em opportunities (HOMOLOGADA)
+
+- **Objetivo:** validar a proteção tenant de `account_id` e `contact_id` para os 6 papéis funcionais em ambas as orgs sintéticas, remover a RPC temporária.
+- **Execução:** 36 probes via `nsec12_probe_insert_opportunity_with_relations` com JWT real de cada persona; publishable key em `apikey`; zero service role.
+- **Resultados:**
+  - Bloco 1 same-org (12/12): 10 `ALLOWED_ROLLED_BACK` + 2 `BLOCKED_RLS` (viewers A e B). ✅
+  - Bloco 2 account cross-tenant (12/12): `BLOCKED_RLS` em 100% dos papéis. ✅ → SEC-016 revalidado.
+  - Bloco 3 contact cross-tenant (12/12): `BLOCKED_RLS` em 100% dos papéis. ✅ → SEC-017 revalidado.
+- **Baseline pré/pós:** 2624 / 2624; zero opportunities `SECURITY_TEST_OPPORTUNITY_REL_CANARY_MATRIX_CHG021%`; 9 policies; fixtures e órfão intactos; zero egress externo.
+- **Estados consolidados:**
+  - Opportunities INSERT básico: **PASS**.
+  - `pipeline_id` / `stage_id`: **PASS**.
+  - `account_id` tenant matriz completa por papel: **PASS**.
+  - `contact_id` tenant matriz completa por papel: **PASS**.
+  - Viewer: **BLOCKED** conforme esperado (dupla barreira em cross-tenant).
+  - Compatibilidade account↔contact same-tenant: **NÃO EXECUTADA**.
+  - UPDATE / DELETE: **NÃO EXECUTADOS**.
+  - RPC `nsec12_probe_insert_opportunity_with_relations`: **REMOVIDA** (REVOKE + DROP FUNCTION). `pg_proc` = 0. Sem referências de produto.
+- **SEC-013 / SEC-014 / SEC-015:** permanecem RESOLVED (viewer revalidado sem regressão).
+- **SEC-016 / SEC-017:** RESOLVED — matriz por papel homologada, evidência CHG-021 registrada em `security-findings-v1.csv`.
+- **Relatório completo:** `docs/security/phase4-opportunity-account-contact-matrix-v1.md`.
+- **Rollback (informativo — RPC removida):** RPC pode ser reprovisionada por migration reversível caso testes futuros exijam.
+- **Decisão final:** `OPPORTUNITIES ACCOUNT/CONTACT TENANT MATRIX HOMOLOGADA`.
