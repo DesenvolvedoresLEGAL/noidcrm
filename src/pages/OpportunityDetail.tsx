@@ -396,6 +396,7 @@ export default function OpportunityDetail() {
                 onLost={handleLost}
                 onEdit={() => setEditModalOpen(true)}
                 onDelete={() => setDeleteDialogOpen(true)}
+                onDuplicate={() => duplicateMutation.mutate()}
                 onReopen={handleReopen}
                 userRole={membership?.org_role || undefined}
                 onNavigateToIntelligence={() => setActiveTab('intelligence')}
