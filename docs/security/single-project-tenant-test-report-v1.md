@@ -117,3 +117,34 @@ Estado: `CONTACTS.ACCOUNT_ID CANARY VALIDATED`. Sprint parada conforme mandato.
 - `UPDATE`/`DELETE`, opportunities, activities, proposals, Storage: **NÃO EXECUTADOS.**
 
 Estado: `CONTACTS.ACCOUNT_ID HOMOLOGADO`. Sprint parada conforme mandato.
+
+## NSEC-1.2-CHG-011 — Opportunities INSERT pre-flight
+
+- Pre-flight read-only concluído em 12 fases (schema, FKs, policies, triggers, egress, defaults).
+- `title` e `organization_id` únicos NOT NULL sem default; `status='new'` neutro e sem egress externo.
+- 16 triggers inspecionados; `trg_segment_benchmark_refresh` restrito a won/lost.
+- Estado: `OPPORTUNITIES INSERT READY AFTER SYNTHETIC FIXTURES`.
+
+## NSEC-1.2-CHG-012 — Pipeline/Stage fixtures
+
+- Fixtures criadas via JWT real (sem service role), `is_primary=false`, `pipeline_type=sales`, sem stage won/lost/qualified.
+- Pipeline A `d1f1c882-...-30f5`, Stage A `18208f58-...-9bc7`, Pipeline B `0526054f-...-f992`, Stage B `7efae798-...-1e48`.
+- Visibilidade same-org OK; cross-org 4/4 bloqueado; nenhum pipeline/stage real alterado.
+- Estado: `OPPORTUNITY PIPELINE FIXTURES READY`.
+
+## NSEC-1.2-CHG-013 — Opportunities INSERT canary
+
+- RPC `nsec12_probe_insert_opportunity(text,text,text,text)` `SECURITY INVOKER`, rollback interno via `RAISE 'NSEC12_ROLLBACK'`.
+- 12 probes executados com JWT real dos 4 atores sintéticos (Owner A/B, Viewer A/B) via `apikey` publishable — zero service role.
+- Same-org (P1/P2): **PASS** (`ALLOWED_ROLLED_BACK`).
+- Organization cross-org (P3/P4): **PASS** (`BLOCKED_RLS`).
+- Viewer same-org (P5/P6): **FAIL** — `ALLOWED_ROLLED_BACK` → **SEC-013 CONFIRMED**.
+- Pipeline cross-tenant isolado (P7/P8): **FAIL** — `ALLOWED_ROLLED_BACK` → **SEC-014 NEW**.
+- Stage cross-tenant isolada (P9/P10): **FAIL** — `ALLOWED_ROLLED_BACK` → **SEC-015 NEW**.
+- Pipeline+stage incompatíveis mesmo tenant (P11/P12): **PASS** (`BLOCKED_CHECK`).
+- Baseline pré/pós idêntico em opportunities/system_events/audit_log/entity_snapshots/revenue_events/stage_history/notifications/interactions/workflow_executions; +31 em score/nrhs queues atribuídos a atividade real concorrente (nenhum referencia fixtures/canary).
+- Fixtures pipeline/stage inalteradas. Zero opportunity persistida. Zero dado real alterado. Zero egress externo.
+- RPC canary **permanece instalada** aguardando reprobes pós-correção. Rollback DDL: `DROP FUNCTION IF EXISTS public.nsec12_probe_insert_opportunity(text,text,text,text);`.
+- Matriz completa de papéis, `account_id`, `contact_id`, UPDATE, DELETE: **NÃO EXECUTADOS.**
+
+Estado: `OPPORTUNITIES INSERT CANARY FAILED` (metodologia OK; 3 findings lógicos abertos).
