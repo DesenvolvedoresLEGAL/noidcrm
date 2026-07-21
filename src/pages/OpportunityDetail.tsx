@@ -199,6 +199,22 @@ export default function OpportunityDetail() {
     },
   });
 
+  const duplicateMutation = useMutation({
+    mutationFn: () => duplicateOpportunity(id!),
+    onSuccess: (created: any) => {
+      queryClient.invalidateQueries({ queryKey: opportunityKeys.all });
+      toast({ title: 'Oportunidade duplicada com sucesso' });
+      if (created?.id) navigate(`/app/opportunities/${created.id}`);
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao duplicar oportunidade',
+        description: error.message,
+      });
+    },
+  });
+
   const reopenMutation = useMutation({
     mutationFn: ({ reason, targetStageId }: { reason: string; targetStageId: string }) =>
       reopenOpportunity(id!, { reason, targetStageId }),
