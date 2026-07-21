@@ -226,3 +226,80 @@ dependentes.**
 4. Registro em tombstone e atualização deste runbook.
 
 **Nenhum cleanup executado nesta mudança.**
+
+---
+
+## 5. Fixtures de pipelines e stages sintéticos (NSEC-1.2-CHG-012)
+
+Criadas via PostgREST com JWT real dos owners sintéticos. Nenhum service role
+usado. Nenhum pipeline/stage real alterado. Nenhum default modificado
+(a organização real mantém seu único `is_primary=true`).
+
+### Pipeline A
+| Campo | Valor |
+| --- | --- |
+| ID (`pipelines.id`, text/UUID) | `d1f1c882-6769-49d6-a9ca-9de75aeb30f5` |
+| `name` | `SECURITY_TEST_PIPELINE_ORG_A` |
+| `type` / `pipeline_type` | `sales` / `sales` |
+| `organization_id` | `e1c4881f-0cd4-45fb-bc50-48314ce7bca0` (NOID_SECURITY_ORG_A) |
+| `is_primary` | `false` |
+| `lead_distribution_strategy` | `none` |
+| Criador (JWT) | `sec-test-a-owner@example.com` (`58c9eb37-…-329b`) |
+| Criada em (UTC) | 2026-07-21 12:52 |
+| Efeitos derivados | Nenhum (sem trigger de audit; `ensure_single_primary_pipeline` não disparou pois `is_primary=false`). |
+
+### Stage A
+| Campo | Valor |
+| --- | --- |
+| ID (`stages.id`) | `18208f58-29b3-4e34-99bb-613751659bc7` |
+| `name` | `SECURITY_TEST_STAGE_ORG_A_INITIAL` |
+| `pipeline_id` | `d1f1c882-6769-49d6-a9ca-9de75aeb30f5` (Pipeline A) |
+| `organization_id` | `e1c4881f-0cd4-45fb-bc50-48314ce7bca0` (ORG_A) |
+| `order_index` | `0` (isolado — não desloca stages reais) |
+| `probability` | `5` |
+| `allow_create_opportunity` | `true` |
+| `allow_win_opportunity` / `allow_lose_opportunity` | `false` / `false` |
+| `is_qualified_stage` | `false` |
+| Criador (JWT) | `sec-test-a-owner@example.com` |
+| Criada em (UTC) | 2026-07-21 12:52 |
+| Efeitos derivados | Nenhum. |
+
+### Pipeline B
+| Campo | Valor |
+| --- | --- |
+| ID | `0526054f-d41d-485c-b669-6f6235b6f992` |
+| `name` | `SECURITY_TEST_PIPELINE_ORG_B` |
+| `type` / `pipeline_type` | `sales` / `sales` |
+| `organization_id` | `bea090a6-4c6c-45b1-92e0-83678c687578` (NOID_SECURITY_ORG_B) |
+| `is_primary` | `false` |
+| Criador (JWT) | `sec-test-b-owner@example.com` (`4ac56488-…-9526`) |
+| Criada em (UTC) | 2026-07-21 12:52 |
+| Efeitos derivados | Nenhum. |
+
+### Stage B
+| Campo | Valor |
+| --- | --- |
+| ID | `7efae798-823e-4521-a9bc-959ba1551e48` |
+| `name` | `SECURITY_TEST_STAGE_ORG_B_INITIAL` |
+| `pipeline_id` | `0526054f-d41d-485c-b669-6f6235b6f992` (Pipeline B) |
+| `organization_id` | `bea090a6-4c6c-45b1-92e0-83678c687578` (ORG_B) |
+| `order_index` | `0` |
+| `probability` | `5` |
+| Flags `won/lost` | `false / false` |
+| `is_qualified_stage` | `false` |
+| Criador (JWT) | `sec-test-b-owner@example.com` |
+| Criada em (UTC) | 2026-07-21 12:52 |
+| Efeitos derivados | Nenhum. |
+
+### Dependências futuras esperadas
+- `opportunities.pipeline_id` e `opportunities.stage_id` apontando para essas fixtures na canary NSEC-1.2-CHG-013.
+
+### Ordem de cleanup futura
+1. Soft/hard delete das opportunities sintéticas.
+2. `DELETE FROM stages WHERE id IN ('18208f58-…','7efae798-…')`.
+3. `DELETE FROM pipelines WHERE id IN ('d1f1c882-…','0526054f-…')` (ON DELETE CASCADE em `stages` cobre eventuais órfãs).
+4. Atualizar runbook e tombstone.
+
+**PROIBIDO** remover essas fixtures durante os testes de INSERT em opportunities.
+
+**Nenhum cleanup executado nesta mudança.**
