@@ -39,7 +39,17 @@ com rollback interno + JWT real por HTTPS (`apikey` publishable, nunca `service_
 | RPC temporária `nsec12_probe_insert_contact` | **REMOVIDA** | NSEC-1.2-CHG-007 | `pg_proc` 0 linhas |
 | RPC temporária `nsec12_probe_insert_contact_with_account` | **REMOVIDA** | NSEC-1.2-CHG-010 | `pg_proc` 0 linhas |
 
-### Demais tabelas (`opportunities`, `activities`, `proposals`, …)
+### `public.opportunities`
+
+| Operação | Estado | Autorização | Evidência |
+|---|---|---|---|
+| Pre-flight (schema, FKs, policies, triggers, egress, código, fixtures) | **EXECUTADO** | NSEC-1.2-CHG-011 | `docs/security/phase4-opportunities-insert-preflight-v1.md` |
+| INSERT (probes dinâmicos) | **NÃO EXECUTADOS** | — | aguarda fixtures + autorização |
+| UPDATE / DELETE | **NÃO EXECUTADOS** | — | fora do escopo |
+| Readiness | `READY AFTER SYNTHETIC FIXTURES` | NSEC-1.2-CHG-011 | pipelines/stages sintéticos ausentes; contacts-base permanentes ausentes |
+| Achados abertos | SEC-013 candidato (viewer insere), Achado A (FK cross-tenant sem tenant-check em account/contact/pipeline/stage) | NSEC-1.2-CHG-011 | §6.1 e §3 do pre-flight |
+
+### Demais tabelas (`activities`, `proposals`, …)
 
 Não homologadas para escrita. Aguardando autorização explícita.
 
