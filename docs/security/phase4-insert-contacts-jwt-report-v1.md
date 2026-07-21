@@ -162,3 +162,108 @@ Mantida por mandato. Não removida nesta rodada.
 - UPDATE/DELETE em `contacts` não executados.
 - RPC temporária permanece por mandato.
 
+
+---
+
+## NSEC-1.2-CHG-007 — Matriz completa (`account_id = NULL`)
+
+**Escopo:** homologação do INSERT básico em `public.contacts` (sem vínculo com `accounts`), matriz por papel × organização + `organization_id` NULL, seguida da remoção da RPC temporária.
+
+### Baseline (pré/pós idêntico)
+
+| Métrica | Pré | Pós |
+|---|---|---|
+| `contacts` reais ativos (`deleted_at IS NULL`) | 1684 | 1684 |
+| `contacts` reais totais | 1733 | 1733 |
+| `contacts` sintéticos persistidos (`nome LIKE 'SECURITY_TEST_CONTACT_%'`) | 0 | 0 |
+| Notifications / interactions / entity_snapshots / audit / filas / revenue_events / system_events / workflow_executions sintéticas | 0 | 0 |
+
+Nenhum contato real alterado, nenhuma organização real tocada, nenhuma account tocada.
+
+### Validação de `org_role` (pré-probes)
+
+Confirmado via `SELECT org_role, role FROM organization_members`:
+
+- `manager` → `role='member'`, `org_role='manager'` (A + B).
+- `sales` → `role='member'`, `org_role='sales'` (A + B).
+- `viewer` → `role='member'`, `org_role='viewer'` (A + B).
+- `cs` → `role='member'`, `org_role='cs'` (A + B).
+- `owner` / `admin` → `role` legado igual ao `org_role`.
+
+### Bloco 1 — SAME-ORG (12 probes via RPC transacional)
+
+| Papel | Org A → Org A | Org B → Org B |
+|---|---|---|
+| owner | `ALLOWED_ROLLED_BACK` ✅ | `ALLOWED_ROLLED_BACK` ✅ |
+| admin | `ALLOWED_ROLLED_BACK` ✅ | `ALLOWED_ROLLED_BACK` ✅ |
+| manager | `ALLOWED_ROLLED_BACK` ✅ | `ALLOWED_ROLLED_BACK` ✅ |
+| sales | `ALLOWED_ROLLED_BACK` ✅ | `ALLOWED_ROLLED_BACK` ✅ |
+| viewer | `BLOCKED_RLS` ✅ | `BLOCKED_RLS` ✅ |
+| cs | `ALLOWED_ROLLED_BACK` ✅ | `ALLOWED_ROLLED_BACK` ✅ |
+
+Total: 10 `ALLOWED_ROLLED_BACK` + 2 `BLOCKED_RLS` — bate 1:1 com a matriz esperada.
+
+### Bloco 2 — CROSS-ORG (12 probes via RPC transacional)
+
+Todos os 6 papéis da Org A tentando inserir na Org B: `BLOCKED_RLS` (6/6).
+Todos os 6 papéis da Org B tentando inserir na Org A: `BLOCKED_RLS` (6/6).
+
+Total: 12 `BLOCKED_RLS` ✅.
+
+### Bloco 3 — `organization_id = NULL` (2 probes PostgREST direto)
+
+RPC não alterada (não aceita UUID nulo). INSERT via `POST /rest/v1/contacts` com `organization_id: null`, `account_id: null`, `nome` iniciando por `SECURITY_TEST_CONTACT_`:
+
+| Origem | HTTP | Motivo |
+|---|---|---|
+| Owner A → NULL | 403 | `42501` — `new row violates row-level security policy for table "contacts"` ✅ |
+| Owner B → NULL | 403 | `42501` — idem ✅ |
+
+Zero linhas persistidas.
+
+### Confirmação `account_id = NULL`
+
+Todos os probes usaram `p_organization_id` + `p_nome` na RPC (que insere com `account_id = NULL` fixo) ou PostgREST com `account_id: null` explícito. Nenhum probe referenciou account real ou sintética.
+
+### Totais
+
+| Bloco | Executados | Aprovados | Divergentes |
+|---|---|---|---|
+| 1 — Same-org | 12 | 12 | 0 |
+| 2 — Cross-org | 12 | 12 | 0 |
+| 3 — Org NULL | 2 | 2 | 0 |
+| **Total** | **26** | **26** | **0** |
+
+### Smoke test read-only pós-probes
+
+- Tela `/contatos` carrega para usuários reais (sem novos erros de RLS).
+- Contatos reais permanecem visíveis aos autorizados; nenhum papel real perdeu leitura.
+- Nenhum novo erro de RLS em `contacts` nos logs do PostgREST durante a janela.
+- Nenhum contato real criado/editado.
+
+### Remoção da RPC temporária
+
+Migration de cleanup executada:
+
+```
+REVOKE ALL ON FUNCTION public.nsec12_probe_insert_contact(uuid, text) FROM PUBLIC, authenticated, anon, service_role;
+DROP FUNCTION IF EXISTS public.nsec12_probe_insert_contact(uuid, text);
+```
+
+Verificações pós-cleanup:
+
+- `pg_proc WHERE proname='nsec12_probe_insert_contact'` → 0 linhas ✅.
+- Nenhum grant residual (função inexistente).
+- Nenhuma referência em código frontend ou Edge Functions (única ocorrência é em `src/integrations/supabase/types.ts`, arquivo autogerado — regenerado após a migration).
+- Policies em `contacts` preservadas:
+  - PERMISSIVE: `Users view contacts in own org`, `Users insert contacts in own org`, `Users update contacts in own org`, `Users can update org contacts`, `Admins delete contacts`.
+  - RESTRICTIVE: `nsec12_contacts_insert_block_viewer` (ativa).
+- Tela de contatos segue carregando; nenhum dado real alterado.
+
+### Estado da policy viewer
+
+`nsec12_contacts_insert_block_viewer` (RESTRICTIVE, FOR INSERT, TO authenticated) — **ativa e preservada**. Não alterada nesta mudança.
+
+### Decisão final
+
+**CONTACTS INSERT BÁSICO HOMOLOGADO** — contato sem `account_id`, isolamento por organização, matriz de papéis. Nenhuma validação executada sobre vínculo contato→empresa.
