@@ -164,3 +164,24 @@ Estado: `OPPORTUNITIES INSERT CANARY FAILED` (metodologia OK; 3 findings lógico
 - Rollback: `DROP POLICY IF EXISTS nsec12_opportunities_insert_block_viewer ON public.opportunities;`.
 
 Estado: `NSEC-1.2-CHG-014 VALIDATED`.
+
+## NSEC-1.2-CHG-015 — Integridade tenant de pipeline_id e stage_id
+
+- **Policy nova:** `nsec12_opportunities_insert_tenant_relations_guard` (RESTRICTIVE, INSERT, authenticated, somente WITH CHECK).
+- **Reprobes:** 12/12 conforme esperado.
+  - Owner same-org (P1/P2): `ALLOWED_ROLLED_BACK`.
+  - Organization cross-org (P3/P4): `BLOCKED_RLS`.
+  - Viewer same-org (P5/P6): `BLOCKED_RLS` (preservação CHG-014).
+  - Pipeline cross-tenant (P7/P8): `BLOCKED_RLS`.
+  - Stage cross-tenant (P9/P10): `BLOCKED_RLS`.
+  - Pipeline/stage incompatíveis (P11/P12): `BLOCKED_CHECK`.
+- **Baseline:** 2621 opportunities / 2218 ativas / 0 sintéticas — pré = pós.
+- **SEC-013:** RESOLVED (preservado).
+- **SEC-014:** RESOLVED.
+- **SEC-015:** RESOLVED.
+- **Matriz completa de papéis:** ainda não executada.
+- **account_id / contact_id em opportunities:** ainda não testados.
+- **UPDATE / DELETE:** ainda não testados.
+- **RPC canary:** mantida (SECURITY INVOKER) para próximas rodadas.
+- **Rollback:** `DROP POLICY IF EXISTS nsec12_opportunities_insert_tenant_relations_guard ON public.opportunities;`
+- **Decisão final:** `NSEC-1.2-CHG-015 VALIDATED`.
