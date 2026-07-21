@@ -220,3 +220,15 @@ Estado: `NSEC-1.2-CHG-014 VALIDATED`.
 - **Dados reais intocados.** Zero egress externo.
 - **Relatório completo:** `docs/security/phase4-opportunity-contact-fixtures-report-v1.md`.
 - **Decisão final:** `OPPORTUNITY CONTACT FIXTURES BLOCKED`. Remediação proposta em CHG-018 (usar `primeiro_nome`), aguardando autorização humana.
+
+## NSEC-1.2-CHG-018 — Recuperação das contact fixtures (READY)
+
+- **Contact A oficial:** `55d589fb-…-bbf0` · Org A · Account A · `nome=primeiro_nome=SECURITY_TEST_CONTACT_ORG_A_BASE` · JWT `sec-test-a-owner@example.com`.
+- **Contact B oficial:** `47ad14f0-…-8a27` · Org B · Account B · `nome=primeiro_nome=SECURITY_TEST_CONTACT_ORG_B_BASE` · JWT `sec-test-b-owner@example.com`.
+- **Órfão CHG-017:** `b53de59c-…-fcb3` preservado read-only, `updated_at` inalterado, permanece NON-FIXTURE.
+- **Matriz de visibilidade (12 probes):** owner/viewer same-org veem seu contato; cross-org 100% bloqueado; órfão invisível fora da Org A.
+- **Integridade contact→account→org:** validada para A e B.
+- **Accounts-base:** intactas. Efeitos derivados apenas locais (queues). Zero egress. Zero dado real alterado.
+- **Estados:** Opportunities INSERT básico = PASS · Account fixtures = READY · Pipeline/stage fixtures = READY · **Contact fixtures = READY** · Órfão = registrado e excluído de probes · Opportunities.account_id = NÃO EXECUTADO · Opportunities.contact_id = NÃO EXECUTADO · UPDATE/DELETE = NÃO EXECUTADOS.
+- **SEC-013, SEC-014, SEC-015:** RESOLVED (sem regressão).
+- **Decisão final:** `OPPORTUNITY CONTACT FIXTURES READY`.

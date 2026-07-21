@@ -335,3 +335,51 @@ sem autorização humana. Contact A/B oficiais serão criados em CHG-018 com
 Contact B não foi criado.
 
 **Nenhum cleanup executado nesta mudança.**
+
+## 7. Fixture oficial de contatos (NSEC-1.2-CHG-018 — READY)
+
+Recuperação da CHG-017. Payload corrigido com `primeiro_nome` populado; o
+trigger `trg_contact_nome` recompôs `nome` corretamente. O órfão (§6) foi
+preservado intocado (`updated_at` inalterado: 2026-07-21 16:33:57) e
+permanece `NON-FIXTURE / DO NOT USE IN PROBES / CLEANUP REQUIRED / ACTIVE
+UNTIL DEDICATED CLEANUP WINDOW`.
+
+### Contact A oficial (Org A)
+
+| Campo | Valor |
+|---|---|
+| Tabela | `public.contacts` |
+| `id` | `55d589fb-e680-455a-b9d9-987a7c2bbbf0` |
+| `nome` | `SECURITY_TEST_CONTACT_ORG_A_BASE` |
+| `primeiro_nome` | `SECURITY_TEST_CONTACT_ORG_A_BASE` |
+| `ultimo_nome` | NULL |
+| `organization_id` | `e1c4881f-0cd4-45fb-bc50-48314ce7bca0` (NOID_SECURITY_ORG_A) |
+| `account_id` | `36085a30-06a1-491a-a079-a24fb42dd92b` (SECURITY_TEST_ACCOUNT_ORG_A_BASE) |
+| Criador (JWT) | `sec-test-a-owner@example.com` (`58c9eb37-…-329b`) |
+| Criada em (UTC) | 2026-07-21 16:40:20 |
+| Estado | ativo (`deleted_at IS NULL`) |
+| Finalidade | FIXTURE BASE PARA TESTES RELACIONAIS DE OPPORTUNITIES |
+
+### Contact B oficial (Org B)
+
+| Campo | Valor |
+|---|---|
+| Tabela | `public.contacts` |
+| `id` | `47ad14f0-3e17-4a6e-a268-bdd9f5dc8a27` |
+| `nome` | `SECURITY_TEST_CONTACT_ORG_B_BASE` |
+| `primeiro_nome` | `SECURITY_TEST_CONTACT_ORG_B_BASE` |
+| `ultimo_nome` | NULL |
+| `organization_id` | `bea090a6-4c6c-45b1-92e0-83678c687578` (NOID_SECURITY_ORG_B) |
+| `account_id` | `b777baac-072a-4c1a-b481-306d0c899f41` (SECURITY_TEST_ACCOUNT_ORG_B_BASE) |
+| Criador (JWT) | `sec-test-b-owner@example.com` (`4ac56488-…-9526`) |
+| Criada em (UTC) | 2026-07-21 16:40:20 |
+| Estado | ativo (`deleted_at IS NULL`) |
+| Finalidade | FIXTURE BASE PARA TESTES RELACIONAIS DE OPPORTUNITIES |
+
+**Proibido remover** enquanto testes relacionais de `opportunities.contact_id`
+não concluírem. Ordem de cleanup futura: opportunities/activities sintéticas
+dependentes → Contact A → Contact B → contato órfão (§6) → stages sintéticas
+→ pipelines sintéticos → accounts sintéticas → efeitos derivados → usuários e
+organizações sintéticas (ordem final respeita FKs no momento do cleanup).
+
+**Nenhum cleanup executado nesta mudança.**
