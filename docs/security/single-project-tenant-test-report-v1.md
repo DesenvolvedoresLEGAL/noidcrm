@@ -338,3 +338,34 @@ Estado: `NSEC-1.2-CHG-014 VALIDATED`.
 
 ### Observação operacional
 Guardrails #10 (>2 accounts) e #12 (retry duplicidade) acionados por parse local incorreto de `jq` durante Fase C, gerando 1 orphan account (`73db****7f77`) em Org A sem referências downstream. Registrado em `single-project-cleanup-runbook-v1.md §8bis`. Nenhum DELETE executado (não autorizado nesta CHG).
+
+## NSEC-1.2-CHG-023 — Account/contact same-tenant compatibility canary (FAILED)
+
+- **Data:** 2026-07-21
+- **Classificação:** AMARELA controlada
+- **Decisão:** `OPPORTUNITIES ACCOUNT/CONTACT SAME-TENANT CANARY FAILED`
+- **Detalhe:** `docs/security/phase4-opportunity-account-contact-same-tenant-canary-v1.md`
+
+### Consolidated status
+- Opportunities INSERT básico: **PASS**
+- Pipeline/stage tenant: **PASS**
+- Account/contact tenant (guard): **PASS**
+- Account/contact tenant matrix (36 probes): **PASS**
+- Account/contact compatibility same-tenant (CHG-023): **FAILED** (P5–P8 aceitos)
+- Fixtures same-tenant mismatch: **PARTIAL** (oficiais utilizáveis; órfãos excluídos da canary)
+- Órfãos (account dup + contact vazio): **excluídos da canary por rejeição literal na RPC**
+- UPDATE / DELETE: **NÃO EXECUTADOS**
+- RPC ativa em opportunities: `nsec12_probe_insert_opportunity_account_contact_match` **mantida** para reprobes pós-correção (mandato CHG-023)
+
+### Findings
+- SEC-013 permanece **RESOLVED** (P9/P10 BLOCKED_RLS).
+- SEC-016 permanece **RESOLVED** (P11/P12 BLOCKED_RLS).
+- SEC-017 permanece **RESOLVED** (P13/P14 BLOCKED_RLS).
+- **SEC-018 (NOVO):** MEDIUM, OPEN — combinação `account_id`/`contact_id` incompatível same-tenant aceita (P5–P8 ALLOWED_ROLLED_BACK). Correção **não executada** conforme escopo.
+
+### Baseline pré/pós
+- 2 627 opportunities totais, 2 224 ativas, 0 sintéticas, 0 canary titles (idêntico pré/pós).
+- 4 accounts oficiais + 4 contacts oficiais intactos.
+- Account órfã duplicada e contact órfão intactos.
+- 9 policies em `public.opportunities` inalteradas.
+- Zero dado real alterado. Zero egress externo.
