@@ -209,3 +209,61 @@ Ficam preservados:
 
 Aguardando autorização humana explícita para CHG-018 (remediação com
 `primeiro_nome`).
+
+---
+
+# NSEC-1.2-CHG-018 — Recuperação das fixtures
+
+**Data:** 2026-07-21 16:40:20 UTC · **Decisão:** `OPPORTUNITY CONTACT FIXTURES READY`
+
+## 1. Pre-flight (read-only)
+- Accounts A/B ativas, tenant-correct, `deleted_at IS NULL`.
+- Owners A/B ativos com `org_role='owner'`; viewers A/B ativos.
+- Trigger `trg_contact_nome` inalterado (`tgenabled='O'`); função recompõe `nome := trim(primeiro_nome || ' ' || coalesce(ultimo_nome,''))`.
+- 5 policies PERMISSIVE + 1 RESTRICTIVE (`nsec12_contacts_insert_block_viewer`) presentes.
+- Nenhum contato oficial pré-existente com os nomes-alvo (count=0).
+- Órfão `b53de59c-…-fcb3` presente, nome vazio, `updated_at=2026-07-21 16:33:57`.
+
+## 2. Contrato do trigger
+`NEW.nome := trim(NEW.primeiro_nome || ' ' || coalesce(NEW.ultimo_nome,''))` — determinístico. Confirmado que enviar `primeiro_nome=SECURITY_TEST_CONTACT_ORG_<X>_BASE` + `ultimo_nome=NULL` produz `nome=SECURITY_TEST_CONTACT_ORG_<X>_BASE`.
+
+## 3. Payload A + resultado
+PostgREST POST `/rest/v1/contacts` com JWT `sec-test-a-owner@example.com`. Payload: `{nome, primeiro_nome: SECURITY_TEST_CONTACT_ORG_A_BASE, ultimo_nome: null, organization_id: e1c4881f-…-bca0, account_id: 36085a30-…-d92b}`. HTTP 201. ID: `55d589fb-…-bbf0`. Recomposto: `nome=SECURITY_TEST_CONTACT_ORG_A_BASE`.
+
+## 4. Payload B + resultado
+PostgREST POST com JWT `sec-test-b-owner@example.com`. Payload análogo para Org B. HTTP 201. ID: `47ad14f0-…-8a27`. Recomposto: `nome=SECURITY_TEST_CONTACT_ORG_B_BASE`.
+
+## 5. Integridade contact → account
+- Contact A.organization_id == Account A.organization_id == Org A ✓
+- Contact B.organization_id == Account B.organization_id == Org B ✓
+- IDs distintos entre si e do órfão ✓
+
+## 6. Matriz de visibilidade (PostgREST + JWT real, sem service role)
+
+| Persona | Contact A | Contact B | Órfão |
+|---|---|---|---|
+| Owner A | ✓ | ✗ | ✓ |
+| Owner B | ✗ | ✓ | ✗ |
+| Viewer A | ✓ | ✗ | ✓ |
+| Viewer B | ✗ | ✓ | ✗ |
+
+Cross-org 100% bloqueado. Órfão invisível para Org B.
+
+## 7. Órfão (read-only)
+`id=b53de59c-…-fcb3`, Org A, Account A, nome vazio, `updated_at` inalterado (16:33:57). NON-FIXTURE / DO NOT USE.
+
+## 8. Efeitos derivados
+Apenas transacionais locais (queues de recalc). Zero egress externo. Zero associação com dado real.
+
+## 9. Baseline pós
+- Contatos oficiais sintéticos ativos: **2**
+- Contatos órfãos: **1**
+- Accounts sintéticas: **2** (inalteradas)
+- Opportunities/activities sintéticas: **0**
+- Dados reais alterados: **0**
+
+## 10. Smoke read-only
+Runbook atualizado (§7). Nenhuma tela regredida.
+
+## 11. Decisão
+**OPPORTUNITY CONTACT FIXTURES READY.**
