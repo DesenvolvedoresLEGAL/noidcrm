@@ -25,14 +25,16 @@ com rollback interno + JWT real por HTTPS (`apikey` publishable, nunca `service_
 
 | Operação | Estado | Autorização | Evidência |
 |---|---|---|---|
-| SELECT | PASS (implícito na Fase 4 SELECT) | NSEC-1.2-CHG (Fase 4) | `phase4-select-report-v1.md` |
-| INSERT canary (owner same-org × 2) | PASS | NSEC-1.2-CHG-005 | 2/2 `ALLOWED_ROLLED_BACK` — `phase4-insert-contacts-jwt-report-v1.md` |
-| INSERT canary cross-org (owner × 2) | PASS — bloqueado | NSEC-1.2-CHG-005 | 2/2 `BLOCKED_RLS` |
-| INSERT canary viewer (same-org × 2) | **FIXED** | NSEC-1.2-CHG-005 → CHG-006 | Canary 2/2 `ALLOWED_ROLLED_BACK` → `SEC-012` HIGH; correção `nsec12_contacts_insert_block_viewer` (RESTRICTIVE); reprobe 2/2 `BLOCKED_RLS`; SEC-012 **RESOLVED** |
-| `account_id` FK | não testado | — | fora do escopo do canary |
-| Matriz completa (admin/manager/sales/cs, org_id NULL) | não executada | — | aguardando autorização |
-| UPDATE / DELETE | não executados | — | fora do escopo autorizado |
-| RPC temporária de probe | **MANTIDA** (por mandato) | NSEC-1.2-CHG-005 | `public.nsec12_probe_insert_contact` — rollback `DROP FUNCTION IF EXISTS public.nsec12_probe_insert_contact(uuid, text);` |
+| SELECT | PASS | NSEC-1.2-CHG (Fase 4) | `phase4-select-report-v1.md` |
+| INSERT same-org sem `account_id` (owner/admin/manager/sales/cs) | PASS | NSEC-1.2-CHG-007 | 10/10 `ALLOWED_ROLLED_BACK` — `phase4-insert-contacts-jwt-report-v1.md` (CHG-007) |
+| INSERT same-org sem `account_id` (viewer) | PASS — bloqueado | NSEC-1.2-CHG-006 (policy) + CHG-007 (reprobe matriz) | 2/2 `BLOCKED_RLS` |
+| INSERT cross-org sem `account_id` (todos os papéis) | PASS — bloqueado | NSEC-1.2-CHG-007 | 12/12 `BLOCKED_RLS` |
+| INSERT `organization_id = NULL` (owners A/B) | PASS — bloqueado | NSEC-1.2-CHG-007 | 2/2 HTTP 403 RLS |
+| Role enforcement (`org_role`) | PASS | NSEC-1.2-CHG-006 + CHG-007 | manager/sales/cs preservados; viewer bloqueado |
+| INSERT com `account_id` FK | **NÃO EXECUTADO** | — | fora do escopo autorizado (CHG-007 pára aqui) |
+| UPDATE | não executado | — | fora do escopo autorizado |
+| DELETE | não executado | — | fora do escopo autorizado |
+| RPC temporária de probe | **REMOVIDA** | NSEC-1.2-CHG-007 (cleanup) | `DROP FUNCTION nsec12_probe_insert_contact` — `pg_proc` 0 linhas |
 
 ### Demais tabelas (`opportunities`, `activities`, `proposals`, …)
 
