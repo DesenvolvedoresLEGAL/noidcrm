@@ -71,3 +71,19 @@ autorização explícita.
 Baseline: accounts reais ativas 4781 → 4781 (delta 0); sintéticas ativas 0 → 2; tombstone 1 → 1.
 
 Estado: `ACCOUNT RELATIONSHIP FIXTURES READY`.
+
+## NSEC-1.2-CHG-009 — Contacts × account_id canary
+
+- Canary executada com 8 probes via RPC `SECURITY INVOKER` + JWT real sintético.
+- Same-org (Owner A→A, Owner B→B): **PASS** (`ALLOWED_ROLLED_BACK`).
+- Account cross-org (Owner A→AccB, Owner B→AccA): **PASS** (`BLOCKED_RLS`).
+- Organization cross-org (Owner A→OrgB, Owner B→OrgA): **PASS** (`BLOCKED_RLS`).
+- Viewer same-org (A e B): **PASS** (`BLOCKED_RLS`).
+- Proteção enforçada pela policy permissiva `Users insert contacts in own org` (subquery em `accounts` casando `organization_id`).
+- Baseline contacts inalterado: 1.684 ativos, 1.733 totais, 0 sintéticos persistidos.
+- Accounts-base intactas.
+- RPC temporária removida (`pg_proc` = 0).
+- Matriz completa com `account_id`: **NÃO EXECUTADA.**
+- `UPDATE`/`DELETE`: **NÃO EXECUTADOS.**
+
+Estado: `CONTACTS.ACCOUNT_ID CANARY VALIDATED`. Sprint parada conforme mandato.
