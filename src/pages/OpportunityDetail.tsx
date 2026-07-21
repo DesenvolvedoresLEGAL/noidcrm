@@ -33,7 +33,7 @@ import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { extractEmail, extractPhone } from '@/lib/contactFormat';
-import { updateOpportunity, updateOpportunityStatus, markOpportunityAsLost, markOpportunityAsWon, deleteOpportunity, reopenOpportunity } from '@/services/crm/opportunities';
+import { updateOpportunity, updateOpportunityStatus, markOpportunityAsLost, markOpportunityAsWon, deleteOpportunity, reopenOpportunity, duplicateOpportunity } from '@/services/crm/opportunities';
 import { processPendingWorkflows } from '@/services/crm/workflow-rules';
 import { invalidateOpportunity } from '@/lib/cache-invalidation';
 import { opportunityKeys } from '@/lib/query-keys';
