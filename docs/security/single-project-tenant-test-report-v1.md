@@ -254,3 +254,32 @@ Estado: `NSEC-1.2-CHG-014 VALIDATED`.
 - **RPC canary:** MANTIDA para reprobes após remediação. Rollback DDL: `DROP FUNCTION IF EXISTS public.nsec12_probe_insert_opportunity_with_relations(uuid,text,text,uuid,uuid,text);`
 - **Relatório completo:** `docs/security/phase4-opportunity-account-contact-canary-v1.md`.
 - **Decisão final:** `OPPORTUNITIES ACCOUNT/CONTACT CANARY FAILED`. Correção fora de escopo desta mudança — aguardando autorização humana explícita para CHG de remediação (proposta: policy RESTRICTIVE tenant-aware para `account_id` e `contact_id`, análoga à `nsec12_opportunities_insert_tenant_relations_guard`).
+
+## NSEC-1.2-CHG-020 — Integridade tenant de account_id / contact_id em opportunities (VALIDATED)
+
+- **Objetivo:** remediar SEC-016 e SEC-017 impedindo INSERT em `public.opportunities` com `account_id` ou `contact_id` de outro tenant.
+- **Migration aplicada:** policy única aditiva `nsec12_opportunities_insert_account_contact_tenant_guard` (RESTRICTIVE, INSERT, authenticated, apenas WITH CHECK). Sem trigger, sem função auxiliar, sem alteração de policies existentes. Total pós: 9 policies.
+- **Rollback documentado:** `DROP POLICY IF EXISTS nsec12_opportunities_insert_account_contact_tenant_guard ON public.opportunities;`
+- **Reprobes (16/16 conforme esperado, JWT real via `issueToken`, publishable key em `apikey`, zero service role em `Authorization`):**
+  - Relação completa same-org (P1/P2): `ALLOWED_ROLLED_BACK` ✅
+  - Viewer (P3/P4): `BLOCKED_RLS` ✅
+  - Organization cross-org (P5/P6): `BLOCKED_RLS` ✅
+  - Account isolada same-org (P7/P8): `ALLOWED_ROLLED_BACK` ✅
+  - Contact isolado same-org (P9/P10): `ALLOWED_ROLLED_BACK` ✅
+  - Account cross-tenant (P11/P12): `BLOCKED_RLS` ✅ → **SEC-016 RESOLVED**
+  - Contact cross-tenant (P13/P14): `BLOCKED_RLS` ✅ → **SEC-017 RESOLVED**
+  - Account + Contact cross-tenant conjuntos (P15/P16): `BLOCKED_RLS` ✅
+- **Baseline pré/pós opportunities:** 2623 / 2623 — idêntico. Zero linhas com prefixo `SECURITY_TEST_OPPORTUNITY_REL_CANARY_%`. Fixtures A/B intactas; órfão preservado; pipelines/stages sintéticos intactos. Zero egress externo. Zero dado real alterado.
+- **Estados consolidados:**
+  - Opportunities INSERT básico: **PASS** (CHG-016).
+  - `pipeline_id`: **PASS** (CHG-015).
+  - `stage_id`: **PASS** (CHG-015).
+  - `account_id` tenant: **PASS** (CHG-020).
+  - `contact_id` tenant: **PASS** (CHG-020).
+  - Compatibilidade account↔contact same-tenant: **NÃO EXECUTADA** (fora de escopo).
+  - Matriz completa relacional por papel: **NÃO EXECUTADA.**
+  - UPDATE / DELETE: **NÃO EXECUTADOS.**
+  - RPC temporária `nsec12_probe_insert_opportunity_with_relations`: **MANTIDA** para reprobes futuros.
+- **SEC-013 / SEC-014 / SEC-015:** permanecem RESOLVED (sem regressão em P3–P6).
+- **Relatório completo:** `docs/security/phase4-opportunity-account-contact-canary-v1.md` (seção CHG-020).
+- **Decisão final:** `NSEC-1.2-CHG-020 VALIDATED`.
