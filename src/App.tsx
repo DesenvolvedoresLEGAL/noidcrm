@@ -120,6 +120,7 @@ const WinLossReasons = lazy(() => import("./pages/settings/WinLossReasons"));
 const ProposalLayouts = lazy(() => import("./pages/settings/ProposalLayouts"));
 const ProposalSettings = lazy(() => import("./pages/settings/ProposalSettings"));
 const EventrixInventorySettings = lazy(() => import("./pages/settings/EventrixInventorySettings"));
+const InventoryProviderSettingsPage = lazy(() => import("./pages/settings/InventoryProviderSettingsPage"));
 const NoidInventoryBackupPage = lazy(() => import("./pages/settings/NoidInventoryBackupPage"));
 const ProposalTemplateEditor = lazy(() => import("./pages/settings/ProposalTemplateEditor"));
 const ReleaseNotes = lazy(() => import("./pages/ReleaseNotes"));
@@ -573,11 +574,11 @@ const App = () => (
               />
               <Route
                 path="/app/operations/inventory"
-                element={<Navigate to="/app/settings/eventrix-inventory" replace />}
+                element={<Navigate to="/app/settings/inventory-provider" replace />}
               />
               <Route
                 path="/app/operations/inventory/*"
-                element={<Navigate to="/app/settings/eventrix-inventory" replace />}
+                element={<Navigate to="/app/settings/inventory-provider" replace />}
               />
               <Route
                 path="/app/forecast"
@@ -917,7 +918,11 @@ const App = () => (
                 <Route path="/app/settings/loss-reasons" element={<WinLossReasons />} />
                 <Route path="/app/settings/proposal-layouts" element={<ProposalLayouts />} />
                 <Route path="/app/settings/proposal-settings" element={<ProposalSettings />} />
-                <Route path="/app/settings/eventrix-inventory" element={<EventrixInventorySettings />} />
+                <Route path="/app/settings/inventory-provider" element={<InventoryProviderSettingsPage />} />
+                <Route
+                  path="/app/settings/eventrix-inventory"
+                  element={<Navigate to="/app/settings/inventory-provider?provider=eventrix" replace />}
+                />
                 <Route path="/app/settings/noid-inventory-backup" element={<NoidInventoryBackupPage />} />
                 <Route path="/app/settings/proposal-templates" element={<ProposalLayouts />} />
                 <Route path="/app/settings/proposal-templates/new" element={<ProposalTemplateEditor />} />
