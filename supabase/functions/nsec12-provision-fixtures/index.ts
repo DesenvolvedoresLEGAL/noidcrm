@@ -40,21 +40,17 @@ Deno.serve(async (req) => {
     : ORG_ALLOW;
 
   // ---- Test-token issuer (Phase 4 read-only impersonation) ----
-  // Signs in as a synthetic user, strictly enforced by email prefix/domain.
-  // Returns access_token + user_id. Never touches real users.
   if (action === 'issueToken') {
     const email: string = typeof body?.email === 'string' ? body.email : '';
     if (!email.startsWith(`${EMAIL_PREFIX}-`) || !email.endsWith(`@${EMAIL_DOMAIN}`)) {
       return json({ error: 'email not allowed (must be sec-test-*@example.com)' }, 400);
     }
-    // find user + reset password to a known one for this call
     const { data: list } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 });
     const found = list?.users?.find((u) => u.email === email);
     if (!found) return json({ error: 'user not found' }, 404);
     const password = 'SEC_TEST_' + crypto.randomUUID();
     const { error: updErr } = await admin.auth.admin.updateUserById(found.id, { password });
     if (updErr) return json({ error: 'password reset failed', detail: updErr.message }, 500);
-    // sign in via anon endpoint
     const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const resp = await fetch(`${url}/auth/v1/token?grant_type=password`, {
       method: 'POST',
@@ -63,11 +59,33 @@ Deno.serve(async (req) => {
     });
     const tok = await resp.json();
     if (!resp.ok) return json({ error: 'signin failed', detail: tok }, 500);
-    return json({
-      email, user_id: found.id,
-      access_token: tok.access_token,
-      expires_in: tok.expires_in,
-    });
+    return json({ email, user_id: found.id, access_token: tok.access_token, expires_in: tok.expires_in });
+  }
+
+  // ---- CHG-029: delete synthetic auth users (strict whitelist) ----
+  if (action === 'delete') {
+    const WHITELIST_IDS = new Set([
+      '58c9eb37-4ae3-4612-bbfd-e873f49b329b','2fc41788-9b17-44c2-b90b-578f72f3e3f2',
+      '70f0f9de-677c-46ac-9fe9-12a93f74fee9','ec646ad0-b719-4464-be12-aaa5b139a60f',
+      '84cfb07e-6009-4a5e-a814-ab0d11a37daf','6da9ebee-770c-439c-9d18-5614fe952ac6',
+      '4ac56488-9128-4ff4-b236-56e1e06e9526','e29eef51-867a-4c78-b823-2543352611e9',
+      '13668a50-d30a-4346-993b-521a67a6d616','56eed1b0-542a-43b0-a01c-28a83371854f',
+      'ea6ca3ef-e18a-43dc-aaca-5da10a581331','c8a897f4-48c1-4823-a75b-d7f35cb284cc',
+    ]);
+    // Owner A must be RETAINED as EVIDENCE RETENTION PRINCIPAL (tombstone created_by).
+    const RETAIN_IDS = new Set(['58c9eb37-4ae3-4612-bbfd-e873f49b329b']);
+    const results: Array<{ id: string; email?: string; action: string; error?: string }> = [];
+    const { data: list } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 });
+    for (const id of WHITELIST_IDS) {
+      const u = list?.users?.find((x) => x.id === id);
+      const emailMatch = u?.email?.startsWith(`${EMAIL_PREFIX}-`) && u?.email?.endsWith(`@${EMAIL_DOMAIN}`);
+      if (!u) { results.push({ id, action: 'not_found' }); continue; }
+      if (!emailMatch) { results.push({ id, email: u.email, action: 'refused_email_prefix_mismatch' }); continue; }
+      if (RETAIN_IDS.has(id)) { results.push({ id, email: u.email, action: 'retained_evidence' }); continue; }
+      const { error: delErr } = await admin.auth.admin.deleteUser(id);
+      results.push({ id, email: u.email, action: delErr ? 'error' : 'deleted', error: delErr?.message });
+    }
+    return json({ dryRun, results });
   }
 
   const result: any = { dryRun, orgs: [], users: [], errors: [] };
