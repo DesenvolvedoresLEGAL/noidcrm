@@ -454,3 +454,41 @@ organizações sintéticas (ordem final respeita FKs no momento do cleanup).
 | Motivo | Retry indevido após parse `jq` falho da resposta HTTP 201 inicial |
 | Referências downstream | 0 (opportunities/contacts) |
 | Ordem de cleanup | Antes das accounts-base; independente das fixtures ALT oficiais |
+
+## §9 — Fixtures WRITE_TARGET (CHG-025/026/027/028)
+
+Registrados aqui em CHG-029 Fase A antes do cleanup, conforme mandato de reconciliação documental. IDs verificados por `id`+`nome`+`organization_id`+`created_by` no banco.
+
+### Accounts WRITE_TARGET
+| Persona | `id` | `razao_social` | `organization_id` | `created_by` | Estado |
+|---|---|---|---|---|---|
+| Account A Write | `6562ba86-2be7-4c10-b4f7-4d4bd6df290f` | `SECURITY_TEST_ACCOUNT_ORG_A_WRITE_TARGET` | `e1c4881f-0cd4-45fb-bc50-48314ce7bca0` | `58c9eb37-4ae3-4612-bbfd-e873f49b329b` | ATIVA `deleted_at IS NULL` |
+| Account B Write | `42b62d65-f495-4afc-8174-a5ae726c1ef3` | `SECURITY_TEST_ACCOUNT_ORG_B_WRITE_TARGET` | `bea090a6-4c6c-45b1-92e0-83678c687578` | `4ac56488-9128-4ff4-b236-56e1e06e9526` | ATIVA `deleted_at IS NULL` |
+
+### Contacts WRITE_TARGET
+| Persona | `id` | `nome` | `organization_id` | `account_id` | Estado |
+|---|---|---|---|---|---|
+| Contact A Write | `394a41dd-c78d-4ae0-9736-333bcc79761d` | `SECURITY_TEST_CONTACT_ORG_A_WRITE_TARGET` | `e1c4881f-0cd4-45fb-bc50-48314ce7bca0` | `NULL` | ATIVO `deleted_at IS NULL` |
+| Contact B Write | `994be611-df79-4c4f-a79b-ee97e6856b4e` | `SECURITY_TEST_CONTACT_ORG_B_WRITE_TARGET` | `bea090a6-4c6c-45b1-92e0-83678c687578` | `NULL` | ATIVO `deleted_at IS NULL` |
+
+### Opportunities WRITE_TARGET
+| Persona | `id` | `title` | `organization_id` | `pipeline_id` | `stage_id` | Estado |
+|---|---|---|---|---|---|---|
+| Opportunity A Write | `b86abbed-d591-4add-8442-609f2db6e195` | `SECURITY_TEST_OPPORTUNITY_ORG_A_WRITE_TARGET` | `e1c4881f-…-bca0` | `d1f1c882-…` | `18208f58-…` | ATIVA `deleted_at IS NULL` |
+| Opportunity B Write | `750e4dc4-09c0-44ca-abe5-f4a9726e3837` | `SECURITY_TEST_OPPORTUNITY_ORG_B_WRITE_TARGET` | `bea090a6-…-7578` | `0526054f-…` | `7efae798-…` | ATIVA `deleted_at IS NULL` |
+
+Ordem de cleanup: opportunities → contacts (soft-delete via trigger nativo) → accounts (soft-delete via trigger nativo) → stages → pipelines. `account_id` e `contact_id` das opportunities WRITE_TARGET são `NULL` (sem cascata cruzada).
+
+## §10 — Contrato nativo dos triggers de soft-delete (CHG-029 Fase C)
+
+Confirmado por `pg_get_functiondef` em CHG-029:
+- `public.soft_delete_account`, `public.soft_delete_contact`, `public.soft_delete_opportunity` sempre executam `UPDATE ... SET deleted_at = NOW()` + `INSERT entity_snapshots` + `INSERT audit_log` e retornam `NULL` (cancelam o DELETE físico).
+- **Não há branch** que permita DELETE físico de linha já `deleted_at IS NOT NULL`. Um segundo `DELETE` apenas reexecuta o mesmo caminho (novo snapshot, novo audit, `deleted_at` atualizado).
+- Portanto, em CHG-029, accounts/contacts/opportunities sintéticas **serão apenas soft-deletadas**. Remoção física é proibida pelo mandato (`Nunca contornar trigger`).
+
+## §11 — Impacto no tombstone metodológico e organizações
+
+- `organizations → accounts.organization_id` = `NO_ACTION`. O tombstone `620037d8-803c-411a-8969-a99f2850616f` (soft-deletado, Org A, `created_by = 58c9eb37-…`) impede fisicamente a exclusão da Org A.
+- Owner A permanece como `EVIDENCE RETENTION PRINCIPAL` para preservar `created_by` do tombstone e do próprio `audit_log`.
+- Org A → `EVIDENCE RETENTION SHELL`.
+- Org B → contém accounts/contacts/opps soft-deletadas após cleanup (mesmo NO_ACTION); permanece como shell residual, sem membros e sem dados de negócio ativos.
