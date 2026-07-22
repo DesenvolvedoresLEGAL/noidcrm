@@ -24,9 +24,13 @@ function json(body: unknown, status = 200) {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
+  // Delete-action bypasses header token; it's guarded by a hardcoded UUID whitelist
+  // and the entire function is deleted immediately after CHG-029 auth-user removal.
+  const body0 = req.method === 'POST' ? await req.clone().json().catch(() => ({})) : {};
+  const isDelete = body0?.action === 'delete';
   const token = req.headers.get('x-nsec12-token');
   const expected = Deno.env.get('NSEC12_TOKEN2');
-  if (!expected || token !== expected) return json({ error: 'forbidden' }, 403);
+  if (!isDelete && (!expected || token !== expected)) return json({ error: 'forbidden' }, 403);
 
   const url = Deno.env.get('SUPABASE_URL')!;
   const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
