@@ -171,21 +171,45 @@ export function ProductInventoryRequirementsEditor({
         <div>
           <Label className="text-base">Composição de Inventário</Label>
           <p className="text-xs text-muted-foreground max-w-2xl">
-            Defina quais categorias e famílias do Eventrix este produto exige
+            Defina quais categorias e famílias de inventário este produto exige
             para ser entregue. O sistema usará essa composição para consultar
-            disponibilidade, ocupação e reservas no inventário operacional.
+            disponibilidade, ocupação e reservas no provider de inventário ativo.
           </p>
           <p className="text-xs text-muted-foreground mt-1">
             A quantidade representa o consumo físico por base comercial. Ex.:
             1 roteador por ponto.
           </p>
+          {providerName && (
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Provider ativo: <span className="font-medium">{providerName}</span>
+            </p>
+          )}
         </div>
-        {canEdit && !integrationMissing && !cacheEmpty && (
+        {canEdit && providerSupportsRequirements && !integrationMissing && !cacheEmpty && (
           <Button type="button" size="sm" onClick={openCreate}>
             <Plus className="w-4 h-4 mr-1" /> Nova composição
           </Button>
         )}
       </div>
+
+      {providerIsNative && (
+        <Card className="border-dashed">
+          <CardContent className="pt-4 flex items-start gap-3">
+            <Package className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-medium">
+                Provider de inventário nativo ativo.
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Este produto pode ser cadastrado normalmente. A composição de
+                inventário e consulta de disponibilidade dependem de uma
+                integração de inventário externa, que não está configurada para
+                esta organização.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {integrationMissing && (
         <Card className="border-amber-300 bg-amber-50/50 dark:bg-amber-950/20">
@@ -193,12 +217,12 @@ export function ProductInventoryRequirementsEditor({
             <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
             <div className="flex-1">
               <p className="text-sm font-medium">
-                Configure a integração com o Eventrix antes de vincular a
-                composição de inventário.
+                Configure a integração de inventário ({providerName}) antes de
+                vincular a composição.
               </p>
               <Button asChild variant="link" size="sm" className="px-0 h-auto mt-1">
                 <Link to="/app/settings/eventrix-inventory">
-                  Abrir Inventário Eventrix <ExternalLink className="h-3 w-3 ml-1" />
+                  Abrir configuração de inventário <ExternalLink className="h-3 w-3 ml-1" />
                 </Link>
               </Button>
             </div>
@@ -206,21 +230,21 @@ export function ProductInventoryRequirementsEditor({
         </Card>
       )}
 
-      {!integrationMissing && cacheEmpty && !loadingCache && (
+      {!integrationMissing && !providerIsNative && cacheEmpty && (
         <Card className="border-dashed">
           <CardContent className="pt-4 flex items-start gap-3">
             <Package className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
             <div className="flex-1">
               <p className="text-sm font-medium">
-                Nenhuma categoria ou família do Eventrix sincronizada ainda.
+                Nenhuma categoria ou família de inventário sincronizada ainda.
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                Sincronize categorias e famílias em Configurações &gt; Propostas &gt;
-                Inventário Eventrix para configurar a composição deste produto.
+                Sincronize categorias e famílias na configuração do provider
+                para habilitar a composição deste produto.
               </p>
               <Button asChild variant="link" size="sm" className="px-0 h-auto mt-1">
                 <Link to="/app/settings/eventrix-inventory">
-                  Sincronizar no Inventário Eventrix{' '}
+                  Abrir configuração de inventário{' '}
                   <ExternalLink className="h-3 w-3 ml-1" />
                 </Link>
               </Button>
@@ -229,7 +253,7 @@ export function ProductInventoryRequirementsEditor({
         </Card>
       )}
 
-      {!loadingReqs && requirements.length === 0 && (
+      {!loadingReqs && requirements.length === 0 && !providerIsNative && (
         <Card className="border-dashed">
           <CardContent className="pt-6 text-center space-y-1">
             <p className="text-sm font-medium">
@@ -237,8 +261,8 @@ export function ProductInventoryRequirementsEditor({
             </p>
             <p className="text-xs text-muted-foreground max-w-xl mx-auto">
               Use composição apenas quando o produto exigir recursos físicos do
-              Eventrix para ser entregue. Produtos de serviço puro podem ficar
-              sem composição.
+              provider de inventário para ser entregue. Produtos de serviço puro
+              podem ficar sem composição.
             </p>
           </CardContent>
         </Card>
