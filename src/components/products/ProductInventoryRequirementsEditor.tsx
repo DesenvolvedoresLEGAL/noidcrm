@@ -402,16 +402,8 @@ export function ProductInventoryRequirementsEditor({
 interface DialogProps {
   open: boolean;
   onOpenChange: (o: boolean) => void;
-  categories: Array<{
-    eventrix_entity_id: string;
-    name: string;
-  }>;
-  families: Array<{
-    eventrix_entity_id: string;
-    name: string;
-    parent_eventrix_entity_id: string | null;
-    item_kind: string | null;
-  }>;
+  categories: InventoryCategory[];
+  families: InventoryFamily[];
   initial: ProductInventoryRequirement | null;
   onSubmit: (values: ProductInventoryRequirementInput) => void | Promise<void>;
   submitting: boolean;
@@ -462,12 +454,10 @@ function RequirementDialog({
   const categoryId = form.watch('eventrix_category_id');
   const quantity = form.watch('quantity');
   const unitBasis = form.watch('unit_basis');
-  const filteredFamilies = families.filter(
-    (f) => f.parent_eventrix_entity_id === categoryId,
-  );
+  const filteredFamilies = families.filter((f) => f.categoryId === categoryId);
 
   const onCategoryChange = (id: string) => {
-    const cat = categories.find((c) => c.eventrix_entity_id === id);
+    const cat = categories.find((c) => c.id === id);
     form.setValue('eventrix_category_id', id);
     form.setValue('eventrix_category_name', cat?.name ?? '');
     form.setValue('eventrix_family_id', '');
@@ -476,10 +466,10 @@ function RequirementDialog({
   };
 
   const onFamilyChange = (id: string) => {
-    const fam = filteredFamilies.find((f) => f.eventrix_entity_id === id);
+    const fam = filteredFamilies.find((f) => f.id === id);
     form.setValue('eventrix_family_id', id);
     form.setValue('eventrix_family_name', fam?.name ?? '');
-    form.setValue('eventrix_item_kind', fam?.item_kind ?? null);
+    form.setValue('eventrix_item_kind', fam?.itemKind ?? null);
   };
 
   return (
