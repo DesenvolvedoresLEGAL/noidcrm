@@ -1,0 +1,42 @@
+capability,module,configurable_by_tenant,admin_ui_available,database_access_required,versioned,audited,rollback_available,pack_ready,tenant_override_supported,legal_hardcode_present,maturity_level,evidence,recommended_next_step
+tenant_identity,Organization Settings,yes,yes,no,no,no,no,no,yes,no,3,src/pages/settings/OrganizationSettings.tsx,Add versioning
+pipelines,Pipeline Settings,yes,yes,no,no,partial,no,no,yes,no,3,src/pages/PipelineSettings.tsx,Pack seeds + versioning
+stages,Pipeline Settings,yes,yes,no,no,partial,no,no,yes,no,3,src/pages/PipelineSettings.tsx,Pack seeds
+stage_probabilities,Pipeline Settings,yes,yes,no,no,no,no,no,yes,no,2,src/pages/PipelineSettings.tsx,Auditoria
+slas,Sales Config,yes,yes,no,no,no,no,no,yes,no,2,src/pages/settings/SalesConfigPage.tsx,Auditoria + versioning
+custom_forms,Custom Forms,yes,yes,no,no,yes (system_events),no,no,yes,no,3,src/pages/settings/CustomForms.tsx,Rollback
+custom_fields,Custom Fields,yes,yes,no,no,partial,no,no,yes,no,3,src/pages/settings/CustomFields.tsx,Pack seeds
+qualification_framework,Qualification,yes,yes,no,yes (qualification_framework_audit_log),yes,no,partial,yes,no,3,src/pages/settings/QualificationFrameworkPage.tsx,Pack templates
+handoff_rules,Automation,yes,yes,no,no,yes,no,no,yes,no,3,src/pages/AutomationAndSequences.tsx,Pack seeds
+products,Product Settings,yes,yes,no,no,partial (product_price_history),no,no,yes,no,2,src/pages/settings/ProductSettings.tsx,Desacoplar Eventrix
+product_categories,Product Categories,yes,yes,no,no,no,no,no,yes,no,3,src/pages/settings/ProductCategories.tsx,Pack seeds
+measurement_units,DB,yes,partial,partial,no,no,no,no,yes,no,2,measurement_units table,Admin UI
+pricing_rules,Pricing Factor Rules,yes,yes,no,no,partial (proposal_dynamic_pricing_events),no,no,yes,no,3,src/services/proposals/proposalPricingGuard.ts,Pack templates
+proposal_templates,Proposal Templates,yes,yes,no,no,partial,no,no,yes,no,3,src/pages/settings/ProposalTemplateEditor.tsx,Pack templates + versioning formal
+proposal_layouts,Proposal Layouts,yes,yes,no,no,no,no,no,yes,no,2,src/pages/settings/ProposalLayouts.tsx,Versioning
+loss_reasons,Loss Reasons,yes,yes,no,no,no,no,no,yes,no,3,src/pages/settings/LossReasons.tsx,Pack seeds
+win_reasons,Win/Loss Reasons,yes,yes,no,no,no,no,no,yes,no,3,src/pages/,Pack seeds
+goals,Sales Config,yes,yes,no,no,no,no,no,yes,no,3,src/pages/settings/SalesConfigPage.tsx,History table
+ote_config,Seller Targets,yes,yes,no,partial,partial,no,no,yes,no,3,src/pages/settings/SellerTargetsPage.tsx,Full versioning
+roles,Permissions,yes,yes,no,no,yes (audit_log),no,partial,yes,no,3,src/pages/settings/PermissionSettings.tsx,Pack default sets
+permissions,Permissions,yes,yes,no,no,yes,no,partial,yes,no,3,permission_sets table,
+dashboards,Dynamic Dashboard,yes,partial,no,no,partial (crm_dynamic_dashboard_*),no,no,yes,no,3,src/pages/DynamicDashboardPage.tsx,Admin UI completo
+reports,Reports,partial,partial,no,no,no,no,no,partial,no,2,src/pages/Reports.tsx,Report packs
+academy_content,Roleplay,partial,yes,no,no,no,no,partial,yes,no,2,src/services/roleplay/,Pack seeds; archetypes travados em vertical eventos
+roleplay_archetypes,Roleplay,no,partial,no,no,no,no,no,no,yes,1,src/services/roleplay/archetypes.ts:6,Extrair enum literal para lookup pack-seeded
+ai_prompts,Noid Intelligence,yes,yes,no,yes (ai_agent_versions),yes (ai_agent_audit),yes (ai_agent_publish_history),partial,yes,no,4,src/services/ai-agents/,MODELO REFERÊNCIA de maturidade
+ai_knowledge,Noid Intelligence,yes,yes,no,partial,yes,no,partial,yes,no,3,src/pages/settings/noid-intelligence/,
+automations,Automation Rules,yes,yes,no,no,yes (automation_logs),no,no,yes,no,3,workflow_rules table,Pack seeds
+sequences,Sequences,yes,yes,no,no,yes,no,no,yes,no,3,src/pages/Sequences.tsx,Pack seeds
+feature_flags,DB + Admin,yes,partial,partial,no,no,no,partial,yes,no,3,feature_flags + organization_feature_flags,Admin UI unificado
+integrations,Integrations,yes,yes,no,no,partial,no,no,yes,no,3,src/pages/settings/Integrations.tsx,Provider registry
+inventory_provider,Eventrix Inventory Settings,partial (só Eventrix),yes,no,no,partial,no,no,no,yes (via naming),1,src/pages/settings/EventrixInventorySettings.tsx,Renomear + adapter genérico
+inventory_equipment_schema,Inventory,no,no,no,no,no,no,no,no,yes,0,src/lib/operations/inventoryEquipmentProfile.ts,Extrair para pack Conectividade
+notifications_settings,Notification Preferences,yes,yes,no,no,partial,no,no,yes,no,3,src/pages/settings/NotificationPreferences.tsx,
+email_templates,Email Templates,yes,yes,no,no,no,no,no,yes,no,3,src/pages/EmailTemplates.tsx,Pack seeds
+smtp_custom,User SMTP,yes,yes,no,no,no,no,no,yes,no,3,src/pages/,
+industries,Industries,yes,yes,no,no,no,no,no,yes,no,3,src/pages/settings/Industries.tsx,Pack seeds
+origins,Origins,yes,yes,no,no,no,no,no,yes,no,3,src/pages/settings/Origins.tsx,Pack seeds
+tags,Tags,yes,yes,no,no,no,no,no,yes,no,3,src/pages/,
+business_units,Business Units,yes,yes,no,no,no,no,no,yes,no,3,src/pages/settings/BusinessUnits.tsx,
+territories,Territories,yes,yes,no,no,no,no,no,yes,no,3,src/pages/,
