@@ -480,7 +480,7 @@ function RequirementDialog({
             {initial ? 'Editar composição' : 'Nova composição'}
           </DialogTitle>
           <DialogDescription>
-            Vincule uma categoria e família do Eventrix a este produto.
+            Vincule uma categoria e família do provider a este produto.
           </DialogDescription>
         </DialogHeader>
 
@@ -504,7 +504,7 @@ function RequirementDialog({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <Label>Categoria Eventrix *</Label>
+              <Label>Categoria de inventário *</Label>
               <Select value={categoryId} onValueChange={onCategoryChange}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione…" />
@@ -512,8 +512,8 @@ function RequirementDialog({
                 <SelectContent>
                   {categories.map((c) => (
                     <SelectItem
-                      key={c.eventrix_entity_id}
-                      value={c.eventrix_entity_id}
+                      key={c.id}
+                      value={c.id}
                     >
                       {c.name}
                     </SelectItem>
@@ -527,7 +527,7 @@ function RequirementDialog({
               )}
             </div>
             <div>
-              <Label>Família Eventrix *</Label>
+              <Label>Família de inventário *</Label>
               <Select
                 value={form.watch('eventrix_family_id')}
                 onValueChange={onFamilyChange}
@@ -544,8 +544,8 @@ function RequirementDialog({
                   ) : (
                     filteredFamilies.map((f) => (
                       <SelectItem
-                        key={f.eventrix_entity_id}
-                        value={f.eventrix_entity_id}
+                        key={f.id}
+                        value={f.id}
                       >
                         {f.name}
                       </SelectItem>
