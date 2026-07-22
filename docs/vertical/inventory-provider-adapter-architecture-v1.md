@@ -68,17 +68,23 @@ O native NUNCA declara `availability` ou `items` — evita inventário fictício
 - `get(type)` retorna `null` para tipos desconhecidos (não cai silenciosamente para Eventrix).
 - Registro duplicado lança erro.
 
-## 7. Regra transitória de resolução
+## 7. Regra de resolução (atualizada em VERT-01.2B)
+
+Precedência oficial:
 
 ```
-if (eventrix_inventory_integration_settings.is_enabled === true)  → eventrix
-else                                                               → native
+1. inventory_provider_settings (canonical, tenant-aware)  → source=canonical_provider_settings
+2. eventrix_inventory_integration_settings.is_enabled=true → source=legacy_eventrix_settings  (fallback transitório)
+3. Native default                                          → source=native_default
 ```
 
-- Falha ao consultar settings → fallback `native` com status `available` e detail do erro.
-- Eventrix ativo com `status='error'` → adapter Eventrix é escolhido mas retorna status `error` normalizado.
+Dual-write: ativar/desativar Eventrix pela UI legada sincroniza a row canônica automaticamente (`selection_source='legacy_eventrix_settings'`).
+
+- `provider_type` canônico desconhecido → native com status `error` (nunca cai silenciosamente para Eventrix).
+- Falha ao consultar canonical + legado ativo → usa legado durante a janela de transição.
 - Nenhum organization_id, slug, domínio, nome ou UUID da LEGAL é hardcoded.
-- A regra definitiva (tabela `inventory_provider_settings` própria) fica para VERT-01.2B.
+- Detalhes completos em `inventory-provider-settings-foundation-v1.md`.
+
 
 ## 8. Compatibilidade legada
 
