@@ -115,7 +115,7 @@ da D-B terão a base para retornar `status: 'unsupported'` sem inventar demanda.
 
 ## 9. Testes novos (Fase N — subset D-A)
 
-Arquivo: `src/inventory/demand/__tests__/foundation.test.ts` (10 casos).
+Arquivo: `src/inventory/demand/__tests__/foundation.test.ts` (12 casos — reconciliado na D-B).
 
 1. Requisito Eventrix legado é normalizado para referência genérica.
 2. Category id/nome preservados.
