@@ -6,6 +6,7 @@ import type {
   EventrixInventorySettingsInput,
   EventrixInventoryStatus,
 } from '@/schemas/eventrixInventorySettings';
+import { upsertInventoryProviderSettings } from '@/inventory/hooks/useInventoryProviderSettings';
 
 export interface EventrixInventorySettings {
   id: string;
