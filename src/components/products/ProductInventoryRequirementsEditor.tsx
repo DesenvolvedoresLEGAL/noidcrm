@@ -221,7 +221,7 @@ export function ProductInventoryRequirementsEditor({
                 vincular a composição.
               </p>
               <Button asChild variant="link" size="sm" className="px-0 h-auto mt-1">
-                <Link to="/app/settings/eventrix-inventory">
+                <Link to="/app/settings/inventory-provider?provider=eventrix">
                   Abrir configuração de inventário <ExternalLink className="h-3 w-3 ml-1" />
                 </Link>
               </Button>
@@ -243,7 +243,7 @@ export function ProductInventoryRequirementsEditor({
                 para habilitar a composição deste produto.
               </p>
               <Button asChild variant="link" size="sm" className="px-0 h-auto mt-1">
-                <Link to="/app/settings/eventrix-inventory">
+                <Link to="/app/settings/inventory-provider?provider=eventrix">
                   Abrir configuração de inventário{' '}
                   <ExternalLink className="h-3 w-3 ml-1" />
                 </Link>
