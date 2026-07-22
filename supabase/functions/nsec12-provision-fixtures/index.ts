@@ -76,7 +76,10 @@ Deno.serve(async (req) => {
       '13668a50-d30a-4346-993b-521a67a6d616','56eed1b0-542a-43b0-a01c-28a83371854f',
       'ea6ca3ef-e18a-43dc-aaca-5da10a581331','c8a897f4-48c1-4823-a75b-d7f35cb284cc',
     ];
-    const RETAIN_IDS = new Set(['58c9eb37-4ae3-4612-bbfd-e873f49b329b']);
+    const RETAIN_IDS = new Set([
+      '58c9eb37-4ae3-4612-bbfd-e873f49b329b', // Owner A — tombstone 620037d8 created_by
+      '4ac56488-9128-4ff4-b236-56e1e06e9526', // Owner B — created_by of soft-deleted Account B fixtures (audit evidence)
+    ]);
     const results: Array<Record<string, unknown>> = [];
     for (const id of WHITELIST_IDS) {
       if (RETAIN_IDS.has(id)) { results.push({ id, action: 'retained_evidence_principal' }); continue; }
