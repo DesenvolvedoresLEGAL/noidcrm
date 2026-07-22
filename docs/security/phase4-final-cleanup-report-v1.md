@@ -125,3 +125,14 @@ de regressão restrito à observação de contadores.
 `NSEC-1.2-CHG-029 EXECUTED` — cleanup concluído com evidência
 retida conforme mandato. Emissão de GO NSEC-1.2 pendente de nova
 autorização explícita.
+
+---
+
+## 12. Referência documental — NSEC-1.2-CHG-030
+
+- **GO emitido:** `SECURITY GO CONDICIONAL — PROJETO ÚNICO`
+- **Artefato principal:** [`security-go-conditional-single-project-v1.md`](./security-go-conditional-single-project-v1.md)
+- **Backlog pós-GO:** [`post-go-hardening-backlog-v1.md`](./post-go-hardening-backlog-v1.md)
+- **Nenhuma mudança adicional foi executada nesta referência** (CHG-030
+  é exclusivamente documental / read-only). Resultados históricos das
+  Fases A–J acima permanecem inalterados.

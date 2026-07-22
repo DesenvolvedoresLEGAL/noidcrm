@@ -420,3 +420,46 @@ Policy única `nsec12_opportunities_insert_account_contact_match_guard`:
 - Matriz completa por papel + UPDATE/DELETE activities/proposals: **backlog pós-GO**.
 - Ferramentas temporárias (2 RPCs + edge `nsec12-canary-027`): **removidas**.
 - Próxima etapa: cleanup geral das fixtures sintéticas.
+
+---
+
+## NSEC-1.2-CHG-030 — SECURITY GO CONDICIONAL
+
+**Decisão:** `SECURITY GO CONDICIONAL — PROJETO ÚNICO`
+**Data (UTC):** 2026-07-22
+**Classificação:** GREEN (documental / read-only)
+
+### Escopo homologado
+Accounts, Contacts, Opportunities (SELECT/INSERT/UPDATE/DELETE +
+integridade tenant + matriz por papel), Activities INSERT smoke,
+Proposals INSERT smoke, Storage `opportunity-files`.
+
+### Cleanup consolidado
+Zero fixture sintética ativa. RPCs, Edge Functions e secrets
+`nsec12/NSEC12_*` removidos. 10 policies RESTRICTIVE permanentes
+preservadas. Tombstone metodológico intacto.
+
+### Evidence retention
+Owner A + Owner B (auth users, sem memberships/roles/uso operacional),
+2 organizações shell, 2 pipelines shell, 2 stages shell,
+accounts/contacts/opportunities sintéticas soft-deleted,
+`audit_log`/`entity_snapshot` relacionados, migrations históricas.
+
+### Riscos residuais
+SEC-001, SEC-002 (HIGH / OPEN); SEC-004, SEC-008, SEC-009
+(MEDIUM / OPEN); SEC-005 (CRITICAL / BLOCKED); SEC-006, SEC-007
+(HIGH / BLOCKED). Detalhamento e ação em
+[`post-go-hardening-backlog-v1.md`](./post-go-hardening-backlog-v1.md).
+
+### Guardrails
+GREEN / YELLOW / RED definidos em
+[`security-go-conditional-single-project-v1.md`](./security-go-conditional-single-project-v1.md)
+§14. Invalidação automática do GO em §19.
+
+### Artefatos vinculados
+- [`security-go-conditional-single-project-v1.md`](./security-go-conditional-single-project-v1.md)
+- [`post-go-hardening-backlog-v1.md`](./post-go-hardening-backlog-v1.md)
+
+### Encerramento
+Programa **NOID-SECURITY 1.2 formalmente encerrado** na CHG-030.
+Continuidade autorizada sob os guardrails registrados.
