@@ -120,3 +120,92 @@ Confirmado: zero mutação em accounts/contacts/opportunities/activities/proposa
 ## 14. Decisão
 
 **`FINAL RESIDUAL SMOKE BLOCKED`** — SEC-023 e SEC-024 confirmadas. Cleanup das ferramentas suspenso para permitir reprobe pós-remediação (autorização separada exigida).
+
+---
+
+## NSEC-1.2-CHG-028 — Remediação SEC-023 / SEC-024
+
+**Data:** 2026-07-22
+**Classe:** AMARELA controlada
+**Status:** `NSEC-1.2-CHG-028 VALIDATED — FINAL RESIDUAL SMOKE HOMOLOGADO`
+
+### Pre-flight
+- RLS ativa em `public.activities` e `public.proposals`.
+- Baseline: activities=4 policies, proposals=4 policies. Nenhuma validava tenant da opportunity vinculada.
+- `activities.opportunity_id` nullable; `proposals.opportunity_id` NOT NULL.
+- Fixtures Opportunity Write A/B intactas, status `new`, títulos originais preservados.
+- RPCs `nsec12_probe_activity_insert_smoke` e `nsec12_probe_proposal_insert_smoke` ativas, SECURITY INVOKER.
+- Edge Function `nsec12-canary-027` preservada com whitelist Owner A/B hardcoded.
+- Baseline pré: 0 activities CHG027 / 0 proposals CHG027.
+
+### Policies criadas (RESTRICTIVE, FOR INSERT, TO authenticated, WITH CHECK)
+
+`nsec12_activities_insert_opportunity_tenant_guard`
+```sql
+WITH CHECK (
+  opportunity_id IS NULL
+  OR EXISTS (
+    SELECT 1 FROM public.opportunities o
+    WHERE o.id = activities.opportunity_id
+      AND o.organization_id = activities.organization_id
+  )
+)
+```
+
+`nsec12_proposals_insert_opportunity_tenant_guard`
+```sql
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM public.opportunities o
+    WHERE o.id = proposals.opportunity_id
+      AND o.organization_id = proposals.organization_id
+  )
+)
+```
+
+### Rollback documentado
+```sql
+DROP POLICY IF EXISTS nsec12_activities_insert_opportunity_tenant_guard ON public.activities;
+DROP POLICY IF EXISTS nsec12_proposals_insert_opportunity_tenant_guard ON public.proposals;
+```
+
+### Reprobes (8/8 conforme esperado)
+
+| Probe | Cenário | Esperado | Obtido |
+|---|---|---|---|
+| A1 | Owner A / Org A / Opp A | ALLOWED_ROLLED_BACK | ✅ ALLOWED_ROLLED_BACK |
+| A2 | Owner B / Org B / Opp B | ALLOWED_ROLLED_BACK | ✅ ALLOWED_ROLLED_BACK |
+| A3 | Owner A / Org A / Opp B | BLOCKED | ✅ BLOCKED_RLS |
+| A4 | Owner B / Org B / Opp A | BLOCKED | ✅ BLOCKED_RLS |
+| P1 | Owner A / Org A / Opp A | ALLOWED_ROLLED_BACK | ✅ ALLOWED_ROLLED_BACK |
+| P2 | Owner B / Org B / Opp B | ALLOWED_ROLLED_BACK | ✅ ALLOWED_ROLLED_BACK |
+| P3 | Owner A / Org A / Opp B | BLOCKED | ✅ BLOCKED_RLS |
+| P4 | Owner B / Org B / Opp A | BLOCKED | ✅ BLOCKED_RLS |
+
+### Storage
+Não reexecutado. PASS da CHG-027 (S1/S2/S3/S4) preservado.
+
+### Baseline pós
+- activities CHG027 = 0
+- proposals CHG027 = 0
+- Opportunities Write A/B: `status='new'`, títulos originais, `organization_id` inalterado.
+- Zero dado real alterado. Zero egress externo.
+
+### Cleanup
+- `nsec12_probe_activity_insert_smoke` — DROP concluído (pg_proc = 0).
+- `nsec12_probe_proposal_insert_smoke` — DROP concluído (pg_proc = 0).
+- Edge Function `nsec12-canary-027` — deploy removido + código local removido.
+- Policies novas ativas. `nsec12-provision-fixtures` preservada.
+
+### Findings
+- **SEC-023 — RESOLVED** via `nsec12_activities_insert_opportunity_tenant_guard`.
+- **SEC-024 — RESOLVED** via `nsec12_proposals_insert_opportunity_tenant_guard`.
+
+### Riscos residuais (backlog pós-GO)
+- Matriz completa por papel (manager/sales/viewer/cs) para activities e proposals INSERT.
+- UPDATE/DELETE em activities e proposals.
+- Fluxos comerciais completos (PDF, envio, assinatura, aceite, cobrança, link público).
+- Bucket `proposal-pdfs` privatização (staged, não aplicada).
+
+### Decisão
+`NSEC-1.2-CHG-028 VALIDATED — FINAL RESIDUAL SMOKE HOMOLOGADO`
