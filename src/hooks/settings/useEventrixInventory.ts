@@ -6,6 +6,7 @@ import type {
   EventrixInventorySettingsInput,
   EventrixInventoryStatus,
 } from '@/schemas/eventrixInventorySettings';
+import { upsertInventoryProviderSettings } from '@/inventory/hooks/useInventoryProviderSettings';
 
 export interface EventrixInventorySettings {
   id: string;
@@ -118,13 +119,37 @@ export function useUpsertEventrixInventorySettings() {
         .select('*')
         .single();
       if (error) throw error;
+
+      // Dual-write: NOID-VERTICAL-1.0-VERT-01.2B
+      // Keep canonical inventory_provider_settings in sync while legacy UI
+      // remains the entry point for Eventrix activation/deactivation.
+      try {
+        await upsertInventoryProviderSettings({
+          organizationId: orgId,
+          userId: user?.id ?? null,
+          input: {
+            provider_type: input.is_enabled ? 'eventrix' : 'native',
+            is_enabled: true,
+            selection_source: 'legacy_eventrix_settings',
+          },
+        });
+      } catch (canonicalErr) {
+        // Do NOT swallow: surface the divergence to the caller.
+        throw new Error(
+          `Configuração Eventrix salva, mas falha ao sincronizar seleção canônica: ${(canonicalErr as Error).message}`,
+        );
+      }
+
       return data as EventrixInventorySettings;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['eventrix-inv-settings', orgId] });
+      qc.invalidateQueries({ queryKey: ['inventory-provider-settings', orgId] });
+      qc.invalidateQueries({ queryKey: ['inventory-provider', orgId] });
     },
   });
 }
+
 
 // Local-only connection test: no external call.
 export function useTestEventrixInventoryConnection() {
