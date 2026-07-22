@@ -139,45 +139,7 @@ Deno.serve(async (req) => {
     record('P4', 'BLOCKED',
       await callRpc(url, anonKey, jwtB, 'nsec12_probe_proposal_insert_smoke', propArgs(ORG_B, OPP_A, 'P4')));
 
-    // ---------------- STORAGE ----------------
-    const content = 'SECURITY_TEST_STORAGE_CHG027';
-    const pathA = `${ORG_A}/SECURITY_TEST_STORAGE_CHG027_A.txt`;
-    const pathB = `${ORG_B}/SECURITY_TEST_STORAGE_CHG027_B.txt`;
-
-    // S1: Owner A own-tenant full round trip
-    const s1w = await storageWrite(url, anonKey, jwtA, pathA, content);
-    const s1r = await storageRead(url, anonKey, jwtA, pathA);
-    const s1d = await storageDelete(url, anonKey, jwtA, pathA);
-    const s1r2 = await storageRead(url, anonKey, jwtA, pathA);
-    results.push({
-      probe: 'S1', expected: 'ALLOWED_AND_CLEANED',
-      http_write: s1w.http, http_read: s1r.http, http_delete: s1d.http, http_read_after: s1r2.http,
-      body_read_after: s1r2.body,
-    });
-
-    // S2: Owner B own-tenant
-    const s2w = await storageWrite(url, anonKey, jwtB, pathB, content);
-    const s2r = await storageRead(url, anonKey, jwtB, pathB);
-    const s2d = await storageDelete(url, anonKey, jwtB, pathB);
-    const s2r2 = await storageRead(url, anonKey, jwtB, pathB);
-    results.push({
-      probe: 'S2', expected: 'ALLOWED_AND_CLEANED',
-      http_write: s2w.http, http_read: s2r.http, http_delete: s2d.http, http_read_after: s2r2.http,
-      body_read_after: s2r2.body,
-    });
-
-    // S3: Owner A tries to write in Org B path
-    const s3 = await storageWrite(url, anonKey, jwtA, pathB, content);
-    results.push({ probe: 'S3', expected: 'BLOCKED_RLS', http: s3.http, body: s3.body });
-
-    // S4: Owner B tries to write in Org A path
-    const s4 = await storageWrite(url, anonKey, jwtB, pathA, content);
-    results.push({ probe: 'S4', expected: 'BLOCKED_RLS', http: s4.http, body: s4.body });
-
-    // Defensive cleanup of any residual cross-tenant object created by S3/S4
-    // (shouldn't exist if BLOCKED; safe if it does)
-    await admin.storage.from(BUCKET).remove([pathA, pathB]);
-
+    // ---------------- STORAGE SKIPPED (CHG-028: reprobe only activities/proposals) ----------------
     return j({ ok: true, results });
   } catch (e) {
     return j({ ok: false, error: String((e as Error)?.message || e), results }, 500);
