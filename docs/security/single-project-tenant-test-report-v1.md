@@ -410,3 +410,13 @@ Policy única `nsec12_opportunities_insert_account_contact_match_guard`:
 - 2 627 opportunities totais, 0 títulos `SECURITY_TEST_OPPORTUNITY_MATCH_CANARY_%` (idêntico pré/pós).
 - 4 accounts oficiais + 4 contacts oficiais intactos; account órfã duplicada e contact órfão intactos.
 - Triggers intactos. Zero dado real alterado. Zero egress externo.
+
+## NSEC-1.2-CHG-028 (2026-07-22)
+- Activities INSERT smoke: **HOMOLOGADO** (A1/A2 ALLOWED_ROLLED_BACK; A3/A4 BLOCKED_RLS).
+- Proposals INSERT smoke: **HOMOLOGADO** (P1/P2 ALLOWED_ROLLED_BACK; P3/P4 BLOCKED_RLS).
+- Storage `opportunity-files`: **PASS** preservado (evidência CHG-027).
+- SEC-023: **RESOLVED** — policy `nsec12_activities_insert_opportunity_tenant_guard`.
+- SEC-024: **RESOLVED** — policy `nsec12_proposals_insert_opportunity_tenant_guard`.
+- Matriz completa por papel + UPDATE/DELETE activities/proposals: **backlog pós-GO**.
+- Ferramentas temporárias (2 RPCs + edge `nsec12-canary-027`): **removidas**.
+- Próxima etapa: cleanup geral das fixtures sintéticas.
