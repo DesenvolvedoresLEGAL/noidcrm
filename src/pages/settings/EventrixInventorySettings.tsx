@@ -185,13 +185,14 @@ function itemKindLabel(kind: string | null): string {
   return '—';
 }
 
-export default function EventrixInventorySettings() {
-  const { isOwner, isAdmin, orgRole, loading } = usePermissions();
+// NOID-VERTICAL-1.0-VERT-01.2C
+// Painel específico Eventrix reutilizável pela nova página genérica de
+// Provider de Inventário. Contém apenas o corpo (sem Layout/PageHeader).
+export function EventrixInventoryProviderPanel() {
+  const { isOwner, isAdmin, orgRole } = usePermissions();
 
   const canWrite =
     isOwner || isAdmin || orgRole === 'operations' || orgRole === 'operacional';
-  const canRead =
-    canWrite || orgRole === 'commercial_manager' || orgRole === 'sales_manager';
 
   const settingsQuery = useEventrixInventorySettings();
   const categoriesQuery = useEventrixInventorySyncCache('category');
@@ -219,19 +220,6 @@ export default function EventrixInventorySettings() {
       });
     }
   }, [settingsQuery.data]);
-
-  if (loading) return null;
-
-  if (!canRead) {
-    return (
-      <Layout pageTitle="Inventário Eventrix">
-        <AccessDenied
-          title="Acesso restrito"
-          description="Esta configuração é reservada aos perfis Owner, Admin, Operacional e Gestores Comerciais."
-        />
-      </Layout>
-    );
-  }
 
   const status: EventrixInventoryStatus =
     settingsQuery.data?.status ?? 'not_configured';
@@ -292,17 +280,7 @@ export default function EventrixInventorySettings() {
   };
 
   return (
-    <Layout pageTitle="Inventário Eventrix">
-      <PageContainer>
-        <PageHeader
-          icon={Boxes}
-          title="Inventário conectado ao Eventrix"
-          subtitle="O Eventrix será a fonte oficial do inventário físico. O NOID consumirá essas informações para propostas, disponibilidade e tabela dinâmica."
-          badge={{ label: 'Eventrix master', icon: ShieldCheck }}
-          variant="teal"
-        />
-
-        <div className="space-y-6">
+    <div className="space-y-6">
           {/* Bloco 1 — Configuração da conexão */}
           <Card>
             <CardHeader>
