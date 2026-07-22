@@ -33,10 +33,18 @@ interface EventrixCacheRow {
   synced_at: string | null;
 }
 
+// NOID-VERTICAL-1.0-VERT-01.2D-A
+// `proposal_demand` é declarado porque o cálculo de demanda de
+// propostas depende apenas de referências (categoria/família) que
+// já estão modeladas nos requisitos do produto — nenhum call
+// externo adicional é necessário. A lógica comercial permanece no
+// domínio genérico (`src/inventory/demand`) e NÃO é movida para
+// dentro do adapter nesta fase.
 const CAPS: InventoryProviderCapability[] = [
   'categories',
   'families',
   'product_requirements',
+  'proposal_demand',
 ];
 
 export interface EventrixProviderDeps {
