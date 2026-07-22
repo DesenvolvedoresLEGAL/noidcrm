@@ -116,3 +116,17 @@ User → /app/settings/eventrix-inventory
 - **VIOLAÇÃO-03** (MEDIUM): lógica de inventory demand em propostas depende do provider Eventrix sem adapter genérico.
 
 Todas endereçáveis no VERT-01.2/01.3 sem quebra de compatibilidade.
+
+---
+
+## Update — Sprint VERT-01.2A (2026-07-22)
+
+Adapter `InventoryProviderAdapter` criado. Consumidor migrado:
+`src/components/products/ProductInventoryRequirementsEditor.tsx`.
+
+Novo pipeline:
+`Component → useInventoryProvider → resolveInventoryProvider → EventrixInventoryProvider | NativeInventoryProvider`.
+
+Eventrix classificado como `OPTIONAL_INTEGRATION` no runtime — Core não conhece mais detalhes de schema Eventrix. Dependências remanescentes (proposals demand, settings page, BOM editor) preservadas para VERT-01.2B.
+
+Ver `docs/vertical/inventory-provider-adapter-architecture-v1.md`.

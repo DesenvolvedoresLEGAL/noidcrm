@@ -1,8 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import {
   Plus,
   Pencil,
@@ -58,32 +56,21 @@ import {
 import {
   useCreateProductInventoryRequirement,
   useDeactivateProductInventoryRequirement,
-  useEventrixInventoryCache,
   useProductInventoryRequirements,
   useUpdateProductInventoryRequirement,
   type ProductInventoryRequirement,
 } from '@/hooks/products/useProductInventoryRequirements';
+import {
+  useInventoryProvider,
+  useInventoryCategories,
+  useInventoryFamilies,
+} from '@/inventory/hooks/useInventoryProvider';
+import type { InventoryCategory, InventoryFamily } from '@/inventory/providers/types';
 
 interface Props {
   organizationId: string;
   productId: string;
   canEdit: boolean;
-}
-
-function useEventrixIntegrationStatus(organizationId?: string | null) {
-  return useQuery({
-    queryKey: ['eventrix-inventory-settings', organizationId],
-    enabled: !!organizationId,
-    queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from('eventrix_inventory_integration_settings')
-        .select('id,status,is_enabled')
-        .eq('organization_id', organizationId)
-        .maybeSingle();
-      if (error) throw error;
-      return data as { id: string; status: string; is_enabled: boolean } | null;
-    },
-  });
 }
 
 const previewBasisText = (input: {
@@ -115,20 +102,26 @@ export function ProductInventoryRequirementsEditor({
   canEdit,
 }: Props) {
   const { toast } = useToast();
-  const { data: integration } = useEventrixIntegrationStatus(organizationId);
-  const { data: cache = [], isLoading: loadingCache } =
-    useEventrixInventoryCache(organizationId);
+
+  // NOID-VERTICAL-1.0-VERT-01.2A — consumo via provider adapter genérico.
+  const {
+    provider,
+    providerType,
+    providerName,
+    status: providerStatus,
+    isLoading: loadingProvider,
+  } = useInventoryProvider(organizationId);
+
+  const providerSupportsRequirements =
+    !!provider && provider.hasCapability('product_requirements');
+
+  const { data: categories = [], isLoading: loadingCategories } =
+    useInventoryCategories(providerSupportsRequirements ? organizationId : null);
+  const { data: families = [], isLoading: loadingFamilies } =
+    useInventoryFamilies(providerSupportsRequirements ? organizationId : null);
+
   const { data: requirements = [], isLoading: loadingReqs } =
     useProductInventoryRequirements(productId);
-
-  const categories = useMemo(
-    () => cache.filter((c) => c.entity_type === 'category'),
-    [cache],
-  );
-  const families = useMemo(
-    () => cache.filter((c) => c.entity_type === 'family'),
-    [cache],
-  );
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<ProductInventoryRequirement | null>(null);
@@ -139,9 +132,14 @@ export function ProductInventoryRequirementsEditor({
   const updateMut = useUpdateProductInventoryRequirement(productId);
   const deactivateMut = useDeactivateProductInventoryRequirement(productId);
 
+  const loadingCache = loadingProvider || loadingCategories || loadingFamilies;
+  const providerIsNative = providerType === 'native';
   const integrationMissing =
-    !integration || integration.status === 'not_configured';
-  const cacheEmpty = categories.length === 0;
+    !providerIsNative &&
+    (providerStatus?.code === 'not_configured' ||
+      providerStatus?.code === 'unavailable');
+  const cacheEmpty =
+    providerSupportsRequirements && categories.length === 0 && !loadingCache;
 
   const openCreate = () => {
     setEditing(null);
@@ -173,21 +171,45 @@ export function ProductInventoryRequirementsEditor({
         <div>
           <Label className="text-base">Composição de Inventário</Label>
           <p className="text-xs text-muted-foreground max-w-2xl">
-            Defina quais categorias e famílias do Eventrix este produto exige
+            Defina quais categorias e famílias de inventário este produto exige
             para ser entregue. O sistema usará essa composição para consultar
-            disponibilidade, ocupação e reservas no inventário operacional.
+            disponibilidade, ocupação e reservas no provider de inventário ativo.
           </p>
           <p className="text-xs text-muted-foreground mt-1">
             A quantidade representa o consumo físico por base comercial. Ex.:
             1 roteador por ponto.
           </p>
+          {providerName && (
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Provider ativo: <span className="font-medium">{providerName}</span>
+            </p>
+          )}
         </div>
-        {canEdit && !integrationMissing && !cacheEmpty && (
+        {canEdit && providerSupportsRequirements && !integrationMissing && !cacheEmpty && (
           <Button type="button" size="sm" onClick={openCreate}>
             <Plus className="w-4 h-4 mr-1" /> Nova composição
           </Button>
         )}
       </div>
+
+      {providerIsNative && (
+        <Card className="border-dashed">
+          <CardContent className="pt-4 flex items-start gap-3">
+            <Package className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-medium">
+                Provider de inventário nativo ativo.
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Este produto pode ser cadastrado normalmente. A composição de
+                inventário e consulta de disponibilidade dependem de uma
+                integração de inventário externa, que não está configurada para
+                esta organização.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {integrationMissing && (
         <Card className="border-amber-300 bg-amber-50/50 dark:bg-amber-950/20">
@@ -195,12 +217,12 @@ export function ProductInventoryRequirementsEditor({
             <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
             <div className="flex-1">
               <p className="text-sm font-medium">
-                Configure a integração com o Eventrix antes de vincular a
-                composição de inventário.
+                Configure a integração de inventário ({providerName}) antes de
+                vincular a composição.
               </p>
               <Button asChild variant="link" size="sm" className="px-0 h-auto mt-1">
                 <Link to="/app/settings/eventrix-inventory">
-                  Abrir Inventário Eventrix <ExternalLink className="h-3 w-3 ml-1" />
+                  Abrir configuração de inventário <ExternalLink className="h-3 w-3 ml-1" />
                 </Link>
               </Button>
             </div>
@@ -208,21 +230,21 @@ export function ProductInventoryRequirementsEditor({
         </Card>
       )}
 
-      {!integrationMissing && cacheEmpty && !loadingCache && (
+      {!integrationMissing && !providerIsNative && cacheEmpty && (
         <Card className="border-dashed">
           <CardContent className="pt-4 flex items-start gap-3">
             <Package className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
             <div className="flex-1">
               <p className="text-sm font-medium">
-                Nenhuma categoria ou família do Eventrix sincronizada ainda.
+                Nenhuma categoria ou família de inventário sincronizada ainda.
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                Sincronize categorias e famílias em Configurações &gt; Propostas &gt;
-                Inventário Eventrix para configurar a composição deste produto.
+                Sincronize categorias e famílias na configuração do provider
+                para habilitar a composição deste produto.
               </p>
               <Button asChild variant="link" size="sm" className="px-0 h-auto mt-1">
                 <Link to="/app/settings/eventrix-inventory">
-                  Sincronizar no Inventário Eventrix{' '}
+                  Abrir configuração de inventário{' '}
                   <ExternalLink className="h-3 w-3 ml-1" />
                 </Link>
               </Button>
@@ -231,7 +253,7 @@ export function ProductInventoryRequirementsEditor({
         </Card>
       )}
 
-      {!loadingReqs && requirements.length === 0 && (
+      {!loadingReqs && requirements.length === 0 && !providerIsNative && (
         <Card className="border-dashed">
           <CardContent className="pt-6 text-center space-y-1">
             <p className="text-sm font-medium">
@@ -239,8 +261,8 @@ export function ProductInventoryRequirementsEditor({
             </p>
             <p className="text-xs text-muted-foreground max-w-xl mx-auto">
               Use composição apenas quando o produto exigir recursos físicos do
-              Eventrix para ser entregue. Produtos de serviço puro podem ficar
-              sem composição.
+              provider de inventário para ser entregue. Produtos de serviço puro
+              podem ficar sem composição.
             </p>
           </CardContent>
         </Card>
@@ -380,16 +402,8 @@ export function ProductInventoryRequirementsEditor({
 interface DialogProps {
   open: boolean;
   onOpenChange: (o: boolean) => void;
-  categories: Array<{
-    eventrix_entity_id: string;
-    name: string;
-  }>;
-  families: Array<{
-    eventrix_entity_id: string;
-    name: string;
-    parent_eventrix_entity_id: string | null;
-    item_kind: string | null;
-  }>;
+  categories: InventoryCategory[];
+  families: InventoryFamily[];
   initial: ProductInventoryRequirement | null;
   onSubmit: (values: ProductInventoryRequirementInput) => void | Promise<void>;
   submitting: boolean;
@@ -440,12 +454,10 @@ function RequirementDialog({
   const categoryId = form.watch('eventrix_category_id');
   const quantity = form.watch('quantity');
   const unitBasis = form.watch('unit_basis');
-  const filteredFamilies = families.filter(
-    (f) => f.parent_eventrix_entity_id === categoryId,
-  );
+  const filteredFamilies = families.filter((f) => f.categoryId === categoryId);
 
   const onCategoryChange = (id: string) => {
-    const cat = categories.find((c) => c.eventrix_entity_id === id);
+    const cat = categories.find((c) => c.id === id);
     form.setValue('eventrix_category_id', id);
     form.setValue('eventrix_category_name', cat?.name ?? '');
     form.setValue('eventrix_family_id', '');
@@ -454,10 +466,10 @@ function RequirementDialog({
   };
 
   const onFamilyChange = (id: string) => {
-    const fam = filteredFamilies.find((f) => f.eventrix_entity_id === id);
+    const fam = filteredFamilies.find((f) => f.id === id);
     form.setValue('eventrix_family_id', id);
     form.setValue('eventrix_family_name', fam?.name ?? '');
-    form.setValue('eventrix_item_kind', fam?.item_kind ?? null);
+    form.setValue('eventrix_item_kind', fam?.itemKind ?? null);
   };
 
   return (
@@ -468,7 +480,7 @@ function RequirementDialog({
             {initial ? 'Editar composição' : 'Nova composição'}
           </DialogTitle>
           <DialogDescription>
-            Vincule uma categoria e família do Eventrix a este produto.
+            Vincule uma categoria e família do provider a este produto.
           </DialogDescription>
         </DialogHeader>
 
@@ -492,7 +504,7 @@ function RequirementDialog({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <Label>Categoria Eventrix *</Label>
+              <Label>Categoria de inventário *</Label>
               <Select value={categoryId} onValueChange={onCategoryChange}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione…" />
@@ -500,8 +512,8 @@ function RequirementDialog({
                 <SelectContent>
                   {categories.map((c) => (
                     <SelectItem
-                      key={c.eventrix_entity_id}
-                      value={c.eventrix_entity_id}
+                      key={c.id}
+                      value={c.id}
                     >
                       {c.name}
                     </SelectItem>
@@ -515,7 +527,7 @@ function RequirementDialog({
               )}
             </div>
             <div>
-              <Label>Família Eventrix *</Label>
+              <Label>Família de inventário *</Label>
               <Select
                 value={form.watch('eventrix_family_id')}
                 onValueChange={onFamilyChange}
@@ -532,8 +544,8 @@ function RequirementDialog({
                   ) : (
                     filteredFamilies.map((f) => (
                       <SelectItem
-                        key={f.eventrix_entity_id}
-                        value={f.eventrix_entity_id}
+                        key={f.id}
+                        value={f.id}
                       >
                         {f.name}
                       </SelectItem>

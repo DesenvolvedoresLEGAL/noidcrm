@@ -45,6 +45,12 @@ export interface EventrixSyncCacheItem {
   synced_at: string | null;
 }
 
+/**
+ * @deprecated NOID-VERTICAL-1.0-VERT-01.2A
+ * Use `useInventoryCategories` / `useInventoryFamilies` de
+ * `@/inventory/hooks/useInventoryProvider`. Preservado apenas para
+ * compatibilidade legada e será removido em VERT-01.2B.
+ */
 export function useEventrixInventoryCache(organizationId?: string | null) {
   return useQuery({
     queryKey: ['eventrix-inventory-cache', organizationId],
