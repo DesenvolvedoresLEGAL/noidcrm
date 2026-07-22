@@ -1,8 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import {
   Plus,
   Pencil,
@@ -58,32 +56,21 @@ import {
 import {
   useCreateProductInventoryRequirement,
   useDeactivateProductInventoryRequirement,
-  useEventrixInventoryCache,
   useProductInventoryRequirements,
   useUpdateProductInventoryRequirement,
   type ProductInventoryRequirement,
 } from '@/hooks/products/useProductInventoryRequirements';
+import {
+  useInventoryProvider,
+  useInventoryCategories,
+  useInventoryFamilies,
+} from '@/inventory/hooks/useInventoryProvider';
+import type { InventoryCategory, InventoryFamily } from '@/inventory/providers/types';
 
 interface Props {
   organizationId: string;
   productId: string;
   canEdit: boolean;
-}
-
-function useEventrixIntegrationStatus(organizationId?: string | null) {
-  return useQuery({
-    queryKey: ['eventrix-inventory-settings', organizationId],
-    enabled: !!organizationId,
-    queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from('eventrix_inventory_integration_settings')
-        .select('id,status,is_enabled')
-        .eq('organization_id', organizationId)
-        .maybeSingle();
-      if (error) throw error;
-      return data as { id: string; status: string; is_enabled: boolean } | null;
-    },
-  });
 }
 
 const previewBasisText = (input: {
@@ -115,20 +102,26 @@ export function ProductInventoryRequirementsEditor({
   canEdit,
 }: Props) {
   const { toast } = useToast();
-  const { data: integration } = useEventrixIntegrationStatus(organizationId);
-  const { data: cache = [], isLoading: loadingCache } =
-    useEventrixInventoryCache(organizationId);
+
+  // NOID-VERTICAL-1.0-VERT-01.2A — consumo via provider adapter genérico.
+  const {
+    provider,
+    providerType,
+    providerName,
+    status: providerStatus,
+    isLoading: loadingProvider,
+  } = useInventoryProvider(organizationId);
+
+  const providerSupportsRequirements =
+    !!provider && provider.hasCapability('product_requirements');
+
+  const { data: categories = [], isLoading: loadingCategories } =
+    useInventoryCategories(providerSupportsRequirements ? organizationId : null);
+  const { data: families = [], isLoading: loadingFamilies } =
+    useInventoryFamilies(providerSupportsRequirements ? organizationId : null);
+
   const { data: requirements = [], isLoading: loadingReqs } =
     useProductInventoryRequirements(productId);
-
-  const categories = useMemo(
-    () => cache.filter((c) => c.entity_type === 'category'),
-    [cache],
-  );
-  const families = useMemo(
-    () => cache.filter((c) => c.entity_type === 'family'),
-    [cache],
-  );
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<ProductInventoryRequirement | null>(null);
@@ -139,9 +132,14 @@ export function ProductInventoryRequirementsEditor({
   const updateMut = useUpdateProductInventoryRequirement(productId);
   const deactivateMut = useDeactivateProductInventoryRequirement(productId);
 
+  const loadingCache = loadingProvider || loadingCategories || loadingFamilies;
+  const providerIsNative = providerType === 'native';
   const integrationMissing =
-    !integration || integration.status === 'not_configured';
-  const cacheEmpty = categories.length === 0;
+    !providerIsNative &&
+    (providerStatus?.code === 'not_configured' ||
+      providerStatus?.code === 'unavailable');
+  const cacheEmpty =
+    providerSupportsRequirements && categories.length === 0 && !loadingCache;
 
   const openCreate = () => {
     setEditing(null);
