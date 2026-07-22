@@ -68,28 +68,33 @@ Deno.serve(async (req) => {
 
   // ---- CHG-029: delete synthetic auth users (strict whitelist) ----
   if (action === 'delete') {
-    const WHITELIST_IDS = new Set([
+    const WHITELIST_IDS = [
       '58c9eb37-4ae3-4612-bbfd-e873f49b329b','2fc41788-9b17-44c2-b90b-578f72f3e3f2',
       '70f0f9de-677c-46ac-9fe9-12a93f74fee9','ec646ad0-b719-4464-be12-aaa5b139a60f',
       '84cfb07e-6009-4a5e-a814-ab0d11a37daf','6da9ebee-770c-439c-9d18-5614fe952ac6',
       '4ac56488-9128-4ff4-b236-56e1e06e9526','e29eef51-867a-4c78-b823-2543352611e9',
       '13668a50-d30a-4346-993b-521a67a6d616','56eed1b0-542a-43b0-a01c-28a83371854f',
       'ea6ca3ef-e18a-43dc-aaca-5da10a581331','c8a897f4-48c1-4823-a75b-d7f35cb284cc',
-    ]);
-    // Owner A must be RETAINED as EVIDENCE RETENTION PRINCIPAL (tombstone created_by).
+    ];
     const RETAIN_IDS = new Set(['58c9eb37-4ae3-4612-bbfd-e873f49b329b']);
-    const results: Array<{ id: string; email?: string; action: string; error?: string }> = [];
-    const { data: list } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 });
+    const results: Array<Record<string, unknown>> = [];
     for (const id of WHITELIST_IDS) {
-      const u = list?.users?.find((x) => x.id === id);
-      const emailMatch = u?.email?.startsWith(`${EMAIL_PREFIX}-`) && u?.email?.endsWith(`@${EMAIL_DOMAIN}`);
-      if (!u) { results.push({ id, action: 'not_found' }); continue; }
-      if (!emailMatch) { results.push({ id, email: u.email, action: 'refused_email_prefix_mismatch' }); continue; }
-      if (RETAIN_IDS.has(id)) { results.push({ id, email: u.email, action: 'retained_evidence' }); continue; }
+      if (RETAIN_IDS.has(id)) { results.push({ id, action: 'retained_evidence_principal' }); continue; }
+      const { data: gu } = await admin.auth.admin.getUserById(id);
+      const email = gu?.user?.email ?? null;
+      const emailOk = typeof email === 'string' && email.startsWith(`${EMAIL_PREFIX}-`) && email.endsWith(`@${EMAIL_DOMAIN}`);
+      if (email && !emailOk) { results.push({ id, action: 'refused_email_prefix_mismatch' }); continue; }
       const { error: delErr } = await admin.auth.admin.deleteUser(id);
-      results.push({ id, email: u.email, action: delErr ? 'error' : 'deleted', error: delErr?.message });
+      if (!delErr) { results.push({ id, action: 'deleted' }); continue; }
+      const msg = (delErr as any)?.message || (delErr as any)?.code || String(delErr);
+      const status = (delErr as any)?.status;
+      if (status === 404 || /not\s*found|does\s*not\s*exist/i.test(msg)) {
+        results.push({ id, action: 'not_found' });
+      } else {
+        results.push({ id, action: 'error', status, message: msg });
+      }
     }
-    return json({ dryRun, results });
+    return json({ results });
   }
 
   const result: any = { dryRun, orgs: [], users: [], errors: [] };
