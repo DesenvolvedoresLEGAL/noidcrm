@@ -793,7 +793,46 @@ export function EventrixInventoryProviderPanel() {
             </CardContent>
           </Card>
         </div>
+  );
+}
+
+// NOID-VERTICAL-1.0-VERT-01.2C
+// Wrapper legado. A rota /app/settings/eventrix-inventory agora redireciona
+// para /app/settings/inventory-provider?provider=eventrix (ver App.tsx).
+// Mantido apenas por compatibilidade caso algum consumidor importe direto.
+export default function EventrixInventorySettings() {
+  const { loading, isOwner, isAdmin, orgRole } = usePermissions();
+  const canRead =
+    isOwner ||
+    isAdmin ||
+    orgRole === 'operations' ||
+    orgRole === 'operacional' ||
+    orgRole === 'commercial_manager' ||
+    orgRole === 'sales_manager';
+  if (loading) return null;
+  if (!canRead) {
+    return (
+      <Layout pageTitle="Inventário Eventrix">
+        <AccessDenied
+          title="Acesso restrito"
+          description="Esta configuração é reservada aos perfis Owner, Admin, Operacional e Gestores Comerciais."
+        />
+      </Layout>
+    );
+  }
+  return (
+    <Layout pageTitle="Inventário Eventrix">
+      <PageContainer>
+        <PageHeader
+          icon={Boxes}
+          title="Inventário conectado ao Eventrix"
+          subtitle="O Eventrix será a fonte oficial do inventário físico. O NOID consumirá essas informações para propostas, disponibilidade e tabela dinâmica."
+          badge={{ label: 'Eventrix master', icon: ShieldCheck }}
+          variant="teal"
+        />
+        <EventrixInventoryProviderPanel />
       </PageContainer>
     </Layout>
   );
 }
+
