@@ -1,6 +1,21 @@
+// NOID-VERTICAL-1.0-VERT-01.2D-B
+// @deprecated — este módulo permanece apenas como ponte de compatibilidade
+// para consumidores existentes (componentes e hooks de proposta).
+// A implementação real vive em `src/inventory/demand` (builder genérico).
+// A resolução real do provider ativo será conectada na sprint VERT-01.2D-C.
 import type { ProductInventoryRequirement } from '@/hooks/products/useProductInventoryRequirements';
 import type { UnitBasis } from '@/schemas/productInventoryRequirement';
+import {
+  buildInventoryDemandPreview,
+  normalizeProductInventoryRequirements,
+  resolveInventoryDemandCommercialContext,
+  type InventoryDemandInputItem,
+  type InventoryDemandInputProposal,
+  type InventoryDemandLine,
+  type InventoryDemandPreview as GenericPreview,
+} from '@/inventory/demand';
 
+/** @deprecated use `InventoryDemandLineSource` de `@/inventory/demand`. */
 export interface ProposalInventoryDemandLineSource {
   product_id: string;
   product_name: string;
@@ -10,6 +25,7 @@ export interface ProposalInventoryDemandLineSource {
   calculation_label: string;
 }
 
+/** @deprecated use `InventoryDemandLine` de `@/inventory/demand`. */
 export interface ProposalInventoryDemandLine {
   key: string;
   eventrix_category_id: string;
@@ -26,6 +42,7 @@ export interface ProposalInventoryDemandLine {
   source_products: ProposalInventoryDemandLineSource[];
 }
 
+/** @deprecated use `InventoryDemandPayload` genérico. */
 export interface EventrixAvailabilityPreviewPayload {
   source: 'noid';
   mode: 'preview';
@@ -62,6 +79,7 @@ export interface EventrixAvailabilityPreviewPayload {
   }>;
 }
 
+/** @deprecated use `InventoryDemandPreview` genérico. */
 export interface ProposalInventoryDemandPreview {
   status: 'ready' | 'empty' | 'incomplete';
   warnings: string[];
@@ -74,346 +92,114 @@ export interface ProposalInventoryDemandPreview {
   payload: EventrixAvailabilityPreviewPayload;
 }
 
-export interface ProposalInventoryDemandInputProposal {
-  id?: string | null;
-  organization_id?: string | null;
-  opportunity_id?: string | null;
-  customer_id?: string | null;
-  account_id?: string | null;
-  title?: string | null;
-  event_name?: string | null;
-  event_venue?: string | null;
-  event_start_date?: string | null;
-  event_end_date?: string | null;
-  points?: number | null;
-  point_count?: number | null;
-  quantity_points?: number | null;
-  access_points?: number | null;
-  commercial_points?: number | null;
-  days?: number | null;
-  daily_count?: number | null;
-  duration_days?: number | null;
-  event_days?: number | null;
-  commercial_days?: number | null;
-  participant_count?: number | null;
-  attendees_count?: number | null;
-  expected_attendees?: number | null;
-  visitors_count?: number | null;
-}
+/** @deprecated */
+export type ProposalInventoryDemandInputProposal = InventoryDemandInputProposal;
+/** @deprecated */
+export type ProposalInventoryDemandInputItem = InventoryDemandInputItem;
 
-export interface ProposalInventoryDemandInputItem {
-  id?: string;
-  product_id?: string | null;
-  name?: string | null;
-  quantity?: number | null;
-  product_quantity?: number | null;
-  item_quantity?: number | null;
-  quantity_points?: number | null;
-  billing_days?: number | null;
-  billing_type?: string | null;
-}
-
+/** @deprecated */
 export interface ProposalInventoryDemandInput {
   proposal: ProposalInventoryDemandInputProposal | null | undefined;
   proposalItems: ProposalInventoryDemandInputItem[];
   productRequirements: ProductInventoryRequirement[];
 }
 
-function firstPositive(...vals: Array<number | null | undefined>): number | null {
-  for (const v of vals) {
-    if (v != null && Number.isFinite(Number(v)) && Number(v) > 0) return Number(v);
-  }
-  return null;
-}
-
-function daysBetween(start?: string | null, end?: string | null): number | null {
-  if (!start || !end) return null;
-  const s = new Date(start);
-  const e = new Date(end);
-  if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime())) return null;
-  const diff = Math.round((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-  return diff > 0 ? diff : null;
-}
-
+/** @deprecated use `resolveInventoryDemandCommercialContext`. */
 export function resolveCommercialContext(
   proposal: ProposalInventoryDemandInputProposal | null | undefined,
   items: ProposalInventoryDemandInputItem[],
-): {
-  points: number | null;
-  days: number | null;
-  participants: number | null;
-  pointsAssumed: boolean;
-  daysAssumed: boolean;
-} {
-  const p = proposal ?? {};
-  const explicitPoints = firstPositive(
-    p.points,
-    p.point_count,
-    p.quantity_points,
-    p.access_points,
-    p.commercial_points,
-  );
-  const inferredPoints = items.reduce<number | null>((acc, it) => {
-    if (it.billing_type === 'point_day' && it.quantity_points && it.quantity_points > 0) {
-      return Math.max(acc ?? 0, Number(it.quantity_points));
-    }
-    return acc;
-  }, null);
-  const points = explicitPoints ?? inferredPoints;
+) {
+  return resolveInventoryDemandCommercialContext(proposal, items);
+}
 
-  const explicitDays = firstPositive(
-    p.days,
-    p.daily_count,
-    p.duration_days,
-    p.event_days,
-    p.commercial_days,
-  );
-  const inferredDays = items.reduce<number | null>((acc, it) => {
-    if (it.billing_type === 'point_day' && it.billing_days && it.billing_days > 0) {
-      return Math.max(acc ?? 0, Number(it.billing_days));
-    }
-    return acc;
-  }, null);
-  const days = explicitDays ?? inferredDays ?? daysBetween(p.event_start_date, p.event_end_date);
-
-  const participants = firstPositive(
-    p.participant_count,
-    p.attendees_count,
-    p.expected_attendees,
-    p.visitors_count,
-  );
-
+function toLegacyLine(l: InventoryDemandLine): ProposalInventoryDemandLine {
   return {
-    points,
-    days,
-    participants,
-    pointsAssumed: points == null,
-    daysAssumed: days == null,
+    key: l.key,
+    eventrix_category_id: l.category_ref,
+    eventrix_category_name: l.category_name,
+    eventrix_family_id: l.family_ref,
+    eventrix_family_name: l.family_name,
+    eventrix_item_kind: l.item_kind,
+    unit_basis: l.unit_basis as UnitBasis,
+    is_required: l.is_required,
+    required_quantity: l.required_quantity,
+    requirement_quantity: l.requirement_quantity,
+    calculation_label: l.calculation_label,
+    status: l.status,
+    source_products: l.source_products.map((s) => ({
+      product_id: s.product_id,
+      product_name: s.product_name,
+      proposal_item_id: s.proposal_item_id ?? undefined,
+      quantity: s.quantity,
+      required_quantity: s.required_quantity,
+      calculation_label: s.calculation_label,
+    })),
   };
 }
 
-const BASIS_LABEL: Record<UnitBasis, string> = {
-  per_point: 'pontos',
-  per_event: 'evento',
-  per_day: 'diárias',
-  per_participant: 'participantes',
-  per_unit: 'unidades',
-  manual: 'manual',
-};
-
-function productQuantity(item: ProposalInventoryDemandInputItem): number {
-  return (
-    firstPositive(item.quantity, item.product_quantity, item.item_quantity) ?? 1
-  );
+function toLegacyPayload(p: GenericPreview['payload']): EventrixAvailabilityPreviewPayload {
+  return {
+    source: 'noid',
+    mode: 'preview',
+    organization_id: p.organization_id,
+    proposal_id: p.proposal_id,
+    opportunity_id: p.opportunity_id ?? null,
+    customer_id: p.customer_id ?? null,
+    event: {
+      name: p.event?.name ?? null,
+      venue: p.event?.venue ?? null,
+      start_date: p.event?.start_date ?? null,
+      end_date: p.event?.end_date ?? null,
+      setup_start: p.event?.setup_start ?? null,
+      teardown_end: p.event?.teardown_end ?? null,
+    },
+    commercial_context: {
+      points: p.commercial_context.points,
+      days: p.commercial_context.days,
+      participants: p.commercial_context.participants,
+    },
+    requirements: (p.requirements ?? []).map((r) => ({
+      eventrix_category_id: r.category_ref,
+      eventrix_category_name: r.category_name,
+      eventrix_family_id: r.family_ref,
+      eventrix_family_name: r.family_name,
+      eventrix_item_kind: r.item_kind,
+      quantity: r.quantity,
+      unit_basis: r.unit_basis,
+      is_required: r.is_required,
+      source: r.source,
+    })),
+  };
 }
 
+/**
+ * @deprecated Wrapper legado — delega para o builder genérico
+ * (`buildInventoryDemandPreview`) assumindo provider Eventrix.
+ * A resolução real do provider ativo será conectada na D-C.
+ */
 export function buildProposalInventoryDemandPreview(
   input: ProposalInventoryDemandInput,
 ): ProposalInventoryDemandPreview {
-  const { proposal, proposalItems, productRequirements } = input;
-  const warnings: string[] = [];
-  const ctx = resolveCommercialContext(proposal, proposalItems);
-
-  const orgId = proposal?.organization_id ?? '';
-  const emptyPayload: EventrixAvailabilityPreviewPayload = {
-    source: 'noid',
-    mode: 'preview',
-    organization_id: orgId,
-    proposal_id: proposal?.id ?? null,
-    opportunity_id: proposal?.opportunity_id ?? null,
-    customer_id: proposal?.customer_id ?? proposal?.account_id ?? null,
-    event: {
-      name: proposal?.event_name ?? proposal?.title ?? null,
-      venue: proposal?.event_venue ?? null,
-      start_date: proposal?.event_start_date ?? null,
-      end_date: proposal?.event_end_date ?? null,
-    },
-    commercial_context: {
-      points: ctx.points,
-      days: ctx.days,
-      participants: ctx.participants,
-    },
-    requirements: [],
-  };
-
-  if (!proposalItems || proposalItems.length === 0) {
-    return {
-      status: 'empty',
-      warnings,
-      totals: { requiredFamilies: 0, totalRequiredUnits: 0, optionalFamilies: 0 },
-      lines: [],
-      payload: emptyPayload,
-    };
-  }
-
-  const reqsByProduct = new Map<string, ProductInventoryRequirement[]>();
-  for (const r of productRequirements) {
-    if (!r.is_active) continue;
-    const arr = reqsByProduct.get(r.product_id) ?? [];
-    arr.push(r);
-    reqsByProduct.set(r.product_id, arr);
-  }
-
-  const groups = new Map<string, ProposalInventoryDemandLine>();
-  let hasAnyRequirement = false;
-  let hasParticipantMissing = false;
-  let hasIncomplete = false;
-
-  const effectivePoints = ctx.points ?? 1;
-  const effectiveDays = ctx.days ?? 1;
-
-  for (const item of proposalItems) {
-    if (!item.product_id) continue;
-    const reqs = reqsByProduct.get(item.product_id);
-    if (!reqs || reqs.length === 0) continue;
-    hasAnyRequirement = true;
-
-    const pQty = productQuantity(item);
-    const productName = item.name ?? 'Produto';
-
-    for (const req of reqs) {
-      const key = [
-        req.eventrix_category_id,
-        req.eventrix_family_id,
-        req.unit_basis,
-        req.is_required ? '1' : '0',
-      ].join('|');
-
-      let required: number | null = null;
-      let calcLabel = '';
-      let status: 'calculated' | 'manual' | 'incomplete' = 'calculated';
-      const q = Number(req.quantity);
-
-      switch (req.unit_basis) {
-        case 'per_point':
-          required = q * effectivePoints;
-          calcLabel = `${q} × ${effectivePoints} pontos`;
-          break;
-        case 'per_event':
-          required = q;
-          calcLabel = `${q} fixo por evento`;
-          break;
-        case 'per_day':
-          required = q * effectiveDays;
-          calcLabel = `${q} × ${effectiveDays} diárias`;
-          break;
-        case 'per_participant':
-          if (ctx.participants != null) {
-            required = q * ctx.participants;
-            calcLabel = `${q} × ${ctx.participants} participantes`;
-          } else {
-            required = null;
-            calcLabel = 'Aguardando participantes';
-            status = 'incomplete';
-            hasParticipantMissing = true;
-            hasIncomplete = true;
-          }
-          break;
-        case 'per_unit':
-          required = q * pQty;
-          calcLabel = `${q} × ${pQty} unidades`;
-          break;
-        case 'manual':
-          required = null;
-          calcLabel = 'Manual';
-          status = 'manual';
-          break;
-      }
-
-      const source: ProposalInventoryDemandLineSource = {
-        product_id: item.product_id,
-        product_name: productName,
-        proposal_item_id: item.id,
-        quantity: pQty,
-        required_quantity: required,
-        calculation_label: calcLabel,
-      };
-
-      const existing = groups.get(key);
-      if (existing) {
-        if (existing.required_quantity != null && required != null) {
-          existing.required_quantity += required;
-        } else if (required != null && existing.required_quantity == null && existing.status !== 'manual') {
-          existing.required_quantity = required;
-        }
-        existing.source_products.push(source);
-        if (status === 'incomplete') existing.status = 'incomplete';
-      } else {
-        groups.set(key, {
-          key,
-          eventrix_category_id: req.eventrix_category_id,
-          eventrix_category_name: req.eventrix_category_name,
-          eventrix_family_id: req.eventrix_family_id,
-          eventrix_family_name: req.eventrix_family_name,
-          eventrix_item_kind: req.eventrix_item_kind,
-          unit_basis: req.unit_basis,
-          is_required: req.is_required,
-          required_quantity: required,
-          requirement_quantity: q,
-          calculation_label: calcLabel,
-          status,
-          source_products: [source],
-        });
-      }
-    }
-  }
-
-  const lines = Array.from(groups.values()).sort((a, b) => {
-    if (a.is_required !== b.is_required) return a.is_required ? -1 : 1;
-    return a.eventrix_family_name.localeCompare(b.eventrix_family_name);
-  });
-
-  if (!hasAnyRequirement) {
-    return {
-      status: 'empty',
-      warnings,
-      totals: { requiredFamilies: 0, totalRequiredUnits: 0, optionalFamilies: 0 },
-      lines: [],
-      payload: emptyPayload,
-    };
-  }
-
-  if (ctx.pointsAssumed && lines.some((l) => l.unit_basis === 'per_point')) {
-    warnings.push('Quantidade de pontos não informada. Usando 1 como referência.');
-  }
-  if (ctx.daysAssumed && lines.some((l) => l.unit_basis === 'per_day')) {
-    warnings.push('Quantidade de diárias não informada. Usando 1 como referência.');
-  }
-  if (hasParticipantMissing) {
-    warnings.push('Existem demandas por participante, mas a quantidade de participantes não foi informada.');
-  }
-
-  const requiredFamilies = lines.filter((l) => l.is_required).length;
-  const optionalFamilies = lines.filter((l) => !l.is_required).length;
-  const totalRequiredUnits = lines.reduce(
-    (acc, l) => acc + (l.required_quantity ?? 0),
-    0,
+  const { normalized } = normalizeProductInventoryRequirements(
+    input.productRequirements ?? [],
+    { providerType: 'eventrix' },
   );
-
-  const payload: EventrixAvailabilityPreviewPayload = {
-    ...emptyPayload,
-    requirements: lines.map((l) => ({
-      eventrix_category_id: l.eventrix_category_id,
-      eventrix_category_name: l.eventrix_category_name,
-      eventrix_family_id: l.eventrix_family_id,
-      eventrix_family_name: l.eventrix_family_name,
-      eventrix_item_kind: l.eventrix_item_kind,
-      quantity: l.required_quantity,
-      unit_basis: l.unit_basis,
-      is_required: l.is_required,
-      source: {
-        product_ids: Array.from(new Set(l.source_products.map((s) => s.product_id))),
-        product_names: Array.from(new Set(l.source_products.map((s) => s.product_name))),
-      },
-    })),
-  };
-
+  const generic = buildInventoryDemandPreview({
+    proposal: input.proposal,
+    proposalItems: input.proposalItems ?? [],
+    requirements: normalized,
+    providerType: 'eventrix',
+    supportsProposalDemand: true,
+  });
+  // Wrapper legado mapeia unsupported -> empty apenas para não quebrar UI antiga.
+  const status: 'ready' | 'empty' | 'incomplete' =
+    generic.status === 'unsupported' ? 'empty' : generic.status;
   return {
-    status: hasIncomplete ? 'incomplete' : 'ready',
-    warnings,
-    totals: { requiredFamilies, totalRequiredUnits, optionalFamilies },
-    lines,
-    payload,
+    status,
+    warnings: generic.warnings,
+    totals: generic.totals,
+    lines: generic.lines.map(toLegacyLine),
+    payload: toLegacyPayload(generic.payload),
   };
 }
 
@@ -429,6 +215,15 @@ export const UNIT_BASIS_UI_LABEL: Record<UnitBasis, string> = {
 export const ITEM_KIND_UI_LABEL: Record<string, string> = {
   serialized: 'Serializado',
   quantity: 'Por quantidade',
+};
+
+const BASIS_LABEL: Record<UnitBasis, string> = {
+  per_point: 'pontos',
+  per_event: 'evento',
+  per_day: 'diárias',
+  per_participant: 'participantes',
+  per_unit: 'unidades',
+  manual: 'manual',
 };
 
 export { BASIS_LABEL };

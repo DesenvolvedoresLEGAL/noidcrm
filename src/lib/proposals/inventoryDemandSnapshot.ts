@@ -1,9 +1,23 @@
+// NOID-VERTICAL-1.0-VERT-01.2D-B
+// @deprecated — ponte de compatibilidade. Delegado ao domínio genérico
+// (`src/inventory/demand`). Persistência real (`useProposalInventoryDemandSnapshots`)
+// permanece intocada nesta sprint.
 import type {
   ProposalInventoryDemandPreview,
   ProposalInventoryDemandInputItem,
 } from '@/lib/proposals/inventoryDemandPreview';
 import type { ProductInventoryRequirement } from '@/hooks/products/useProductInventoryRequirements';
 import type { ProposalInventoryDemandSnapshot } from '@/schemas/proposalInventoryDemandSnapshot';
+import {
+  buildInventoryDemandSourceProducts,
+  buildInventoryDemandSourceRequirements,
+  compareInventoryDemand,
+  computeInventoryDemandHash,
+  normalizeInventoryDemandPreviewForCompare,
+  normalizeInventoryDemandSnapshotForCompare,
+  normalizeProductInventoryRequirements,
+  type InventoryDemandPreview as GenericPreview,
+} from '@/inventory/demand';
 
 export interface SnapshotSummary {
   required_families: number;
@@ -14,6 +28,70 @@ export interface SnapshotSummary {
   incomplete_lines: number;
 }
 
+function toGenericPreview(preview: ProposalInventoryDemandPreview): GenericPreview {
+  return {
+    status: preview.status,
+    provider_type: 'eventrix',
+    warnings: preview.warnings,
+    totals: preview.totals,
+    lines: (preview.lines ?? []).map((l) => ({
+      key: l.key,
+      provider_type: 'eventrix',
+      category_ref: l.eventrix_category_id,
+      category_name: l.eventrix_category_name,
+      family_ref: l.eventrix_family_id,
+      family_name: l.eventrix_family_name,
+      item_kind: l.eventrix_item_kind,
+      unit_basis: l.unit_basis,
+      is_required: l.is_required,
+      required_quantity: l.required_quantity,
+      requirement_quantity: l.requirement_quantity,
+      calculation_label: l.calculation_label,
+      status: l.status,
+      source_products: (l.source_products ?? []).map((s) => ({
+        product_id: s.product_id,
+        product_name: s.product_name,
+        proposal_item_id: s.proposal_item_id ?? null,
+        quantity: s.quantity,
+        required_quantity: s.required_quantity,
+        calculation_label: s.calculation_label,
+      })),
+    })),
+    payload: {
+      schema_version: 2,
+      source: 'noid',
+      mode: 'preview',
+      provider_type: 'eventrix',
+      organization_id: preview.payload.organization_id,
+      proposal_id: preview.payload.proposal_id,
+      opportunity_id: preview.payload.opportunity_id ?? null,
+      customer_id: preview.payload.customer_id ?? null,
+      event: {
+        name: preview.payload.event.name ?? null,
+        venue: preview.payload.event.venue ?? null,
+        start_date: preview.payload.event.start_date ?? null,
+        end_date: preview.payload.event.end_date ?? null,
+        setup_start: preview.payload.event.setup_start ?? null,
+        teardown_end: preview.payload.event.teardown_end ?? null,
+      },
+      commercial_context: preview.payload.commercial_context,
+      requirements: (preview.payload.requirements ?? []).map((r) => ({
+        provider_type: 'eventrix',
+        category_ref: r.eventrix_category_id,
+        category_name: r.eventrix_category_name,
+        family_ref: r.eventrix_family_id,
+        family_name: r.eventrix_family_name,
+        item_kind: r.eventrix_item_kind,
+        quantity: r.quantity,
+        unit_basis: r.unit_basis,
+        is_required: r.is_required,
+        source: r.source,
+      })),
+    },
+  };
+}
+
+/** @deprecated use serializer/summary genérico. */
 export function buildSnapshotSummary(
   preview: ProposalInventoryDemandPreview,
 ): SnapshotSummary {
@@ -24,7 +102,8 @@ export function buildSnapshotSummary(
   const incompleteLines = lines.filter((l) => l.status === 'incomplete');
   const total = lines.reduce(
     (acc, l) =>
-      acc + (l.status === 'calculated' && typeof l.required_quantity === 'number'
+      acc +
+      (l.status === 'calculated' && typeof l.required_quantity === 'number'
         ? l.required_quantity
         : 0),
     0,
@@ -39,116 +118,61 @@ export function buildSnapshotSummary(
   };
 }
 
+/** @deprecated */
 export function buildSourceProducts(
   preview: ProposalInventoryDemandPreview,
   proposalItems: ProposalInventoryDemandInputItem[],
 ) {
-  const productIds = new Set<string>();
-  for (const line of preview.lines ?? []) {
-    for (const s of line.source_products ?? []) {
-      if (s.product_id) productIds.add(s.product_id);
-    }
-  }
-  const byId = new Map<string, ProposalInventoryDemandInputItem>();
-  for (const it of proposalItems ?? []) {
-    if (it.product_id && productIds.has(it.product_id) && !byId.has(it.product_id)) {
-      byId.set(it.product_id, it);
-    }
-  }
-  return Array.from(productIds).map((pid) => {
-    const it = byId.get(pid);
-    return {
-      product_id: pid,
-      product_name: it?.name ?? 'Produto',
-      proposal_item_id: it?.id ?? null,
-      quantity: Number(it?.quantity ?? it?.product_quantity ?? it?.item_quantity ?? 1),
-    };
-  });
+  const generic = toGenericPreview(preview);
+  return buildInventoryDemandSourceProducts(generic, proposalItems);
 }
 
+/** @deprecated */
 export function buildSourceRequirements(
   preview: ProposalInventoryDemandPreview,
   requirements: ProductInventoryRequirement[],
 ) {
-  const usedProductIds = new Set<string>();
-  const usedKeys = new Set<string>();
-  for (const line of preview.lines ?? []) {
-    for (const s of line.source_products ?? []) {
-      if (s.product_id) usedProductIds.add(s.product_id);
-    }
-    usedKeys.add(
-      `${line.eventrix_category_id}|${line.eventrix_family_id}|${line.unit_basis}`,
-    );
-  }
-  return (requirements ?? [])
-    .filter(
-      (r) =>
-        r.is_active &&
-        usedProductIds.has(r.product_id) &&
-        usedKeys.has(
-          `${r.eventrix_category_id}|${r.eventrix_family_id}|${r.unit_basis}`,
-        ),
-    )
-    .map((r) => ({
-      requirement_id: r.id,
-      product_id: r.product_id,
-      label: r.label,
-      eventrix_category_id: r.eventrix_category_id,
-      eventrix_category_name: r.eventrix_category_name,
-      eventrix_family_id: r.eventrix_family_id,
-      eventrix_family_name: r.eventrix_family_name,
-      eventrix_item_kind: r.eventrix_item_kind,
-      quantity: Number(r.quantity),
-      unit_basis: r.unit_basis,
-      is_required: r.is_required,
-    }));
+  const generic = toGenericPreview(preview);
+  const { normalized } = normalizeProductInventoryRequirements(requirements ?? [], {
+    providerType: 'eventrix',
+  });
+  const genericReqs = buildInventoryDemandSourceRequirements(generic, normalized);
+  // Adiciona aliases Eventrix para consumidores legados (persistência atual).
+  return genericReqs.map((r) => ({
+    requirement_id: r.requirement_id,
+    product_id: r.product_id,
+    label: r.label,
+    eventrix_category_id: r.category_ref,
+    eventrix_category_name: r.category_name,
+    eventrix_family_id: r.family_ref,
+    eventrix_family_name: r.family_name,
+    eventrix_item_kind: r.item_kind,
+    quantity: r.quantity,
+    unit_basis: r.unit_basis,
+    is_required: r.is_required,
+  }));
 }
 
-function stableStringify(value: any): string {
-  if (value === null || typeof value !== 'object') return JSON.stringify(value);
-  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
-  const keys = Object.keys(value).sort();
-  return `{${keys
-    .map((k) => `${JSON.stringify(k)}:${stableStringify(value[k])}`)
-    .join(',')}}`;
-}
-
+/** @deprecated use `normalizeInventoryDemandPreviewForCompare`. */
 export function normalizePreviewForCompare(preview: ProposalInventoryDemandPreview) {
-  return {
-    summary: preview?.totals ?? {},
-    commercial_context: preview?.payload?.commercial_context ?? {},
-    requirements: preview?.payload?.requirements ?? [],
-  };
+  return normalizeInventoryDemandPreviewForCompare(toGenericPreview(preview));
 }
 
+/** @deprecated use `normalizeInventoryDemandSnapshotForCompare`. */
 export function normalizeSnapshotForCompare(snapshot: ProposalInventoryDemandSnapshot) {
-  return {
-    summary: {
-      requiredFamilies: snapshot?.summary?.required_families ?? 0,
-      totalRequiredUnits: snapshot?.summary?.total_required_units ?? 0,
-      optionalFamilies: snapshot?.summary?.optional_lines ?? 0,
-    },
-    commercial_context: (snapshot?.payload as any)?.commercial_context ?? {},
-    requirements: (snapshot?.payload as any)?.requirements ?? [],
-  };
+  return normalizeInventoryDemandSnapshotForCompare(snapshot);
 }
 
+/** @deprecated use `compareInventoryDemand`. */
 export function comparePreviewToSnapshot(
   preview: ProposalInventoryDemandPreview,
   snapshot: ProposalInventoryDemandSnapshot | null | undefined,
 ): 'no_snapshot' | 'aligned' | 'changed' {
   if (!snapshot) return 'no_snapshot';
-  const a = stableStringify(normalizePreviewForCompare(preview));
-  const b = stableStringify(normalizeSnapshotForCompare(snapshot));
-  return a === b ? 'aligned' : 'changed';
+  return compareInventoryDemand(toGenericPreview(preview), snapshot);
 }
 
+/** @deprecated use `computeInventoryDemandHash`. */
 export function computePreviewHash(preview: ProposalInventoryDemandPreview): string {
-  // simple non-crypto hash of stable JSON — sufficient for change detection
-  const str = stableStringify(normalizePreviewForCompare(preview));
-  let h = 5381;
-  for (let i = 0; i < str.length; i++) {
-    h = ((h << 5) + h) ^ str.charCodeAt(i);
-  }
-  return `h${(h >>> 0).toString(16)}`;
+  return computeInventoryDemandHash(toGenericPreview(preview));
 }
