@@ -39285,22 +39285,6 @@ export type Database = {
         Returns: number
       }
       normalize_inventory_slug: { Args: { input: string }; Returns: string }
-      nsec12_probe_activity_insert_smoke: {
-        Args: {
-          p_marker: string
-          p_opportunity_id: string
-          p_organization_id: string
-        }
-        Returns: string
-      }
-      nsec12_probe_proposal_insert_smoke: {
-        Args: {
-          p_marker: string
-          p_opportunity_id: string
-          p_organization_id: string
-        }
-        Returns: string
-      }
       orchestrate_proposal_financials: {
         Args: { p_proposal_id: string; p_reason?: string }
         Returns: Json
