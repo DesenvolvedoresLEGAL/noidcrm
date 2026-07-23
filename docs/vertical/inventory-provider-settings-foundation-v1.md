@@ -169,3 +169,9 @@ Backfill some junto com o DROP. Tabela Eventrix não é tocada pelo rollback.
 2. Alias de rota `/app/settings/inventory-provider` + tela genérica opcional.
 3. Deprecação formal de `useEventrixInventoryCache`.
 4. Iniciar Pack Conectividade (equipment profile).
+
+---
+
+## Chronological notes
+
+- **VERT-01.2E-0 — canonical sync consistency fix.** UPDATE branch of `useUpsertEventrixInventorySettings` no longer returns early; INSERT and UPDATE share a single canonical sync step into `inventory_provider_settings`. Enable → `eventrix`, disable → `native`. See `docs/vertical/inventory-provider-canonical-sync-consistency-v1.md`.
