@@ -102,6 +102,11 @@ export function useUpsertEventrixInventorySettings() {
         .maybeSingle();
       if (findErr) throw findErr;
 
+      // NOID-VERTICAL-1.0-VERT-01.2E-0
+      // Both INSERT and UPDATE branches MUST fall through to the same canonical
+      // sync step. A previous early return on UPDATE caused Eventrix rows to
+      // drift from `inventory_provider_settings`.
+      let savedSettings: EventrixInventorySettings;
       if (existing?.id) {
         const { data, error } = await (supabase as any)
           .from(SETTINGS_TABLE)
@@ -110,19 +115,21 @@ export function useUpsertEventrixInventorySettings() {
           .select('*')
           .single();
         if (error) throw error;
-        return data as EventrixInventorySettings;
+        savedSettings = data as EventrixInventorySettings;
+      } else {
+        const { data, error } = await (supabase as any)
+          .from(SETTINGS_TABLE)
+          .insert({ ...payload, created_by: user?.id ?? null })
+          .select('*')
+          .single();
+        if (error) throw error;
+        savedSettings = data as EventrixInventorySettings;
       }
 
-      const { data, error } = await (supabase as any)
-        .from(SETTINGS_TABLE)
-        .insert({ ...payload, created_by: user?.id ?? null })
-        .select('*')
-        .single();
-      if (error) throw error;
-
-      // Dual-write: NOID-VERTICAL-1.0-VERT-01.2B
-      // Keep canonical inventory_provider_settings in sync while legacy UI
-      // remains the entry point for Eventrix activation/deactivation.
+      // Canonical sync — single shared code path for INSERT and UPDATE.
+      // enable  → provider_type = 'eventrix'
+      // disable → provider_type = 'native'
+      // Residual risk: the two writes are not atomic (client-side).
       try {
         await upsertInventoryProviderSettings({
           organizationId: orgId,
@@ -140,7 +147,7 @@ export function useUpsertEventrixInventorySettings() {
         );
       }
 
-      return data as EventrixInventorySettings;
+      return savedSettings;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['eventrix-inv-settings', orgId] });
