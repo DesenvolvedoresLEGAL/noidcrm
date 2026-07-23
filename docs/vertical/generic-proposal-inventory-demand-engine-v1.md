@@ -118,6 +118,31 @@ Somente código: restaurar as duas libs legadas via git, remover os arquivos
 novos do domínio, manter D-A e providers. Nenhum rollback de banco necessário.
 
 ## Recomendação D-C
+
 Prosseguir com `VERT-01.2D-C` — conectar `useProposalInventoryDemandPreview`
 ao provider resolver, exibir `unsupported` na UI, gravar snapshot v2 real
 mantendo aliases legados durante janela de migração.
+
+---
+
+## Update — VERT-01.2D-C (2026-07-23)
+
+Estado anterior `ENGINE_READY_NOT_CONNECTED` **substituído** por
+`ENGINE_CONNECTED_RUNTIME_ACTIVE`. Registro histórico da D-B preservado
+acima; a nota abaixo passa a valer como estado corrente.
+
+- Engine `buildInventoryDemandPreview` foi conectado ao runtime real via
+  `useProposalInventoryDemandPreview` (`src/hooks/proposals/`).
+- Persistência **v2** ativa: `useProposalInventoryDemandSnapshots` grava
+  `algorithm_version = 'inventory-demand-v2'` e `payload.schema_version = 2`.
+- Runtime usa `useInventoryProvider` (resolver canonical → legacy → native)
+  em vez do hardcode `provider_type='eventrix'` do bridge legado.
+- Native retorna `status='unsupported'` (capability `proposal_demand`
+  ausente); Eventrix continua funcionando via normalização na fronteira.
+- Bridges em `src/lib/proposals/inventoryDemand{Preview,Snapshot}.ts`
+  permanecem `@deprecated` **apenas** para compatibilidade com consumidores
+  não migrados; wrapper `provider_type='eventrix'` mantido apenas nesse
+  bridge, não no runtime real.
+- Aliases Eventrix no snapshot v2 preservados por design (bridge temporário).
+
+Ver `docs/vertical/generic-proposal-inventory-demand-runtime-v1.md`.
