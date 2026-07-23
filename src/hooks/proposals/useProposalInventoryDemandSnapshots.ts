@@ -53,7 +53,13 @@ export function useCreateProposalInventoryDemandSnapshot() {
           organization_id: orgId,
           proposal_id: input.proposal_id,
           snapshot_version: nextVersion,
-          algorithm_version: 'noid-inv-demand-v1',
+          // NOID-VERTICAL-1.0-VERT-01.2D-C
+          // Novos snapshots v2 informam explicitamente
+          // `algorithm_version='inventory-demand-v2'`. Callers legados
+          // sem esse campo mantêm o fallback histórico.
+          algorithm_version: input.algorithm_version ?? 'noid-inv-demand-v1',
+          // Preservamos o significado atual da coluna física `status`.
+          // O status semântico da demanda vive no payload/serializer.
           status: 'preview_snapshot',
           summary: input.summary ?? {},
           payload: input.payload ?? {},
