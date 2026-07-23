@@ -8,6 +8,13 @@
 > `InventoryRequirementMetadataError` para valores inválidos e UnitBasis
 > canônico em `src/inventory/requirements/unitBasis.ts` (schema legado
 > vira bridge). Ver `generic-product-inventory-requirement-facade-hardening-v1.md`.
+>
+> **VERT-01.2E-B2A — editor runtime activation (2026-07-23):**
+> `ProductInventoryRequirementsEditor` migrado para o hook/schema genéricos.
+> Zero `eventrix_*` no componente. Provider mismatch bloqueia edição sem
+> destruir dados. Ver
+> `generic-product-inventory-requirement-editor-runtime-v1.md`.
+
 
 ## 1. Contexto
 Após E-A, o inventário está desacoplado do Eventrix exceto por um resíduo
