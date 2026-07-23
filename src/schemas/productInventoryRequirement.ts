@@ -1,30 +1,21 @@
 /**
- * @deprecated compatibility schema (VERT-01.2E-B1).
+ * @deprecated compatibility schema (VERT-01.2E-B1 / hardened em B1.1).
  * Substituto genérico: `@/inventory/requirements/schema`
  * (`inventoryProductRequirementSchema`). Mantido enquanto o
  * ProductInventoryRequirementsEditor ainda opera com chaves `eventrix_*`.
+ *
+ * UnitBasis canônico vive em `@/inventory/requirements/unitBasis`; este
+ * arquivo apenas re-exporta para preservar consumers legados.
  */
 import { z } from 'zod';
+import {
+  UNIT_BASIS_LABELS,
+  UNIT_BASIS_VALUES,
+  type UnitBasis,
+} from '@/inventory/requirements/unitBasis';
 
-export const UNIT_BASIS_VALUES = [
-  'per_point',
-  'per_event',
-  'per_day',
-  'per_participant',
-  'per_unit',
-  'manual',
-] as const;
-
-export type UnitBasis = (typeof UNIT_BASIS_VALUES)[number];
-
-export const UNIT_BASIS_LABELS: Record<UnitBasis, string> = {
-  per_point: 'Por ponto',
-  per_event: 'Por evento',
-  per_day: 'Por diária',
-  per_participant: 'Por participante',
-  per_unit: 'Por unidade',
-  manual: 'Manual',
-};
+export { UNIT_BASIS_VALUES, UNIT_BASIS_LABELS };
+export type { UnitBasis };
 
 export const ITEM_KIND_LABELS: Record<string, string> = {
   serialized: 'Serializado',

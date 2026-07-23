@@ -10,9 +10,10 @@
 //   porque esse é o significado físico real das colunas atuais.
 
 import type { InventoryProviderType } from '@/inventory/providers/types';
-import type { UnitBasis } from '@/schemas/productInventoryRequirement';
+import type { UnitBasis } from './unitBasis';
 import {
   INVENTORY_PROVIDER_METADATA_KEY,
+  InventoryRequirementMetadataError,
   InventoryRequirementProviderNotSupportedError,
   type InventoryProductRequirement,
   type InventoryProductRequirementInput,
@@ -50,10 +51,16 @@ const SUPPORTED_STORAGE_PROVIDERS = new Set<InventoryProviderType>(['eventrix'])
 function readProviderFromMetadata(
   metadata: Record<string, unknown> | null | undefined,
 ): InventoryProviderType {
-  const raw = metadata?.[INVENTORY_PROVIDER_METADATA_KEY];
+  if (!metadata || !(INVENTORY_PROVIDER_METADATA_KEY in metadata)) {
+    // Fallback histórico: chave AUSENTE → colunas `eventrix_*` são a verdade física.
+    return 'eventrix';
+  }
+  const raw = metadata[INVENTORY_PROVIDER_METADATA_KEY];
   if (raw === 'eventrix' || raw === 'native') return raw;
-  // Fallback histórico: colunas `eventrix_*` sem metadata explícita → eventrix.
-  return 'eventrix';
+  // Chave presente com valor inválido = corrupção, não legado. Nunca reinterpretar.
+  throw new InventoryRequirementMetadataError(
+    `metadata.${INVENTORY_PROVIDER_METADATA_KEY} inválido: ${JSON.stringify(raw)}`,
+  );
 }
 
 /**

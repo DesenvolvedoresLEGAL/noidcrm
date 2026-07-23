@@ -4,7 +4,7 @@
 // com as colunas legadas fica confinado a `storageMapper.ts`.
 
 import type { InventoryProviderType } from '@/inventory/providers/types';
-import type { UnitBasis } from '@/schemas/productInventoryRequirement';
+import type { UnitBasis } from './unitBasis';
 
 export interface InventoryProductRequirement {
   id: string;

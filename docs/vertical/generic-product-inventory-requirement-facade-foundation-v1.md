@@ -3,6 +3,12 @@
 **Change ID:** `NOID-VERTICAL-1.0-VERT-01.2E-B1`
 **Decisão:** `VERT-01.2E-B1 VALIDATED WITH LEGACY STORAGE BRIDGE`
 
+> **VERT-01.2E-B1.1 — façade safety hardening (2026-07-23):** metadata
+> preservation em update com `provider_type`, parser estrito com
+> `InventoryRequirementMetadataError` para valores inválidos e UnitBasis
+> canônico em `src/inventory/requirements/unitBasis.ts` (schema legado
+> vira bridge). Ver `generic-product-inventory-requirement-facade-hardening-v1.md`.
+
 ## 1. Contexto
 Após E-A, o inventário está desacoplado do Eventrix exceto por um resíduo
 estrutural: `product_inventory_requirements` ainda usa colunas físicas

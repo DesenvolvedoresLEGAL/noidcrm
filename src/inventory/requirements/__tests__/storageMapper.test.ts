@@ -8,6 +8,7 @@ import {
 } from '../storageMapper';
 import {
   INVENTORY_PROVIDER_METADATA_KEY,
+  InventoryRequirementMetadataError,
   InventoryRequirementProviderNotSupportedError,
   type InventoryProductRequirementInput,
 } from '../types';
@@ -81,12 +82,29 @@ describe('storage → domain', () => {
     expect(d.provider_type).toBe('eventrix');
   });
 
-  it('metadata desconhecida não é silenciosamente eventrix (usa fallback controlado)', () => {
-    const d = mapProductInventoryRequirementFromStorage(
-      baseRow({ metadata: { [INVENTORY_PROVIDER_METADATA_KEY]: 'zabbix' } }),
-    );
-    // Valor inválido → cai no fallback histórico documentado (eventrix),
-    // mas nunca é tratado como um provider Native inferido.
+  it('metadata explícita inválida lança InventoryRequirementMetadataError', () => {
+    expect(() =>
+      mapProductInventoryRequirementFromStorage(
+        baseRow({ metadata: { [INVENTORY_PROVIDER_METADATA_KEY]: 'zabbix' } }),
+      ),
+    ).toThrow(InventoryRequirementMetadataError);
+  });
+
+  it.each([
+    ['number', 123],
+    ['boolean', true],
+    ['object', { nested: true }],
+    ['array', ['eventrix']],
+  ])('metadata provider tipo %s lança erro', (_label, value) => {
+    expect(() =>
+      mapProductInventoryRequirementFromStorage(
+        baseRow({ metadata: { [INVENTORY_PROVIDER_METADATA_KEY]: value as unknown } }),
+      ),
+    ).toThrow(InventoryRequirementMetadataError);
+  });
+
+  it('metadata {} (sem chave provider) → fallback histórico eventrix', () => {
+    const d = mapProductInventoryRequirementFromStorage(baseRow({ metadata: {} }));
     expect(d.provider_type).toBe('eventrix');
   });
 
@@ -179,6 +197,22 @@ describe('domain → storage (update)', () => {
     expect(() =>
       mapInventoryRequirementUpdateToStorage({ provider_type: 'native' }),
     ).toThrow(InventoryRequirementProviderNotSupportedError);
+  });
+
+  it('update com provider_type preserva chaves existentes de metadata', () => {
+    const existing = {
+      foo: 'bar',
+      custom: 123,
+      [INVENTORY_PROVIDER_METADATA_KEY]: 'eventrix',
+    };
+    const patch = mapInventoryRequirementUpdateToStorage(
+      { provider_type: 'eventrix', label: 'Atualizado' },
+      existing,
+    );
+    expect(patch.label).toBe('Atualizado');
+    expect(patch.metadata?.foo).toBe('bar');
+    expect(patch.metadata?.custom).toBe(123);
+    expect(patch.metadata?.[INVENTORY_PROVIDER_METADATA_KEY]).toBe('eventrix');
   });
 });
 
