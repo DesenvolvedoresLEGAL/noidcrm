@@ -1,3 +1,9 @@
+/**
+ * @deprecated compatibility schema (VERT-01.2E-B1).
+ * Substituto genérico: `@/inventory/requirements/schema`
+ * (`inventoryProductRequirementSchema`). Mantido enquanto o
+ * ProductInventoryRequirementsEditor ainda opera com chaves `eventrix_*`.
+ */
 import { z } from 'zod';
 
 export const UNIT_BASIS_VALUES = [

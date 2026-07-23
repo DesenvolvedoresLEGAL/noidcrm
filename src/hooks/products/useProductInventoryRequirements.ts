@@ -1,3 +1,10 @@
+/**
+ * @deprecated storage-contract bridge (VERT-01.2E-B1).
+ * Substituto genérico: `@/inventory/hooks/useInventoryProductRequirements`.
+ * Este hook mantém o contrato legado com chaves `eventrix_*` porque o
+ * ProductInventoryRequirementsEditor ainda depende delas. Não remover
+ * enquanto E-B2 não migrar o editor.
+ */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type {

@@ -94,3 +94,7 @@ Nenhuma alteração de banco a desfazer.
 
 ## 20. Próxima sprint
 `VERT-01.2E-B — GENERIC PRODUCT INVENTORY REQUIREMENT FACADE`.
+
+---
+**Update:** `VERT-01.2E-B1 — generic facade foundation created`. Ver
+`docs/vertical/generic-product-inventory-requirement-facade-foundation-v1.md`.
