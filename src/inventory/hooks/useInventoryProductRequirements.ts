@@ -99,9 +99,11 @@ export function useUpdateInventoryProductRequirement(scope: TenantScope) {
       const userId = await getUserId();
 
       let existingMetadata: Record<string, unknown> | null = null;
-      const needsExistingMetadata =
-        input.metadata !== undefined && input.provider_type === undefined;
-      if (needsExistingMetadata) {
+      // Metadata existente precisa ser lida SEMPRE que o mapper for tocar em metadata:
+      // isto é, tanto quando o input traz `metadata` quanto quando traz `provider_type`.
+      const shouldReadExistingMetadata =
+        input.metadata !== undefined || input.provider_type !== undefined;
+      if (shouldReadExistingMetadata) {
         const { data: current, error: readErr } = await (supabase as any)
           .from(TABLE)
           .select('metadata')
