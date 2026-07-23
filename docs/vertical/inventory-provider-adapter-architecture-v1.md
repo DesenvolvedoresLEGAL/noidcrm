@@ -98,18 +98,25 @@ Dual-write: ativar/desativar Eventrix pela UI legada sincroniza a row canônica 
 
 ## 9. Consumidores migrados
 
-- `src/components/products/ProductInventoryRequirementsEditor.tsx`
+- `src/components/products/ProductInventoryRequirementsEditor.tsx` (VERT-01.2A).
+- `src/hooks/proposals/useProposalInventoryDemandPreview.ts` (VERT-01.2D-C).
+- `src/components/proposals/ProposalInventoryDemandPreview.tsx` (VERT-01.2D-C).
+- `src/components/proposals/ProposalInventoryDemandSnapshotDetails.tsx`
+  (VERT-01.2D-C — via compatibility reader).
 
 ## 10. Consumidores ainda legados
 
 - `src/hooks/settings/useEventrixInventory.ts` (tela de configuração).
-- `src/pages/settings/EventrixInventorySettings.tsx` (configuração canônica).
-- `src/components/proposals/ProposalInventoryDemand*.tsx` (snapshot/preview).
-- `src/lib/proposals/inventoryDemand*.ts`.
+- `src/pages/settings/EventrixInventorySettings.tsx` (configuração canônica,
+  encapsulada como painel provider-specific).
+- `src/lib/proposals/inventoryDemand*.ts` — bridges `@deprecated` mantidos
+  apenas para consumidores não migrados; delegam ao domínio genérico.
 - `src/services/operations/inventory*.ts` (BOM Editor, etc).
+- `src/hooks/products/useProductInventoryRequirements.ts` (Product BOM lê
+  colunas físicas `eventrix_*`).
 
 Estes permanecem para preservar compatibilidade da LEGAL e serão avaliados
-individualmente em VERT-01.2B.
+em VERT-01.2E.
 
 ## 11. Comportamento da LEGAL
 
@@ -117,37 +124,64 @@ individualmente em VERT-01.2B.
 - Editor mostra "Provider ativo: Eventrix".
 - Categorias/famílias carregam da mesma tabela cache.
 - Cadastro/edição/desativação de composição idênticos.
+- Proposal Inventory Demand roda pelo domínio genérico; requisitos Eventrix
+  são normalizados na fronteira.
 
 ## 12. Comportamento de tenant sem Eventrix
 
 - Provider resolvido: `native`.
-- Editor mostra card informativo "Provider de inventário nativo ativo",
-  sem mensagem de erro pedindo integração Eventrix.
-- Botão "Nova composição" fica oculto (capacidade `product_requirements` ausente).
+- Editor de produto mostra card informativo "Provider de inventário nativo
+  ativo", sem mensagem de erro pedindo integração Eventrix.
+- Botão "Nova composição" fica oculto (capacidade `product_requirements`
+  ausente).
+- Proposal Inventory Demand retorna `status='unsupported'` (capability
+  `proposal_demand` ausente) sem consultar requisitos.
 - Cadastro de produto (não relacionado a inventário) continua funcionando.
 
 ## 13. Testes
 
 - `__tests__/registry.test.ts` — 5 casos.
 - `__tests__/resolver.test.ts` — 5 casos.
+- `__tests__/resolver-canonical.test.ts` — 8 casos.
 - `__tests__/providers.test.ts` — 7 casos (native + eventrix normalization).
+- `demand/__tests__/foundation.test.ts` — 12 casos.
+- `demand/__tests__/engine.test.ts` — 36 casos.
+- Settings page smoke — 2 casos.
+- Total: 91/91 verdes.
 
-## 14. Riscos
+## 14. Capabilities declaradas
 
-- Consumidores de proposal demand ainda acoplados ao Eventrix.
+| Provider  | Capabilities                                                                | Fonte                                          |
+| --------- | --------------------------------------------------------------------------- | ---------------------------------------------- |
+| native    | (vazio)                                                                     | nenhuma; nunca presume disponibilidade         |
+| eventrix  | `categories`, `families`, `product_requirements`, **`proposal_demand`**     | `eventrix_inventory_sync_cache` + settings     |
+
+`proposal_demand` (declarada na VERT-01.2D-A e efetivamente consumida na
+VERT-01.2D-C) é a capability que habilita o Proposal Inventory Demand
+genérico. Native não a declara e a UI de proposta apresenta estado
+`unsupported`.
+
+## 15. Riscos
+
 - Rota canônica ainda tem "eventrix" no path (intencionalmente preservada).
 - Native provider ainda não oferece capacidades reais — quando o Pack
   Conectividade existir, o native poderá receber sua própria fonte.
+- Colunas físicas `eventrix_*` em `product_inventory_requirements` continuam
+  como fonte legada; a normalização vive apenas na fronteira.
+- Product BOM ainda acoplado ao provider Eventrix; snapshots históricos
+  continuam legíveis independentemente do provider ativo, mas o cadastro
+  de requisitos ainda depende do provider legado.
 
-## 15. Próxima sprint (VERT-01.2B)
+## 16. Próxima sprint (VERT-01.2E)
 
-1. Criar tabela `inventory_provider_settings` (organization-scoped).
-2. Migrar consumidores de Proposal Inventory Demand.
-3. Introduzir alias de rota `/app/settings/inventory-provider`.
-4. Deprecar oficialmente `useEventrixInventoryCache`.
-5. Iniciar planejamento do Pack Conectividade (equipment profile).
+1. Desacoplar Product BOM do provider Eventrix.
+2. Reavaliar remoção dos aliases `eventrix_*` do snapshot v2 após
+   revalidação dos snapshots históricos.
+3. Iniciar Pack Conectividade (equipment profile) como fonte nativa.
+4. Avaliar depreciação real de `useEventrixInventoryCache` e do painel
+   provider-specific.
 
-## 16. Rollback
+## 17. Rollback
 
 Rollback exclusivamente de código:
 

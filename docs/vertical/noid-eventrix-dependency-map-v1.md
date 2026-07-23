@@ -130,3 +130,49 @@ Novo pipeline:
 Eventrix classificado como `OPTIONAL_INTEGRATION` no runtime — Core não conhece mais detalhes de schema Eventrix. Dependências remanescentes (proposals demand, settings page, BOM editor) preservadas para VERT-01.2B.
 
 Ver `docs/vertical/inventory-provider-adapter-architecture-v1.md`.
+
+---
+
+## Update — Sprint VERT-01.2D (2026-07-23)
+
+**Change ID:** `NOID-VERTICAL-1.0-VERT-01.2D-C`
+**Fechamento:** `VERT-01.2D COMPLETE — PROPOSAL INVENTORY DEMAND DECOUPLED WITH LEGACY SNAPSHOT ALIASES`
+
+Correção cronológica: as seções §3, §4 (E08–E11) e §6.2 acima descreviam o
+Proposal Inventory Demand como acoplado diretamente ao provider Eventrix.
+Essa afirmação **não vale mais em runtime** a partir da VERT-01.2D-C. As
+seções históricas são preservadas como registro de auditoria; a atualização
+abaixo passa a valer como estado corrente.
+
+Estado corrente do Proposal Inventory Demand:
+
+- Utiliza o domínio genérico `src/inventory/demand/` (builder, snapshot v2,
+  reader v1/v2, compare/hash).
+- Componentes `ProposalInventoryDemandPreview` e
+  `ProposalInventoryDemandSnapshotDetails` não dependem mais de `eventrix_*`
+  em runtime — leem `category_name`, `family_name`, `item_kind` genéricos.
+- `useProposalInventoryDemandPreview` resolve o provider ativo via
+  `useInventoryProvider` (resolver canonical → legacy → native).
+- Eventrix é provider opcional que declara capability `proposal_demand`.
+- Native retorna `status='unsupported'` sem consultar requisitos.
+- Novos snapshots são gravados no formato **v2** com
+  `algorithm_version='inventory-demand-v2'` e `payload.schema_version=2`.
+- Snapshots **v1** permanecem legíveis via reader; nenhum backfill executado.
+- Aliases `eventrix_*` no snapshot v2 permanecem **apenas** como bridge de
+  compatibilidade quando `provider_type='eventrix'`; não são domínio.
+- Bridges `src/lib/proposals/inventoryDemand{Preview,Snapshot}.ts` seguem
+  `@deprecated`, delegando ao domínio genérico.
+
+Dependências Eventrix ainda **residuais** após a VERT-01.2D:
+
+- **Product BOM** (`ProductBOMEditor`,
+  `ProductInventoryRequirementsEditor`, `useProductInventoryRequirements`)
+  ainda leem/gravam colunas Eventrix.
+- **Settings Eventrix** (`useEventrixInventory`,
+  `EventrixInventorySettings`, `eventrix_inventory_integration_settings`,
+  `eventrix_inventory_sync_cache`) permanecem provider-specific.
+- **Colunas físicas** `eventrix_category_id/name`, `eventrix_family_id/name`,
+  `eventrix_item_kind` em `product_inventory_requirements` continuam
+  pendentes (aguardam VERT-01.2E / Pack Conectividade).
+
+Ver `docs/vertical/generic-proposal-inventory-demand-runtime-v1.md`.
