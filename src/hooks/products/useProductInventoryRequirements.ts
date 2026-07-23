@@ -30,43 +30,13 @@ export interface ProductInventoryRequirement {
 
 const TABLE = 'product_inventory_requirements' as const;
 
-export interface EventrixSyncCacheItem {
-  id: string;
-  organization_id: string;
-  eventrix_entity_id: string;
-  entity_type: 'category' | 'family';
-  name: string;
-  description: string | null;
-  parent_eventrix_entity_id: string | null;
-  control_mode: string | null;
-  item_kind: string | null;
-  is_active: boolean;
-  payload: Record<string, unknown> | null;
-  synced_at: string | null;
-}
-
-/**
- * @deprecated NOID-VERTICAL-1.0-VERT-01.2A
- * Use `useInventoryCategories` / `useInventoryFamilies` de
- * `@/inventory/hooks/useInventoryProvider`. Preservado apenas para
- * compatibilidade legada e será removido em VERT-01.2B.
- */
-export function useEventrixInventoryCache(organizationId?: string | null) {
-  return useQuery({
-    queryKey: ['eventrix-inventory-cache', organizationId],
-    enabled: !!organizationId,
-    queryFn: async (): Promise<EventrixSyncCacheItem[]> => {
-      const { data, error } = await (supabase as any)
-        .from('eventrix_inventory_sync_cache')
-        .select('*')
-        .eq('organization_id', organizationId)
-        .eq('is_active', true)
-        .order('name', { ascending: true });
-      if (error) throw error;
-      return (data ?? []) as EventrixSyncCacheItem[];
-    },
-  });
-}
+// NOID-VERTICAL-1.0-VERT-01.2E-A
+// Removidos `useEventrixInventoryCache` e `EventrixSyncCacheItem`: sem consumers
+// ativos no repositório. A leitura genérica de categorias/famílias de inventário
+// é feita via `useInventoryCategories`/`useInventoryFamilies` em
+// `@/inventory/hooks/useInventoryProvider`. A tabela física
+// `eventrix_inventory_sync_cache` permanece intocada e continua alimentando o
+// EventrixInventoryProvider através do adapter.
 
 export function useProductInventoryRequirements(productId?: string | null) {
   return useQuery({

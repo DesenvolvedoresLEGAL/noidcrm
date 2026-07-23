@@ -82,10 +82,11 @@ export function ProductBOMEditor({ organizationId, productId, value, onChange }:
         <div>
           <Label className="text-base">Composição de Inventário</Label>
           <p className="text-xs text-muted-foreground">
-            Defina quais categorias e famílias do Eventrix este produto exige para ser entregue.
-            A quantidade deve representar o consumo físico por unidade comercial vendida
-            (ex.: 1 roteador por ponto). O sistema usará essa composição para consultar
-            disponibilidade, ocupação e reservas no inventário operacional.
+            Defina quais categorias e famílias de inventário este produto exige para ser entregue.
+            A quantidade representa o consumo físico por unidade comercial vendida
+            (ex.: 1 roteador por ponto). Essa composição descreve os recursos físicos
+            associados ao produto e pode ser utilizada pelos fluxos de disponibilidade,
+            reserva e operação quando suportados pelo provider ativo.
           </p>
         </div>
         <Button type="button" size="sm" variant="outline" onClick={addRow}>

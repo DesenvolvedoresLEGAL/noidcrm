@@ -176,3 +176,23 @@ Dependências Eventrix ainda **residuais** após a VERT-01.2D:
   pendentes (aguardam VERT-01.2E / Pack Conectividade).
 
 Ver `docs/vertical/generic-proposal-inventory-demand-runtime-v1.md`.
+
+## Update — VERT-01.2E-A
+
+- Product BOM (`ProductBOMEditor` + `product_bom_items`) confirmado
+  provider-neutral: usa `inventory_category_id`/`inventory_family_id`
+  genéricos e serviços `services/operations/inventory{Categories,Families}`.
+  Copy Eventrix removida.
+- Settings/schema/hook específicos Eventrix
+  (`eventrixInventorySettingsSchema`, `useEventrixInventory*`) confinados
+  ao painel Eventrix — reclassificados como integração legítima, não
+  hardcode Core. Abstração Core permanece em `InventoryProviderAdapter` +
+  `useInventoryProvider`.
+- Dead code removido: `useEventrixInventoryCache` e `EventrixSyncCacheItem`
+  em `src/hooks/products/useProductInventoryRequirements.ts` (zero
+  consumers verificados via rg).
+- Rota `/app/settings/eventrix-inventory` mantida como redirect legado.
+  Nenhum link interno novo aponta para ela.
+- Colunas físicas `eventrix_*` em `product_inventory_requirements` e
+  aliases `eventrix_*` em snapshots v2 permanecem inalterados; próximo
+  alvo é a façade genérica (`VERT-01.2E-B`).
