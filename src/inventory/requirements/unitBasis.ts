@@ -21,3 +21,14 @@ export const UNIT_BASIS_LABELS: Record<UnitBasis, string> = {
   per_unit: 'Por unidade',
   manual: 'Manual',
 };
+
+/**
+ * Rótulos neutros por tipo de item de inventário. O conjunto de chaves
+ * permanece aberto porque `item_kind` é livremente definido pelo provider
+ * ativo (Eventrix hoje: serialized/quantity).
+ */
+export const ITEM_KIND_LABELS: Record<string, string> = {
+  serialized: 'Serializado',
+  quantity: 'Por quantidade',
+};
+

@@ -17,10 +17,8 @@ import {
 export { UNIT_BASIS_VALUES, UNIT_BASIS_LABELS };
 export type { UnitBasis };
 
-export const ITEM_KIND_LABELS: Record<string, string> = {
-  serialized: 'Serializado',
-  quantity: 'Por quantidade',
-};
+export { ITEM_KIND_LABELS } from '@/inventory/requirements/unitBasis';
+
 
 export const productInventoryRequirementSchema = z.object({
   label: z

@@ -1,3 +1,7 @@
+// NOID-VERTICAL-1.0-VERT-01.2E-B2A
+// Ativação runtime da façade genérica de Product Inventory Requirements.
+// O componente não conhece mais colunas físicas `eventrix_*` — todo o binding
+// legado permanece confinado ao storageMapper via generic hook.
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -46,26 +50,30 @@ import {
 import { useToast } from '@/hooks/use-toast';
 
 import {
-  productInventoryRequirementSchema,
-  type ProductInventoryRequirementInput,
+  inventoryProductRequirementSchema,
   UNIT_BASIS_LABELS,
   UNIT_BASIS_VALUES,
   ITEM_KIND_LABELS,
+  type InventoryProductRequirement,
+  type InventoryProductRequirementInput,
   type UnitBasis,
-} from '@/schemas/productInventoryRequirement';
+} from '@/inventory/requirements';
 import {
-  useCreateProductInventoryRequirement,
-  useDeactivateProductInventoryRequirement,
-  useProductInventoryRequirements,
-  useUpdateProductInventoryRequirement,
-  type ProductInventoryRequirement,
-} from '@/hooks/products/useProductInventoryRequirements';
+  useCreateInventoryProductRequirement,
+  useDeactivateInventoryProductRequirement,
+  useInventoryProductRequirements,
+  useUpdateInventoryProductRequirement,
+} from '@/inventory/hooks/useInventoryProductRequirements';
 import {
   useInventoryProvider,
   useInventoryCategories,
   useInventoryFamilies,
 } from '@/inventory/hooks/useInventoryProvider';
-import type { InventoryCategory, InventoryFamily } from '@/inventory/providers/types';
+import type {
+  InventoryCategory,
+  InventoryFamily,
+  InventoryProviderType,
+} from '@/inventory/providers/types';
 
 interface Props {
   organizationId: string;
@@ -103,7 +111,6 @@ export function ProductInventoryRequirementsEditor({
 }: Props) {
   const { toast } = useToast();
 
-  // NOID-VERTICAL-1.0-VERT-01.2A — consumo via provider adapter genérico.
   const {
     provider,
     providerType,
@@ -120,17 +127,21 @@ export function ProductInventoryRequirementsEditor({
   const { data: families = [], isLoading: loadingFamilies } =
     useInventoryFamilies(providerSupportsRequirements ? organizationId : null);
 
-  const { data: requirements = [], isLoading: loadingReqs } =
-    useProductInventoryRequirements(productId);
+  const {
+    data: requirements = [],
+    isLoading: loadingReqs,
+    error: requirementsError,
+  } = useInventoryProductRequirements({ organizationId, productId });
 
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editing, setEditing] = useState<ProductInventoryRequirement | null>(null);
+  const [editing, setEditing] = useState<InventoryProductRequirement | null>(null);
   const [deactivateTarget, setDeactivateTarget] =
-    useState<ProductInventoryRequirement | null>(null);
+    useState<InventoryProductRequirement | null>(null);
 
-  const createMut = useCreateProductInventoryRequirement(organizationId, productId);
-  const updateMut = useUpdateProductInventoryRequirement(productId);
-  const deactivateMut = useDeactivateProductInventoryRequirement(productId);
+  const scope = { organizationId, productId };
+  const createMut = useCreateInventoryProductRequirement(scope);
+  const updateMut = useUpdateInventoryProductRequirement(scope);
+  const deactivateMut = useDeactivateInventoryProductRequirement(scope);
 
   const loadingCache = loadingProvider || loadingCategories || loadingFamilies;
   const providerIsNative = providerType === 'native';
@@ -141,11 +152,23 @@ export function ProductInventoryRequirementsEditor({
   const cacheEmpty =
     providerSupportsRequirements && categories.length === 0 && !loadingCache;
 
+  const canOpenCreate =
+    !loadingProvider &&
+    !!providerType &&
+    providerSupportsRequirements &&
+    !integrationMissing &&
+    !cacheEmpty;
+
+  const providerConfigHref = providerType
+    ? `/app/settings/inventory-provider?provider=${providerType}`
+    : '/app/settings/inventory-provider';
+
   const openCreate = () => {
+    if (!canOpenCreate) return;
     setEditing(null);
     setDialogOpen(true);
   };
-  const openEdit = (r: ProductInventoryRequirement) => {
+  const openEdit = (r: InventoryProductRequirement) => {
     setEditing(r);
     setDialogOpen(true);
   };
@@ -171,9 +194,10 @@ export function ProductInventoryRequirementsEditor({
         <div>
           <Label className="text-base">Composição de Inventário</Label>
           <p className="text-xs text-muted-foreground max-w-2xl">
-            Defina quais categorias e famílias de inventário este produto exige
-            para ser entregue. O sistema usará essa composição para consultar
-            disponibilidade, ocupação e reservas no provider de inventário ativo.
+            Defina quais recursos de inventário este produto exige para ser
+            entregue. Essa composição é utilizada no cálculo de demanda e poderá
+            alimentar recursos de disponibilidade e operação quando suportados
+            pelo provider ativo.
           </p>
           <p className="text-xs text-muted-foreground mt-1">
             A quantidade representa o consumo físico por base comercial. Ex.:
@@ -185,12 +209,29 @@ export function ProductInventoryRequirementsEditor({
             </p>
           )}
         </div>
-        {canEdit && providerSupportsRequirements && !integrationMissing && !cacheEmpty && (
+        {canEdit && canOpenCreate && (
           <Button type="button" size="sm" onClick={openCreate}>
             <Plus className="w-4 h-4 mr-1" /> Nova composição
           </Button>
         )}
       </div>
+
+      {requirementsError && (
+        <Card className="border-destructive/40 bg-destructive/5">
+          <CardContent className="pt-4 flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-medium">
+                Não foi possível carregar a composição de inventário deste produto.
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Tente novamente em instantes. Se o problema persistir, contate o
+                suporte.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {providerIsNative && (
         <Card className="border-dashed">
@@ -221,7 +262,7 @@ export function ProductInventoryRequirementsEditor({
                 vincular a composição.
               </p>
               <Button asChild variant="link" size="sm" className="px-0 h-auto mt-1">
-                <Link to="/app/settings/inventory-provider?provider=eventrix">
+                <Link to={providerConfigHref}>
                   Abrir configuração de inventário <ExternalLink className="h-3 w-3 ml-1" />
                 </Link>
               </Button>
@@ -243,7 +284,7 @@ export function ProductInventoryRequirementsEditor({
                 para habilitar a composição deste produto.
               </p>
               <Button asChild variant="link" size="sm" className="px-0 h-auto mt-1">
-                <Link to="/app/settings/inventory-provider?provider=eventrix">
+                <Link to={providerConfigHref}>
                   Abrir configuração de inventário{' '}
                   <ExternalLink className="h-3 w-3 ml-1" />
                 </Link>
@@ -253,7 +294,7 @@ export function ProductInventoryRequirementsEditor({
         </Card>
       )}
 
-      {!loadingReqs && requirements.length === 0 && !providerIsNative && (
+      {!loadingReqs && !requirementsError && requirements.length === 0 && !providerIsNative && (
         <Card className="border-dashed">
           <CardContent className="pt-6 text-center space-y-1">
             <p className="text-sm font-medium">
@@ -285,73 +326,85 @@ export function ProductInventoryRequirementsEditor({
               </tr>
             </thead>
             <tbody>
-              {requirements.map((r) => (
-                <tr key={r.id} className="border-t">
-                  <td className="px-3 py-2 font-medium">{r.label}</td>
-                  <td className="px-3 py-2">{r.eventrix_category_name}</td>
-                  <td className="px-3 py-2">{r.eventrix_family_name}</td>
-                  <td className="px-3 py-2 text-muted-foreground">
-                    {r.eventrix_item_kind
-                      ? ITEM_KIND_LABELS[r.eventrix_item_kind] ?? '—'
-                      : '—'}
-                  </td>
-                  <td className="px-3 py-2 text-right tabular-nums">
-                    {Number(r.quantity)}
-                  </td>
-                  <td className="px-3 py-2">{UNIT_BASIS_LABELS[r.unit_basis]}</td>
-                  <td className="px-3 py-2">
-                    {r.is_required ? (
-                      <Badge variant="default">Obrigatório</Badge>
-                    ) : (
-                      <Badge variant="secondary">Opcional</Badge>
-                    )}
-                  </td>
-                  <td className="px-3 py-2">
-                    {r.is_active ? (
-                      <Badge variant="outline">Ativo</Badge>
-                    ) : (
-                      <Badge variant="secondary">Inativo</Badge>
-                    )}
-                  </td>
-                  <td className="px-3 py-2">
-                    {canEdit && (
-                      <div className="flex items-center justify-end gap-1">
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => openEdit(r)}
-                          aria-label="Editar"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        {r.is_active && (
+              {requirements.map((r) => {
+                const providerMismatch =
+                  !!providerType && r.provider_type !== providerType;
+                const editDisabled = providerMismatch;
+                return (
+                  <tr key={r.id} className="border-t">
+                    <td className="px-3 py-2 font-medium">{r.label}</td>
+                    <td className="px-3 py-2">{r.category_name}</td>
+                    <td className="px-3 py-2">{r.family_name}</td>
+                    <td className="px-3 py-2 text-muted-foreground">
+                      {r.item_kind
+                        ? ITEM_KIND_LABELS[r.item_kind] ?? '—'
+                        : '—'}
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums">
+                      {Number(r.quantity)}
+                    </td>
+                    <td className="px-3 py-2">{UNIT_BASIS_LABELS[r.unit_basis]}</td>
+                    <td className="px-3 py-2">
+                      {r.is_required ? (
+                        <Badge variant="default">Obrigatório</Badge>
+                      ) : (
+                        <Badge variant="secondary">Opcional</Badge>
+                      )}
+                    </td>
+                    <td className="px-3 py-2">
+                      {r.is_active ? (
+                        <Badge variant="outline">Ativo</Badge>
+                      ) : (
+                        <Badge variant="secondary">Inativo</Badge>
+                      )}
+                    </td>
+                    <td className="px-3 py-2">
+                      {canEdit && (
+                        <div className="flex items-center justify-end gap-1">
                           <Button
                             type="button"
                             size="icon"
                             variant="ghost"
-                            onClick={() => setDeactivateTarget(r)}
-                            aria-label="Desativar"
+                            onClick={() => openEdit(r)}
+                            disabled={editDisabled}
+                            aria-label="Editar"
+                            title={
+                              providerMismatch
+                                ? `Requisito vinculado a outro provider (${r.provider_type}).`
+                                : undefined
+                            }
                           >
-                            <Power className="h-4 w-4 text-destructive" />
+                            <Pencil className="h-4 w-4" />
                           </Button>
-                        )}
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                          {r.is_active && (
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => setDeactivateTarget(r)}
+                              aria-label="Desativar"
+                            >
+                              <Power className="h-4 w-4 text-destructive" />
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
       )}
 
-      {dialogOpen && (
+      {dialogOpen && providerType && (
         <RequirementDialog
           open={dialogOpen}
           onOpenChange={setDialogOpen}
           categories={categories}
           families={families}
+          providerType={providerType}
           initial={editing}
           onSubmit={async (values) => {
             try {
@@ -404,8 +457,9 @@ interface DialogProps {
   onOpenChange: (o: boolean) => void;
   categories: InventoryCategory[];
   families: InventoryFamily[];
-  initial: ProductInventoryRequirement | null;
-  onSubmit: (values: ProductInventoryRequirementInput) => void | Promise<void>;
+  providerType: InventoryProviderType;
+  initial: InventoryProductRequirement | null;
+  onSubmit: (values: InventoryProductRequirementInput) => void | Promise<void>;
   submitting: boolean;
 }
 
@@ -414,20 +468,22 @@ function RequirementDialog({
   onOpenChange,
   categories,
   families,
+  providerType,
   initial,
   onSubmit,
   submitting,
 }: DialogProps) {
-  const form = useForm<ProductInventoryRequirementInput>({
-    resolver: zodResolver(productInventoryRequirementSchema),
+  const form = useForm<InventoryProductRequirementInput>({
+    resolver: zodResolver(inventoryProductRequirementSchema) as never,
     defaultValues: initial
       ? {
           label: initial.label,
-          eventrix_category_id: initial.eventrix_category_id,
-          eventrix_category_name: initial.eventrix_category_name,
-          eventrix_family_id: initial.eventrix_family_id,
-          eventrix_family_name: initial.eventrix_family_name,
-          eventrix_item_kind: initial.eventrix_item_kind ?? null,
+          provider_type: initial.provider_type,
+          category_ref: initial.category_ref,
+          category_name: initial.category_name,
+          family_ref: initial.family_ref,
+          family_name: initial.family_name,
+          item_kind: initial.item_kind ?? null,
           quantity: Number(initial.quantity),
           unit_basis: initial.unit_basis,
           is_required: initial.is_required,
@@ -437,11 +493,12 @@ function RequirementDialog({
         }
       : {
           label: '',
-          eventrix_category_id: '',
-          eventrix_category_name: '',
-          eventrix_family_id: '',
-          eventrix_family_name: '',
-          eventrix_item_kind: null,
+          provider_type: providerType,
+          category_ref: '',
+          category_name: '',
+          family_ref: '',
+          family_name: '',
+          item_kind: null,
           quantity: 1,
           unit_basis: 'per_point',
           is_required: true,
@@ -451,25 +508,25 @@ function RequirementDialog({
         },
   });
 
-  const categoryId = form.watch('eventrix_category_id');
+  const categoryRef = form.watch('category_ref');
   const quantity = form.watch('quantity');
   const unitBasis = form.watch('unit_basis');
-  const filteredFamilies = families.filter((f) => f.categoryId === categoryId);
+  const filteredFamilies = families.filter((f) => f.categoryId === categoryRef);
 
   const onCategoryChange = (id: string) => {
     const cat = categories.find((c) => c.id === id);
-    form.setValue('eventrix_category_id', id);
-    form.setValue('eventrix_category_name', cat?.name ?? '');
-    form.setValue('eventrix_family_id', '');
-    form.setValue('eventrix_family_name', '');
-    form.setValue('eventrix_item_kind', null);
+    form.setValue('category_ref', id);
+    form.setValue('category_name', cat?.name ?? '');
+    form.setValue('family_ref', '');
+    form.setValue('family_name', '');
+    form.setValue('item_kind', null);
   };
 
   const onFamilyChange = (id: string) => {
     const fam = filteredFamilies.find((f) => f.id === id);
-    form.setValue('eventrix_family_id', id);
-    form.setValue('eventrix_family_name', fam?.name ?? '');
-    form.setValue('eventrix_item_kind', fam?.itemKind ?? null);
+    form.setValue('family_ref', id);
+    form.setValue('family_name', fam?.name ?? '');
+    form.setValue('item_kind', fam?.itemKind ?? null);
   };
 
   return (
@@ -505,33 +562,30 @@ function RequirementDialog({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
               <Label>Categoria de inventário *</Label>
-              <Select value={categoryId} onValueChange={onCategoryChange}>
+              <Select value={categoryRef} onValueChange={onCategoryChange}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione…" />
                 </SelectTrigger>
                 <SelectContent>
                   {categories.map((c) => (
-                    <SelectItem
-                      key={c.id}
-                      value={c.id}
-                    >
+                    <SelectItem key={c.id} value={c.id}>
                       {c.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              {form.formState.errors.eventrix_category_id && (
+              {form.formState.errors.category_ref && (
                 <p className="text-xs text-destructive mt-1">
-                  {form.formState.errors.eventrix_category_id.message}
+                  {form.formState.errors.category_ref.message}
                 </p>
               )}
             </div>
             <div>
               <Label>Família de inventário *</Label>
               <Select
-                value={form.watch('eventrix_family_id')}
+                value={form.watch('family_ref')}
                 onValueChange={onFamilyChange}
-                disabled={!categoryId}
+                disabled={!categoryRef}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione…" />
@@ -543,19 +597,16 @@ function RequirementDialog({
                     </div>
                   ) : (
                     filteredFamilies.map((f) => (
-                      <SelectItem
-                        key={f.id}
-                        value={f.id}
-                      >
+                      <SelectItem key={f.id} value={f.id}>
                         {f.name}
                       </SelectItem>
                     ))
                   )}
                 </SelectContent>
               </Select>
-              {form.formState.errors.eventrix_family_id && (
+              {form.formState.errors.family_ref && (
                 <p className="text-xs text-destructive mt-1">
-                  {form.formState.errors.eventrix_family_id.message}
+                  {form.formState.errors.family_ref.message}
                 </p>
               )}
             </div>
