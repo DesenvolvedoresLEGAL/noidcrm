@@ -10,9 +10,10 @@
 //   porque esse é o significado físico real das colunas atuais.
 
 import type { InventoryProviderType } from '@/inventory/providers/types';
-import type { UnitBasis } from '@/schemas/productInventoryRequirement';
+import type { UnitBasis } from './unitBasis';
 import {
   INVENTORY_PROVIDER_METADATA_KEY,
+  InventoryRequirementMetadataError,
   InventoryRequirementProviderNotSupportedError,
   type InventoryProductRequirement,
   type InventoryProductRequirementInput,
