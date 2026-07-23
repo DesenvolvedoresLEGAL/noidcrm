@@ -198,6 +198,22 @@ describe('domain → storage (update)', () => {
       mapInventoryRequirementUpdateToStorage({ provider_type: 'native' }),
     ).toThrow(InventoryRequirementProviderNotSupportedError);
   });
+
+  it('update com provider_type preserva chaves existentes de metadata', () => {
+    const existing = {
+      foo: 'bar',
+      custom: 123,
+      [INVENTORY_PROVIDER_METADATA_KEY]: 'eventrix',
+    };
+    const patch = mapInventoryRequirementUpdateToStorage(
+      { provider_type: 'eventrix', label: 'Atualizado' },
+      existing,
+    );
+    expect(patch.label).toBe('Atualizado');
+    expect(patch.metadata?.foo).toBe('bar');
+    expect(patch.metadata?.custom).toBe(123);
+    expect(patch.metadata?.[INVENTORY_PROVIDER_METADATA_KEY]).toBe('eventrix');
+  });
 });
 
 describe('schema', () => {
