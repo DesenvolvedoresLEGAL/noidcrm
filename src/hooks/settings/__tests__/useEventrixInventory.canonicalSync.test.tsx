@@ -12,9 +12,9 @@ const ORG_ID = 'org-under-test';
 const USER_ID = 'user-under-test';
 
 // ---- Mocks ----
-const upsertCanonicalMock = vi.fn(async () => ({ id: 'canonical-row' }));
+const upsertCanonicalMock = vi.fn<(arg: any) => Promise<any>>(async () => ({ id: 'canonical-row' }));
 vi.mock('@/inventory/hooks/useInventoryProviderSettings', () => ({
-  upsertInventoryProviderSettings: (...args: any[]) => upsertCanonicalMock(...args),
+  upsertInventoryProviderSettings: (arg: any) => upsertCanonicalMock(arg),
 }));
 
 vi.mock('@/hooks/useCurrentOrganization', () => ({
