@@ -1,3 +1,7 @@
+// NOID-VERTICAL-1.0-VERT-01.2D-C
+// Runtime UI: consome o domínio genérico de Proposal Inventory Demand.
+// Não usa mais campos `eventrix_*` como estrutura principal — provider
+// é apresentado apenas como contexto.
 import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -35,7 +39,9 @@ import {
   AlertTriangle,
   Camera,
   Eye,
+  Settings,
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useProposalInventoryDemandPreview } from '@/hooks/proposals/useProposalInventoryDemandPreview';
 import {
   UNIT_BASIS_UI_LABEL,
@@ -48,31 +54,49 @@ import {
   useCreateProposalInventoryDemandSnapshot,
 } from '@/hooks/proposals/useProposalInventoryDemandSnapshots';
 import {
-  buildSnapshotSummary,
-  buildSourceProducts,
-  buildSourceRequirements,
-  comparePreviewToSnapshot,
-  computePreviewHash,
-} from '@/lib/proposals/inventoryDemandSnapshot';
+  buildInventoryDemandSourceProducts,
+  buildInventoryDemandSourceRequirements,
+  compareInventoryDemand,
+  computeInventoryDemandHash,
+  serializeInventoryDemandSnapshotV2,
+  INVENTORY_DEMAND_ALGORITHM_VERSION,
+} from '@/inventory/demand';
 import { ProposalInventoryDemandSnapshotDetails } from './ProposalInventoryDemandSnapshotDetails';
 import type { ProposalInventoryDemandSnapshot } from '@/schemas/proposalInventoryDemandSnapshot';
 import { toast } from '@/hooks/use-toast';
-
 
 interface Props {
   proposal: ProposalInventoryDemandInputProposal | null | undefined;
   proposalItems: ProposalInventoryDemandInputItem[];
 }
 
+function providerBadgeLabel(
+  providerType: string | undefined,
+  providerName: string | undefined,
+): string {
+  if (providerName) return providerName;
+  if (providerType === 'eventrix') return 'Eventrix';
+  if (providerType === 'native') return 'Inventário Nativo';
+  return 'Provider de inventário';
+}
+
 export function ProposalInventoryDemandPreview({ proposal, proposalItems }: Props) {
-  const { preview, loading, productRequirements } = useProposalInventoryDemandPreview(
-    proposal,
-    proposalItems,
-  );
+  const {
+    preview,
+    loading,
+    error,
+    providerType,
+    providerName,
+    supportsProposalDemand,
+    productRequirements,
+    normalizedRequirements,
+  } = useProposalInventoryDemandPreview(proposal, proposalItems);
+
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [payloadOpen, setPayloadOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [detailsSnapshot, setDetailsSnapshot] = useState<ProposalInventoryDemandSnapshot | null>(null);
+  const [detailsSnapshot, setDetailsSnapshot] =
+    useState<ProposalInventoryDemandSnapshot | null>(null);
   const [confirmIncomplete, setConfirmIncomplete] = useState(false);
 
   const proposalId = proposal?.id ?? null;
@@ -83,25 +107,27 @@ export function ProposalInventoryDemandPreview({ proposal, proposalItems }: Prop
   const latestSnapshot = snapshots[0] ?? null;
 
   const comparison = useMemo(
-    () => comparePreviewToSnapshot(preview, latestSnapshot),
+    () =>
+      preview.status === 'unsupported'
+        ? 'no_snapshot'
+        : compareInventoryDemand(preview, latestSnapshot),
     [preview, latestSnapshot],
   );
 
-  const hasIncompleteOnly =
-    preview.lines.length > 0 &&
-    preview.lines.every((l) => l.status === 'incomplete' || l.status === 'manual');
-
   const canSaveSnapshot =
     !!proposalId &&
+    supportsProposalDemand &&
     (preview.status === 'ready' || preview.status === 'incomplete') &&
     preview.lines.length > 0;
 
   const disabledReason = !proposalId
     ? 'Salve a proposta antes de gerar um snapshot.'
+    : !supportsProposalDemand
+    ? 'Provider ativo não suporta snapshot de demanda.'
     : !proposalItems || proposalItems.length === 0
     ? 'Adicione produtos à proposta antes de salvar um snapshot.'
     : preview.lines.length === 0
-    ? 'Não há demanda operacional para salvar.'
+    ? 'Não há demanda de inventário para salvar.'
     : null;
 
   const toggle = (key: string) => {
@@ -114,20 +140,36 @@ export function ProposalInventoryDemandPreview({ proposal, proposalItems }: Prop
   };
 
   const doSaveSnapshot = async () => {
-    if (!proposalId) return;
+    if (!proposalId || !supportsProposalDemand) return;
     try {
+      const sourceProducts = buildInventoryDemandSourceProducts(
+        preview,
+        proposalItems,
+      );
+      const sourceRequirements = buildInventoryDemandSourceRequirements(
+        preview,
+        normalizedRequirements,
+      );
+      const hash = computeInventoryDemandHash(preview);
+      const v2 = serializeInventoryDemandSnapshotV2({
+        preview,
+        sourceProducts,
+        sourceRequirements,
+        hash,
+      });
       await createSnapshot.mutateAsync({
         proposal_id: proposalId,
-        summary: buildSnapshotSummary(preview),
-        payload: preview.payload as any,
-        lines: preview.lines as any,
-        warnings: preview.warnings as any,
-        commercial_context: preview.payload.commercial_context as any,
-        source_products: buildSourceProducts(preview, proposalItems) as any,
-        source_requirements: buildSourceRequirements(preview, productRequirements) as any,
-        hash: computePreviewHash(preview),
+        algorithm_version: v2.algorithm_version,
+        summary: v2.summary as any,
+        payload: v2.payload as any,
+        lines: v2.lines as any,
+        warnings: v2.warnings as any,
+        commercial_context: v2.commercial_context as any,
+        source_products: v2.source_products as any,
+        source_requirements: v2.source_requirements as any,
+        hash: v2.hash,
       });
-      toast({ title: 'Snapshot de demanda operacional salvo.' });
+      toast({ title: 'Snapshot de demanda de inventário salvo.' });
     } catch (err: any) {
       toast({
         title: 'Não foi possível salvar o snapshot.',
@@ -139,13 +181,12 @@ export function ProposalInventoryDemandPreview({ proposal, proposalItems }: Prop
 
   const handleSaveClick = () => {
     if (!canSaveSnapshot) return;
-    if (hasIncompleteOnly || preview.lines.some((l) => l.status === 'incomplete')) {
+    if (preview.lines.some((l) => l.status === 'incomplete')) {
       setConfirmIncomplete(true);
       return;
     }
     void doSaveSnapshot();
   };
-
 
   const header = (
     <CardHeader>
@@ -153,12 +194,16 @@ export function ProposalInventoryDemandPreview({ proposal, proposalItems }: Prop
         <div className="space-y-1">
           <CardTitle className="flex items-center gap-2 text-base">
             <Boxes className="h-4 w-4 text-primary" />
-            Demanda operacional
-            <Badge variant="secondary" className="ml-1">Preview Eventrix</Badge>
+            Demanda de inventário
+            {providerType && (
+              <Badge variant="secondary" className="ml-1">
+                {providerBadgeLabel(providerType, providerName)}
+              </Badge>
+            )}
           </CardTitle>
           <p className="text-sm text-muted-foreground max-w-2xl">
-            Estimativa dos recursos físicos necessários para entregar esta proposta,
-            com base na Composição de Inventário dos produtos.
+            Estimativa dos recursos de inventário necessários para entregar
+            esta proposta, com base nos requisitos configurados nos produtos.
           </p>
         </div>
       </div>
@@ -169,7 +214,8 @@ export function ProposalInventoryDemandPreview({ proposal, proposalItems }: Prop
     <Alert>
       <Info className="h-4 w-4" />
       <AlertDescription>
-        Este preview ainda não consulta disponibilidade real no Eventrix.
+        Esta estimativa calcula a demanda de inventário da proposta. Ela não
+        representa confirmação de disponibilidade de estoque.
       </AlertDescription>
     </Alert>
   );
@@ -177,18 +223,156 @@ export function ProposalInventoryDemandPreview({ proposal, proposalItems }: Prop
   const copyPayload = async () => {
     try {
       await navigator.clipboard.writeText(JSON.stringify(preview.payload, null, 2));
-      toast({ title: 'Payload copiado', description: 'JSON copiado para a área de transferência.' });
+      toast({
+        title: 'Payload copiado',
+        description: 'JSON copiado para a área de transferência.',
+      });
     } catch {
       toast({ title: 'Erro ao copiar', variant: 'destructive' });
     }
   };
+
+  // History renderer is always available so o histórico permanece
+  // acessível mesmo quando o provider atual não suporta novo cálculo.
+  const historyBlock = snapshots.length > 0 && (
+    <Collapsible open={historyOpen} onOpenChange={setHistoryOpen}>
+      <CollapsibleTrigger asChild>
+        <button
+          type="button"
+          className="w-full flex items-center justify-between text-left text-sm py-1"
+        >
+          <span className="font-medium">
+            Histórico de snapshots ({snapshots.length})
+          </span>
+          {historyOpen ? (
+            <ChevronDown className="h-4 w-4" />
+          ) : (
+            <ChevronRight className="h-4 w-4" />
+          )}
+        </button>
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <div className="rounded-md border overflow-x-auto mt-2">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Versão</TableHead>
+                <TableHead>Criado em</TableHead>
+                <TableHead>Famílias</TableHead>
+                <TableHead>Unidades</TableHead>
+                <TableHead>Avisos</TableHead>
+                <TableHead>Formato</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {snapshots.slice(0, 5).map((snap) => {
+                const sum = snap.summary as any;
+                const isV2 =
+                  (snap.payload as any)?.schema_version === 2 ||
+                  snap.algorithm_version === INVENTORY_DEMAND_ALGORITHM_VERSION;
+                return (
+                  <TableRow key={snap.id}>
+                    <TableCell className="font-medium">
+                      v{snap.snapshot_version}
+                    </TableCell>
+                    <TableCell className="text-xs">
+                      {new Date(snap.created_at).toLocaleString('pt-BR')}
+                    </TableCell>
+                    <TableCell>{sum?.required_families ?? 0}</TableCell>
+                    <TableCell>{sum?.total_required_units ?? 0}</TableCell>
+                    <TableCell>
+                      {Array.isArray(snap.warnings) ? snap.warnings.length : 0}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="text-xs">
+                        {isV2 ? 'Snapshot v2' : 'Formato legado'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setDetailsSnapshot(snap)}
+                      >
+                        <Eye className="h-3 w-3 mr-1" /> Ver detalhes
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+
+  const snapshotDetailsDialog = (
+    <ProposalInventoryDemandSnapshotDetails
+      open={!!detailsSnapshot}
+      onOpenChange={(o) => !o && setDetailsSnapshot(null)}
+      snapshot={detailsSnapshot}
+    />
+  );
 
   if (loading) {
     return (
       <Card>
         {header}
         <CardContent>
-          <div className="text-sm text-muted-foreground">Calculando demanda operacional…</div>
+          <div className="text-sm text-muted-foreground">
+            Calculando demanda de inventário…
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card>
+        {header}
+        <CardContent className="space-y-3">
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              Não foi possível calcular a demanda de inventário desta proposta.
+              {error.message ? ` Detalhes: ${error.message}` : ''}
+            </AlertDescription>
+          </Alert>
+          {historyBlock}
+          {snapshotDetailsDialog}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (preview.status === 'unsupported') {
+    return (
+      <Card>
+        {header}
+        <CardContent className="space-y-3">
+          <div className="rounded-md border border-dashed p-6 text-center space-y-2">
+            <h3 className="font-medium">Demanda de inventário não disponível</h3>
+            <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">
+              O provider de inventário ativo
+              {providerType
+                ? ` (${providerBadgeLabel(providerType, providerName)})`
+                : ''}{' '}
+              não oferece cálculo automático de demanda para propostas.
+            </p>
+            <div>
+              <Button asChild variant="outline" size="sm">
+                <Link to="/app/settings/inventory-provider">
+                  <Settings className="h-3 w-3 mr-1" />
+                  Configurações de inventário
+                </Link>
+              </Button>
+            </div>
+          </div>
+          {historyBlock}
+          {snapshotDetailsDialog}
         </CardContent>
       </Card>
     );
@@ -203,14 +387,18 @@ export function ProposalInventoryDemandPreview({ proposal, proposalItems }: Prop
           {infoAlert}
           <div className="rounded-md border border-dashed p-6 text-center">
             <h3 className="font-medium">
-              {noItems ? 'Nenhum produto na proposta' : 'Nenhuma demanda operacional identificada'}
+              {noItems
+                ? 'Nenhum produto na proposta'
+                : 'Nenhuma demanda de inventário identificada'}
             </h3>
             <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">
               {noItems
-                ? 'Adicione produtos à proposta para visualizar a demanda operacional estimada.'
-                : 'Os produtos desta proposta ainda não possuem Composição de Inventário vinculada ao Eventrix.'}
+                ? 'Adicione produtos à proposta para visualizar a demanda de inventário estimada.'
+                : 'Os produtos desta proposta ainda não possuem requisitos de inventário aplicáveis ao provider ativo.'}
             </p>
           </div>
+          {historyBlock}
+          {snapshotDetailsDialog}
         </CardContent>
       </Card>
     );
@@ -242,7 +430,7 @@ export function ProposalInventoryDemandPreview({ proposal, proposalItems }: Prop
               <TableRow>
                 <TableHead className="w-6" />
                 <TableHead>Categoria</TableHead>
-                <TableHead>Família Eventrix</TableHead>
+                <TableHead>Família</TableHead>
                 <TableHead>Tipo</TableHead>
                 <TableHead>Necessário</TableHead>
                 <TableHead>Base</TableHead>
@@ -256,15 +444,23 @@ export function ProposalInventoryDemandPreview({ proposal, proposalItems }: Prop
                 const open = expanded.has(line.key);
                 return (
                   <>
-                    <TableRow key={line.key} className="cursor-pointer" onClick={() => toggle(line.key)}>
+                    <TableRow
+                      key={line.key}
+                      className="cursor-pointer"
+                      onClick={() => toggle(line.key)}
+                    >
                       <TableCell>
-                        {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                        {open ? (
+                          <ChevronDown className="h-4 w-4" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4" />
+                        )}
                       </TableCell>
-                      <TableCell>{line.eventrix_category_name}</TableCell>
-                      <TableCell className="font-medium">{line.eventrix_family_name}</TableCell>
+                      <TableCell>{line.category_name}</TableCell>
+                      <TableCell className="font-medium">{line.family_name}</TableCell>
                       <TableCell>
-                        {line.eventrix_item_kind
-                          ? ITEM_KIND_UI_LABEL[line.eventrix_item_kind] ?? line.eventrix_item_kind
+                        {line.item_kind
+                          ? ITEM_KIND_UI_LABEL[line.item_kind] ?? line.item_kind
                           : '—'}
                       </TableCell>
                       <TableCell>
@@ -312,7 +508,9 @@ export function ProposalInventoryDemandPreview({ proposal, proposalItems }: Prop
                               <div key={idx} className="text-sm">
                                 <span className="font-medium">{s.product_name}</span>
                                 {' — '}
-                                <span className="text-muted-foreground">{s.calculation_label}</span>
+                                <span className="text-muted-foreground">
+                                  {s.calculation_label}
+                                </span>
                                 {s.required_quantity != null && (
                                   <span className="text-muted-foreground">
                                     {' = '}
@@ -338,11 +536,11 @@ export function ProposalInventoryDemandPreview({ proposal, proposalItems }: Prop
             <div>
               <div className="font-medium text-sm flex items-center gap-2">
                 <Camera className="h-4 w-4 text-primary" />
-                Snapshot operacional
+                Snapshot de inventário
               </div>
               <p className="text-xs text-muted-foreground max-w-xl mt-0.5">
-                Congela a demanda operacional atual desta proposta para histórico e
-                validação futura.
+                Congela a demanda de inventário atual desta proposta para
+                histórico e validação futura.
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -371,7 +569,7 @@ export function ProposalInventoryDemandPreview({ proposal, proposalItems }: Prop
           )}
           {comparison === 'changed' && (
             <p className="text-xs text-muted-foreground">
-              A demanda operacional atual mudou desde o último snapshot salvo.
+              A demanda de inventário atual mudou desde o último snapshot salvo.
             </p>
           )}
 
@@ -384,27 +582,39 @@ export function ProposalInventoryDemandPreview({ proposal, proposalItems }: Prop
               <div className="text-sm">
                 <div className="font-medium">Nenhum snapshot salvo ainda</div>
                 <p className="text-muted-foreground text-xs mt-1">
-                  Salve um snapshot para congelar a demanda operacional estimada desta
-                  proposta.
+                  Salve um snapshot para congelar a demanda de inventário
+                  estimada desta proposta.
                 </p>
               </div>
             ) : (
               <div className="text-sm space-y-1">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-medium">Snapshot v{latestSnapshot.snapshot_version}</span>
+                  <span className="font-medium">
+                    Snapshot v{latestSnapshot.snapshot_version}
+                  </span>
                   <Badge variant="outline" className="text-xs">
-                    {latestSnapshot.status === 'preview_snapshot' ? 'Preview' : latestSnapshot.status}
+                    {(latestSnapshot.payload as any)?.schema_version === 2 ||
+                    latestSnapshot.algorithm_version ===
+                      INVENTORY_DEMAND_ALGORITHM_VERSION
+                      ? 'Snapshot v2'
+                      : 'Formato legado'}
                   </Badge>
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  Salvo em {new Date(latestSnapshot.created_at).toLocaleString('pt-BR')}
+                  Salvo em{' '}
+                  {new Date(latestSnapshot.created_at).toLocaleString('pt-BR')}
                 </div>
                 <div className="text-xs">
-                  Famílias exigidas: {(latestSnapshot.summary as any)?.required_families ?? 0}
+                  Famílias exigidas:{' '}
+                  {(latestSnapshot.summary as any)?.required_families ?? 0}
                   {' • '}
-                  Unidades estimadas: {(latestSnapshot.summary as any)?.total_required_units ?? 0}
+                  Unidades estimadas:{' '}
+                  {(latestSnapshot.summary as any)?.total_required_units ?? 0}
                   {' • '}
-                  Avisos: {Array.isArray(latestSnapshot.warnings) ? latestSnapshot.warnings.length : 0}
+                  Avisos:{' '}
+                  {Array.isArray(latestSnapshot.warnings)
+                    ? latestSnapshot.warnings.length
+                    : 0}
                 </div>
                 <div className="pt-1">
                   <Button
@@ -419,75 +629,7 @@ export function ProposalInventoryDemandPreview({ proposal, proposalItems }: Prop
             )}
           </div>
 
-          {/* History */}
-          {snapshots.length > 0 && (
-            <Collapsible open={historyOpen} onOpenChange={setHistoryOpen}>
-              <CollapsibleTrigger asChild>
-                <button
-                  type="button"
-                  className="w-full flex items-center justify-between text-left text-sm py-1"
-                >
-                  <span className="font-medium">
-                    Histórico de snapshots ({snapshots.length})
-                  </span>
-                  {historyOpen ? (
-                    <ChevronDown className="h-4 w-4" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4" />
-                  )}
-                </button>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <div className="rounded-md border overflow-x-auto mt-2">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Versão</TableHead>
-                        <TableHead>Criado em</TableHead>
-                        <TableHead>Famílias</TableHead>
-                        <TableHead>Unidades</TableHead>
-                        <TableHead>Avisos</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Ações</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {snapshots.slice(0, 5).map((snap) => {
-                        const sum = snap.summary as any;
-                        return (
-                          <TableRow key={snap.id}>
-                            <TableCell className="font-medium">v{snap.snapshot_version}</TableCell>
-                            <TableCell className="text-xs">
-                              {new Date(snap.created_at).toLocaleString('pt-BR')}
-                            </TableCell>
-                            <TableCell>{sum?.required_families ?? 0}</TableCell>
-                            <TableCell>{sum?.total_required_units ?? 0}</TableCell>
-                            <TableCell>
-                              {Array.isArray(snap.warnings) ? snap.warnings.length : 0}
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant="outline" className="text-xs">
-                                {snap.status === 'preview_snapshot' ? 'Preview' : snap.status}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => setDetailsSnapshot(snap)}
-                              >
-                                <Eye className="h-3 w-3 mr-1" /> Ver payload
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
-          )}
+          {historyBlock}
         </div>
 
         <Collapsible open={payloadOpen} onOpenChange={setPayloadOpen}>
@@ -498,13 +640,16 @@ export function ProposalInventoryDemandPreview({ proposal, proposalItems }: Prop
                 className="w-full flex items-center justify-between p-3 text-left"
               >
                 <div>
-                  <div className="font-medium text-sm">Payload futuro para Eventrix</div>
+                  <div className="font-medium text-sm">Payload técnico</div>
                   <div className="text-xs text-muted-foreground">
-                    Prévia técnica do payload que será enviado ao Eventrix quando a consulta real
-                    de disponibilidade estiver ativa.
+                    Prévia do payload genérico calculado para esta proposta.
                   </div>
                 </div>
-                {payloadOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                {payloadOpen ? (
+                  <ChevronDown className="h-4 w-4" />
+                ) : (
+                  <ChevronRight className="h-4 w-4" />
+                )}
               </button>
             </CollapsibleTrigger>
             <CollapsibleContent>
@@ -515,7 +660,7 @@ export function ProposalInventoryDemandPreview({ proposal, proposalItems }: Prop
                   </Button>
                 </div>
                 <pre className="text-xs bg-muted rounded p-3 overflow-x-auto max-h-96">
-{JSON.stringify(preview.payload, null, 2)}
+                  {JSON.stringify(preview.payload, null, 2)}
                 </pre>
               </div>
             </CollapsibleContent>
@@ -523,18 +668,15 @@ export function ProposalInventoryDemandPreview({ proposal, proposalItems }: Prop
         </Collapsible>
       </CardContent>
 
-      <ProposalInventoryDemandSnapshotDetails
-        open={!!detailsSnapshot}
-        onOpenChange={(o) => !o && setDetailsSnapshot(null)}
-        snapshot={detailsSnapshot}
-      />
+      {snapshotDetailsDialog}
 
       <AlertDialog open={confirmIncomplete} onOpenChange={setConfirmIncomplete}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Salvar snapshot mesmo assim?</AlertDialogTitle>
             <AlertDialogDescription>
-              Existem dados incompletos no preview. Deseja salvar o snapshot mesmo assim?
+              Existem dados incompletos no preview. Deseja salvar o snapshot
+              mesmo assim?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -552,6 +694,10 @@ export function ProposalInventoryDemandPreview({ proposal, proposalItems }: Prop
       </AlertDialog>
     </Card>
   );
+
+  // suppress unused-vars: productRequirements is intentionally exposed for
+  // downstream consumers via the hook, not directly consumed by this component.
+  void productRequirements;
 }
 
 function Kpi({ label, value }: { label: string; value: number | string }) {
