@@ -1,7 +1,7 @@
 // NOID-VERTICAL-1.0-VERT-01.2E-B1
 // Schema Zod genérico. Nunca expõe chaves `eventrix_*`.
 import { z } from 'zod';
-import { UNIT_BASIS_VALUES } from '@/schemas/productInventoryRequirement';
+import { UNIT_BASIS_VALUES } from './unitBasis';
 
 const PROVIDER_TYPES = ['native', 'eventrix'] as const;
 
