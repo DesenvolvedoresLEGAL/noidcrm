@@ -10,6 +10,9 @@ export const createProposalInventoryDemandSnapshotSchema = z.object({
   source_products: z.array(z.any()).default([]),
   source_requirements: z.array(z.any()).default([]),
   hash: z.string().nullable().optional(),
+  // NOID-VERTICAL-1.0-VERT-01.2D-C
+  // Opcional para retrocompatibilidade — callers legados mantêm fallback v1.
+  algorithm_version: z.string().optional(),
 });
 
 export type CreateProposalInventoryDemandSnapshotInput = z.infer<
