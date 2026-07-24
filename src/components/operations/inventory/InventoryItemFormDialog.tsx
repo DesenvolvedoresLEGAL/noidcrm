@@ -120,7 +120,7 @@ const schema = z
     model: z.string().trim().max(120, 'Máximo 120 caracteres').optional().or(z.literal('')),
     notes: z.string().trim().max(1000, 'Máximo 1000 caracteres').optional().or(z.literal('')),
     technical_specs: technicalSpecsArraySchema,
-    equipment_profile: z.enum(['generic', 'router', 'sim_card']).default('generic'),
+    equipment_profile: z.enum(EQUIPMENT_PROFILE_ENUM_VALUES).default('generic'),
     // IMPORTANT: keep these as opaque records. Validation happens conditionally in
     // superRefine based on equipment_profile so that the irrelevant block (e.g.
     // sim_card while creating a router) never blocks submit with hidden errors.
@@ -128,6 +128,7 @@ const schema = z
     sim_card_factory: z.record(z.any()).optional().nullable(),
   })
   .superRefine((val, ctx) => {
+    if (!isConnectivityEquipmentProfile(val.equipment_profile)) return;
     if (val.equipment_profile === 'router') {
       const r = routerFactorySchema.safeParse(val.router_factory ?? {});
       if (!r.success) {
