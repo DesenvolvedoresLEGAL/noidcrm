@@ -1,7 +1,12 @@
 import { toast } from 'sonner';
 import type { FieldErrors } from 'react-hook-form';
 
-const FIELD_LABELS: Record<string, string> = {
+/**
+ * Core-generic field labels for inventory forms. This map MUST NOT contain
+ * connectivity concepts (router, SIM, IMEI, ICCID, APN, Wi-Fi). Vertical Packs
+ * pass their own label maps explicitly via `showFormErrors(errors, options)`.
+ */
+export const CORE_FIELD_LABELS: Record<string, string> = {
   name: 'Nome do item',
   category_id: 'Categoria',
   family_id: 'Família',
@@ -17,22 +22,17 @@ const FIELD_LABELS: Record<string, string> = {
   model: 'Modelo',
   notes: 'Observações',
   description: 'Descrição',
-  router_factory: 'Dados de fábrica do roteador',
-  sim_card_factory: 'Dados do chip',
   technical_specs: 'Especificações técnicas',
-  // Leaf-level (router)
-  'router_factory.ssid_factory': 'SSID de fábrica',
-  'router_factory.wifi_password_factory': 'Senha Wi-Fi de fábrica',
-  'router_factory.admin_user': 'Usuário admin',
-  'router_factory.admin_password': 'Senha admin',
-  'router_factory.imei': 'IMEI',
-  // Leaf-level (sim card)
-  'sim_card_factory.iccid': 'ICCID',
-  'sim_card_factory.line_number': 'Número da linha',
-  'sim_card_factory.carrier': 'Operadora',
-  'sim_card_factory.apn': 'APN',
-  'sim_card_factory.pin': 'PIN',
 };
+
+export interface ShowFormErrorsOptions {
+  /**
+   * Extra label map layered on top of `CORE_FIELD_LABELS`. Consumers pass the
+   * relevant Vertical Pack labels (for example
+   * `CONNECTIVITY_INVENTORY_FIELD_LABELS`). Takes precedence over Core labels.
+   */
+  fieldLabels?: Record<string, string>;
+}
 
 function firstLeaf(errors: any, path: string[] = []): { path: string[]; message?: string } | null {
   if (!errors || typeof errors !== 'object') return null;
@@ -60,18 +60,32 @@ function findFocusTarget(path: string[]): HTMLElement | null {
   return null;
 }
 
-export function showFormErrors(errors: FieldErrors): void {
+function resolveLabel(
+  path: string[],
+  extraLabels: Record<string, string> | undefined,
+): string {
+  const dotted = path.join('.');
+  const leaf = path[path.length - 1];
+  const head = path[0];
+  const layered: Array<Record<string, string> | undefined> = [extraLabels, CORE_FIELD_LABELS];
+  for (const key of [dotted, leaf, head]) {
+    for (const map of layered) {
+      if (map && map[key]) return map[key];
+    }
+  }
+  return head ?? dotted;
+}
+
+export function showFormErrors(errors: FieldErrors, options: ShowFormErrorsOptions = {}): void {
   const leaf = firstLeaf(errors);
   if (!leaf) {
     toast.error('Revise os campos destacados antes de continuar.');
     return;
   }
-  const dotted = leaf.path.join('.');
-  const label = FIELD_LABELS[dotted] ?? FIELD_LABELS[leaf.path[0]] ?? leaf.path[0];
+  const label = resolveLabel(leaf.path, options.fieldLabels);
   const msg = leaf.message ? `${label}: ${leaf.message}` : `Revise o campo "${label}".`;
   toast.error(msg);
 
-  // Scroll to the offending field on the next frame so the toast doesn't race the layout
   requestAnimationFrame(() => {
     const target = findFocusTarget(leaf.path);
     if (target) {
