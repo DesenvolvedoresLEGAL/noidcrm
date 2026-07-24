@@ -200,7 +200,7 @@ export function InventoryItemFormDialog({ open, onOpenChange, item }: Props) {
     },
   });
 
-  const [profile, setProfile] = useState<EquipmentProfile>('generic');
+  const [profile, setProfile] = useState<InventoryFormEquipmentProfile>('generic');
 
   const familyById = useMemo(() => {
     const m = new Map<string, any>();
