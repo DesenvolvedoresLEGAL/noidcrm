@@ -76,12 +76,21 @@ function resolveLabel(
   return head ?? dotted;
 }
 
-export function showFormErrors(errors: FieldErrors, options: ShowFormErrorsOptions = {}): void {
+/**
+ * The second parameter is typed loosely so that `showFormErrors` can be passed
+ * directly as the `handleSubmit` error handler (react-hook-form invokes it as
+ * `(errors, event)`). When called explicitly, pass a `ShowFormErrorsOptions`.
+ */
+export function showFormErrors(errors: FieldErrors, optionsOrEvent?: unknown): void {
   const leaf = firstLeaf(errors);
   if (!leaf) {
     toast.error('Revise os campos destacados antes de continuar.');
     return;
   }
+  const options: ShowFormErrorsOptions =
+    optionsOrEvent && typeof optionsOrEvent === 'object' && 'fieldLabels' in optionsOrEvent
+      ? (optionsOrEvent as ShowFormErrorsOptions)
+      : {};
   const label = resolveLabel(leaf.path, options.fieldLabels);
   const msg = leaf.message ? `${label}: ${leaf.message}` : `Revise o campo "${label}".`;
   toast.error(msg);
