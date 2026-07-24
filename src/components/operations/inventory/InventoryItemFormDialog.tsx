@@ -430,7 +430,7 @@ export function InventoryItemFormDialog({ open, onOpenChange, item }: Props) {
           </div>
         )}
 
-        <form onSubmit={form.handleSubmit(onSubmit, showFormErrors)} className="space-y-4">
+        <form onSubmit={form.handleSubmit(onSubmit, handleFormErrors)} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="name">Nome do item</Label>
             <Input id="name" placeholder="Ex: Router BLUE 001" {...form.register('name')} />
