@@ -214,7 +214,7 @@ export function InventoryCategoryFormDialog({ open, onOpenChange, category }: Pr
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {EQUIPMENT_PROFILE_OPTIONS.map((o) => (
+                {CATEGORY_EQUIPMENT_PROFILE_OPTIONS.map((o) => (
                   <SelectItem key={o.value} value={o.value}>
                     {o.label}
                   </SelectItem>
