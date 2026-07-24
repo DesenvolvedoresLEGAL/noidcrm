@@ -219,8 +219,8 @@ export function InventoryItemFormDialog({ open, onOpenChange, item }: Props) {
 
   useEffect(() => {
     if (open) {
-      const initialProfile = (((item as any)?.category?.equipment_profile) ?? 'generic') as EquipmentProfile;
-      setProfile(initialProfile === 'router' || initialProfile === 'sim_card' ? initialProfile : 'generic');
+      const initialProfile = normalizeFormProfile((item as any)?.category?.equipment_profile);
+      setProfile(initialProfile);
       const router = getRouterFactory(item?.metadata) ?? { ssid_factory: '', wifi_password_factory: '', admin_user: '', admin_password: '', imei: '' };
       const sim = getSimCardFactory(item?.metadata) ?? { iccid: '', line_number: '', carrier: '', apn: '', pin: '' };
       const allSpecs = getTechnicalSpecs(item?.metadata) as TechnicalSpec[];
