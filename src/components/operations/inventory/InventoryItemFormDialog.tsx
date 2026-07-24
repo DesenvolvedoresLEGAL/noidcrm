@@ -388,7 +388,7 @@ export function InventoryItemFormDialog({ open, onOpenChange, item }: Props) {
   const { update: updateCategory } = useInventoryCategoryMutations();
   const promoteCategoryProfile = async () => {
     if (!selectedCategory) return;
-    const desired: 'router' | 'sim_card' = looksLikeRouter ? 'router' : 'sim_card';
+    const desired: ConnectivityEquipmentProfile = looksLikeRouter ? 'router' : 'sim_card';
     try {
       await updateCategory.mutateAsync({
         id: selectedCategory.id,
