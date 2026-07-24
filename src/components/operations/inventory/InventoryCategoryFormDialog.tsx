@@ -104,7 +104,7 @@ export function InventoryCategoryFormDialog({ open, onOpenChange, category }: Pr
         name: category?.name ?? '',
         description: category?.description ?? '',
         control_mode: getCategoryControlMode(category),
-        equipment_profile: getEquipmentProfile((category as any)?.equipment_profile),
+        equipment_profile: normalizeCategoryProfile((category as any)?.equipment_profile),
         sort_order: category?.sort_order ?? 0,
       });
     }
