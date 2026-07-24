@@ -207,7 +207,7 @@ export function InventoryCategoryFormDialog({ open, onOpenChange, category }: Pr
             <Select
               value={form.watch('equipment_profile')}
               onValueChange={(v) =>
-                form.setValue('equipment_profile', v as EquipmentProfile, { shouldDirty: true })
+                form.setValue('equipment_profile', v as CategoryEquipmentProfile, { shouldDirty: true })
               }
             >
               <SelectTrigger>
