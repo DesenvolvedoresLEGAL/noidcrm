@@ -9,7 +9,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import type { UseFormReturn } from 'react-hook-form';
-import { SIM_CARRIERS } from '@/lib/operations/inventoryEquipmentProfile';
+import { SIM_CARRIERS } from '@/vertical-packs/connectivity/inventory';
 
 export function RouterFactoryFields({ form }: { form: UseFormReturn<any> }) {
   const errs = (form.formState.errors as any)?.router_factory ?? {};
