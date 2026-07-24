@@ -15,7 +15,7 @@ import {
   mergeFactorySim,
   type RouterFactory,
   type SimCardFactory,
-} from '@/lib/operations/inventoryEquipmentProfile';
+} from '@/vertical-packs/connectivity/inventory';
 
 export type InventoryItemRow = Database['public']['Tables']['inventory_items']['Row'] & {
   family_id?: string | null;
