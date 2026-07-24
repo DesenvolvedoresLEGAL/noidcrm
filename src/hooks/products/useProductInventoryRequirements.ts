@@ -1,9 +1,10 @@
 /**
- * @deprecated storage-contract bridge (VERT-01.2E-B1).
+ * @deprecated LEGACY STORAGE BRIDGE — ZERO ACTIVE CORE CONSUMERS (VERT-01.2E-B2B).
  * Substituto genérico: `@/inventory/hooks/useInventoryProductRequirements`.
- * Este hook mantém o contrato legado com chaves `eventrix_*` porque o
- * ProductInventoryRequirementsEditor ainda depende delas. Não remover
- * enquanto E-B2 não migrar o editor.
+ * O ProductInventoryRequirementsEditor (B2A) e o Proposal Inventory Demand (B2B)
+ * já não consomem este módulo. Mantido apenas por compatibilidade enquanto as
+ * colunas físicas `eventrix_*` continuam existindo em
+ * `product_inventory_requirements`. NÃO criar novos consumers.
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -11,6 +12,7 @@ import type {
   ProductInventoryRequirementInput,
   UnitBasis,
 } from '@/schemas/productInventoryRequirement';
+
 
 export interface ProductInventoryRequirement {
   id: string;

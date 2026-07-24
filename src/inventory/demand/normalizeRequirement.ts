@@ -1,37 +1,28 @@
-// NOID-VERTICAL-1.0-VERT-01.2D-A
-// Única fronteira autorizada a ler as colunas físicas legadas
-// `eventrix_*` de `product_inventory_requirements` e transformá-las
-// em `NormalizedProductInventoryRequirement` do domínio genérico.
+// NOID-VERTICAL-1.0-VERT-01.2E-B2B
+// Normalizer principal do domínio genérico.
+// Entrada CANÔNICA: `InventoryProductRequirement` (domínio genérico).
+// NUNCA lê colunas físicas `eventrix_*` — para isso existe o bridge
+// legado em `./legacyRequirementCompatibility.ts` que passa a row
+// pelo `storageMapper` antes de chamar este normalizer.
 //
 // Regras:
-// - Nenhum outro arquivo do domínio, hook, componente ou builder
-//   deve replicar este mapeamento.
-// - O default de provider_type é 'eventrix' porque a tabela atual
-//   só carrega referências Eventrix. Quando o provider ativo é
-//   Native, o consumidor deve tratar o resultado como
-//   `unsupported`/`empty` — NÃO reinterpretar a referência.
-// - Não inventa IMEI/ICCID/SSID/WiFi ou qualquer metadado técnico
-//   de conectividade.
+// - `provider_type` vem SEMPRE do requirement de entrada.
+// - `expectedProviderType` é opcional e apenas VALIDAÇÃO. Nunca
+//   reescreve `provider_type` do requirement.
+// - Nunca inventa IMEI/ICCID/SSID/WiFi ou metadados de conectividade.
 
-import type { ProductInventoryRequirement } from '@/hooks/products/useProductInventoryRequirements';
+import type { InventoryProductRequirement } from '@/inventory/requirements/types';
+import { UNIT_BASIS_VALUES } from '@/inventory/requirements/unitBasis';
 import type { InventoryProviderType } from '@/inventory/providers/types';
-import { UNIT_BASIS_VALUES } from '@/schemas/productInventoryRequirement';
 import {
   InventoryDemandNormalizationError,
   type NormalizedProductInventoryRequirement,
 } from './types';
 
-export interface NormalizeRequirementOptions {
-  /**
-   * Provider ao qual a referência legada pertence. Default: 'eventrix'.
-   * Quando o tenant estiver em Native, o consumidor NÃO deve chamar
-   * este normalizer — deve marcar a demanda como `unsupported`.
-   */
-  providerType?: InventoryProviderType;
-  /**
-   * Se `true` (padrão), lança `InventoryDemandNormalizationError`
-   * para entradas inválidas. Se `false`, retorna `null`.
-   */
+export interface NormalizeInventoryRequirementOptions {
+  /** Se presente e divergente de `requirement.provider_type`, gera `provider_mismatch`. */
+  expectedProviderType?: InventoryProviderType;
+  /** Default `true`. `false` retorna `null` no lugar de lançar. */
   strict?: boolean;
 }
 
@@ -41,19 +32,11 @@ function trimOrNull(v: unknown): string | null {
   return t.length > 0 ? t : null;
 }
 
-/**
- * Normaliza um `ProductInventoryRequirement` legado (colunas físicas
- * `eventrix_*`) para o formato genérico do domínio.
- *
- * Retorna `null` em vez de lançar quando `strict === false` e a
- * entrada estiver malformada, para permitir uso defensivo em
- * builders/UI sem quebrar a página inteira.
- */
-export function normalizeProductInventoryRequirement(
-  req: ProductInventoryRequirement,
-  opts: NormalizeRequirementOptions = {},
+export function normalizeInventoryProductRequirement(
+  req: InventoryProductRequirement,
+  opts: NormalizeInventoryRequirementOptions = {},
 ): NormalizedProductInventoryRequirement | null {
-  const { providerType = 'eventrix', strict = true } = opts;
+  const { expectedProviderType, strict = true } = opts;
 
   const fail = (
     code: InventoryDemandNormalizationError['code'],
@@ -67,28 +50,18 @@ export function normalizeProductInventoryRequirement(
     return fail('missing_category', 'Requisito ausente ou inválido.');
   }
 
-  const category_ref = trimOrNull(req.eventrix_category_id);
-  const family_ref = trimOrNull(req.eventrix_family_id);
-  const category_name =
-    trimOrNull(req.eventrix_category_name) ?? category_ref ?? '';
-  const family_name = trimOrNull(req.eventrix_family_name) ?? family_ref ?? '';
+  const category_ref = trimOrNull(req.category_ref);
+  const family_ref = trimOrNull(req.family_ref);
+  const category_name = trimOrNull(req.category_name) ?? category_ref ?? '';
+  const family_name = trimOrNull(req.family_name) ?? family_ref ?? '';
 
-  if (!category_ref) {
-    return fail('missing_category', 'Referência de categoria ausente.');
-  }
-  if (!family_ref) {
-    return fail('missing_family', 'Referência de família ausente.');
-  }
-  if (!req.product_id) {
-    return fail('missing_product', 'Produto de origem ausente.');
-  }
+  if (!category_ref) return fail('missing_category', 'Referência de categoria ausente.');
+  if (!family_ref) return fail('missing_family', 'Referência de família ausente.');
+  if (!req.product_id) return fail('missing_product', 'Produto de origem ausente.');
 
   const quantity = Number(req.quantity);
   if (!Number.isFinite(quantity) || quantity <= 0) {
-    return fail(
-      'invalid_quantity',
-      `Quantidade inválida (${String(req.quantity)}).`,
-    );
+    return fail('invalid_quantity', `Quantidade inválida (${String(req.quantity)}).`);
   }
 
   if (!UNIT_BASIS_VALUES.includes(req.unit_basis)) {
@@ -98,13 +71,20 @@ export function normalizeProductInventoryRequirement(
     );
   }
 
+  if (expectedProviderType && req.provider_type !== expectedProviderType) {
+    return fail(
+      'provider_mismatch',
+      `Provider do requisito (${req.provider_type}) diverge do esperado (${expectedProviderType}).`,
+    );
+  }
+
   return {
-    provider_type: providerType,
+    provider_type: req.provider_type,
     category_ref,
     category_name,
     family_ref,
     family_name,
-    item_kind: trimOrNull(req.eventrix_item_kind),
+    item_kind: trimOrNull(req.item_kind),
     requirement_id: req.id,
     product_id: req.product_id,
     label: trimOrNull(req.label) ?? family_name,
@@ -118,13 +98,9 @@ export function normalizeProductInventoryRequirement(
   };
 }
 
-/**
- * Normaliza uma coleção descartando entradas inválidas silenciosamente.
- * O caller pode inspecionar o segundo elemento para diagnóstico local.
- */
-export function normalizeProductInventoryRequirements(
-  reqs: ProductInventoryRequirement[],
-  opts: Omit<NormalizeRequirementOptions, 'strict'> = {},
+export function normalizeInventoryProductRequirements(
+  reqs: InventoryProductRequirement[],
+  opts: Omit<NormalizeInventoryRequirementOptions, 'strict'> = {},
 ): {
   normalized: NormalizedProductInventoryRequirement[];
   skipped: Array<{ requirement_id: string; reason: string }>;
@@ -133,10 +109,7 @@ export function normalizeProductInventoryRequirements(
   const skipped: Array<{ requirement_id: string; reason: string }> = [];
   for (const r of reqs ?? []) {
     try {
-      const n = normalizeProductInventoryRequirement(r, {
-        ...opts,
-        strict: true,
-      });
+      const n = normalizeInventoryProductRequirement(r, { ...opts, strict: true });
       if (n) normalized.push(n);
     } catch (err) {
       skipped.push({

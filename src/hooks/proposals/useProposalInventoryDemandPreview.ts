@@ -1,16 +1,18 @@
-// NOID-VERTICAL-1.0-VERT-01.2D-C
-// Runtime real do Proposal Inventory Demand — conecta o provider
-// resolver ao domínio genérico (`src/inventory/demand`) e substitui
-// o builder legado como implementação principal.
-import { useQuery } from '@tanstack/react-query';
+// NOID-VERTICAL-1.0-VERT-01.2E-B2B
+// Runtime real do Proposal Inventory Demand. Consome exclusivamente
+// a façade genérica de Product Inventory Requirements (nunca
+// consulta `product_inventory_requirements` diretamente e nunca vê
+// colunas `eventrix_*`). O provider ativo determina se demand é
+// suportado; requisitos de provider divergente são filtrados antes
+// da normalização.
 import { useMemo } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { useInventoryProvider } from '@/inventory/hooks/useInventoryProvider';
-import type { ProductInventoryRequirement } from '@/hooks/products/useProductInventoryRequirements';
+import { useInventoryProductRequirementsForProducts } from '@/inventory/hooks/useInventoryProductRequirements';
+import type { InventoryProductRequirement } from '@/inventory/requirements/types';
 import {
   buildInventoryDemandPreview,
-  normalizeProductInventoryRequirements,
+  normalizeInventoryProductRequirements,
   type InventoryDemandInputItem,
   type InventoryDemandInputProposal,
   type InventoryDemandPreview,
@@ -27,7 +29,7 @@ export interface UseProposalInventoryDemandPreviewResult {
   providerName: string | undefined;
   capabilities: ReturnType<typeof useInventoryProvider>['capabilities'];
   supportsProposalDemand: boolean;
-  productRequirements: ProductInventoryRequirement[];
+  productRequirements: InventoryProductRequirement[];
   normalizedRequirements: NormalizedProductInventoryRequirement[];
   refreshProvider: ReturnType<typeof useInventoryProvider>['refresh'];
 }
@@ -81,49 +83,37 @@ export function useProposalInventoryDemandPreview(
     [proposalItems],
   );
 
-  const requirementsQuery = useQuery({
-    queryKey: [
-      'proposal-inventory-requirements',
-      orgId,
-      providerType,
-      productIds.slice().sort().join(','),
-    ],
-    enabled:
-      !!orgId &&
-      !providerLoading &&
-      !providerError &&
-      supportsProposalDemand &&
-      productIds.length > 0,
-    queryFn: async (): Promise<ProductInventoryRequirement[]> => {
-      const { data, error } = await (supabase as any)
-        .from('product_inventory_requirements')
-        .select('*')
-        .eq('organization_id', orgId)
-        .eq('is_active', true)
-        .in('product_id', productIds)
-        .order('sort_order', { ascending: true });
-      if (error) throw error;
-      return (data ?? []) as ProductInventoryRequirement[];
-    },
+  // Bulk query genérica: só executa quando provider carregou, é sadio,
+  // possui capability proposal_demand e há products com id.
+  const canQueryRequirements =
+    !!orgId &&
+    !providerLoading &&
+    !providerError &&
+    supportsProposalDemand &&
+    productIds.length > 0;
+
+  const requirementsQuery = useInventoryProductRequirementsForProducts({
+    organizationId: orgId,
+    productIds,
+    activeOnly: true,
+    enabled: canQueryRequirements,
   });
 
-  const productRequirements = requirementsQuery.data ?? [];
+  const productRequirements: InventoryProductRequirement[] =
+    requirementsQuery.data ?? [];
 
   const normalizedRequirements = useMemo(() => {
     if (!supportsProposalDemand || !providerType) return [];
-    // Requisitos físicos legados carregam colunas Eventrix. Normalizar
-    // apenas quando o provider ativo os aceita — nunca reinterpretar
-    // referências Eventrix como Native.
-    const { normalized } = normalizeProductInventoryRequirements(
-      productRequirements,
-      { providerType },
+    // Filtrar por provider ANTES da normalização preserva a semântica clara
+    // (Eventrix consome só eventrix; nunca reinterpreta Native).
+    const compatible = productRequirements.filter(
+      (r) => r.provider_type === providerType,
     );
+    const { normalized } = normalizeInventoryProductRequirements(compatible);
     return normalized;
   }, [productRequirements, providerType, supportsProposalDemand]);
 
   const preview = useMemo<InventoryDemandPreview>(() => {
-    // Enquanto o provider ainda carrega, evitar cálculos precipitados
-    // (retorna unsupported placeholder — a UI mostra estado de loading).
     if (providerLoading || !providerType) {
       return emptyUnsupportedPreview(proposal, 'native', orgId);
     }
@@ -151,7 +141,7 @@ export function useProposalInventoryDemandPreview(
 
   const loading =
     providerLoading ||
-    (supportsProposalDemand && productIds.length > 0 && requirementsQuery.isLoading);
+    (canQueryRequirements && requirementsQuery.isLoading);
 
   const error =
     (providerError as Error | null) ??

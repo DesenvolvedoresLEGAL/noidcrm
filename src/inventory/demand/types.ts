@@ -12,7 +12,7 @@
 // sub-sprint VERT-01.2D-B / VERT-01.2D-C.
 
 import type { InventoryProviderType } from '@/inventory/providers/types';
-import type { UnitBasis } from '@/schemas/productInventoryRequirement';
+import type { UnitBasis } from '@/inventory/requirements/unitBasis';
 
 /**
  * Referência genérica a uma família/categoria de inventário,
@@ -162,7 +162,8 @@ export class InventoryDemandNormalizationError extends Error {
     | 'missing_family'
     | 'invalid_quantity'
     | 'invalid_unit_basis'
-    | 'missing_product';
+    | 'missing_product'
+    | 'provider_mismatch';
   constructor(
     code: InventoryDemandNormalizationError['code'],
     message: string,
@@ -172,3 +173,4 @@ export class InventoryDemandNormalizationError extends Error {
     this.code = code;
   }
 }
+

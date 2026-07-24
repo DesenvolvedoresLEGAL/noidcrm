@@ -1,12 +1,19 @@
 /**
- * @deprecated compatibility schema (VERT-01.2E-B1 / hardened em B1.1).
+ * @deprecated compatibility schema (VERT-01.2E-B1 → B2B).
  * Substituto genérico: `@/inventory/requirements/schema`
- * (`inventoryProductRequirementSchema`). Mantido enquanto o
- * ProductInventoryRequirementsEditor ainda opera com chaves `eventrix_*`.
+ * (`inventoryProductRequirementSchema`).
  *
- * UnitBasis canônico vive em `@/inventory/requirements/unitBasis`; este
- * arquivo apenas re-exporta para preservar consumers legados.
+ * Estado após VERT-01.2E-B2B:
+ * - ProductInventoryRequirementsEditor já migrado para a façade genérica (B2A).
+ * - Proposal Inventory Demand já migrado para a façade genérica (B2B).
+ * - Este arquivo permanece EXCLUSIVAMENTE como compatibility bridge, enquanto
+ *   as colunas físicas `eventrix_*` continuarem existindo em
+ *   `product_inventory_requirements`. NÃO criar novos consumers.
+ *
+ * UnitBasis / UNIT_BASIS_* / ITEM_KIND_LABELS canônicos vivem em
+ * `@/inventory/requirements/unitBasis`; este módulo apenas re-exporta.
  */
+
 import { z } from 'zod';
 import {
   UNIT_BASIS_LABELS,

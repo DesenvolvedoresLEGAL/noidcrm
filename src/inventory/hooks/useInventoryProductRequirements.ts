@@ -1,7 +1,8 @@
-// NOID-VERTICAL-1.0-VERT-01.2E-B1
-// Hook genérico (não conectado à UI nesta sprint).
-// Trabalha exclusivamente com `InventoryProductRequirement` do domínio;
-// jamais expõe `eventrix_*` para o Core.
+// NOID-VERTICAL-1.0-VERT-01.2E-B1 (repository extraction — B2B)
+// Hooks React genéricos. Toda leitura runtime passa pelo
+// repository (`@/inventory/requirements/repository`) para garantir
+// ONE STORAGE READ BOUNDARY. Nenhum consumidor Core enxerga
+// `eventrix_*` — apenas `InventoryProductRequirement`.
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -11,6 +12,10 @@ import {
   mapProductInventoryRequirementFromStorage,
   type LegacyProductInventoryRequirementStorageRow,
 } from '@/inventory/requirements/storageMapper';
+import {
+  dedupeProductIds,
+  listInventoryProductRequirements,
+} from '@/inventory/requirements/repository';
 import type {
   InventoryProductRequirement,
   InventoryProductRequirementInput,
@@ -40,19 +45,45 @@ export function useInventoryProductRequirements(scope: Partial<TenantScope>) {
       productId: scope.productId ?? '',
     }),
     enabled,
-    queryFn: async (): Promise<InventoryProductRequirement[]> => {
-      const { data, error } = await (supabase as any)
-        .from(TABLE)
-        .select('*')
-        .eq('organization_id', scope.organizationId)
-        .eq('product_id', scope.productId)
-        .order('sort_order', { ascending: true })
-        .order('created_at', { ascending: true });
-      if (error) throw error;
-      return ((data ?? []) as LegacyProductInventoryRequirementStorageRow[]).map(
-        mapProductInventoryRequirementFromStorage,
-      );
-    },
+    queryFn: (): Promise<InventoryProductRequirement[]> =>
+      listInventoryProductRequirements({
+        organizationId: scope.organizationId!,
+        productId: scope.productId!,
+      }),
+  });
+}
+
+export interface UseInventoryProductRequirementsForProductsParams {
+  organizationId: string | null | undefined;
+  productIds: ReadonlyArray<string | null | undefined>;
+  activeOnly?: boolean;
+  enabled?: boolean;
+}
+
+/**
+ * Bulk read genérica usada pelo Proposal Demand.
+ * Nunca dispara `.in()` com array vazio; a query key é provider-neutral.
+ */
+export function useInventoryProductRequirementsForProducts(
+  params: UseInventoryProductRequirementsForProductsParams,
+) {
+  const { organizationId, productIds, activeOnly = true, enabled = true } = params;
+  const deduped = dedupeProductIds(productIds);
+  const canRun = enabled && !!organizationId && deduped.length > 0;
+  return useQuery({
+    queryKey: [
+      'inventory-product-requirements-bulk',
+      organizationId ?? null,
+      activeOnly,
+      deduped.join(','),
+    ] as const,
+    enabled: canRun,
+    queryFn: (): Promise<InventoryProductRequirement[]> =>
+      listInventoryProductRequirements({
+        organizationId: organizationId!,
+        productIds: deduped,
+        activeOnly,
+      }),
   });
 }
 
@@ -82,6 +113,7 @@ export function useCreateInventoryProductRequirement(scope: TenantScope) {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: key(scope) });
+      qc.invalidateQueries({ queryKey: ['inventory-product-requirements-bulk'] });
     },
   });
 }
@@ -99,8 +131,6 @@ export function useUpdateInventoryProductRequirement(scope: TenantScope) {
       const userId = await getUserId();
 
       let existingMetadata: Record<string, unknown> | null = null;
-      // Metadata existente precisa ser lida SEMPRE que o mapper for tocar em metadata:
-      // isto é, tanto quando o input traz `metadata` quanto quando traz `provider_type`.
       const shouldReadExistingMetadata =
         input.metadata !== undefined || input.provider_type !== undefined;
       if (shouldReadExistingMetadata) {
@@ -131,6 +161,7 @@ export function useUpdateInventoryProductRequirement(scope: TenantScope) {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: key(scope) });
+      qc.invalidateQueries({ queryKey: ['inventory-product-requirements-bulk'] });
     },
   });
 }
@@ -140,7 +171,6 @@ export function useDeactivateInventoryProductRequirement(scope: TenantScope) {
   return useMutation({
     mutationFn: async (id: string): Promise<void> => {
       const userId = await getUserId();
-      // Soft delete apenas — nunca DELETE.
       const { error } = await (supabase as any)
         .from(TABLE)
         .update({ is_active: false, updated_by: userId })
@@ -151,6 +181,7 @@ export function useDeactivateInventoryProductRequirement(scope: TenantScope) {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: key(scope) });
+      qc.invalidateQueries({ queryKey: ['inventory-product-requirements-bulk'] });
     },
   });
 }

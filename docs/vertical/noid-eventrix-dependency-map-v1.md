@@ -196,3 +196,18 @@ Ver `docs/vertical/generic-proposal-inventory-demand-runtime-v1.md`.
 - Colunas físicas `eventrix_*` em `product_inventory_requirements` e
   aliases `eventrix_*` em snapshots v2 permanecem inalterados; próximo
   alvo é a façade genérica (`VERT-01.2E-B`).
+
+---
+
+## Update — VERT-01.2E-B2B
+
+- Editor genérico (B2A) e Proposal Demand genérico (B2B).
+- Zero `ACTIVE_CORE_CONSUMER` das colunas `eventrix_*` — `storageMapper`
+  é a única fronteira física.
+- Settings Eventrix continuam provider-specific legítimos.
+- Snapshots mantêm aliases `eventrix_*` por compatibilidade histórica.
+- Colunas físicas `product_inventory_requirements.eventrix_*` continuam
+  existentes (dívida de storage; migration não realizada).
+
+Fechamento formal:
+`VERT-01.2E COMPLETE — EVENTRIX CORE COUPLING REMOVED WITH LEGACY STORAGE BRIDGE`.
