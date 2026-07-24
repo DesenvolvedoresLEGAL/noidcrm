@@ -17,7 +17,12 @@ export interface InventoryCategoryInput {
   icon?: string | null;
   sort_order?: number;
   is_active?: boolean;
-  equipment_profile?: 'generic' | 'router' | 'sim_card';
+  /**
+   * Opaque profile marker persisted verbatim. Core does not know about
+   * Connectivity Pack profiles (router / sim_card); those literals are owned
+   * by `@/vertical-packs/connectivity/inventory`. Legacy default: `generic`.
+   */
+  equipment_profile?: string | null;
 }
 
 export async function listInventoryCategories(organizationId: string) {

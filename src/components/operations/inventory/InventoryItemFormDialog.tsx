@@ -45,10 +45,13 @@ import {
   getSimCardFactory,
   routerFactorySchema,
   simCardFactorySchema,
-  type EquipmentProfile,
+  isConnectivityEquipmentProfile,
+  CONNECTIVITY_EQUIPMENT_PROFILE_VALUES,
+  CONNECTIVITY_INVENTORY_FIELD_LABELS,
+  type ConnectivityEquipmentProfile,
   type RouterFactory,
   type SimCardFactory,
-} from '@/lib/operations/inventoryEquipmentProfile';
+} from '@/vertical-packs/connectivity/inventory';
 import { TechnicalSpecsSection } from './TechnicalSpecsSection';
 import { FamilyTemplateSpecsFields } from './FamilyTemplateSpecsFields';
 import { InventoryClassificationFields } from './InventoryClassificationFields';
@@ -62,8 +65,28 @@ import { useInventoryLocations } from '@/hooks/operations/useInventoryLocations'
 import { useInventoryItemMutations } from '@/hooks/operations/useInventoryItems';
 import type { InventoryItemWithRefs } from '@/services/operations/inventoryItems';
 import { showFormErrors } from '@/lib/operations/formErrorFeedback';
+import type { FieldErrors } from 'react-hook-form';
 import { useInventoryCategoryMutations } from '@/hooks/operations/useInventoryCategories';
 import { AlertCircle, Wifi } from 'lucide-react';
+
+/**
+ * Composition type at the ItemForm host: Core-neutral `generic` PLUS whatever
+ * profiles the Connectivity Pack currently exposes. Do NOT redeclare router /
+ * sim_card literals here.
+ */
+type InventoryFormEquipmentProfile = 'generic' | ConnectivityEquipmentProfile;
+
+const EQUIPMENT_PROFILE_ENUM_VALUES = [
+  'generic',
+  ...CONNECTIVITY_EQUIPMENT_PROFILE_VALUES,
+] as const;
+
+function normalizeFormProfile(value: unknown): InventoryFormEquipmentProfile {
+  return isConnectivityEquipmentProfile(value) ? value : 'generic';
+}
+
+const handleFormErrors = (errors: FieldErrors) =>
+  showFormErrors(errors, { fieldLabels: CONNECTIVITY_INVENTORY_FIELD_LABELS });
 
 const STATUSES = [
   'available',
@@ -97,7 +120,7 @@ const schema = z
     model: z.string().trim().max(120, 'Máximo 120 caracteres').optional().or(z.literal('')),
     notes: z.string().trim().max(1000, 'Máximo 1000 caracteres').optional().or(z.literal('')),
     technical_specs: technicalSpecsArraySchema,
-    equipment_profile: z.enum(['generic', 'router', 'sim_card']).default('generic'),
+    equipment_profile: z.enum(EQUIPMENT_PROFILE_ENUM_VALUES).default('generic'),
     // IMPORTANT: keep these as opaque records. Validation happens conditionally in
     // superRefine based on equipment_profile so that the irrelevant block (e.g.
     // sim_card while creating a router) never blocks submit with hidden errors.
@@ -105,6 +128,7 @@ const schema = z
     sim_card_factory: z.record(z.any()).optional().nullable(),
   })
   .superRefine((val, ctx) => {
+    if (!isConnectivityEquipmentProfile(val.equipment_profile)) return;
     if (val.equipment_profile === 'router') {
       const r = routerFactorySchema.safeParse(val.router_factory ?? {});
       if (!r.success) {
@@ -176,7 +200,7 @@ export function InventoryItemFormDialog({ open, onOpenChange, item }: Props) {
     },
   });
 
-  const [profile, setProfile] = useState<EquipmentProfile>('generic');
+  const [profile, setProfile] = useState<InventoryFormEquipmentProfile>('generic');
 
   const familyById = useMemo(() => {
     const m = new Map<string, any>();
@@ -195,8 +219,8 @@ export function InventoryItemFormDialog({ open, onOpenChange, item }: Props) {
 
   useEffect(() => {
     if (open) {
-      const initialProfile = (((item as any)?.category?.equipment_profile) ?? 'generic') as EquipmentProfile;
-      setProfile(initialProfile === 'router' || initialProfile === 'sim_card' ? initialProfile : 'generic');
+      const initialProfile = normalizeFormProfile((item as any)?.category?.equipment_profile);
+      setProfile(initialProfile);
       const router = getRouterFactory(item?.metadata) ?? { ssid_factory: '', wifi_password_factory: '', admin_user: '', admin_password: '', imei: '' };
       const sim = getSimCardFactory(item?.metadata) ?? { iccid: '', line_number: '', carrier: '', apn: '', pin: '' };
       const allSpecs = getTechnicalSpecs(item?.metadata) as TechnicalSpec[];
@@ -364,7 +388,7 @@ export function InventoryItemFormDialog({ open, onOpenChange, item }: Props) {
   const { update: updateCategory } = useInventoryCategoryMutations();
   const promoteCategoryProfile = async () => {
     if (!selectedCategory) return;
-    const desired: 'router' | 'sim_card' = looksLikeRouter ? 'router' : 'sim_card';
+    const desired: ConnectivityEquipmentProfile = looksLikeRouter ? 'router' : 'sim_card';
     try {
       await updateCategory.mutateAsync({
         id: selectedCategory.id,
@@ -406,7 +430,7 @@ export function InventoryItemFormDialog({ open, onOpenChange, item }: Props) {
           </div>
         )}
 
-        <form onSubmit={form.handleSubmit(onSubmit, showFormErrors)} className="space-y-4">
+        <form onSubmit={form.handleSubmit(onSubmit, handleFormErrors)} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="name">Nome do item</Label>
             <Input id="name" placeholder="Ex: Router BLUE 001" {...form.register('name')} />
@@ -442,7 +466,8 @@ export function InventoryItemFormDialog({ open, onOpenChange, item }: Props) {
               form.setValue('operational_type', next.operational_type);
               form.setValue('criticality', next.criticality);
             }}
-            onCategoryProfileChange={(p) => {
+            onCategoryProfileChange={(rawProfile) => {
+              const p = normalizeFormProfile(rawProfile);
               setProfile(p);
               form.setValue('equipment_profile', p, { shouldValidate: true });
             }}
