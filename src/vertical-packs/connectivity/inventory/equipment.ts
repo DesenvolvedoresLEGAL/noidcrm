@@ -15,7 +15,10 @@ import { z } from 'zod';
 
 // ----- Connectivity profile -----
 
-export type ConnectivityEquipmentProfile = 'router' | 'sim_card';
+export const CONNECTIVITY_EQUIPMENT_PROFILE_VALUES = ['router', 'sim_card'] as const;
+
+export type ConnectivityEquipmentProfile =
+  (typeof CONNECTIVITY_EQUIPMENT_PROFILE_VALUES)[number];
 
 export const CONNECTIVITY_EQUIPMENT_PROFILE_LABELS: Record<
   ConnectivityEquipmentProfile,
@@ -28,15 +31,18 @@ export const CONNECTIVITY_EQUIPMENT_PROFILE_LABELS: Record<
 export const CONNECTIVITY_EQUIPMENT_PROFILE_OPTIONS: {
   value: ConnectivityEquipmentProfile;
   label: string;
-}[] = [
-  { value: 'router', label: CONNECTIVITY_EQUIPMENT_PROFILE_LABELS.router },
-  { value: 'sim_card', label: CONNECTIVITY_EQUIPMENT_PROFILE_LABELS.sim_card },
-];
+}[] = CONNECTIVITY_EQUIPMENT_PROFILE_VALUES.map((value) => ({
+  value,
+  label: CONNECTIVITY_EQUIPMENT_PROFILE_LABELS[value],
+}));
 
 export function isConnectivityEquipmentProfile(
   value: unknown,
 ): value is ConnectivityEquipmentProfile {
-  return value === 'router' || value === 'sim_card';
+  return (
+    typeof value === 'string' &&
+    (CONNECTIVITY_EQUIPMENT_PROFILE_VALUES as readonly string[]).includes(value)
+  );
 }
 
 // ----- SIM Carriers -----
