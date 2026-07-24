@@ -29,7 +29,12 @@ interface Props {
     operational_type: OperationalType;
     criticality: Criticality;
   }) => void;
-  onCategoryProfileChange?: (profile: 'generic' | 'router' | 'sim_card') => void;
+  /**
+   * Emits the raw `equipment_profile` value stored on the category. Core does
+   * NOT interpret it — Vertical Packs (e.g. Connectivity) decide what each
+   * opaque value means at the composition host.
+   */
+  onCategoryProfileChange?: (profile: string | null) => void;
   errors?: {
     category_id?: { message?: string };
     family_id?: { message?: string };
