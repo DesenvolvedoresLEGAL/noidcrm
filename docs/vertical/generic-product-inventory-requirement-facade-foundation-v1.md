@@ -124,3 +124,16 @@ genérico, remover comentários `@deprecated`. Banco intocado.
 `VERT-01.2E-B2 — ACTIVATE GENERIC PRODUCT INVENTORY REQUIREMENT FACADE`:
 migrar editor/dialog para o hook genérico; converter hook/schema legados
 em bridges reais; reavaliar HC-015 (colunas físicas + snapshots).
+
+---
+
+## VERT-01.2E-B2B — generic façade activated in Proposal Demand
+
+Runtime do Proposal Inventory Demand migrado para a façade genérica via
+bulk repository (`listInventoryProductRequirements`) e
+`useInventoryProductRequirementsForProducts`. Normalizer principal
+(`normalizeInventoryProductRequirement`) agora consome
+`InventoryProductRequirement` e não conhece colunas `eventrix_*`.
+Bridge legado isolado em `src/inventory/demand/legacyRequirementCompatibility.ts`.
+Relatório completo em
+`docs/vertical/generic-product-inventory-requirement-proposal-runtime-v1.md`.
