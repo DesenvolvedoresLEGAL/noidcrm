@@ -45,10 +45,13 @@ import {
   getSimCardFactory,
   routerFactorySchema,
   simCardFactorySchema,
-  type EquipmentProfile,
+  isConnectivityEquipmentProfile,
+  CONNECTIVITY_EQUIPMENT_PROFILE_VALUES,
+  CONNECTIVITY_INVENTORY_FIELD_LABELS,
+  type ConnectivityEquipmentProfile,
   type RouterFactory,
   type SimCardFactory,
-} from '@/lib/operations/inventoryEquipmentProfile';
+} from '@/vertical-packs/connectivity/inventory';
 import { TechnicalSpecsSection } from './TechnicalSpecsSection';
 import { FamilyTemplateSpecsFields } from './FamilyTemplateSpecsFields';
 import { InventoryClassificationFields } from './InventoryClassificationFields';
@@ -62,8 +65,28 @@ import { useInventoryLocations } from '@/hooks/operations/useInventoryLocations'
 import { useInventoryItemMutations } from '@/hooks/operations/useInventoryItems';
 import type { InventoryItemWithRefs } from '@/services/operations/inventoryItems';
 import { showFormErrors } from '@/lib/operations/formErrorFeedback';
+import type { FieldErrors } from 'react-hook-form';
 import { useInventoryCategoryMutations } from '@/hooks/operations/useInventoryCategories';
 import { AlertCircle, Wifi } from 'lucide-react';
+
+/**
+ * Composition type at the ItemForm host: Core-neutral `generic` PLUS whatever
+ * profiles the Connectivity Pack currently exposes. Do NOT redeclare router /
+ * sim_card literals here.
+ */
+type InventoryFormEquipmentProfile = 'generic' | ConnectivityEquipmentProfile;
+
+const EQUIPMENT_PROFILE_ENUM_VALUES = [
+  'generic',
+  ...CONNECTIVITY_EQUIPMENT_PROFILE_VALUES,
+] as const;
+
+function normalizeFormProfile(value: unknown): InventoryFormEquipmentProfile {
+  return isConnectivityEquipmentProfile(value) ? value : 'generic';
+}
+
+const handleFormErrors = (errors: FieldErrors) =>
+  showFormErrors(errors, { fieldLabels: CONNECTIVITY_INVENTORY_FIELD_LABELS });
 
 const STATUSES = [
   'available',
