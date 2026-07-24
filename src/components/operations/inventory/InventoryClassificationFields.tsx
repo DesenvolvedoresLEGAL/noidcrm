@@ -87,11 +87,10 @@ export function InventoryClassificationFields({
   useEffect(() => {
     if (!onCategoryProfileChange) return;
     const cat = (categories ?? []).find((c) => c.id === categoryId);
-    const profile = ((cat as any)?.equipment_profile ?? 'generic') as
-      | 'generic'
-      | 'router'
-      | 'sim_card';
-    onCategoryProfileChange(profile === 'router' || profile === 'sim_card' ? profile : 'generic');
+    const rawProfile = (cat as any)?.equipment_profile;
+    const opaque =
+      typeof rawProfile === 'string' && rawProfile.length > 0 ? rawProfile : null;
+    onCategoryProfileChange(opaque);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [categoryId, categories]);
 
