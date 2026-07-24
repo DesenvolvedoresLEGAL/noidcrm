@@ -5,7 +5,7 @@
 // e adiciona status `unsupported` quando o provider ativo não declara capability
 // `proposal_demand`.
 import type { InventoryProviderType } from '@/inventory/providers/types';
-import type { UnitBasis } from '@/schemas/productInventoryRequirement';
+import type { UnitBasis } from '@/inventory/requirements/unitBasis';
 import type {
   InventoryDemandCommercialContext,
   InventoryDemandEventContext,
