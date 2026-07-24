@@ -466,7 +466,8 @@ export function InventoryItemFormDialog({ open, onOpenChange, item }: Props) {
               form.setValue('operational_type', next.operational_type);
               form.setValue('criticality', next.criticality);
             }}
-            onCategoryProfileChange={(p) => {
+            onCategoryProfileChange={(rawProfile) => {
+              const p = normalizeFormProfile(rawProfile);
               setProfile(p);
               form.setValue('equipment_profile', p, { shouldValidate: true });
             }}
