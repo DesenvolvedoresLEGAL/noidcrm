@@ -30,10 +30,32 @@ import {
 import { useInventoryCategoryMutations } from '@/hooks/operations/useInventoryCategories';
 import type { InventoryCategory } from '@/services/operations/inventoryCategories';
 import {
-  EQUIPMENT_PROFILE_OPTIONS,
-  getEquipmentProfile,
-  type EquipmentProfile,
-} from '@/lib/operations/inventoryEquipmentProfile';
+  CONNECTIVITY_EQUIPMENT_PROFILE_OPTIONS,
+  CONNECTIVITY_EQUIPMENT_PROFILE_VALUES,
+  isConnectivityEquipmentProfile,
+  type ConnectivityEquipmentProfile,
+} from '@/vertical-packs/connectivity/inventory';
+
+/**
+ * Category-level equipment profile at the Inventory Catalog host: Core-neutral
+ * `generic` composed with whatever profiles the active Vertical Packs expose.
+ * Do NOT redeclare pack literals here.
+ */
+type CategoryEquipmentProfile = 'generic' | ConnectivityEquipmentProfile;
+
+const CATEGORY_EQUIPMENT_PROFILE_ENUM_VALUES = [
+  'generic',
+  ...CONNECTIVITY_EQUIPMENT_PROFILE_VALUES,
+] as const;
+
+const CATEGORY_EQUIPMENT_PROFILE_OPTIONS: { value: CategoryEquipmentProfile; label: string }[] = [
+  { value: 'generic', label: 'Genérico' },
+  ...CONNECTIVITY_EQUIPMENT_PROFILE_OPTIONS,
+];
+
+function normalizeCategoryProfile(value: unknown): CategoryEquipmentProfile {
+  return isConnectivityEquipmentProfile(value) ? value : 'generic';
+}
 
 const schema = z.object({
   name: z
@@ -45,7 +67,7 @@ const schema = z.object({
   control_mode: z.enum(['serialized', 'quantity', 'mixed'], {
     required_error: 'Selecione o modo de controle permitido',
   }),
-  equipment_profile: z.enum(['generic', 'router', 'sim_card']).default('generic'),
+  equipment_profile: z.enum(CATEGORY_EQUIPMENT_PROFILE_ENUM_VALUES).default('generic'),
   sort_order: z
     .number({ invalid_type_error: 'Informe um número inteiro' })
     .int('Apenas números inteiros')
