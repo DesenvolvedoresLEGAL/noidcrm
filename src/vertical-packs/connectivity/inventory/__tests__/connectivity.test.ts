@@ -18,7 +18,7 @@ import {
   hasSimCustom,
   mergeFactoryRouter,
   mergeFactorySim,
-} from './index';
+} from '../index';
 
 describe('Connectivity Pack — profile surface', () => {
   it('contains router', () => {
