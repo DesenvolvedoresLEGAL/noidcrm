@@ -13,4 +13,10 @@ export {
   mapInventoryRequirementUpdateToStorage,
   type LegacyProductInventoryRequirementStorageRow,
 } from './storageMapper';
+export {
+  listInventoryProductRequirements,
+  dedupeProductIds,
+  type ListInventoryProductRequirementsParams,
+} from './repository';
+
 
