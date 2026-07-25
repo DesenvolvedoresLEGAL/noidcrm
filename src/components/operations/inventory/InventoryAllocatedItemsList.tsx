@@ -19,9 +19,11 @@ import {
   useInventoryPreReservationAllocations,
 } from '@/hooks/operations/useInventoryPreReservations';
 import {
-  isAllocationConfigured,
-  type EquipmentProfile,
-} from '@/lib/operations/inventoryEquipmentProfile';
+  isConnectivityEquipmentProfile,
+  isConnectivityProfileConfigured,
+  type ConnectivityEquipmentProfile,
+} from '@/vertical-packs/connectivity/inventory';
+
 import { AllocationCustomConfigDialog } from './AllocationCustomConfigDialog';
 
 interface Props {
@@ -42,10 +44,11 @@ export function InventoryAllocatedItemsList({ preReservationItemId }: Props) {
   const cancel = useCancelInventoryAllocation();
   const [configTarget, setConfigTarget] = useState<{
     id: string;
-    profile: EquipmentProfile;
+    profile: ConnectivityEquipmentProfile;
     name: string | null;
     custom: Record<string, unknown> | null;
   } | null>(null);
+
 
   const handleCancel = async (id: string) => {
     if (!window.confirm('Cancelar esta alocação?')) return;
@@ -79,9 +82,13 @@ export function InventoryAllocatedItemsList({ preReservationItemId }: Props) {
         </TableHeader>
         <TableBody>
           {rows.map((a: any) => {
-            const profile: EquipmentProfile = (a.equipment_profile ?? 'generic') as EquipmentProfile;
-            const needsConfig = profile !== 'generic';
-            const configured = isAllocationConfigured(profile, a.custom_config);
+            const connectivityProfile = isConnectivityEquipmentProfile(a.equipment_profile)
+              ? (a.equipment_profile as ConnectivityEquipmentProfile)
+              : null;
+            const needsConfig = connectivityProfile !== null;
+            const configured = connectivityProfile
+              ? isConnectivityProfileConfigured(connectivityProfile, a.custom_config)
+              : true;
             return (
               <TableRow key={a.id} className={a.allocation_status !== 'active' ? 'opacity-50' : ''}>
                 <TableCell>
@@ -110,11 +117,12 @@ export function InventoryAllocatedItemsList({ preReservationItemId }: Props) {
                   </Badge>
                 </TableCell>
                 <TableCell>
-                  {needsConfig ? (
+                  {needsConfig && connectivityProfile ? (
                     <div className="flex items-center gap-2">
                       {configured ? (
                         <Badge variant="secondary" className="gap-1">
-                          <Wifi className="h-3 w-3" /> {profile === 'router' ? 'Rede OK' : 'APN OK'}
+                          <Wifi className="h-3 w-3" />{' '}
+                          {connectivityProfile === 'router' ? 'Rede OK' : 'APN OK'}
                         </Badge>
                       ) : (
                         <Badge variant="destructive">Configuração pendente</Badge>
@@ -126,14 +134,14 @@ export function InventoryAllocatedItemsList({ preReservationItemId }: Props) {
                           onClick={() =>
                             setConfigTarget({
                               id: a.id,
-                              profile,
+                              profile: connectivityProfile,
                               name: a.inventory_item_name,
                               custom: (a.custom_config ?? {}) as Record<string, unknown>,
                             })
                           }
                         >
                           <Settings2 className="h-3 w-3 mr-1" />
-                          {profile === 'router' ? 'Configurar rede' : 'Configurar chip'}
+                          {connectivityProfile === 'router' ? 'Configurar rede' : 'Configurar chip'}
                         </Button>
                       )}
                     </div>
@@ -141,6 +149,7 @@ export function InventoryAllocatedItemsList({ preReservationItemId }: Props) {
                     <span className="text-xs text-muted-foreground">—</span>
                   )}
                 </TableCell>
+
                 <TableCell className="text-xs text-muted-foreground">
                   {fmtDate(a.created_at)}
                 </TableCell>
@@ -162,15 +171,18 @@ export function InventoryAllocatedItemsList({ preReservationItemId }: Props) {
         </TableBody>
       </Table>
 
-      <AllocationCustomConfigDialog
-        open={!!configTarget}
-        onOpenChange={(o) => !o && setConfigTarget(null)}
-        allocationId={configTarget?.id ?? null}
-        profile={configTarget?.profile ?? 'generic'}
-        itemName={configTarget?.name ?? null}
-        currentConfig={configTarget?.custom ?? null}
-        onSaved={() => q.refetch()}
-      />
+      {configTarget && (
+        <AllocationCustomConfigDialog
+          open={!!configTarget}
+          onOpenChange={(o) => !o && setConfigTarget(null)}
+          allocationId={configTarget.id}
+          profile={configTarget.profile}
+          itemName={configTarget.name}
+          currentConfig={configTarget.custom}
+          onSaved={() => q.refetch()}
+        />
+      )}
+
     </div>
   );
 }

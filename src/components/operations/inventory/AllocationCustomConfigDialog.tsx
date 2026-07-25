@@ -15,18 +15,21 @@ import {
   simCardCustomSchema,
   getRouterCustom,
   getSimCardCustom,
-  type EquipmentProfile,
-} from '@/lib/operations/inventoryEquipmentProfile';
+  mergeRouterCustomConfig,
+  mergeSimCardCustomConfig,
+  type ConnectivityEquipmentProfile,
+} from '@/vertical-packs/connectivity/inventory';
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   allocationId: string | null;
-  profile: EquipmentProfile;
+  profile: ConnectivityEquipmentProfile;
   itemName?: string | null;
   currentConfig?: Record<string, unknown> | null;
   onSaved?: () => void;
 }
+
 
 export function AllocationCustomConfigDialog({
   open,
@@ -60,9 +63,21 @@ export function AllocationCustomConfigDialog({
     if (!allocationId) return;
     setSaving(true);
     try {
-      const merged = isRouter
-        ? { ...(currentConfig ?? {}), router: { ssid_custom: data.ssid_custom, wifi_password_custom: data.wifi_password_custom, notes: data.notes || null } }
-        : { ...(currentConfig ?? {}), sim_card: { apn_operational: data.apn_operational, notes: data.notes || null } };
+      let merged: Record<string, unknown>;
+      if (profile === 'router') {
+        merged = mergeRouterCustomConfig(currentConfig ?? {}, {
+          ssid_custom: data.ssid_custom,
+          wifi_password_custom: data.wifi_password_custom,
+          notes: data.notes || null,
+        });
+      } else if (profile === 'sim_card') {
+        merged = mergeSimCardCustomConfig(currentConfig ?? {}, {
+          apn_operational: data.apn_operational,
+          notes: data.notes || null,
+        });
+      } else {
+        throw new Error('Perfil de conectividade não suportado.');
+      }
       await updateAllocationCustomConfig(allocationId, merged, user?.id);
       toast.success('Configuração salva.');
       qc.invalidateQueries({ queryKey: ['inventory-pre-reservation-allocations'] });
@@ -74,6 +89,7 @@ export function AllocationCustomConfigDialog({
       setSaving(false);
     }
   };
+
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
