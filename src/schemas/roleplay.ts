@@ -28,7 +28,7 @@ export const icpSchema = z.object({
  */
 export const archetypeSchema = z.object({
   name: z.string().min(3, 'Nome deve ter no mínimo 3 caracteres').max(100),
-  type: z.enum(EVENTS_ARCHETYPE_TYPES as unknown as [string, ...string[]]),
+  type: z.enum(EVENTS_ARCHETYPE_TYPES),
   level: z.enum(['Entrada', 'Intermediário', 'Avançado', 'Enterprise']),
   tone_style: z.enum(['técnico', 'apressado', 'cético', 'indeciso', 'agressivo', 'metódico']),
   decision_role: z.enum(['Decisor', 'Influenciador', 'Usuário-Chave']),
