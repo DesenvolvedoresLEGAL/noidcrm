@@ -19,9 +19,11 @@ import {
   useInventoryPreReservationAllocations,
 } from '@/hooks/operations/useInventoryPreReservations';
 import {
-  isAllocationConfigured,
-  type EquipmentProfile,
-} from '@/lib/operations/inventoryEquipmentProfile';
+  isConnectivityEquipmentProfile,
+  isConnectivityProfileConfigured,
+  type ConnectivityEquipmentProfile,
+} from '@/vertical-packs/connectivity/inventory';
+
 import { AllocationCustomConfigDialog } from './AllocationCustomConfigDialog';
 
 interface Props {
