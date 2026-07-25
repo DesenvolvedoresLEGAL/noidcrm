@@ -1,9 +1,21 @@
 import { supabase } from '@/integrations/supabase/client';
+import type { ClientArchetypeType } from '@/roleplay/archetypes';
 
+/**
+ * Roleplay Archetype — universal runtime contract.
+ *
+ * Sprint: NOID-VERTICAL-1.0-VERT-01.4B2.
+ *
+ * `type` is now the generic `ClientArchetypeType` (string). The DB column is
+ * `text` (see VERT-01.4B1). Events-specific values (Organizador, Expositor,
+ * Agência, Empresa Contratante) are supplied by the Events Vertical Pack at
+ * the composition/UI layer — this service is Pack-agnostic and MUST NOT
+ * import from `@/vertical-packs/**`.
+ */
 export interface Archetype {
   id: string;
   name: string;
-  type: 'Organizador' | 'Expositor' | 'Agência' | 'Empresa Contratante';
+  type: ClientArchetypeType;
   level: 'Entrada' | 'Intermediário' | 'Avançado' | 'Enterprise';
   tone_style: 'técnico' | 'apressado' | 'cético' | 'indeciso' | 'agressivo' | 'metódico';
   decision_role: 'Decisor' | 'Influenciador' | 'Usuário-Chave';
