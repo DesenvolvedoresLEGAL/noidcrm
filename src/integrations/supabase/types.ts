@@ -7564,7 +7564,7 @@ export type Database = {
           objection_set: Json | null
           organization_id: string
           tone_style: Database["public"]["Enums"]["tone_style_type"] | null
-          type: Database["public"]["Enums"]["client_type"] | null
+          type: string | null
           updated_at: string | null
         }
         Insert: {
@@ -7580,7 +7580,7 @@ export type Database = {
           objection_set?: Json | null
           organization_id: string
           tone_style?: Database["public"]["Enums"]["tone_style_type"] | null
-          type?: Database["public"]["Enums"]["client_type"] | null
+          type?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -7596,7 +7596,7 @@ export type Database = {
           objection_set?: Json | null
           organization_id?: string
           tone_style?: Database["public"]["Enums"]["tone_style_type"] | null
-          type?: Database["public"]["Enums"]["client_type"] | null
+          type?: string | null
           updated_at?: string | null
         }
         Relationships: [
