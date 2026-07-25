@@ -1,18 +1,20 @@
 /**
- * LEGACY COMPATIBILITY BRIDGE — Sprint NOID-VERTICAL-1.0-VERT-01.3A.
+ * LEGACY COMPATIBILITY BRIDGE — ZERO ACTIVE RUNTIME CONSUMERS.
  *
- * The authoritative implementation for router / SIM concepts now lives in the
- * Connectivity Vertical Pack at `src/vertical-packs/connectivity/inventory`.
+ * Sprints: NOID-VERTICAL-1.0-VERT-01.3A → VERT-01.3B1 → VERT-01.3B2.
  *
- * This file re-exports those symbols and preserves the legacy tri-value
- * `EquipmentProfile` union (`generic | router | sim_card`) plus the
- * `isAllocationConfigured` helper for consumers that have not been migrated
- * yet. Nothing here duplicates schemas — everything delegates to the Pack.
+ * As of VERT-01.3B2, both the Inventory Catalog and Allocation flows import
+ * the connectivity domain directly from the Connectivity Vertical Pack at
+ * `src/vertical-packs/connectivity/inventory`. This bridge no longer has any
+ * runtime consumer inside `src/` — only its own regression test file imports
+ * from here to guarantee backwards-compatible re-exports for external callers.
  *
- * @deprecated Prefer importing directly from
- * `@/vertical-packs/connectivity/inventory` for new code. This bridge exists
- * only so existing consumers keep compiling until VERT-01.3B migrates them.
+ * @deprecated Do NOT import from this module in new code. Import from
+ * `@/vertical-packs/connectivity/inventory` instead. The bridge is kept
+ * intentionally as a compatibility artifact and may be removed in a future
+ * GREEN cleanup sprint.
  */
+
 import {
   CONNECTIVITY_EQUIPMENT_PROFILE_LABELS,
   CONNECTIVITY_EQUIPMENT_PROFILE_OPTIONS,
