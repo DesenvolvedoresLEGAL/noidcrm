@@ -15,18 +15,21 @@ import {
   simCardCustomSchema,
   getRouterCustom,
   getSimCardCustom,
-  type EquipmentProfile,
-} from '@/lib/operations/inventoryEquipmentProfile';
+  mergeRouterCustomConfig,
+  mergeSimCardCustomConfig,
+  type ConnectivityEquipmentProfile,
+} from '@/vertical-packs/connectivity/inventory';
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   allocationId: string | null;
-  profile: EquipmentProfile;
+  profile: ConnectivityEquipmentProfile;
   itemName?: string | null;
   currentConfig?: Record<string, unknown> | null;
   onSaved?: () => void;
 }
+
 
 export function AllocationCustomConfigDialog({
   open,
