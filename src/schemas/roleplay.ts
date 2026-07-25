@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { EVENTS_ARCHETYPE_TYPES } from '@/vertical-packs/events/roleplay';
+import { clientArchetypeTypeSchema } from '@/roleplay/archetypes';
 
 export const icpSchema = z.object({
   name: z.string().min(3, 'Nome deve ter no mínimo 3 caracteres').max(100),
@@ -14,21 +14,18 @@ export const icpSchema = z.object({
 });
 
 /**
- * LEGACY EVENTS-CONSTRAINED CONTRACT — VERT-01.4A.
+ * Runtime archetype schema — VERT-01.4B2.
  *
- * `archetypeSchema` continues to enforce the four Events archetype types for
- * runtime backwards-compatibility with the Postgres enum `client_type`. The
- * value list is sourced from the Events Vertical Pack — this file must never
- * redeclare the union. Level/tone/decision-role enums remain here until their
- * own extraction sprint (see VERT-01.4A docs, "other roleplay literals").
- *
- * Activation of the generic Core factory in runtime is deferred to VERT-01.4B,
- * which also requires a database migration to unlock non-events archetype
- * types.
+ * `type` is validated by the generic Core `clientArchetypeTypeSchema` (any
+ * well-formed trimmed string, 2–60 chars). Events-specific literals live in
+ * the Events Vertical Pack (`eventsArchetypeSchema`). The other structural
+ * enums (level / tone_style / decision_role) remain restricted here because
+ * they are still enforced by dedicated Postgres enums and are pending their
+ * own extraction sprint.
  */
 export const archetypeSchema = z.object({
   name: z.string().min(3, 'Nome deve ter no mínimo 3 caracteres').max(100),
-  type: z.enum(EVENTS_ARCHETYPE_TYPES),
+  type: clientArchetypeTypeSchema,
   level: z.enum(['Entrada', 'Intermediário', 'Avançado', 'Enterprise']),
   tone_style: z.enum(['técnico', 'apressado', 'cético', 'indeciso', 'agressivo', 'metódico']),
   decision_role: z.enum(['Decisor', 'Influenciador', 'Usuário-Chave']),
