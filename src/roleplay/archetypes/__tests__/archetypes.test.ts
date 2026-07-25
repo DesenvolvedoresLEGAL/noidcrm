@@ -51,10 +51,11 @@ describe('createArchetypeSchema factory', () => {
     expect(s.safeParse({ ...validBase, type: 'Procurement' }).success).toBe(true);
   });
   it('with allowedTypes restricts', () => {
-    const s = createArchetypeSchema({ allowedTypes: ['A', 'B'] });
-    expect(s.safeParse({ ...validBase, type: 'A' }).success).toBe(true);
-    expect(s.safeParse({ ...validBase, type: 'C' }).success).toBe(false);
+    const s = createArchetypeSchema({ allowedTypes: ['CFO', 'CTO'] });
+    expect(s.safeParse({ ...validBase, type: 'CFO' }).success).toBe(true);
+    expect(s.safeParse({ ...validBase, type: 'CEO' }).success).toBe(false);
   });
+
   it('uses controlled error message', () => {
     const s = createArchetypeSchema({ allowedTypes: ['A'], invalidTypeMessage: 'MSG' });
     const r = s.safeParse({ ...validBase, type: 'X' });
