@@ -88,11 +88,13 @@ describe('Events Vertical Pack', () => {
   });
 });
 
-describe('Legacy archetypeSchema regression', () => {
+describe('Runtime archetypeSchema — Events values regression', () => {
   it.each(['Organizador', 'Expositor', 'Agência', 'Empresa Contratante'])('accepts %s', (t) => {
     expect(archetypeSchema.safeParse({ ...validBase, type: t }).success).toBe(true);
   });
-  it('still rejects values outside the four', () => {
-    expect(archetypeSchema.safeParse({ ...validBase, type: 'CFO' }).success).toBe(false);
+  // VERT-01.4B2: runtime schema is now generic. Strict Events-only rejection
+  // lives on `eventsArchetypeSchema` (see runtimeActivation.test.ts).
+  it('accepts synthetic non-Events type after B2 activation', () => {
+    expect(archetypeSchema.safeParse({ ...validBase, type: 'CFO' }).success).toBe(true);
   });
 });
