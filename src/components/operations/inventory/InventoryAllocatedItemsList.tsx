@@ -44,10 +44,11 @@ export function InventoryAllocatedItemsList({ preReservationItemId }: Props) {
   const cancel = useCancelInventoryAllocation();
   const [configTarget, setConfigTarget] = useState<{
     id: string;
-    profile: EquipmentProfile;
+    profile: ConnectivityEquipmentProfile;
     name: string | null;
     custom: Record<string, unknown> | null;
   } | null>(null);
+
 
   const handleCancel = async (id: string) => {
     if (!window.confirm('Cancelar esta alocação?')) return;
