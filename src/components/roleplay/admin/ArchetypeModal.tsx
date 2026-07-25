@@ -10,6 +10,10 @@ import { Slider } from '@/components/ui/slider';
 import { archetypeSchema, type ArchetypeFormData } from '@/schemas/roleplay';
 import { ArrayInput } from './ArrayInput';
 import type { Archetype } from '@/services/roleplay/archetypes';
+import {
+  EVENTS_ARCHETYPE_TYPE_OPTIONS,
+  isEventsArchetypeType,
+} from '@/vertical-packs/events/roleplay';
 
 interface ArchetypeModalProps {
   open: boolean;
