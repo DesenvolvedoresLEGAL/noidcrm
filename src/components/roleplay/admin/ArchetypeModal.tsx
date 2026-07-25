@@ -97,15 +97,25 @@ export function ArchetypeModal({ open, onClose, onSave, archetype }: ArchetypeMo
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>Tipo *</Label>
-              <Select onValueChange={(value) => setValue('type', value as any)} value={watch('type')}>
+              <Select onValueChange={(value) => setValue('type', value)} value={watch('type')}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Organizador">Organizador</SelectItem>
-                  <SelectItem value="Expositor">Expositor</SelectItem>
-                  <SelectItem value="Agência">Agência</SelectItem>
-                  <SelectItem value="Empresa Contratante">Empresa Contratante</SelectItem>
+                  {EVENTS_ARCHETYPE_TYPE_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
+                  {(() => {
+                    const current = watch('type');
+                    if (current && !isEventsArchetypeType(current)) {
+                      return (
+                        <SelectItem key={current} value={current}>
+                          {current} <span className="text-xs text-muted-foreground">(tipo existente)</span>
+                        </SelectItem>
+                      );
+                    }
+                    return null;
+                  })()}
                 </SelectContent>
               </Select>
               {errors.type && <p className="text-sm text-destructive mt-1">{errors.type.message}</p>}
