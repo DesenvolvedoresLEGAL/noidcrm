@@ -3,6 +3,7 @@
 **Change ID:** `NOID-VERTICAL-1.0-VERT-01.4B0`
 **Classification:** GREEN / READ-ONLY. Zero DB writes. Zero migrations. Zero publish.
 **Decision:** `VERT-01.4B0 VALIDATED — ARCHETYPE ENUM MIGRATION READY`
+**Chronological note:** `VERT-01.4B1 executed and validated` — see `roleplay-archetype-db-migration-execution-v1.md`.
 
 ---
 
