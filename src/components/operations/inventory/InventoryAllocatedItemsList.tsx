@@ -82,9 +82,13 @@ export function InventoryAllocatedItemsList({ preReservationItemId }: Props) {
         </TableHeader>
         <TableBody>
           {rows.map((a: any) => {
-            const profile: EquipmentProfile = (a.equipment_profile ?? 'generic') as EquipmentProfile;
-            const needsConfig = profile !== 'generic';
-            const configured = isAllocationConfigured(profile, a.custom_config);
+            const connectivityProfile = isConnectivityEquipmentProfile(a.equipment_profile)
+              ? (a.equipment_profile as ConnectivityEquipmentProfile)
+              : null;
+            const needsConfig = connectivityProfile !== null;
+            const configured = connectivityProfile
+              ? isConnectivityProfileConfigured(connectivityProfile, a.custom_config)
+              : true;
             return (
               <TableRow key={a.id} className={a.allocation_status !== 'active' ? 'opacity-50' : ''}>
                 <TableCell>
@@ -113,11 +117,12 @@ export function InventoryAllocatedItemsList({ preReservationItemId }: Props) {
                   </Badge>
                 </TableCell>
                 <TableCell>
-                  {needsConfig ? (
+                  {needsConfig && connectivityProfile ? (
                     <div className="flex items-center gap-2">
                       {configured ? (
                         <Badge variant="secondary" className="gap-1">
-                          <Wifi className="h-3 w-3" /> {profile === 'router' ? 'Rede OK' : 'APN OK'}
+                          <Wifi className="h-3 w-3" />{' '}
+                          {connectivityProfile === 'router' ? 'Rede OK' : 'APN OK'}
                         </Badge>
                       ) : (
                         <Badge variant="destructive">Configuração pendente</Badge>
@@ -129,14 +134,14 @@ export function InventoryAllocatedItemsList({ preReservationItemId }: Props) {
                           onClick={() =>
                             setConfigTarget({
                               id: a.id,
-                              profile,
+                              profile: connectivityProfile,
                               name: a.inventory_item_name,
                               custom: (a.custom_config ?? {}) as Record<string, unknown>,
                             })
                           }
                         >
                           <Settings2 className="h-3 w-3 mr-1" />
-                          {profile === 'router' ? 'Configurar rede' : 'Configurar chip'}
+                          {connectivityProfile === 'router' ? 'Configurar rede' : 'Configurar chip'}
                         </Button>
                       )}
                     </div>
@@ -144,6 +149,7 @@ export function InventoryAllocatedItemsList({ preReservationItemId }: Props) {
                     <span className="text-xs text-muted-foreground">—</span>
                   )}
                 </TableCell>
+
                 <TableCell className="text-xs text-muted-foreground">
                   {fmtDate(a.created_at)}
                 </TableCell>
