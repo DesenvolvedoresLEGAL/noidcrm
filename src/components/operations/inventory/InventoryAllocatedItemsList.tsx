@@ -171,15 +171,18 @@ export function InventoryAllocatedItemsList({ preReservationItemId }: Props) {
         </TableBody>
       </Table>
 
-      <AllocationCustomConfigDialog
-        open={!!configTarget}
-        onOpenChange={(o) => !o && setConfigTarget(null)}
-        allocationId={configTarget?.id ?? null}
-        profile={configTarget?.profile ?? 'generic'}
-        itemName={configTarget?.name ?? null}
-        currentConfig={configTarget?.custom ?? null}
-        onSaved={() => q.refetch()}
-      />
+      {configTarget && (
+        <AllocationCustomConfigDialog
+          open={!!configTarget}
+          onOpenChange={(o) => !o && setConfigTarget(null)}
+          allocationId={configTarget.id}
+          profile={configTarget.profile}
+          itemName={configTarget.name}
+          currentConfig={configTarget.custom}
+          onSaved={() => q.refetch()}
+        />
+      )}
+
     </div>
   );
 }
