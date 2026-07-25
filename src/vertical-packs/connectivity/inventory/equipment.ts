@@ -216,3 +216,43 @@ export function isConnectivityProfileConfigured(
   if (profile === 'sim_card') return hasSimCustom(customConfig);
   return false;
 }
+
+/**
+ * Merge a router custom config block into an existing allocation custom_config
+ * without touching sibling namespaces. Non-mutating.
+ */
+export function mergeRouterCustomConfig(
+  existingConfig: unknown,
+  router: RouterCustom,
+): Record<string, unknown> {
+  const base =
+    existingConfig && typeof existingConfig === 'object'
+      ? { ...(existingConfig as Record<string, unknown>) }
+      : {};
+  base.router = {
+    ssid_custom: router.ssid_custom,
+    wifi_password_custom: router.wifi_password_custom,
+    notes: router.notes ?? null,
+  };
+  return base;
+}
+
+/**
+ * Merge a SIM-card custom config block into an existing allocation
+ * custom_config without touching sibling namespaces. Non-mutating.
+ */
+export function mergeSimCardCustomConfig(
+  existingConfig: unknown,
+  sim: SimCardCustom,
+): Record<string, unknown> {
+  const base =
+    existingConfig && typeof existingConfig === 'object'
+      ? { ...(existingConfig as Record<string, unknown>) }
+      : {};
+  base.sim_card = {
+    apn_operational: sim.apn_operational,
+    notes: sim.notes ?? null,
+  };
+  return base;
+}
+
