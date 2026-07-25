@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { EVENTS_ARCHETYPE_TYPES } from '@/vertical-packs/events/roleplay';
 
 export const icpSchema = z.object({
   name: z.string().min(3, 'Nome deve ter no mínimo 3 caracteres').max(100),
@@ -12,9 +13,22 @@ export const icpSchema = z.object({
   competing_alternatives: z.array(z.string()).optional(),
 });
 
+/**
+ * LEGACY EVENTS-CONSTRAINED CONTRACT — VERT-01.4A.
+ *
+ * `archetypeSchema` continues to enforce the four Events archetype types for
+ * runtime backwards-compatibility with the Postgres enum `client_type`. The
+ * value list is sourced from the Events Vertical Pack — this file must never
+ * redeclare the union. Level/tone/decision-role enums remain here until their
+ * own extraction sprint (see VERT-01.4A docs, "other roleplay literals").
+ *
+ * Activation of the generic Core factory in runtime is deferred to VERT-01.4B,
+ * which also requires a database migration to unlock non-events archetype
+ * types.
+ */
 export const archetypeSchema = z.object({
   name: z.string().min(3, 'Nome deve ter no mínimo 3 caracteres').max(100),
-  type: z.enum(['Organizador', 'Expositor', 'Agência', 'Empresa Contratante']),
+  type: z.enum(EVENTS_ARCHETYPE_TYPES as unknown as [string, ...string[]]),
   level: z.enum(['Entrada', 'Intermediário', 'Avançado', 'Enterprise']),
   tone_style: z.enum(['técnico', 'apressado', 'cético', 'indeciso', 'agressivo', 'metódico']),
   decision_role: z.enum(['Decisor', 'Influenciador', 'Usuário-Chave']),
@@ -22,6 +36,7 @@ export const archetypeSchema = z.object({
   min_message_exchanges: z.number().min(10).max(200),
   objection_set: z.array(z.string()).min(1, 'Adicione pelo menos 1 objeção'),
 });
+
 
 export const rubricSchema = z.object({
   name: z.string().min(3, 'Nome deve ter no mínimo 3 caracteres').max(100),
