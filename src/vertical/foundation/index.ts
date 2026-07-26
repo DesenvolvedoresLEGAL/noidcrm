@@ -1,9 +1,9 @@
 // NOID-VERTICAL-1.0-VERT-02.1
 // Public API of the Vertical Foundation.
 //
-// This barrel exposes only identity + capability contracts. Extension
-// surfaces, contribution model, composition context, registry and resolver
-// belong to later sprints and are intentionally absent.
+// Extension surface contracts added in VERT-02.2. Registry, resolver,
+// contribution provenance/validation, and composition context remain
+// intentionally absent — they belong to VERT-02.3+.
 
 export type {
   VerticalId,
@@ -32,3 +32,13 @@ export {
   isCanonicalCapabilityId,
   type CanonicalCapabilityId,
 } from './capabilities';
+
+// VERT-02.2 — Extension Surface contracts.
+export {
+  defineExtensionSurface,
+  declareExtensionContribution,
+  type ExtensionSurfaceDescriptor,
+  type ExtensionContributionDeclaration,
+  type ContributionOf,
+  type DefineExtensionSurfaceInput,
+} from './surfaces';
