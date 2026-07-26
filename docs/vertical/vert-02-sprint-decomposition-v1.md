@@ -19,6 +19,8 @@ Proposed decomposition of the VERT-02 epic (Vertical Foundation) into small, ind
 
 **Exit criteria.** Types + validator + constants + tests green; ADR-10 assertion test in place.
 
+**Status.** `VERT-02.1 implemented / validated` — see [Core Types & Capability Contract](./vertical-foundation-core-types-capabilities-v1.md).
+
 ---
 
 ## VERT-02.2 — Extension Surface Contracts
