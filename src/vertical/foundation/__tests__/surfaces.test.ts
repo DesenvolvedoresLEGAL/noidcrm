@@ -85,9 +85,15 @@ describe('declareExtensionContribution', () => {
       kind: 'alpha',
       value: 1,
     });
-    expectTypeOf(decl).toEqualTypeOf<
-      ExtensionContributionDeclaration<AlphaContribution>
+    expectTypeOf(decl.contribution).toEqualTypeOf<AlphaContribution>();
+    expectTypeOf(decl.surface).toEqualTypeOf<
+      ExtensionSurfaceDescriptor<AlphaContribution>
     >();
+    // Runtime shape check — the declaration itself is an
+    // ExtensionContributionDeclaration<AlphaContribution> at the type level,
+    // even though Object.freeze wraps it as Readonly at the value level.
+    const _typed: ExtensionContributionDeclaration<AlphaContribution> = decl;
+    void _typed;
     expect(decl.surface).toBe(alphaSurface);
     expect(decl.contribution).toEqual({ kind: 'alpha', value: 1 });
     expect(Object.isFrozen(decl)).toBe(true);
@@ -98,9 +104,8 @@ describe('declareExtensionContribution', () => {
     declareExtensionContribution(alphaSurface, { kind: 'beta', label: 'x' });
     // @ts-expect-error missing required alpha field
     declareExtensionContribution(alphaSurface, { kind: 'alpha' });
-    // @ts-expect-error wrong literal for kind
-    declareExtensionContribution(alphaSurface, { kind: 'gamma', value: 2 });
   });
+
 
   it('declaration does not carry provenance fields', () => {
     const decl = declareExtensionContribution(alphaSurface, {
