@@ -93,7 +93,8 @@ export interface ExtensionContributionDeclaration<TContribution> {
  */
 export function declareExtensionContribution<TContribution>(
   surface: ExtensionSurfaceDescriptor<TContribution>,
-  contribution: TContribution,
+  contribution: NoInfer<TContribution>,
 ): ExtensionContributionDeclaration<TContribution> {
   return Object.freeze({ surface, contribution });
 }
+
