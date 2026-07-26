@@ -5,6 +5,8 @@
 
 Initial catalog of surfaces in Core where Vertical Packs will contribute in future sprints. This document freezes intent, ownership, and priority — it does NOT implement any surface.
 
+> **Implementation note (VERT-02.2).** The generic surface *contract* is now implemented in `src/vertical/foundation/surfaces.ts` (`ExtensionSurfaceDescriptor`, `defineExtensionSurface`, `declareExtensionContribution`, `ContributionOf`). A reference-only surface declaration exists for `inventory.product_requirements` at `src/vertical/reference-surfaces/inventoryProductRequirementsSurface.ts`. No surface below is runtime-active yet — see [Extension Surface Contracts](./vertical-foundation-extension-surfaces-v1.md).
+
 ## Legend
 
 - **Purpose** — what the surface enables.
