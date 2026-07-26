@@ -31,6 +31,8 @@ Proposed decomposition of the VERT-02 epic (Vertical Foundation) into small, ind
 
 **Exit criteria.** Contracts compile; reference host stub demonstrates intent; type-level tests prove surface generics are sound.
 
+**Status.** `VERT-02.2 implemented / validated` — see [Extension Surface Contracts](./vertical-foundation-extension-surfaces-v1.md).
+
 ---
 
 ## VERT-02.3 — Contribution Model Foundation
