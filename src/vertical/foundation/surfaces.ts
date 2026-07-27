@@ -109,8 +109,8 @@ export function declareExtensionContribution<TContribution>(
     provenance,
     contribution,
   });
-  if (!result.ok) {
-    throw new ExtensionContributionValidationError(result.diagnostic);
+  if (result.ok) {
+    return result.declaration;
   }
-  return result.declaration;
+  throw new ExtensionContributionValidationError(result.diagnostic);
 }
