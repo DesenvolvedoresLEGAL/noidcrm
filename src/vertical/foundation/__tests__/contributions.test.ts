@@ -30,7 +30,16 @@ function expectFailure<T>(
 
 function expectSuccess<T>(res: ExtensionContributionValidationResult<T>) {
   if (!res.ok) throw new Error('expected validation success');
-  return (res as { readonly ok: true; readonly declaration: never & { surface: unknown; provenance: ContributionProvenance; contribution: T } }).declaration;
+  return (
+    res as {
+      readonly ok: true;
+      readonly declaration: {
+        readonly surface: unknown;
+        readonly provenance: ContributionProvenance;
+        readonly contribution: T;
+      };
+    }
+  ).declaration;
 }
 
 const capability = parseCapabilityId('demo.contrib');
