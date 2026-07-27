@@ -167,6 +167,17 @@ export type ExtensionContributionValidationResult<TContribution> =
       readonly diagnostic: ContributionValidationDiagnostic;
     };
 
+/**
+ * Type predicate — narrows a validation result to its failure variant.
+ * Provided because TypeScript generic discriminated-union narrowing on
+ * `!result.ok` is unreliable for this shape.
+ */
+export function isContributionValidationFailure<TContribution>(
+  result: ExtensionContributionValidationResult<TContribution>,
+): result is { readonly ok: false; readonly diagnostic: ContributionValidationDiagnostic } {
+  return result.ok === false;
+}
+
 // ---------------------------------------------------------------------------
 // Core pipeline (shared by safe + throwing APIs)
 // ---------------------------------------------------------------------------
