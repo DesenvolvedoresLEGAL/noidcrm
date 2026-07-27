@@ -55,6 +55,8 @@ Proposed decomposition of the VERT-02 epic (Vertical Foundation) into small, ind
 
 **Exit criteria.** Context type + factory + tests.
 
+**Status.** `VERT-02.4 implemented / validated` — see [Composition Context Foundation](./vertical-foundation-composition-context-v1.md). Foundation exposes `sharedDomain` (industry-neutral) instead of `eventCore` per ADR-10; VERT-03 will adapt Event Core to this contract.
+
 ---
 
 ## VERT-02.5 — Static Registry / Resolver Foundation
