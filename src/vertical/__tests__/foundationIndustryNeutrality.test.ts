@@ -60,6 +60,8 @@ const FORBIDDEN_CONCEPT_TOKENS = [
   'pavilion',
   'exhibitor',
   'organizer',
+  // VERT-02.4 — Foundation must not name Event Core (ADR-10 refinement).
+  forbid(['event', 'Core']).toLowerCase(),
 ];
 
 describe('Foundation industry neutrality (ADR-01 + ADR-10)', () => {
