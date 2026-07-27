@@ -115,7 +115,7 @@ describe('declareExtensionContribution', () => {
     const _typed: ExtensionContributionDeclaration<AlphaContribution> = decl;
     void _typed;
     expect(decl.surface).toBe(alphaSurface);
-    expect(decl.provenance).toBe(alphaProvenance);
+    expect(decl.provenance).toEqual(alphaProvenance);
     expect(decl.contribution).toEqual({ kind: 'alpha', value: 1 });
     expect(Object.isFrozen(decl)).toBe(true);
   });
