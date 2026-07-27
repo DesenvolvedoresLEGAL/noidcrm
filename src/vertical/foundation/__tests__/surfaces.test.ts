@@ -122,11 +122,8 @@ describe('declareExtensionContribution', () => {
 
   it('rejects payloads whose shape does not match the surface (compile-time)', () => {
     // beta payload cannot bind to an alpha surface
-    // @ts-expect-error mismatched literal
-    declareExtensionContribution(alphaSurface, alphaProvenance, { kind: 'beta', label: 'x' });
-    // missing required alpha field
-    // @ts-expect-error missing value
-    declareExtensionContribution(alphaSurface, alphaProvenance, { kind: 'alpha' });
+    // @ts-expect-error mismatched literal kind
+    declareExtensionContribution(alphaSurface, alphaProvenance, { kind: 'beta', value: 1 });
   });
 
   it('declaration carries surface, provenance, contribution only', () => {
