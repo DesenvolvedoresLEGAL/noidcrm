@@ -12,12 +12,12 @@ import {
 } from '../index';
 
 const capabilityId = parseCapabilityId('test.context_surface');
-const surface = defineExtensionSurface({
+const contributionSchema = z.object({ value: z.string() });
+type Contribution = z.infer<typeof contributionSchema>;
+const surface = defineExtensionSurface<Contribution>({
   capabilityId,
-  contributionSchema: z.object({ value: z.string() }),
+  contributionSchema,
 });
-
-type Contribution = { value: string };
 
 const ORG = 'org-123';
 const USER = 'user-456';
