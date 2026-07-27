@@ -112,5 +112,8 @@ export function declareExtensionContribution<TContribution>(
   if (result.ok) {
     return result.declaration;
   }
-  throw new ExtensionContributionValidationError(result.diagnostic);
+  throw new ExtensionContributionValidationError(
+    (result as { readonly diagnostic: import('./contributions').ContributionValidationDiagnostic })
+      .diagnostic,
+  );
 }
