@@ -53,3 +53,13 @@ export {
   type ContributionValidationDiagnostic,
   type ExtensionContributionValidationResult,
 } from './contributions';
+
+// VERT-02.4 — Composition Context Foundation.
+export {
+  EMPTY_COMPOSITION_ACCESSOR,
+  createCompositionContext,
+  type ReadonlyCompositionAccessor,
+  type CompositionContext,
+  type ContributionOfContext,
+  type CreateCompositionContextInput,
+} from './context';
