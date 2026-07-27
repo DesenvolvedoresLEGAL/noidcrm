@@ -13,7 +13,16 @@ import {
   parseCapabilityId,
   parsePackId,
   type ContributionProvenance,
+  type ContributionValidationDiagnostic,
+  type ExtensionContributionValidationResult,
 } from '../index';
+
+function expectFailure<T>(
+  res: ExtensionContributionValidationResult<T>,
+): ContributionValidationDiagnostic {
+  if (res.ok) throw new Error('expected validation failure');
+  return res.diagnostic;
+}
 
 const capability = parseCapabilityId('demo.contrib');
 
