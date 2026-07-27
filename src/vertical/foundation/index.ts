@@ -1,9 +1,5 @@
-// NOID-VERTICAL-1.0-VERT-02.1
+// NOID-VERTICAL-1.0-VERT-02.1 (evolved by VERT-02.2, VERT-02.3)
 // Public API of the Vertical Foundation.
-//
-// Extension surface contracts added in VERT-02.2. Registry, resolver,
-// contribution provenance/validation, and composition context remain
-// intentionally absent — they belong to VERT-02.3+.
 
 export type {
   VerticalId,
@@ -42,3 +38,18 @@ export {
   type ContributionOf,
   type DefineExtensionSurfaceInput,
 } from './surfaces';
+
+// VERT-02.3 — Contribution Model Foundation.
+export {
+  contributionProvenanceSchema,
+  parseContributionProvenance,
+  safeParseContributionProvenance,
+  validateExtensionContribution,
+  safeDeclareExtensionContribution,
+  ExtensionContributionValidationError,
+  type ContributionProvenance,
+  type ContributionValidationCode,
+  type ContributionValidationIssue,
+  type ContributionValidationDiagnostic,
+  type ExtensionContributionValidationResult,
+} from './contributions';
