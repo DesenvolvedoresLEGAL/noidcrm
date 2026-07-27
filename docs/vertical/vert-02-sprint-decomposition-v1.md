@@ -43,6 +43,8 @@ Proposed decomposition of the VERT-02 epic (Vertical Foundation) into small, ind
 
 **Exit criteria.** Contribution validator accepts/rejects synthetic samples; diagnostics carry provenance.
 
+**Status.** `VERT-02.3 implemented / validated` — see [Contribution Model Foundation](./vertical-foundation-contribution-model-v1.md).
+
 ---
 
 ## VERT-02.4 — Composition Context Foundation

@@ -5,6 +5,8 @@
 **Predecessors:** [VERT-02.0 Architecture](./vertical-foundation-architecture-v1.md), [VERT-02.1 Core Types & Capabilities](./vertical-foundation-core-types-capabilities-v1.md), [Extension Surfaces Catalog](./vertical-extension-surfaces-v1.md).
 **Decision:** `VERT-02.2 VALIDATED — EXTENSION SURFACE CONTRACTS ACTIVE` (qualified: **REFERENCE SURFACE ONLY — NO RUNTIME RESOLUTION**).
 
+> **Addendum — VERT-02.3.** The Contribution Model Foundation adds a required runtime `contributionSchema: z.ZodType<TContribution>` to `ExtensionSurfaceDescriptor`, adds `ContributionProvenance` (`packId` / `packVersion` / `sourcePath`) to `ExtensionContributionDeclaration`, and introduces a safe + throwing validation pipeline with sanitized diagnostics. The architectural contract frozen by VERT-02.0 is unchanged. See [Contribution Model Foundation](./vertical-foundation-contribution-model-v1.md).
+
 ## 1. Objective
 
 Deliver the second Foundation block: type-safe extension surface contracts (`ExtensionSurfaceDescriptor`, host declaration, contribution declaration, `ContributionOf`) plus one reference-only surface for `inventory.product_requirements`. No registry, no resolver, no runtime wiring.

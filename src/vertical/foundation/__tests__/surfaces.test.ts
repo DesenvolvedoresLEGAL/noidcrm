@@ -1,35 +1,53 @@
-// NOID-VERTICAL-1.0-VERT-02.2
+// NOID-VERTICAL-1.0-VERT-02.2 (evolved by VERT-02.3)
 import { describe, expect, it, expectTypeOf } from 'vitest';
+import { z } from 'zod';
 import {
   CAPABILITY_IDS,
   defineExtensionSurface,
   declareExtensionContribution,
   parseCapabilityId,
+  parsePackId,
   type ContributionOf,
+  type ContributionProvenance,
   type ExtensionSurfaceDescriptor,
   type ExtensionContributionDeclaration,
 } from '../index';
 
-interface AlphaContribution {
-  readonly kind: 'alpha';
-  readonly value: number;
-}
-
-interface BetaContribution {
-  readonly kind: 'beta';
-  readonly label: string;
-}
-
 const alphaCapability = parseCapabilityId('demo.alpha');
 const betaCapability = parseCapabilityId('demo.beta');
+
+const alphaSchema = z
+  .object({
+    kind: z.literal('alpha'),
+    value: z.number(),
+  })
+  .strict();
+
+const betaSchema = z
+  .object({
+    kind: z.literal('beta'),
+    label: z.string(),
+  })
+  .strict();
+
+type AlphaContribution = z.infer<typeof alphaSchema>;
+type BetaContribution = z.infer<typeof betaSchema>;
 
 const alphaSurface = defineExtensionSurface<AlphaContribution>({
   capabilityId: alphaCapability,
   description: 'Synthetic alpha surface for tests',
+  contributionSchema: alphaSchema,
 });
 
 const betaSurface = defineExtensionSurface<BetaContribution>({
   capabilityId: betaCapability,
+  contributionSchema: betaSchema,
+});
+
+const alphaProvenance: ContributionProvenance = Object.freeze({
+  packId: parsePackId('alpha_pack'),
+  packVersion: 'v1',
+  sourcePath: 'packs/alpha/contribution.ts',
 });
 
 describe('defineExtensionSurface', () => {
@@ -57,8 +75,13 @@ describe('defineExtensionSurface', () => {
       defineExtensionSurface<AlphaContribution>({
         // @ts-expect-error not a CapabilityId
         capabilityId: 'Not.Valid',
+        contributionSchema: alphaSchema,
       }),
     ).toThrow();
+  });
+
+  it('exposes the contributionSchema on the descriptor', () => {
+    expect(alphaSurface.contributionSchema).toBe(alphaSchema);
   });
 
   it('descriptor does not carry PackId, version, or provenance fields', () => {
@@ -80,8 +103,8 @@ describe('ContributionOf', () => {
 });
 
 describe('declareExtensionContribution', () => {
-  it('infers TContribution from the surface without restating the generic', () => {
-    const decl = declareExtensionContribution(alphaSurface, {
+  it('infers TContribution from the surface and requires provenance', () => {
+    const decl = declareExtensionContribution(alphaSurface, alphaProvenance, {
       kind: 'alpha',
       value: 1,
     });
@@ -89,38 +112,37 @@ describe('declareExtensionContribution', () => {
     expectTypeOf(decl.surface).toEqualTypeOf<
       ExtensionSurfaceDescriptor<AlphaContribution>
     >();
-    // Runtime shape check — the declaration itself is an
-    // ExtensionContributionDeclaration<AlphaContribution> at the type level,
-    // even though Object.freeze wraps it as Readonly at the value level.
     const _typed: ExtensionContributionDeclaration<AlphaContribution> = decl;
     void _typed;
     expect(decl.surface).toBe(alphaSurface);
+    expect(decl.provenance).toEqual(alphaProvenance);
     expect(decl.contribution).toEqual({ kind: 'alpha', value: 1 });
     expect(Object.isFrozen(decl)).toBe(true);
   });
 
-  it('rejects payloads whose shape does not match the surface', () => {
-    // @ts-expect-error beta payload cannot bind to an alpha surface
-    declareExtensionContribution(alphaSurface, { kind: 'beta', label: 'x' });
-    // @ts-expect-error missing required alpha field
-    declareExtensionContribution(alphaSurface, { kind: 'alpha' });
+  it('rejects payloads whose shape does not match the surface (compile-time)', () => {
+    expect(() => {
+      // @ts-expect-error mismatched literal kind
+      declareExtensionContribution(alphaSurface, alphaProvenance, { kind: 'beta', value: 1 });
+    }).toThrow();
   });
 
-
-  it('declaration does not carry provenance fields', () => {
-    const decl = declareExtensionContribution(alphaSurface, {
+  it('declaration carries surface, provenance, contribution only', () => {
+    const decl = declareExtensionContribution(alphaSurface, alphaProvenance, {
       kind: 'alpha',
       value: 1,
     });
-    const keys = Object.keys(decl);
-    expect(keys.sort()).toEqual(['contribution', 'surface']);
+    const keys = Object.keys(decl).sort();
+    expect(keys).toEqual(['contribution', 'provenance', 'surface']);
   });
 });
 
 describe('capability binding', () => {
   it('binds surfaces to canonical Foundation capability ids', () => {
-    const surface = defineExtensionSurface<{ readonly ok: true }>({
+    const schema = z.object({ ok: z.literal(true) }).strict();
+    const surface = defineExtensionSurface<z.infer<typeof schema>>({
       capabilityId: CAPABILITY_IDS.INVENTORY_PROPOSAL_DEMAND,
+      contributionSchema: schema,
     });
     expect(surface.capabilityId).toBe(CAPABILITY_IDS.INVENTORY_PROPOSAL_DEMAND);
   });
