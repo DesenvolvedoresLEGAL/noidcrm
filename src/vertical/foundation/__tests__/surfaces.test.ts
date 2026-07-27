@@ -13,32 +13,25 @@ import {
   type ExtensionContributionDeclaration,
 } from '../index';
 
-interface AlphaContribution {
-  readonly kind: 'alpha';
-  readonly value: number;
-}
-
-interface BetaContribution {
-  readonly kind: 'beta';
-  readonly label: string;
-}
-
 const alphaCapability = parseCapabilityId('demo.alpha');
 const betaCapability = parseCapabilityId('demo.beta');
 
-const alphaSchema: z.ZodType<AlphaContribution> = z
+const alphaSchema = z
   .object({
     kind: z.literal('alpha'),
     value: z.number(),
   })
   .strict();
 
-const betaSchema: z.ZodType<BetaContribution> = z
+const betaSchema = z
   .object({
     kind: z.literal('beta'),
     label: z.string(),
   })
   .strict();
+
+type AlphaContribution = z.infer<typeof alphaSchema>;
+type BetaContribution = z.infer<typeof betaSchema>;
 
 const alphaSurface = defineExtensionSurface<AlphaContribution>({
   capabilityId: alphaCapability,
@@ -127,16 +120,13 @@ describe('declareExtensionContribution', () => {
     expect(Object.isFrozen(decl)).toBe(true);
   });
 
-  it('rejects payloads whose shape does not match the surface', () => {
-    // @ts-expect-error beta payload cannot bind to an alpha surface
-    declareExtensionContribution(alphaSurface, alphaProvenance, {
-      kind: 'beta',
-      label: 'x',
-    });
-    // @ts-expect-error missing required alpha field
-    declareExtensionContribution(alphaSurface, alphaProvenance, {
-      kind: 'alpha',
-    });
+  it('rejects payloads whose shape does not match the surface (compile-time)', () => {
+    // beta payload cannot bind to an alpha surface
+    // @ts-expect-error mismatched literal
+    declareExtensionContribution(alphaSurface, alphaProvenance, { kind: 'beta', label: 'x' });
+    // missing required alpha field
+    // @ts-expect-error missing value
+    declareExtensionContribution(alphaSurface, alphaProvenance, { kind: 'alpha' });
   });
 
   it('declaration carries surface, provenance, contribution only', () => {
@@ -151,11 +141,10 @@ describe('declareExtensionContribution', () => {
 
 describe('capability binding', () => {
   it('binds surfaces to canonical Foundation capability ids', () => {
-    const surface = defineExtensionSurface<{ readonly ok: true }>({
+    const schema = z.object({ ok: z.literal(true) }).strict();
+    const surface = defineExtensionSurface<z.infer<typeof schema>>({
       capabilityId: CAPABILITY_IDS.INVENTORY_PROPOSAL_DEMAND,
-      contributionSchema: z.object({ ok: z.literal(true) }).strict() as z.ZodType<{
-        readonly ok: true;
-      }>,
+      contributionSchema: schema,
     });
     expect(surface.capabilityId).toBe(CAPABILITY_IDS.INVENTORY_PROPOSAL_DEMAND);
   });
