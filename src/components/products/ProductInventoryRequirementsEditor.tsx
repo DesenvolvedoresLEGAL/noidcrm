@@ -212,9 +212,9 @@ export function ProductInventoryRequirementsEditor({
             pelo provider ativo.
           </p>
           <p className="text-xs text-muted-foreground mt-1">
-            A quantidade representa o consumo físico por base comercial. Ex.:
-            1 roteador por ponto.
+            {verticalPolicy.presentation.consumptionExample}
           </p>
+
           {providerName && (
             <p className="text-[11px] text-muted-foreground mt-1">
               Provider ativo: <span className="font-medium">{providerName}</span>
