@@ -277,10 +277,11 @@ describe('VERT-02.5 resolver', () => {
 
   it('does not execute contribution payload functions', () => {
     const spy = vi.fn();
-    const schemaFn = z.object({
+    type Fn = { run: () => void };
+    const schemaFn: z.ZodType<Fn> = z.object({
       run: z.custom<() => void>((v) => typeof v === 'function'),
-    }).strict();
-    const s = defineExtensionSurface<{ run: () => void }>({
+    }) as unknown as z.ZodType<Fn>;
+    const s = defineExtensionSurface<Fn>({
       capabilityId: parseCapabilityId('exec.probe'),
       contributionSchema: schemaFn,
     });
