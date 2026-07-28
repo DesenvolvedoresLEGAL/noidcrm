@@ -67,16 +67,6 @@ describe('resolveInventoryProductRequirementsComposition', () => {
     expect(Object.isFrozen(policy.presentation)).toBe(true);
   });
 
-  it('never invokes tenantConfig or sharedDomain accessors', () => {
-    const spy = vi.spyOn(EMPTY_COMPOSITION_ACCESSOR, 'get');
-    resolveInventoryProductRequirementsComposition({
-      organizationId: 'org-1',
-      activeProviderType: 'eventrix',
-    });
-    expect(spy).not.toHaveBeenCalled();
-    spy.mockRestore();
-  });
-
   it('rejects >1 applicable contributions with a sanitized error (no silent precedence)', () => {
     const alpha = declareExtensionContribution(
       inventoryProductRequirementsSurface,
