@@ -67,6 +67,8 @@ Proposed decomposition of the VERT-02 epic (Vertical Foundation) into small, ind
 
 **Exit criteria.** Registry + resolver + conflict tests; zero concrete Pack knowledge in Foundation.
 
+**Status.** `VERT-02.5 implemented / validated` — see [Static Registry / Resolver Foundation](./vertical-foundation-static-registry-resolver-v1.md). Instance-based `createExtensionRegistry()` (no singleton), deterministic order by ascending `PackId`, unique key `(surface.capabilityId, provenance.packId)`, merge contract deferred.
+
 ---
 
 ## VERT-02.6 — Foundation Integration & Gate 2A
