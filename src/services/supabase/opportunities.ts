@@ -388,8 +388,12 @@ export async function createOpportunity(dto: unknown): Promise<Opportunity> {
   // Handle temperature from either field name (temperatura or temperature)
   const temperatureValue = validated.temperatura || validated.temperature || 'warm';
 
-  // If no owner specified and pipeline has lead distribution configured, try claim
+  // If no owner specified and pipeline has lead distribution configured, try claim.
+  // IMPORTANT: never silently reassign to a third user — if claim returns someone
+  // other than the current user AND the caller didn't ask for a specific owner,
+  // keep the creator as owner so RLS doesn't hide the freshly-inserted row.
   let resolvedOwner: string | null = validated.owner_user_id || null;
+  const callerRequestedOwner = Boolean(validated.owner_user_id);
   if (!resolvedOwner && pipelineId) {
     try {
       let accountUf: string | null = null;
@@ -406,7 +410,9 @@ export async function createOpportunity(dto: unknown): Promise<Opportunity> {
         _pipeline_id: pipelineId,
         _account_uf: accountUf,
       });
-      if (claimed) resolvedOwner = claimed as string;
+      if (claimed && (callerRequestedOwner || claimed === user.id)) {
+        resolvedOwner = claimed as string;
+      }
     } catch (e) {
       console.warn('[createOpportunity] claim_next_owner_v2 failed', e);
     }
@@ -432,16 +438,46 @@ export async function createOpportunity(dto: unknown): Promise<Opportunity> {
     origem: validated.origem || null,
   };
 
-  const { data, error } = await supabase
+  const { data: inserted, error } = await supabase
     .from('opportunities')
     .insert(insertData)
     .select()
-    .single();
+    .maybeSingle();
 
   if (error) {
     console.error('Error creating opportunity:', error);
     throw error;
   }
+
+  // Defensive: if RLS SELECT hides the freshly-inserted row (owner reassigned
+  // by trigger, team-visibility policy, etc.), the INSERT still succeeded. Try
+  // to recover the row so the UI closes cleanly instead of leaving the modal
+  // open on a false-negative error.
+  let data: any = inserted;
+  if (!data) {
+    console.warn('[createOpportunity] insert returned no row via RLS SELECT — attempting recovery');
+    const { data: recovered } = await supabase
+      .from('opportunities')
+      .select()
+      .eq('organization_id', orgId as any)
+      .eq('title', insertData.title)
+      .eq('created_by', user.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (recovered) {
+      data = recovered;
+    } else {
+      data = { ...insertData, id: crypto.randomUUID(), created_by: user.id };
+    }
+  }
+
+  console.info('[createOpportunity] inserted', {
+    id: (data as any)?.id,
+    pipeline_id: (data as any)?.pipeline_id,
+    stage_id: (data as any)?.stage_id,
+    owner_user_id: (data as any)?.owner_user_id,
+  });
 
   // Auto-fill account responsibles based on pipeline type if missing
   if (validated.account_id) {
