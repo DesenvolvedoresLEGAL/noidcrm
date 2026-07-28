@@ -25,8 +25,8 @@ import type { CapabilityId, PackId } from './ids';
 import type { ExtensionSurfaceDescriptor } from './surfaces';
 import type {
   ExtensionContributionDeclaration,
-  ContributionProvenance,
-} from './contributions';
+} from './surfaces';
+import type { ContributionProvenance } from './contributions';
 import {
   ExtensionContributionValidationError,
   validateExtensionContribution,
