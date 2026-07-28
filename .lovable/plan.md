@@ -1,73 +1,44 @@
-## Diagnóstico (confirmado com dados reais)
+## Diagnóstico
 
-**Proposta:** `86b2387a-2145-4376-beb3-13a96c042733` (ONFLY – FORUM ECOMMERCE 2026).
+O banco mostra que a criação **está gravando** para o Gustavo (`f45f5762…`) na OPERADORA LEGAL — 7 oportunidades criadas com sucesso entre 12:58 e 13:09 UTC, todas com `owner_user_id` = Gustavo, `status='new'`, `close_date_prevista` e `origem` preenchidos.
 
-**Estado no banco (`proposal_payment_terms`):**
-- `payment_condition = upfront`
-- `dynamic_pricing_reference_type = 'custom_date'`
-- `dynamic_pricing_reference_date = 2026-08-07` ← data personalizada escolhida pelo vendedor
-- `first_installment_date = 2026-07-20` ← lixo antigo (data em que o termo foi criado)
+Ainda assim, o Gustavo relatou **"modal trava/não fecha"** no pipeline PRÉ VENDAS. O padrão bate com uma falha **depois** do `INSERT` bem-sucedido dentro de `createOpportunity()` — que faz o modal cair no `catch`, mostrar toast de erro e não chamar `onOpenChange(false)`, mesmo com o registro já persistido. Isso também explica os retries visíveis no banco ("SIMONE DA AGRNCIA" → "SIMONE A AGENCIA" → "SIMONE DA AGENCIA").
 
-**Comportamento:**
-- **Editor (Configurar formas de pagamento):** mostra vencimento **07/08/2026** ✅
-- **Link público / cliente:** mostra vencimento **20/07/2026** ❌
+Suspeitos, em `src/services/supabase/opportunities.ts` (função `createOpportunity`, linhas 326–482):
 
-## Causa raiz
+1. **`.insert(...).select().single()`** — se a política RLS de SELECT em `opportunities` (ou uma view/trigger que reescreve `owner_user_id`) fizer a linha inserida não ser visível de volta na mesma request, o `.single()` lança `PGRST116` e a UI acha que falhou, apesar da linha estar gravada.
+2. **`claim_next_owner_v2`** — se retornar um `owner` de outro usuário quando `owner_user_id` chega vazio, o Gustavo perde SELECT sobre a própria criação e cai no mesmo caso 1. Hoje já existe `try/catch`, mas o resultado é aplicado sem validação.
+3. **Auto-fill de responsáveis da conta** (linhas 447–479) — está sob `try/catch` e não deve derrubar; será mantido intacto, apenas garantindo que exceções continuem apenas em `console.warn`.
 
-O helper `calculateInstallments` em `src/services/supabase/proposal-payment-terms.ts` decide o vencimento do "Pagamento à vista" nesta ordem:
+Nada disso indica que o `INSERT` esteja quebrado — o insert funciona. A correção precisa ser **cirúrgica**, apenas para o retorno pós-insert não derrubar o fluxo da UI quando a linha já foi gravada.
 
-1. `customAnchor` (data personalizada da tabela dinâmica) — **somente se `!isFrozen`**
-2. `dynEnd` (fim do tier vigente) — **somente se `!isFrozen`**
-3. `first_installment_date` (fallback)
+## Escopo da correção (mínimo e seguro)
 
-Onde `isFrozen = options.approvedAmount != null`.
+Somente `src/services/supabase/opportunities.ts`, função `createOpportunity`. Nenhuma migration, nenhuma mudança em RLS, nenhuma mudança de UI, nada em duplicação, moves, updates, delete, forecast, revenue, etc.
 
-- No **editor** (`ProposalPaymentTerms.tsx`, linha 443) o helper é chamado **sem `approvedAmount`** → `isFrozen=false` → cai no `customAnchor` → 07/08. ✅
-- No **link público** (`ProposalPublicView.tsx`, linha 1066) o helper é chamado com `approvedAmount: ledgerOneTimeNet` para **propostas ainda não aceitas** (para não reaplicar desconto sobre a base já líquida do ledger). Isso ativa `isFrozen=true` mesmo em proposta `sent`, então o helper **ignora** `customAnchor` e `dynEnd` e cai no `first_installment_date = 2026-07-20`. ❌
+### Mudanças
 
-O sinal "base já líquida do ledger" está sendo confundido com "cronograma congelado por aceite". São coisas diferentes.
+1. Trocar `.single()` por `.maybeSingle()` no retorno do insert e:
+   - Se `data` vier `null` (linha gravada mas invisível pela RLS de SELECT), fazer um **re-fetch defensivo** em `opportunities` por `organization_id` + `title` + `created_by = auth.uid()` limit 1 mais recente, retornando esse row.
+   - Se o re-fetch também vier vazio, retornar um objeto sintético com os campos que a UI usa (`id` do insert quando disponível via `.select('id')`, `pipeline_id`, `stage_id`, `owner_user_id`, `status`, `organization_id`), para o modal considerar sucesso e fechar.
 
-## Correção (definitiva, mínima e segura)
+2. Blindar `claim_next_owner_v2`: se o `claimed` retornar um `user_id` diferente do `auth.uid()` E o `dto` não pediu explicitamente outro dono, manter `resolvedOwner = user.id`. Isso evita a linha ser gravada com dono terceiro e sumir da SELECT do criador. (Comportamento explícito de "assign to X" continua funcionando quando `owner_user_id` vem no DTO.)
 
-Separar os dois conceitos no `calculateInstallments`:
+3. Log estruturado (`console.info('[createOpportunity] inserted', { id, pipeline_id, stage_id, owner_user_id })`) apenas para forense — sem alterar contrato.
 
-- **Base já líquida (não reaplicar desconto):** continua sinalizada por `approvedAmount != null`.
-- **Cronograma congelado (ignora âncora personalizada e tier vigente):** passa a exigir sinal explícito — proposta `accepted` + `approved_payment_schedule` presente.
+## Fora do escopo (explícito)
 
-### Passos
+- Não mexer em `duplicateOpportunity`, `moveOpportunity`, `updateOpportunity`, `markAsWon/Lost`, `restore`, `reopen`.
+- Não mexer em `CreateOpportunityModal.tsx`, `Opportunities.tsx`, hooks de scoring, badges, forecast, revenue.
+- Não criar migration, não alterar RLS, não alterar trigger, não alterar view.
 
-1. **`src/services/supabase/proposal-payment-terms.ts`** — em `calculateInstallments`, no ramo `isUpfront`:
-   - Adicionar opção nova `frozenSchedule?: boolean` (ou reaproveitar um sinal já existente: `options.isAccepted`).
-   - Trocar `const isFrozen = options?.approvedAmount != null` por `const isFrozen = options?.frozenSchedule === true`.
-   - Assim, `approvedAmount` continua servindo apenas para evitar reaplicar `discount_percent` sobre a base já líquida (linhas 175-179), mas **não bloqueia mais** `customAnchor`/`dynEnd`.
+## Verificação
 
-2. **`src/pages/ProposalPublicView.tsx`** (duas chamadas — cronograma da tela pública em linha 1066 e PDF em linha 322):
-   - Passar `frozenSchedule: proposal?.status === 'accepted' && !!proposal?.approved_payment_schedule`.
-   - Manter `approvedAmount: ledgerOneTimeNet` (não aceito) / `approved_amount` (aceito) como está.
-
-3. **`src/components/proposals/ProposalPreview.tsx`** e **`src/components/proposals/ProposalPaymentTerms.tsx`**: sem mudança — já não passam `approvedAmount` em rascunho. Só passar `frozenSchedule: true` quando `status === 'accepted'` (para preservar comportamento pós-aceite; o `readFrozenSchedule` já roda antes disso mesmo, então é só cinto-e-suspensório).
-
-4. **Testes:** adicionar caso em `src/lib/proposals/resolvePaymentDueDate.test.ts` **não** cobre esse ponto (esse helper é diferente). Adicionar teste dedicado a `calculateInstallments` cobrindo:
-   - proposta `sent` + `custom_date` + `approvedAmount` (ledger) → vencimento = data personalizada.
-   - proposta `sent` + tabela dinâmica sem custom_date + `approvedAmount` → vencimento = `current_ends_at`.
-   - proposta `accepted` + `frozenSchedule=true` → mantém `first_installment_date` congelado.
-
-5. **Higienização opcional (fora deste fix):** o valor `first_installment_date = 2026-07-20` em DB é resíduo. Não precisa alterar dado — a correção acima já faz a UI ignorar esse campo enquanto houver âncora personalizada ou tier vigente. Nenhuma migração é necessária.
-
-## Escopo
-
-- Somente frontend/UI (regra de cálculo do vencimento exibido).
-- Nenhuma alteração de RLS, schema, RPC ou dados existentes.
-- Zero efeito em propostas já aceitas (o freeze via `approved_payment_schedule` continua tendo prioridade máxima em `readFrozenSchedule`).
+1. Typecheck do arquivo alterado.
+2. Rodar `src/test/services/opportunities.test.ts` (já existente) para garantir contrato preservado.
+3. Pedir ao Gustavo para tentar criar 1 oportunidade no PRÉ VENDAS e confirmar que o modal fecha e o toast de sucesso aparece.
 
 ## Riscos
 
-- **Baixo.** A única mudança de comportamento visível é: propostas **não aceitas** com "Data personalizada" ou tabela dinâmica ativa passam a exibir no link público o mesmo vencimento que o editor já mostra hoje — que é justamente o comportamento contratado.
-- Propostas aceitas continuam intocadas (frozen schedule tem prioridade absoluta).
-
-## Validação pós-fix
-
-1. Abrir o link público da proposta ONFLY e conferir "Pagamento à vista **07/08/2026**".
-2. Baixar o PDF e conferir a mesma data.
-3. Editor continua mostrando 07/08 (sem regressão).
-4. Simular uma proposta aceita antiga e conferir que o vencimento congelado não muda.
+- Baixo: mudança isolada em uma função, com fallback conservador. Se `.maybeSingle()` retornar a linha (caso feliz de hoje), o comportamento é idêntico ao atual.
+- O re-fetch defensivo pode, em teoria, resolver para uma linha muito parecida criada em paralelo pelo mesmo usuário. Mitigado por `order by created_at desc limit 1` e filtro por `created_by = auth.uid()` dentro da mesma request (< 1s).
