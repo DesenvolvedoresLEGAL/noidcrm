@@ -78,11 +78,15 @@ import type {
   InventoryProviderType,
 } from '@/inventory/providers/types';
 
+import type { ResolvedInventoryProductRequirementsPolicy } from '@/vertical/composition/inventoryProductRequirementsComposition';
+
 interface Props {
   organizationId: string;
   productId: string;
   canEdit: boolean;
+  verticalPolicy: ResolvedInventoryProductRequirementsPolicy;
 }
+
 
 const previewBasisText = (input: {
   quantity: number;
