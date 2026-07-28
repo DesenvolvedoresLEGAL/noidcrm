@@ -517,7 +517,7 @@ function RequirementDialog({
           family_name: '',
           item_kind: null,
           quantity: 1,
-          unit_basis: 'per_point',
+          unit_basis: verticalPolicy.defaultUnitBasis,
           is_required: true,
           notes: '',
           sort_order: 0,
@@ -567,7 +567,7 @@ function RequirementDialog({
             <Label>Rótulo *</Label>
             <Input
               {...form.register('label')}
-              placeholder="Ex: Roteador 5G Indoor"
+              placeholder={verticalPolicy.presentation.requirementLabelPlaceholder}
             />
             {form.formState.errors.label && (
               <p className="text-xs text-destructive mt-1">
@@ -698,7 +698,7 @@ function RequirementDialog({
               rows={3}
               maxLength={300}
               {...form.register('notes')}
-              placeholder="Ex: Usado em pontos de conectividade indoor."
+              placeholder={verticalPolicy.presentation.notesPlaceholder}
             />
             {form.formState.errors.notes && (
               <p className="text-xs text-destructive mt-1">
