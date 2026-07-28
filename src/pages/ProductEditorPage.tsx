@@ -26,7 +26,7 @@ import { useToast } from '@/hooks/use-toast';
 
 import { ImageUpload } from '@/components/products/ImageUpload';
 import { ProductBOMEditor } from '@/components/products/ProductBOMEditor';
-import { ProductInventoryRequirementsEditor } from '@/components/products/ProductInventoryRequirementsEditor';
+import { ComposedProductInventoryRequirementsEditor } from '@/vertical/composition/components/ComposedProductInventoryRequirementsEditor';
 import { useProductCategories } from '@/hooks/useProductCategories';
 import { useMeasurementUnits } from '@/hooks/useMeasurementUnits';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
@@ -649,11 +649,12 @@ export default function ProductEditorPage() {
                 <Card>
                   <CardContent className="pt-6">
                     {isEdit && product?.id ? (
-                      <ProductInventoryRequirementsEditor
+                      <ComposedProductInventoryRequirementsEditor
                         organizationId={organization.id}
                         productId={product.id}
                         canEdit={true}
                       />
+
                     ) : (
                       <div className="space-y-2">
                         <Label className="text-base">Composição de Inventário</Label>

@@ -1,7 +1,10 @@
-// NOID-VERTICAL-1.0-VERT-01.2E-B2A
-// Ativação runtime da façade genérica de Product Inventory Requirements.
-// O componente não conhece mais colunas físicas `eventrix_*` — todo o binding
-// legado permanece confinado ao storageMapper via generic hook.
+// NOID-VERTICAL-1.0-VERT-02.6
+// Editor view for product inventory requirements.
+// The view is Pack-agnostic: it consumes vertical concerns (default unit
+// basis + presentation copy + provider applicability) exclusively via the
+// `verticalPolicy` prop resolved by the composition boundary. It knows
+// nothing about Foundation Registry, contributions, PackId or provenance.
+
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -75,11 +78,15 @@ import type {
   InventoryProviderType,
 } from '@/inventory/providers/types';
 
+import type { ResolvedInventoryProductRequirementsPolicy } from '@/vertical/composition/inventoryProductRequirementsComposition';
+
 interface Props {
   organizationId: string;
   productId: string;
   canEdit: boolean;
+  verticalPolicy: ResolvedInventoryProductRequirementsPolicy;
 }
+
 
 const previewBasisText = (input: {
   quantity: number;
@@ -108,7 +115,9 @@ export function ProductInventoryRequirementsEditor({
   organizationId,
   productId,
   canEdit,
+  verticalPolicy,
 }: Props) {
+
   const { toast } = useToast();
 
   const {
@@ -120,7 +129,10 @@ export function ProductInventoryRequirementsEditor({
   } = useInventoryProvider(organizationId);
 
   const providerSupportsRequirements =
-    !!provider && provider.hasCapability('product_requirements');
+    !!provider &&
+    provider.hasCapability('product_requirements') &&
+    verticalPolicy.providerSupportedByPack;
+
 
   const { data: categories = [], isLoading: loadingCategories } =
     useInventoryCategories(providerSupportsRequirements ? organizationId : null);
@@ -200,9 +212,9 @@ export function ProductInventoryRequirementsEditor({
             pelo provider ativo.
           </p>
           <p className="text-xs text-muted-foreground mt-1">
-            A quantidade representa o consumo físico por base comercial. Ex.:
-            1 roteador por ponto.
+            {verticalPolicy.presentation.consumptionExample}
           </p>
+
           {providerName && (
             <p className="text-[11px] text-muted-foreground mt-1">
               Provider ativo: <span className="font-medium">{providerName}</span>
@@ -405,7 +417,9 @@ export function ProductInventoryRequirementsEditor({
           categories={categories}
           families={families}
           providerType={providerType}
+          verticalPolicy={verticalPolicy}
           initial={editing}
+
           onSubmit={async (values) => {
             try {
               if (editing) {
@@ -458,6 +472,7 @@ interface DialogProps {
   categories: InventoryCategory[];
   families: InventoryFamily[];
   providerType: InventoryProviderType;
+  verticalPolicy: ResolvedInventoryProductRequirementsPolicy;
   initial: InventoryProductRequirement | null;
   onSubmit: (values: InventoryProductRequirementInput) => void | Promise<void>;
   submitting: boolean;
@@ -469,10 +484,12 @@ function RequirementDialog({
   categories,
   families,
   providerType,
+  verticalPolicy,
   initial,
   onSubmit,
   submitting,
 }: DialogProps) {
+
   const form = useForm<InventoryProductRequirementInput>({
     resolver: zodResolver(inventoryProductRequirementSchema) as never,
     defaultValues: initial
@@ -500,7 +517,7 @@ function RequirementDialog({
           family_name: '',
           item_kind: null,
           quantity: 1,
-          unit_basis: 'per_point',
+          unit_basis: verticalPolicy.defaultUnitBasis,
           is_required: true,
           notes: '',
           sort_order: 0,
@@ -550,7 +567,7 @@ function RequirementDialog({
             <Label>Rótulo *</Label>
             <Input
               {...form.register('label')}
-              placeholder="Ex: Roteador 5G Indoor"
+              placeholder={verticalPolicy.presentation.requirementLabelPlaceholder}
             />
             {form.formState.errors.label && (
               <p className="text-xs text-destructive mt-1">
@@ -681,7 +698,7 @@ function RequirementDialog({
               rows={3}
               maxLength={300}
               {...form.register('notes')}
-              placeholder="Ex: Usado em pontos de conectividade indoor."
+              placeholder={verticalPolicy.presentation.notesPlaceholder}
             />
             {form.formState.errors.notes && (
               <p className="text-xs text-destructive mt-1">

@@ -69,6 +69,22 @@ vi.mock('@/hooks/use-toast', () => ({
 }));
 
 import { ProductInventoryRequirementsEditor } from '../ProductInventoryRequirementsEditor';
+import type { ResolvedInventoryProductRequirementsPolicy } from '@/vertical/composition/inventoryProductRequirementsComposition';
+
+const TEST_POLICY: ResolvedInventoryProductRequirementsPolicy = Object.freeze({
+  providerSupportedByPack: true,
+  defaultUnitBasis: 'per_point',
+  presentation: Object.freeze({
+    consumptionExample: 'A quantidade representa o consumo físico por base comercial. Ex.: 1 roteador por ponto.',
+    requirementLabelPlaceholder: 'Ex: Roteador 5G Indoor',
+    notesPlaceholder: 'Ex: Usado em pontos de conectividade indoor.',
+  }),
+});
+
+const NATIVE_POLICY: ResolvedInventoryProductRequirementsPolicy = Object.freeze({
+  ...TEST_POLICY,
+  providerSupportedByPack: false,
+});
 
 function wrap(ui: ReactNode) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -134,6 +150,7 @@ describe('ProductInventoryRequirementsEditor (generic façade)', () => {
           organizationId="org-1"
           productId="prod-1"
           canEdit
+          verticalPolicy={NATIVE_POLICY}
         />,
       ),
     );
@@ -151,6 +168,7 @@ describe('ProductInventoryRequirementsEditor (generic façade)', () => {
           organizationId="org-1"
           productId="prod-1"
           canEdit
+          verticalPolicy={TEST_POLICY}
         />,
       ),
     );
@@ -173,6 +191,7 @@ describe('ProductInventoryRequirementsEditor (generic façade)', () => {
           organizationId="org-1"
           productId="prod-1"
           canEdit
+          verticalPolicy={TEST_POLICY}
         />,
       ),
     );
@@ -186,6 +205,7 @@ describe('ProductInventoryRequirementsEditor (generic façade)', () => {
           organizationId="org-1"
           productId="prod-1"
           canEdit
+          verticalPolicy={TEST_POLICY}
         />,
       ),
     );
@@ -201,6 +221,7 @@ describe('ProductInventoryRequirementsEditor (generic façade)', () => {
           organizationId="org-1"
           productId="prod-1"
           canEdit
+          verticalPolicy={TEST_POLICY}
         />,
       ),
     );
@@ -217,6 +238,7 @@ describe('ProductInventoryRequirementsEditor (generic façade)', () => {
           organizationId="org-1"
           productId="prod-1"
           canEdit
+          verticalPolicy={TEST_POLICY}
         />,
       ),
     );
@@ -234,6 +256,7 @@ describe('ProductInventoryRequirementsEditor (generic façade)', () => {
           organizationId="org-1"
           productId="prod-1"
           canEdit
+          verticalPolicy={TEST_POLICY}
         />,
       ),
     );
@@ -250,6 +273,7 @@ describe('ProductInventoryRequirementsEditor (generic façade)', () => {
           organizationId="org-1"
           productId="prod-1"
           canEdit
+          verticalPolicy={TEST_POLICY}
         />,
       ),
     );

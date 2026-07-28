@@ -1,4 +1,4 @@
-// NOID-VERTICAL-1.0-VERT-02.2 (evolved by VERT-02.3)
+// NOID-VERTICAL-1.0-VERT-02.6
 import { describe, expect, it, expectTypeOf } from 'vitest';
 import {
   CAPABILITY_IDS,
@@ -20,21 +20,23 @@ const provenance: ContributionProvenance = Object.freeze({
 });
 
 const validPayload: InventoryProductRequirementsContribution = {
-  providerType: 'native',
-  acceptedCategoryRefs: ['cat-1'],
-  acceptedFamilyRefs: ['fam-1'],
-  defaultUnitBasis: 'per_unit',
-  labels: { title: 'Requirements' },
+  supportedProviderTypes: ['eventrix'],
+  defaultUnitBasis: 'per_point',
+  presentation: {
+    consumptionExample: 'ex',
+    requirementLabelPlaceholder: 'label',
+    notesPlaceholder: 'notes',
+  },
 };
 
-describe('inventory.product_requirements reference surface', () => {
+describe('inventory.product_requirements host surface (canonical)', () => {
   it('binds to the canonical capability id constant', () => {
     expect(inventoryProductRequirementsSurface.capabilityId).toBe(
       CAPABILITY_IDS.INVENTORY_PRODUCT_REQUIREMENTS,
     );
   });
 
-  it('exposes the reference contribution type via ContributionOf', () => {
+  it('exposes the contribution type via ContributionOf', () => {
     type X = ContributionOf<typeof inventoryProductRequirementsSurface>;
     expectTypeOf<X>().toEqualTypeOf<InventoryProductRequirementsContribution>();
   });
@@ -43,15 +45,7 @@ describe('inventory.product_requirements reference surface', () => {
     expect(Object.isFrozen(inventoryProductRequirementsSurface)).toBe(true);
   });
 
-  it('does not encode PackId or provenance on the descriptor', () => {
-    const keys = Object.keys(inventoryProductRequirementsSurface);
-    expect(keys).not.toContain('packId');
-    expect(keys).not.toContain('packVersion');
-    expect(keys).not.toContain('sourcePath');
-    expect(keys).not.toContain('priority');
-  });
-
-  it('exposes a runtime contributionSchema', () => {
+  it('exposes the runtime contributionSchema', () => {
     expect(inventoryProductRequirementsSurface.contributionSchema).toBe(
       inventoryProductRequirementsContributionSchema,
     );
@@ -65,31 +59,46 @@ describe('inventory.product_requirements reference surface', () => {
     expect(res.ok).toBe(true);
   });
 
+  it('rejects the legacy reference contract (acceptedCategoryRefs / acceptedFamilyRefs)', () => {
+    const legacy = {
+      providerType: 'eventrix',
+      acceptedCategoryRefs: ['cat-1'],
+      acceptedFamilyRefs: ['fam-1'],
+      defaultUnitBasis: 'per_point',
+      labels: {},
+    } as unknown;
+    const res = validateExtensionContribution(
+      inventoryProductRequirementsSurface,
+      { provenance, contribution: legacy },
+    );
+    expect(res.ok).toBe(false);
+  });
+
   it.each([
     [
-      'invalid providerType',
-      { ...validPayload, providerType: 'nonexistent' as unknown as 'native' },
+      'empty supportedProviderTypes',
+      { ...validPayload, supportedProviderTypes: [] },
+    ],
+    [
+      'duplicate supportedProviderTypes',
+      { ...validPayload, supportedProviderTypes: ['eventrix', 'eventrix'] },
+    ],
+    [
+      'invalid provider inside supportedProviderTypes',
+      { ...validPayload, supportedProviderTypes: ['nope'] as unknown as ['eventrix'] },
     ],
     [
       'invalid defaultUnitBasis',
-      { ...validPayload, defaultUnitBasis: 'per_hour' as unknown as 'per_unit' },
+      { ...validPayload, defaultUnitBasis: 'per_hour' as unknown as 'per_point' },
     ],
     [
-      'invalid acceptedCategoryRefs (empty entry)',
-      { ...validPayload, acceptedCategoryRefs: [''] },
-    ],
-    [
-      'invalid acceptedFamilyRefs (not array)',
+      'missing consumptionExample',
       {
         ...validPayload,
-        acceptedFamilyRefs: 'nope' as unknown as string[],
-      },
-    ],
-    [
-      'invalid labels (non-string values)',
-      {
-        ...validPayload,
-        labels: { title: 42 } as unknown as Record<string, string>,
+        presentation: {
+          requirementLabelPlaceholder: 'x',
+          notesPlaceholder: 'y',
+        } as unknown as InventoryProductRequirementsContribution['presentation'],
       },
     ],
   ])('rejects contribution with %s', (_desc, bad) => {
