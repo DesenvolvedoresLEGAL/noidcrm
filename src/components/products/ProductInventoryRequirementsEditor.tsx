@@ -129,7 +129,10 @@ export function ProductInventoryRequirementsEditor({
   } = useInventoryProvider(organizationId);
 
   const providerSupportsRequirements =
-    !!provider && provider.hasCapability('product_requirements');
+    !!provider &&
+    provider.hasCapability('product_requirements') &&
+    verticalPolicy.providerSupportedByPack;
+
 
   const { data: categories = [], isLoading: loadingCategories } =
     useInventoryCategories(providerSupportsRequirements ? organizationId : null);
