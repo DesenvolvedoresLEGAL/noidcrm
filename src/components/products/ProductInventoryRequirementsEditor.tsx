@@ -1,7 +1,10 @@
-// NOID-VERTICAL-1.0-VERT-01.2E-B2A
-// Ativação runtime da façade genérica de Product Inventory Requirements.
-// O componente não conhece mais colunas físicas `eventrix_*` — todo o binding
-// legado permanece confinado ao storageMapper via generic hook.
+// NOID-VERTICAL-1.0-VERT-02.6
+// Editor view for product inventory requirements.
+// The view is Pack-agnostic: it consumes vertical concerns (default unit
+// basis + presentation copy + provider applicability) exclusively via the
+// `verticalPolicy` prop resolved by the composition boundary. It knows
+// nothing about Foundation Registry, contributions, PackId or provenance.
+
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
