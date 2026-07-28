@@ -115,7 +115,9 @@ export function ProductInventoryRequirementsEditor({
   organizationId,
   productId,
   canEdit,
+  verticalPolicy,
 }: Props) {
+
   const { toast } = useToast();
 
   const {
