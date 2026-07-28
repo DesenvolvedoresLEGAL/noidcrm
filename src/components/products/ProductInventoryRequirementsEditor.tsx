@@ -472,6 +472,7 @@ interface DialogProps {
   categories: InventoryCategory[];
   families: InventoryFamily[];
   providerType: InventoryProviderType;
+  verticalPolicy: ResolvedInventoryProductRequirementsPolicy;
   initial: InventoryProductRequirement | null;
   onSubmit: (values: InventoryProductRequirementInput) => void | Promise<void>;
   submitting: boolean;
@@ -483,10 +484,12 @@ function RequirementDialog({
   categories,
   families,
   providerType,
+  verticalPolicy,
   initial,
   onSubmit,
   submitting,
 }: DialogProps) {
+
   const form = useForm<InventoryProductRequirementInput>({
     resolver: zodResolver(inventoryProductRequirementSchema) as never,
     defaultValues: initial
