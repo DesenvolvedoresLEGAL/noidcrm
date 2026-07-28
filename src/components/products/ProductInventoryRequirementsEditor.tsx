@@ -417,7 +417,9 @@ export function ProductInventoryRequirementsEditor({
           categories={categories}
           families={families}
           providerType={providerType}
+          verticalPolicy={verticalPolicy}
           initial={editing}
+
           onSubmit={async (values) => {
             try {
               if (editing) {
