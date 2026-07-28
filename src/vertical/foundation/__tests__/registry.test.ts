@@ -223,7 +223,10 @@ describe('VERT-02.5 resolver', () => {
     const s = makeSurfaceA();
     r.registerSurface(s);
     const forged = { ...createCompositionContext({ organizationId: 'o', surface: s }), capabilityId: CAP_B };
-    expect(() => r.resolve(forged as never)).toThrowError(/context_surface_mismatch/);
+    expect(() => r.resolve(forged as never)).toThrow(ExtensionRegistryError);
+    try { r.resolve(forged as never); } catch (e) {
+      expect((e as ExtensionRegistryError).code).toBe('context_surface_mismatch');
+    }
   });
 
   it('preserves context identity in result', () => {
