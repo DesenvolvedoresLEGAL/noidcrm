@@ -63,3 +63,13 @@ export {
   type ContributionOfContext,
   type CreateCompositionContextInput,
 } from './context';
+
+// VERT-02.5 — Static Registry / Resolver Foundation.
+export {
+  createExtensionRegistry,
+  ExtensionRegistryError,
+  type ExtensionRegistry,
+  type ExtensionRegistryErrorCode,
+  type ExtensionRegistryErrorDetails,
+  type ExtensionResolutionResult,
+} from './registry';
