@@ -174,10 +174,9 @@ export function getPipelineTerminology(pipelineType?: string | null) {
   }
 }
 
-const isTestOpportunity = (title: string) => {
-  const lower = (title || '').toLowerCase();
-  return lower.includes('teste') || lower.includes('test');
-};
+// Removido filtro heurístico por título ("teste"/"test"): gerava falso positivo
+// em deals reais (ex.: "LLC MAKELOVE NOS TESTES DA FORD"). Exclusão de dados de
+// teste deve vir de sinal explícito (flag/tag), nunca de substring livre.
 
 // ─── Main Hook ───────────────────────────────────────────────────────
 export function useWinLossData(organizationId: string | undefined, pipelineId: string | null, dateRange: DateRange) {
