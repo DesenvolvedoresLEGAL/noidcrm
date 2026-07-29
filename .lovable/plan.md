@@ -1,44 +1,53 @@
-## Diagnóstico
+## Diagnóstico confirmado
 
-O banco mostra que a criação **está gravando** para o Gustavo (`f45f5762…`) na OPERADORA LEGAL — 7 oportunidades criadas com sucesso entre 12:58 e 13:09 UTC, todas com `owner_user_id` = Gustavo, `status='new'`, `close_date_prevista` e `origem` preenchidos.
+Hoje há **4 ganhos** com win_reasons distintos, confirmados no banco:
 
-Ainda assim, o Gustavo relatou **"modal trava/não fecha"** no pipeline PRÉ VENDAS. O padrão bate com uma falha **depois** do `INSERT` bem-sucedido dentro de `createOpportunity()` — que faz o modal cair no `catch`, mostrar toast de erro e não chamar `onOpenChange(false)`, mesmo com o registro já persistido. Isso também explica os retries visíveis no banco ("SIMONE DA AGRNCIA" → "SIMONE A AGENCIA" → "SIMONE DA AGENCIA").
+| Oportunidade | Win reason | Valor |
+|---|---|---|
+| LLC MAKELOVE NOS TESTES DA FORD | Proposta mais clara e profissional | R$ 2.943 |
+| ETHB - TIME HOLDING BRASIL | Melhor atendimento | R$ 4.765 |
+| EVENTO CASA CANON | Indicação/Referência | R$ 1.182 |
+| BR BRANDS NA BEAUTY FAIR 2026 | Suporte durante o projeto/evento | R$ 13.589 |
 
-Suspeitos, em `src/services/supabase/opportunities.ts` (função `createOpportunity`, linhas 326–482):
+Os KPIs do topo (`Ganhos = 4`, `Receita Ganha = R$ 22.479`) leem da SSoT `commercial_won_revenue_view` e estão corretos. Já os blocos "O que mais gera vitória", "Top drivers", "Diferenciais decisivos", "Vitórias por vendedor" e "Vitórias por canal" leem de `data.wins` do hook `useWinLossData`, e esse array está com **3 registros** — falta a LLC MAKELOVE.
 
-1. **`.insert(...).select().single()`** — se a política RLS de SELECT em `opportunities` (ou uma view/trigger que reescreve `owner_user_id`) fizer a linha inserida não ser visível de volta na mesma request, o `.single()` lança `PGRST116` e a UI acha que falhou, apesar da linha estar gravada.
-2. **`claim_next_owner_v2`** — se retornar um `owner` de outro usuário quando `owner_user_id` chega vazio, o Gustavo perde SELECT sobre a própria criação e cai no mesmo caso 1. Hoje já existe `try/catch`, mas o resultado é aplicado sem validação.
-3. **Auto-fill de responsáveis da conta** (linhas 447–479) — está sob `try/catch` e não deve derrubar; será mantido intacto, apenas garantindo que exceções continuem apenas em `console.warn`.
+### Causa raiz
 
-Nada disso indica que o `INSERT` esteja quebrado — o insert funciona. A correção precisa ser **cirúrgica**, apenas para o retorno pós-insert não derrubar o fluxo da UI quando a linha já foi gravada.
+`src/hooks/useWinLossData.ts` (linhas 177‑180 e 283) aplica:
 
-## Escopo da correção (mínimo e seguro)
+```ts
+const isTestOpportunity = (title: string) => {
+  const lower = (title || '').toLowerCase();
+  return lower.includes('teste') || lower.includes('test');
+};
+// ...
+.filter(opp => !isTestOpportunity(opp.title))
+```
 
-Somente `src/services/supabase/opportunities.ts`, função `createOpportunity`. Nenhuma migration, nenhuma mudança em RLS, nenhuma mudança de UI, nada em duplicação, moves, updates, delete, forecast, revenue, etc.
+O título `LLC MAKELOVE NOS TESTES DA FORD` contém o substring `testes`, então a oportunidade é descartada como "teste". Isso é uma heurística ingênua que gera falso positivo em qualquer negócio real cujo nome contenha as palavras "teste"/"test" (comum em eventos: teste de produto, test drive, testes técnicos, etc.).
 
-### Mudanças
+Resultado: SSoT reporta 4 vitórias e R$ 22.479, mas todas as análises derivadas (drivers, diferenciais, receita associada, ranking de vendedor, canal) enxergam apenas 3 vitórias e R$ 19.536 — exatamente a diferença de R$ 2.943 do MAKELOVE.
 
-1. Trocar `.single()` por `.maybeSingle()` no retorno do insert e:
-   - Se `data` vier `null` (linha gravada mas invisível pela RLS de SELECT), fazer um **re-fetch defensivo** em `opportunities` por `organization_id` + `title` + `created_by = auth.uid()` limit 1 mais recente, retornando esse row.
-   - Se o re-fetch também vier vazio, retornar um objeto sintético com os campos que a UI usa (`id` do insert quando disponível via `.select('id')`, `pipeline_id`, `stage_id`, `owner_user_id`, `status`, `organization_id`), para o modal considerar sucesso e fechar.
+## Mudança proposta
 
-2. Blindar `claim_next_owner_v2`: se o `claimed` retornar um `user_id` diferente do `auth.uid()` E o `dto` não pediu explicitamente outro dono, manter `resolvedOwner = user.id`. Isso evita a linha ser gravada com dono terceiro e sumir da SELECT do criador. (Comportamento explícito de "assign to X" continua funcionando quando `owner_user_id` vem no DTO.)
+Remover o filtro heurístico por título em `useWinLossData.ts`. Dados de produção não devem ser silenciosamente omitidos de análises por causa de uma palavra no nome do deal.
 
-3. Log estruturado (`console.info('[createOpportunity] inserted', { id, pipeline_id, stage_id, owner_user_id })`) apenas para forense — sem alterar contrato.
+- Apagar a função `isTestOpportunity` e a chamada `.filter(opp => !isTestOpportunity(opp.title))`.
+- Nenhuma outra alteração de lógica. Agregações (`WinDriversBlock`, `WinLossWinsTab`, `WinOriginBreakdownBlock`, ranking por vendedor, etc.) passam a receber os 4 wins e voltam a bater com a SSoT.
 
-## Fora do escopo (explícito)
+Se no futuro for necessário excluir oportunidades de teste, isso deve ser feito por um sinal explícito (ex.: coluna `is_test`, tag dedicada, prefixo `[TESTE]` no título) — nunca por substring livre. Fora do escopo desta correção.
 
-- Não mexer em `duplicateOpportunity`, `moveOpportunity`, `updateOpportunity`, `markAsWon/Lost`, `restore`, `reopen`.
-- Não mexer em `CreateOpportunityModal.tsx`, `Opportunities.tsx`, hooks de scoring, badges, forecast, revenue.
-- Não criar migration, não alterar RLS, não alterar trigger, não alterar view.
+## Arquivos afetados
 
-## Verificação
+- `src/hooks/useWinLossData.ts` — remover `isTestOpportunity` e o filtro correspondente.
 
-1. Typecheck do arquivo alterado.
-2. Rodar `src/test/services/opportunities.test.ts` (já existente) para garantir contrato preservado.
-3. Pedir ao Gustavo para tentar criar 1 oportunidade no PRÉ VENDAS e confirmar que o modal fecha e o toast de sucesso aparece.
+## Validação pós-fix
+
+- Recarregar a tela Win/Loss no filtro "Hoje / Vendas": drivers passam a mostrar 4 linhas (uma por win_reason), soma 4 ganhos, receita associada R$ 22.479.
+- KPI strip continua exibindo 4 / R$ 22.479 (inalterado).
+- Ranking "Vitórias por vendedor" para Wagner: 4 / R$ 22.479 / 100%.
+- "Vitórias por canal" passa a incluir o canal do MAKELOVE.
 
 ## Riscos
 
-- Baixo: mudança isolada em uma função, com fallback conservador. Se `.maybeSingle()` retornar a linha (caso feliz de hoje), o comportamento é idêntico ao atual.
-- O re-fetch defensivo pode, em teoria, resolver para uma linha muito parecida criada em paralelo pelo mesmo usuário. Mitigado por `order by created_at desc limit 1` e filtro por `created_by = auth.uid()` dentro da mesma request (< 1s).
+- Baixo. Único efeito é parar de esconder deals reais cujo título contenha "test"/"teste". Se existirem deals sintéticos criados durante QA que dependam desse filtro, eles voltarão a aparecer — mas o correto é tratá-los via flag/tag explícita, não via heurística.
