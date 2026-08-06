@@ -16,11 +16,13 @@ describe("apollo reveal core — KAI.18.15 (sem chamadas pagas)", () => {
 
   it("extrai request_id negativo e string", () => {
     expect(extractProviderRequestId('{"request_id":-7788991122334455667}', {}, null)).toBe("-7788991122334455667");
-    expect(extractProviderRequestId('{"webhook_request_id":"wr_123"}', {}, null)).toBe("wr_123");
+    // KAI.18.16: request_id não numérico é inválido.
+    expect(extractProviderRequestId('{"webhook_request_id":"wr_123"}', {}, null)).toBeNull();
+    expect(extractProviderRequestId('{"webhook_request_id":"123456789"}', {}, null)).toBe("123456789");
   });
 
   it("usa header como último recurso e retorna null sem sinal", () => {
-    expect(extractProviderRequestId(null, {}, "hdr-1")).toBe("hdr-1");
+    expect(extractProviderRequestId(null, {}, "hdr-1")).toBeNull();
     expect(extractProviderRequestId('{"foo":1}', { foo: 1 }, null)).toBeNull();
   });
 
