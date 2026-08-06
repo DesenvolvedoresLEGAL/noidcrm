@@ -733,8 +733,11 @@ export async function runApolloReveal(admin: any, req: RevealRequest, env: {
           is_whatsapp_ready: qual.is_whatsapp_ready,
         });
       }
-    } else if (providerRequestId) {
-      // Fluxo oficial: telefone chega por webhook/webhook_result. NUNCA concluir aqui.
+    } else if (providerRequestId || webhookConfigured) {
+      // KAI.18.16 — telefone é assíncrono. Com request_id válido usamos polling;
+      // sem request_id, o callback chega pelo webhook (contact_id/job_id na URL).
+      const pendingReason = providerRequestId ? "awaiting_provider_async_phone" : AWAITING_WEBHOOK_REASON;
+      const ttlMs = providerRequestId ? JOB_TTL_MS : WEBHOOK_WAIT_TTL_MS;
       await finalizeField(admin, {
         contact_id: contact.id,
         field: "phone",
@@ -745,20 +748,31 @@ export async function runApolloReveal(admin: any, req: RevealRequest, env: {
         credits_confirmed: null,
         provider_request_id: providerRequestId,
         audit_id: auditId,
-        reason: "awaiting_provider_async_phone",
+        reason: pendingReason,
       });
       try {
         await admin.from("enrichment_jobs").update({
           status: "pending_provider",
           provider_request_id: providerRequestId,
           attempt_count: 0,
-          next_retry_at: new Date(Date.now() + 60_000).toISOString(),
-          expires_at: new Date(Date.now() + JOB_TTL_MS).toISOString(),
+          next_retry_at: new Date(Date.now() + (providerRequestId ? 60_000 : 120_000)).toISOString(),
+          expires_at: new Date(Date.now() + ttlMs).toISOString(),
           reconciliation_required: false,
+          skip_reason: pendingReason,
           completed_at: null,
           locked_at: null,
           locked_by: null,
-          response: { sync: { status: apolloStatus, person_id: apolloPersonId, request_id: providerRequestId } },
+          response: {
+            reason: pendingReason,
+            webhook_configured: webhookConfigured,
+            sync: {
+              status: apolloStatus,
+              person_id: apolloPersonId,
+              request_id: providerRequestId,
+              // Payload pago preservado integralmente para reprocessamento sem nova cobrança.
+              person_payload: person ?? null,
+            },
+          },
         }).eq("id", jobs.phone!.id);
       } catch (e) { console.warn("persist pending phone job failed", e); }
 
@@ -770,11 +784,11 @@ export async function runApolloReveal(admin: any, req: RevealRequest, env: {
         credits_estimated: 1,
         credits_used: null,
         credits_confirmed: null,
-        reason: "awaiting_provider_async_phone",
+        reason: pendingReason,
         job_id: jobs.phone!.id,
       };
       await emitRevenueEvent(admin, orgId, "apollo_phone_pending_provider", {
-        contact_id: contact.id, provider_request_id: providerRequestId,
+        contact_id: contact.id, provider_request_id: providerRequestId, reason: pendingReason,
       });
     } else {
       // Sem número e sem request_id rastreável → terminal honesto.
