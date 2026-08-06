@@ -43,11 +43,20 @@ describe("apollo phone candidates (KAI.18.14)", () => {
     expect(sel.selected?.classification).toBe("person_unclassified");
   });
 
-  it("marca phone_only_web quando provider sinaliza telefone mas não entrega", () => {
+  it("NÃO marca phone_only_web sem evidência vinculada (KAI.18.15)", () => {
     const sel = selectBestPhone({ person: { has_direct_phone: "Yes" } });
-    expect(sel.outcome).toBe("phone_only_web");
+    expect(sel.outcome).toBe("not_found");
     expect(sel.provider_indicates_phone).toBe(true);
   });
+
+  it("só marca phone_only_web com evidência explícita", () => {
+    const sel = selectBestPhone(
+      { person: { has_direct_phone: "Yes" } },
+      { phoneOnlyWebEvidence: { evidence_id: "ev_1", source: "browser_parity", captured_at: new Date().toISOString() } },
+    );
+    expect(sel.outcome).toBe("phone_only_web");
+  });
+
 
   it("marca pending_provider quando permitido e há entradas vazias", () => {
     const sel = selectBestPhone({ person: { phone_numbers: [{ type: "mobile" }] } }, { allowPending: true });

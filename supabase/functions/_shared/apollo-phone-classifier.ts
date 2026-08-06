@@ -7,6 +7,7 @@ import {
   auditSummary,
   isBrazilianMobile,
   type PhoneCandidate,
+  type PhoneOnlyWebEvidence,
   type PhoneOutcome,
   type PhoneSelection,
   selectBestPhone,
@@ -130,7 +131,7 @@ export function computePhoneQuality(
   person: any,
   extraCompanyPhones: (string | null | undefined)[] = [],
   source: PhoneQuality["phone_source"] = "apollo",
-  opts: { extraPayloads?: any[]; allowPending?: boolean } = {},
+  opts: { extraPayloads?: any[]; allowPending?: boolean; phoneOnlyWebEvidence?: PhoneOnlyWebEvidence | null } = {},
 ): PhoneQuality {
   const sel = selectBestPhone(person, { extraCompanyPhones, ...opts });
   return computePhoneQualityFromSelection(sel, source);

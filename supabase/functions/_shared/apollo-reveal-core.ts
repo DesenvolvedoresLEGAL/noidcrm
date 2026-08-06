@@ -85,7 +85,40 @@ function overallFrom(phone: FieldResult, email: FieldResult): RevealResponse["ov
   return "not_found";
 }
 
+/**
+ * KAI.18.15 — request_id do Apollo é signed 64-bit e pode exceder Number.MAX_SAFE_INTEGER.
+ * Extraímos direto do TEXTO da resposta para não perder precisão no JSON.parse.
+ * Ordem oficial: request_id → webhook_request_id → id → header x-request-id.
+ */
+export function extractProviderRequestId(
+  rawText: string | null,
+  parsed: any,
+  headerValue: string | null,
+): string | null {
+  if (rawText) {
+    const m = rawText.match(/"(?:request_id|webhook_request_id)"\s*:\s*(?:"([^"]*)"|(-?\d+))/);
+    const v = m?.[1] ?? m?.[2];
+    if (v && v.trim()) return v.trim();
+  }
+  for (const key of ["request_id", "webhook_request_id", "id"]) {
+    const v = parsed?.[key];
+    if (v !== undefined && v !== null && String(v).trim()) return String(v).trim();
+  }
+  return headerValue && headerValue.trim() ? headerValue.trim() : null;
+}
+
+/** Créditos: só persistimos valor CONFIRMADO pelo provider. Nunca inferir 1. */
+export function extractProviderCredits(payload: any): number | null {
+  for (const k of ["credits_consumed", "credits_used", "credit_consumed", "credits"]) {
+    const v = payload?.[k];
+    const n = typeof v === "number" ? v : (typeof v === "string" && v.trim() !== "" ? Number(v) : NaN);
+    if (Number.isFinite(n)) return n;
+  }
+  return null;
+}
+
 export async function writeAudit(admin: any, row: Record<string, unknown>): Promise<string | null> {
+
   try {
     const { data } = await admin.from("apollo_reveal_audit").insert(row).select("id").maybeSingle();
     return data?.id ?? null;
@@ -149,22 +182,66 @@ interface ActiveJob {
   status: string;
   field: RevealField;
   request_group_id: string | null;
+  provider_request_id?: string | null;
+  created_at?: string | null;
+  expires_at?: string | null;
 }
 
-/** Cria um job por campo. Idempotência: índice único parcial por (workspace, contato, campo, provider). */
-async function claimJob(
-  admin: any,
-  params: {
-    workspace_id: string;
-    prospect_id: string | null;
-    contact_id: string;
-    field: RevealField;
-    request_group_id: string;
-    source: string;
-    requested_data_type: DataType;
-  },
-): Promise<{ job: ActiveJob | null; reused: boolean }> {
-  const { data, error } = await admin
+const JOB_SELECT =
+  "id, status, field, request_group_id, provider_request_id, created_at, expires_at, workspace_id, contact_id, provider, response, request";
+const STALE_WITHOUT_REQUEST_ID_MS = 2 * 60_000;
+const JOB_TTL_MS = 30 * 60_000;
+
+async function failJob(admin: any, jobId: string, reason: string) {
+  try {
+    await admin.from("enrichment_jobs").update({
+      status: "failed",
+      error: reason,
+      skip_reason: reason,
+      reconciliation_required: false,
+      completed_at: new Date().toISOString(),
+      locked_at: null,
+      locked_by: null,
+    }).eq("id", jobId);
+  } catch (e) {
+    console.warn("failJob error", reason, e);
+  }
+}
+
+/** Job só é reutilizável se for rastreável de verdade (request_id ou payload recuperável). */
+function isRecoverable(job: any): boolean {
+  if (job?.provider_request_id && String(job.provider_request_id).trim() !== "") return true;
+  const resp = job?.response;
+  return !!(resp && typeof resp === "object" && Object.keys(resp).length > 0);
+}
+
+const NON_TERMINAL = ["queued", "running", "pending_provider"];
+
+/**
+ * KAI.18.15 — decisão pura de reaproveitamento de job.
+ * Reaproveita SOMENTE job não terminal, não expirado e com evidência de
+ * processamento real (provider_request_id/payload) ou ainda dentro da janela
+ * de 2 minutos desde a criação.
+ */
+export function isTrackableJob(
+  job: any,
+  nowMs: number = Date.now(),
+): { trackable: boolean; reason: string | null } {
+  if (!job) return { trackable: false, reason: "no_job" };
+  if (!NON_TERMINAL.includes(String(job.status))) return { trackable: false, reason: "job_terminal" };
+  if (job.expires_at && new Date(job.expires_at).getTime() < nowMs) {
+    return { trackable: false, reason: "stale_job_expired" };
+  }
+  const ageMs = job.created_at ? nowMs - new Date(job.created_at).getTime() : 0;
+  if (!isRecoverable(job) && ageMs > STALE_WITHOUT_REQUEST_ID_MS) {
+    return { trackable: false, reason: "stale_job_without_provider_request_id" };
+  }
+  return { trackable: true, reason: null };
+}
+
+
+async function insertJob(admin: any, params: any) {
+  return await admin
     .from("enrichment_jobs")
     .insert({
       workspace_id: params.workspace_id,
@@ -178,18 +255,40 @@ async function claimJob(
       requested_data_type: params.requested_data_type,
       requested_channel: params.field,
       credits_estimated: 1,
-      expires_at: new Date(Date.now() + 30 * 60_000).toISOString(),
+      attempt_count: 0,
+      expires_at: new Date(Date.now() + JOB_TTL_MS).toISOString(),
       request: { contact_id: params.contact_id, field: params.field },
     })
-    .select("id, status, field, request_group_id")
+    .select(JOB_SELECT)
     .maybeSingle();
+}
 
+/**
+ * KAI.18.15 — Cria um job por campo.
+ * Reutiliza job existente SOMENTE quando ele é: não terminal, não expirado,
+ * do mesmo workspace/contato/campo/provider e rastreável (provider_request_id
+ * ou payload recuperável). Caso contrário encerra o job zumbi e cria um novo.
+ * Continua protegendo contra duplo clique simultâneo (índice único parcial).
+ */
+async function claimJob(
+  admin: any,
+  params: {
+    workspace_id: string;
+    prospect_id: string | null;
+    contact_id: string;
+    field: RevealField;
+    request_group_id: string;
+    source: string;
+    requested_data_type: DataType;
+  },
+): Promise<{ job: ActiveJob | null; reused: boolean }> {
+  const { data, error } = await insertJob(admin, params);
   if (!error && data) return { job: data as ActiveJob, reused: false };
 
-  // Conflito: já existe job ativo para o mesmo contato/campo → reutiliza (sem chamar Apollo).
   const { data: existing } = await admin
     .from("enrichment_jobs")
-    .select("id, status, field, request_group_id")
+    .select(JOB_SELECT)
+    .eq("workspace_id", params.workspace_id)
     .eq("contact_id", params.contact_id)
     .eq("field", params.field)
     .eq("provider", "apollo_reveal")
@@ -198,10 +297,39 @@ async function claimJob(
     .limit(1)
     .maybeSingle();
 
-  if (existing) return { job: existing as ActiveJob, reused: true };
-  console.error("claimJob failed without existing job", error?.message);
+  if (!existing) {
+    console.error("claimJob failed without existing job", error?.message);
+    return { job: null, reused: false };
+  }
+
+  const verdict = isTrackableJob(existing);
+  if (verdict.trackable) return { job: existing as ActiveJob, reused: true };
+
+  await failJob(admin, existing.id, verdict.reason ?? "stale_job");
+
+  const retry = await insertJob(admin, params);
+  if (!retry.error && retry.data) return { job: retry.data as ActiveJob, reused: false };
+
+  // Corrida com outro clique: o job vencedor é válido e recente.
+  const { data: winner } = await admin
+    .from("enrichment_jobs")
+    .select(JOB_SELECT)
+    .eq("workspace_id", params.workspace_id)
+    .eq("contact_id", params.contact_id)
+    .eq("field", params.field)
+    .eq("provider", "apollo_reveal")
+    .in("status", ["queued", "running", "pending_provider"])
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (winner) return { job: winner as ActiveJob, reused: true };
+
+  console.error("claimJob failed after stale cleanup", retry.error?.message);
   return { job: null, reused: false };
 }
+
+export const _jobInternals = { isRecoverable, isTrackableJob, STALE_WITHOUT_REQUEST_ID_MS };
+
 
 function resolveDomain(prospect: any): string | null {
   if (prospect?.normalized_domain) return prospect.normalized_domain;
@@ -420,14 +548,16 @@ export async function runApolloReveal(admin: any, req: RevealRequest, env: {
     });
     apolloStatus = r.status;
     apolloOk = r.ok;
-    providerRequestId = r.headers.get("x-request-id");
-    apolloResp = await r.json().catch(() => ({}));
+    const rawText = await r.text();
+    try { apolloResp = JSON.parse(rawText); } catch { apolloResp = {}; }
+    providerRequestId = extractProviderRequestId(rawText, apolloResp, r.headers.get("x-request-id"));
     if (!r.ok) apolloError = apolloResp?.error || apolloResp?.message || `HTTP ${apolloStatus}`;
   } catch (e) {
     apolloError = String(e);
   } finally {
     clearTimeout(timer);
   }
+
 
   if (!apolloOk) {
     const isTimeout = !apolloStatus;
@@ -477,6 +607,8 @@ export async function runApolloReveal(admin: any, req: RevealRequest, env: {
     return base({ overall_status: "failed", success: false, audit_id: auditId, reason: "identity_mismatch" });
   }
 
+  const providerCredits = extractProviderCredits(apolloResp);
+
   // ---- E-mail ----
   if (callEmail) {
     const revealedEmail: string | null = person?.email ?? null;
@@ -487,8 +619,8 @@ export async function runApolloReveal(admin: any, req: RevealRequest, env: {
       job_id: jobs.email!.id,
       value: revealedEmail,
       metadata: { email_status: person?.email_status ?? null, apollo_person_id: apolloPersonId },
-      credits_used: revealedEmail ? 1 : 0,
-      credits_confirmed: revealedEmail ? 1 : 0,
+      credits_used: providerCredits,
+      credits_confirmed: providerCredits,
       provider_request_id: providerRequestId,
       audit_id: auditId,
     });
@@ -497,8 +629,8 @@ export async function runApolloReveal(admin: any, req: RevealRequest, env: {
       revealed: out.status === "revealed",
       value: out.value,
       credits_estimated: 1,
-      credits_used: out.status === "revealed" ? 1 : 0,
-      credits_confirmed: out.status === "revealed" ? 1 : 0,
+      credits_used: providerCredits,
+      credits_confirmed: providerCredits,
       reason: out.reason,
       job_id: jobs.email!.id,
       source_type: null,
@@ -507,7 +639,7 @@ export async function runApolloReveal(admin: any, req: RevealRequest, env: {
     else await emitRevenueEvent(admin, orgId, "apollo_email_not_found", { contact_id: contact.id });
   }
 
-  // ---- Telefone ----
+  // ---- Telefone (SEMPRE assíncrono no Apollo) ----
   if (callPhone) {
     const extraCompanyPhones: string[] = [];
     if (prospectId) {
@@ -516,11 +648,8 @@ export async function runApolloReveal(admin: any, req: RevealRequest, env: {
         if (comp?.phone) extraCompanyPhones.push(String(comp.phone));
       } catch { /* noop */ }
     }
-    // KAI.18.14 — pendência assíncrona real: entradas de telefone sem número algum.
-    const rawNumbers: any[] = Array.isArray(person?.phone_numbers) ? person.phone_numbers : [];
-    const asyncPending = rawNumbers.some((p: any) => p && typeof p === "object" && !p.sanitized_number && !p.raw_number && !p.number);
 
-    const qual = computePhoneQuality(person, extraCompanyPhones, "apollo", { allowPending: asyncPending });
+    const qual = computePhoneQuality(person, extraCompanyPhones, "apollo", { allowPending: true });
     const acceptedPhone = qual.phone;
     const sourceType = qual.phone_match_quality === "person_mobile"
       ? "person_mobile"
@@ -528,10 +657,7 @@ export async function runApolloReveal(admin: any, req: RevealRequest, env: {
       ? "person_direct"
       : qual.phone_match_quality === "company_main"
       ? "company_main"
-      : qual.outcome === "phone_only_web"
-      ? "phone_only_web"
       : "unknown";
-    const companyRejected = qual.outcome === "rejected_company_phone";
 
     const metadata = {
       phone_source: qual.phone_source,
@@ -546,52 +672,117 @@ export async function runApolloReveal(admin: any, req: RevealRequest, env: {
       phone_candidates_audit: qual.audit,
     };
 
-    const outcome = qual.outcome;
-
-    const out = await finalizeField(admin, {
-      contact_id: contact.id,
-      field: "phone",
-      outcome: outcome as any,
-      job_id: jobs.phone!.id,
-      value: acceptedPhone,
-      metadata,
-      credits_used: acceptedPhone ? 1 : 0,
-      credits_confirmed: acceptedPhone ? 1 : null,
-      provider_request_id: providerRequestId,
-      audit_id: auditId,
-      reason: qual.reason,
-    });
-
-    const status: FieldStatus = (outcome === "pending_provider" || outcome === "phone_only_web") && out.status !== "failed"
-      ? (outcome as FieldStatus)
-      : out.status;
-    phoneResult = {
-      status,
-      revealed: status === "revealed",
-      value: out.value,
-      source_type: sourceType,
-      credits_estimated: 1,
-      credits_used: status === "revealed" ? 1 : status === "pending_provider" ? null : 0,
-      credits_confirmed: status === "revealed" ? 1 : null,
-      reason: out.reason,
-      job_id: jobs.phone!.id,
-    };
-
-    if (status === "revealed") {
-      await emitRevenueEvent(admin, orgId, "phone_quality_scored", {
+    if (acceptedPhone) {
+      // Caso raro: o retorno síncrono já trouxe número pessoal real.
+      const out = await finalizeField(admin, {
         contact_id: contact.id,
-        phone_match_quality: qual.phone_match_quality,
-        phone_confidence: qual.phone_confidence,
-        is_whatsapp_ready: qual.is_whatsapp_ready,
+        field: "phone",
+        outcome: "revealed",
+        job_id: jobs.phone!.id,
+        value: acceptedPhone,
+        metadata,
+        credits_used: providerCredits,
+        credits_confirmed: providerCredits,
+        provider_request_id: providerRequestId,
+        audit_id: auditId,
+        reason: qual.reason,
       });
-    } else if (companyRejected) {
-      await emitRevenueEvent(admin, orgId, "phone_company_rejected", { contact_id: contact.id, audit: qual.audit });
-    } else if (status === "phone_only_web") {
-      await emitRevenueEvent(admin, orgId, "apollo_phone_only_web", { contact_id: contact.id, audit: qual.audit });
-    } else if (status === "not_found") {
-      await emitRevenueEvent(admin, orgId, "apollo_phone_not_found", { contact_id: contact.id, audit: qual.audit });
+      phoneResult = {
+        status: out.status,
+        revealed: out.status === "revealed",
+        value: out.value,
+        source_type: sourceType,
+        credits_estimated: 1,
+        credits_used: providerCredits,
+        credits_confirmed: providerCredits,
+        reason: out.reason,
+        job_id: jobs.phone!.id,
+      };
+      if (out.status === "revealed") {
+        await emitRevenueEvent(admin, orgId, "phone_quality_scored", {
+          contact_id: contact.id,
+          phone_match_quality: qual.phone_match_quality,
+          phone_confidence: qual.phone_confidence,
+          is_whatsapp_ready: qual.is_whatsapp_ready,
+        });
+      }
+    } else if (providerRequestId) {
+      // Fluxo oficial: telefone chega por webhook/webhook_result. NUNCA concluir aqui.
+      await finalizeField(admin, {
+        contact_id: contact.id,
+        field: "phone",
+        outcome: "pending_provider",
+        job_id: jobs.phone!.id,
+        metadata,
+        credits_used: null,
+        credits_confirmed: null,
+        provider_request_id: providerRequestId,
+        audit_id: auditId,
+        reason: "awaiting_provider_async_phone",
+      });
+      try {
+        await admin.from("enrichment_jobs").update({
+          status: "pending_provider",
+          provider_request_id: providerRequestId,
+          attempt_count: 0,
+          next_retry_at: new Date(Date.now() + 60_000).toISOString(),
+          expires_at: new Date(Date.now() + JOB_TTL_MS).toISOString(),
+          reconciliation_required: false,
+          completed_at: null,
+          locked_at: null,
+          locked_by: null,
+          response: { sync: { status: apolloStatus, person_id: apolloPersonId, request_id: providerRequestId } },
+        }).eq("id", jobs.phone!.id);
+      } catch (e) { console.warn("persist pending phone job failed", e); }
+
+      phoneResult = {
+        status: "pending_provider",
+        revealed: false,
+        value: null,
+        source_type: null,
+        credits_estimated: 1,
+        credits_used: null,
+        credits_confirmed: null,
+        reason: "awaiting_provider_async_phone",
+        job_id: jobs.phone!.id,
+      };
+      await emitRevenueEvent(admin, orgId, "apollo_phone_pending_provider", {
+        contact_id: contact.id, provider_request_id: providerRequestId,
+      });
+    } else {
+      // Sem número e sem request_id rastreável → terminal honesto.
+      const outcome = qual.outcome === "rejected_company_phone" ? "rejected_company_phone" : "not_found";
+      const out = await finalizeField(admin, {
+        contact_id: contact.id,
+        field: "phone",
+        outcome,
+        job_id: jobs.phone!.id,
+        metadata,
+        credits_used: providerCredits,
+        credits_confirmed: providerCredits,
+        audit_id: auditId,
+        reason: outcome === "rejected_company_phone" ? qual.reason : "no_phone_and_no_provider_request_id",
+      });
+      phoneResult = {
+        status: out.status,
+        revealed: false,
+        value: null,
+        source_type: sourceType,
+        credits_estimated: 1,
+        credits_used: providerCredits,
+        credits_confirmed: providerCredits,
+        reason: out.reason,
+        job_id: jobs.phone!.id,
+      };
+      await emitRevenueEvent(
+        admin,
+        orgId,
+        outcome === "rejected_company_phone" ? "phone_company_rejected" : "apollo_phone_not_found",
+        { contact_id: contact.id, audit: qual.audit },
+      );
     }
   }
+
 
   if (apolloPersonId && !contact.apollo_person_id) {
     try { await admin.from("enriched_contact_profiles").update({ apollo_person_id: apolloPersonId }).eq("id", contact.id); } catch { /* noop */ }

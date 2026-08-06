@@ -2,7 +2,7 @@
 // Recebe o callback assíncrono do Apollo e finaliza o job ORIGINAL via RPC oficial.
 // Nunca cria enrichment_jobs. Anti-replay: job terminal é ignorado.
 import { createClient } from "npm:@supabase/supabase-js@2.45.0";
-import { computePhoneQuality, finalizeField } from "../_shared/apollo-reveal-core.ts";
+import { computePhoneQuality, extractProviderCredits, finalizeField } from "../_shared/apollo-reveal-core.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -120,7 +120,15 @@ Deno.serve(async (req: Request) => {
       } catch { /* noop */ }
     }
 
-    const qual = computePhoneQuality(person, extraCompanyPhones, "apollo", { extraPayloads: [payload] });
+    // KAI.18.15 — callback ainda em processamento NÃO pode virar not_found.
+    const stillProcessing = String(payload?.status ?? payload?.state ?? "").toLowerCase()
+        .match(/pending|processing|queued|in_progress/) !== null ||
+      payload?.result_pending === true;
+
+    const qual = computePhoneQuality(person, extraCompanyPhones, "apollo", {
+      extraPayloads: [payload],
+      allowPending: stillProcessing,
+    });
     const phone = qual.phone;
     const sourceType = qual.phone_match_quality === "person_mobile"
       ? "person_mobile"
@@ -128,11 +136,9 @@ Deno.serve(async (req: Request) => {
       ? "person_direct"
       : qual.phone_match_quality === "company_main"
       ? "company_main"
-      : qual.outcome === "phone_only_web"
-      ? "phone_only_web"
       : "unknown";
     const companyRejected = qual.outcome === "rejected_company_phone";
-    const providerCredits = Number(payload?.credits_consumed ?? payload?.credits_used ?? NaN);
+    const providerCredits = extractProviderCredits(payload) ?? extractProviderCredits(person);
 
     console.log("apollo-phone-webhook", {
       contactId,
@@ -146,7 +152,7 @@ Deno.serve(async (req: Request) => {
     const out = await finalizeField(sb, {
       contact_id: contactId,
       field: "phone",
-      outcome: qual.outcome === "pending_provider" ? "not_found" : qual.outcome,
+      outcome: qual.outcome,
       job_id: job?.id ?? null,
       value: phone,
       metadata: {
@@ -161,9 +167,11 @@ Deno.serve(async (req: Request) => {
         apollo_person_id: personId ?? existing.apollo_person_id,
         phone_candidates_audit: qual.audit,
       },
-      credits_used: Number.isFinite(providerCredits) ? providerCredits : (phone ? 1 : 0),
-      credits_confirmed: Number.isFinite(providerCredits) ? providerCredits : (phone ? 1 : null),
-      provider_request_id: payload?.request_id ?? payload?.id ?? null,
+      credits_used: providerCredits,
+      credits_confirmed: providerCredits,
+      provider_request_id: job?.provider_request_id ??
+        (payload?.request_id != null ? String(payload.request_id) : null) ??
+        (payload?.id != null ? String(payload.id) : null),
       reason: qual.reason,
     });
 
@@ -189,7 +197,7 @@ Deno.serve(async (req: Request) => {
           is_whatsapp_ready: !!(qual.is_whatsapp_ready && out.value),
           phone_quality_reason: qual.reason,
           reason: companyRejected ? "company_phone_rejected" : (out.value ? null : "no_person_phone_returned"),
-          raw_response: { webhook: true, person_id: personId, phone_source_type: sourceType },
+          raw_response: { webhook: true, person_id: personId, phone_source_type: sourceType, payload },
         }).eq("id", pendingAudit.id);
       }
     } catch (e) {

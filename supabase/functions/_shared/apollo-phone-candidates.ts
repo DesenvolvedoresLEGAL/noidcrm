@@ -80,11 +80,15 @@ export function normalizePhone(v: unknown): string {
   return d;
 }
 
-/** Chave de deduplicação: compara pelos últimos 8-9 dígitos significativos. */
+/**
+ * Chave de deduplicação/comparação. KAI.18.15: usa o E.164 canônico COMPLETO
+ * (fallback = todos os dígitos normalizados). Nunca truncar em 9 dígitos —
+ * números com mesmo local mas DDD/país diferente NÃO podem colidir.
+ */
 export function phoneKey(v: unknown): string {
-  const d = normalizePhone(v);
-  if (d.length <= 9) return d;
-  return d.slice(-9);
+  const e = toE164(v);
+  if (e) return e.replace(/^\+/, "");
+  return normalizePhone(v);
 }
 
 export function toE164(v: unknown): string | null {
@@ -94,6 +98,7 @@ export function toE164(v: unknown): string | null {
   if (d.length === 10 || d.length === 11) return `+55${d}`;
   return `+${d}`;
 }
+
 
 export function isPlausiblePhone(v: unknown): boolean {
   const d = normalizePhone(v);
@@ -271,13 +276,27 @@ export function providerIndicatesPhone(payload: any): boolean {
   return false;
 }
 
+export interface PhoneOnlyWebEvidence {
+  /** id do registro de evidência (HAR, browser parity, captura auditada). */
+  evidence_id: string;
+  source: "har" | "browser_parity" | "audited_capture" | string;
+  captured_at?: string | null;
+}
+
 export interface SelectOptions {
   extraCompanyPhones?: (string | null | undefined)[];
   /** Payloads adicionais (webhook, reconciliação, histórico) analisados em conjunto. */
   extraPayloads?: any[];
   /** Indica que o provider ainda pode entregar assincronamente. */
   allowPending?: boolean;
+  /**
+   * KAI.18.15 — `phone_only_web` SÓ pode ser emitido com evidência vinculada
+   * (HAR / Browser Parity / captura auditada). Ausência de telefone na API
+   * NÃO prova existência no Apollo Web.
+   */
+  phoneOnlyWebEvidence?: PhoneOnlyWebEvidence | null;
 }
+
 
 export function selectBestPhone(payload: any, opts: SelectOptions = {}): PhoneSelection {
   const payloads = [payload, ...(opts.extraPayloads ?? [])].filter((p) => p && typeof p === "object");
@@ -322,21 +341,31 @@ export function selectBestPhone(payload: any, opts: SelectOptions = {}): PhoneSe
       candidates, rejected, company_phones: [...companyKeys], provider_indicates_phone: indicates,
     };
   }
-  if (indicates) {
+  const evidence = opts.phoneOnlyWebEvidence ?? null;
+  if (evidence?.evidence_id) {
     return {
-      outcome: opts.allowPending ? "pending_provider" : "phone_only_web",
+      outcome: "phone_only_web",
       selected: null,
-      reason: opts.allowPending ? "provider_processing" : "phone_absent_from_api_payload",
-      candidates, rejected, company_phones: [...companyKeys], provider_indicates_phone: true,
+      reason: `phone_only_web_evidence:${evidence.source}:${evidence.evidence_id}`,
+      candidates, rejected, company_phones: [...companyKeys], provider_indicates_phone: indicates,
+    };
+  }
+  if (opts.allowPending) {
+    return {
+      outcome: "pending_provider",
+      selected: null,
+      reason: "provider_processing",
+      candidates, rejected, company_phones: [...companyKeys], provider_indicates_phone: indicates,
     };
   }
   return {
     outcome: "not_found",
     selected: null,
-    reason: "no_phone_in_payload",
-    candidates, rejected, company_phones: [...companyKeys], provider_indicates_phone: false,
+    reason: indicates ? "provider_indicated_phone_but_none_delivered" : "no_phone_in_payload",
+    candidates, rejected, company_phones: [...companyKeys], provider_indicates_phone: indicates,
   };
 }
+
 
 /** Resumo enxuto para auditoria/RPC. */
 export function auditSummary(sel: PhoneSelection) {
