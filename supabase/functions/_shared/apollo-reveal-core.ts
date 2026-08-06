@@ -515,18 +515,22 @@ export async function runApolloReveal(admin: any, req: RevealRequest, env: {
         if (comp?.phone) extraCompanyPhones.push(String(comp.phone));
       } catch { /* noop */ }
     }
-    const qual = computePhoneQuality(person, extraCompanyPhones, "apollo");
-    const acceptedPhone = qual.phone && qual.phone_confidence >= 80 ? qual.phone : null;
+    // KAI.18.14 — pendência assíncrona real: entradas de telefone sem número algum.
+    const rawNumbers: any[] = Array.isArray(person?.phone_numbers) ? person.phone_numbers : [];
+    const asyncPending = rawNumbers.some((p: any) => p && typeof p === "object" && !p.sanitized_number && !p.raw_number && !p.number);
+
+    const qual = computePhoneQuality(person, extraCompanyPhones, "apollo", { allowPending: asyncPending });
+    const acceptedPhone = qual.phone;
     const sourceType = qual.phone_match_quality === "person_mobile"
       ? "person_mobile"
       : qual.phone_match_quality === "person_direct"
       ? "person_direct"
       : qual.phone_match_quality === "company_main"
       ? "company_main"
+      : qual.outcome === "phone_only_web"
+      ? "phone_only_web"
       : "unknown";
-    const companyRejected = !acceptedPhone && !!qual.rejected_company_phone;
-    const rawNumbers: any[] = Array.isArray(person?.phone_numbers) ? person.phone_numbers : [];
-    const asyncPending = rawNumbers.some((p: any) => p && typeof p === "object" && !p.sanitized_number && !p.raw_number && !p.number);
+    const companyRejected = qual.outcome === "rejected_company_phone";
 
     const metadata = {
       phone_source: qual.phone_source,
@@ -538,15 +542,10 @@ export async function runApolloReveal(admin: any, req: RevealRequest, env: {
       phone_validation_status: qual.phone_validation_status,
       is_whatsapp_ready: !!(qual.is_whatsapp_ready && acceptedPhone),
       apollo_person_id: apolloPersonId,
+      phone_candidates_audit: qual.audit,
     };
 
-    const outcome = acceptedPhone
-      ? "revealed"
-      : companyRejected
-      ? "rejected_company_phone"
-      : asyncPending
-      ? "pending_provider"
-      : "not_found";
+    const outcome = qual.outcome;
 
     const out = await finalizeField(admin, {
       contact_id: contact.id,
