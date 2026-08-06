@@ -163,7 +163,7 @@ export async function syncEnrichedContactsToAccount(
 }
 
 export interface RevealApolloContactResult {
-  status: "revealed" | "partial" | "pending" | "no_data" | "skipped" | "failed";
+  status: "revealed" | "partial" | "pending" | "no_data" | "not_found" | "rejected_company_phone" | "skipped" | "failed";
   contact_id?: string;
   email?: string | null;
   phone?: string | null;
