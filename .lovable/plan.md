@@ -94,28 +94,30 @@ Suite cobrindo os 22 cenários listados na sprint (imediato, assíncrono, parcia
 
 Ao concluir, o resumo trará: causa raiz, call graph antes/depois, duplicidades removidas, arquivos criados/alterados, migration/RPC aplicada, estados implementados, estratégia webhook/polling, proteção de créditos, registros corrigidos pelo reparo, resultado de testes/typecheck/build, funções publicadas, plano de teste manual de 1 contato e riscos remanescentes.
 
-## Ajustes obrigatórios incorporados (aprovação do usuário)
+## Ajustes obrigatórios incorporados (validação final)
 
-1. Idempotência por campo: chave e unicidade parcial por `organization_id + contact_id + field (phone|email) + provider` para jobs não terminais, mesmo quando a solicitação for `both`.
-2. `apollo-phone-webhook` nunca cria `enrichment_jobs`; localiza e finaliza o job original por `provider_request_id`/`correlation_id`. Índice único parcial em `provider_request_id` quando não nulo.
-3. Webhook autenticado com proteção anti-replay: valida token, job e identidade do contato; nunca confia em IDs livres do payload; nunca loga secrets.
-4. A migration não faz reconciliação externa — apenas marca jobs vencidos como `reconciliation_required`. A consulta ao provider fica exclusivamente em `kairos-apollo-reveal-status-sync`, sem repetir reveal pago.
-5. Ausência de telefone/e-mail na resposta inicial permanece `pending_provider` quando o fluxo do provider for assíncrono. Timeout vira `failed/provider_timeout`. `not_found` só com conclusão explícita do provider.
-6. Match prioriza `apollo_person_id`, depois e-mail exato, depois LinkedIn exato. Persistência só após confirmar que o retorno pertence ao mesmo contato.
-7. Trigger de preservação protege individualmente `phone`, `email`, seus estados e metadados. Nenhum upsert comum pode rebaixar status, gravar null, dado obfuscado ou telefone corporativo sobre dado revelado.
-8. Recuperação de payload histórico só quando `contact_id`, `apollo_person_id`, identidade e classificação do telefone forem compatíveis e não houver invalidação posterior. Ambíguos viram `recovery_requires_review`, sem restauração automática.
-9. `reveal-apollo-contact` não delega por HTTP: extrair `_shared/apollo-reveal-core.ts` usado pelas duas edges durante a transição; registrar callers legados e remover a duplicada depois da migração.
-10. Créditos separados em `credits_estimated`, `credits_used` e `credits_confirmed`. Sem confirmação, `credits_used = null`; a UI nunca afirma consumo com base em estimativa.
-11. Confirmar publicação Realtime e RLS da tabela de contatos; fallback de polling e estado recuperável após refresh. Nenhum contato pode ficar eternamente em "Buscando telefone".
-12. Ordem de deploy: banco/RPC/trigger → shared core → webhook → sync → orquestrador → wrapper → writers → frontend → reparo → teste manual.
+1. Idempotência oficial é por `field` (`phone` | `email`): unicidade parcial por `organization_id + contact_id + field + provider` para jobs não terminais. Nenhuma idempotência por `requested_data_type` no texto ou no código.
+2. Solicitação `both` cria um `request_group_id` com dois `enrichment_jobs` independentes (um `phone`, um `email`), cada um com status, `provider_request_id`, créditos e ciclo de vida próprios.
+3. `apollo-phone-webhook` nunca cria jobs; localiza e finaliza o job original por `provider_request_id`/`correlation_id`. Índice único parcial em `provider_request_id` quando não nulo.
+4. Webhook autenticado com proteção anti-replay: valida token, job e identidade do contato; nunca confia em IDs livres do payload; nunca loga secrets.
+5. A migration jamais reconcilia externamente. Jobs antigos com `provider_request_id` são marcados `reconciliation_required`; a consulta externa ocorre só em `kairos-apollo-reveal-status-sync`, sem repetir reveal pago.
+6. `reveal-apollo-contact` e `kairos-apollo-reveal-contact` importam diretamente `_shared/apollo-reveal-core.ts`. Sem delegação HTTP entre edges.
+7. `kairos-apollo-reveal-status-sync` agendada por cron a cada 1–2 minutos, com claim/lock (`FOR UPDATE SKIP LOCKED`), `attempt_count`, backoff, `next_retry_at` e `expires_at`.
+8. Ausência de telefone/e-mail na resposta inicial permanece `pending_provider` no fluxo assíncrono. Timeout vira `failed/provider_timeout`; `not_found` só com conclusão explícita do provider.
+9. Match prioriza `apollo_person_id`, depois e-mail exato, depois LinkedIn exato. Persistência só após confirmar que o retorno pertence ao mesmo contato.
+10. Trigger de preservação protege individualmente `phone`, `email`, estados e metadados, sem bypass genérico controlável pelo cliente: alterações apenas via RPC oficial de finalização, RPC auditada de invalidação e correção administrativa auditada.
+11. Recuperação de payload histórico só com `contact_id`, `apollo_person_id`, identidade e classificação de telefone compatíveis e sem invalidação posterior. Ambíguos viram `recovery_requires_review`.
+12. Créditos separados em `credits_estimated`, `credits_used` e `credits_confirmed`. Sem confirmação, `credits_used = null`; a UI nunca afirma consumo com base em estimativa.
+13. Confirmar Realtime e RLS da tabela de contatos; fallback de polling e estado recuperável após refresh. Nenhum contato fica eternamente em "Buscando telefone".
+14. Ordem de deploy: banco/RPC/trigger → shared core → webhook → sync + cron → orquestrador → wrapper → writers → frontend → reparo → teste manual.
 
 ## Teste manual final controlado
 
-- A — HYPERA/Andreia: telefone isolado (job, resposta, persistência, read-back, UI), depois e-mail isolado, depois `both` em outro contato sem dados.
+- A — HYPERA/Andreia: telefone isolado (job, resposta, persistência, read-back, UI), depois e-mail isolado, depois `both` em outro contato sem dados (dois jobs no mesmo `request_group_id`).
 - B — HYPERA/Vivian: e-mail permanece; telefone corporativo continua rejeitado; nenhum enrichment posterior apaga o e-mail.
 - C — MULTIAGENTS/Leonardo: match por `apollo_person_id`; telefone real persistido e exibido; `has_direct_phone` isolado mantém pendente/não revelado, nunca sucesso.
 
-Conclusão só com banco, job, auditoria e UI idênticos após refresh completo.
+Em cada caso registrar saldo de créditos antes/depois e a cadeia completa: resposta do Apollo → persistência via RPC → read-back → renderização após refresh. Conclusão só com banco, job, auditoria e UI idênticos após refresh completo.
 
 ## Riscos
 
