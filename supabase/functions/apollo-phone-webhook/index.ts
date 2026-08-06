@@ -159,11 +159,12 @@ Deno.serve(async (req: Request) => {
         phone_validation_status: qual.phone_validation_status,
         is_whatsapp_ready: !!(qual.is_whatsapp_ready && phone),
         apollo_person_id: personId ?? existing.apollo_person_id,
+        phone_candidates_audit: qual.audit,
       },
       credits_used: Number.isFinite(providerCredits) ? providerCredits : (phone ? 1 : 0),
       credits_confirmed: Number.isFinite(providerCredits) ? providerCredits : (phone ? 1 : null),
       provider_request_id: payload?.request_id ?? payload?.id ?? null,
-      reason: companyRejected ? "company_phone_rejected" : (phone ? null : "no_person_phone_returned"),
+      reason: qual.reason,
     });
 
     // Auditoria: atualiza o registro pendente mais recente do contato
