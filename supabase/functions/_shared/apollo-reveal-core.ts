@@ -201,6 +201,8 @@ const JOB_SELECT =
   "id, status, field, request_group_id, provider_request_id, created_at, expires_at, workspace_id, contact_id, provider, response, request";
 const STALE_WITHOUT_REQUEST_ID_MS = 2 * 60_000;
 const JOB_TTL_MS = 30 * 60_000;
+/** KAI.18.16 — janela de espera de webhook quando não há request_id válido. */
+export const WEBHOOK_WAIT_TTL_MS = 10 * 60_000;
 
 async function failJob(admin: any, jobId: string, reason: string) {
   try {
