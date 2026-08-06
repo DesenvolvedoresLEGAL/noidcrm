@@ -551,12 +551,14 @@ export async function runApolloReveal(admin: any, req: RevealRequest, env: {
     reveal_personal_emails: callEmail,
     reveal_phone_number: callPhone,
   };
+  let webhookConfigured = false;
   if (callPhone) {
     const token = env.APOLLO_WEBHOOK_TOKEN ?? "";
     payload.webhook_url =
       `${env.SUPABASE_URL}/functions/v1/apollo-phone-webhook?contact_id=${encodeURIComponent(contact.id)}` +
       `&job_id=${encodeURIComponent(jobs.phone!.id)}` +
       (token ? `&token=${encodeURIComponent(token)}` : "");
+    webhookConfigured = !!token;
   }
 
   const ctrl = new AbortController();
