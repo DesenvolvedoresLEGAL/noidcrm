@@ -545,6 +545,12 @@ export function ProspectContactsTab({
               const emailKey = `${c.id}:email`;
               const bothKey = `${c.id}:both`;
 
+              // KAI.18.13 — bloqueio é por campo pendente, nunca global.
+              const phonePending = ['requested', 'pending_provider', 'awaiting', 'pending'].includes(phoneStatus)
+                || revealingKey === phoneKey || revealingKey === bothKey;
+              const emailPending = ['requested', 'pending_provider', 'awaiting', 'pending'].includes(emailStatus)
+                || revealingKey === emailKey || revealingKey === bothKey;
+
               return (
                 <div className="pl-6 pt-1 space-y-2">
                   <div className="flex flex-wrap gap-1">
@@ -557,7 +563,7 @@ export function ProspectContactsTab({
                         size="sm" variant="outline"
                         className="h-7 text-[11px] gap-1"
                         onClick={() => openConfirm("phone")}
-                        disabled={phoneRevealed || phoneBlocked || reveal.isPending}
+                        disabled={phoneRevealed || phoneBlocked || phonePending}
                       >
                         {revealingKey === phoneKey ? <Loader2 className="h-3 w-3 animate-spin" /> : <Phone className="h-3 w-3" />}
                         Telefone
@@ -566,7 +572,7 @@ export function ProspectContactsTab({
                         size="sm" variant="outline"
                         className="h-7 text-[11px] gap-1"
                         onClick={() => openConfirm("email")}
-                        disabled={emailRevealed || emailBlocked || reveal.isPending}
+                        disabled={emailRevealed || emailBlocked || emailPending}
                       >
                         {revealingKey === emailKey ? <Loader2 className="h-3 w-3 animate-spin" /> : <Mail className="h-3 w-3" />}
                         E-mail
@@ -575,7 +581,7 @@ export function ProspectContactsTab({
                         size="sm" variant="default"
                         className="h-7 text-[11px] gap-1"
                         onClick={() => openConfirm("both")}
-                        disabled={(phoneRevealed && emailRevealed) || reveal.isPending}
+                        disabled={(phoneRevealed && emailRevealed) || (phonePending && emailPending)}
                       >
                         {revealingKey === bothKey ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
                         Ambos
