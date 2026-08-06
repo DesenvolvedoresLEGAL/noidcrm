@@ -220,18 +220,31 @@ async function failJob(admin: any, jobId: string, reason: string) {
 
 /** Job só é reutilizável se for rastreável de verdade (request_id ou payload recuperável). */
 function isRecoverable(job: any): boolean {
-  if (job?.provider_request_id && String(job.provider_request_id).trim() !== "") return true;
+  if (isValidApolloAsyncRequestId(job?.provider_request_id)) return true;
   const resp = job?.response;
   return !!(resp && typeof resp === "object" && Object.keys(resp).length > 0);
+}
+
+export const AWAITING_WEBHOOK_REASON = "awaiting_provider_webhook";
+
+/** KAI.18.16 — job cujo callback chega por webhook (job_id/contact_id), sem request_id. */
+export function isAwaitingWebhook(job: any): boolean {
+  const marks = [job?.skip_reason, job?.error, job?.response?.reason, job?.request?.reason]
+    .map((v) => String(v ?? "").toLowerCase());
+  if (marks.some((m) => m.includes(AWAITING_WEBHOOK_REASON))) return true;
+  const req = job?.request;
+  const resp = job?.response;
+  const hasWebhook = (o: any) =>
+    !!o && typeof o === "object" && JSON.stringify(o).includes("apollo-phone-webhook");
+  return hasWebhook(req) || hasWebhook(resp) || req?.webhook_configured === true;
 }
 
 const NON_TERMINAL = ["queued", "running", "pending_provider"];
 
 /**
- * KAI.18.15 — decisão pura de reaproveitamento de job.
- * Reaproveita SOMENTE job não terminal, não expirado e com evidência de
- * processamento real (provider_request_id/payload) ou ainda dentro da janela
- * de 2 minutos desde a criação.
+ * KAI.18.16 — decisão pura de reaproveitamento de job.
+ * Job aguardando webhook (sem request_id) é rastreável até `expires_at`;
+ * nunca vira zumbi em 2 minutos.
  */
 export function isTrackableJob(
   job: any,
@@ -240,8 +253,12 @@ export function isTrackableJob(
   if (!job) return { trackable: false, reason: "no_job" };
   if (!NON_TERMINAL.includes(String(job.status))) return { trackable: false, reason: "job_terminal" };
   if (job.expires_at && new Date(job.expires_at).getTime() < nowMs) {
-    return { trackable: false, reason: "stale_job_expired" };
+    return {
+      trackable: false,
+      reason: isAwaitingWebhook(job) ? "webhook_timeout_without_request_id" : "stale_job_expired",
+    };
   }
+  if (isAwaitingWebhook(job)) return { trackable: true, reason: null };
   const ageMs = job.created_at ? nowMs - new Date(job.created_at).getTime() : 0;
   if (!isRecoverable(job) && ageMs > STALE_WITHOUT_REQUEST_ID_MS) {
     return { trackable: false, reason: "stale_job_without_provider_request_id" };
