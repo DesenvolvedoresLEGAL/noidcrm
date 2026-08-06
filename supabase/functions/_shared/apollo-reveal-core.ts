@@ -86,9 +86,19 @@ function overallFrom(phone: FieldResult, email: FieldResult): RevealResponse["ov
 }
 
 /**
- * KAI.18.15 — request_id do Apollo é signed 64-bit e pode exceder Number.MAX_SAFE_INTEGER.
- * Extraímos direto do TEXTO da resposta para não perder precisão no JSON.parse.
- * Ordem oficial: request_id → webhook_request_id → id → header x-request-id.
+ * KAI.18.16 — request_id assíncrono do Apollo é SEMPRE um inteiro signed 64-bit.
+ * IDs hexadecimais de 24 chars (Mongo/person/contact/account) e UUIDs NÃO são
+ * request_id e jamais podem ser enviados a /webhook_result.
+ */
+export function isValidApolloAsyncRequestId(v: unknown): boolean {
+  const s = String(v ?? "").trim();
+  if (!s) return false;
+  return /^-?\d{1,20}$/.test(s);
+}
+
+/**
+ * KAI.18.16 — extrai SOMENTE `request_id` / `webhook_request_id` explícitos.
+ * Nunca usa `parsed.id` (é o person/contact id). Header só se for válido.
  */
 export function extractProviderRequestId(
   rawText: string | null,
@@ -97,14 +107,14 @@ export function extractProviderRequestId(
 ): string | null {
   if (rawText) {
     const m = rawText.match(/"(?:request_id|webhook_request_id)"\s*:\s*(?:"([^"]*)"|(-?\d+))/);
-    const v = m?.[1] ?? m?.[2];
-    if (v && v.trim()) return v.trim();
+    const v = (m?.[1] ?? m?.[2])?.trim();
+    if (v && isValidApolloAsyncRequestId(v)) return v;
   }
-  for (const key of ["request_id", "webhook_request_id", "id"]) {
+  for (const key of ["request_id", "webhook_request_id"]) {
     const v = parsed?.[key];
-    if (v !== undefined && v !== null && String(v).trim()) return String(v).trim();
+    if (v !== undefined && v !== null && isValidApolloAsyncRequestId(v)) return String(v).trim();
   }
-  return headerValue && headerValue.trim() ? headerValue.trim() : null;
+  return isValidApolloAsyncRequestId(headerValue) ? String(headerValue).trim() : null;
 }
 
 /** Créditos: só persistimos valor CONFIRMADO pelo provider. Nunca inferir 1. */
