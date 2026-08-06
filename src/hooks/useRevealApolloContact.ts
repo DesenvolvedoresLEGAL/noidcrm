@@ -16,22 +16,20 @@ export function useRevealApolloContact() {
       qc.invalidateQueries({ queryKey: ["enriched-contacts", vars.prospectId] });
       const who = vars.contactName ?? "contato";
       if (res.status === "revealed") {
-        toast.success(`Email e telefone revelados para ${who} (${res.credits_used ?? 2} créditos).`);
+        toast.success(`Telefone e e-mail salvos para ${who}.`);
       } else if (res.status === "partial") {
-        const what = res.email ? "email" : "telefone";
-        toast.success(`${what} revelado para ${who} (${res.credits_used ?? 1} crédito).`);
+        const what = res.email ? "E-mail" : "Telefone";
+        toast.success(`${what} salvo para ${who}.`);
       } else if (res.status === "pending") {
-        toast.info(
-          `Email revelado para ${who}. Telefone chegará em até 1 min (Apollo entrega assíncrono).`,
-          { duration: 7000 },
-        );
-        // Re-invalidar em 30s e 90s para pegar o telefone via webhook
+        toast.info(`Buscando dados de ${who} no Apollo… o status atualiza automaticamente.`, { duration: 7000 });
         setTimeout(() => qc.invalidateQueries({ queryKey: ["enriched-contacts", vars.prospectId] }), 30_000);
         setTimeout(() => qc.invalidateQueries({ queryKey: ["enriched-contacts", vars.prospectId] }), 90_000);
+      } else if (res.status === "rejected_company_phone") {
+        toast.info(`Apollo só encontrou o telefone da empresa para ${who}. Nenhum crédito confirmado.`);
       } else if (res.status === "skipped") {
         toast.info(res.reason ?? "Contato já revelado recentemente.");
-      } else if (res.status === "no_data") {
-        toast.warning(`Apollo não tem email/telefone para ${who}.`, { duration: 6000 });
+      } else if (res.status === "no_data" || res.status === "not_found") {
+        toast.warning(`Apollo não tem e-mail/telefone individual para ${who}.`, { duration: 6000 });
       } else if (res.status === "failed") {
         toast.error(
           res.inaccessible
