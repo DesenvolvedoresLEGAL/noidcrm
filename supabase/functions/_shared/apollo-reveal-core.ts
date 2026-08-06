@@ -18,6 +18,7 @@ export type FieldStatus =
   | "revealed"
   | "not_found"
   | "rejected_company_phone"
+  | "phone_only_web"
   | "failed"
   | "skipped";
 
