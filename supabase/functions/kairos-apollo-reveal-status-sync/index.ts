@@ -115,10 +115,11 @@ Deno.serve(async (req) => {
             const raw = a.raw_response ?? {};
             const rawPersonId = raw?.person_id ?? null;
             if (rawPersonId && String(rawPersonId) !== String(contact.apollo_person_id)) continue;
-            const candidate = a.phone_after ?? null;
-            if (!candidate) continue;
-            const qual = computePhoneQuality({ phone_numbers: [{ sanitized_number: candidate }] }, [], "apollo");
-            if (qual.phone && qual.phone_confidence >= 80) {
+            // KAI.18.14 — reprocessa o payload PAGO inteiro (sem nova cobrança).
+            const extraPayloads: any[] = [];
+            if (a.phone_after) extraPayloads.push({ phone_numbers: [{ sanitized_number: a.phone_after }] });
+            const qual = computePhoneQuality(raw, [], "apollo", { extraPayloads });
+            if (qual.phone) {
               recovered = qual.phone;
               recoveredMeta = {
                 phone_source: qual.phone_source,
@@ -128,6 +129,7 @@ Deno.serve(async (req) => {
                 phone_source_type: qual.phone_match_quality,
                 phone_quality_reason: "recovered_from_existing_payload",
                 is_whatsapp_ready: qual.is_whatsapp_ready,
+                phone_candidates_audit: qual.audit,
               };
               break;
             }

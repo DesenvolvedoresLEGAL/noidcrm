@@ -120,16 +120,18 @@ Deno.serve(async (req: Request) => {
       } catch { /* noop */ }
     }
 
-    const qual = computePhoneQuality(person, extraCompanyPhones, "apollo");
-    const phone = qual.phone && qual.phone_confidence >= 80 ? qual.phone : null;
+    const qual = computePhoneQuality(person, extraCompanyPhones, "apollo", { extraPayloads: [payload] });
+    const phone = qual.phone;
     const sourceType = qual.phone_match_quality === "person_mobile"
       ? "person_mobile"
       : qual.phone_match_quality === "person_direct"
       ? "person_direct"
       : qual.phone_match_quality === "company_main"
       ? "company_main"
+      : qual.outcome === "phone_only_web"
+      ? "phone_only_web"
       : "unknown";
-    const companyRejected = !phone && !!qual.rejected_company_phone;
+    const companyRejected = qual.outcome === "rejected_company_phone";
     const providerCredits = Number(payload?.credits_consumed ?? payload?.credits_used ?? NaN);
 
     console.log("apollo-phone-webhook", {
@@ -138,12 +140,13 @@ Deno.serve(async (req: Request) => {
       accepted: !!phone,
       quality: qual.phone_match_quality,
       company_rejected: companyRejected,
+      audit: qual.audit,
     });
 
     const out = await finalizeField(sb, {
       contact_id: contactId,
       field: "phone",
-      outcome: phone ? "revealed" : companyRejected ? "rejected_company_phone" : "not_found",
+      outcome: qual.outcome === "pending_provider" ? "not_found" : qual.outcome,
       job_id: job?.id ?? null,
       value: phone,
       metadata: {
@@ -156,11 +159,12 @@ Deno.serve(async (req: Request) => {
         phone_validation_status: qual.phone_validation_status,
         is_whatsapp_ready: !!(qual.is_whatsapp_ready && phone),
         apollo_person_id: personId ?? existing.apollo_person_id,
+        phone_candidates_audit: qual.audit,
       },
       credits_used: Number.isFinite(providerCredits) ? providerCredits : (phone ? 1 : 0),
       credits_confirmed: Number.isFinite(providerCredits) ? providerCredits : (phone ? 1 : null),
       provider_request_id: payload?.request_id ?? payload?.id ?? null,
-      reason: companyRejected ? "company_phone_rejected" : (phone ? null : "no_person_phone_returned"),
+      reason: qual.reason,
     });
 
     // Auditoria: atualiza o registro pendente mais recente do contato

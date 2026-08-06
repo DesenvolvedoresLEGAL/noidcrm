@@ -116,6 +116,7 @@ export type RevealFieldStatus =
   | 'revealed'
   | 'not_found'
   | 'rejected_company_phone'
+  | 'phone_only_web'
   | 'failed'
   | 'skipped';
 

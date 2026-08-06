@@ -18,6 +18,7 @@ export type FieldStatus =
   | "revealed"
   | "not_found"
   | "rejected_company_phone"
+  | "phone_only_web"
   | "failed"
   | "skipped";
 
@@ -107,7 +108,7 @@ export async function emitRevenueEvent(admin: any, orgId: string, kind: string, 
 export async function finalizeField(admin: any, args: {
   contact_id: string;
   field: RevealField;
-  outcome: "revealed" | "not_found" | "rejected_company_phone" | "failed" | "pending_provider";
+  outcome: "revealed" | "not_found" | "rejected_company_phone" | "failed" | "pending_provider" | "phone_only_web";
   job_id?: string | null;
   value?: string | null;
   metadata?: Record<string, unknown>;
@@ -515,18 +516,22 @@ export async function runApolloReveal(admin: any, req: RevealRequest, env: {
         if (comp?.phone) extraCompanyPhones.push(String(comp.phone));
       } catch { /* noop */ }
     }
-    const qual = computePhoneQuality(person, extraCompanyPhones, "apollo");
-    const acceptedPhone = qual.phone && qual.phone_confidence >= 80 ? qual.phone : null;
+    // KAI.18.14 — pendência assíncrona real: entradas de telefone sem número algum.
+    const rawNumbers: any[] = Array.isArray(person?.phone_numbers) ? person.phone_numbers : [];
+    const asyncPending = rawNumbers.some((p: any) => p && typeof p === "object" && !p.sanitized_number && !p.raw_number && !p.number);
+
+    const qual = computePhoneQuality(person, extraCompanyPhones, "apollo", { allowPending: asyncPending });
+    const acceptedPhone = qual.phone;
     const sourceType = qual.phone_match_quality === "person_mobile"
       ? "person_mobile"
       : qual.phone_match_quality === "person_direct"
       ? "person_direct"
       : qual.phone_match_quality === "company_main"
       ? "company_main"
+      : qual.outcome === "phone_only_web"
+      ? "phone_only_web"
       : "unknown";
-    const companyRejected = !acceptedPhone && !!qual.rejected_company_phone;
-    const rawNumbers: any[] = Array.isArray(person?.phone_numbers) ? person.phone_numbers : [];
-    const asyncPending = rawNumbers.some((p: any) => p && typeof p === "object" && !p.sanitized_number && !p.raw_number && !p.number);
+    const companyRejected = qual.outcome === "rejected_company_phone";
 
     const metadata = {
       phone_source: qual.phone_source,
@@ -538,15 +543,10 @@ export async function runApolloReveal(admin: any, req: RevealRequest, env: {
       phone_validation_status: qual.phone_validation_status,
       is_whatsapp_ready: !!(qual.is_whatsapp_ready && acceptedPhone),
       apollo_person_id: apolloPersonId,
+      phone_candidates_audit: qual.audit,
     };
 
-    const outcome = acceptedPhone
-      ? "revealed"
-      : companyRejected
-      ? "rejected_company_phone"
-      : asyncPending
-      ? "pending_provider"
-      : "not_found";
+    const outcome = qual.outcome;
 
     const out = await finalizeField(admin, {
       contact_id: contact.id,
@@ -559,10 +559,12 @@ export async function runApolloReveal(admin: any, req: RevealRequest, env: {
       credits_confirmed: acceptedPhone ? 1 : null,
       provider_request_id: providerRequestId,
       audit_id: auditId,
-      reason: companyRejected ? "company_phone_rejected" : (outcome === "not_found" ? "no_person_phone_returned" : null),
+      reason: qual.reason,
     });
 
-    const status: FieldStatus = outcome === "pending_provider" && out.status !== "failed" ? "pending_provider" : out.status;
+    const status: FieldStatus = (outcome === "pending_provider" || outcome === "phone_only_web") && out.status !== "failed"
+      ? (outcome as FieldStatus)
+      : out.status;
     phoneResult = {
       status,
       revealed: status === "revealed",
@@ -583,9 +585,11 @@ export async function runApolloReveal(admin: any, req: RevealRequest, env: {
         is_whatsapp_ready: qual.is_whatsapp_ready,
       });
     } else if (companyRejected) {
-      await emitRevenueEvent(admin, orgId, "phone_company_rejected", { contact_id: contact.id });
+      await emitRevenueEvent(admin, orgId, "phone_company_rejected", { contact_id: contact.id, audit: qual.audit });
+    } else if (status === "phone_only_web") {
+      await emitRevenueEvent(admin, orgId, "apollo_phone_only_web", { contact_id: contact.id, audit: qual.audit });
     } else if (status === "not_found") {
-      await emitRevenueEvent(admin, orgId, "apollo_phone_not_found", { contact_id: contact.id });
+      await emitRevenueEvent(admin, orgId, "apollo_phone_not_found", { contact_id: contact.id, audit: qual.audit });
     }
   }
 
@@ -604,6 +608,8 @@ export async function runApolloReveal(admin: any, req: RevealRequest, env: {
         provider_request_id: providerRequestId,
         phone_status: phoneResult.status,
         email_status: emailResult.status,
+        // KAI.18.14 — payload pago preservado para reprocessamento sem nova cobrança.
+        person_payload: person ?? null,
       },
       phone_source_type: phoneResult.source_type ?? null,
     }).eq("id", auditId);
