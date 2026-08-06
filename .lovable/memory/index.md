@@ -42,6 +42,7 @@ Updated: now
 - [AI suggestion cache](mem://architectural-decision/ai/opportunity-suggestions-context-signature-cache) — context_signature hash, cache em ai_suggestions, force_refresh manual only.
 - [Apollo Invisible Mode](mem://architectural-decision/intelligence/apollo-invisible-mode) — KAI.15: regras org, eligibility/credits, audit, primary contact via Contact Score.
 - [Apollo decision-maker enrichment](mem://architectural-decision/intelligence/apollo-decision-maker-enrichment) — Sprint E.1+E.1.1: triple-guard, anti-spam 24h, rate-limit 20/min.
+- [Apollo phone reveal async](mem://architectural-decision/intelligence/apollo-phone-reveal-async-contract) — KAI.18.15: telefone só termina via webhook ou polling webhook_result (0 créditos); créditos nunca inferidos; jobs zumbis encerrados.
 - [Apollo realtime & governance](mem://architectural-decision/intelligence/apollo-realtime-and-contact-governance) — Sprint E.1.2: dedupe/resolve_primary RPCs + global realtime toasts.
 - [ExpoFP provider](mem://architectural-decision/intelligence/expofp-provider-sourcing) — Detect ExpoFP iframe, fetch /data/data.js?v=<v>, bypass Firecrawl.
 - [Active Users Source of Truth](mem://architectural-decision/access-control/active-users-source-of-truth) — View `crm_active_users_view` + service/hook únicos.
