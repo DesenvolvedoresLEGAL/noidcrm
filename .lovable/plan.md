@@ -94,7 +94,31 @@ Suite cobrindo os 22 cenários listados na sprint (imediato, assíncrono, parcia
 
 Ao concluir, o resumo trará: causa raiz, call graph antes/depois, duplicidades removidas, arquivos criados/alterados, migration/RPC aplicada, estados implementados, estratégia webhook/polling, proteção de créditos, registros corrigidos pelo reparo, resultado de testes/typecheck/build, funções publicadas, plano de teste manual de 1 contato e riscos remanescentes.
 
+## Ajustes obrigatórios incorporados (aprovação do usuário)
+
+1. Idempotência por campo: chave e unicidade parcial por `organization_id + contact_id + field (phone|email) + provider` para jobs não terminais, mesmo quando a solicitação for `both`.
+2. `apollo-phone-webhook` nunca cria `enrichment_jobs`; localiza e finaliza o job original por `provider_request_id`/`correlation_id`. Índice único parcial em `provider_request_id` quando não nulo.
+3. Webhook autenticado com proteção anti-replay: valida token, job e identidade do contato; nunca confia em IDs livres do payload; nunca loga secrets.
+4. A migration não faz reconciliação externa — apenas marca jobs vencidos como `reconciliation_required`. A consulta ao provider fica exclusivamente em `kairos-apollo-reveal-status-sync`, sem repetir reveal pago.
+5. Ausência de telefone/e-mail na resposta inicial permanece `pending_provider` quando o fluxo do provider for assíncrono. Timeout vira `failed/provider_timeout`. `not_found` só com conclusão explícita do provider.
+6. Match prioriza `apollo_person_id`, depois e-mail exato, depois LinkedIn exato. Persistência só após confirmar que o retorno pertence ao mesmo contato.
+7. Trigger de preservação protege individualmente `phone`, `email`, seus estados e metadados. Nenhum upsert comum pode rebaixar status, gravar null, dado obfuscado ou telefone corporativo sobre dado revelado.
+8. Recuperação de payload histórico só quando `contact_id`, `apollo_person_id`, identidade e classificação do telefone forem compatíveis e não houver invalidação posterior. Ambíguos viram `recovery_requires_review`, sem restauração automática.
+9. `reveal-apollo-contact` não delega por HTTP: extrair `_shared/apollo-reveal-core.ts` usado pelas duas edges durante a transição; registrar callers legados e remover a duplicada depois da migração.
+10. Créditos separados em `credits_estimated`, `credits_used` e `credits_confirmed`. Sem confirmação, `credits_used = null`; a UI nunca afirma consumo com base em estimativa.
+11. Confirmar publicação Realtime e RLS da tabela de contatos; fallback de polling e estado recuperável após refresh. Nenhum contato pode ficar eternamente em "Buscando telefone".
+12. Ordem de deploy: banco/RPC/trigger → shared core → webhook → sync → orquestrador → wrapper → writers → frontend → reparo → teste manual.
+
+## Teste manual final controlado
+
+- A — HYPERA/Andreia: telefone isolado (job, resposta, persistência, read-back, UI), depois e-mail isolado, depois `both` em outro contato sem dados.
+- B — HYPERA/Vivian: e-mail permanece; telefone corporativo continua rejeitado; nenhum enrichment posterior apaga o e-mail.
+- C — MULTIAGENTS/Leonardo: match por `apollo_person_id`; telefone real persistido e exibido; `has_direct_phone` isolado mantém pendente/não revelado, nunca sucesso.
+
+Conclusão só com banco, job, auditoria e UI idênticos após refresh completo.
+
 ## Riscos
 
 - Trigger de preservação pode bloquear correções legítimas: previsto caminho administrativo auditado para invalidar dado revelado.
 - Formato real do payload assíncrono do Apollo é inferido do código atual; a reconciliação será tolerante a formatos e sempre cairá em `pending_provider`/`failed` em vez de `revealed`.
+
