@@ -25,7 +25,7 @@ async function trackFieldUntilTerminal(
   who: string,
   field: 'phone' | 'email',
 ) {
-  const maxTries = 20; // ~2 min
+  const maxTries = 60; // ~6 min — o telefone Apollo é assíncrono (webhook/polling).
   for (let i = 0; i < maxTries; i++) {
     await new Promise((r) => setTimeout(r, 6000));
     const { data } = await (supabase as any)
