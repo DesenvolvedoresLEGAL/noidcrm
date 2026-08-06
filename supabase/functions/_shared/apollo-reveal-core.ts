@@ -210,10 +210,35 @@ async function failJob(admin: any, jobId: string, reason: string) {
 
 /** Job só é reutilizável se for rastreável de verdade (request_id ou payload recuperável). */
 function isRecoverable(job: any): boolean {
-  if (job?.provider_request_id) return true;
+  if (job?.provider_request_id && String(job.provider_request_id).trim() !== "") return true;
   const resp = job?.response;
   return !!(resp && typeof resp === "object" && Object.keys(resp).length > 0);
 }
+
+const NON_TERMINAL = ["queued", "running", "pending_provider"];
+
+/**
+ * KAI.18.15 — decisão pura de reaproveitamento de job.
+ * Reaproveita SOMENTE job não terminal, não expirado e com evidência de
+ * processamento real (provider_request_id/payload) ou ainda dentro da janela
+ * de 2 minutos desde a criação.
+ */
+export function isTrackableJob(
+  job: any,
+  nowMs: number = Date.now(),
+): { trackable: boolean; reason: string | null } {
+  if (!job) return { trackable: false, reason: "no_job" };
+  if (!NON_TERMINAL.includes(String(job.status))) return { trackable: false, reason: "job_terminal" };
+  if (job.expires_at && new Date(job.expires_at).getTime() < nowMs) {
+    return { trackable: false, reason: "stale_job_expired" };
+  }
+  const ageMs = job.created_at ? nowMs - new Date(job.created_at).getTime() : 0;
+  if (!isRecoverable(job) && ageMs > STALE_WITHOUT_REQUEST_ID_MS) {
+    return { trackable: false, reason: "stale_job_without_provider_request_id" };
+  }
+  return { trackable: true, reason: null };
+}
+
 
 async function insertJob(admin: any, params: any) {
   return await admin
