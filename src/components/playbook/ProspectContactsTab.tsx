@@ -515,6 +515,7 @@ export function ProspectContactsTab({
                 requested: { label: "Buscando telefone...", cls: "bg-blue-500/10 text-blue-600 border-blue-500/30" },
                 awaiting: { label: "Buscando telefone...", cls: "bg-blue-500/10 text-blue-600 border-blue-500/30" },
                 pending: { label: "Buscando telefone...", cls: "bg-blue-500/10 text-blue-600 border-blue-500/30" },
+                pending_provider: { label: "Buscando telefone...", cls: "bg-blue-500/10 text-blue-600 border-blue-500/30" },
                 revealed: { label: phoneRevealedLabel, cls: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30" },
                 not_found: { label: phoneNotFoundLabel, cls: "bg-red-500/10 text-red-600 border-red-500/30" },
                 rejected_company_phone: { label: "Telefone da empresa rejeitado", cls: "bg-red-500/10 text-red-600 border-red-500/30" },
