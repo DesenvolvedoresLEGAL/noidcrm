@@ -519,6 +519,7 @@ export function ProspectContactsTab({
                 revealed: { label: phoneRevealedLabel, cls: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30" },
                 not_found: { label: phoneNotFoundLabel, cls: "bg-red-500/10 text-red-600 border-red-500/30" },
                 rejected_company_phone: { label: "Telefone da empresa rejeitado", cls: "bg-red-500/10 text-red-600 border-red-500/30" },
+                phone_only_web: { label: "Telefone visível só no Apollo Web", cls: "bg-amber-500/10 text-amber-600 border-amber-500/30" },
                 failed: { label: "Falha ao revelar", cls: "bg-red-500/10 text-red-600 border-red-500/30" },
                 skipped: { label: "Já revelado / ignorado", cls: "bg-muted text-muted-foreground" },
               };
