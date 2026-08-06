@@ -302,14 +302,10 @@ async function claimJob(
     return { job: null, reused: false };
   }
 
-  const now = Date.now();
-  const expired = existing.expires_at ? new Date(existing.expires_at).getTime() < now : false;
-  const ageMs = existing.created_at ? now - new Date(existing.created_at).getTime() : 0;
-  const stale = !isRecoverable(existing) && ageMs > STALE_WITHOUT_REQUEST_ID_MS;
+  const verdict = isTrackableJob(existing);
+  if (verdict.trackable) return { job: existing as ActiveJob, reused: true };
 
-  if (!expired && !stale) return { job: existing as ActiveJob, reused: true };
-
-  await failJob(admin, existing.id, expired ? "stale_job_expired" : "stale_job_without_provider_request_id");
+  await failJob(admin, existing.id, verdict.reason ?? "stale_job");
 
   const retry = await insertJob(admin, params);
   if (!retry.error && retry.data) return { job: retry.data as ActiveJob, reused: false };
@@ -332,7 +328,7 @@ async function claimJob(
   return { job: null, reused: false };
 }
 
-export const _jobInternals = { isRecoverable, STALE_WITHOUT_REQUEST_ID_MS };
+export const _jobInternals = { isRecoverable, isTrackableJob, STALE_WITHOUT_REQUEST_ID_MS };
 
 
 function resolveDomain(prospect: any): string | null {
