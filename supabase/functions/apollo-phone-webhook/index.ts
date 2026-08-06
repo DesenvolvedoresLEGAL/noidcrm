@@ -2,7 +2,12 @@
 // Recebe o callback assíncrono do Apollo e finaliza o job ORIGINAL via RPC oficial.
 // Nunca cria enrichment_jobs. Anti-replay: job terminal é ignorado.
 import { createClient } from "npm:@supabase/supabase-js@2.45.0";
-import { computePhoneQuality, extractProviderCredits, finalizeField } from "../_shared/apollo-reveal-core.ts";
+import {
+  computePhoneQuality,
+  extractProviderCredits,
+  finalizeField,
+  isValidApolloAsyncRequestId,
+} from "../_shared/apollo-reveal-core.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
