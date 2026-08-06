@@ -4,7 +4,14 @@
 // NUNCA repete chamada paga (people/match). Só o webhook ou o webhook_result
 // podem produzir estado terminal de telefone.
 import { createClient } from "npm:@supabase/supabase-js@2.45.0";
-import { computePhoneQuality, extractProviderCredits, finalizeField } from "../_shared/apollo-reveal-core.ts";
+import {
+  AWAITING_WEBHOOK_REASON,
+  computePhoneQuality,
+  extractProviderCredits,
+  finalizeField,
+  isAwaitingWebhook,
+  isValidApolloAsyncRequestId,
+} from "../_shared/apollo-reveal-core.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -34,6 +41,64 @@ async function keepPending(sb: any, jobId: string, retryAfterSeconds: number, no
     completed_at: null,
   }).eq("id", jobId);
   return { outcome: "still_pending", note, attempt };
+}
+
+/**
+ * KAI.18.16 — recuperação SEM crédito: reprocessa payloads já pagos (job.response
+ * e apollo_reveal_audit.raw_response) com o classificador compartilhado.
+ * Só conclui `revealed`; nunca conclui not_found por aqui.
+ */
+async function recoverFromStoredPayload(sb: any, job: any, contact: any): Promise<{ revealed: boolean } | null> {
+  try {
+    const payloads: any[] = [];
+    if (job?.response && typeof job.response === "object") payloads.push(job.response);
+    const { data: audits } = await sb
+      .from("apollo_reveal_audit")
+      .select("id, raw_response")
+      .eq("contact_id", contact.id)
+      .order("created_at", { ascending: false })
+      .limit(5);
+    for (const a of audits ?? []) if (a?.raw_response) payloads.push(a.raw_response);
+    if (payloads.length === 0) return null;
+
+    const extraCompanyPhones: string[] = [];
+    if (contact.prospect_id) {
+      const { data: comp } = await sb.from("enriched_company_profiles").select("phone")
+        .eq("prospect_id", contact.prospect_id).maybeSingle();
+      if (comp?.phone) extraCompanyPhones.push(String(comp.phone));
+    }
+
+    const qual = computePhoneQuality(payloads[0], extraCompanyPhones, "apollo", {
+      extraPayloads: payloads.slice(1),
+    });
+    if (!qual.phone) return null;
+
+    const out = await finalizeField(sb, {
+      contact_id: contact.id,
+      field: "phone",
+      outcome: "revealed",
+      job_id: job.id,
+      value: qual.phone,
+      metadata: {
+        phone_source: "apollo",
+        phone_type: qual.phone_type,
+        phone_match_quality: qual.phone_match_quality,
+        phone_confidence: qual.phone_confidence,
+        phone_source_type: qual.phone_match_quality,
+        phone_quality_reason: "recovered_from_existing_payload",
+        phone_validation_status: qual.phone_validation_status,
+        is_whatsapp_ready: !!qual.is_whatsapp_ready,
+        phone_candidates_audit: qual.audit,
+      },
+      credits_used: null,
+      credits_confirmed: null,
+      reason: "recovered_from_existing_payload",
+    });
+    return { revealed: out.status === "revealed" };
+  } catch (e) {
+    console.warn("recoverFromStoredPayload failed", String(e));
+    return null;
+  }
 }
 
 Deno.serve(async (req) => {
@@ -85,19 +150,6 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // Expiração / esgotamento: nunca deixa contato eternamente "buscando".
-      const expired = job.expires_at ? new Date(job.expires_at).getTime() < Date.now() : false;
-      const exhausted = attempt >= MAX_ATTEMPTS;
-      if (expired || exhausted) {
-        await finalizeField(sb, {
-          contact_id: contactId, field, outcome: "failed", job_id: job.id,
-          credits_used: null, credits_confirmed: null,
-          reason: expired ? "stale_job_expired" : "provider_timeout",
-        });
-        results.push({ job_id: job.id, outcome: expired ? "stale_job_expired" : "provider_timeout" });
-        continue;
-      }
-
       const { data: contact } = await sb
         .from("enriched_contact_profiles")
         .select("id, prospect_id, phone, phone_revealed, email, email_revealed, apollo_person_id")
@@ -124,21 +176,54 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      const requestId = job.provider_request_id ? String(job.provider_request_id) : null;
+      const awaitingWebhook = isAwaitingWebhook(job);
+      const rawRequestId = job.provider_request_id ? String(job.provider_request_id) : null;
+      const requestId = isValidApolloAsyncRequestId(rawRequestId) ? rawRequestId : null;
 
-      // Job sem request_id rastreável: encerra (o clique seguinte cria job novo).
-      if (!requestId) {
+      // KAI.18.16 — ID inválido (hex 24 / UUID / person_id) nunca vai para webhook_result.
+      if (rawRequestId && !requestId) {
         await sb.from("enrichment_jobs").update({
-          status: "failed",
-          error: "stale_job_without_provider_request_id",
-          skip_reason: "stale_job_without_provider_request_id",
-          reconciliation_required: false,
-          completed_at: new Date().toISOString(),
-          locked_at: null, locked_by: null,
+          provider_request_id: null,
+          skip_reason: "provider_record_id_misclassified_as_request_id",
         }).eq("id", job.id);
-        results.push({ job_id: job.id, outcome: "stale_job_without_provider_request_id" });
+      }
+
+      // Expiração / esgotamento: nunca deixa contato eternamente "buscando".
+      const expired = job.expires_at ? new Date(job.expires_at).getTime() < Date.now() : false;
+      const exhausted = attempt >= MAX_ATTEMPTS;
+      if (expired || exhausted) {
+        // Antes de encerrar, tenta recuperar do payload já pago (0 créditos).
+        const recovered = field === "phone"
+          ? await recoverFromStoredPayload(sb, job, contact)
+          : null;
+        if (recovered?.revealed) {
+          results.push({ job_id: job.id, outcome: "revealed", source: "stored_payload_recovery" });
+          continue;
+        }
+        const reason = expired
+          ? (awaitingWebhook || !requestId ? "webhook_timeout_without_request_id" : "stale_job_expired")
+          : "provider_timeout";
+        await finalizeField(sb, {
+          contact_id: contactId, field, outcome: "failed", job_id: job.id,
+          credits_used: null, credits_confirmed: null, reason,
+        });
+        results.push({ job_id: job.id, outcome: reason });
         continue;
       }
+
+      // Sem request_id válido: o resultado só pode chegar por webhook. Mantém pendente.
+      if (!requestId) {
+        if (field === "phone") {
+          const recovered = await recoverFromStoredPayload(sb, job, contact);
+          if (recovered?.revealed) {
+            results.push({ job_id: job.id, outcome: "revealed", source: "stored_payload_recovery" });
+            continue;
+          }
+        }
+        results.push(await keepPending(sb, job.id, 120, AWAITING_WEBHOOK_REASON, attempt));
+        continue;
+      }
+
 
       if (!APOLLO_API_KEY) {
         results.push(await keepPending(sb, job.id, 180, "missing_apollo_api_key", attempt));

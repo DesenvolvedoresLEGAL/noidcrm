@@ -2,7 +2,12 @@
 // Recebe o callback assíncrono do Apollo e finaliza o job ORIGINAL via RPC oficial.
 // Nunca cria enrichment_jobs. Anti-replay: job terminal é ignorado.
 import { createClient } from "npm:@supabase/supabase-js@2.45.0";
-import { computePhoneQuality, extractProviderCredits, finalizeField } from "../_shared/apollo-reveal-core.ts";
+import {
+  computePhoneQuality,
+  extractProviderCredits,
+  finalizeField,
+  isValidApolloAsyncRequestId,
+} from "../_shared/apollo-reveal-core.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -169,9 +174,10 @@ Deno.serve(async (req: Request) => {
       },
       credits_used: providerCredits,
       credits_confirmed: providerCredits,
-      provider_request_id: job?.provider_request_id ??
-        (payload?.request_id != null ? String(payload.request_id) : null) ??
-        (payload?.id != null ? String(payload.id) : null),
+      // KAI.18.16 — nunca aceitar person/contact id (hex/UUID) como request_id.
+      provider_request_id: [job?.provider_request_id, payload?.request_id, payload?.webhook_request_id]
+        .map((v) => (v == null ? null : String(v)))
+        .find((v) => isValidApolloAsyncRequestId(v)) ?? null,
       reason: qual.reason,
     });
 

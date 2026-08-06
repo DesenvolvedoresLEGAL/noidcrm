@@ -27,3 +27,17 @@ KAI.18.15 — contrato definitivo do reveal de telefone Apollo.
   `x-internal-secret` (`CRON_INTERNAL_SECRET` ou `INTERNAL_WORKFLOW_SECRET`).
 - Testes: `src/test/services/apolloRevealCore.test.ts` e
   `apolloPhoneCandidates.test.ts` — nenhum faz chamada paga.
+
+## KAI.18.16 — request_id determinístico
+- `isValidApolloAsyncRequestId`: request_id válido é signed 64-bit (`^-?\d{1,20}$`).
+  Hex 24 (person/contact/account) e UUID nunca são request_id.
+- `extractProviderRequestId` lê só `request_id`/`webhook_request_id`; nunca `parsed.id`.
+- Sem request_id válido → job fica `pending_provider` com reason
+  `awaiting_provider_webhook` e TTL `WEBHOOK_WAIT_TTL_MS` (10 min); o sync
+  mantém pendente em vez de matar o job.
+- Antes de qualquer terminal negativo, o sync tenta `recoverFromStoredPayload`
+  (job.response + apollo_reveal_audit.raw_response) — 0 créditos.
+- `cleanup_stale_phone_reveal_requests` nunca marca `not_found` quando existe
+  payload com `sanitized_number`/`raw_number` ou job assíncrono vivo (30 min).
+- `recompute_primary_contact` grava `revenue_events` com `channel='system'` e
+  falha de evento nunca aborta a finalização do reveal.

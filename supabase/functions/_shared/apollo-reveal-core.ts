@@ -86,9 +86,19 @@ function overallFrom(phone: FieldResult, email: FieldResult): RevealResponse["ov
 }
 
 /**
- * KAI.18.15 — request_id do Apollo é signed 64-bit e pode exceder Number.MAX_SAFE_INTEGER.
- * Extraímos direto do TEXTO da resposta para não perder precisão no JSON.parse.
- * Ordem oficial: request_id → webhook_request_id → id → header x-request-id.
+ * KAI.18.16 — request_id assíncrono do Apollo é SEMPRE um inteiro signed 64-bit.
+ * IDs hexadecimais de 24 chars (Mongo/person/contact/account) e UUIDs NÃO são
+ * request_id e jamais podem ser enviados a /webhook_result.
+ */
+export function isValidApolloAsyncRequestId(v: unknown): boolean {
+  const s = String(v ?? "").trim();
+  if (!s) return false;
+  return /^-?\d{1,20}$/.test(s);
+}
+
+/**
+ * KAI.18.16 — extrai SOMENTE `request_id` / `webhook_request_id` explícitos.
+ * Nunca usa `parsed.id` (é o person/contact id). Header só se for válido.
  */
 export function extractProviderRequestId(
   rawText: string | null,
@@ -97,14 +107,14 @@ export function extractProviderRequestId(
 ): string | null {
   if (rawText) {
     const m = rawText.match(/"(?:request_id|webhook_request_id)"\s*:\s*(?:"([^"]*)"|(-?\d+))/);
-    const v = m?.[1] ?? m?.[2];
-    if (v && v.trim()) return v.trim();
+    const v = (m?.[1] ?? m?.[2])?.trim();
+    if (v && isValidApolloAsyncRequestId(v)) return v;
   }
-  for (const key of ["request_id", "webhook_request_id", "id"]) {
+  for (const key of ["request_id", "webhook_request_id"]) {
     const v = parsed?.[key];
-    if (v !== undefined && v !== null && String(v).trim()) return String(v).trim();
+    if (v !== undefined && v !== null && isValidApolloAsyncRequestId(v)) return String(v).trim();
   }
-  return headerValue && headerValue.trim() ? headerValue.trim() : null;
+  return isValidApolloAsyncRequestId(headerValue) ? String(headerValue).trim() : null;
 }
 
 /** Créditos: só persistimos valor CONFIRMADO pelo provider. Nunca inferir 1. */
@@ -191,6 +201,8 @@ const JOB_SELECT =
   "id, status, field, request_group_id, provider_request_id, created_at, expires_at, workspace_id, contact_id, provider, response, request";
 const STALE_WITHOUT_REQUEST_ID_MS = 2 * 60_000;
 const JOB_TTL_MS = 30 * 60_000;
+/** KAI.18.16 — janela de espera de webhook quando não há request_id válido. */
+export const WEBHOOK_WAIT_TTL_MS = 10 * 60_000;
 
 async function failJob(admin: any, jobId: string, reason: string) {
   try {
@@ -210,18 +222,31 @@ async function failJob(admin: any, jobId: string, reason: string) {
 
 /** Job só é reutilizável se for rastreável de verdade (request_id ou payload recuperável). */
 function isRecoverable(job: any): boolean {
-  if (job?.provider_request_id && String(job.provider_request_id).trim() !== "") return true;
+  if (isValidApolloAsyncRequestId(job?.provider_request_id)) return true;
   const resp = job?.response;
   return !!(resp && typeof resp === "object" && Object.keys(resp).length > 0);
+}
+
+export const AWAITING_WEBHOOK_REASON = "awaiting_provider_webhook";
+
+/** KAI.18.16 — job cujo callback chega por webhook (job_id/contact_id), sem request_id. */
+export function isAwaitingWebhook(job: any): boolean {
+  const marks = [job?.skip_reason, job?.error, job?.response?.reason, job?.request?.reason]
+    .map((v) => String(v ?? "").toLowerCase());
+  if (marks.some((m) => m.includes(AWAITING_WEBHOOK_REASON))) return true;
+  const req = job?.request;
+  const resp = job?.response;
+  const hasWebhook = (o: any) =>
+    !!o && typeof o === "object" && JSON.stringify(o).includes("apollo-phone-webhook");
+  return hasWebhook(req) || hasWebhook(resp) || req?.webhook_configured === true;
 }
 
 const NON_TERMINAL = ["queued", "running", "pending_provider"];
 
 /**
- * KAI.18.15 — decisão pura de reaproveitamento de job.
- * Reaproveita SOMENTE job não terminal, não expirado e com evidência de
- * processamento real (provider_request_id/payload) ou ainda dentro da janela
- * de 2 minutos desde a criação.
+ * KAI.18.16 — decisão pura de reaproveitamento de job.
+ * Job aguardando webhook (sem request_id) é rastreável até `expires_at`;
+ * nunca vira zumbi em 2 minutos.
  */
 export function isTrackableJob(
   job: any,
@@ -230,8 +255,12 @@ export function isTrackableJob(
   if (!job) return { trackable: false, reason: "no_job" };
   if (!NON_TERMINAL.includes(String(job.status))) return { trackable: false, reason: "job_terminal" };
   if (job.expires_at && new Date(job.expires_at).getTime() < nowMs) {
-    return { trackable: false, reason: "stale_job_expired" };
+    return {
+      trackable: false,
+      reason: isAwaitingWebhook(job) ? "webhook_timeout_without_request_id" : "stale_job_expired",
+    };
   }
+  if (isAwaitingWebhook(job)) return { trackable: true, reason: null };
   const ageMs = job.created_at ? nowMs - new Date(job.created_at).getTime() : 0;
   if (!isRecoverable(job) && ageMs > STALE_WITHOUT_REQUEST_ID_MS) {
     return { trackable: false, reason: "stale_job_without_provider_request_id" };
@@ -524,12 +553,14 @@ export async function runApolloReveal(admin: any, req: RevealRequest, env: {
     reveal_personal_emails: callEmail,
     reveal_phone_number: callPhone,
   };
+  let webhookConfigured = false;
   if (callPhone) {
     const token = env.APOLLO_WEBHOOK_TOKEN ?? "";
     payload.webhook_url =
       `${env.SUPABASE_URL}/functions/v1/apollo-phone-webhook?contact_id=${encodeURIComponent(contact.id)}` +
       `&job_id=${encodeURIComponent(jobs.phone!.id)}` +
       (token ? `&token=${encodeURIComponent(token)}` : "");
+    webhookConfigured = !!token;
   }
 
   const ctrl = new AbortController();
@@ -706,8 +737,11 @@ export async function runApolloReveal(admin: any, req: RevealRequest, env: {
           is_whatsapp_ready: qual.is_whatsapp_ready,
         });
       }
-    } else if (providerRequestId) {
-      // Fluxo oficial: telefone chega por webhook/webhook_result. NUNCA concluir aqui.
+    } else if (providerRequestId || webhookConfigured) {
+      // KAI.18.16 — telefone é assíncrono. Com request_id válido usamos polling;
+      // sem request_id, o callback chega pelo webhook (contact_id/job_id na URL).
+      const pendingReason = providerRequestId ? "awaiting_provider_async_phone" : AWAITING_WEBHOOK_REASON;
+      const ttlMs = providerRequestId ? JOB_TTL_MS : WEBHOOK_WAIT_TTL_MS;
       await finalizeField(admin, {
         contact_id: contact.id,
         field: "phone",
@@ -718,20 +752,31 @@ export async function runApolloReveal(admin: any, req: RevealRequest, env: {
         credits_confirmed: null,
         provider_request_id: providerRequestId,
         audit_id: auditId,
-        reason: "awaiting_provider_async_phone",
+        reason: pendingReason,
       });
       try {
         await admin.from("enrichment_jobs").update({
           status: "pending_provider",
           provider_request_id: providerRequestId,
           attempt_count: 0,
-          next_retry_at: new Date(Date.now() + 60_000).toISOString(),
-          expires_at: new Date(Date.now() + JOB_TTL_MS).toISOString(),
+          next_retry_at: new Date(Date.now() + (providerRequestId ? 60_000 : 120_000)).toISOString(),
+          expires_at: new Date(Date.now() + ttlMs).toISOString(),
           reconciliation_required: false,
+          skip_reason: pendingReason,
           completed_at: null,
           locked_at: null,
           locked_by: null,
-          response: { sync: { status: apolloStatus, person_id: apolloPersonId, request_id: providerRequestId } },
+          response: {
+            reason: pendingReason,
+            webhook_configured: webhookConfigured,
+            sync: {
+              status: apolloStatus,
+              person_id: apolloPersonId,
+              request_id: providerRequestId,
+              // Payload pago preservado integralmente para reprocessamento sem nova cobrança.
+              person_payload: person ?? null,
+            },
+          },
         }).eq("id", jobs.phone!.id);
       } catch (e) { console.warn("persist pending phone job failed", e); }
 
@@ -743,11 +788,11 @@ export async function runApolloReveal(admin: any, req: RevealRequest, env: {
         credits_estimated: 1,
         credits_used: null,
         credits_confirmed: null,
-        reason: "awaiting_provider_async_phone",
+        reason: pendingReason,
         job_id: jobs.phone!.id,
       };
       await emitRevenueEvent(admin, orgId, "apollo_phone_pending_provider", {
-        contact_id: contact.id, provider_request_id: providerRequestId,
+        contact_id: contact.id, provider_request_id: providerRequestId, reason: pendingReason,
       });
     } else {
       // Sem número e sem request_id rastreável → terminal honesto.
