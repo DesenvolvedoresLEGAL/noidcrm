@@ -45,6 +45,8 @@ async function trackFieldUntilTerminal(
       toast.success(field === 'phone' ? `Telefone salvo para ${who}.` : `E-mail salvo para ${who}.`);
     } else if (status === 'rejected_company_phone' || data.phone_source_type === 'company_main') {
       toast.info(`Apollo só encontrou o telefone da empresa para ${who}. Nenhum crédito confirmado.`);
+    } else if (status === 'phone_only_web') {
+      toast.warning(`Apollo exibe telefone de ${who} no site, mas não entregou pela API. Nenhum crédito confirmado.`);
     } else if (status === 'not_found') {
       toast.info(field === 'phone'
         ? `Apollo não tem telefone individual de ${who}.`
