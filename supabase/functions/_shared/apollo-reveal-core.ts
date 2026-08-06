@@ -108,7 +108,7 @@ export async function emitRevenueEvent(admin: any, orgId: string, kind: string, 
 export async function finalizeField(admin: any, args: {
   contact_id: string;
   field: RevealField;
-  outcome: "revealed" | "not_found" | "rejected_company_phone" | "failed" | "pending_provider";
+  outcome: "revealed" | "not_found" | "rejected_company_phone" | "failed" | "pending_provider" | "phone_only_web";
   job_id?: string | null;
   value?: string | null;
   metadata?: Record<string, unknown>;
