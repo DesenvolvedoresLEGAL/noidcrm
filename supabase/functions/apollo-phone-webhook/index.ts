@@ -169,9 +169,10 @@ Deno.serve(async (req: Request) => {
       },
       credits_used: providerCredits,
       credits_confirmed: providerCredits,
-      provider_request_id: job?.provider_request_id ??
-        (payload?.request_id != null ? String(payload.request_id) : null) ??
-        (payload?.id != null ? String(payload.id) : null),
+      // KAI.18.16 — nunca aceitar person/contact id (hex/UUID) como request_id.
+      provider_request_id: [job?.provider_request_id, payload?.request_id, payload?.webhook_request_id]
+        .map((v) => (v == null ? null : String(v)))
+        .find((v) => isValidApolloAsyncRequestId(v)) ?? null,
       reason: qual.reason,
     });
 
