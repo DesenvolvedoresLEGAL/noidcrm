@@ -1,36 +1,26 @@
-// KAI.15.1 / KAI.15.2 — Apollo Phone Quality Guard
-// Classifica telefones retornados pelo Apollo em pessoa (mobile/direct/whatsapp)
-// vs empresa (reception/main). Rejeita telefones herdados de organization/account.
-// Também computa qualidade, confiança e prontidão WhatsApp.
+// KAI.15.1 / KAI.15.2 / KAI.18.14 — Apollo Phone Quality Guard
+// Fachada de compatibilidade: TODA a lógica de extração/classificação/ranking vive em
+// `apollo-phone-candidates.ts`. Este módulo apenas traduz a seleção para o contrato
+// legado (PhoneQuality) consumido pelas edge functions.
 
-export type PhoneSourceType =
-  | "person_mobile"
-  | "person_direct"
-  | "company_main"
-  | "unknown";
+import {
+  auditSummary,
+  isBrazilianMobile,
+  type PhoneCandidate,
+  type PhoneOutcome,
+  type PhoneSelection,
+  selectBestPhone,
+} from "./apollo-phone-candidates.ts";
+
+export type PhoneSourceType = "person_mobile" | "person_direct" | "company_main" | "unknown";
 
 export type PhoneMatchQuality =
-  | "person_whatsapp"
-  | "person_mobile"
-  | "person_direct"
-  | "company_reception"
-  | "company_main"
-  | "unknown";
+  | "person_whatsapp" | "person_mobile" | "person_direct"
+  | "company_reception" | "company_main" | "unknown";
 
-export type PhoneType =
-  | "mobile"
-  | "direct"
-  | "whatsapp"
-  | "company_main"
-  | "company_reception"
-  | "unknown";
+export type PhoneType = "mobile" | "direct" | "whatsapp" | "company_main" | "company_reception" | "unknown";
 
-export type PhoneValidationStatus =
-  | "valid"
-  | "likely_valid"
-  | "unknown"
-  | "invalid"
-  | "stale";
+export type PhoneValidationStatus = "valid" | "likely_valid" | "unknown" | "invalid" | "stale";
 
 export interface PhoneClassification {
   phone: string | null;
@@ -48,296 +38,100 @@ export interface PhoneQuality {
   phone_validation_status: PhoneValidationStatus;
   reason: string;
   rejected_company_phone: string | null;
+  /** KAI.18.14 — resultado determinístico do seletor de candidatos. */
+  outcome: PhoneOutcome;
+  selection: PhoneSelection;
+  audit: ReturnType<typeof auditSummary>;
 }
 
-const PERSON_TYPES = new Set([
-  "mobile",
-  "cell",
-  "cellular",
-  "personal",
-  "person",
-  "home",
-]);
-const DIRECT_TYPES = new Set([
-  "direct",
-  "direct_dial",
-  "direct_phone",
-  "work_direct",
-  "office_direct",
-]);
-const COMPANY_TYPES = new Set([
-  "corporate",
-  "corporate_hq",
-  "hq",
-  "headquarters",
-  "main",
-  "company",
-  "organization",
-  "office",
-  "work",
-  "general",
-  "switchboard",
-]);
-
-const PERSON_FIELDS = [
-  "mobile_phone",
-  "mobile",
-  "cell_phone",
-  "cellphone",
-  "personal_phone",
-  "personal_number",
-  "direct_dial",
-  "direct_phone",
-  "direct_number",
-  "work_direct_phone",
-];
-
-const COMPANY_FIELDS = [
-  "corporate_phone",
-  "corporate_hq_phone",
-  "company_phone",
-  "main_phone",
-  "headquarters_phone",
-  "hq_phone",
-  "office_phone",
-  "general_phone",
-];
-
-function digits(v: unknown): string {
-  return String(v ?? "").replace(/\D+/g, "");
-}
-
-function isPlausiblePhone(v: unknown): boolean {
-  const d = digits(v);
-  return d.length >= 7 && d.length <= 20;
-}
-
-function normalizeType(t: unknown): string {
-  return String(t ?? "").toLowerCase().replace(/\s+/g, "_");
-}
-
-function firstString(...vals: unknown[]): string | null {
-  for (const v of vals) {
-    if (typeof v === "string" && v.trim().length > 0) return v.trim();
-  }
-  return null;
-}
-
-function collectCompanyPhones(person: any): Set<string> {
-  const set = new Set<string>();
-  const push = (v: unknown) => {
-    if (!isPlausiblePhone(v)) return;
-    set.add(digits(v));
-  };
-  const org = person?.organization ?? person?.account ?? null;
-  if (org) {
-    push(org.phone);
-    push(org.primary_phone);
-    push(org.sanitized_phone);
-    push(org.corporate_phone);
-    push(org.main_phone);
-    if (Array.isArray(org.phone_numbers)) {
-      for (const p of org.phone_numbers) {
-        push(p?.sanitized_number ?? p?.raw_number ?? p?.number ?? p?.value);
-      }
-    }
-  }
-  for (const f of COMPANY_FIELDS) push(person?.[f]);
-  return set;
-}
-
-/**
- * Classifica um telefone retornado pelo Apollo people/match ou webhook.
- * @param person   Registro `person` (ou payload equivalente do webhook)
- * @param extraCompanyPhones telefones conhecidos da empresa (ex.: enriched_company_profiles.phone)
- */
+/** Compat: classificação simples (usa o seletor oficial). */
 export function classifyApolloPhone(
   person: any,
   extraCompanyPhones: (string | null | undefined)[] = [],
 ): PhoneClassification {
-  if (!person || typeof person !== "object") {
-    return { phone: null, sourceType: "unknown", rejectedCompanyPhone: null };
-  }
-
-  const companyDigits = collectCompanyPhones(person);
-  for (const p of extraCompanyPhones) {
-    if (isPlausiblePhone(p)) companyDigits.add(digits(p));
-  }
-
-  const isCompanyMatch = (v: unknown) => {
-    if (!isPlausiblePhone(v)) return false;
-    return companyDigits.has(digits(v));
+  const sel = selectBestPhone(person, { extraCompanyPhones });
+  const sourceType: PhoneSourceType = sel.selected
+    ? (sel.selected.classification === "person_mobile" ? "person_mobile" : "person_direct")
+    : (sel.outcome === "rejected_company_phone" ? "company_main" : "unknown");
+  return {
+    phone: sel.selected?.raw ?? null,
+    sourceType,
+    rejectedCompanyPhone: sel.outcome === "rejected_company_phone"
+      ? (sel.rejected[0]?.e164 ?? sel.rejected[0]?.raw ?? null)
+      : null,
   };
+}
 
-  // 1) Explicit person fields
-  for (const f of PERSON_FIELDS) {
-    const val = person?.[f];
-    if (!isPlausiblePhone(val)) continue;
-    if (isCompanyMatch(val)) continue;
-    const isMobile = /mobile|cell|personal/i.test(f);
+function qualityFromCandidate(c: PhoneCandidate): Pick<PhoneQuality, "phone_type" | "phone_match_quality" | "phone_confidence" | "is_whatsapp_ready" | "phone_validation_status" | "reason"> {
+  const brMobile = isBrazilianMobile(c.raw);
+  if (c.classification === "person_mobile") {
     return {
-      phone: String(val).trim(),
-      sourceType: isMobile ? "person_mobile" : "person_direct",
-      rejectedCompanyPhone: null,
+      phone_type: "mobile", phone_match_quality: "person_mobile", phone_confidence: c.confidence,
+      is_whatsapp_ready: brMobile, phone_validation_status: c.validated ? "valid" : "likely_valid",
+      reason: "person_mobile_detected",
     };
   }
-
-  // 2) phone_numbers array (Apollo people/match returns typed entries)
-  const arrays: any[] = [];
-  if (Array.isArray(person.phone_numbers)) arrays.push(...person.phone_numbers);
-  if (Array.isArray(person.phone_numbers_for_person)) arrays.push(...person.phone_numbers_for_person);
-  if (Array.isArray(person.contact_phone_numbers)) arrays.push(...person.contact_phone_numbers);
-
-  // Prefer mobile → direct → other person types; ignore company types.
-  const scored: Array<{ value: string; sourceType: PhoneSourceType; rank: number }> = [];
-  for (const entry of arrays) {
-    const value = firstString(
-      entry?.sanitized_number,
-      entry?.raw_number,
-      entry?.number,
-      entry?.value,
-      entry?.phone,
-    );
-    if (!isPlausiblePhone(value)) continue;
-    const t = normalizeType(entry?.type ?? entry?.phone_type ?? entry?.category ?? entry?.label);
-    if (COMPANY_TYPES.has(t)) continue;
-    if (isCompanyMatch(value)) continue;
-    if (PERSON_TYPES.has(t)) scored.push({ value: value!, sourceType: "person_mobile", rank: 100 });
-    else if (DIRECT_TYPES.has(t)) scored.push({ value: value!, sourceType: "person_direct", rank: 80 });
-    else if (t === "" || t === "unknown" || t === "other") {
-      // Untyped Apollo entries: only accept if not equal to any company phone.
-      // Treat as direct dial (person-owned) since Apollo separates org phones.
-      scored.push({ value: value!, sourceType: "person_direct", rank: 40 });
-    }
+  if (c.classification === "person_direct") {
+    return {
+      phone_type: "direct", phone_match_quality: "person_direct", phone_confidence: c.confidence,
+      is_whatsapp_ready: brMobile, phone_validation_status: c.validated ? "valid" : "likely_valid",
+      reason: "person_direct_detected",
+    };
   }
-  scored.sort((a, b) => b.rank - a.rank);
-  if (scored.length > 0) {
-    const best = scored[0];
-    return { phone: best.value, sourceType: best.sourceType, rejectedCompanyPhone: null };
-  }
-
-  // 3) Bare sanitized_phone on person (only if != company phone)
-  const bare = firstString(person.sanitized_phone, person.phone);
-  if (isPlausiblePhone(bare) && !isCompanyMatch(bare)) {
-    // Ambiguous — Apollo sometimes populates this from organization data.
-    // Only accept when there's clearly no organization phone we could match against.
-    if (companyDigits.size === 0) {
-      return { phone: bare, sourceType: "person_direct", rejectedCompanyPhone: null };
-    }
-  }
-
-  // 4) Nothing acceptable — surface which company phone was seen (audit only)
-  const rejected = firstString(
-    person?.organization?.phone,
-    person?.organization?.primary_phone,
-    person?.organization?.sanitized_phone,
-    person?.account?.phone,
-    person?.corporate_phone,
-    person?.main_phone,
-    person?.company_phone,
-    bare,
-  );
+  // person_unclassified
   return {
-    phone: null,
-    sourceType: rejected ? "company_main" : "unknown",
-    rejectedCompanyPhone: rejected,
+    phone_type: brMobile ? "mobile" : "unknown",
+    phone_match_quality: brMobile ? "person_mobile" : "unknown",
+    phone_confidence: c.confidence,
+    is_whatsapp_ready: brMobile,
+    phone_validation_status: "unknown",
+    reason: brMobile ? "person_mobile_pattern_unclassified" : "person_phone_unclassified",
   };
 }
 
-// KAI.15.2 — Mobile Brazilian pattern (9 na 3ª posição do número local)
-// Padrão internacional aceito: E.164 ou 55DDD9XXXXXXXX. Fora do Brasil, heurística
-// de 11 dígitos com "9" na posição 3 também vale para celular BR.
-function isMobileBRDigits(d: string): boolean {
-  const s = d.replace(/^55/, "");
-  if (s.length === 11 && s[2] === "9") return true;
-  if (s.length === 10) return false;
-  return false;
+export function computePhoneQualityFromSelection(
+  sel: PhoneSelection,
+  source: PhoneQuality["phone_source"] = "apollo",
+): PhoneQuality {
+  const audit = auditSummary(sel);
+  if (sel.selected) {
+    return {
+      phone: sel.selected.e164 ?? sel.selected.raw,
+      phone_source: source,
+      ...qualityFromCandidate(sel.selected),
+      rejected_company_phone: null,
+      outcome: sel.outcome,
+      selection: sel,
+      audit,
+    };
+  }
+  if (sel.outcome === "rejected_company_phone") {
+    return {
+      phone: null, phone_source: source, phone_type: "company_main",
+      phone_match_quality: "company_main", phone_confidence: 10, is_whatsapp_ready: false,
+      phone_validation_status: "invalid", reason: "company_phone_rejected",
+      rejected_company_phone: sel.rejected[0]?.e164 ?? sel.rejected[0]?.raw ?? null,
+      outcome: sel.outcome, selection: sel, audit,
+    };
+  }
+  const reason = sel.outcome === "phone_only_web"
+    ? "phone_absent_from_api_payload"
+    : sel.outcome === "pending_provider"
+    ? "provider_processing"
+    : "no_person_phone_returned";
+  return {
+    phone: null, phone_source: source, phone_type: "unknown", phone_match_quality: "unknown",
+    phone_confidence: 0, is_whatsapp_ready: false, phone_validation_status: "unknown",
+    reason, rejected_company_phone: null, outcome: sel.outcome, selection: sel, audit,
+  };
 }
 
-/**
- * KAI.15.2 — Governança avançada. Retorna qualidade, tipo, confiança e prontidão WhatsApp.
- * `source` default = "apollo". Para revelações manuais/CRM passar explicitamente.
- */
 export function computePhoneQuality(
   person: any,
   extraCompanyPhones: (string | null | undefined)[] = [],
   source: PhoneQuality["phone_source"] = "apollo",
+  opts: { extraPayloads?: any[]; allowPending?: boolean } = {},
 ): PhoneQuality {
-  const cls = classifyApolloPhone(person, extraCompanyPhones);
-  const phone = cls.phone;
-
-  // Rejeitado (telefone da empresa) — nunca aceitar como pessoa
-  if (!phone && cls.rejectedCompanyPhone) {
-    return {
-      phone: null,
-      phone_source: source,
-      phone_type: "company_main",
-      phone_match_quality: "company_main",
-      phone_confidence: 10,
-      is_whatsapp_ready: false,
-      phone_validation_status: "invalid",
-      reason: "company_phone_rejected",
-      rejected_company_phone: cls.rejectedCompanyPhone,
-    };
-  }
-
-  // Não encontrou telefone
-  if (!phone) {
-    return {
-      phone: null,
-      phone_source: source,
-      phone_type: "unknown",
-      phone_match_quality: "unknown",
-      phone_confidence: 0,
-      is_whatsapp_ready: false,
-      phone_validation_status: "unknown",
-      reason: "no_person_phone_returned",
-      rejected_company_phone: null,
-    };
-  }
-
-  const d = digits(phone);
-  const isMobile = cls.sourceType === "person_mobile" || isMobileBRDigits(d);
-  const isDirect = cls.sourceType === "person_direct";
-
-  if (isMobile) {
-    return {
-      phone,
-      phone_source: source,
-      phone_type: "mobile",
-      phone_match_quality: "person_mobile",
-      phone_confidence: 95,
-      is_whatsapp_ready: true, // celular BR → WhatsApp pronto
-      phone_validation_status: "likely_valid",
-      reason: "person_mobile_detected",
-      rejected_company_phone: null,
-    };
-  }
-
-  if (isDirect) {
-    return {
-      phone,
-      phone_source: source,
-      phone_type: "direct",
-      phone_match_quality: "person_direct",
-      phone_confidence: 85,
-      is_whatsapp_ready: false,
-      phone_validation_status: "likely_valid",
-      reason: "person_direct_detected",
-      rejected_company_phone: null,
-    };
-  }
-
-  // Aceitou telefone mas fonte desconhecida
-  return {
-    phone,
-    phone_source: source,
-    phone_type: "unknown",
-    phone_match_quality: "unknown",
-    phone_confidence: 50,
-    is_whatsapp_ready: false,
-    phone_validation_status: "unknown",
-    reason: "person_phone_unclassified",
-    rejected_company_phone: null,
-  };
+  const sel = selectBestPhone(person, { extraCompanyPhones, ...opts });
+  return computePhoneQualityFromSelection(sel, source);
 }
