@@ -608,6 +608,8 @@ export async function runApolloReveal(admin: any, req: RevealRequest, env: {
         provider_request_id: providerRequestId,
         phone_status: phoneResult.status,
         email_status: emailResult.status,
+        // KAI.18.14 — payload pago preservado para reprocessamento sem nova cobrança.
+        person_payload: person ?? null,
       },
       phone_source_type: phoneResult.source_type ?? null,
     }).eq("id", auditId);
