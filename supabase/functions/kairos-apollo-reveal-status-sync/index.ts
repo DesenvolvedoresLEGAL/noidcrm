@@ -43,6 +43,64 @@ async function keepPending(sb: any, jobId: string, retryAfterSeconds: number, no
   return { outcome: "still_pending", note, attempt };
 }
 
+/**
+ * KAI.18.16 — recuperação SEM crédito: reprocessa payloads já pagos (job.response
+ * e apollo_reveal_audit.raw_response) com o classificador compartilhado.
+ * Só conclui `revealed`; nunca conclui not_found por aqui.
+ */
+async function recoverFromStoredPayload(sb: any, job: any, contact: any): Promise<{ revealed: boolean } | null> {
+  try {
+    const payloads: any[] = [];
+    if (job?.response && typeof job.response === "object") payloads.push(job.response);
+    const { data: audits } = await sb
+      .from("apollo_reveal_audit")
+      .select("id, raw_response")
+      .eq("contact_id", contact.id)
+      .order("created_at", { ascending: false })
+      .limit(5);
+    for (const a of audits ?? []) if (a?.raw_response) payloads.push(a.raw_response);
+    if (payloads.length === 0) return null;
+
+    const extraCompanyPhones: string[] = [];
+    if (contact.prospect_id) {
+      const { data: comp } = await sb.from("enriched_company_profiles").select("phone")
+        .eq("prospect_id", contact.prospect_id).maybeSingle();
+      if (comp?.phone) extraCompanyPhones.push(String(comp.phone));
+    }
+
+    const qual = computePhoneQuality(payloads[0], extraCompanyPhones, "apollo", {
+      extraPayloads: payloads.slice(1),
+    });
+    if (!qual.phone) return null;
+
+    const out = await finalizeField(sb, {
+      contact_id: contact.id,
+      field: "phone",
+      outcome: "revealed",
+      job_id: job.id,
+      value: qual.phone,
+      metadata: {
+        phone_source: "apollo",
+        phone_type: qual.phone_type,
+        phone_match_quality: qual.phone_match_quality,
+        phone_confidence: qual.phone_confidence,
+        phone_source_type: qual.phone_match_quality,
+        phone_quality_reason: "recovered_from_existing_payload",
+        phone_validation_status: qual.phone_validation_status,
+        is_whatsapp_ready: !!qual.is_whatsapp_ready,
+        phone_candidates_audit: qual.audit,
+      },
+      credits_used: null,
+      credits_confirmed: null,
+      reason: "recovered_from_existing_payload",
+    });
+    return { revealed: out.status === "revealed" };
+  } catch (e) {
+    console.warn("recoverFromStoredPayload failed", String(e));
+    return null;
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
