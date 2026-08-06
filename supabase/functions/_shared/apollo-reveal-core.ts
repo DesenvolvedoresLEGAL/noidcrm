@@ -558,10 +558,12 @@ export async function runApolloReveal(admin: any, req: RevealRequest, env: {
       credits_confirmed: acceptedPhone ? 1 : null,
       provider_request_id: providerRequestId,
       audit_id: auditId,
-      reason: companyRejected ? "company_phone_rejected" : (outcome === "not_found" ? "no_person_phone_returned" : null),
+      reason: qual.reason,
     });
 
-    const status: FieldStatus = outcome === "pending_provider" && out.status !== "failed" ? "pending_provider" : out.status;
+    const status: FieldStatus = (outcome === "pending_provider" || outcome === "phone_only_web") && out.status !== "failed"
+      ? (outcome as FieldStatus)
+      : out.status;
     phoneResult = {
       status,
       revealed: status === "revealed",
@@ -582,9 +584,11 @@ export async function runApolloReveal(admin: any, req: RevealRequest, env: {
         is_whatsapp_ready: qual.is_whatsapp_ready,
       });
     } else if (companyRejected) {
-      await emitRevenueEvent(admin, orgId, "phone_company_rejected", { contact_id: contact.id });
+      await emitRevenueEvent(admin, orgId, "phone_company_rejected", { contact_id: contact.id, audit: qual.audit });
+    } else if (status === "phone_only_web") {
+      await emitRevenueEvent(admin, orgId, "apollo_phone_only_web", { contact_id: contact.id, audit: qual.audit });
     } else if (status === "not_found") {
-      await emitRevenueEvent(admin, orgId, "apollo_phone_not_found", { contact_id: contact.id });
+      await emitRevenueEvent(admin, orgId, "apollo_phone_not_found", { contact_id: contact.id, audit: qual.audit });
     }
   }
 
