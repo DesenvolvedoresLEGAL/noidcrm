@@ -108,23 +108,43 @@ export interface ApolloRules {
 
 export type RevealDataType = 'profile_only' | 'email' | 'phone' | 'both';
 
+// KAI.18.13 — contrato canônico por campo
+export type RevealFieldStatus =
+  | 'not_requested'
+  | 'requested'
+  | 'pending_provider'
+  | 'revealed'
+  | 'not_found'
+  | 'rejected_company_phone'
+  | 'failed'
+  | 'skipped';
+
+export interface RevealFieldResult {
+  status: RevealFieldStatus;
+  revealed: boolean;
+  value: string | null;
+  source_type?: string | null;
+  credits_estimated: number;
+  credits_used: number | null;
+  credits_confirmed: number | null;
+  reason: string | null;
+  job_id: string | null;
+}
+
 export interface RevealResult {
-  status: 'revealed' | 'pending' | 'not_found' | 'rejected_company_phone' | 'failed' | 'skipped';
   success?: boolean;
+  overall_status: 'revealed' | 'partial' | 'pending' | 'not_found' | 'rejected_company_phone' | 'failed' | 'skipped';
+  /** compat legado — não usar para decidir UI */
+  status?: string;
   contact_id?: string;
   requested_data_type?: RevealDataType;
-  phone_reveal_status?: string | null;
-  phone_revealed?: boolean;
-  phone_source_type?: 'person_mobile' | 'person_direct' | 'company_main' | 'unknown' | null;
-  credits_estimated?: number;
-  credits_used?: number;
-  email?: string | null;
-  phone?: string | null;
-  phone_pending?: boolean;
-  company_phone_rejected?: boolean;
-  preferred_channel?: string;
+  request_group_id?: string | null;
+  correlation_id?: string | null;
+  phone: RevealFieldResult;
+  email: RevealFieldResult;
+  credits_used?: number | null;
   audit_id?: string | null;
-  reason?: string;
+  reason?: string | null;
 }
 
 export async function revealContact(params: {
