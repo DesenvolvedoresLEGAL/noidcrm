@@ -4,7 +4,14 @@
 // NUNCA repete chamada paga (people/match). Só o webhook ou o webhook_result
 // podem produzir estado terminal de telefone.
 import { createClient } from "npm:@supabase/supabase-js@2.45.0";
-import { computePhoneQuality, extractProviderCredits, finalizeField } from "../_shared/apollo-reveal-core.ts";
+import {
+  AWAITING_WEBHOOK_REASON,
+  computePhoneQuality,
+  extractProviderCredits,
+  finalizeField,
+  isAwaitingWebhook,
+  isValidApolloAsyncRequestId,
+} from "../_shared/apollo-reveal-core.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
