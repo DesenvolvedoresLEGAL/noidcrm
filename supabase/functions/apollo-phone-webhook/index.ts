@@ -120,16 +120,18 @@ Deno.serve(async (req: Request) => {
       } catch { /* noop */ }
     }
 
-    const qual = computePhoneQuality(person, extraCompanyPhones, "apollo");
-    const phone = qual.phone && qual.phone_confidence >= 80 ? qual.phone : null;
+    const qual = computePhoneQuality(person, extraCompanyPhones, "apollo", { extraPayloads: [payload] });
+    const phone = qual.phone;
     const sourceType = qual.phone_match_quality === "person_mobile"
       ? "person_mobile"
       : qual.phone_match_quality === "person_direct"
       ? "person_direct"
       : qual.phone_match_quality === "company_main"
       ? "company_main"
+      : qual.outcome === "phone_only_web"
+      ? "phone_only_web"
       : "unknown";
-    const companyRejected = !phone && !!qual.rejected_company_phone;
+    const companyRejected = qual.outcome === "rejected_company_phone";
     const providerCredits = Number(payload?.credits_consumed ?? payload?.credits_used ?? NaN);
 
     console.log("apollo-phone-webhook", {
@@ -138,12 +140,13 @@ Deno.serve(async (req: Request) => {
       accepted: !!phone,
       quality: qual.phone_match_quality,
       company_rejected: companyRejected,
+      audit: qual.audit,
     });
 
     const out = await finalizeField(sb, {
       contact_id: contactId,
       field: "phone",
-      outcome: phone ? "revealed" : companyRejected ? "rejected_company_phone" : "not_found",
+      outcome: qual.outcome === "pending_provider" ? "not_found" : qual.outcome,
       job_id: job?.id ?? null,
       value: phone,
       metadata: {
