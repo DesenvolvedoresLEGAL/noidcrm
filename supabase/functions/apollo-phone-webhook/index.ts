@@ -1,14 +1,18 @@
-// Recebe callback assíncrono da Apollo com o telefone revelado.
-// Apollo chama este endpoint quando reveal_phone_number=true completa.
-// KAI.15.1 phone quality: rejeita telefones corporativos, aceita só mobile/direct pessoais.
+// apollo-phone-webhook (KAI.18.13)
+// Recebe o callback assíncrono do Apollo e finaliza o job ORIGINAL via RPC oficial.
+// Nunca cria enrichment_jobs. Anti-replay: job terminal é ignorado.
 import { createClient } from "npm:@supabase/supabase-js@2.45.0";
-import { computePhoneQuality } from "../_shared/apollo-phone-classifier.ts";
+import { computePhoneQuality, finalizeField } from "../_shared/apollo-reveal-core.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "*",
   "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
 };
+
+function json(status: number, body: unknown) {
+  return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+}
 
 function extractPerson(payload: any, contactId: string, existingApolloId?: string | null): any {
   const records = [
@@ -35,20 +39,15 @@ Deno.serve(async (req: Request) => {
   try {
     const url = new URL(req.url);
     const contactId = url.searchParams.get("contact_id");
+    const jobIdParam = url.searchParams.get("job_id");
     const token = url.searchParams.get("token");
     const expectedToken = Deno.env.get("APOLLO_WEBHOOK_TOKEN");
 
-    if (!contactId) {
-      return new Response(JSON.stringify({ error: "contact_id required" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
     if (!expectedToken || !token || token !== expectedToken) {
-      console.warn("apollo-phone-webhook invalid/missing token", { contactId, secret_configured: !!expectedToken });
-      return new Response(JSON.stringify({ error: "forbidden" }), {
-        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      console.warn("apollo-phone-webhook invalid token", { secret_configured: !!expectedToken });
+      return json(403, { error: "forbidden" });
     }
+    if (!contactId) return json(400, { error: "contact_id required" });
 
     const sb = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -58,100 +57,113 @@ Deno.serve(async (req: Request) => {
 
     const { data: existing } = await sb
       .from("enriched_contact_profiles")
-      .select("id, workspace_id, prospect_id, email, phone, email_revealed, phone_revealed, phone_credits_used, reveal_credits_used, apollo_person_id, linkedin_url")
+      .select("id, workspace_id, prospect_id, email, phone, phone_revealed, apollo_person_id")
       .eq("id", contactId)
       .maybeSingle();
+    if (!existing) return json(404, { error: "contact not found" });
 
-    if (!existing) {
-      return new Response(JSON.stringify({ error: "contact not found" }), {
-        status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    // Localiza o job ORIGINAL de telefone (nunca cria)
+    let job: any = null;
+    if (jobIdParam) {
+      const { data } = await sb
+        .from("enrichment_jobs")
+        .select("id, status, contact_id, field, provider_request_id")
+        .eq("id", jobIdParam)
+        .maybeSingle();
+      job = data ?? null;
+    }
+    if (!job) {
+      const { data } = await sb
+        .from("enrichment_jobs")
+        .select("id, status, contact_id, field, provider_request_id")
+        .eq("contact_id", contactId)
+        .eq("provider", "apollo_reveal")
+        .eq("field", "phone")
+        .in("status", ["queued", "running", "pending_provider"])
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      job = data ?? null;
     }
 
-    // Company phones to reject
+    // Anti-replay: identidade e estado terminal
+    if (job && job.contact_id !== contactId) {
+      console.warn("apollo-phone-webhook job/contact mismatch");
+      return json(409, { error: "job_contact_mismatch" });
+    }
+    if (job && !["queued", "running", "pending_provider"].includes(job.status)) {
+      return json(200, { ok: true, ignored: "job_already_terminal" });
+    }
+    if (existing.phone_revealed && existing.phone) {
+      return json(200, { ok: true, ignored: "phone_already_revealed" });
+    }
+
+    const payload = await req.json().catch(() => ({} as any));
+    const person = extractPerson(payload, contactId, existing.apollo_person_id);
+
+    // Identidade: se já conhecemos o apollo_person_id, o retorno precisa bater.
+    const personId = person?.id ?? person?.person_id ?? null;
+    if (existing.apollo_person_id && personId && String(personId) !== String(existing.apollo_person_id)) {
+      console.warn("apollo-phone-webhook identity mismatch");
+      return json(409, { error: "identity_mismatch" });
+    }
+
     const extraCompanyPhones: string[] = [];
-    if ((existing as any).prospect_id) {
+    if (existing.prospect_id) {
       try {
         const { data: comp } = await sb
           .from("enriched_company_profiles")
           .select("phone")
-          .eq("prospect_id", (existing as any).prospect_id)
+          .eq("prospect_id", existing.prospect_id)
           .maybeSingle();
         if (comp?.phone) extraCompanyPhones.push(String(comp.phone));
       } catch { /* noop */ }
     }
 
-    const payload = await req.json().catch(() => ({} as any));
-    const person = extractPerson(payload, contactId, (existing as any).apollo_person_id);
     const qual = computePhoneQuality(person, extraCompanyPhones, "apollo");
     const phone = qual.phone && qual.phone_confidence >= 80 ? qual.phone : null;
-    const phoneSourceType = qual.phone_match_quality === "person_mobile" ? "person_mobile"
-      : qual.phone_match_quality === "person_direct" ? "person_direct"
-      : qual.phone_match_quality === "company_main" ? "company_main"
+    const sourceType = qual.phone_match_quality === "person_mobile"
+      ? "person_mobile"
+      : qual.phone_match_quality === "person_direct"
+      ? "person_direct"
+      : qual.phone_match_quality === "company_main"
+      ? "company_main"
       : "unknown";
-    const companyPhoneRejected = !phone && !!qual.rejected_company_phone;
-    const creditsConsumed = Number(payload?.credits_consumed ?? payload?.credits_used ?? 0) || (phone ? 1 : 0);
+    const companyRejected = !phone && !!qual.rejected_company_phone;
+    const providerCredits = Number(payload?.credits_consumed ?? payload?.credits_used ?? NaN);
 
-    console.log("apollo-phone-webhook payload", {
+    console.log("apollo-phone-webhook", {
       contactId,
-      keys: Object.keys(payload || {}),
-      picked_person_id: person?.id ?? person?.person_id ?? null,
-      phone_source_type: phoneSourceType,
-      phone_match_quality: qual.phone_match_quality,
-      phone_confidence: qual.phone_confidence,
+      job_id: job?.id ?? null,
       accepted: !!phone,
-      company_rejected: companyPhoneRejected,
+      quality: qual.phone_match_quality,
+      company_rejected: companyRejected,
     });
 
-    const nowIso = new Date().toISOString();
-    const update: Record<string, unknown> = {
-      last_reveal_attempt_at: nowIso,
-      // KAI.15.2 — sempre persiste metadados de qualidade
-      phone_source: qual.phone_source,
-      phone_type: qual.phone_type,
-      phone_match_quality: qual.phone_match_quality,
-      phone_confidence: qual.phone_confidence,
-      phone_quality_reason: qual.reason,
-      is_whatsapp_ready: qual.is_whatsapp_ready && !!phone,
-      phone_validation_status: qual.phone_validation_status,
-      phone_last_validation_at: nowIso,
-      phone_source_type: phoneSourceType,
-    };
+    const out = await finalizeField(sb, {
+      contact_id: contactId,
+      field: "phone",
+      outcome: phone ? "revealed" : companyRejected ? "rejected_company_phone" : "not_found",
+      job_id: job?.id ?? null,
+      value: phone,
+      metadata: {
+        phone_source: qual.phone_source,
+        phone_type: qual.phone_type,
+        phone_match_quality: qual.phone_match_quality,
+        phone_confidence: qual.phone_confidence,
+        phone_source_type: sourceType,
+        phone_quality_reason: qual.reason,
+        phone_validation_status: qual.phone_validation_status,
+        is_whatsapp_ready: !!(qual.is_whatsapp_ready && phone),
+        apollo_person_id: personId ?? existing.apollo_person_id,
+      },
+      credits_used: Number.isFinite(providerCredits) ? providerCredits : (phone ? 1 : 0),
+      credits_confirmed: Number.isFinite(providerCredits) ? providerCredits : (phone ? 1 : null),
+      provider_request_id: payload?.request_id ?? payload?.id ?? null,
+      reason: companyRejected ? "company_phone_rejected" : (phone ? null : "no_person_phone_returned"),
+    });
 
-    if (phone) {
-      update.phone = phone;
-      update.revealed_at = nowIso;
-      update.reveal_status = existing.email ? "revealed" : "partial";
-      update.reveal_credits_used = ((existing as any).reveal_credits_used ?? 0) + creditsConsumed;
-      update.phone_revealed = true;
-      update.phone_reveal_status = "revealed";
-      update.phone_revealed_at = nowIso;
-      update.phone_verified_at = nowIso;
-      update.phone_credits_used = ((existing as any).phone_credits_used ?? 0) + creditsConsumed;
-      update.preferred_channel = qual.is_whatsapp_ready ? "whatsapp" : "call";
-    } else {
-      update.reveal_status = existing.email ? "partial" : "no_data";
-      update.phone_revealed = false;
-      update.is_whatsapp_ready = false;
-      update.phone_reveal_status = companyPhoneRejected ? "rejected_company_phone" : "not_found";
-      if (!existing.phone_revealed) {
-        update.preferred_channel = existing.email_revealed
-          ? "email"
-          : (existing as any).linkedin_url
-            ? "linkedin"
-            : "unknown";
-      }
-    }
-
-    const { error: updateError } = await sb.from("enriched_contact_profiles").update(update).eq("id", contactId);
-    if (updateError) {
-      console.error("apollo-phone-webhook update error", updateError);
-      return new Response(JSON.stringify({ error: "failed to update contact" }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Atualizar audit pendente mais recente
+    // Auditoria: atualiza o registro pendente mais recente do contato
     try {
       const { data: pendingAudit } = await sb
         .from("apollo_reveal_audit")
@@ -163,72 +175,36 @@ Deno.serve(async (req: Request) => {
         .maybeSingle();
       if (pendingAudit?.id) {
         await sb.from("apollo_reveal_audit").update({
-          status: phone ? "revealed" : (companyPhoneRejected ? "rejected_company_phone" : "not_found"),
-          credits_used: creditsConsumed,
-          phone_after: phone ?? (pendingAudit as any).phone_before,
-          phone_source_type: phoneSourceType,
+          status: out.status,
+          phone_after: out.value ?? pendingAudit.phone_before,
+          phone_source_type: sourceType,
           phone_source: qual.phone_source,
           phone_type: qual.phone_type,
           phone_match_quality: qual.phone_match_quality,
           phone_confidence: qual.phone_confidence,
-          is_whatsapp_ready: qual.is_whatsapp_ready && !!phone,
+          is_whatsapp_ready: !!(qual.is_whatsapp_ready && out.value),
           phone_quality_reason: qual.reason,
-          reason: companyPhoneRejected ? "company_phone_rejected" : (phone ? null : "no_person_phone_returned"),
-          raw_response: {
-            webhook: true,
-            person_id: person?.id ?? person?.person_id ?? null,
-            phone_source_type: phoneSourceType,
-            phone_match_quality: qual.phone_match_quality,
-            phone_confidence: qual.phone_confidence,
-            company_phone_rejected: companyPhoneRejected,
-            rejected_company_phone: qual.rejected_company_phone ?? null,
-          },
+          reason: companyRejected ? "company_phone_rejected" : (out.value ? null : "no_person_phone_returned"),
+          raw_response: { webhook: true, person_id: personId, phone_source_type: sourceType },
         }).eq("id", pendingAudit.id);
       }
     } catch (e) {
       console.warn("apollo-phone-webhook audit update failed:", e);
     }
 
-    if (phone && (existing as any).prospect_id) {
-      try { await sb.rpc("resolve_primary_contact", { p_prospect_id: (existing as any).prospect_id }); } catch { /*noop*/ }
+    if (out.status === "revealed" && existing.prospect_id) {
+      try { await sb.rpc("resolve_primary_contact", { p_prospect_id: existing.prospect_id }); } catch { /* noop */ }
     }
 
-    await sb.from("enrichment_jobs").insert({
-      workspace_id: (existing as any).workspace_id,
-      prospect_id: (existing as any).prospect_id,
-      provider: "apollo_phone_webhook",
-      status: phone ? "done" : "no_data",
-      trigger_source: "system",
-      credits_used: creditsConsumed,
-      response_summary: {
-        contact_id: contactId,
-        revealed_phone: !!phone,
-        phone_source_type: phoneSourceType,
-        company_phone_rejected: companyPhoneRejected,
-      },
-      response: {
-        payload_sample: {
-          status: payload?.status ?? null,
-          person_id: person?.id ?? person?.person_id ?? null,
-          has_phone: !!phone,
-          company_phone_rejected: companyPhoneRejected,
-        },
-      },
-      completed_at: nowIso,
-    });
-
-    return new Response(JSON.stringify({
+    return json(200, {
       ok: true,
-      phone_received: !!phone,
-      phone_source_type: phoneSourceType,
-      company_phone_rejected: companyPhoneRejected,
-    }), {
-      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: out.status,
+      phone_received: out.status === "revealed",
+      phone_source_type: sourceType,
+      company_phone_rejected: companyRejected,
     });
   } catch (e) {
     console.error("apollo-phone-webhook error:", e);
-    return new Response(JSON.stringify({ error: String(e) }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return json(500, { error: "webhook_processing_failed" });
   }
 });
