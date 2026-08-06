@@ -52,7 +52,7 @@ describe("apollo phone candidates (KAI.18.14)", () => {
   it("só marca phone_only_web com evidência explícita", () => {
     const sel = selectBestPhone(
       { person: { has_direct_phone: "Yes" } },
-      { phoneOnlyWebEvidence: { evidence_id: "ev_1", source: "apollo_web", observed_at: new Date().toISOString() } },
+      { phoneOnlyWebEvidence: { evidence_id: "ev_1", source: "browser_parity", captured_at: new Date().toISOString() } },
     );
     expect(sel.outcome).toBe("phone_only_web");
   });
