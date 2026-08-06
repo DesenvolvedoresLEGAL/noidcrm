@@ -11345,19 +11345,30 @@ export type Database = {
       }
       enrichment_jobs: {
         Row: {
+          attempt_count: number
           completed_at: string | null
           contact_id: string | null
+          contact_id_field_key: string | null
           contacts_found: number | null
           created_at: string | null
+          credits_confirmed: number | null
           credits_estimated: number | null
           credits_used: number | null
           decision_makers_found: number | null
           error: string | null
           estimated_credits: number | null
+          expires_at: string | null
+          field: string | null
           id: string
+          locked_at: string | null
+          locked_by: string | null
+          next_retry_at: string | null
           prospect_id: string | null
           provider: string
+          provider_request_id: string | null
+          reconciliation_required: boolean
           request: Json | null
+          request_group_id: string | null
           requested_channel: string | null
           requested_data_type: string | null
           response: Json | null
@@ -11368,19 +11379,30 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          attempt_count?: number
           completed_at?: string | null
           contact_id?: string | null
+          contact_id_field_key?: string | null
           contacts_found?: number | null
           created_at?: string | null
+          credits_confirmed?: number | null
           credits_estimated?: number | null
           credits_used?: number | null
           decision_makers_found?: number | null
           error?: string | null
           estimated_credits?: number | null
+          expires_at?: string | null
+          field?: string | null
           id?: string
+          locked_at?: string | null
+          locked_by?: string | null
+          next_retry_at?: string | null
           prospect_id?: string | null
           provider: string
+          provider_request_id?: string | null
+          reconciliation_required?: boolean
           request?: Json | null
+          request_group_id?: string | null
           requested_channel?: string | null
           requested_data_type?: string | null
           response?: Json | null
@@ -11391,19 +11413,30 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          attempt_count?: number
           completed_at?: string | null
           contact_id?: string | null
+          contact_id_field_key?: string | null
           contacts_found?: number | null
           created_at?: string | null
+          credits_confirmed?: number | null
           credits_estimated?: number | null
           credits_used?: number | null
           decision_makers_found?: number | null
           error?: string | null
           estimated_credits?: number | null
+          expires_at?: string | null
+          field?: string | null
           id?: string
+          locked_at?: string | null
+          locked_by?: string | null
+          next_retry_at?: string | null
           prospect_id?: string | null
           provider?: string
+          provider_request_id?: string | null
+          reconciliation_required?: boolean
           request?: Json | null
+          request_group_id?: string | null
           requested_channel?: string | null
           requested_data_type?: string | null
           response?: Json | null
@@ -37848,6 +37881,7 @@ export type Database = {
         Returns: Json
       }
       admin_delete_organization: { Args: { org_id: string }; Returns: boolean }
+      apollo_reveal_ctx_token: { Args: never; Returns: string }
       apply_dynamic_price_to_proposal: {
         Args: { p_proposal_id: string; p_reference_at?: string }
         Returns: Json
@@ -38433,8 +38467,71 @@ export type Database = {
           reason: string
         }[]
       }
+      fn_claim_apollo_reveal_jobs: {
+        Args: { p_limit?: number; p_worker?: string }
+        Returns: {
+          attempt_count: number
+          completed_at: string | null
+          contact_id: string | null
+          contact_id_field_key: string | null
+          contacts_found: number | null
+          created_at: string | null
+          credits_confirmed: number | null
+          credits_estimated: number | null
+          credits_used: number | null
+          decision_makers_found: number | null
+          error: string | null
+          estimated_credits: number | null
+          expires_at: string | null
+          field: string | null
+          id: string
+          locked_at: string | null
+          locked_by: string | null
+          next_retry_at: string | null
+          prospect_id: string | null
+          provider: string
+          provider_request_id: string | null
+          reconciliation_required: boolean
+          request: Json | null
+          request_group_id: string | null
+          requested_channel: string | null
+          requested_data_type: string | null
+          response: Json | null
+          response_summary: Json | null
+          skip_reason: string | null
+          status: string
+          trigger_source: string | null
+          workspace_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "enrichment_jobs"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       fn_cnae_to_segmento: { Args: { p_cnae: string }; Returns: string }
+      fn_finalize_apollo_reveal: {
+        Args: {
+          p_audit_id?: string
+          p_contact_id: string
+          p_credits_confirmed?: number
+          p_credits_used?: number
+          p_field: string
+          p_job_id?: string
+          p_metadata?: Json
+          p_outcome: string
+          p_provider_request_id?: string
+          p_reason?: string
+          p_value?: string
+        }
+        Returns: Json
+      }
       fn_infer_segmento_from_name: { Args: { p_nome: string }; Returns: string }
+      fn_invalidate_apollo_reveal: {
+        Args: { p_contact_id: string; p_field: string; p_reason: string }
+        Returns: Json
+      }
       fn_kairos_compute_gtm_performance: {
         Args: { p_organization_id: string }
         Returns: Json

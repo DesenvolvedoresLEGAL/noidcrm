@@ -515,6 +515,7 @@ export function ProspectContactsTab({
                 requested: { label: "Buscando telefone...", cls: "bg-blue-500/10 text-blue-600 border-blue-500/30" },
                 awaiting: { label: "Buscando telefone...", cls: "bg-blue-500/10 text-blue-600 border-blue-500/30" },
                 pending: { label: "Buscando telefone...", cls: "bg-blue-500/10 text-blue-600 border-blue-500/30" },
+                pending_provider: { label: "Buscando telefone...", cls: "bg-blue-500/10 text-blue-600 border-blue-500/30" },
                 revealed: { label: phoneRevealedLabel, cls: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30" },
                 not_found: { label: phoneNotFoundLabel, cls: "bg-red-500/10 text-red-600 border-red-500/30" },
                 rejected_company_phone: { label: "Telefone da empresa rejeitado", cls: "bg-red-500/10 text-red-600 border-red-500/30" },
@@ -524,6 +525,7 @@ export function ProspectContactsTab({
               const emailBadge: Record<string, { label: string; cls: string }> = {
                 not_requested: { label: "E-mail: não solicitado", cls: "bg-muted text-muted-foreground" },
                 requested: { label: "E-mail: aguardando", cls: "bg-blue-500/10 text-blue-600 border-blue-500/30" },
+                pending_provider: { label: "E-mail: aguardando", cls: "bg-blue-500/10 text-blue-600 border-blue-500/30" },
                 revealed: { label: c.email_status === "verified" ? "E-mail verificado" : "E-mail revelado", cls: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30" },
                 not_found: { label: "E-mail não encontrado", cls: "bg-red-500/10 text-red-600 border-red-500/30" },
                 failed: { label: "E-mail falhou", cls: "bg-red-500/10 text-red-600 border-red-500/30" },
@@ -545,6 +547,12 @@ export function ProspectContactsTab({
               const emailKey = `${c.id}:email`;
               const bothKey = `${c.id}:both`;
 
+              // KAI.18.13 — bloqueio é por campo pendente, nunca global.
+              const phonePending = ['requested', 'pending_provider', 'awaiting', 'pending'].includes(phoneStatus)
+                || revealingKey === phoneKey || revealingKey === bothKey;
+              const emailPending = ['requested', 'pending_provider', 'awaiting', 'pending'].includes(emailStatus)
+                || revealingKey === emailKey || revealingKey === bothKey;
+
               return (
                 <div className="pl-6 pt-1 space-y-2">
                   <div className="flex flex-wrap gap-1">
@@ -557,7 +565,7 @@ export function ProspectContactsTab({
                         size="sm" variant="outline"
                         className="h-7 text-[11px] gap-1"
                         onClick={() => openConfirm("phone")}
-                        disabled={phoneRevealed || phoneBlocked || reveal.isPending}
+                        disabled={phoneRevealed || phoneBlocked || phonePending}
                       >
                         {revealingKey === phoneKey ? <Loader2 className="h-3 w-3 animate-spin" /> : <Phone className="h-3 w-3" />}
                         Telefone
@@ -566,7 +574,7 @@ export function ProspectContactsTab({
                         size="sm" variant="outline"
                         className="h-7 text-[11px] gap-1"
                         onClick={() => openConfirm("email")}
-                        disabled={emailRevealed || emailBlocked || reveal.isPending}
+                        disabled={emailRevealed || emailBlocked || emailPending}
                       >
                         {revealingKey === emailKey ? <Loader2 className="h-3 w-3 animate-spin" /> : <Mail className="h-3 w-3" />}
                         E-mail
@@ -575,7 +583,7 @@ export function ProspectContactsTab({
                         size="sm" variant="default"
                         className="h-7 text-[11px] gap-1"
                         onClick={() => openConfirm("both")}
-                        disabled={(phoneRevealed && emailRevealed) || reveal.isPending}
+                        disabled={(phoneRevealed && emailRevealed) || (phonePending && emailPending)}
                       >
                         {revealingKey === bothKey ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
                         Ambos
