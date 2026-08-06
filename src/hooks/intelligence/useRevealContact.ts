@@ -12,7 +12,7 @@ interface Vars {
   source?: 'manual' | 'autopilot' | 'sdr_agent' | 'apollo_invisible';
 }
 
-const TERMINAL = ['revealed', 'not_found', 'rejected_company_phone', 'failed', 'skipped', 'invalidated'];
+const TERMINAL = ['revealed', 'not_found', 'rejected_company_phone', 'phone_only_web', 'failed', 'skipped', 'invalidated'];
 
 /**
  * KAI.18.13 — acompanha o estado REAL do campo no banco.
