@@ -98,6 +98,8 @@ export function useRevealContact() {
           void trackFieldUntilTerminal(vars.contactId, vars.prospectId, qc, who, field);
         } else if (r.status === 'rejected_company_phone') {
           toast.info(`Apollo só encontrou o telefone da empresa para ${who}. Nenhum crédito confirmado.`);
+        } else if (r.status === 'phone_only_web') {
+          toast.warning(`Apollo exibe telefone de ${who} no site, mas não entregou pela API. Nenhum crédito confirmado.`);
         } else if (r.status === 'not_found') {
           toast.info(field === 'phone'
             ? `Apollo não tem telefone individual de ${who}.`
