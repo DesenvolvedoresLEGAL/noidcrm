@@ -11,7 +11,9 @@ import {
   finalizeField,
   isAwaitingWebhook,
   isValidApolloAsyncRequestId,
+  WEBHOOK_WAIT_TTL_MS,
 } from "../_shared/apollo-reveal-core.ts";
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -267,6 +269,18 @@ Deno.serve(async (req) => {
           : status === 404
           ? "provider_request_id_unknown"
           : "provider_auth_error";
+
+        // KAI.18.17 — o polling é FALLBACK. Se o webhook ainda está dentro da
+        // janela oficial, jamais matar o job por erro de polling.
+        const createdMs = job.created_at ? new Date(job.created_at).getTime() : 0;
+        const webhookAlive = field === "phone" &&
+          !!(job.request as any)?.webhook_nonce_hash &&
+          createdMs > 0 && Date.now() - createdMs < WEBHOOK_WAIT_TTL_MS;
+        if (webhookAlive) {
+          results.push(await keepPending(sb, job.id, 120, `poll_unavailable_waiting_webhook:${reason}`, attempt));
+          continue;
+        }
+
         await finalizeField(sb, {
           contact_id: contactId, field, outcome: "failed", job_id: job.id,
           credits_used: null, credits_confirmed: null,
@@ -275,6 +289,7 @@ Deno.serve(async (req) => {
         results.push({ job_id: job.id, outcome: reason });
         continue;
       }
+
       if (status !== 200) {
         results.push(await keepPending(sb, job.id, 180, `unexpected_status_${status}`, attempt));
         continue;

@@ -3,11 +3,15 @@
 // Nunca cria enrichment_jobs. Anti-replay: job terminal é ignorado.
 import { createClient } from "npm:@supabase/supabase-js@2.45.0";
 import {
+  canWebhookRecoverJob,
   computePhoneQuality,
+  constantTimeEqual,
   extractProviderCredits,
   finalizeField,
+  hashWebhookNonce,
   isValidApolloAsyncRequestId,
 } from "../_shared/apollo-reveal-core.ts";
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -45,20 +49,50 @@ Deno.serve(async (req: Request) => {
     const url = new URL(req.url);
     const contactId = url.searchParams.get("contact_id");
     const jobIdParam = url.searchParams.get("job_id");
+    const nonce = url.searchParams.get("nonce");
     const token = url.searchParams.get("token");
     const expectedToken = Deno.env.get("APOLLO_WEBHOOK_TOKEN");
 
-    if (!expectedToken || !token || token !== expectedToken) {
-      console.warn("apollo-phone-webhook invalid token", { secret_configured: !!expectedToken });
-      return json(403, { error: "forbidden" });
-    }
     if (!contactId) return json(400, { error: "contact_id required" });
+    if (!jobIdParam) return json(400, { error: "job_id required" });
+    if (!nonce && !(expectedToken && token && token === expectedToken)) {
+      return json(400, { error: "nonce required" });
+    }
 
     const sb = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
       { auth: { persistSession: false } },
     );
+
+    // KAI.18.17 — job é a raiz da autenticação: nonce hash por job, sem secret global.
+    const { data: job } = await sb
+      .from("enrichment_jobs")
+      .select(
+        "id, status, contact_id, field, provider, provider_request_id, request, response, created_at, expires_at, error, skip_reason",
+      )
+      .eq("id", jobIdParam)
+      .maybeSingle();
+
+    if (!job) return json(404, { error: "job_not_found" });
+    if (job.contact_id !== contactId) {
+      console.warn("apollo-phone-webhook job/contact mismatch");
+      return json(409, { error: "job_contact_mismatch" });
+    }
+    if (job.field !== "phone" || job.provider !== "apollo_reveal") {
+      return json(409, { error: "job_field_mismatch" });
+    }
+
+    const expectedHash = (job.request as any)?.webhook_nonce_hash ?? null;
+    const legacyToken = !!(expectedToken && token && token === expectedToken);
+    if (!legacyToken) {
+      if (!expectedHash) return json(403, { error: "forbidden" });
+      const receivedHash = await hashWebhookNonce(String(nonce));
+      if (!constantTimeEqual(receivedHash, String(expectedHash))) {
+        console.warn("apollo-phone-webhook invalid nonce", { job_id: job.id });
+        return json(403, { error: "forbidden" });
+      }
+    }
 
     const { data: existing } = await sb
       .from("enriched_contact_profiles")
@@ -67,41 +101,15 @@ Deno.serve(async (req: Request) => {
       .maybeSingle();
     if (!existing) return json(404, { error: "contact not found" });
 
-    // Localiza o job ORIGINAL de telefone (nunca cria)
-    let job: any = null;
-    if (jobIdParam) {
-      const { data } = await sb
-        .from("enrichment_jobs")
-        .select("id, status, contact_id, field, provider_request_id")
-        .eq("id", jobIdParam)
-        .maybeSingle();
-      job = data ?? null;
-    }
-    if (!job) {
-      const { data } = await sb
-        .from("enrichment_jobs")
-        .select("id, status, contact_id, field, provider_request_id")
-        .eq("contact_id", contactId)
-        .eq("provider", "apollo_reveal")
-        .eq("field", "phone")
-        .in("status", ["queued", "running", "pending_provider"])
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      job = data ?? null;
-    }
-
-    // Anti-replay: identidade e estado terminal
-    if (job && job.contact_id !== contactId) {
-      console.warn("apollo-phone-webhook job/contact mismatch");
-      return json(409, { error: "job_contact_mismatch" });
-    }
-    if (job && !["queued", "running", "pending_provider"].includes(job.status)) {
-      return json(200, { ok: true, ignored: "job_already_terminal" });
-    }
+    // Idempotência real: só ignora se o telefone já foi realmente revelado.
     if (existing.phone_revealed && existing.phone) {
       return json(200, { ok: true, ignored: "phone_already_revealed" });
     }
+    // Job terminal só bloqueia se NÃO for falha exclusiva do fallback de polling.
+    if (!canWebhookRecoverJob(job)) {
+      return json(200, { ok: true, ignored: "job_already_terminal" });
+    }
+
 
     const payload = await req.json().catch(() => ({} as any));
     const person = extractPerson(payload, contactId, existing.apollo_person_id);
