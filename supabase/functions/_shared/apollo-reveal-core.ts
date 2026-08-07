@@ -599,7 +599,7 @@ export async function runApolloReveal(admin: any, req: RevealRequest, env: {
     email_before: contact.email, phone_before: contact.phone,
   });
 
-  const callPhone = fieldsToCall.includes("phone");
+  let callPhone = fieldsToCall.includes("phone");
   const callEmail = fieldsToCall.includes("email");
 
   const { payload: matchPayload, strategy } = buildMatchPayload(contact, prospect);
@@ -608,15 +608,62 @@ export async function runApolloReveal(admin: any, req: RevealRequest, env: {
     reveal_personal_emails: callEmail,
     reveal_phone_number: callPhone,
   };
+
+  // KAI.18.17 — webhook é o caminho PRIMÁRIO do telefone e se autentica por nonce
+  // único do job (SHA-256 persistido). Não depende de APOLLO_WEBHOOK_TOKEN.
   let webhookConfigured = false;
   if (callPhone) {
-    const token = env.APOLLO_WEBHOOK_TOKEN ?? "";
-    payload.webhook_url =
-      `${env.SUPABASE_URL}/functions/v1/apollo-phone-webhook?contact_id=${encodeURIComponent(contact.id)}` +
-      `&job_id=${encodeURIComponent(jobs.phone!.id)}` +
-      (token ? `&token=${encodeURIComponent(token)}` : "");
-    webhookConfigured = !!token;
+    const nonce = generateWebhookNonce();
+    let nonceStored = false;
+    try {
+      const nonceHash = await hashWebhookNonce(nonce);
+      const { error: nonceErr } = await admin.from("enrichment_jobs").update({
+        request: {
+          contact_id: contact.id,
+          field: "phone",
+          webhook_nonce_hash: nonceHash,
+          webhook_configured: true,
+          webhook_created_at: new Date().toISOString(),
+        },
+      }).eq("id", jobs.phone!.id);
+      nonceStored = !nonceErr;
+      if (nonceErr) console.error("webhook nonce persist failed", nonceErr.message);
+    } catch (e) {
+      console.error("webhook nonce setup failed", String(e));
+    }
+
+    if (!nonceStored) {
+      // NUNCA chamar Apollo (custo) sem canal de retorno autenticado.
+      await finalizeField(admin, {
+        contact_id: contact.id,
+        field: "phone",
+        outcome: "failed",
+        job_id: jobs.phone!.id,
+        credits_used: 0,
+        credits_confirmed: 0,
+        audit_id: auditId,
+        reason: "webhook_setup_failed",
+      });
+      phoneResult = {
+        ...emptyField("failed", "webhook_setup_failed"),
+        credits_estimated: 0, credits_used: 0, credits_confirmed: 0, job_id: jobs.phone!.id,
+      };
+      callPhone = false;
+      payload.reveal_phone_number = false;
+      const idx = fieldsToCall.indexOf("phone");
+      if (idx >= 0) fieldsToCall.splice(idx, 1);
+      if (fieldsToCall.length === 0) {
+        return base({ overall_status: "failed", success: false, audit_id: auditId, reason: "webhook_setup_failed" });
+      }
+    } else {
+      payload.webhook_url =
+        `${env.SUPABASE_URL}/functions/v1/apollo-phone-webhook?contact_id=${encodeURIComponent(contact.id)}` +
+        `&job_id=${encodeURIComponent(jobs.phone!.id)}` +
+        `&nonce=${encodeURIComponent(nonce)}`;
+      webhookConfigured = true;
+    }
   }
+
 
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), APOLLO_TIMEOUT_MS);
