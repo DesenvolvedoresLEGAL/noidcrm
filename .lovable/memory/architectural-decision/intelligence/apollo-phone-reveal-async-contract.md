@@ -41,3 +41,20 @@ KAI.18.15 — contrato definitivo do reveal de telefone Apollo.
   payload com `sanitized_number`/`raw_number` ou job assíncrono vivo (30 min).
 - `recompute_primary_contact` grava `revenue_events` com `channel='system'` e
   falha de evento nunca aborta a finalização do reveal.
+
+## KAI.18.17 — webhook autossuficiente por nonce de job
+- O webhook é o caminho PRIMÁRIO do telefone; polling é fallback não-destrutivo.
+- Autenticação por JOB: nonce 256-bit gerado no core, SHA-256 salvo em
+  `enrichment_jobs.request.webhook_nonce_hash`, nonce cru só na `webhook_url`
+  (`?contact_id&job_id&nonce`). Não depende de `APOLLO_WEBHOOK_TOKEN` global
+  (aceito apenas como legado).
+- Se o nonce não puder ser persistido → job `failed/webhook_setup_failed` e
+  NENHUMA chamada paga ao Apollo é feita.
+- `WEBHOOK_WAIT_TTL_MS` = 15 min (janela oficial do callback).
+- `POLL_ONLY_FAILURE_REASONS` + `canWebhookRecoverJob`: callback válido recupera
+  job marcado `failed` por erro exclusivo de polling em até 30 min.
+- Sync: erro 400/401/403/404/410 do `webhook_result` NÃO mata o job enquanto a
+  janela do webhook estiver viva (`poll_unavailable_waiting_webhook:<reason>`).
+- Webhook exige `job_id` + `nonce`; valida contato/field/provider e usa
+  `constantTimeEqual` no hash.
+- Canary KAI.18.17: Rodrigo (BRQ) revelado `person_mobile` +5511996113504.
