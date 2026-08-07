@@ -3,11 +3,15 @@
 // Nunca cria enrichment_jobs. Anti-replay: job terminal é ignorado.
 import { createClient } from "npm:@supabase/supabase-js@2.45.0";
 import {
+  canWebhookRecoverJob,
   computePhoneQuality,
+  constantTimeEqual,
   extractProviderCredits,
   finalizeField,
+  hashWebhookNonce,
   isValidApolloAsyncRequestId,
 } from "../_shared/apollo-reveal-core.ts";
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
