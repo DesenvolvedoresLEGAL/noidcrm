@@ -6,6 +6,11 @@ import {
   isAwaitingWebhook,
   isTrackableJob,
   isValidApolloAsyncRequestId,
+  canWebhookRecoverJob,
+  constantTimeEqual,
+  generateWebhookNonce,
+  hashWebhookNonce,
+  WEBHOOK_WAIT_TTL_MS,
 } from "../../../supabase/functions/_shared/apollo-reveal-core.ts";
 
 describe("apollo reveal core — KAI.18.15 (sem chamadas pagas)", () => {
@@ -90,5 +95,40 @@ describe("apollo reveal core — KAI.18.16 (request_id determinístico)", () => 
     const now = Date.now();
     const job = { status: "pending_provider", created_at: new Date(now - 10 * 60_000).toISOString(), provider_request_id: "5f4d1a2b3c4d5e6f70819202", expires_at: new Date(now + 600_000).toISOString() };
     expect(isTrackableJob(job, now).reason).toBe("stale_job_without_provider_request_id");
+  });
+});
+
+describe("apollo reveal core — KAI.18.17 (webhook nonce por job)", () => {
+  it("gera nonce forte e hash SHA-256 estável", async () => {
+    const a = generateWebhookNonce();
+    const b = generateWebhookNonce();
+    expect(a).toMatch(/^[0-9a-f]{64}$/);
+    expect(a).not.toBe(b);
+    expect(await hashWebhookNonce(a)).toBe(await hashWebhookNonce(a));
+    expect(await hashWebhookNonce(a)).not.toBe(await hashWebhookNonce(b));
+  });
+
+  it("comparação constante rejeita vazio, tamanho diferente e valor errado", () => {
+    expect(constantTimeEqual("abc", "abc")).toBe(true);
+    expect(constantTimeEqual("abc", "abd")).toBe(false);
+    expect(constantTimeEqual("", "")).toBe(false);
+    expect(constantTimeEqual(null, "abc")).toBe(false);
+    expect(constantTimeEqual("abc", "abcd")).toBe(false);
+  });
+
+  it("callback recupera job falhado só por erro de polling dentro de 30 min", () => {
+    const now = Date.now();
+    const fresh = new Date(now - 60_000).toISOString();
+    const old = new Date(now - 45 * 60_000).toISOString();
+    expect(canWebhookRecoverJob({ status: "pending_provider", created_at: fresh }, now)).toBe(true);
+    expect(canWebhookRecoverJob({ status: "failed", error: "provider_request_id_unknown", created_at: fresh }, now)).toBe(true);
+    expect(canWebhookRecoverJob({ status: "failed", skip_reason: "poll_unavailable_waiting_webhook:provider_auth_error", created_at: fresh }, now)).toBe(true);
+    expect(canWebhookRecoverJob({ status: "failed", error: "provider_request_id_unknown", created_at: old }, now)).toBe(false);
+    expect(canWebhookRecoverJob({ status: "failed", error: "identity_mismatch", created_at: fresh }, now)).toBe(false);
+    expect(canWebhookRecoverJob({ status: "done", created_at: fresh }, now)).toBe(false);
+  });
+
+  it("janela oficial do webhook é de 15 minutos", () => {
+    expect(WEBHOOK_WAIT_TTL_MS).toBe(15 * 60_000);
   });
 });
