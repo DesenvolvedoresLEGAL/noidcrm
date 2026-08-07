@@ -201,8 +201,63 @@ const JOB_SELECT =
   "id, status, field, request_group_id, provider_request_id, created_at, expires_at, workspace_id, contact_id, provider, response, request";
 const STALE_WITHOUT_REQUEST_ID_MS = 2 * 60_000;
 const JOB_TTL_MS = 30 * 60_000;
-/** KAI.18.16 — janela de espera de webhook quando não há request_id válido. */
-export const WEBHOOK_WAIT_TTL_MS = 10 * 60_000;
+/**
+ * KAI.18.17 — janela oficial do callback assíncrono do Apollo (15 min).
+ * O webhook é o caminho primário; o polling é apenas fallback não-destrutivo.
+ */
+export const WEBHOOK_WAIT_TTL_MS = 15 * 60_000;
+
+/** KAI.18.17 — nonce forte por job (256 bits). Só o hash é persistido. */
+export function generateWebhookNonce(): string {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+export async function hashWebhookNonce(nonce: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(String(nonce)));
+  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/** Comparação em tempo constante de hashes hex. */
+export function constantTimeEqual(a: string | null | undefined, b: string | null | undefined): boolean {
+  const x = String(a ?? "");
+  const y = String(b ?? "");
+  if (x.length === 0 || y.length === 0 || x.length !== y.length) return false;
+  let diff = 0;
+  for (let i = 0; i < x.length; i++) diff |= x.charCodeAt(i) ^ y.charCodeAt(i);
+  return diff === 0;
+}
+
+/**
+ * KAI.18.17 — falhas que vêm APENAS do fallback de polling. Um callback válido
+ * do Apollo pode recuperar o job dentro da janela do webhook.
+ */
+export const POLL_ONLY_FAILURE_REASONS = [
+  "provider_request_id_unknown",
+  "invalid_provider_request_id",
+  "provider_request_id_expired",
+  "provider_auth_error",
+  "poll_network_error",
+  "poll_request_unknown_waiting_webhook",
+  "poll_unavailable_waiting_webhook",
+];
+
+export function isPollOnlyFailure(job: any): boolean {
+  const marks = [job?.error, job?.skip_reason].map((v) => String(v ?? "").toLowerCase());
+  return POLL_ONLY_FAILURE_REASONS.some((r) => marks.some((m) => m.includes(r)));
+}
+
+/** Callback ainda pode ser aceito para um job já finalizado por erro de polling? */
+export function canWebhookRecoverJob(job: any, nowMs: number = Date.now()): boolean {
+  if (!job) return false;
+  if (["queued", "running", "pending_provider"].includes(String(job.status))) return true;
+  if (String(job.status) !== "failed") return false;
+  if (!isPollOnlyFailure(job)) return false;
+  const created = job.created_at ? new Date(job.created_at).getTime() : 0;
+  return created > 0 && nowMs - created <= 30 * 60_000;
+}
+
 
 async function failJob(admin: any, jobId: string, reason: string) {
   try {
