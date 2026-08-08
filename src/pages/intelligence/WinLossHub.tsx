@@ -130,13 +130,11 @@ function WinLossHubContent() {
         />
 
 
-        {/* Context Selector (filtros comerciais + período expandido) */}
+        {/* Context Selector (filtros comerciais + período/navegação/comparação) */}
         <WinLossContextSelector
           pipelines={pipelines}
           selectedPipelineId={selectedPipelineId}
           onPipelineChange={setSelectedPipelineId}
-          timeframe={timeframe}
-          onTimeframeChange={setTimeframe}
         />
 
         {/* Error Banner */}
@@ -168,7 +166,24 @@ function WinLossHubContent() {
                 }
               : undefined
           }
+          comparison={
+            isComparing
+              ? {
+                  label: comparisonRange?.label ?? '',
+                  isLoading: isComparisonLoading,
+                  data: comparisonData,
+                  ssotOverride: ssotWonComparison
+                    ? {
+                        wonCount: ssotWonComparison.count,
+                        wonValue: ssotWonComparison.total,
+                        avgTicketWon: ssotWonComparison.avgTicket,
+                      }
+                    : undefined,
+                }
+              : undefined
+          }
         />
+
 
         {/* Sprint WL-UX-04: banners "AI Insights" e "Insights da IA" removidos. */}
 
