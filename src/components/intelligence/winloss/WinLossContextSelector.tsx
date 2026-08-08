@@ -1,17 +1,14 @@
 import { useMemo } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Filter, GitBranch } from 'lucide-react';
-import { type TimeframePreset } from '@/hooks/useWinLossData';
+import { Filter, GitBranch } from 'lucide-react';
 import { type Pipeline } from '@/services/supabase/pipelines';
+import { WinLossPeriodSelector } from './WinLossPeriodSelector';
 
 interface WinLossContextSelectorProps {
   pipelines: Pipeline[];
   selectedPipelineId: string | null;
   onPipelineChange: (id: string | null) => void;
-  timeframe: TimeframePreset;
-  onTimeframeChange: (t: TimeframePreset) => void;
 }
 
 const PIPELINE_TYPE_LABELS: Record<string, string> = {
