@@ -298,3 +298,12 @@ function WinLossHubContent() {
     </Layout>
   );
 }
+
+export default function WinLossHub() {
+  return (
+    <WinLossPeriodProvider defaultPeriod="year">
+      <WinLossHubContent />
+    </WinLossPeriodProvider>
+  );
+}
+
