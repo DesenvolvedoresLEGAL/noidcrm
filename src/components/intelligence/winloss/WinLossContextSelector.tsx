@@ -72,24 +72,8 @@ export function WinLossContextSelector({
         </Select>
       </div>
 
-      {/* Timeframe Selector */}
-      <div className="flex items-center gap-2 overflow-x-auto">
-        <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
-        <ToggleGroup
-          type="single"
-          value={timeframe}
-          onValueChange={(val) => val && onTimeframeChange(val as TimeframePreset)}
-          className="justify-start"
-        >
-          <ToggleGroupItem value="today" className="text-xs px-2.5 h-8">Hoje</ToggleGroupItem>
-          <ToggleGroupItem value="7d" className="text-xs px-2.5 h-8">7d</ToggleGroupItem>
-          <ToggleGroupItem value="15d" className="text-xs px-2.5 h-8">15d</ToggleGroupItem>
-          <ToggleGroupItem value="month" className="text-xs px-2.5 h-8">Mês</ToggleGroupItem>
-          <ToggleGroupItem value="quarter" className="text-xs px-2.5 h-8">Trimestre</ToggleGroupItem>
-          <ToggleGroupItem value="semester" className="text-xs px-2.5 h-8">Semestre</ToggleGroupItem>
-          <ToggleGroupItem value="year" className="text-xs px-2.5 h-8">Ano</ToggleGroupItem>
-        </ToggleGroup>
-      </div>
+      {/* Período, navegação histórica e comparação (SSoT via URL) */}
+      <WinLossPeriodSelector />
     </div>
   );
 }
