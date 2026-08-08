@@ -1,17 +1,14 @@
 import { useMemo } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Filter, GitBranch } from 'lucide-react';
-import { type TimeframePreset } from '@/hooks/useWinLossData';
+import { Filter, GitBranch } from 'lucide-react';
 import { type Pipeline } from '@/services/supabase/pipelines';
+import { WinLossPeriodSelector } from './WinLossPeriodSelector';
 
 interface WinLossContextSelectorProps {
   pipelines: Pipeline[];
   selectedPipelineId: string | null;
   onPipelineChange: (id: string | null) => void;
-  timeframe: TimeframePreset;
-  onTimeframeChange: (t: TimeframePreset) => void;
 }
 
 const PIPELINE_TYPE_LABELS: Record<string, string> = {
@@ -31,8 +28,6 @@ export function WinLossContextSelector({
   pipelines,
   selectedPipelineId,
   onPipelineChange,
-  timeframe,
-  onTimeframeChange,
 }: WinLossContextSelectorProps) {
   const commercialPipelines = useMemo(
     () => pipelines.filter((p) => p.pipeline_type && ALLOWED_TYPES.has(p.pipeline_type)),
@@ -40,9 +35,9 @@ export function WinLossContextSelector({
   );
 
   return (
-    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 p-4 rounded-lg border bg-card">
+    <div className="flex flex-col gap-3 p-4 rounded-lg border bg-card">
       {/* Pipeline Selector */}
-      <div className="flex items-center gap-2 flex-1 min-w-0">
+      <div className="flex items-center gap-2 min-w-0">
         <GitBranch className="h-4 w-4 text-muted-foreground shrink-0" />
         <Select
           value={selectedPipelineId || 'all'}
@@ -77,24 +72,8 @@ export function WinLossContextSelector({
         </Select>
       </div>
 
-      {/* Timeframe Selector */}
-      <div className="flex items-center gap-2 overflow-x-auto">
-        <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
-        <ToggleGroup
-          type="single"
-          value={timeframe}
-          onValueChange={(val) => val && onTimeframeChange(val as TimeframePreset)}
-          className="justify-start"
-        >
-          <ToggleGroupItem value="today" className="text-xs px-2.5 h-8">Hoje</ToggleGroupItem>
-          <ToggleGroupItem value="7d" className="text-xs px-2.5 h-8">7d</ToggleGroupItem>
-          <ToggleGroupItem value="15d" className="text-xs px-2.5 h-8">15d</ToggleGroupItem>
-          <ToggleGroupItem value="month" className="text-xs px-2.5 h-8">Mês</ToggleGroupItem>
-          <ToggleGroupItem value="quarter" className="text-xs px-2.5 h-8">Trimestre</ToggleGroupItem>
-          <ToggleGroupItem value="semester" className="text-xs px-2.5 h-8">Semestre</ToggleGroupItem>
-          <ToggleGroupItem value="year" className="text-xs px-2.5 h-8">Ano</ToggleGroupItem>
-        </ToggleGroup>
-      </div>
+      {/* Período, navegação histórica e comparação (SSoT via URL) */}
+      <WinLossPeriodSelector />
     </div>
   );
 }

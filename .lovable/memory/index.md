@@ -51,3 +51,4 @@ Updated: now
 - [Account duplicate prevention](mem://business-rules/account-semantic-duplicate-prevention-mandatory) — Warn ≥70% similarity, block ≥90% via pg_trgm.
 - [Win/Loss Semantic Engine](mem://architectural-decision/winloss/semantic-engine-invisible-overview) — IA semântica como motor invisível da Visão Geral.
 - [Release notes automation](mem://features/release-notes/automated-generation) — Edge generate-release-notes-draft; cron sexta 21h UTC.
+- [Win/Loss Period Engine](mem://architectural-decision/winloss/period-and-comparison-engine) — WL-FILTERS-07: presets + navegação histórica + custom + comparação com deltas; SSoT na URL.

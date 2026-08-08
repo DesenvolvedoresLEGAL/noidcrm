@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { Layout } from '@/components/Layout';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useOrganizationPipelines } from '@/hooks/useOrganizationPipelines';
-import { useWinLossData, getDateRangeFromPreset, getPipelineTerminology, type TimeframePreset } from '@/hooks/useWinLossData';
+import { useWinLossData, getPipelineTerminology, type TimeframePreset } from '@/hooks/useWinLossData';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PageHeader } from '@/components/ui/page-header';
@@ -26,17 +26,25 @@ import { WinLossRecommendationsTab } from '@/components/intelligence/winloss/tab
 import { ProposalApprovalsTab } from '@/components/intelligence/winloss/tabs/ProposalApprovalsTab';
 import { useClosedRevenueSummary } from '@/hooks/revenue/useRevenueSsot';
 import { RevenueCommandLegacyBanner } from '@/components/revenue-command/migration/RevenueCommandLegacyBanner';
+import { WinLossPeriodProvider, useWinLossPeriod } from '@/contexts/WinLossPeriodContext';
 
-export default function WinLossHub() {
+function WinLossHubContent() {
   const { organization } = useCurrentUser();
   const { pipelines } = useOrganizationPipelines();
 
   // State
   const [selectedPipelineId, setSelectedPipelineId] = useState<string | null>(null);
-  const [timeframe, setTimeframe] = useState<TimeframePreset>('year');
 
-  // Derived — stabilize dateRange so it doesn't change on every render
-  const dateRange = useMemo(() => getDateRangeFromPreset(timeframe), [timeframe]);
+  // WL-FILTERS-07 — período/comparação vêm do SSoT temporal (URL).
+  const { periodType, range, comparisonRange, isComparing } = useWinLossPeriod();
+  const timeframe = periodType as TimeframePreset;
+
+  const dateRange = useMemo(() => ({ from: range.start, to: range.end }), [range.start, range.end]);
+  const comparisonDateRange = useMemo(
+    () => (comparisonRange ? { from: comparisonRange.start, to: comparisonRange.end } : null),
+    [comparisonRange],
+  );
+
   const selectedPipeline = pipelines.find(p => p.id === selectedPipelineId);
   const pipelineType = selectedPipeline?.pipeline_type || 'sales';
   const terminology = getPipelineTerminology(pipelineType);
@@ -52,6 +60,13 @@ export default function WinLossHub() {
     organization?.id,
     selectedPipelineId,
     dateRange
+  );
+
+  // Série comparativa — só é buscada quando a comparação está ativa.
+  const { data: comparisonData, isLoading: isComparisonLoading } = useWinLossData(
+    isComparing ? organization?.id : undefined,
+    selectedPipelineId,
+    comparisonDateRange ?? dateRange,
   );
 
   // P0 Revenue SSoT — monetários ganhos vêm de commercial_won_revenue_view.
@@ -73,8 +88,18 @@ export default function WinLossHub() {
     pipelineIds: ssotPipelineIds,
   });
 
+  const { data: ssotWonComparison } = useClosedRevenueSummary({
+    surface: 'winloss-hub-comparison',
+    organizationId: isSalesContext && isComparing ? organization?.id : undefined,
+    start: (comparisonDateRange ?? dateRange).from.toISOString(),
+    end: (comparisonDateRange ?? dateRange).to.toISOString(),
+    pipelineIds: ssotPipelineIds,
+  });
+
   // Semantic aggregates compartilhados entre Visão Geral e Losses.
   const { data: semantic } = useLossSemantic(organization?.id, selectedPipelineId, dateRange);
+
+
 
 
 
@@ -105,13 +130,11 @@ export default function WinLossHub() {
         />
 
 
-        {/* Context Selector (filtros comerciais + período expandido) */}
+        {/* Context Selector (filtros comerciais + período/navegação/comparação) */}
         <WinLossContextSelector
           pipelines={pipelines}
           selectedPipelineId={selectedPipelineId}
           onPipelineChange={setSelectedPipelineId}
-          timeframe={timeframe}
-          onTimeframeChange={setTimeframe}
         />
 
         {/* Error Banner */}
@@ -143,7 +166,24 @@ export default function WinLossHub() {
                 }
               : undefined
           }
+          comparison={
+            isComparing
+              ? {
+                  label: comparisonRange?.label ?? '',
+                  isLoading: isComparisonLoading,
+                  data: comparisonData,
+                  ssotOverride: ssotWonComparison
+                    ? {
+                        wonCount: ssotWonComparison.count,
+                        wonValue: ssotWonComparison.total,
+                        avgTicketWon: ssotWonComparison.avgTicket,
+                      }
+                    : undefined,
+                }
+              : undefined
+          }
         />
+
 
         {/* Sprint WL-UX-04: banners "AI Insights" e "Insights da IA" removidos. */}
 
@@ -258,3 +298,12 @@ export default function WinLossHub() {
     </Layout>
   );
 }
+
+export default function WinLossHub() {
+  return (
+    <WinLossPeriodProvider defaultPeriod="year">
+      <WinLossHubContent />
+    </WinLossPeriodProvider>
+  );
+}
+
