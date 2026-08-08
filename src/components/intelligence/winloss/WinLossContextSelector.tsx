@@ -28,8 +28,6 @@ export function WinLossContextSelector({
   pipelines,
   selectedPipelineId,
   onPipelineChange,
-  timeframe,
-  onTimeframeChange,
 }: WinLossContextSelectorProps) {
   const commercialPipelines = useMemo(
     () => pipelines.filter((p) => p.pipeline_type && ALLOWED_TYPES.has(p.pipeline_type)),
@@ -37,9 +35,9 @@ export function WinLossContextSelector({
   );
 
   return (
-    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 p-4 rounded-lg border bg-card">
+    <div className="flex flex-col gap-3 p-4 rounded-lg border bg-card">
       {/* Pipeline Selector */}
-      <div className="flex items-center gap-2 flex-1 min-w-0">
+      <div className="flex items-center gap-2 min-w-0">
         <GitBranch className="h-4 w-4 text-muted-foreground shrink-0" />
         <Select
           value={selectedPipelineId || 'all'}
