@@ -45,7 +45,10 @@ import {
   MapPin,
   ExternalLink,
   MessageCircle,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Sun,
+  Moon
+
 } from 'lucide-react';
 import { getProposalByToken, declineProposal, trackView } from '@/services/crm/proposals';
 import { getProposalPricingSummary } from '@/lib/proposals/pricingLedger';
