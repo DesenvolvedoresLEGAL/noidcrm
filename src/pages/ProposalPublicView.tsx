@@ -45,7 +45,10 @@ import {
   MapPin,
   ExternalLink,
   MessageCircle,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Sun,
+  Moon
+
 } from 'lucide-react';
 import { getProposalByToken, declineProposal, trackView } from '@/services/crm/proposals';
 import { getProposalPricingSummary } from '@/lib/proposals/pricingLedger';
@@ -58,7 +61,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { formatDateBR } from '@/lib/dateUtils';
 import { downloadProposalPDF } from '@/lib/proposalPdfGenerator';
-import { sanitizeHtml } from '@/lib/sanitizeHtml';
+import { sanitizeHtml, sanitizeRichTextForDisplay } from '@/lib/sanitizeHtml';
+import { usePublicDocumentTheme } from '@/hooks/usePublicDocumentTheme';
 import confetti from 'canvas-confetti';
 import { extractEmail, extractPhone } from '@/lib/contactFormat';
 import { useProposalEngagementTracker } from '@/hooks/useProposalEngagementTracker';
@@ -80,6 +84,7 @@ const FALLBACK_DECLINE_REASONS = [
 
 export default function ProposalPublicView() {
   const { token } = useParams<{ token: string }>();
+  const { theme: docTheme, toggleTheme: toggleDocTheme } = usePublicDocumentTheme();
   const [proposal, setProposal] = useState<any>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [items, setItems] = useState<any[]>([]);
@@ -943,7 +948,7 @@ export default function ProposalPublicView() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-background dark:to-muted">
         <div className="text-center">
           <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
           <p className="text-muted-foreground">Carregando proposta...</p>
@@ -954,7 +959,7 @@ export default function ProposalPublicView() {
 
   if (!proposal) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-background dark:to-muted">
         <Card className="max-w-md shadow-xl">
           <CardContent className="pt-8 text-center">
             {loadError ? (
@@ -1134,11 +1139,11 @@ export default function ProposalPublicView() {
   const accountEmail = extractEmail(account?.emails) || '';
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-background dark:via-background dark:to-muted">
       {/* Premium Letterhead Header */}
       <header 
         data-section="header"
-        className="bg-white border-b-4 shadow-sm"
+        className="bg-white dark:bg-card border-b-4 shadow-sm"
         style={{ borderBottomColor: organization?.primary_color || '#6366f1' }}
       >
         <div className="max-w-7xl mx-auto px-3 py-4 md:px-4 md:py-6">
@@ -1185,7 +1190,19 @@ export default function ProposalPublicView() {
 
             {/* Right: Proposal Info */}
             <div className="w-full md:w-auto md:text-right">
-              <div className="bg-slate-50 rounded-lg p-3 md:p-4 border">
+              <div className="flex justify-end mb-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={toggleDocTheme}
+                  aria-label={docTheme === 'dark' ? 'Ativar modo claro' : 'Ativar modo escuro'}
+                  title={docTheme === 'dark' ? 'Modo claro' : 'Modo escuro'}
+                >
+                  {docTheme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                </Button>
+              </div>
+              <div className="bg-slate-50 dark:bg-muted rounded-lg p-3 md:p-4 border">
                 <p className="text-xs md:text-sm text-muted-foreground mb-1">PROPOSTA COMERCIAL</p>
                 <p className="font-bold text-base md:text-lg">
                   {proposal.proposal_number || `#${proposal.id?.slice(0, 8)}`}
@@ -1405,7 +1422,7 @@ export default function ProposalPublicView() {
             <CardContent>
               <div 
                 className="prose prose-sm max-w-none"
-                dangerouslySetInnerHTML={{ __html: sanitizeHtml(proposal.introduction) }}
+                dangerouslySetInnerHTML={{ __html: sanitizeRichTextForDisplay(proposal.introduction) }}
               />
             </CardContent>
           </Card>
@@ -1494,7 +1511,7 @@ export default function ProposalPublicView() {
                                   {item.description && (
                                     <div 
                                       className="text-xs md:text-sm text-muted-foreground prose prose-sm max-w-none mt-1"
-                                      dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.description) }}
+                                      dangerouslySetInnerHTML={{ __html: sanitizeRichTextForDisplay(item.description) }}
                                     />
                                   )}
                                 </div>
@@ -1705,7 +1722,7 @@ export default function ProposalPublicView() {
                                   {item.description && (
                                     <div 
                                       className="text-xs md:text-sm text-muted-foreground prose prose-sm max-w-none mt-1"
-                                      dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.description) }}
+                                      dangerouslySetInnerHTML={{ __html: sanitizeRichTextForDisplay(item.description) }}
                                     />
                                   )}
                                 </div>
@@ -2130,7 +2147,7 @@ export default function ProposalPublicView() {
             <CardContent>
               <div 
                 className="prose prose-sm max-w-none"
-                dangerouslySetInnerHTML={{ __html: sanitizeHtml(proposal.terms) }}
+                dangerouslySetInnerHTML={{ __html: sanitizeRichTextForDisplay(proposal.terms) }}
               />
             </CardContent>
           </Card>
@@ -2145,14 +2162,14 @@ export default function ProposalPublicView() {
             <CardContent>
               <div 
                 className="prose prose-sm max-w-none"
-                dangerouslySetInnerHTML={{ __html: sanitizeHtml(proposal.notes) }}
+                dangerouslySetInnerHTML={{ __html: sanitizeRichTextForDisplay(proposal.notes) }}
               />
             </CardContent>
           </Card>
         )}
 
         {/* Footer with Seller Contact + Actions */}
-        <Card className="bg-slate-50">
+        <Card className="bg-slate-50 dark:bg-muted">
           <CardContent className="py-6">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
               {/* Seller Contact Card */}
@@ -2450,8 +2467,8 @@ export default function ProposalPublicView() {
                   className="font-signature text-base h-10"
                 />
                 {signatureName && (
-                  <div className="p-3 bg-slate-50 rounded-lg border-2 border-dashed">
-                    <p className="text-center font-signature text-xl italic text-slate-700">
+                  <div className="p-3 bg-slate-50 dark:bg-muted rounded-lg border-2 border-dashed">
+                    <p className="text-center font-signature text-xl italic text-slate-700 dark:text-foreground">
                       {signatureName}
                     </p>
                   </div>
