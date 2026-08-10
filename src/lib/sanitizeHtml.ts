@@ -28,7 +28,54 @@ export function sanitizeHtml(html: string | null | undefined): string {
     RETURN_DOM: false,
     RETURN_DOM_FRAGMENT: false,
   });
+
+const COLOR_STRIP_HOOK = 'lovable-strip-colors';
+let colorHookInstalled = false;
+
+function installColorStripHook() {
+  if (colorHookInstalled) return;
+  colorHookInstalled = true;
+  DOMPurify.addHook('afterSanitizeAttributes', (node: any) => {
+    if (!node.getAttribute) return;
+    // Only active for calls that opt in via the marker attribute on the root call.
+    if (!(DOMPurify as any).__stripColors) return;
+
+    if (node.hasAttribute?.('color')) node.removeAttribute('color');
+    if (node.hasAttribute?.('bgcolor')) node.removeAttribute('bgcolor');
+
+    const style = node.getAttribute('style');
+    if (style) {
+      const cleaned = style
+        .split(';')
+        .filter((decl: string) => {
+          const prop = decl.split(':')[0]?.trim().toLowerCase();
+          return prop && !['color', 'background', 'background-color'].includes(prop);
+        })
+        .join(';')
+        .trim();
+      if (cleaned) node.setAttribute('style', cleaned);
+      else node.removeAttribute('style');
+    }
+  });
 }
+
+/**
+ * Sanitizes rich-text HTML for on-screen display in themed surfaces
+ * (light/dark). Keeps all formatting but strips hardcoded text/background
+ * colors coming from the rich text editor, so the content inherits the
+ * theme's foreground color and stays readable in both modes.
+ */
+export function sanitizeRichTextForDisplay(html: string | null | undefined): string {
+  if (!html) return '';
+  installColorStripHook();
+  (DOMPurify as any).__stripColors = true;
+  try {
+    return sanitizeHtml(html);
+  } finally {
+    (DOMPurify as any).__stripColors = false;
+  }
+}
+
 
 /**
  * Sanitizes HTML and converts newlines to <br/> tags.
