@@ -28,9 +28,10 @@ export function sanitizeHtml(html: string | null | undefined): string {
     RETURN_DOM: false,
     RETURN_DOM_FRAGMENT: false,
   });
+}
 
-const COLOR_STRIP_HOOK = 'lovable-strip-colors';
 let colorHookInstalled = false;
+
 
 function installColorStripHook() {
   if (colorHookInstalled) return;
