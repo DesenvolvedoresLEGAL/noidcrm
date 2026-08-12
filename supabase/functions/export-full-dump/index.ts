@@ -22,12 +22,29 @@ const TABLES_TO_EXPORT = [
   'email_templates', 'email_accounts',
   'performance_activities', 'activity_targets', 'activity_logs', 'attendance',
   'algorithm_versions',
-];
+] as const;
+
+const TABLE_ALLOWLIST = new Set<string>(TABLES_TO_EXPORT);
+const GLOBAL_REFERENCE_TABLES = new Set(['plans', 'plan_entitlements']);
+
+type ExportOptions = {
+  include_deleted: boolean;
+  tables: string[];
+};
+
+class HttpError extends Error {
+  status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
 
 async function validateAdminAndGetOrg(req: Request) {
   const authHeader = req.headers.get('Authorization');
   if (!authHeader?.startsWith('Bearer ')) {
-    throw new Error('UNAUTHORIZED');
+    throw new HttpError(401, 'Unauthorized');
   }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -40,28 +57,121 @@ async function validateAdminAndGetOrg(req: Request) {
   const token = authHeader.replace('Bearer ', '');
   const { data, error } = await supabaseAuth.auth.getClaims(token);
   if (error || !data?.claims) {
-    throw new Error('UNAUTHORIZED');
+    throw new HttpError(401, 'Unauthorized');
   }
 
   const userId = data.claims.sub as string;
+  const supabaseAdmin = createClient(
+    supabaseUrl,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+  );
 
-  const supabaseAdmin = createClient(supabaseUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
-
-  // Verify admin/owner
-  const { data: member } = await supabaseAdmin
+  const { data: member, error: memberError } = await supabaseAdmin
     .from('organization_members')
     .select('organization_id, org_role')
     .eq('user_id', userId)
     .eq('status', 'active')
     .in('org_role', ['owner', 'admin'])
     .limit(1)
-    .single();
+    .maybeSingle();
+
+  if (memberError) {
+    console.error('[export-full-dump] Membership lookup failed:', memberError);
+    throw new HttpError(500, 'Unable to validate organization membership');
+  }
 
   if (!member) {
-    throw new Error('FORBIDDEN');
+    throw new HttpError(403, 'Forbidden: admin/owner role required');
   }
 
   return { userId, supabaseAdmin, organizationId: member.organization_id };
+}
+
+function parseOptions(body: unknown): ExportOptions {
+  const raw = body && typeof body === 'object' ? body as Record<string, unknown> : {};
+  const includeDeleted = raw.include_deleted === true;
+  const requestedTables = Array.isArray(raw.tables)
+    ? raw.tables.filter((value): value is string => typeof value === 'string')
+    : [];
+
+  const invalidTables = requestedTables.filter((table) => !TABLE_ALLOWLIST.has(table));
+  if (invalidTables.length > 0) {
+    throw new HttpError(400, `Unsupported export table(s): ${invalidTables.join(', ')}`);
+  }
+
+  return {
+    include_deleted: includeDeleted,
+    tables: requestedTables,
+  };
+}
+
+async function getOrganizationUserIds(supabaseAdmin: ReturnType<typeof createClient>, organizationId: string) {
+  const { data, error } = await supabaseAdmin
+    .from('organization_members')
+    .select('user_id')
+    .eq('organization_id', organizationId)
+    .eq('status', 'active');
+
+  if (error) {
+    throw new Error(`Unable to resolve tenant members: ${error.message}`);
+  }
+
+  return (data || [])
+    .map((row: { user_id?: string | null }) => row.user_id)
+    .filter((userId: string | null | undefined): userId is string => Boolean(userId));
+}
+
+function buildScopedQuery(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  tableName: string,
+  organizationId: string,
+  organizationUserIds: string[],
+  includeDeleted: boolean,
+) {
+  let query = supabaseAdmin.from(tableName).select('*');
+
+  if (tableName === 'organizations') {
+    query = query.eq('id', organizationId);
+  } else if (tableName === 'profiles') {
+    if (organizationUserIds.length === 0) {
+      return query.in('user_id', ['00000000-0000-0000-0000-000000000000']);
+    }
+    query = query.in('user_id', organizationUserIds);
+  } else if (!GLOBAL_REFERENCE_TABLES.has(tableName)) {
+    query = query.eq('organization_id', organizationId);
+  }
+
+  if (!includeDeleted) {
+    query = query.is('deleted_at', null);
+  }
+
+  return query;
+}
+
+function buildScopedRetryQuery(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  tableName: string,
+  organizationId: string,
+  organizationUserIds: string[],
+) {
+  let query = supabaseAdmin.from(tableName).select('*');
+
+  if (tableName === 'organizations') {
+    return query.eq('id', organizationId);
+  }
+
+  if (tableName === 'profiles') {
+    if (organizationUserIds.length === 0) {
+      return query.in('user_id', ['00000000-0000-0000-0000-000000000000']);
+    }
+    return query.in('user_id', organizationUserIds);
+  }
+
+  if (!GLOBAL_REFERENCE_TABLES.has(tableName)) {
+    return query.eq('organization_id', organizationId);
+  }
+
+  return query;
 }
 
 Deno.serve(async (req) => {
@@ -69,53 +179,56 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  if (req.method !== 'POST') {
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+      status: 405,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
   try {
     const { userId, supabaseAdmin, organizationId } = await validateAdminAndGetOrg(req);
 
     console.log(`[export-full-dump] Export by user ${userId} for org ${organizationId}`);
 
-    let options = { include_deleted: false, tables: [] as string[] };
+    let rawBody: unknown = {};
     try {
-      const body = await req.json();
-      options = { ...options, ...body };
+      rawBody = await req.json();
     } catch {
-      // defaults
+      // Empty body means default export options.
     }
 
-    const tablesToExport = options.tables?.length > 0 ? options.tables : TABLES_TO_EXPORT;
+    const options = parseOptions(rawBody);
+    const tablesToExport = options.tables.length > 0
+      ? options.tables
+      : [...TABLES_TO_EXPORT];
+
+    const organizationUserIds = await getOrganizationUserIds(supabaseAdmin, organizationId);
 
     const exportData: Record<string, unknown[]> = {};
     const errors: Record<string, string> = {};
     const counts: Record<string, number> = {};
 
-    // Tables that are org-scoped
-    const orgScopedFilter = (tableName: string) => {
-      // These tables may not have organization_id
-      const noOrgFilter = ['profiles', 'plans', 'plan_entitlements'];
-      return !noOrgFilter.includes(tableName);
-    };
-
     for (const tableName of tablesToExport) {
       try {
-        let query = supabaseAdmin.from(tableName).select('*');
-
-        // Always scope to organization
-        if (orgScopedFilter(tableName)) {
-          query = query.eq('organization_id', organizationId);
-        }
-
-        if (!options.include_deleted) {
-          query = query.is('deleted_at', null);
-        }
-
+        const query = buildScopedQuery(
+          supabaseAdmin,
+          tableName,
+          organizationId,
+          organizationUserIds,
+          options.include_deleted,
+        );
         const { data, error } = await query;
 
         if (error) {
-          if (error.message?.includes('deleted_at') || error.message?.includes('organization_id')) {
-            // Retry without problematic filter
-            const { data: retryData, error: retryError } = orgScopedFilter(tableName)
-              ? await supabaseAdmin.from(tableName).select('*').eq('organization_id', organizationId)
-              : await supabaseAdmin.from(tableName).select('*');
+          if (!options.include_deleted && error.message?.includes('deleted_at')) {
+            const retryQuery = buildScopedRetryQuery(
+              supabaseAdmin,
+              tableName,
+              organizationId,
+              organizationUserIds,
+            );
+            const { data: retryData, error: retryError } = await retryQuery;
 
             if (retryError) {
               errors[tableName] = retryError.message;
@@ -158,20 +271,16 @@ Deno.serve(async (req) => {
       },
     });
   } catch (error: unknown) {
+    const status = error instanceof HttpError ? error.status : 500;
     const message = error instanceof Error ? error.message : 'Unknown error';
-    if (message === 'UNAUTHORIZED') {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+
+    if (status >= 500) {
+      console.error('[export-full-dump] Error:', message);
     }
-    if (message === 'FORBIDDEN') {
-      return new Response(JSON.stringify({ error: 'Forbidden: admin/owner role required' }), {
-        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-    console.error('[export-full-dump] Error:', message);
+
     return new Response(JSON.stringify({ error: message }), {
-      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 });
