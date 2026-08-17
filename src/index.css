@@ -157,9 +157,6 @@ All colors MUST be HSL.
   }
 
   html {
-    /* iOS: evita "estouro" de largura e scroll horizontal no webapp */
-    max-width: 100%;
-    overflow-x: hidden;
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
   }
@@ -167,21 +164,31 @@ All colors MUST be HSL.
   body {
     @apply bg-background text-foreground font-sans antialiased;
     font-feature-settings: "ss01", "cv11";
-    max-width: 100%;
-    overflow-x: hidden;
-    min-height: 100dvh;
-    /* evita bounce/rubber-band que expõe fundo branco no standalone */
-    overscroll-behavior-y: none;
   }
 
-  /* iOS Safari: impede o zoom automático ao focar campos (< 16px) */
+  /* Ajustes exclusivos de mobile/webapp iOS (não afetam desktop) */
   @media (max-width: 767px) {
+    html {
+      max-width: 100%;
+      overflow-x: hidden;
+    }
+
+    body {
+      max-width: 100%;
+      overflow-x: hidden;
+      min-height: 100dvh;
+      /* evita bounce/rubber-band que expõe fundo branco no standalone */
+      overscroll-behavior-y: none;
+    }
+
+    /* iOS Safari: impede o zoom automático ao focar campos (< 16px) */
     input,
     select,
     textarea {
       font-size: 16px;
     }
   }
+
 
   h1, h2, h3, h4 {
     @apply font-display tracking-tight;
