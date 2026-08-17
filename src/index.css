@@ -156,9 +156,31 @@ All colors MUST be HSL.
     @apply border-border;
   }
 
+  html {
+    /* iOS: evita "estouro" de largura e scroll horizontal no webapp */
+    max-width: 100%;
+    overflow-x: hidden;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
   body {
     @apply bg-background text-foreground font-sans antialiased;
     font-feature-settings: "ss01", "cv11";
+    max-width: 100%;
+    overflow-x: hidden;
+    min-height: 100dvh;
+    /* evita bounce/rubber-band que expõe fundo branco no standalone */
+    overscroll-behavior-y: none;
+  }
+
+  /* iOS Safari: impede o zoom automático ao focar campos (< 16px) */
+  @media (max-width: 767px) {
+    input,
+    select,
+    textarea {
+      font-size: 16px;
+    }
   }
 
   h1, h2, h3, h4 {
