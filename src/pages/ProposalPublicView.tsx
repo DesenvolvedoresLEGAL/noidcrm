@@ -1245,9 +1245,6 @@ export default function ProposalPublicView() {
                 <p className="text-sm md:text-base text-red-700">
                   Recusada em {formatDateBR(proposal.declined_at)}
                 </p>
-                {proposal.declined_reason && (
-                  <p className="text-xs md:text-sm text-red-600 mt-1">Motivo: {proposal.declined_reason}</p>
-                )}
               </div>
             </CardContent>
           </Card>
