@@ -573,7 +573,7 @@ function extractFilenameGridLogos(html: string, pageHost: string, pagePath: stri
     const alt = pickAttr(tag, "alt");
     let name: string | null = null;
     if (alt && alt.trim().length >= 2) {
-      name = cleanCompanyNameCandidate(alt);
+      name = normalizeSlugName(alt);
     }
     if (!name) name = nameFromFilename(src);
     if (!name) continue;
@@ -617,7 +617,9 @@ export function detectLogoWall(eventUrl: string, html: string): LogoWallFetchRes
   const pathSignal = SPONSOR_PATH_RE.test(pagePath);
   const contentSignal = SPONSOR_CONTENT_RE.test(html);
   if (pathSignal || contentSignal) {
-    const sectionedSponsors = extractSectionedAltLogoGrid(html, pageHost, pagePath);
+    const sectionedSponsors = extractSectionedAltLogoGrid(html, pageHost, pagePath, {
+      permissiveSections: pathSignal,
+    });
     const minDensity = pathSignal ? 6 : 10;
     if (sectionedSponsors.length >= minDensity) {
       return {
