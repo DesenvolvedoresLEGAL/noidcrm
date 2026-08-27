@@ -78,3 +78,6 @@ export type {
   JetEngineListingFetchResult,
   JetEngineListingSponsor,
 } from "./jet-engine-listing.ts";
+
+export { detectExpoPostos, fetchExpoPostosBrands, tryExpoPostosFromUrl } from "./expopostos.ts";
+export type { ExpoPostosBrand, ExpoPostosFetchResult } from "./expopostos.ts";
