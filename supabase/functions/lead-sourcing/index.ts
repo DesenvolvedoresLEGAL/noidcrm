@@ -1117,19 +1117,48 @@ async function handleEventFirecrawl(
           (metrics as any).provider = "expopostos";
           (metrics as any).expopostos_total_count = expoPostos.result.total_count;
           (metrics as any).expopostos_pages_fetched = expoPostos.result.pages_fetched;
+          (metrics as any).expopostos_access_method = expoPostos.result.access_method;
           await logRunEvent(supabase, organizationId, run.id, "info",
             `Expo Postos API forneceu ${expoPostos.result.brands.length}/${expoPostos.result.total_count ?? "?"} marcas em ${expoPostos.result.pages_fetched} páginas — pulando logo-wall/Firecrawl/IA`,
-            { provider: "expopostos", count: expoPostos.result.brands.length, pages: expoPostos.result.pages_fetched });
+            {
+              provider: "expopostos",
+              access_method: expoPostos.result.access_method,
+              count: expoPostos.result.brands.length,
+              expected_count: expoPostos.result.total_count,
+              pages: expoPostos.result.pages_fetched,
+            });
         } else {
-          await logRunEvent(supabase, organizationId, run.id, "warn",
-            "Expo Postos detectado mas a API paginada falhou — seguindo para fallback",
+          const failureMessage = "Expo Postos detectado, mas não foi possível obter a lista completa. A execução foi interrompida para não salvar apenas 49 marcas.";
+          await logRunEvent(supabase, organizationId, run.id, "error",
+            failureMessage,
             { error: expoPostos.error });
+          await supabase.from("playbook_runs").update({
+            status: "failed",
+            finished_at: new Date().toISOString(),
+            error_summary: `${failureMessage} ${expoPostos.error ?? ""}`.trim(),
+            execution_time_ms: Date.now() - startTime,
+            stats: { ...metrics, provider: "expopostos_failed" },
+          }).eq("id", run.id);
+          return new Response(JSON.stringify({ error: failureMessage, details: expoPostos.error }), {
+            status: 502,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
         }
       }
     } catch (providerErr) {
-      await logRunEvent(supabase, organizationId, run.id, "warn",
-        "Erro ao tentar provider Expo Postos — seguindo para fallback",
-        { error: String(providerErr) });
+      const failureMessage = "Falha inesperada no provider Expo Postos. A execução foi interrompida para impedir resultado parcial.";
+      await logRunEvent(supabase, organizationId, run.id, "error", failureMessage, { error: String(providerErr) });
+      await supabase.from("playbook_runs").update({
+        status: "failed",
+        finished_at: new Date().toISOString(),
+        error_summary: `${failureMessage} ${String(providerErr)}`,
+        execution_time_ms: Date.now() - startTime,
+        stats: { ...metrics, provider: "expopostos_failed" },
+      }).eq("id", run.id);
+      return new Response(JSON.stringify({ error: failureMessage }), {
+        status: 502,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
   }
 
