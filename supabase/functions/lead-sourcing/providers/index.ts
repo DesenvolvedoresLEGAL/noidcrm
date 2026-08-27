@@ -109,3 +109,6 @@ export type {
   NextApiPartnersFetchResult,
 } from "./next-api-partners.ts";
 
+
+export { detectPaving, extractPavingExhibitors, fetchPavingExhibitors, tryPavingFromUrl } from "./paving.ts";
+export type { PavingDetection, PavingExhibitor, PavingFetchResult } from "./paving.ts";

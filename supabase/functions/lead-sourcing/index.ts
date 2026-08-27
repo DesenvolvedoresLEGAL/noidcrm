@@ -1289,6 +1289,67 @@ async function handleEventFirecrawl(
     }
   }
 
+  // PAVING EXPO lists every exhibitor/sponsor as an Elementor loop card whose
+  // only text is "Estande: N/D". The generic logo-wall extractor collapses the
+  // grid, so this provider reads all loop items directly from the HTML.
+  if (allExhibitors.length === 0) {
+    try {
+      const { tryPavingFromUrl } = await import("./providers/index.ts");
+      const paving = await tryPavingFromUrl(eventUrl);
+      if (paving.detection) {
+        if (paving.result && paving.result.exhibitors.length > 0) {
+          for (const exhibitor of paving.result.exhibitors) {
+            allExhibitors.push({
+              company_name: exhibitor.name,
+              website: exhibitor.website,
+              category: "Expositor",
+              description: null,
+              booth: exhibitor.booth,
+              country: null,
+              city: null,
+              exhibitor_profile_url: null,
+              signals: ["paving_official_exhibitor"],
+              confidence: 95,
+              _source_url: exhibitor.source_url,
+              _page_type: "event_exhibitor_directory",
+              _extraction_method: "paving_elementor_loop",
+              _logo_url: exhibitor.logo_url,
+            });
+          }
+          providerUsed = "paving";
+          metrics.exhibitors_extracted_raw = allExhibitors.length;
+          metrics.html_hybrid_extracted = allExhibitors.length;
+          (metrics as any).provider = providerUsed;
+          (metrics as any).paving_exhibitors_count = allExhibitors.length;
+          (metrics as any).paving_access_method = paving.result.access_method;
+          await logRunEvent(supabase, organizationId, run.id, "info",
+            `PAVING forneceu ${allExhibitors.length} expositores e patrocinadores`,
+            { provider: providerUsed, count: allExhibitors.length, access_method: paving.result.access_method });
+        } else {
+          const failureMessage = "PAVING detectado, mas a lista completa de expositores não pôde ser validada. Execução interrompida para não salvar resultado parcial.";
+          await logRunEvent(supabase, organizationId, run.id, "error", failureMessage, { error: paving.error });
+          await supabase.from("playbook_runs").update({
+            status: "failed",
+            finished_at: new Date().toISOString(),
+            error_summary: `${failureMessage} ${paving.error ?? ""}`.trim(),
+            execution_time_ms: Date.now() - startTime,
+            stats: { ...metrics, provider: "paving_failed" },
+          }).eq("id", run.id);
+          return new Response(JSON.stringify({ error: failureMessage, details: paving.error }), {
+            status: 502,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
+    } catch (providerErr) {
+      await logRunEvent(supabase, organizationId, run.id, "warn",
+        "Falha ao avaliar o provider PAVING; seguindo com os demais extratores.",
+        { error: String(providerErr) });
+    }
+  }
+
+
+
 
   // HIS renders sponsor names only inside logo artwork. The generic logo-wall
   // provider sees no alt/link text and emits a handful of meaningless names,
