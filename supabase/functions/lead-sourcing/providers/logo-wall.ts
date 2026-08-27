@@ -193,30 +193,39 @@ const SLUG_SUFFIX_RE = /[-_\s]+(novo|new|logo|logotipo|marca|final|atualizado|of
 export function normalizeSlugName(raw: string): string | null {
   let stem = decodeEntities(raw).trim();
   if (!stem) return null;
-  // Only treat as slug when there is no natural spacing or it is clearly a file slug.
-  const looksLikeSlug = !/\s/.test(stem) && /[-_]/.test(stem);
-  if (!looksLikeSlug && !/^[A-Z0-9][A-Z0-9\s_-]*$/.test(stem)) return cleanCompanyNameCandidate(stem);
 
   stem = stem.replace(/\.(png|jpe?g|webp|svg|avif|gif)$/i, "");
+  // "Logo_JRG_Fundo_CLARO (propspeed)" → the parenthetical is the real brand.
+  const paren = stem.match(/\(([^)]{3,40})\)/);
+  if (paren && /[A-Za-zÀ-ÿ]/.test(paren[1])) stem = paren[1];
   stem = stem.replace(/\([^)]*\)/g, " ");
+
   let previous = "";
   while (previous !== stem) {
     previous = stem;
-    stem = stem.replace(SLUG_PREFIX_RE, "").replace(SLUG_SUFFIX_RE, "");
+    stem = stem.replace(SLUG_PREFIX_RE, "").replace(SLUG_SUFFIX_RE, "").trim();
   }
+
+  const hasNaturalSpacing = /\s/.test(stem) && !/[_]/.test(stem);
+  if (hasNaturalSpacing && !/^[A-ZÀ-Ý0-9\s&.-]+$/.test(stem)) {
+    return cleanCompanyNameCandidate(stem.replace(/\s+/g, " "));
+  }
+
   const tokens = stem
     .split(/[-_\s.]+/)
     .map((t) => t.trim())
     .filter((t) => t && !/^\d+$/.test(t) && !FILENAME_NOISE_RE.test(t));
   if (tokens.length === 0) return null;
   const name = tokens
-    .map((t) =>
-      /^[A-ZÀ-Ý0-9&]+$/.test(t) && t.length <= 4
-        ? t.toUpperCase()
-        : t[0].toLocaleUpperCase("pt-BR") + t.slice(1).toLocaleLowerCase("pt-BR")
-    )
+    .map((t) => {
+      // Preserve intentional camel/brand casing (EcoolMove, FSYachts).
+      if (/[a-zà-ÿ]/.test(t) && /[A-ZÀ-Ý]/.test(t.slice(1))) return t;
+      if (/^[A-ZÀ-Ý0-9&]+$/.test(t) && t.length <= 4) return t.toUpperCase();
+      return t[0].toLocaleUpperCase("pt-BR") + t.slice(1).toLocaleLowerCase("pt-BR");
+    })
     .join(" ");
   return cleanCompanyNameCandidate(name);
+
 }
 
 
