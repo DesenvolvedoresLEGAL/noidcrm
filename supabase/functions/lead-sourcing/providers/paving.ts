@@ -67,9 +67,7 @@ function nameFromFilename(filename: string): string | null {
     .split("-")
     .map((token) => token.trim())
     .filter((token) => token.length > 0)
-    .filter((token) => !NOISE_TOKENS.has(token.toLowerCase()))
-    // Drop trailing version/duplication counters ("-1", "-2-1", "-2026").
-    .filter((token) => !/^\d{1,4}$/.test(token) || /^\d{2,4}$/.test(token) === false);
+    .filter((token) => !NOISE_TOKENS.has(token.toLowerCase()));
 
   const cleaned: string[] = [];
   for (const token of tokens) {
