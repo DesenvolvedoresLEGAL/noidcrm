@@ -1899,7 +1899,7 @@ async function handleEventFirecrawl(
           allExhibitors.push({
             company_name: s.name,
             website: s.website,
-            category: null,
+            category: s.tier || null,
             description: null,
             booth: s.booth,
             country: null,

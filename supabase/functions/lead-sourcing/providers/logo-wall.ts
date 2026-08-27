@@ -638,11 +638,18 @@ export async function tryLogoWallFromUrl(eventUrl: string): Promise<{
     detected = await fetchConarhPartners(eventUrl, html);
   }
 
-  // SPA shell fallback: when the raw HTML is too small (Vite/React/Next shell)
-  // we won't see any sponsor <img>. Re-render via Firecrawl and retry. Examples
-  // hitting this branch: conarh.org.br (Vite SPA, ~1.3KB raw HTML).
+  // Render fallback: sponsor routes frequently return a sizeable Next.js shell
+  // (navigation, analytics and footer included), so HTML size alone is not a
+  // reliable signal. If a sponsor/exhibitor URL did not yield a catalogue,
+  // render it before allowing the generic extractor to consume navigation text.
   const looksLikeShell = (html.length < 5000) || (!/<img\b/i.test(html));
-  if (!detected && looksLikeShell) {
+  let pathLooksLikeCatalogue = false;
+  try {
+    pathLooksLikeCatalogue = SPONSOR_PATH_RE.test(new URL(eventUrl).pathname);
+  } catch {
+    pathLooksLikeCatalogue = false;
+  }
+  if (!detected && (looksLikeShell || pathLooksLikeCatalogue)) {
     const apiKey = (globalThis as any).Deno?.env?.get?.("FIRECRAWL_API_KEY");
     if (apiKey) {
       try {
