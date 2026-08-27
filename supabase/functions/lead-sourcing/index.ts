@@ -29,6 +29,34 @@ function extractDomain(line: string): string | null {
   return null;
 }
 
+// Social/aggregator hosts identify a profile, not a company. Many event
+// directories list an Instagram/Facebook page as the exhibitor "website";
+// deduping by these domains would collapse hundreds of distinct companies.
+const NON_IDENTIFYING_DOMAINS = new Set([
+  "instagram.com",
+  "facebook.com",
+  "m.facebook.com",
+  "linkedin.com",
+  "br.linkedin.com",
+  "x.com",
+  "twitter.com",
+  "tiktok.com",
+  "youtube.com",
+  "youtu.be",
+  "wa.me",
+  "api.whatsapp.com",
+  "linktr.ee",
+  "beacons.ai",
+  "bit.ly",
+]);
+
+function isIdentifyingDomain(domain: string | null): boolean {
+  if (!domain) return false;
+  return !NON_IDENTIFYING_DOMAINS.has(domain);
+}
+
+
+
 function extractDomainFromUrl(url: string | null): string | null {
   if (!url) return null;
   try {
