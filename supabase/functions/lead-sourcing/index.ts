@@ -2262,7 +2262,16 @@ async function handleEventFirecrawl(
   // e o pipeline existente (parser → AI → dedup) segue normal.
   // Falha silenciosa: se nada for encontrado, o fluxo A-Z / infinite-scroll roda
   // exatamente como antes (zero regressão para Feimec/Bett/Feicon).
-  if (isSpaLike) {
+  // Também roda quando a página tem botão "ver mais / carregar mais" (lista
+  // truncada client-side, ex: expopostos.com.br), mesmo sem parecer SPA vazia.
+  const combinedFirstMarkup = scrapedContents
+    .map((c) => `${c.html || ""}\n${c.markdown || ""}`)
+    .join("\n")
+    .slice(0, 400000);
+  const hasLoadMoreButton = /(ver|carregar|mostrar)\s+(mais|todos)|load\s+more|show\s+more|view\s+all/i
+    .test(combinedFirstMarkup);
+
+  if (isSpaLike || hasLoadMoreButton) {
     try {
       const apiResult = await tryNativeApiProbe(formattedEventUrl, supabase, organizationId, run.id);
       if (apiResult && apiResult.exhibitors.length >= 5) {
