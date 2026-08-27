@@ -1230,6 +1230,64 @@ async function handleEventFirecrawl(
     }
   }
 
+  // Next.js/SPA event sites that render the sponsor wall client-side from a
+  // small same-origin JSON endpoint (`/api/partners`, `/api/sponsors`…).
+  // ExpoIN26: HTML has zero sponsors, `/api/partners` has all 104 by tier.
+  if (allExhibitors.length === 0) {
+    try {
+      const { tryNextApiPartnersFromUrl } = await import("./providers/index.ts");
+      const nap = await tryNextApiPartnersFromUrl(eventUrl);
+      if (nap.detection) {
+        if (nap.result && nap.result.partners.length > 0) {
+          for (const partner of nap.result.partners) {
+            allExhibitors.push({
+              company_name: partner.name,
+              website: partner.website,
+              category: partner.category,
+              description: null,
+              booth: null,
+              country: null,
+              city: null,
+              exhibitor_profile_url: null,
+              signals: ["site_official_partners_api", partner.category].filter(Boolean),
+              confidence: 93,
+              _source_url: partner.source_url,
+              _page_type: "event_sponsor_directory",
+              _extraction_method: "next_api_partners",
+              _logo_url: partner.logo_url,
+            });
+          }
+          providerUsed = "next-api-partners";
+          metrics.exhibitors_extracted_raw = allExhibitors.length;
+          metrics.html_hybrid_extracted = allExhibitors.length;
+          (metrics as any).provider = providerUsed;
+          (metrics as any).next_api_endpoint = nap.result.endpoint;
+          (metrics as any).next_api_announced_total = nap.result.announced_total;
+          await logRunEvent(supabase, organizationId, run.id, "info",
+            `API oficial de patrocinadores retornou ${allExhibitors.length} de ${nap.result.announced_total} registros`,
+            { provider: providerUsed, count: allExhibitors.length, endpoint: nap.result.endpoint });
+        } else {
+          const failureMessage = "API oficial de patrocinadores detectada, mas nenhum nome pôde ser derivado. Execução interrompida para não salvar resultado inválido.";
+          await logRunEvent(supabase, organizationId, run.id, "error", failureMessage, { error: nap.error });
+          await supabase.from("playbook_runs").update({
+            status: "failed",
+            finished_at: new Date().toISOString(),
+            error_summary: `${failureMessage} ${nap.error ?? ""}`.trim(),
+            execution_time_ms: Date.now() - startTime,
+            stats: { ...metrics, provider: "next-api-partners_failed" },
+          }).eq("id", run.id);
+          return new Response(JSON.stringify({ error: failureMessage, details: nap.error }), {
+            status: 502,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
+    } catch (providerErr) {
+      await logRunEvent(supabase, organizationId, run.id, "warn",
+        "Falha ao avaliar o provider de API de patrocinadores; seguindo com os demais extratores.",
+        { error: String(providerErr) });
+    }
+  }
 
 
   // HIS renders sponsor names only inside logo artwork. The generic logo-wall

@@ -101,3 +101,11 @@ export type {
   WpHeadlessNodeExhibitor,
   WpHeadlessNodeFetchResult,
 } from "./wp-headless-node.ts";
+
+export { tryNextApiPartnersFromUrl } from "./next-api-partners.ts";
+export type {
+  NextApiPartner,
+  NextApiPartnersDetection,
+  NextApiPartnersFetchResult,
+} from "./next-api-partners.ts";
+
