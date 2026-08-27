@@ -1082,6 +1082,57 @@ async function handleEventFirecrawl(
   // Hard run-level timeout (Firecrawl/AI fallback can otherwise hang for hours).
   const MAX_RUN_MS = 5 * 60 * 1000;
   const isTimeoutExceeded = () => (Date.now() - startTime) > MAX_RUN_MS;
+
+  // Expo Postos exposes the complete confirmed-brand directory through a
+  // paginated public API. This must run before the generic logo-wall provider,
+  // whose initial SSR HTML contains only the first 49 visible cards.
+  if (allExhibitors.length === 0) {
+    try {
+      const { tryExpoPostosFromUrl } = await import("./providers/index.ts");
+      const expoPostos = await tryExpoPostosFromUrl(eventUrl);
+      if (expoPostos.detection) {
+        if (expoPostos.result && expoPostos.result.brands.length > 0) {
+          for (const brand of expoPostos.result.brands) {
+            allExhibitors.push({
+              company_name: brand.name,
+              website: brand.website,
+              category: null,
+              description: brand.description,
+              booth: null,
+              country: null,
+              city: null,
+              exhibitor_profile_url: null,
+              signals: ["expopostos_official_api", brand.website ? "has_website" : null].filter(Boolean) as string[],
+              confidence: 95,
+              _source_url: eventUrl,
+              _page_type: "expopostos_brand_directory",
+              _extraction_method: "expopostos_paginated_api",
+              _logo_url: brand.logo_url,
+              _expopostos_external_id: brand.id,
+            });
+          }
+          providerUsed = "expopostos";
+          metrics.exhibitors_extracted_raw = allExhibitors.length;
+          metrics.html_hybrid_extracted = allExhibitors.length;
+          (metrics as any).provider = "expopostos";
+          (metrics as any).expopostos_total_count = expoPostos.result.total_count;
+          (metrics as any).expopostos_pages_fetched = expoPostos.result.pages_fetched;
+          await logRunEvent(supabase, organizationId, run.id, "info",
+            `Expo Postos API forneceu ${expoPostos.result.brands.length}/${expoPostos.result.total_count ?? "?"} marcas em ${expoPostos.result.pages_fetched} páginas — pulando logo-wall/Firecrawl/IA`,
+            { provider: "expopostos", count: expoPostos.result.brands.length, pages: expoPostos.result.pages_fetched });
+        } else {
+          await logRunEvent(supabase, organizationId, run.id, "warn",
+            "Expo Postos detectado mas a API paginada falhou — seguindo para fallback",
+            { error: expoPostos.error });
+        }
+      }
+    } catch (providerErr) {
+      await logRunEvent(supabase, organizationId, run.id, "warn",
+        "Erro ao tentar provider Expo Postos — seguindo para fallback",
+        { error: String(providerErr) });
+    }
+  }
+
   try {
     const { tryExpoFPFromUrl } = await import("./providers/index.ts");
     const expofp = await tryExpoFPFromUrl(eventUrl);
