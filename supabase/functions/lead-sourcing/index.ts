@@ -3080,7 +3080,9 @@ ${chunk}`,
       ex.signals?.includes?.("pdf_floorplan") ||
       ex.signals?.includes?.("logo_wall");
 
-    const stableProviderId = ex._informa_connect_external_id
+    const stableProviderId = ex._expopostos_external_id
+      ? `expopostos:${ex._expopostos_external_id}`
+      : ex._informa_connect_external_id
       ? `informa-connect:${ex._informa_connect_external_id}`
       : sharedSourceProvider
         ? `${ex._page_type || ex._extraction_method || "shared-source"}:${normalizedName}`
