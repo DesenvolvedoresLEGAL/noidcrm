@@ -1083,6 +1083,92 @@ async function handleEventFirecrawl(
   const MAX_RUN_MS = 5 * 60 * 1000;
   const isTimeoutExceeded = () => (Date.now() - startTime) > MAX_RUN_MS;
 
+  // FESQUA renders every alphabetical tab in the same HTML document. Generic
+  // table extraction stops at the first visible tab (A), so this provider must
+  // run first and also include the separate Apoio and Parceiros de Mídia grids.
+  if (allExhibitors.length === 0) {
+    try {
+      const { tryFesquaFromUrl } = await import("./providers/index.ts");
+      const fesqua = await tryFesquaFromUrl(eventUrl);
+      if (fesqua.detection) {
+        if (fesqua.result && fesqua.result.companies.length > 0) {
+          for (const company of fesqua.result.companies) {
+            allExhibitors.push({
+              company_name: company.name,
+              website: company.website,
+              category: company.group === "exhibitor"
+                ? "Expositor"
+                : company.group === "support" ? "Apoio" : "Parceiro de mídia",
+              description: null,
+              booth: null,
+              country: null,
+              city: null,
+              exhibitor_profile_url: null,
+              signals: [
+                "fesqua_official_directory",
+                company.group,
+                company.website ? "has_website" : null,
+              ].filter(Boolean) as string[],
+              confidence: 96,
+              _source_url: company.source_url,
+              _page_type: company.group === "exhibitor" ? "exhibitors_list" : "event_partner_directory",
+              _extraction_method: "fesqua_complete_html",
+              _logo_url: company.logo_url,
+            });
+          }
+          providerUsed = "fesqua";
+          metrics.exhibitors_extracted_raw = allExhibitors.length;
+          metrics.html_hybrid_extracted = allExhibitors.length;
+          (metrics as any).provider = "fesqua";
+          (metrics as any).fesqua_exhibitors_count = fesqua.result.exhibitors_count;
+          (metrics as any).fesqua_support_count = fesqua.result.support_count;
+          (metrics as any).fesqua_media_partners_count = fesqua.result.media_partners_count;
+          (metrics as any).fesqua_tables_found = fesqua.result.tables_found;
+          (metrics as any).fesqua_access_method = fesqua.result.access_method;
+          await logRunEvent(supabase, organizationId, run.id, "info",
+            `FESQUA forneceu ${fesqua.result.exhibitors_count} expositores, ${fesqua.result.support_count} apoios e ${fesqua.result.media_partners_count} parceiros de mídia — todas as letras processadas`,
+            {
+              provider: "fesqua",
+              count: fesqua.result.companies.length,
+              exhibitors: fesqua.result.exhibitors_count,
+              support: fesqua.result.support_count,
+              media_partners: fesqua.result.media_partners_count,
+              tables: fesqua.result.tables_found,
+              access_method: fesqua.result.access_method,
+            });
+        } else {
+          const failureMessage = "FESQUA detectada, mas a lista completa não pôde ser validada. A execução foi interrompida para não salvar somente a letra A.";
+          await logRunEvent(supabase, organizationId, run.id, "error", failureMessage, { error: fesqua.error });
+          await supabase.from("playbook_runs").update({
+            status: "failed",
+            finished_at: new Date().toISOString(),
+            error_summary: `${failureMessage} ${fesqua.error ?? ""}`.trim(),
+            execution_time_ms: Date.now() - startTime,
+            stats: { ...metrics, provider: "fesqua_failed" },
+          }).eq("id", run.id);
+          return new Response(JSON.stringify({ error: failureMessage, details: fesqua.error }), {
+            status: 502,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
+    } catch (providerErr) {
+      const failureMessage = "Falha inesperada no provider FESQUA. A execução foi interrompida para impedir resultado parcial.";
+      await logRunEvent(supabase, organizationId, run.id, "error", failureMessage, { error: String(providerErr) });
+      await supabase.from("playbook_runs").update({
+        status: "failed",
+        finished_at: new Date().toISOString(),
+        error_summary: `${failureMessage} ${String(providerErr)}`,
+        execution_time_ms: Date.now() - startTime,
+        stats: { ...metrics, provider: "fesqua_failed" },
+      }).eq("id", run.id);
+      return new Response(JSON.stringify({ error: failureMessage }), {
+        status: 502,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+  }
+
   // Expo Postos exposes the complete confirmed-brand directory through a
   // paginated public API. This must run before the generic logo-wall provider,
   // whose initial SSR HTML contains only the first 49 visible cards.
