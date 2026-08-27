@@ -53,13 +53,13 @@ export interface LogoWallSponsor {
   logo_url: string | null;    // <img src>
   tier?: string | null;       // closest preceding h1/h2/h3 (DIAMANTE, OURO…)
   source_url: string;         // page where the logo was found
-  extraction_mode?: "anchor_image" | "filename_grid";
+  extraction_mode?: "anchor_image" | "filename_grid" | "sectioned_alt_grid";
 }
 
 export interface LogoWallDetection {
   density: number;            // number of external-link logo pairs found
   page_host: string;
-  mode: "anchor_image" | "filename_grid";
+  mode: "anchor_image" | "filename_grid" | "sectioned_alt_grid";
 }
 
 export interface LogoWallFetchResult {
@@ -165,6 +165,98 @@ function pickAttr(tag: string, name: string): string | null {
   const re = new RegExp(`${name}\\s*=\\s*["']([^"']*)["']`, "i");
   const m = tag.match(re);
   return m ? decodeEntities(m[1]).trim() : null;
+}
+
+const SPONSOR_SECTION_LABELS = new Set([
+  "parceiros", "parceiras", "partners", "experiências", "experiencias",
+  "patrocinadores", "sponsors", "apoio", "apoiadores",
+]);
+
+const SPONSOR_TIER_LABELS = new Set([
+  "master", "diamante", "diamond", "black", "platinum", "platina",
+  "ouro", "gold", "prata", "silver", "bronze", "cobre",
+]);
+
+function normalizeLabel(raw: string): string {
+  return decodeEntities(raw.replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
+}
+
+function unwrapOptimizedImageUrl(rawSrc: string, pageUrl: string): URL | null {
+  try {
+    const outer = new URL(rawSrc, pageUrl);
+    const nested = outer.searchParams.get("url");
+    if (nested) return new URL(decodeURIComponent(nested), pageUrl);
+    return outer;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Generic parser for SSR sponsor catalogues (especially Next.js): the page
+ * exposes trustworthy alt text, but the images are not links and their real
+ * CDN URL is wrapped by /_next/image?url=. Walking the document in order also
+ * preserves top-level sections and sponsorship tiers.
+ */
+function extractSectionedAltLogoGrid(html: string, pageHost: string, pagePath: string): LogoWallSponsor[] {
+  const out: LogoWallSponsor[] = [];
+  const seen = new Set<string>();
+  const pageUrl = `https://${pageHost}${pagePath || "/"}`;
+  let section: string | null = null;
+  let tier: string | null = null;
+
+  const tokenRe = /(<h[1-4]\b[^>]*>[\s\S]*?<\/h[1-4]>)|(<(?:div|span|p)\b[^>]*>\s*([^<>]{2,30})\s*<\/(?:div|span|p)>)|(<img\b[^>]*>)/gi;
+  for (const match of html.matchAll(tokenRe)) {
+    if (match[1]) {
+      const label = normalizeLabel(match[1]);
+      const key = label.toLocaleLowerCase("pt-BR");
+      if (SPONSOR_SECTION_LABELS.has(key)) {
+        section = label;
+        tier = null;
+      } else if (section && SPONSOR_TIER_LABELS.has(key)) {
+        tier = label;
+      }
+      continue;
+    }
+    if (match[2]) {
+      const label = normalizeLabel(match[3] || "");
+      const key = label.toLocaleLowerCase("pt-BR");
+      if (section && SPONSOR_TIER_LABELS.has(key)) tier = label;
+      continue;
+    }
+
+    const tag = match[4];
+    if (!tag || !section) continue;
+    const alt = pickAttr(tag, "alt");
+    const name = alt ? cleanCompanyNameCandidate(alt) : null;
+    if (!name || isBlacklistedName(name)) continue;
+
+    const rawSrc = pickAttr(tag, "data-src") || pickAttr(tag, "data-lazy-src") || pickAttr(tag, "src");
+    if (!rawSrc || /^data:/i.test(rawSrc)) continue;
+    const imageUrl = unwrapOptimizedImageUrl(rawSrc, pageUrl);
+    if (!imageUrl || isRejectedLogoAsset(imageUrl.toString(), name)) continue;
+
+    // A catalogue logo must come from content media, a dedicated logo path, or
+    // an external CDN. This excludes the event's own navigation/chrome assets.
+    const imageHost = stripWww(imageUrl.hostname);
+    const pageHostKey = stripWww(pageHost);
+    const contentAsset = imageHost !== pageHostKey ||
+      /\/(uploads?|media|content|sponsors?|patroc|parceir|partners?|logos?|assets)\//i.test(imageUrl.pathname);
+    if (!contentAsset) continue;
+
+    const key = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push({
+      name,
+      website: null,
+      logo_url: imageUrl.toString(),
+      tier: tier ? `${section} — ${tier}` : section,
+      source_url: pageUrl,
+      extraction_mode: "sectioned_alt_grid",
+    });
+  }
+  return out;
 }
 
 /**
@@ -472,6 +564,19 @@ export function detectLogoWall(eventUrl: string, html: string): LogoWallFetchRes
   } catch { return null; }
   if (!pageHost) return null;
 
+  const pathSignal = SPONSOR_PATH_RE.test(pagePath);
+  const contentSignal = SPONSOR_CONTENT_RE.test(html);
+  if (pathSignal || contentSignal) {
+    const sectionedSponsors = extractSectionedAltLogoGrid(html, pageHost, pagePath);
+    const minDensity = pathSignal ? 6 : 10;
+    if (sectionedSponsors.length >= minDensity) {
+      return {
+        detection: { density: sectionedSponsors.length, page_host: pageHost, mode: "sectioned_alt_grid" },
+        sponsors: sectionedSponsors,
+      };
+    }
+  }
+
   const anchorSponsors = extractAnchorImagePairs(html, pageHost, pagePath);
   for (const s of anchorSponsors) s.extraction_mode = "anchor_image";
   if (anchorSponsors.length >= 6) {
@@ -484,8 +589,6 @@ export function detectLogoWall(eventUrl: string, html: string): LogoWallFetchRes
   // Filename/alt grid: runs when (a) the URL path looks like a sponsor list, OR
   // (b) the page text mentions sponsors/partners/exhibitors. Without (b) we'd
   // never catch CONARH ("/") or other landing pages that embed a logo wall.
-  const pathSignal = SPONSOR_PATH_RE.test(pagePath);
-  const contentSignal = SPONSOR_CONTENT_RE.test(html);
   if (pathSignal || contentSignal) {
     const grid = extractFilenameGridLogos(html, pageHost, pagePath, { strictPath: pathSignal });
     // Require a higher threshold when triggered purely by content to avoid
