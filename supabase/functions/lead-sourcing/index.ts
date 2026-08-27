@@ -3404,7 +3404,7 @@ ${chunk}`,
     if (profileUrl && seenProfileUrls.has(profileUrl)) { metrics.deduped_in_run++; continue; }
 
     seenNames.add(nameDedupeKey);
-    if (!stableProviderId && domain) seenDomains.add(domain);
+    if (!stableProviderId && isIdentifyingDomain(domain)) seenDomains.add(domain!);
     if (profileUrl) seenProfileUrls.add(profileUrl);
 
     const website = ex.website || (domain ? `https://${domain}` : null);
