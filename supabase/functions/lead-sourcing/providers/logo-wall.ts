@@ -181,6 +181,54 @@ function normalizeLabel(raw: string): string {
   return decodeEntities(raw.replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
 }
 
+/**
+ * Many WordPress/Elementor catalogues expose the media slug as alt text
+ * ("EC3-AZIMUT", "diantonio-boats", "FLUVIMAR2_NOVO"). Turn those into readable
+ * company names: drop internal cota prefixes (EC-, EC3-, LOGO-), separators and
+ * editorial suffixes, then title-case the remaining tokens.
+ */
+const SLUG_PREFIX_RE = /^(ec\d*|logo(?:tipo)?|marca|brand|img|image|foto|patrocinador|expositor)[-_\s]+/i;
+const SLUG_SUFFIX_RE = /[-_\s]+(novo|new|logo|logotipo|marca|final|atualizado|oficial|preto|branco|color|colorido|vector|horizontal|vertical|png|jpg|site|web|\d{2,4}|v\d)$/i;
+
+export function normalizeSlugName(raw: string): string | null {
+  let stem = decodeEntities(raw).trim();
+  if (!stem) return null;
+
+  stem = stem.replace(/\.(png|jpe?g|webp|svg|avif|gif)$/i, "");
+  // "Logo_JRG_Fundo_CLARO (propspeed)" → the parenthetical is the real brand.
+  const paren = stem.match(/\(([^)]{3,40})\)/);
+  if (paren && /[A-Za-zÀ-ÿ]/.test(paren[1])) stem = paren[1];
+  stem = stem.replace(/\([^)]*\)/g, " ");
+
+  let previous = "";
+  while (previous !== stem) {
+    previous = stem;
+    stem = stem.replace(SLUG_PREFIX_RE, "").replace(SLUG_SUFFIX_RE, "").trim();
+  }
+
+  const hasNaturalSpacing = /\s/.test(stem) && !/[_]/.test(stem);
+  if (hasNaturalSpacing && !/^[A-ZÀ-Ý0-9\s&.-]+$/.test(stem)) {
+    return cleanCompanyNameCandidate(stem.replace(/\s+/g, " "));
+  }
+
+  const tokens = stem
+    .split(/[-_\s.]+/)
+    .map((t) => t.trim())
+    .filter((t) => t && !/^\d+$/.test(t) && !FILENAME_NOISE_RE.test(t));
+  if (tokens.length === 0) return null;
+  const name = tokens
+    .map((t) => {
+      // Preserve intentional camel/brand casing (EcoolMove, FSYachts).
+      if (/[a-zà-ÿ]/.test(t) && /[A-ZÀ-Ý]/.test(t.slice(1))) return t;
+      if (/^[A-ZÀ-Ý0-9&]+$/.test(t) && t.length <= 4) return t.toUpperCase();
+      return t[0].toLocaleUpperCase("pt-BR") + t.slice(1).toLocaleLowerCase("pt-BR");
+    })
+    .join(" ");
+  return cleanCompanyNameCandidate(name);
+
+}
+
+
 function unwrapOptimizedImageUrl(rawSrc: string, pageUrl: string): URL | null {
   try {
     const outer = new URL(rawSrc, pageUrl);
@@ -198,7 +246,12 @@ function unwrapOptimizedImageUrl(rawSrc: string, pageUrl: string): URL | null {
  * CDN URL is wrapped by /_next/image?url=. Walking the document in order also
  * preserves top-level sections and sponsorship tiers.
  */
-function extractSectionedAltLogoGrid(html: string, pageHost: string, pagePath: string): LogoWallSponsor[] {
+function extractSectionedAltLogoGrid(
+  html: string,
+  pageHost: string,
+  pagePath: string,
+  opts: { permissiveSections?: boolean } = {},
+): LogoWallSponsor[] {
   const out: LogoWallSponsor[] = [];
   const seen = new Set<string>();
   const pageUrl = `https://${pageHost}${pagePath || "/"}`;
@@ -215,6 +268,11 @@ function extractSectionedAltLogoGrid(html: string, pageHost: string, pagePath: s
         tier = null;
       } else if (section && SPONSOR_TIER_LABELS.has(key)) {
         tier = label;
+      } else if (opts.permissiveSections && label && label.length <= 80 && /[A-Za-zÀ-ÿ]/.test(label)) {
+        // Catalogue pages (URL already scoped to exhibitors/sponsors) group logos
+        // under editorial headings ("ESTALEIROS", "SHOPPING"), not tier keywords.
+        section = label;
+        tier = null;
       }
       continue;
     }
@@ -228,8 +286,9 @@ function extractSectionedAltLogoGrid(html: string, pageHost: string, pagePath: s
     const tag = match[4];
     if (!tag || !section) continue;
     const alt = pickAttr(tag, "alt");
-    const name = alt ? cleanCompanyNameCandidate(alt) : null;
+    const name = alt ? normalizeSlugName(alt) : null;
     if (!name || isBlacklistedName(name)) continue;
+
 
     const rawSrc = pickAttr(tag, "data-src") || pickAttr(tag, "data-lazy-src") || pickAttr(tag, "src");
     if (!rawSrc || /^data:/i.test(rawSrc)) continue;
@@ -523,7 +582,7 @@ function extractFilenameGridLogos(html: string, pageHost: string, pagePath: stri
     const alt = pickAttr(tag, "alt");
     let name: string | null = null;
     if (alt && alt.trim().length >= 2) {
-      name = cleanCompanyNameCandidate(alt);
+      name = normalizeSlugName(alt);
     }
     if (!name) name = nameFromFilename(src);
     if (!name) continue;
@@ -567,7 +626,9 @@ export function detectLogoWall(eventUrl: string, html: string): LogoWallFetchRes
   const pathSignal = SPONSOR_PATH_RE.test(pagePath);
   const contentSignal = SPONSOR_CONTENT_RE.test(html);
   if (pathSignal || contentSignal) {
-    const sectionedSponsors = extractSectionedAltLogoGrid(html, pageHost, pagePath);
+    const sectionedSponsors = extractSectionedAltLogoGrid(html, pageHost, pagePath, {
+      permissiveSections: pathSignal,
+    });
     const minDensity = pathSignal ? 6 : 10;
     if (sectionedSponsors.length >= minDensity) {
       return {
