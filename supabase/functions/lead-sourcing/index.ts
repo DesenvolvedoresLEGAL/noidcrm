@@ -1083,6 +1083,75 @@ async function handleEventFirecrawl(
   const MAX_RUN_MS = 5 * 60 * 1000;
   const isTimeoutExceeded = () => (Date.now() - startTime) > MAX_RUN_MS;
 
+  // HIS renders sponsor names only inside logo artwork. The generic logo-wall
+  // provider sees no alt/link text and emits a handful of meaningless names,
+  // so this domain-specific parser resolves every logo before generic scraping.
+  if (allExhibitors.length === 0) {
+    try {
+      const { tryHisSponsorsFromUrl } = await import("./providers/index.ts");
+      const his = await tryHisSponsorsFromUrl(eventUrl);
+      if (his.detection) {
+        if (his.result && his.result.sponsors.length > 0) {
+          for (const sponsor of his.result.sponsors) {
+            allExhibitors.push({
+              company_name: sponsor.name,
+              website: null,
+              category: sponsor.category,
+              description: null,
+              booth: null,
+              country: null,
+              city: null,
+              exhibitor_profile_url: null,
+              signals: ["his_official_sponsor", sponsor.category],
+              confidence: 95,
+              _source_url: sponsor.source_url,
+              _page_type: "event_sponsor_directory",
+              _extraction_method: "his_sponsor_logo_catalog",
+              _logo_url: sponsor.logo_url,
+            });
+          }
+          providerUsed = "his-sponsors";
+          metrics.exhibitors_extracted_raw = allExhibitors.length;
+          metrics.html_hybrid_extracted = allExhibitors.length;
+          (metrics as any).provider = providerUsed;
+          (metrics as any).his_sponsors_count = allExhibitors.length;
+          (metrics as any).his_access_method = his.result.access_method;
+          await logRunEvent(supabase, organizationId, run.id, "info",
+            `HIS forneceu ${allExhibitors.length} patrocinadores com nomes e categorias resolvidos`,
+            { provider: providerUsed, count: allExhibitors.length, access_method: his.result.access_method });
+        } else {
+          const failureMessage = "HIS detectado, mas a lista completa de patrocinadores não pôde ser validada. A execução foi interrompida para não salvar logos sem nome.";
+          await logRunEvent(supabase, organizationId, run.id, "error", failureMessage, { error: his.error });
+          await supabase.from("playbook_runs").update({
+            status: "failed",
+            finished_at: new Date().toISOString(),
+            error_summary: `${failureMessage} ${his.error ?? ""}`.trim(),
+            execution_time_ms: Date.now() - startTime,
+            stats: { ...metrics, provider: "his-sponsors_failed" },
+          }).eq("id", run.id);
+          return new Response(JSON.stringify({ error: failureMessage, details: his.error }), {
+            status: 502,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
+    } catch (providerErr) {
+      const failureMessage = "Falha inesperada no provider HIS. A execução foi interrompida para impedir resultado inválido.";
+      await logRunEvent(supabase, organizationId, run.id, "error", failureMessage, { error: String(providerErr) });
+      await supabase.from("playbook_runs").update({
+        status: "failed",
+        finished_at: new Date().toISOString(),
+        error_summary: `${failureMessage} ${String(providerErr)}`,
+        execution_time_ms: Date.now() - startTime,
+        stats: { ...metrics, provider: "his-sponsors_failed" },
+      }).eq("id", run.id);
+      return new Response(JSON.stringify({ error: failureMessage }), {
+        status: 502,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+  }
+
   // FESQUA renders every alphabetical tab in the same HTML document. Generic
   // table extraction stops at the first visible tab (A), so this provider must
   // run first and also include the separate Apoio and Parceiros de Mídia grids.
