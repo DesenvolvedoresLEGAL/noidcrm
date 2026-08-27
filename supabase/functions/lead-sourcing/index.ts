@@ -4080,7 +4080,7 @@ async function tryNativeApiProbe(
     `["'\`](\\/api\\/[a-z0-9_\\/.-]*(?:${ENTITY_WORDS})[a-z0-9_\\/-]*\\/?(?:\\?[a-z0-9_=&%.,-]*)?)["'\`]`,
     "gi",
   );
-  for (const pm of pathRegex[Symbol.matchAll] ? bundlesContent.matchAll(pathRegex) : []) {
+  for (const pm of bundlesContent.matchAll(pathRegex)) {
     const p = pm[1].split("$")[0]; // corta template literals
     if (p && !pathGuesses.includes(p)) pathGuesses.push(p);
   }
