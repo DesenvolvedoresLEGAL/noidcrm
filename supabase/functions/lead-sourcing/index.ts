@@ -1083,6 +1083,66 @@ async function handleEventFirecrawl(
   const MAX_RUN_MS = 5 * 60 * 1000;
   const isTimeoutExceeded = () => (Date.now() - startTime) > MAX_RUN_MS;
 
+  // RX Global / Reed Exhibitions sites (FENATRAN, Hospitalar, Fispal, Equipotel…)
+  // render the exhibitor directory client-side from an Algolia index. The HTML has
+  // zero exhibitors, so generic scrapers only capture the first virtualized page.
+  // This provider reads the embedded Algolia credentials and pages the index.
+  if (allExhibitors.length === 0) {
+    try {
+      const { tryRxAlgoliaFromUrl } = await import("./providers/index.ts");
+      const rx = await tryRxAlgoliaFromUrl(eventUrl);
+      if (rx.detection) {
+        if (rx.result && rx.result.exhibitors.length > 0) {
+          for (const exhibitor of rx.result.exhibitors) {
+            allExhibitors.push({
+              company_name: exhibitor.name,
+              website: exhibitor.website,
+              category: exhibitor.category,
+              description: exhibitor.description,
+              booth: exhibitor.booth,
+              country: exhibitor.country,
+              city: null,
+              exhibitor_profile_url: exhibitor.profile_url,
+              signals: ["rx_official_exhibitor_directory", exhibitor.category].filter(Boolean),
+              confidence: 96,
+              _source_url: exhibitor.source_url,
+              _page_type: "event_exhibitor_directory",
+              _extraction_method: "rx_algolia_directory",
+            });
+          }
+          providerUsed = "rx-algolia";
+          metrics.exhibitors_extracted_raw = allExhibitors.length;
+          metrics.html_hybrid_extracted = allExhibitors.length;
+          (metrics as any).provider = providerUsed;
+          (metrics as any).rx_announced_total = rx.result.announced_total;
+          (metrics as any).rx_pages_fetched = rx.result.pages_fetched;
+          (metrics as any).rx_access_method = rx.result.access_method;
+          await logRunEvent(supabase, organizationId, run.id, "info",
+            `Diretório RX (Algolia) retornou ${allExhibitors.length} de ${rx.result.announced_total} expositores`,
+            { provider: providerUsed, count: allExhibitors.length, announced: rx.result.announced_total, pages: rx.result.pages_fetched, access_method: rx.result.access_method });
+        } else {
+          const failureMessage = "Diretório RX detectado, mas a lista completa de expositores não pôde ser obtida. Execução interrompida para não salvar resultado parcial.";
+          await logRunEvent(supabase, organizationId, run.id, "error", failureMessage, { error: rx.error });
+          await supabase.from("playbook_runs").update({
+            status: "failed",
+            finished_at: new Date().toISOString(),
+            error_summary: `${failureMessage} ${rx.error ?? ""}`.trim(),
+            execution_time_ms: Date.now() - startTime,
+            stats: { ...metrics, provider: "rx-algolia_failed" },
+          }).eq("id", run.id);
+          return new Response(JSON.stringify({ error: failureMessage, details: rx.error }), {
+            status: 502,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
+    } catch (providerErr) {
+      await logRunEvent(supabase, organizationId, run.id, "warn",
+        "Falha ao avaliar o provider RX (Algolia); seguindo com os demais extratores.",
+        { error: String(providerErr) });
+    }
+  }
+
   // HIS renders sponsor names only inside logo artwork. The generic logo-wall
   // provider sees no alt/link text and emits a handful of meaningless names,
   // so this domain-specific parser resolves every logo before generic scraping.

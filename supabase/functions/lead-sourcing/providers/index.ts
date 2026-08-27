@@ -87,3 +87,6 @@ export type { FesquaCompany, FesquaFetchResult } from "./fesqua.ts";
 
 export { detectHisSponsors, fetchHisSponsors, tryHisSponsorsFromUrl } from "./his-sponsors.ts";
 export type { HisSponsor, HisSponsorsFetchResult } from "./his-sponsors.ts";
+
+export { fetchRxAlgoliaExhibitors, parseRxAlgoliaConfig, tryRxAlgoliaFromUrl } from "./rx-algolia.ts";
+export type { RxAlgoliaConfig, RxAlgoliaExhibitor, RxAlgoliaFetchResult } from "./rx-algolia.ts";
