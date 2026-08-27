@@ -90,3 +90,14 @@ export type { HisSponsor, HisSponsorsFetchResult } from "./his-sponsors.ts";
 
 export { fetchRxAlgoliaExhibitors, parseRxAlgoliaConfig, tryRxAlgoliaFromUrl } from "./rx-algolia.ts";
 export type { RxAlgoliaConfig, RxAlgoliaExhibitor, RxAlgoliaFetchResult } from "./rx-algolia.ts";
+
+export {
+  extractWpHeadlessNodeItems,
+  fetchWpHeadlessNodeExhibitors,
+  parseWpHeadlessNodeEndpoint,
+  tryWpHeadlessNodeFromUrl,
+} from "./wp-headless-node.ts";
+export type {
+  WpHeadlessNodeExhibitor,
+  WpHeadlessNodeFetchResult,
+} from "./wp-headless-node.ts";
