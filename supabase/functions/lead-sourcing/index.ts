@@ -3397,7 +3397,7 @@ ${chunk}`,
     if (seenNames.has(nameDedupeKey)) { metrics.deduped_in_run++; continue; }
 
     const domain = extractDomain(ex.website || "");
-    if (!stableProviderId && domain && seenDomains.has(domain)) { metrics.deduped_in_run++; continue; }
+    if (!stableProviderId && isIdentifyingDomain(domain) && seenDomains.has(domain!)) { metrics.deduped_in_run++; continue; }
 
     const rawProfileUrl = ex.exhibitor_profile_url || null;
     const profileUrl = sharedSourceProvider || rawProfileUrl === eventUrl ? null : rawProfileUrl;
