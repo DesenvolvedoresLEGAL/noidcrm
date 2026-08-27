@@ -2262,7 +2262,16 @@ async function handleEventFirecrawl(
   // e o pipeline existente (parser → AI → dedup) segue normal.
   // Falha silenciosa: se nada for encontrado, o fluxo A-Z / infinite-scroll roda
   // exatamente como antes (zero regressão para Feimec/Bett/Feicon).
-  if (isSpaLike) {
+  // Também roda quando a página tem botão "ver mais / carregar mais" (lista
+  // truncada client-side, ex: expopostos.com.br), mesmo sem parecer SPA vazia.
+  const combinedFirstMarkup = scrapedContents
+    .map((c) => `${c.html || ""}\n${c.markdown || ""}`)
+    .join("\n")
+    .slice(0, 400000);
+  const hasLoadMoreButton = /(ver|carregar|mostrar)\s+(mais|todos)|load\s+more|show\s+more|view\s+all/i
+    .test(combinedFirstMarkup);
+
+  if (isSpaLike || hasLoadMoreButton) {
     try {
       const apiResult = await tryNativeApiProbe(formattedEventUrl, supabase, organizationId, run.id);
       if (apiResult && apiResult.exhibitors.length >= 5) {
@@ -4016,9 +4025,14 @@ async function tryNativeApiProbe(
 ): Promise<{ endpoint: string; markdown: string; exhibitors: any[] } | null> {
   const u = new URL(eventUrl);
   const baseHost = u.origin;
+  const rootDomain = u.hostname.replace(/^www\./, "");
   const apiHostGuesses = new Set<string>([
-    `https://api.${u.hostname.replace(/^www\./, "")}`,
     baseHost,
+    `https://api.${rootDomain}`,
+    `https://admin.${rootDomain}`,
+    `https://adm.${rootDomain}`,
+    `https://backend.${rootDomain}`,
+    `https://cms.${rootDomain}`,
   ]);
 
   // 1. Baixa landing page
@@ -4026,11 +4040,17 @@ async function tryNativeApiProbe(
   if (!landingResp.ok) return null;
   const landingHtml = await landingResp.text();
 
+  // Hosts de mesma raiz já referenciados no HTML (ex: admin.expopostos.com.br em <img src>)
+  const escapedRoot = rootDomain.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  for (const hm of landingHtml.matchAll(new RegExp(`https://[a-z0-9-]+\\.${escapedRoot}`, "gi"))) {
+    apiHostGuesses.add(hm[0]);
+  }
+
   // 2. Extrai URLs dos bundles JS
   const scriptSrcs = Array.from(landingHtml.matchAll(/<script[^>]+src=["']([^"']+\.js)["']/g))
     .map((m) => m[1])
     .map((src) => src.startsWith("http") ? src : new URL(src, baseHost).toString())
-    .slice(0, 5); // limite de bundles
+    .slice(0, 12); // limite de bundles
 
   // 3. Concatena conteúdo dos bundles e procura por endpoints/hosts
   let bundlesContent = "";
@@ -4041,11 +4061,15 @@ async function tryNativeApiProbe(
     } catch { /* ignora bundle individual */ }
   }
 
-  // Hosts adicionais descobertos no JS (ex: api.abrint.com.br)
-  const hostMatches = bundlesContent.matchAll(/https:\/\/api\.[a-z0-9.-]+\.[a-z]{2,}/gi);
-  for (const hm of hostMatches) apiHostGuesses.add(hm[0]);
+  // Hosts adicionais descobertos no JS (ex: api.abrint.com.br, admin.expopostos.com.br)
+  for (const hm of bundlesContent.matchAll(/https:\/\/(?:api|admin|adm|backend|cms)\.[a-z0-9.-]+\.[a-z]{2,}/gi)) {
+    apiHostGuesses.add(hm[0]);
+  }
+  for (const hm of bundlesContent.matchAll(new RegExp(`https://[a-z0-9-]+\\.${escapedRoot}`, "gi"))) {
+    apiHostGuesses.add(hm[0]);
+  }
 
-  // Caminhos prováveis para listagem de expositores
+  // Caminhos prováveis para listagem de expositores/marcas
   const pathGuesses = [
     "/api/expositores",
     "/api/exhibitors",
@@ -4055,12 +4079,18 @@ async function tryNativeApiProbe(
     "/api/v1.0/exhibitors",
     "/api/exhibitors-list",
     "/api/expositores-lista",
+    "/api/marcas",
+    "/api/marca_confirmada/",
   ];
 
-  // Detecta paths reais nos bundles também (ex: `/api/foo/bar`)
-  const pathMatches = bundlesContent.matchAll(/["'`](\/api\/[a-z0-9_/.-]*(?:expositor|exhibitor)[a-z0-9_/-]*)["'`]/gi);
-  for (const pm of pathMatches) {
-    const p = pm[1].split("$")[0].replace(/\/$/, ""); // remove template literals
+  // Detecta paths reais nos bundles (expositor/exhibitor/marca/brand/empresa/participante/patrocinador)
+  const ENTITY_WORDS = "expositor|exhibitor|marca|brand|empresa|compan|participant|patrocinad|sponsor|associad";
+  const pathRegex = new RegExp(
+    `["'\`](\\/api\\/[a-z0-9_\\/.-]*(?:${ENTITY_WORDS})[a-z0-9_\\/-]*\\/?(?:\\?[a-z0-9_=&%.,-]*)?)["'\`]`,
+    "gi",
+  );
+  for (const pm of bundlesContent.matchAll(pathRegex)) {
+    const p = pm[1].split("$")[0]; // corta template literals
     if (p && !pathGuesses.includes(p)) pathGuesses.push(p);
   }
 
@@ -4069,33 +4099,65 @@ async function tryNativeApiProbe(
     paths_to_try: pathGuesses.length,
   });
 
+  const nameKeys = ["name", "nome", "company", "empresa", "razao_social", "title", "titulo"];
+  const extractList = (json: any): any[] => {
+    if (Array.isArray(json)) return json;
+    for (const k of ["data", "items", "results", "exhibitors", "expositores", "marcas", "records"]) {
+      if (Array.isArray(json?.[k])) return json[k];
+      if (Array.isArray(json?.[k]?.results)) return json[k].results;
+    }
+    return [];
+  };
+
   // 4. Testa combinações host × path
   for (const host of apiHostGuesses) {
     for (const path of pathGuesses) {
-      const endpoint = `${host}${path}`;
+      const endpoint = `${host}${path.startsWith("/") ? path : "/" + path}`;
       try {
-        const resp = await fetch(endpoint, {
-          headers: { "User-Agent": "Mozilla/5.0", "Accept": "application/json" },
+        // Paginação: segue `next` (DRF) ou incrementa `page` até esgotar (máx. 25 páginas)
+        const allItems: any[] = [];
+        let nextUrl: string | null = endpoint;
+        let pages = 0;
+        let firstPageValid = false;
+
+        while (nextUrl && pages < 25) {
+          const resp: Response = await fetch(nextUrl, {
+            headers: { "User-Agent": "Mozilla/5.0", "Accept": "application/json" },
+          });
+          if (!resp.ok) break;
+          const ct = resp.headers.get("content-type") || "";
+          if (!ct.includes("json")) break;
+
+          const json = await resp.json();
+          const list = extractList(json);
+          if (pages === 0) {
+            if (list.length < 5) break;
+            firstPageValid = true;
+          }
+          allItems.push(...list);
+          pages++;
+
+          const rawNext = json?.next || json?.next_page_url || json?.links?.next || null;
+          if (rawNext && typeof rawNext === "string") {
+            nextUrl = rawNext.startsWith("http") ? rawNext : new URL(rawNext, host).toString();
+          } else {
+            nextUrl = null;
+          }
+        }
+
+        if (!firstPageValid) continue;
+
+        // Dedup por nome normalizado
+        const seen = new Set<string>();
+        const validItems = allItems.filter((it) => {
+          if (!it || typeof it !== "object") return false;
+          const name = nameKeys.map((k) => it[k]).find((v) => typeof v === "string" && v.trim().length > 1);
+          if (!name) return false;
+          const key = String(name).trim().toLowerCase();
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
         });
-        if (!resp.ok) continue;
-        const ct = resp.headers.get("content-type") || "";
-        if (!ct.includes("json")) continue;
-
-        const json = await resp.json();
-        // Aceita {data: [...]}, {items: [...]}, [...], {success, data: [...]}
-        let list: any[] = [];
-        if (Array.isArray(json)) list = json;
-        else if (Array.isArray(json?.data)) list = json.data;
-        else if (Array.isArray(json?.items)) list = json.items;
-        else if (Array.isArray(json?.exhibitors)) list = json.exhibitors;
-        else if (Array.isArray(json?.expositores)) list = json.expositores;
-
-        // Valida: precisa ter >=5 itens com algo que pareça nome de empresa
-        if (list.length < 5) continue;
-        const nameKeys = ["name", "nome", "company", "empresa", "razao_social", "title"];
-        const validItems = list.filter((it) =>
-          it && typeof it === "object" && nameKeys.some((k) => typeof it[k] === "string" && it[k].length > 1)
-        );
         if (validItems.length < 5) continue;
 
         // 5. Converte para markdown sintético compatível com o parser existente
@@ -4103,7 +4165,7 @@ async function tryNativeApiProbe(
         for (const it of validItems) {
           const name = nameKeys.map((k) => it[k]).find((v) => typeof v === "string" && v.trim().length > 1);
           if (!name) continue;
-          const website = it.website || it.url || it.site || "";
+          const website = it.website || it.url || it.site || it.link || "";
           const description = it.description || it.descricao || it.descriptionPortuguese || it.about || "";
           const segment = it.segment || it.segmento || it.category || it.categoria || "";
           const location = it.location || it.localizacao || it.booth || it.stand || it.estande || "";
@@ -4116,6 +4178,10 @@ async function tryNativeApiProbe(
           lines.push("");
         }
 
+        await logRunEvent(supabase, organizationId, runId, "info",
+          `Native API endpoint válido: ${validItems.length} itens em ${pages} página(s)`,
+          { endpoint, pages, items: validItems.length });
+
         return {
           endpoint,
           markdown: lines.join("\n"),
@@ -4127,3 +4193,4 @@ async function tryNativeApiProbe(
 
   return null;
 }
+
