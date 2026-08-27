@@ -81,3 +81,6 @@ export type {
 
 export { detectExpoPostos, fetchExpoPostosBrands, tryExpoPostosFromUrl } from "./expopostos.ts";
 export type { ExpoPostosBrand, ExpoPostosFetchResult } from "./expopostos.ts";
+
+export { detectFesqua, fetchFesquaCompanies, tryFesquaFromUrl } from "./fesqua.ts";
+export type { FesquaCompany, FesquaFetchResult } from "./fesqua.ts";
