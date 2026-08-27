@@ -1143,6 +1143,67 @@ async function handleEventFirecrawl(
     }
   }
 
+  // Headless WordPress sites (Next.js front-end) expose listings through
+  // `wp-json/custom/v1/node?path=…` and server-render only the first page
+  // (Beauty Fair: 15 of 471 exhibitors across 32 pages). Walk the API instead.
+  if (allExhibitors.length === 0) {
+    try {
+      const { tryWpHeadlessNodeFromUrl } = await import("./providers/index.ts");
+      const wp = await tryWpHeadlessNodeFromUrl(eventUrl);
+      if (wp.detection) {
+        if (wp.result && wp.result.exhibitors.length > 0) {
+          for (const exhibitor of wp.result.exhibitors) {
+            allExhibitors.push({
+              company_name: exhibitor.name,
+              website: exhibitor.website,
+              category: exhibitor.category,
+              description: null,
+              booth: null,
+              country: null,
+              city: null,
+              exhibitor_profile_url: null,
+              signals: ["wp_headless_official_listing", exhibitor.category].filter(Boolean),
+              confidence: 95,
+              _source_url: exhibitor.source_url,
+              _page_type: "event_exhibitor_directory",
+              _extraction_method: "wp_headless_node_api",
+              _logo_url: exhibitor.logo_url,
+            });
+          }
+          providerUsed = "wp-headless-node";
+          metrics.exhibitors_extracted_raw = allExhibitors.length;
+          metrics.html_hybrid_extracted = allExhibitors.length;
+          (metrics as any).provider = providerUsed;
+          (metrics as any).wp_announced_total = wp.result.announced_total;
+          (metrics as any).wp_pages_fetched = wp.result.pages_fetched;
+          await logRunEvent(supabase, organizationId, run.id, "info",
+            `API headless WordPress retornou ${allExhibitors.length} de ${wp.result.announced_total} expositores em ${wp.result.pages_fetched} páginas`,
+            { provider: providerUsed, count: allExhibitors.length, announced: wp.result.announced_total, pages: wp.result.pages_fetched });
+        } else {
+          const failureMessage = "Listagem headless WordPress detectada, mas a paginação completa não pôde ser obtida. Execução interrompida para não salvar apenas a primeira página.";
+          await logRunEvent(supabase, organizationId, run.id, "error", failureMessage, { error: wp.error });
+          await supabase.from("playbook_runs").update({
+            status: "failed",
+            finished_at: new Date().toISOString(),
+            error_summary: `${failureMessage} ${wp.error ?? ""}`.trim(),
+            execution_time_ms: Date.now() - startTime,
+            stats: { ...metrics, provider: "wp-headless-node_failed" },
+          }).eq("id", run.id);
+          return new Response(JSON.stringify({ error: failureMessage, details: wp.error }), {
+            status: 502,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
+    } catch (providerErr) {
+      await logRunEvent(supabase, organizationId, run.id, "warn",
+        "Falha ao avaliar o provider headless WordPress; seguindo com os demais extratores.",
+        { error: String(providerErr) });
+    }
+  }
+
+
+
   // HIS renders sponsor names only inside logo artwork. The generic logo-wall
   // provider sees no alt/link text and emits a handful of meaningless names,
   // so this domain-specific parser resolves every logo before generic scraping.
