@@ -237,7 +237,12 @@ function unwrapOptimizedImageUrl(rawSrc: string, pageUrl: string): URL | null {
  * CDN URL is wrapped by /_next/image?url=. Walking the document in order also
  * preserves top-level sections and sponsorship tiers.
  */
-function extractSectionedAltLogoGrid(html: string, pageHost: string, pagePath: string): LogoWallSponsor[] {
+function extractSectionedAltLogoGrid(
+  html: string,
+  pageHost: string,
+  pagePath: string,
+  opts: { permissiveSections?: boolean } = {},
+): LogoWallSponsor[] {
   const out: LogoWallSponsor[] = [];
   const seen = new Set<string>();
   const pageUrl = `https://${pageHost}${pagePath || "/"}`;
@@ -254,6 +259,11 @@ function extractSectionedAltLogoGrid(html: string, pageHost: string, pagePath: s
         tier = null;
       } else if (section && SPONSOR_TIER_LABELS.has(key)) {
         tier = label;
+      } else if (opts.permissiveSections && label && label.length <= 80 && /[A-Za-zÀ-ÿ]/.test(label)) {
+        // Catalogue pages (URL already scoped to exhibitors/sponsors) group logos
+        // under editorial headings ("ESTALEIROS", "SHOPPING"), not tier keywords.
+        section = label;
+        tier = null;
       }
       continue;
     }
@@ -267,8 +277,9 @@ function extractSectionedAltLogoGrid(html: string, pageHost: string, pagePath: s
     const tag = match[4];
     if (!tag || !section) continue;
     const alt = pickAttr(tag, "alt");
-    const name = alt ? cleanCompanyNameCandidate(alt) : null;
+    const name = alt ? normalizeSlugName(alt) : null;
     if (!name || isBlacklistedName(name)) continue;
+
 
     const rawSrc = pickAttr(tag, "data-src") || pickAttr(tag, "data-lazy-src") || pickAttr(tag, "src");
     if (!rawSrc || /^data:/i.test(rawSrc)) continue;
