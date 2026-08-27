@@ -181,6 +181,45 @@ function normalizeLabel(raw: string): string {
   return decodeEntities(raw.replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
 }
 
+/**
+ * Many WordPress/Elementor catalogues expose the media slug as alt text
+ * ("EC3-AZIMUT", "diantonio-boats", "FLUVIMAR2_NOVO"). Turn those into readable
+ * company names: drop internal cota prefixes (EC-, EC3-, LOGO-), separators and
+ * editorial suffixes, then title-case the remaining tokens.
+ */
+const SLUG_PREFIX_RE = /^(ec\d*|logo(?:tipo)?|marca|brand|img|image|foto|patrocinador|expositor)[-_\s]+/i;
+const SLUG_SUFFIX_RE = /[-_\s]+(novo|new|logo|logotipo|marca|final|atualizado|oficial|preto|branco|color|colorido|vector|horizontal|vertical|png|jpg|site|web|\d{2,4}|v\d)$/i;
+
+export function normalizeSlugName(raw: string): string | null {
+  let stem = decodeEntities(raw).trim();
+  if (!stem) return null;
+  // Only treat as slug when there is no natural spacing or it is clearly a file slug.
+  const looksLikeSlug = !/\s/.test(stem) && /[-_]/.test(stem);
+  if (!looksLikeSlug && !/^[A-Z0-9][A-Z0-9\s_-]*$/.test(stem)) return cleanCompanyNameCandidate(stem);
+
+  stem = stem.replace(/\.(png|jpe?g|webp|svg|avif|gif)$/i, "");
+  stem = stem.replace(/\([^)]*\)/g, " ");
+  let previous = "";
+  while (previous !== stem) {
+    previous = stem;
+    stem = stem.replace(SLUG_PREFIX_RE, "").replace(SLUG_SUFFIX_RE, "");
+  }
+  const tokens = stem
+    .split(/[-_\s.]+/)
+    .map((t) => t.trim())
+    .filter((t) => t && !/^\d+$/.test(t) && !FILENAME_NOISE_RE.test(t));
+  if (tokens.length === 0) return null;
+  const name = tokens
+    .map((t) =>
+      /^[A-ZÀ-Ý0-9&]+$/.test(t) && t.length <= 4
+        ? t.toUpperCase()
+        : t[0].toLocaleUpperCase("pt-BR") + t.slice(1).toLocaleLowerCase("pt-BR")
+    )
+    .join(" ");
+  return cleanCompanyNameCandidate(name);
+}
+
+
 function unwrapOptimizedImageUrl(rawSrc: string, pageUrl: string): URL | null {
   try {
     const outer = new URL(rawSrc, pageUrl);
