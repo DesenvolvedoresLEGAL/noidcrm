@@ -1,6 +1,17 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.76.0";
 import { sanitizeProspectDomain } from "../_shared/domain-blocklist.ts";
+import { buildMarketPlan } from "./providers/market-plan.ts";
+import { searchPlaces } from "./providers/google-places.ts";
+import { perplexitySearch } from "./providers/perplexity-search.ts";
+import {
+  consolidateCandidates,
+  hasMinimumIdentity,
+  normalizeName,
+  parsePerplexityCompanies,
+  toDomain,
+  type MarketCandidate,
+} from "./providers/market-search.ts";
 
 
 
@@ -742,7 +753,7 @@ ICP Profile:
       }
     };
 
-    if (searchType === "event") {
+    if (searchType === "event" || searchType === "directory") {
       // @ts-ignore - EdgeRuntime is a Supabase Edge global not in default Deno types
       (globalThis as any).EdgeRuntime?.waitUntil
         ? (globalThis as any).EdgeRuntime.waitUntil(executeRun())
@@ -4260,118 +4271,293 @@ ${icpContext}`,
     { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 }
 
-// ── Directory Search Handler ───────────────────────────────────────
+// ── Market Search Handler (aba "Diretórios") ───────────────────────
+// Motor de busca de mercado: alvo em linguagem natural -> plano de consultas
+// -> fan-out (Google Places + Firecrawl Search + Perplexity) -> consolidação
+// -> enriquecimento (contato + CNPJ/porte) -> scoring -> persistência.
 
 async function handleDirectorySearch(
   supabase: any, run: any, organizationId: string, icpId: string | null,
   config: any, icpContext: string, scoreThreshold: number, accounts: any[], startTime: number
 ) {
-  const directorySource = config.directory_source || "diretório";
-  const directoryUrl = config.directory_url || null;
+  const target = String(config.target || config.directory_source || "").trim();
+  if (!target) throw new Error("Descreva o alvo da busca (ex: agências de eventos em São Paulo)");
+
+  const limit = Math.max(5, Math.min(Number(config.limit) || 50, 50));
+  const enrichEnabled = config.enrich !== false;
 
   const FIRECRAWL_API_KEY = Deno.env.get("FIRECRAWL_API_KEY");
-  if (!FIRECRAWL_API_KEY) throw new Error("FIRECRAWL_API_KEY not configured");
-  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-  if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+  const GOOGLE_PLACES_API_KEY = Deno.env.get("GOOGLE_PLACES_API_KEY");
+  const PERPLEXITY_API_KEY = Deno.env.get("PERPLEXITY_API_KEY");
 
   const { data: source } = await supabase.from("lead_sources").insert({
     organization_id: organizationId, playbook_run_id: run.id,
-    source_type: "directory", source_label: `Diretório: ${directorySource}`,
-    source_url: directoryUrl, source_metadata: config,
+    source_type: "market_search", source_label: `Mercado: ${target}`,
+    source_metadata: config,
   }).select().single();
 
-  let combinedContent = "";
-  let pagesProcessed = 0;
+  // ── 1. Interpretação ─────────────────────────────────────────────
+  const plan = await buildMarketPlan({
+    apiKey: OPENAI_API_KEY ?? null,
+    target,
+    segment: config.segment,
+    city: config.city,
+    state: config.state,
+    icpContext,
+  });
+  await logRunEvent(supabase, organizationId, run.id, "info", `Plano de busca: ${plan.queries.length} consultas`, {
+    segment: plan.segment, city: plan.city, state: plan.state, queries: plan.queries, places_queries: plan.places_queries,
+  });
 
-  if (directoryUrl) {
-    // Direct URL crawl: Map + Scrape (similar to event handler)
-    await logRunEvent(supabase, organizationId, run.id, "info", "Mapeando URL do diretório", { directoryUrl });
+  const candidates: MarketCandidate[] = [];
+  const sourcesUsed: string[] = [];
+  const warnings: string[] = [];
 
-    const formatted = directoryUrl.startsWith("http") ? directoryUrl : `https://${directoryUrl}`;
-    const mapResp = await fetch("https://api.firecrawl.dev/v1/map", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${FIRECRAWL_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ url: formatted, limit: 100, includeSubdomains: false }),
-    });
-    const mapData = await mapResp.json();
-    const urls: string[] = (mapData.links || mapData.data?.links || []).slice(0, 8);
-
-    await logRunEvent(supabase, organizationId, run.id, "info", `${urls.length} páginas encontradas no diretório`);
-
-    for (const u of urls) {
+  // ── 2a. Google Places ────────────────────────────────────────────
+  if (GOOGLE_PLACES_API_KEY) {
+    sourcesUsed.push("google_places");
+    for (const q of plan.places_queries) {
       try {
-        const md = await firecrawlScrape(FIRECRAWL_API_KEY, u);
-        if (md) {
-          combinedContent += `\n\n--- Página: ${u} ---\n${md.substring(0, 3000)}`;
-          pagesProcessed++;
-          await supabase.from("source_pages").insert({
-            organization_id: organizationId, lead_source_id: source?.id,
-            url: u, page_type: "directory_page", status: "scraped", raw_content: md.substring(0, 5000),
+        const places = await searchPlaces({ apiKey: GOOGLE_PLACES_API_KEY, query: q, maxResults: limit });
+        for (const p of places) {
+          candidates.push({
+            company_name: p.company_name,
+            website: p.website,
+            domain: toDomain(p.website),
+            phone: p.phone,
+            email: null,
+            address: p.address,
+            city: p.city,
+            state: p.state,
+            category: p.category,
+            description: p.category ? `${p.category}${p.reviews ? ` · ${p.reviews} avaliações` : ""}` : null,
+            sources: ["google_places"],
+            source_urls: [p.maps_url].filter(Boolean) as string[],
+            confidence: 60,
           });
         }
+        await logRunEvent(supabase, organizationId, run.id, "info", `Places: ${places.length} empresas em "${q}"`);
       } catch (err) {
-        console.error(`Scrape error for ${u}:`, err);
-        await logRunEvent(supabase, organizationId, run.id, "warn", `Falha ao scrape: ${u}`, { error: String(err) });
+        warnings.push(`places:${String(err).substring(0, 120)}`);
+        await logRunEvent(supabase, organizationId, run.id, "warn", `Falha no Google Places: ${q}`, { error: String(err) });
       }
     }
   } else {
-    // Search-based discovery
-    const query = `${directorySource} empresas Brasil lista diretório`;
-    await logRunEvent(supabase, organizationId, run.id, "info", "Buscando diretório via Firecrawl Search", { query });
+    warnings.push("GOOGLE_PLACES_API_KEY não configurada");
+    await logRunEvent(supabase, organizationId, run.id, "warn", "Google Places não configurado — rodando sem esta fonte");
+  }
 
-    const results = await firecrawlSearch(FIRECRAWL_API_KEY, query, 8);
-    pagesProcessed = results.length;
-
-    for (const r of results) {
-      if (r.url) {
-        await supabase.from("source_pages").insert({
-          organization_id: organizationId, lead_source_id: source?.id,
-          url: r.url, page_type: "search_result", status: "scraped",
-          raw_content: r.markdown?.substring(0, 5000) || null,
-        });
+  // ── 2b. Firecrawl Search + extração AI ───────────────────────────
+  if (FIRECRAWL_API_KEY && OPENAI_API_KEY) {
+    sourcesUsed.push("firecrawl");
+    let combined = "";
+    let pages = 0;
+    for (const q of plan.queries.slice(0, 8)) {
+      try {
+        const results = await firecrawlSearch(FIRECRAWL_API_KEY, q, 5);
+        for (const r of results) {
+          if (!r.url) continue;
+          pages++;
+          combined += `\n\n--- ${r.url} ---\n${(r.markdown || r.description || "").substring(0, 2500)}`;
+          await supabase.from("source_pages").insert({
+            organization_id: organizationId, lead_source_id: source?.id,
+            url: r.url, page_type: "market_search_result", status: "scraped",
+            raw_content: (r.markdown || "").substring(0, 5000) || null,
+          });
+        }
+      } catch (err) {
+        warnings.push(`firecrawl:${String(err).substring(0, 120)}`);
+        await logRunEvent(supabase, organizationId, run.id, "warn", `Falha na busca: ${q}`, { error: String(err) });
       }
-      combinedContent += `\n\n--- ${r.url || ""} ---\n${(r.markdown || r.description || "").substring(0, 3000)}`;
+    }
+    await logRunEvent(supabase, organizationId, run.id, "info", `${pages} páginas coletadas na web`);
+
+    if (combined.trim()) {
+      const chunks: string[] = [];
+      for (let i = 0; i < combined.length && chunks.length < 3; i += 18000) {
+        chunks.push(combined.substring(i, i + 18000));
+      }
+      for (const chunk of chunks) {
+        try {
+          const extracted = await aiExtractCompanies(
+            OPENAI_API_KEY,
+            `Você é o Kairós extraindo empresas REAIS para prospecção B2B no Brasil.
+Alvo do usuário: "${target}" (segmento: ${plan.segment}${plan.city ? `, cidade: ${plan.city}` : ""}${plan.state ? `/${plan.state}` : ""}).
+Extraia apenas empresas que prestam esse serviço/atuam nesse segmento.
+Ignore portais de notícia, blogs, marketplaces, agregadores, listas genéricas e perfis de rede social.
+NUNCA invente nome, site, telefone ou e-mail: só preencha o que aparece no conteúdo.
+Termos negativos: ${plan.negative_terms.join(", ")}.
+${icpContext}`,
+            `Conteúdo coletado na web:\n\n${chunk}`,
+            "extract_market_companies",
+            "Extrai empresas reais do mercado alvo",
+            { phone: { type: "string" }, email: { type: "string" } },
+          );
+          for (const c of extracted) {
+            candidates.push({
+              company_name: c.company_name,
+              website: c.website || null,
+              domain: toDomain(c.website || null),
+              phone: c.phone || null,
+              email: c.email || null,
+              address: null,
+              city: c.city || plan.city,
+              state: c.state || plan.state,
+              category: c.industry || null,
+              description: c.description || null,
+              sources: ["firecrawl"],
+              source_urls: [],
+              confidence: Math.min(80, c.confidence || 50),
+            });
+          }
+        } catch (err) {
+          warnings.push(`ai_extract:${String(err).substring(0, 120)}`);
+          await logRunEvent(supabase, organizationId, run.id, "warn", "Falha na extração AI de um bloco", { error: String(err) });
+        }
+      }
+    }
+  } else {
+    warnings.push("Firecrawl/OpenAI não configurados");
+  }
+
+  // ── 2c. Perplexity Sonar (fonte citada) ──────────────────────────
+  if (PERPLEXITY_API_KEY) {
+    sourcesUsed.push("perplexity");
+    for (const q of plan.queries.slice(0, 2)) {
+      try {
+        const answer = await perplexitySearch({ apiKey: PERPLEXITY_API_KEY, query: q });
+        const parsed = parsePerplexityCompanies(answer.content, answer.citations);
+        candidates.push(...parsed);
+        await logRunEvent(supabase, organizationId, run.id, "info", `Perplexity: ${parsed.length} empresas em "${q}"`);
+      } catch (err) {
+        warnings.push(`perplexity:${String(err).substring(0, 160)}`);
+        await logRunEvent(supabase, organizationId, run.id, "warn", "Falha na Perplexity", { error: String(err) });
+      }
     }
   }
 
-  await logRunEvent(supabase, organizationId, run.id, "info", `${pagesProcessed} páginas processadas, extraindo empresas via AI`);
-
-  const companies = await aiExtractCompanies(
-    LOVABLE_API_KEY,
-    `Você é o Caramelo Agent extraindo empresas de diretórios B2B.
-Extraia empresas REAIS listadas nos resultados. Nunca invente dados.
-Fonte: ${directorySource}.
-${icpContext}`,
-    `Extraia todas as empresas listadas neste diretório/fonte (${directorySource}):\n\n${combinedContent.substring(0, 20000)}`,
-    "extract_directory_companies",
-    "Extract real companies from directory listings",
+  // ── 3. Consolidação ──────────────────────────────────────────────
+  const consolidated = consolidateCandidates(candidates).filter(hasMinimumIdentity).slice(0, limit);
+  await logRunEvent(
+    supabase, organizationId, run.id, "info",
+    `${candidates.length} candidatos brutos → ${consolidated.length} empresas únicas`,
+    { sources_used: sourcesUsed, warnings },
   );
 
-  await logRunEvent(supabase, organizationId, run.id, "info", `${companies.length} empresas extraídas via AI`);
+  if (consolidated.length === 0) {
+    const elapsed = Date.now() - startTime;
+    const stats = { candidates: candidates.length, prospects_created: 0, sources_used: sourcesUsed, warnings };
+    await supabase.from("playbook_runs").update({
+      status: "completed_empty", finished_at: new Date().toISOString(), stats, execution_time_ms: elapsed,
+    }).eq("id", run.id);
+    await logRunEvent(supabase, organizationId, run.id, "warn", "Nenhuma empresa encontrada com dados verificáveis", stats);
+    return new Response(JSON.stringify({ run_id: run.id, prospects_count: 0, stats }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  }
 
+  // ── 4. Persistência (scoring reaproveitado) ──────────────────────
   const created = await saveProspectsFromExtraction(
-    supabase, companies, organizationId, run.id, icpId, source?.id,
-    `Diretório: ${directorySource}`,
-    ["listed_in_directory", "has_public_profile"],
+    supabase,
+    consolidated.map((c) => ({
+      company_name: c.company_name,
+      website: c.website,
+      industry: c.category,
+      city: c.city,
+      state: c.state,
+      description: c.description,
+      confidence: c.confidence,
+      signals: c.sources.map((s) => `source_${s}`),
+      market_target: target,
+      phone: c.phone,
+      email: c.email,
+      address: c.address,
+      source_urls: c.source_urls,
+    })),
+    organizationId, run.id, icpId, source?.id,
+    `Mercado: ${target}`,
+    ["market_search"],
     accounts,
-    (c) => {
+    (c: any) => {
       let b = 0;
       if (c.website) b += 10;
-      if (directoryUrl) b += 10; // official directory bonus
-      if (c.description && c.description.length > 20) b += 5;
+      if (c.phone) b += 8;
+      if ((c.signals || []).length > 1) b += 10; // citada por mais de uma fonte
+      if (plan.city && c.city && String(c.city).toLowerCase().includes(plan.city.toLowerCase())) b += 5;
       return b;
     },
   );
+
+  // Contatos públicos vindos das fontes (o helper de scoring não os persiste)
+  const { data: runProspects } = await supabase
+    .from("prospects")
+    .select("id, company_name, phone_public, email_public, source_url")
+    .eq("playbook_run_id", run.id)
+    .eq("organization_id", organizationId);
+
+  const byName = new Map<string, MarketCandidate>();
+  for (const c of consolidated) byName.set(normalizeName(c.company_name), c);
+
+  for (const p of runProspects || []) {
+    const c = byName.get(normalizeName(p.company_name));
+    if (!c) continue;
+    const patch: Record<string, any> = {};
+    if (!p.phone_public && c.phone) patch.phone_public = c.phone;
+    if (!p.email_public && c.email) patch.email_public = c.email;
+    if (!p.source_url && c.source_urls[0]) patch.source_url = c.source_urls[0];
+    if (c.address) patch.endereco = c.address;
+    if (Object.keys(patch).length > 0) {
+      await supabase.from("prospects").update(patch).eq("id", p.id);
+    }
+  }
+
+  // ── 5. Enriquecimento (site oficial + CNPJ/porte/CNAE) ───────────
+  let enriched = 0;
+  if (enrichEnabled && runProspects?.length) {
+    await logRunEvent(supabase, organizationId, run.id, "info", `Enriquecendo ${runProspects.length} empresas (contato + CNPJ)`);
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const ids = runProspects.map((p: any) => p.id);
+    const BATCH = 3;
+    for (let i = 0; i < ids.length; i += BATCH) {
+      const chunk = ids.slice(i, i + BATCH);
+      const results = await Promise.all(
+        chunk.map(async (prospect_id: string) => {
+          try {
+            const resp = await fetch(`${supabaseUrl}/functions/v1/enrich-prospect-identity`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}`, apikey: serviceKey },
+              body: JSON.stringify({ prospect_id }),
+            });
+            return resp.ok;
+          } catch (_err) {
+            return false;
+          }
+        }),
+      );
+      enriched += results.filter(Boolean).length;
+    }
+    await logRunEvent(supabase, organizationId, run.id, "info", `${enriched} empresas enriquecidas`);
+  }
 
   const importRules = config.importRules || {};
   const autoImported = await autoImportEligibleProspects(supabase, organizationId, run.id, importRules);
 
   const elapsed = Date.now() - startTime;
-  const stats = { pages_processed: pagesProcessed, companies_extracted: companies.length, prospects_created: created, auto_imported: autoImported };
+  const stats = {
+    target,
+    queries: plan.queries.length,
+    candidates: candidates.length,
+    companies_unique: consolidated.length,
+    prospects_created: created,
+    enriched,
+    auto_imported: autoImported,
+    sources_used: sourcesUsed,
+    warnings,
+  };
   await logRunEvent(supabase, organizationId, run.id, "info", `Concluído: ${created} prospects criados`, stats);
   await supabase.from("playbook_runs").update({
     status: "completed", finished_at: new Date().toISOString(), stats,
-    execution_log: [{ step: "directory_search", ...stats, at: new Date().toISOString() }],
+    execution_log: [{ step: "market_search", ...stats, at: new Date().toISOString() }],
     execution_time_ms: elapsed,
   }).eq("id", run.id);
 
