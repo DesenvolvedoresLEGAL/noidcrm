@@ -355,6 +355,13 @@ export function LeadResultsTable({
                         {prospect.normalized_domain && (
                           <div className="text-xs text-muted-foreground">{prospect.normalized_domain}</div>
                         )}
+                        {(prospect.phone_public || prospect.email_public || prospect.porte) && (
+                          <div className="text-[10px] text-muted-foreground flex flex-wrap gap-x-2">
+                            {prospect.phone_public && <span>{prospect.phone_public}</span>}
+                            {prospect.email_public && <span className="truncate max-w-[160px]">{prospect.email_public}</span>}
+                            {prospect.porte && <span>{prospect.porte}</span>}
+                          </div>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">{prospect.source_label || '-'}</TableCell>

@@ -265,6 +265,13 @@ export function ProspectDetailDrawer({
                     </div>
                   )}
                 </div>
+                {(prospect.phone_public || prospect.email_public || prospect.endereco) && (
+                  <div className="grid grid-cols-1 gap-1 text-xs">
+                    {prospect.phone_public && <div><span className="text-muted-foreground">Telefone:</span> <span className="font-medium">{prospect.phone_public}</span></div>}
+                    {prospect.email_public && <div><span className="text-muted-foreground">E-mail:</span> <span className="font-medium break-all">{prospect.email_public}</span></div>}
+                    {prospect.endereco && <div><span className="text-muted-foreground">Endereço:</span> {prospect.endereco}</div>}
+                  </div>
+                )}
                 {prospect.summary && <p className="text-sm text-muted-foreground">{prospect.summary}</p>}
               </section>
 
