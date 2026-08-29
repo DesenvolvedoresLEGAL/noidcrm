@@ -55,7 +55,7 @@ function sanitizeEventUrl(raw: string): { url: string | null; error: string | nu
 const SEARCH_TYPES = [
   { id: 'event', label: 'Evento (Expositores)', icon: CalendarDays, description: 'Encontre leads a partir de eventos e feiras', status: 'live' as const },
   { id: 'import', label: 'Lista Importada', icon: FileUp, description: 'Analise uma lista existente', status: 'live' as const },
-  { id: 'directory', label: 'Diretórios', icon: Globe, description: 'Busque em diretórios de empresas', status: 'wip' as const },
+  { id: 'directory', label: 'Diretórios', icon: Globe, description: 'Busca de mercado por segmento e região', status: 'live' as const },
   { id: 'geo', label: 'Busca Geográfica', icon: MapPin, description: 'Prospecção por localização', status: 'wip' as const },
   { id: 'seed', label: 'Seed Expansion', icon: Users, description: 'Encontre empresas similares', status: 'wip' as const },
 ];
@@ -129,6 +129,11 @@ export function LeadSearchForm({ onExecute, isExecuting }: LeadSearchFormProps) 
           autoAssignOwner,
         },
       });
+      return;
+    }
+
+    if (playbookType === 'directory' && !String(inputPayload.target || '').trim()) {
+      toast.error('Descreva o que você quer encontrar (ex: agências de eventos em São Paulo)');
       return;
     }
 
@@ -293,13 +298,47 @@ export function LeadSearchForm({ onExecute, isExecuting }: LeadSearchFormProps) 
             {playbookType === 'directory' && (
               <>
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Diretório / Fonte</Label>
-                  <Input placeholder="Ex: LinkedIn, Crunchbase" value={inputPayload.directory_source || ''} onChange={e => updatePayload('directory_source', e.target.value)} />
+                  <Label className="text-xs">O que você quer encontrar</Label>
+                  <Textarea
+                    className="min-h-[70px] text-xs"
+                    placeholder="Ex: agências de eventos em São Paulo que atendem grandes marcas"
+                    value={inputPayload.target || ''}
+                    onChange={e => updatePayload('target', e.target.value)}
+                  />
+                  <p className="text-[10px] text-muted-foreground">
+                    Descreva o alvo em linguagem natural. O Kairós gera as consultas e busca em Google Places, web e pesquisa com citações.
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Cidade</Label>
+                    <Input placeholder="São Paulo" value={inputPayload.city || ''} onChange={e => updatePayload('city', e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">UF</Label>
+                    <Input placeholder="SP" value={inputPayload.state || ''} onChange={e => updatePayload('state', e.target.value)} />
+                  </div>
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs">URL do Diretório (opcional)</Label>
-                  <Input placeholder="https://diretorio.com.br/empresas" value={inputPayload.directory_url || ''} onChange={e => updatePayload('directory_url', e.target.value)} />
-                  <p className="text-[10px] text-muted-foreground">Se informado, faremos crawl direto na URL</p>
+                  <Label className="text-xs">Segmento (opcional)</Label>
+                  <Input placeholder="Ex: agência de eventos" value={inputPayload.segment || ''} onChange={e => updatePayload('segment', e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Limite de empresas ({inputPayload.limit ?? 50})</Label>
+                  <Slider
+                    value={[Number(inputPayload.limit ?? 50)]}
+                    onValueChange={([v]) => updatePayload('limit', v)}
+                    min={10}
+                    max={50}
+                    step={5}
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs">Enriquecer (contato + CNPJ/porte)</Label>
+                  <Switch
+                    checked={inputPayload.enrich !== false}
+                    onCheckedChange={v => updatePayload('enrich', v)}
+                  />
                 </div>
               </>
             )}
