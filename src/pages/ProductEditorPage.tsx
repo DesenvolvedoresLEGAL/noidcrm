@@ -680,7 +680,7 @@ export default function ProductEditorPage() {
                 <CardContent className="space-y-3">
                   <Row label="Receita bruta" value={formatCurrencyBR(margin.revenue)} />
                   <Row
-                    label={`Imposto (${(taxPercent || 0).toFixed(2)}%)`}
+                    label={`Imposto (${(Number(taxPercent) || 0).toFixed(2)}%)`}
                     value={`− ${formatCurrencyBR(margin.tax_amount)}`}
                     muted
                   />
