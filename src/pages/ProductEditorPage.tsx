@@ -179,22 +179,28 @@ export default function ProductEditorPage() {
   const ppdPoints = form.watch('default_quantity_points') || 1;
   const ppdDays = form.watch('default_billing_days') || 1;
 
+  const toNum = (v: unknown): number | null => {
+    if (v === null || v === undefined || v === '') return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+
   const margin = useMemo(
     () =>
       computeMargin({
         billing_type: billingType,
-        price: price ?? null,
-        monthly_price: monthlyPrice ?? null,
-        point_day_price: ppdPrice ?? null,
-        points: ppdPoints,
-        days: ppdDays,
-        cost: cost ?? null,
-        tax_percent: taxPercent ?? null,
+        price: toNum(price),
+        monthly_price: toNum(monthlyPrice),
+        point_day_price: toNum(ppdPrice),
+        points: toNum(ppdPoints) ?? 1,
+        days: toNum(ppdDays) ?? 1,
+        cost: toNum(cost),
+        tax_percent: toNum(taxPercent),
       }),
     [billingType, price, monthlyPrice, ppdPrice, ppdPoints, ppdDays, cost, taxPercent],
   );
 
-  const contractTotal = (monthlyPrice || 0) * minimumContractMonths;
+  const contractTotal = (toNum(monthlyPrice) ?? 0) * (toNum(minimumContractMonths) ?? 12);
 
   const mutation = useMutation({
     mutationFn: async (data: ProductFormData) => {
