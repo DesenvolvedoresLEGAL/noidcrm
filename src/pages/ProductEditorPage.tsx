@@ -695,12 +695,12 @@ export default function ProductEditorPage() {
                     <div className="text-right">
                       <div
                         className={`font-bold text-lg ${
-                          margin.margin_percent > 0
+                          (Number(margin.margin_percent) || 0) > 0
                             ? 'text-emerald-600'
                             : 'text-muted-foreground'
                         }`}
                       >
-                        {margin.margin_percent.toFixed(1)}%
+                        {(Number(margin.margin_percent) || 0).toFixed(1)}%
                       </div>
                       <div className="text-xs text-muted-foreground">
                         {formatCurrencyBR(margin.margin_amount)}
