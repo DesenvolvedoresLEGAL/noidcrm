@@ -110,9 +110,11 @@ export function extractProviderRequestId(
     const v = (m?.[1] ?? m?.[2])?.trim();
     if (v && isValidApolloAsyncRequestId(v)) return v;
   }
+  // Nunca aceitar número vindo de JSON.parse: int64 do Apollo perde precisão
+  // em float64 (ex.: ...113143 -> ...113000) e o /webhook_result devolve 404.
   for (const key of ["request_id", "webhook_request_id"]) {
     const v = parsed?.[key];
-    if (v !== undefined && v !== null && isValidApolloAsyncRequestId(v)) return String(v).trim();
+    if (typeof v === "string" && isValidApolloAsyncRequestId(v)) return v.trim();
   }
   return isValidApolloAsyncRequestId(headerValue) ? String(headerValue).trim() : null;
 }
