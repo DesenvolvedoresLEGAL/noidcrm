@@ -170,12 +170,15 @@ All colors MUST be HSL.
   @media (max-width: 767px) {
     html {
       max-width: 100%;
+      /* `clip` evita que o html vire container de scroll (bug de travamento no iOS) */
       overflow-x: hidden;
+      overflow-x: clip;
     }
 
     body {
       max-width: 100%;
       overflow-x: hidden;
+      overflow-x: clip;
       min-height: 100dvh;
       /* evita bounce/rubber-band que expõe fundo branco no standalone */
       overscroll-behavior-y: none;
@@ -188,6 +191,21 @@ All colors MUST be HSL.
       font-size: 16px;
     }
   }
+
+  /* Documentos públicos (proposta via link): garante rolagem vertical livre
+     em qualquer navegador mobile, sem travas herdadas do webapp. */
+  html.public-doc,
+  html.public-doc body {
+    overflow-x: clip;
+    overflow-y: visible;
+    height: auto;
+    min-height: 0;
+    position: static;
+    overscroll-behavior-y: auto;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y pinch-zoom;
+  }
+
 
 
   h1, h2, h3, h4 {

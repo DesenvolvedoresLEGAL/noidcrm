@@ -38,6 +38,16 @@ export function usePublicDocumentTheme() {
     };
   }, [theme]);
 
+  // Public docs must scroll freely on mobile browsers (no PWA scroll locks).
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.add('public-doc');
+    return () => {
+      root.classList.remove('public-doc');
+    };
+  }, []);
+
+
   const setTheme = useCallback((next: PublicTheme) => {
     try {
       localStorage.setItem(STORAGE_KEY, next);
