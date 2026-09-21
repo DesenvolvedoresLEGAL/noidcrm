@@ -39442,6 +39442,7 @@ export type Database = {
         Args: { p_org_id: string; p_prefix?: string }
         Returns: string
       }
+      prune_log_tables: { Args: never; Returns: Json }
       prune_recalc_queues: { Args: never; Returns: undefined }
       prune_score_history: { Args: never; Returns: undefined }
       read_email_batch: {

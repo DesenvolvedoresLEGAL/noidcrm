@@ -22,6 +22,34 @@
       "when": 1790025852668,
       "tag": "0002_score_history_retention",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790028377986,
+      "tag": "0003_log_tables_retention_fn",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790028491408,
+      "tag": "0004_opportunity_trigger_column_scoping",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790028666746,
+      "tag": "0005_scope_security_audit_triggers_and_retention_30d",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790029112790,
+      "tag": "0006_prune_log_tables_batch_500k",
+      "breakpoints": true
     }
   ]
 }
