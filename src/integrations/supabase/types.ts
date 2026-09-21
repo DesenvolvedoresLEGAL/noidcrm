@@ -39443,6 +39443,7 @@ export type Database = {
         Returns: string
       }
       prune_recalc_queues: { Args: never; Returns: undefined }
+      prune_score_history: { Args: never; Returns: undefined }
       read_email_batch: {
         Args: { batch_size: number; queue_name: string; vt: number }
         Returns: {
