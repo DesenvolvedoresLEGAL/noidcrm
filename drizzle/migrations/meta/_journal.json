@@ -8,6 +8,20 @@
       "when": 1788203778514,
       "tag": "0000_fix_reset_proposal_approval_state_bypass_freeze_guard",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790025541461,
+      "tag": "0001_perf_queue_retention_and_index_cleanup",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790025852668,
+      "tag": "0002_score_history_retention",
+      "breakpoints": true
     }
   ]
 }
