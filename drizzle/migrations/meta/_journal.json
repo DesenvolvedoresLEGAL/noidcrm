@@ -36,6 +36,13 @@
       "when": 1790028491408,
       "tag": "0004_opportunity_trigger_column_scoping",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790028666746,
+      "tag": "0005_scope_security_audit_triggers_and_retention_30d",
+      "breakpoints": true
     }
   ]
 }
