@@ -50,6 +50,13 @@
       "when": 1790029112790,
       "tag": "0006_prune_log_tables_batch_500k",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790187419415,
+      "tag": "0007_prune_cron_job_run_details_retention",
+      "breakpoints": true
     }
   ]
 }
