@@ -83,7 +83,28 @@ serve(async (req: Request) => {
 
       console.log("[BulkCreate] Request from user:", user.id);
 
+      // Platform admins may target a specific organization via orgId
+      if (orgIdOverride) {
+        const { data: isPa } = await supabaseAdmin.from('platform_admins').select('user_id').eq('user_id', user.id).eq('is_active', true).maybeSingle();
+        if (!isPa) {
+          return new Response(JSON.stringify({ error: "Apenas administradores da plataforma podem escolher a organização" }), {
+            status: 403,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const { data: orgRow } = await supabaseAdmin.from('organizations').select('id').eq('id', orgIdOverride).maybeSingle();
+        if (!orgRow) {
+          return new Response(JSON.stringify({ error: "Organização não encontrada" }), {
+            status: 404,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        membership = { organization_id: orgIdOverride, org_role: 'owner' };
+        console.log(`[BulkCreate] Platform admin ${user.id} targeting org ${orgIdOverride}`);
+      }
+
       // Get user's organization and check if admin/owner
+      if (!membership) {
       const { data: member } = await supabaseAdmin
         .from("organization_members")
         .select("organization_id, org_role")
@@ -107,6 +128,7 @@ serve(async (req: Request) => {
           status: 403,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
+      }
       }
     }
 
