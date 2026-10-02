@@ -341,12 +341,13 @@ serve(async (req: Request) => {
         if (existingProfile) {
           // Profile already exists, update it
           console.log(`[BulkCreate] Profile exists, updating with org data`);
+          // NOTE: organization_id is managed by organization_members + sync trigger;
+          // profiles.organization_id changes are blocked by DB trigger, so we don't set it here.
           const { error } = await supabaseAdmin
             .from("profiles")
             .update({
               full_name: userInput.fullName,
               email: userInput.email,
-              organization_id: orgId,
             })
             .eq("user_id", userId);
           profileError = error;
@@ -359,7 +360,6 @@ serve(async (req: Request) => {
               user_id: userId,
               full_name: userInput.fullName,
               email: userInput.email,
-              organization_id: orgId,
             });
           profileError = error;
         }
