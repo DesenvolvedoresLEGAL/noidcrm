@@ -129,6 +129,7 @@ serve(async (req: Request) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+      }
     }
 
     const orgId = (membership as { organization_id: string }).organization_id;
