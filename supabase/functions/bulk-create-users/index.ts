@@ -85,7 +85,7 @@ serve(async (req: Request) => {
 
       // Platform admins may target a specific organization via orgId
       if (orgIdOverride) {
-        const { data: isPa } = await supabaseAdmin.rpc('is_platform_admin', { _user_id: user.id });
+        const { data: isPa } = await supabaseAdmin.from('platform_admins').select('user_id').eq('user_id', user.id).eq('is_active', true).maybeSingle();
         if (!isPa) {
           return new Response(JSON.stringify({ error: "Apenas administradores da plataforma podem escolher a organização" }), {
             status: 403,
