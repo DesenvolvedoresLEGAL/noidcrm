@@ -19,7 +19,7 @@ export function useOrganizationAccounts() {
         
         const { data: accountsData, error: fetchError } = await supabase
           .from('accounts')
-          .select('id, razao_social, nome_fantasia')
+          .select('id, razao_social, nome_fantasia').is('deleted_at', null)
           .eq('organization_id', orgId.data)
           .order('razao_social');
         
