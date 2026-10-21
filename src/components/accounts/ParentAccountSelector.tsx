@@ -44,7 +44,7 @@ export function ParentAccountSelector({ value, onChange, excludeId, disabled }: 
     try {
       let supabaseQuery = supabase
         .from('accounts')
-        .select('id, razao_social, nome_fantasia, cnpj')
+        .select('id, razao_social, nome_fantasia, cnpj').is('deleted_at', null)
         .eq('tipo_pessoa', 'PJ')
         .is('parent_account_id', null)
         .order('razao_social')

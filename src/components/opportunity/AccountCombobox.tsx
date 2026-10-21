@@ -69,6 +69,7 @@ export function AccountCombobox({ value, onChange, disabled, placeholder = "Sele
       let query = supabase
         .from('accounts')
         .select('id, razao_social, nome_fantasia')
+        .is('deleted_at', null)
         .order('razao_social')
         .limit(50);
 
